@@ -76,9 +76,33 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 
   const { plan } = doc;
 
+  // Verify db connectivity — the Dolt database for this project may not exist yet
+  // on fresh installs (bd was installed but bd init was never run at the project root).
+  // If connectivity fails with "database not found", auto-initialize with the right prefix.
+  const issueLabel = plan.id.toLowerCase();
+  try {
+    await execAsync('bd list --json --limit 0', {
+      encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
+    });
+  } catch (connectErr: any) {
+    const msg = String(connectErr?.message ?? connectErr?.stderr ?? '');
+    if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
+      // Derive prefix from issue label (pan-475 → prefix "pan-475")
+      const prefix = issueLabel;
+      console.log(`[beads] Database unreachable — auto-running bd init --prefix ${prefix}`);
+      try {
+        await execAsync(`bd init --prefix ${prefix}`, {
+          encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
+        });
+        console.log(`[beads] bd init succeeded for prefix ${prefix}`);
+      } catch (initErr: any) {
+        console.warn(`[beads] bd init failed: ${initErr.message} — will attempt bead creation anyway`);
+      }
+    }
+  }
+
   // Idempotency: clear any existing beads for this issue before creating new ones.
   // Re-planning means "the old plan was invalid" — start fresh.
-  const issueLabel = plan.id.toLowerCase();
   try {
     const { stdout: existingJson } = await execAsync(
       `bd list --json -l "${issueLabel}" --status all --limit 0`,

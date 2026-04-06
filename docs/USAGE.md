@@ -51,7 +51,18 @@ npm install -g panopticon-cli && pan install && pan sync && pan up
    pan sync
    ```
 
-4. **Start the dashboard:**
+4. **Initialize beads task tracking** (once per project):
+   ```bash
+   cd /path/to/your-project
+   bd init --prefix <project-name>
+   ```
+   For example: `bd init --prefix panopticon`
+
+   This creates the Dolt database that agents use for task tracking. Without it, agents
+   can't start even if planning succeeds. `pan sync` will attempt this automatically for
+   registered projects, but running it manually once is the safest first-time setup.
+
+5. **Start the dashboard:**
    ```bash
    pan up
    ```
@@ -74,7 +85,7 @@ npm install -g panopticon-cli && pan install && pan sync && pan up
 
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
-- **Beads CLI (`bd`)** - For persistent task tracking (auto-installed, upgrade with `pan beads upgrade`)
+- **Beads CLI (`bd`)** - For persistent task tracking (auto-installed, upgrade with `pan beads upgrade`). Requires `bd init --prefix <project-name>` once per project root after installation.
 - **Google Stitch MCP** - For AI-powered UI design integration
 
 ### Platform Support

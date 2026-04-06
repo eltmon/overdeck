@@ -56,11 +56,23 @@ cp .env.example ~/.panopticon.env
 
 Required secrets are documented in `.env.example`. API keys for Claude, GitHub, and any issue trackers you want to connect.
 
+### Initialize beads (once per project)
+
+Beads is the task tracking system agents use. The binary is installed by `pan install`, but the database must be initialized once per project:
+
+```bash
+cd /path/to/panopticon-cli
+bd init --prefix panopticon
+```
+
+Without this, agents cannot start even when planning succeeds. `pan sync` attempts this automatically for registered projects, but running it once manually on first setup is recommended.
+
 ### Verify Your Setup
 
 ```bash
 pan status          # Should show "Panopticon is running" or offer to start it
 pan --version       # Should match package.json
+bd list             # Should show empty list (not a "database not found" error)
 ```
 
 ---

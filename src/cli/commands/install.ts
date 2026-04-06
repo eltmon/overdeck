@@ -662,6 +662,9 @@ async function installCommand(options: InstallOptions): Promise<void> {
     console.log(`  3. Access dashboard at ${chalk.cyan(`http://localhost:${config.dashboard.port}`)}`);
   }
 
-  console.log(`  ${!options.minimal ? '4' : '4'}. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
+  console.log(`  4. In each project root, initialize beads task tracking:`);
+  console.log(`     ${chalk.cyan('cd /path/to/your-project && bd init --prefix <project-name>')}`);
+  console.log(`     ${chalk.dim('e.g. bd init --prefix panopticon  (enables agent task tracking for this project)')}`);
+  console.log(`  5. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
   console.log('');
 }
