@@ -31,6 +31,8 @@ export interface Conversation {
   titleSeed: string | null;
   /** Cached total cost in USD, updated when messages are fetched. */
   totalCost: number;
+  /** ISO timestamp when archived, null = not archived. */
+  archivedAt: string | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -51,6 +53,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     titleSource: (row['title_source'] as TitleSource | null) ?? null,
     titleSeed: (row['title_seed'] as string | null) ?? null,
     totalCost: (row['total_cost'] as number) ?? 0,
+    archivedAt: (row['archived_at'] as string | null) ?? null,
   };
 }
 
@@ -62,8 +65,9 @@ export function listConversations(): Conversation[] {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost
+              title_source, title_seed, total_cost, archived_at
        FROM conversations
+       WHERE archived_at IS NULL
        ORDER BY created_at DESC`,
     )
     .all() as Record<string, unknown>[];
@@ -76,7 +80,7 @@ export function getConversationByName(name: string): Conversation | null {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost
+              title_source, title_seed, total_cost, archived_at
        FROM conversations
        WHERE name = ?`,
     )
@@ -118,7 +122,7 @@ export function createConversation(opts: {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost
+              title_source, title_seed, total_cost, archived_at
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -174,6 +178,22 @@ export function updateConversationTitle(name: string, title: string, titleSource
       `UPDATE conversations SET title = ? WHERE name = ?`,
     ).run(title, name);
   }
+}
+
+/** Archive a conversation — hides from list but preserves all data. */
+export function archiveConversation(name: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET archived_at = ? WHERE name = ?`,
+  ).run(new Date().toISOString(), name);
+}
+
+/** Unarchive a conversation — restores to the active list. */
+export function unarchiveConversation(name: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET archived_at = NULL WHERE name = ?`,
+  ).run(name);
 }
 
 /** Update the cached total cost for a conversation. */

@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /**
  * Initialize the complete database schema.
@@ -177,7 +177,8 @@ export function initSchema(db: Database.Database): void {
       title            TEXT,                               -- human-readable title, auto-set from first message
       title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
       title_seed       TEXT,                               -- original auto-generated title for replacement check
-      total_cost       REAL DEFAULT 0                      -- cached total cost in USD
+      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
+      archived_at      TEXT                                -- ISO timestamp when archived, null = active
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -347,6 +348,16 @@ export function runMigrations(db: Database.Database): void {
   if (currentVersion < 11) {
     try {
       db.exec(`CREATE INDEX IF NOT EXISTS idx_cost_issue_upper ON cost_events(UPPER(issue_id))`);
+    } catch { /* already exists */ }
+  }
+
+  // v11 → v12: archived_at column + index for conversations (T3Code pattern)
+  if (currentVersion < 12) {
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN archived_at TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(archived_at)`);
     } catch { /* already exists */ }
   }
 
