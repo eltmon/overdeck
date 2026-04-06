@@ -13,6 +13,7 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
+import { clearStuckMergeStatuses } from '../../lib/review-status.js';
 import { getEventStore } from './event-store.js';
 
 declare const Bun: unknown;
@@ -60,6 +61,10 @@ process.once('SIGINT', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
 });
+
+// Clear any mergeStatus stuck at 'merging' from before the restart (PAN-490).
+// Pending merges are in-memory only — they don't survive restarts.
+clearStuckMergeStatuses();
 
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();

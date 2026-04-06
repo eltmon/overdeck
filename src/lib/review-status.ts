@@ -166,6 +166,21 @@ export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE)
   return statuses[issueId] || null;
 }
 
+/**
+ * On server startup, clear any mergeStatus stuck at 'merging'.
+ * Pending merge operations are in-memory only — they don't survive a restart.
+ * Any 'merging' status after boot is definitionally stuck (PAN-490).
+ */
+export function clearStuckMergeStatuses(): void {
+  const statuses = loadReviewStatuses();
+  const stuck = Object.values(statuses).filter(s => s.mergeStatus === 'merging');
+  if (stuck.length === 0) return;
+  console.log(`[review-status] Clearing ${stuck.length} stuck 'merging' status(es) on startup`);
+  for (const s of stuck) {
+    setReviewStatus(s.issueId, { mergeStatus: 'pending' });
+  }
+}
+
 export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
   const statuses = loadReviewStatuses(filePath);
   delete statuses[issueId];
