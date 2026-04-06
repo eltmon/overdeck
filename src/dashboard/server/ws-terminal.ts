@@ -8,6 +8,11 @@
  * Exports a single function `setupTerminalWebSocket(server)` that installs a
  * `noServer` WebSocketServer on the given HTTP server's `upgrade` event for the
  * `/ws/terminal` path. Other upgrade paths (e.g., `/ws/rpc`) are left untouched.
+ *
+ * PAN-484: Multiple WebSocket clients (browser tabs) for the same tmux session
+ * are handled via a shared PTY hub — one PTY process, many WebSocket clients.
+ * Output is broadcast to all clients; any client can send input. PTY stays alive
+ * until the last client disconnects.
  */
 
 import http from 'node:http';
@@ -16,11 +21,9 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import { activePtyHubs, broadcastToHub, removeClientFromHub, type PtyHub } from './pty-hub.js';
 
 const execAsync = promisify(exec);
-
-/** Tracks active PTY processes by session name — used for cleanup on reconnect. */
-const activePtys = new Map<string, pty.IPty>();
 
 /**
  * Install the raw WebSocket terminal handler on the given HTTP server.
@@ -101,20 +104,85 @@ export function setupTerminalWebSocket(server: http.Server): void {
         return;
       }
 
-      // Check for existing PTY connection and clean it up to prevent duplicates.
-      // This can happen if user refreshes the page or opens multiple tabs.
-      const existingPty = activePtys.get(sessionName);
-      if (existingPty) {
-        console.log(`[ws-terminal] Cleaning up existing PTY for ${sessionName} before creating new one`);
-        try {
-          existingPty.write('\x02d'); // Ctrl-b d to detach from tmux
-          setTimeout(() => existingPty.kill(), 100);
-        } catch {
-          // Ignore errors during cleanup
+      // ── Hub attachment ──────────────────────────────────────────────────────
+      // If a hub already exists for this session, join it instead of spawning
+      // a new PTY. The existing PTY keeps running; we just add this WebSocket
+      // to its client set and force a repaint so this tab gets the current screen.
+      const existingHub = activePtyHubs.get(sessionName);
+      if (existingHub) {
+        console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
+        existingHub.clients.add(ws);
+
+        // Force a SIGWINCH repaint so the new tab gets the current terminal state.
+        // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
+        const { cols, rows } = existingHub;
+        setTimeout(() => {
+          if (existingHub.clients.has(ws) && ws.readyState === WebSocket.OPEN) {
+            try {
+              existingHub.pty.resize(cols - 1, rows);
+              execAsync(`tmux resize-window -t ${sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
+                .then(() => new Promise<void>(r => setTimeout(r, 50)))
+                .then(() => {
+                  if (existingHub.clients.has(ws)) {
+                    existingHub.pty.resize(cols, rows);
+                    return execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
+                  }
+                })
+                .catch(() => {});
+            } catch {
+              // PTY may have exited — ignore
+            }
+          }
+        }, 100);
+
+        const handleJoinMessage = (message: string) => {
+          if (message.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(message);
+              if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
+                existingHub.cols = parsed.cols;
+                existingHub.rows = parsed.rows;
+                try {
+                  existingHub.pty.resize(parsed.cols, parsed.rows);
+                } catch { /* ignore */ }
+                execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+                  .catch(() => {});
+                return;
+              }
+            } catch {
+              // Invalid JSON, treat as terminal input
+            }
+          }
+          // Forward input to PTY
+          try {
+            existingHub.pty.write(message);
+          } catch { /* ignore */ }
+        };
+
+        messageHandler = handleJoinMessage;
+        for (const msg of earlyMessages) {
+          handleJoinMessage(msg);
         }
-        activePtys.delete(sessionName);
+        earlyMessages.length = 0;
+
+        ws.on('close', () => {
+          console.log(`[ws-terminal] WebSocket closed for session: ${sessionName} (hub client removed)`);
+          const lastClient = removeClientFromHub(activePtyHubs, sessionName, ws);
+          if (lastClient) {
+            console.log(`[ws-terminal] Last client disconnected for ${sessionName}, tearing down hub`);
+            // PTY (tmux attach) exits naturally when pipes close — no kill needed.
+          }
+        });
+
+        ws.on('error', (err) => {
+          console.error(`[ws-terminal] WebSocket error for ${sessionName}:`, err);
+          removeClientFromHub(activePtyHubs, sessionName, ws);
+        });
+
+        return; // Done — joined existing hub
       }
 
+      // ── New hub creation ────────────────────────────────────────────────────
       // Pre-resize tmux window to reasonable default before PTY attach
       try {
         await execAsync(`tmux resize-window -t ${sessionName} -x 120 -y 29 2>/dev/null || true`, { timeout: 5000 });
@@ -122,26 +190,26 @@ export function setupTerminalWebSocket(server: http.Server): void {
         console.log(`[ws-terminal] Initial resize failed for ${sessionName}`);
       }
 
-      // ── Local PTY handler ──────────────────────────────────────────────────
-      // Uses node-pty with `tmux attach-session`.
-      //
-      // CRITICAL (PAN-417): Wait for the client's first resize message before
-      // spawning the PTY. This ensures the PTY starts at the correct dimensions,
-      // avoiding the dimension cascade (200x50 -> 120x30 -> actual) that garbled
-      // terminal output. This matches the remote path's startFly() pattern.
-      activePtys.delete(sessionName);
-
       let ptyProcess: pty.IPty | null = null;
       let ptyStarted = false;
       let lastResizeCols = 0;
       let lastResizeRows = 0;
       const pendingInput: string[] = [];
 
+      const hub: PtyHub = {
+        pty: null as unknown as pty.IPty, // filled in startLocalPty
+        clients: new Set([ws]),
+        cols: 120,
+        rows: 29,
+      };
+
       const startLocalPty = (cols: number, rows: number) => {
         if (ptyStarted) return;
         ptyStarted = true;
         lastResizeCols = cols;
         lastResizeRows = rows;
+        hub.cols = cols;
+        hub.rows = rows;
 
         console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${cols}x${rows}`);
 
@@ -155,7 +223,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
           env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
         });
 
-        activePtys.set(sessionName, ptyProcess);
+        hub.pty = ptyProcess;
+        activePtyHubs.set(sessionName, hub);
 
         // Suppress initial PTY output — the first data burst contains the tmux screen
         // rendered at the OLD size (80x24 default). We drop it, wait for Claude to
@@ -163,10 +232,10 @@ export function setupTerminalWebSocket(server: http.Server): void {
         // a second SIGWINCH via dimension toggle to trigger a clean full repaint.
         let forwarding = false;
 
+        // Broadcast PTY data to ALL connected clients
         ptyProcess.onData((data) => {
-          if (forwarding && ws.readyState === WebSocket.OPEN) {
-            ws.send(data);
-          }
+          if (!forwarding) return;
+          broadcastToHub(hub, data);
         });
 
         // After 200ms: start forwarding, then force full repaint via dimension toggle.
@@ -174,13 +243,13 @@ export function setupTerminalWebSocket(server: http.Server): void {
         // correct size. Claude repaints its entire TUI and we forward the clean result.
         setTimeout(() => {
           forwarding = true;
-          if (ptyProcess && ws.readyState === WebSocket.OPEN) {
+          if (ptyProcess && hub.clients.size > 0) {
             // Toggle dimensions to force SIGWINCH + full repaint
             ptyProcess.resize(cols - 1, rows);
             execAsync(`tmux resize-window -t ${sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
               .then(() => new Promise<void>(r => setTimeout(r, 50)))
               .then(() => {
-                if (ptyProcess && ws.readyState === WebSocket.OPEN) {
+                if (ptyProcess && hub.clients.size > 0) {
                   ptyProcess.resize(cols, rows);
                   return execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
                 }
@@ -189,13 +258,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
           }
         }, 200);
 
-        // Handle PTY exit
+        // Handle PTY exit — close all client connections
         ptyProcess.onExit(({ exitCode }) => {
           console.log(`[ws-terminal] PTY for ${sessionName} exited with code ${exitCode}`);
-          activePtys.delete(sessionName);
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.close(1000, 'Session ended');
+          activePtyHubs.delete(sessionName);
+          for (const client of hub.clients) {
+            if (client.readyState === WebSocket.OPEN) {
+              client.close(1000, 'Session ended');
+            }
           }
+          hub.clients.clear();
         });
 
         // Flush any input that arrived while PTY was starting
@@ -223,6 +295,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
               }
               lastResizeCols = parsed.cols;
               lastResizeRows = parsed.rows;
+              hub.cols = parsed.cols;
+              hub.rows = parsed.rows;
               if (ptyProcess) {
                 ptyProcess.resize(parsed.cols, parsed.rows);
                 execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
@@ -250,16 +324,19 @@ export function setupTerminalWebSocket(server: http.Server): void {
       }
       earlyMessages.length = 0;
 
-      // Clean up on WebSocket close — do NOT kill the PTY, just remove from tracking.
-      // The PTY (tmux attach) will exit naturally when pipes close.
+      // Clean up on WebSocket close
       ws.on('close', () => {
         console.log(`[ws-terminal] WebSocket closed for session: ${sessionName}`);
-        activePtys.delete(sessionName);
+        const lastClient = removeClientFromHub(activePtyHubs, sessionName, ws);
+        if (lastClient) {
+          console.log(`[ws-terminal] Last client disconnected for ${sessionName}, tearing down hub`);
+          // PTY (tmux attach) exits naturally when pipes close — no kill needed.
+        }
       });
 
       ws.on('error', (err) => {
         console.error(`[ws-terminal] WebSocket error for ${sessionName}:`, err);
-        activePtys.delete(sessionName);
+        removeClientFromHub(activePtyHubs, sessionName, ws);
       });
     })();
   });
