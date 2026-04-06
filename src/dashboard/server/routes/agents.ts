@@ -1442,7 +1442,7 @@ const postAgentsRoute = HttpRouter.add(
           const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
           try { await rm(completedFile, { force: true }); } catch { /* non-fatal */ }
 
-          // Build context-rich resume prompt from STATE.md, beads, and feedback
+          // Build resume prompt with user message if provided
           const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
           const resumeLauncher = join(agentDir, 'resume-launcher.sh');
           const resumePromptFile = join(agentDir, 'resume-prompt.md');
@@ -1450,21 +1450,19 @@ const postAgentsRoute = HttpRouter.add(
           const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
           writeFileSync(resumePromptFile, resumePrompt);
 
-          // Fresh session with context prompt (not --resume, which has interactive prompts
-          // and loses prompt caching). The resume prompt contains STATE.md, beads, feedback,
-          // and optional user message — everything the agent needs to pick up where it left off.
-          const agentModel = existingAgentState.model || 'claude-sonnet-4-6';
-          const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
+          // Resume the existing Claude session — keeps full conversation history and session continuity.
+          // Pass the resume prompt via -p so the agent gets context about why it was resumed.
+          const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions -p "$prompt"\n`;
           writeFileSync(resumeLauncher, resumeContent, { mode: 0o755 });
 
-          // Spawn tmux session with fresh claude session
+          // Spawn tmux session with resume command
           const escapedCwd = workspacePath.replace(/"/g, '\\"');
           await execAsync(
             `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "bash ${resumeLauncher}"`,
             { encoding: 'utf-8' }
           );
 
-          console.log(`[start-agent] Resumed ${agentSessionName} with fresh session (previous: ${savedSessionId.slice(0, 8)}...)`);
+          console.log(`[start-agent] Resumed ${agentSessionName} session ${savedSessionId.slice(0, 8)}...`);
 
           // Update agent state
           existingAgentState.status = 'running';
@@ -1714,6 +1712,25 @@ const postAgentsRoute = HttpRouter.add(
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
+// ─── Route: GET /api/agents/:id/tmux-alive ──────────────────────────────────
+
+const getAgentTmuxAliveRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/tmux-alive',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const agentId = params['id'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        await execAsync(`tmux has-session -t ${agentId} 2>/dev/null`, { encoding: 'utf-8' });
+        return jsonResponse({ alive: true });
+      } catch {
+        return jsonResponse({ alive: false });
+      }
+    });
+  }),
+);
+
 export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
@@ -1735,6 +1752,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentHandoffsRoute,
   getAgentCostRoute,
   postAgentsRoute,
+  getAgentTmuxAliveRoute,
 );
 
 export default agentsRouteLayer;
