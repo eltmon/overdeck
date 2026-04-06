@@ -26,7 +26,7 @@ import { httpHandler } from './http-handler.js';
  */
 
 import { exec, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -357,6 +357,73 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
   }
 }
 
+/**
+ * Build a rich PR body with issue link, beads task summary, and AC checklist
+ * from the vBRIEF plan.
+ */
+function buildRichPRBody(issueId: string, workspacePath: string): string {
+  const lines: string[] = [];
+
+  lines.push(`Closes #${issueId.split('-')[1] || issueId}`);
+  lines.push('');
+
+  // Acceptance criteria checklist from vBRIEF plan items
+  try {
+    const plan = readWorkspacePlan(workspacePath);
+    if (plan?.plan?.items?.length) {
+      lines.push('## Acceptance Criteria');
+      lines.push('');
+      for (const item of plan.plan.items) {
+        const checked = item.status === 'completed' ? 'x' : ' ';
+        lines.push(`- [${checked}] ${item.title}`);
+      }
+      lines.push('');
+    }
+  } catch {
+    // No vBRIEF plan — omit checklist
+  }
+
+  // Beads task summary from .beads/issues.jsonl (if available)
+  try {
+    let beadsPath: string | null = null;
+    const workspaceBeadsRedirect = join(workspacePath, '.beads', 'redirect');
+    if (existsSync(workspaceBeadsRedirect)) {
+      const redirectTarget = readFileSync(workspaceBeadsRedirect, 'utf-8').trim();
+      const resolvedPath = redirectTarget.startsWith('/')
+        ? redirectTarget
+        : join(workspacePath, '.beads', redirectTarget);
+      beadsPath = join(resolvedPath, 'issues.jsonl');
+    }
+    const localBeadsPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!beadsPath && existsSync(localBeadsPath)) beadsPath = localBeadsPath;
+
+    if (beadsPath && existsSync(beadsPath)) {
+      const issueLower = issueId.toLowerCase();
+      const beads = readFileSync(beadsPath, 'utf-8')
+        .split('\n')
+        .filter(l => l.trim())
+        .map(l => {
+          try { return JSON.parse(l); } catch { return null; }
+        })
+        .filter(b => b && b.labels?.some((lbl: string) => lbl.toLowerCase() === issueLower));
+
+      if (beads.length > 0) {
+        lines.push('## Implementation Tasks');
+        lines.push('');
+        for (const bead of beads) {
+          const checked = bead.status === 'closed' ? 'x' : ' ';
+          lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
+        }
+        lines.push('');
+      }
+    }
+  } catch {
+    // No beads — omit task list
+  }
+
+  return lines.join('\n') || `Automated PR for ${issueId}`;
+}
+
 async function ensurePRExists(
   issueId: string,
   options?: { cwd?: string; branchName?: string }
@@ -374,13 +441,27 @@ async function ensurePRExists(
     );
     const existing = existingOut.trim();
     if (existing) return { created: false, prUrl: existing };
-    // Create PR
-    const { stdout: createOut } = await execAsync(
-      `gh pr create --head ${branchName} --base main --title "${issueId}" --body "Automated PR for ${issueId}" --json url --jq .url`,
-      execOptions
-    );
-    const prUrl = createOut.trim();
-    return { created: true, prUrl };
+
+    // Build rich PR body if workspace path is available
+    const prBody = options?.cwd ? buildRichPRBody(issueId, options.cwd) : `Automated PR for ${issueId}`;
+
+    // Write body to a temp file to avoid shell escaping issues
+    const { tmpdir } = await import('os');
+    const { join: pathJoin } = await import('path');
+    const { writeFile: writeFileAsync, unlink: unlinkAsync } = await import('fs/promises');
+    const bodyFile = pathJoin(tmpdir(), `pan-pr-body-${issueId}-${Date.now()}.md`);
+    await writeFileAsync(bodyFile, prBody, 'utf-8');
+
+    try {
+      const { stdout: createOut } = await execAsync(
+        `gh pr create --head ${branchName} --base main --title "${issueId}" --body-file "${bodyFile}" --json url --jq .url`,
+        execOptions
+      );
+      const prUrl = createOut.trim();
+      return { created: true, prUrl };
+    } finally {
+      unlinkAsync(bodyFile).catch(() => {});
+    }
   } catch (err: any) {
     return { created: false, error: err.message };
   }
@@ -2218,6 +2299,23 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 const commits = await getWorkspaceGitInfo(workspacePath);
                 setReviewStatus(issueId, { lastReviewCommits: commits });
               } catch {}
+            }
+
+            // Create GitHub PR (or retrieve existing) so review/test agents have a PR URL
+            try {
+              const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName });
+              if (prResult.prUrl) {
+                setReviewStatus(issueId, { prUrl: prResult.prUrl });
+                if (prResult.created) {
+                  console.log(`[review] Created PR for ${issueId}: ${prResult.prUrl}`);
+                } else {
+                  console.log(`[review] Existing PR for ${issueId}: ${prResult.prUrl}`);
+                }
+              } else {
+                console.warn(`[review] Could not create PR for ${issueId}: ${prResult.error}`);
+              }
+            } catch (prErr: any) {
+              console.warn(`[review] PR creation failed for ${issueId}: ${prErr.message}`);
             }
 
             const verifyOutcome = await runVerificationForIssue(
