@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import {
-  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X,
+  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent } from '../../types';
@@ -23,7 +24,7 @@ interface ActionsSectionProps {
   closeMutation: AnyMutation;
   reopenMutation: ReopenMutation;
   resetReviewMutation: ResetReviewMutation;
-  startAgentMutation: AnyMutation;
+  startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
   createWorkspaceMutation: AnyMutation;
   syncMainMutation: SyncMutation;
   onMerge: () => void;
@@ -33,7 +34,7 @@ interface ActionsSectionProps {
   onReopen: () => void;
   onResetReview: () => void;
   onDismissPending: () => void;
-  onStartAgent: () => void;
+  onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
 }
 
@@ -61,6 +62,10 @@ export function ActionsSection({
   onStartAgent,
   onCreateWorkspace,
 }: ActionsSectionProps) {
+  const [showResumeInput, setShowResumeInput] = useState(false);
+  const [resumeMessage, setResumeMessage] = useState('');
+  const isResume = !!agent && agent.status === 'stopped';
+
   if (reviewStatusLoading) {
     return (
       <div className="px-3 py-2 border-b border-pan-border" data-testid="workspace-actions">
@@ -182,12 +187,18 @@ export function ActionsSection({
         {(!agent || agent.status === 'stopped') && (
           <>
             <button
-              onClick={onStartAgent}
-              disabled={startAgentMutation.isPending || startAgentMutation.isSuccess}
+              onClick={() => {
+                if (isResume) {
+                  setShowResumeInput(true);
+                } else {
+                  onStartAgent();
+                }
+              }}
+              disabled={startAgentMutation.isPending || startAgentMutation.isSuccess || showResumeInput}
               className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded hover:bg-blue-600 disabled:opacity-50 font-medium bg-pan-primary"
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : startAgentMutation.isSuccess ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              {startAgentMutation.isPending ? (agent ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (agent ? 'Resumed!' : 'Started!') : (agent ? 'Resume Agent' : 'Start Agent')}
+              {startAgentMutation.isPending ? (isResume ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (isResume ? 'Resumed!' : 'Started!') : (isResume ? 'Resume Agent' : 'Start Agent')}
             </button>
             {!workspace?.exists && (
               <button
@@ -202,6 +213,53 @@ export function ActionsSection({
           </>
         )}
       </div>
+
+      {/* Resume message input */}
+      {showResumeInput && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <label className="text-xs text-pan-text-secondary">Message for agent (optional):</label>
+          <textarea
+            value={resumeMessage}
+            onChange={(e) => setResumeMessage(e.target.value)}
+            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
+            className="w-full px-2 py-1.5 text-xs bg-pan-surface border border-pan-border rounded resize-none text-pan-text-primary placeholder:text-pan-text-secondary/50 focus:outline-none focus:border-blue-500"
+            rows={3}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                onStartAgent(resumeMessage || undefined);
+                setShowResumeInput(false);
+                setResumeMessage('');
+              }
+              if (e.key === 'Escape') {
+                setShowResumeInput(false);
+                setResumeMessage('');
+              }
+            }}
+          />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                onStartAgent(resumeMessage || undefined);
+                setShowResumeInput(false);
+                setResumeMessage('');
+              }}
+              disabled={startAgentMutation.isPending}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded bg-pan-primary hover:bg-blue-600 disabled:opacity-50 font-medium"
+            >
+              {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+              {startAgentMutation.isPending ? 'Resuming...' : 'Resume'}
+            </button>
+            <button
+              onClick={() => { setShowResumeInput(false); setResumeMessage(''); }}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-pan-text-secondary rounded hover:bg-pan-border"
+            >
+              Cancel
+            </button>
+            <span className="text-xs text-pan-text-secondary ml-auto">Ctrl+Enter to send</span>
+          </div>
+        </div>
+      )}
 
       {/* Error states */}
       {reviewMutation.isError && (

@@ -1449,18 +1449,22 @@ const postAgentsRoute = HttpRouter.add(
           const userMessage = (body as any).message || undefined;
           const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
           writeFileSync(resumePromptFile, resumePrompt);
-          // Use launcher script to safely pass prompt via file (avoids shell escaping)
-          const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions -p "$prompt"\n`;
+
+          // Fresh session with context prompt (not --resume, which has interactive prompts
+          // and loses prompt caching). The resume prompt contains STATE.md, beads, feedback,
+          // and optional user message — everything the agent needs to pick up where it left off.
+          const agentModel = existingAgentState.model || 'claude-sonnet-4-6';
+          const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
           writeFileSync(resumeLauncher, resumeContent, { mode: 0o755 });
 
-          // Spawn tmux session with resume command
+          // Spawn tmux session with fresh claude session
           const escapedCwd = workspacePath.replace(/"/g, '\\"');
           await execAsync(
             `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "bash ${resumeLauncher}"`,
             { encoding: 'utf-8' }
           );
 
-          console.log(`[start-agent] Resumed ${agentSessionName} with session ${savedSessionId}`);
+          console.log(`[start-agent] Resumed ${agentSessionName} with fresh session (previous: ${savedSessionId.slice(0, 8)}...)`);
 
           // Update agent state
           existingAgentState.status = 'running';
