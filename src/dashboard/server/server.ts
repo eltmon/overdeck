@@ -25,6 +25,7 @@ import { RallyClientOptionalLive } from './services/rally-client.js';
 import { IssueLifecycleLive } from './services/issue-lifecycle.js';
 import { AgentSpawnerLive } from './services/agent-spawner.js';
 import { WorkspaceServiceLive } from './services/workspace-service.js';
+import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
@@ -227,6 +228,7 @@ const DomainServicesLive = Layer.mergeAll(
   IssueLifecycleServiceLive,
   AgentSpawnerLive,
   WorkspaceServiceLive,
+  OpenRouterServiceLive,
 );
 
 // ─── Full server layer ────────────────────────────────────────────────────────

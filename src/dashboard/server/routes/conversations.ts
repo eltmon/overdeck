@@ -33,6 +33,8 @@ import {
   canReplaceTitle,
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
+import { getProviderForModel, getProviderEnv } from '../../../lib/providers.js';
+import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import {
   parseConversationMessages,
 } from '../services/conversation-service.js';
@@ -121,12 +123,34 @@ async function spawnConversationSession(
   await mkdir(stateDir, { recursive: true });
 
   const launcherScript = join(stateDir, 'launcher.sh');
+
+  // Detect OpenRouter model and inject provider-specific env overrides
+  const providerEnvExports: string[] = [];
+  if (model) {
+    const provider = getProviderForModel(model);
+    if (provider.name === 'openrouter') {
+      const { config } = loadYamlConfig();
+      const apiKey = config.apiKeys.openrouter;
+      if (apiKey) {
+        const providerEnv = getProviderEnv(provider, apiKey);
+        for (const [key, val] of Object.entries(providerEnv)) {
+          providerEnvExports.push(`export ${key}="${val}"`);
+        }
+        // Suppress the native Anthropic key so OpenRouter is used exclusively
+        providerEnvExports.push(`export ANTHROPIC_API_KEY=""`);
+      } else {
+        console.warn('[conversations] OpenRouter model selected but no API key configured');
+      }
+    }
+  }
+
   const envExports = [
     `export TERM=xterm-256color`,
     `export COLORTERM=truecolor`,
     `export LANG=C.UTF-8`,
     `export LC_ALL=C.UTF-8`,
     ...(issueId ? [`export PANOPTICON_ISSUE_ID="${issueId}"`] : []),
+    ...providerEnvExports,
   ].join('\n');
 
   const claudeArgs = [

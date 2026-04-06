@@ -11,7 +11,7 @@ import { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './s
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
 
 /**
  * Map of model ID to provider
@@ -82,16 +82,27 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-6';
 
 /**
+ * Check if a model ID is an OpenRouter model
+ *
+ * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
+ * This is distinct from all other providers which use simple identifiers without slashes.
+ */
+export function isOpenRouterModel(modelId: string): boolean {
+  return modelId.includes('/');
+}
+
+/**
  * Get the provider for a model ID
  */
-export function getModelProvider(modelId: ModelId): ModelProvider {
-  return MODEL_PROVIDERS[modelId];
+export function getModelProvider(modelId: ModelId | string): ModelProvider {
+  if (isOpenRouterModel(modelId)) return 'openrouter';
+  return (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId] ?? 'anthropic';
 }
 
 /**
  * Check if a model requires an external API key
  */
-export function requiresExternalKey(modelId: ModelId): boolean {
+export function requiresExternalKey(modelId: ModelId | string): boolean {
   return getModelProvider(modelId) !== 'anthropic';
 }
 

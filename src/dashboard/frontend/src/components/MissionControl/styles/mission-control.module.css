@@ -1784,6 +1784,10 @@
 }
 
 .pickerOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: var(--mc-space-2) var(--mc-space-3);
   font-size: var(--mc-font-size-sm);
   text-align: left;
@@ -1801,4 +1805,25 @@
 .pickerOptionActive {
   background: var(--mc-bg-selected);
   font-weight: 500;
+}
+
+.pickerGroupHeader {
+  padding: 6px var(--mc-space-3) 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mc-text-muted);
+}
+
+.pickerOptionLabel {
+  flex: 1;
+  text-align: left;
+}
+
+.pickerCostBadge {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
