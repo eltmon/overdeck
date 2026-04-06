@@ -20,7 +20,7 @@
     "tags": ["events", "workspace-lifecycle", "ui-consistency", "contracts"],
     "narratives": {
       "Problem": "Workspace operations (wipe, cleanup, abort, start-planning) don't emit domain events, so the frontend stays stale until tracker poll fires (1-3s delay).",
-      "Proposal": "Define 4 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. abort-planning reuses existing agent.stopped + workspace.deleted rather than adding a new event. The shared reducer pattern means the frontend reacts automatically — no frontend code changes needed."
+      "Proposal": "Define 5 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. The shared reducer pattern means the frontend reacts automatically — no frontend code changes needed."
     },
     "items": [
       {
@@ -34,18 +34,18 @@
           "issueLabel": "pan-485"
         },
         "narrative": {
-          "Action": "Add 4 new event schemas (WorkspaceCreatedEvent, WorkspaceWipeStartedEvent, WorkspaceDestroyedEvent, WorkspaceDeletedEvent) to packages/contracts/src/events.ts following the existing pattern. Add all 4 to the DomainEvent union. abort-planning reuses existing agent.stopped + workspace.deleted events — no new event needed."
+          "Action": "Add 5 new event schemas (WorkspaceCreatedEvent, WorkspaceWipeStartedEvent, WorkspaceDestroyedEvent, WorkspaceDeletedEvent, WorkspaceAbortedEvent) to packages/contracts/src/events.ts following the existing pattern. Add all 5 to the DomainEvent union."
         },
         "subItems": [
           {
             "id": "define-events.ac1",
-            "title": "4 new event schemas exist in events.ts with correct type literals and payload shapes",
+            "title": "5 new event schemas exist in events.ts with correct type literals and payload shapes",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "define-events.ac2",
-            "title": "All 4 new events are included in the DomainEvent union",
+            "title": "All 5 events are included in the DomainEvent union",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -68,7 +68,7 @@
           "issueLabel": "pan-485"
         },
         "narrative": {
-          "Action": "Add switch cases in applyEvent() for workspace.created (no-op), workspace.wipe_started (set wiping state on issue), workspace.destroyed (remove agents, reset to todo), workspace.deleted (same as destroyed). The existing agent.stopped case already handles removing the planning agent — abort-planning just needs to emit that. The exhaustive switch ensures TypeScript catches missing cases."
+          "Action": "Add switch cases in applyEvent() for workspace.created (no-op), workspace.wipe_started (set wiping state on issue), workspace.destroyed (remove agents, reset to todo), workspace.deleted (same as destroyed), workspace.aborted (remove planning agent). The exhaustive switch ensures TypeScript catches missing cases."
         },
         "subItems": [
           {
@@ -80,6 +80,12 @@
           {
             "id": "add-reducers.ac2",
             "title": "workspace.wipe_started sets a wiping transitional state on the issue",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "add-reducers.ac3",
+            "title": "workspace.aborted removes the planning agent from agentsById",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -102,7 +108,7 @@
           "issueLabel": "pan-485"
         },
         "narrative": {
-          "Action": "In issues.ts routes: (1) start-planning: emit workspace.created after worktree setup, before planning.started. (2) abort-planning: emit agent.stopped for the planning agent (planning-pan-<id>) after tmux kill-session; if deleteWorkspace=true also emit workspace.deleted. (3) cleanup-workspace: emit workspace.deleted after successful cleanup. (4) deep-wipe: emit workspace.wipe_started at start, workspace.destroyed at end. Use existing eventStore.append() pattern via Effect DI."
+          "Action": "In issues.ts routes: (1) start-planning: emit workspace.created after worktree setup, before planning.started. (2) abort-planning: emit workspace.aborted after tmux kill-session. (3) cleanup-workspace: emit workspace.deleted after successful cleanup. (4) deep-wipe: emit workspace.wipe_started at start, workspace.destroyed at end. Use existing eventStore.append() pattern via Effect DI."
         },
         "subItems": [
           {
@@ -125,7 +131,7 @@
           },
           {
             "id": "emit-in-routes.ac4",
-            "title": "abort-planning emits agent.stopped for the planning agent; also emits workspace.deleted if deleteWorkspace=true",
+            "title": "abort-planning emits workspace.aborted after session kill",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
