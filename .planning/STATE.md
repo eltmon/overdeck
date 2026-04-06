@@ -3,15 +3,16 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-kn2 (create PR with rich description on work completion)
+Implementing CI fix (remove || true from lint, add npm test step)
 
 ## Completed Work
 - [x] feature-pan-489-52e: Replace local git merge with rebase + gh pr merge --squash in triggerMerge() + add spawnRebaseAgentForBranch() to merge-agent.ts (commit: 4746686)
 - [x] feature-pan-489-4fm: Extend correctness reviewer with consistency/completeness checks section (commit: 2cc3939)
-- [x] feature-pan-489-bcs: Update CONTRIBUTING.md, work-agent.md, and merge-agent.md for PR-based flow (commit: 6c1a722)
+- [x] feature-pan-489-bcs: Update CONTRIBUTING.md, work-agent.md, and merge-agent.md for PR-based flow (commit: f83308f)
+- [x] feature-pan-489-kn2: Expand ensurePRExists() with rich body, call from review endpoint, store prUrl in review status (commit: c9bed89)
 
 ## Remaining Work
-- [ ] feature-pan-489-kn2: Create PR with rich description on work completion
+- [ ] CI: fix lint || true, add npm test step (bonus in-scope work from PRD)
 
 ## Key Decisions
 - D1: triggerMerge() for local monorepo now: ensurePRExists → spawnRebaseAgentForBranch → gh pr merge --squash → postMergeLifecycle. No more local git merge.
