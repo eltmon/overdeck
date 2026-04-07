@@ -25,7 +25,7 @@ export function TranscriptUpload({ issueId, onClose }: TranscriptUploadProps) {
 
     try {
       const content = await file.text();
-      const res = await fetch(`/api/mission-control/planning/${issueId}/upload`, {
+      const res = await fetch(`/api/command-deck/planning/${issueId}/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -36,7 +36,7 @@ export function SkillsList() {
 
   if (error) {
     return (
-      <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-400">
+      <div className="badge-bg-destructive border badge-border-destructive rounded-lg p-4 text-destructive">
         <AlertCircle className="w-5 h-5 inline mr-2" />
         {error}
       </div>
@@ -73,7 +73,7 @@ export function SkillsList() {
           {/* Panopticon Skills */}
           <div className="bg-surface-raised rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <div className="w-2 h-2 rounded-full bg-primary" />
               <h3 className="font-medium text-content">
                 Panopticon ({panopticonSkills.length})
               </h3>
@@ -91,7 +91,7 @@ export function SkillsList() {
           {/* Claude Skills */}
           <div className="bg-surface-raised rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-purple-500" />
+              <div className="w-2 h-2 rounded-full bg-signal-review" />
               <h3 className="font-medium text-content">
                 Claude ({claudeSkills.length})
               </h3>
@@ -112,11 +112,11 @@ export function SkillsList() {
         <h3 className="font-medium text-content mb-2">Skill Locations</h3>
         <div className="text-sm text-content-subtle space-y-1">
           <p>
-            <span className="text-blue-400">Panopticon:</span>{' '}
+            <span className="text-primary">Panopticon:</span>{' '}
             ~/.panopticon/skills/
           </p>
           <p>
-            <span className="text-purple-400">Claude:</span> ~/.claude/skills/
+            <span className="text-signal-review">Claude:</span> ~/.claude/skills/
           </p>
         </div>
       </div>
@@ -133,12 +133,12 @@ function SkillCard({ skill }: { skill: Skill }) {
           <span className="font-medium text-content">{skill.name}</span>
         </div>
         {skill.hasSkillMd ? (
-          <span className="flex items-center gap-1 text-xs text-green-400">
+          <span className="flex items-center gap-1 text-xs text-success">
             <Check className="w-3 h-3" />
             SKILL.md
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-xs text-yellow-400">
+          <span className="flex items-center gap-1 text-xs text-warning">
             <AlertCircle className="w-3 h-3" />
             No SKILL.md
           </span>

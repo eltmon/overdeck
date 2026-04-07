@@ -47,7 +47,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
   return (
     <div className="bg-surface-raised rounded-lg h-full flex flex-col">
       <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
-        <FileText className="w-4 h-4 text-purple-400" />
+        <FileText className="w-4 h-4 text-signal-review" />
         <span className="font-medium text-content text-sm">{agentId}</span>
         {logData?.file && (
           <span className="text-xs text-content-muted ml-auto">

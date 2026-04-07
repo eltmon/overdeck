@@ -57,16 +57,16 @@ async function terminateSpecialist(project: string, type: string, runId: string)
 }
 
 const STATUS_ICONS = {
-  passed: <CheckCircle className="w-4 h-4 text-green-400" />,
-  failed: <XCircle className="w-4 h-4 text-red-400" />,
-  blocked: <AlertCircle className="w-4 h-4 text-yellow-400" />,
+  passed: <CheckCircle className="w-4 h-4 text-success" />,
+  failed: <XCircle className="w-4 h-4 text-destructive" />,
+  blocked: <AlertCircle className="w-4 h-4 text-warning" />,
   incomplete: <Clock className="w-4 h-4 text-content-subtle" />,
 };
 
 const STATUS_COLORS = {
-  passed: 'text-green-400',
-  failed: 'text-red-400',
-  blocked: 'text-yellow-400',
+  passed: 'text-success',
+  failed: 'text-destructive',
+  blocked: 'text-warning',
   incomplete: 'text-content-subtle',
 };
 
@@ -132,14 +132,14 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
     <div className="p-4 bg-surface-raised rounded-lg">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Brain className="w-5 h-5 text-purple-400" />
+          <Brain className="w-5 h-5 text-signal-review" />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-medium text-content">
                 {specialist.projectKey}/{specialist.specialistType}
               </span>
               {specialist.isRunning && (
-                <Loader2 className="w-4 h-4 text-green-400 animate-spin" />
+                <Loader2 className="w-4 h-4 text-success animate-spin" />
               )}
             </div>
             <div className="text-sm text-content-subtle">
@@ -167,7 +167,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
             <button
               onClick={handleTerminate}
               disabled={terminateMutation.isPending}
-              className="p-2 text-content-subtle hover:text-red-400 hover:bg-surface-overlay rounded"
+              className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-overlay rounded"
               title="Terminate"
             >
               <XCircle className="w-4 h-4" />
@@ -176,7 +176,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
 
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-2 text-content-subtle hover:text-blue-400 hover:bg-surface-overlay rounded"
+            className="p-2 text-content-subtle hover:text-primary hover:bg-surface-overlay rounded"
           >
             {expanded ? '−' : '+'}
           </button>
@@ -192,7 +192,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
                 <Link
                   key={run.runId}
                   to={`/specialists/${specialist.projectKey}/${specialist.specialistType}/runs/${run.runId}`}
-                  className="flex items-center justify-between p-2 bg-gray-750 hover:bg-surface-overlay rounded text-xs transition-colors"
+                  className="flex items-center justify-between p-2 bg-surface-emphasis hover:bg-surface-overlay rounded text-xs transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     {run.metadata.status && STATUS_ICONS[run.metadata.status]}
@@ -218,7 +218,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
 
           <Link
             to={`/specialists/${specialist.projectKey}/${specialist.specialistType}`}
-            className="block text-sm text-blue-400 hover:text-blue-300 mt-2"
+            className="block text-sm text-primary hover:text-primary/80 mt-2"
           >
             View all runs →
           </Link>
@@ -248,7 +248,7 @@ export function ProjectSpecialistPanel() {
   if (!specialists || specialists.length === 0) {
     return (
       <div className="text-center py-8">
-        <Brain className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+        <Brain className="w-12 h-12 text-content-muted mx-auto mb-3" />
         <div className="text-content-subtle">No per-project specialists configured yet</div>
         <div className="text-sm text-content-muted mt-1">
           Specialists will appear here when they run for the first time
@@ -271,7 +271,7 @@ export function ProjectSpecialistPanel() {
         <select
           value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
-          className="px-3 py-1 bg-surface-overlay text-content rounded border border-divider-strong focus:border-blue-500 focus:outline-none"
+          className="px-3 py-1 bg-surface-overlay text-content rounded border border-divider-strong focus:border-primary focus:outline-none"
         >
           <option value="all">All Projects</option>
           {projects.map((project) => (

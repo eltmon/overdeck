@@ -8,40 +8,105 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Stitch design system tokens
-        'pan-primary': '#2769ec',
-        'pan-bg': '#101622',
-        'pan-panel-left': '#161b26',
-        'pan-panel-right': '#0d1117',
-        'pan-border': '#232f48',
-        'pan-text-secondary': '#92a4c9',
-        // Status colors
-        'status-healthy': '#22c55e',
-        'status-warning': '#eab308',
-        'status-stuck': '#f97316',
-        'status-dead': '#ef4444',
-        surface: {
-          DEFAULT: 'rgb(var(--color-base) / <alpha-value>)',
-          raised: 'rgb(var(--color-raised) / <alpha-value>)',
-          overlay: 'rgb(var(--color-overlay) / <alpha-value>)',
-          emphasis: 'rgb(var(--color-emphasis) / <alpha-value>)',
+        // ─── Semantic tokens ───
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        card: {
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
         },
-        content: {
-          DEFAULT: 'rgb(var(--color-heading) / <alpha-value>)',
-          body: 'rgb(var(--color-body) / <alpha-value>)',
-          subtle: 'rgb(var(--color-subtle) / <alpha-value>)',
-          muted: 'rgb(var(--color-muted) / <alpha-value>)',
+        popover: {
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
         },
-        divider: {
-          DEFAULT: 'rgb(var(--color-divider) / <alpha-value>)',
-          strong: 'rgb(var(--color-divider-strong) / <alpha-value>)',
+        primary: {
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
         },
-        'input-bg': 'rgb(var(--color-input-bg) / <alpha-value>)',
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
+        },
+        muted: {
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
+        },
+        destructive: {
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
+        },
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+        // ─── Signal colors ───
+        info: {
+          DEFAULT: 'var(--info)',
+          foreground: 'var(--info-foreground)',
+        },
+        success: {
+          DEFAULT: 'var(--success)',
+          foreground: 'var(--success-foreground)',
+        },
+        warning: {
+          DEFAULT: 'var(--warning)',
+          foreground: 'var(--warning-foreground)',
+        },
+        'signal-review': {
+          DEFAULT: 'var(--signal-review)',
+          foreground: 'var(--signal-review-foreground)',
+        },
+        'signal-cost': {
+          DEFAULT: 'var(--signal-cost)',
+          foreground: 'var(--signal-cost-foreground)',
+        },
+        // ─── Extended surface tokens ───
+        surface: 'var(--surface)',
+        'surface-raised': 'var(--surface-raised)',
+        'surface-2': 'var(--surface-2)',
+        'surface-active': 'var(--surface-active)',
+        'surface-hover': 'var(--surface-hover)',
+        'surface-overlay': 'var(--surface-overlay)',
+        'surface-emphasis': 'var(--surface-emphasis)',
+        // ─── Extended border tokens ───
+        divider: 'var(--divider)',
+        'divider-strong': 'var(--divider-strong)',
+        'divider-focus': 'var(--divider-focus)',
+        // ─── Extended input token ───
+        'input-bg': 'var(--input-bg)',
+        // ─── Extended text tokens ───
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-muted': 'var(--text-muted)',
+        // ─── Content text hierarchy ───
+        content: 'var(--content)',
+        'content-body': 'var(--content-body)',
+        'content-muted': 'var(--content-muted)',
+        'content-subtle': 'var(--content-subtle)',
+        // ─── Muted accent ───
+        'accent-muted': 'var(--accent-muted)',
+        // ─── Legacy pan-* aliases (until bead 6kg migration) ───
+        'pan-panel-left': 'var(--pan-panel-left)',
+        'pan-panel-right': 'var(--pan-panel-right)',
+        'pan-border': 'var(--pan-border)',
+        'pan-text-secondary': 'var(--pan-text-secondary)',
       },
       fontFamily: {
         display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
-        body: ['"Noto Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"Space Grotesk"', 'monospace'],
+        body: ['"DM Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
+        mono: ['"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'Menlo', 'monospace'],
+      },
+      borderRadius: {
+        sm: 'calc(var(--radius) - 4px)',
+        md: 'calc(var(--radius) - 2px)',
+        lg: 'var(--radius)',
+        xl: 'calc(var(--radius) + 4px)',
+        '2xl': 'calc(var(--radius) + 8px)',
+        '3xl': 'calc(var(--radius) + 12px)',
+        '4xl': 'calc(var(--radius) + 16px)',
       },
       keyframes: {
         'fade-in': {

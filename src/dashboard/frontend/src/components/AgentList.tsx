@@ -171,7 +171,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   if (agentsError) {
     return (
       <div className="bg-surface-raised rounded-lg p-6">
-        <div className="text-red-400">Error: {(agentsError as Error).message}</div>
+        <div className="text-destructive">Error: {(agentsError as Error).message}</div>
       </div>
     );
   }
@@ -184,13 +184,13 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
       <div className="bg-surface-raised rounded-lg">
         <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
           <h2 className="font-semibold text-content flex items-center gap-2">
-            <Clock className="w-5 h-5 text-blue-400" />
+            <Clock className="w-5 h-5 text-primary" />
             Cloister Deacon
           </h2>
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2 py-1 rounded ${
               anySpecialistActive
-                ? 'bg-green-900/50 text-green-400'
+                ? 'badge-bg-success text-success'
                 : 'bg-surface-overlay text-content-subtle'
             }`}>
               {anySpecialistActive ? '● Specialists Active' : '○ Specialists Idle'}
@@ -199,7 +199,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <button
                 onClick={() => stopCloisterMutation.mutate()}
                 disabled={stopCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-destructive hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
                 title="Stop patrol loop"
               >
                 <Square className="w-3 h-3" />
@@ -209,7 +209,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <button
                 onClick={() => startCloisterMutation.mutate()}
                 disabled={startCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-green-400 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-success hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
                 title="Start patrol loop (health monitoring)"
               >
                 <Play className="w-3 h-3" />
@@ -222,7 +222,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-content-subtle">Patrol Status:</span>{' '}
-              <span className={patrolRunning ? 'text-green-400' : 'text-content-muted'}>
+              <span className={patrolRunning ? 'text-success' : 'text-content-muted'}>
                 {patrolRunning ? '● Running' : '○ Stopped'}
               </span>
             </div>
@@ -235,16 +235,16 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
             {cloisterStatus?.summary && (
               <>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  <CheckCircle2 className="w-4 h-4 text-success" />
                   <span className="text-content-body">{cloisterStatus.summary.active} active</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {cloisterStatus.summary.stuck > 0 ? (
-                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    <AlertCircle className="w-4 h-4 text-destructive" />
                   ) : (
                     <AlertCircle className="w-4 h-4 text-content-muted" />
                   )}
-                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-red-400' : 'text-content-subtle'}>
+                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-destructive' : 'text-content-subtle'}>
                     {cloisterStatus.summary.stuck} stuck
                   </span>
                 </div>
@@ -270,10 +270,10 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <span className={`px-1.5 py-0.5 rounded text-xs ${
-                  entry.type === 'spawn' ? 'bg-green-900/50 text-green-400' :
-                  entry.type === 'complete' ? 'bg-blue-900/50 text-blue-400' :
-                  entry.type === 'error' ? 'bg-red-900/50 text-red-400' :
-                  entry.type === 'deacon' ? 'bg-purple-900/50 text-purple-400' :
+                  entry.type === 'spawn' ? 'badge-bg-success text-success' :
+                  entry.type === 'complete' ? 'badge-bg-primary text-primary' :
+                  entry.type === 'error' ? 'badge-bg-destructive text-destructive' :
+                  entry.type === 'deacon' ? 'badge-bg-secondary text-signal-review' :
                   'bg-surface-overlay text-content-body'
                 }`}>
                   {entry.type}
@@ -295,7 +295,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
         <div className="bg-surface-raised rounded-lg">
           <div className="px-4 py-3 border-b border-divider">
             <h2 className="font-semibold text-content flex items-center gap-2">
-              <Brain className="w-5 h-5 text-green-400" />
+              <Brain className="w-5 h-5 text-success" />
               Per-Project Specialists ({runningProjectSpecialists.length})
             </h2>
           </div>
@@ -305,21 +305,21 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                 key={ps.tmuxSession}
                 onClick={() => onSelectAgent(ps.tmuxSession === selectedAgent ? null : ps.tmuxSession)}
                 className={`p-4 cursor-pointer transition-colors flex items-center justify-between ${
-                  ps.tmuxSession === selectedAgent ? 'bg-surface-overlay' : 'hover:bg-gray-750'
+                  ps.tmuxSession === selectedAgent ? 'bg-surface-overlay' : 'hover:bg-surface-emphasis'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Brain className="w-5 h-5 text-green-400" />
+                  <Brain className="w-5 h-5 text-success" />
                   <div>
                     <div className="font-medium text-content flex items-center gap-2">
-                      <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                      <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                         {ps.projectKey.toUpperCase()}
                       </span>
                       {ps.specialistType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                       {ps.isRunning ? (
-                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Running" />
+                        <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Running" />
                       ) : (
-                        <span className="w-2 h-2 rounded-full bg-gray-500" title="Completed" />
+                        <span className="w-2 h-2 rounded-full bg-content-muted" title="Completed" />
                       )}
                     </div>
                     <div className="text-xs text-content-muted font-mono mt-0.5">
@@ -329,7 +329,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right text-xs text-content-subtle">
-                    <div className={ps.isRunning ? 'text-green-400' : 'text-gray-400'}>
+                    <div className={ps.isRunning ? 'text-success' : 'text-content-muted'}>
                       {ps.isRunning ? '● Running' : '○ Completed'}
                     </div>
                     {ps.metadata?.lastRunAt && (
@@ -342,7 +342,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                       fetch(`/api/specialists/${ps.projectKey}/${ps.specialistType}/kill`, { method: 'POST' })
                         .then(() => queryClient.invalidateQueries({ queryKey: ['project-specialists-running'] }));
                     }}
-                    className="p-2 text-content-subtle hover:text-red-400 hover:bg-surface-emphasis rounded"
+                    className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-emphasis rounded"
                     title={`Kill ${ps.specialistType} (${ps.projectKey})`}
                   >
                     <XCircle className="w-4 h-4" />

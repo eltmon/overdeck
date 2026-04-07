@@ -9,22 +9,22 @@ interface ConvoyPanelProps {
 function StatusIcon({ status }: { status: ConvoyState['status'] }) {
   switch (status) {
     case 'running':
-      return <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />;
+      return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
     case 'completed':
-      return <CheckCircle className="w-4 h-4 text-green-400" />;
+      return <CheckCircle className="w-4 h-4 text-success" />;
     case 'failed':
-      return <XCircle className="w-4 h-4 text-red-400" />;
+      return <XCircle className="w-4 h-4 text-destructive" />;
     case 'partial':
-      return <AlertCircle className="w-4 h-4 text-yellow-400" />;
+      return <AlertCircle className="w-4 h-4 text-warning" />;
   }
 }
 
 function AgentStatusBadge({ status }: { status: string }) {
   const colors = {
     pending: 'bg-surface/50 text-content-subtle',
-    running: 'bg-blue-900/50 text-blue-400',
-    completed: 'bg-green-900/50 text-green-400',
-    failed: 'bg-red-900/50 text-red-400',
+    running: 'badge-bg-primary text-primary',
+    completed: 'badge-bg-success text-success',
+    failed: 'badge-bg-destructive text-destructive',
   };
 
   return (
@@ -77,7 +77,7 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
           <span className="text-content-muted">Output:</span>
           <a
             href={`file://${convoy.outputDir}`}
-            className="ml-2 text-blue-400 hover:text-blue-300 inline-flex items-center gap-1"
+            className="ml-2 text-primary hover:text-primary/80 inline-flex items-center gap-1"
           >
             {convoy.outputDir}
             <ExternalLink className="w-3 h-3" />
@@ -90,7 +90,7 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
               href={convoy.context.prUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-2 text-blue-400 hover:text-blue-300 inline-flex items-center gap-1"
+              className="ml-2 text-primary hover:text-primary/80 inline-flex items-center gap-1"
             >
               View PR
               <ExternalLink className="w-3 h-3" />
@@ -128,7 +128,7 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
             {agent.status === 'completed' && outputs && outputs[agent.role] && (
               <div className="mt-2">
                 <details className="text-xs">
-                  <summary className="cursor-pointer text-blue-400 hover:text-blue-300">
+                  <summary className="cursor-pointer text-primary hover:text-primary/80">
                     View output
                   </summary>
                   <pre className="mt-2 bg-surface rounded p-2 text-content-body font-mono overflow-x-auto max-h-64 overflow-y-auto">
@@ -157,7 +157,7 @@ export function ConvoyPanel({ onClose }: ConvoyPanelProps) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-purple-400" />
+          <Users className="w-5 h-5 text-signal-review" />
           <h2 className="font-medium text-content">Convoys</h2>
           {convoys && convoys.length > 0 && (
             <span className="text-xs text-content-muted">({convoys.length})</span>
@@ -201,7 +201,7 @@ export function ConvoyPanel({ onClose }: ConvoyPanelProps) {
 
                   {/* Summary */}
                   <div className="flex items-center gap-3 text-xs text-content-subtle mb-2">
-                    <span className="text-purple-400">{convoy.template}</span>
+                    <span className="text-signal-review">{convoy.template}</span>
                     <span>•</span>
                     <span>
                       {convoy.agents.filter(a => a.status === 'completed').length}/{convoy.agents.length} agents
@@ -215,12 +215,12 @@ export function ConvoyPanel({ onClose }: ConvoyPanelProps) {
                     <span
                       className={`text-xs px-2 py-0.5 rounded ${
                         convoy.status === 'running'
-                          ? 'bg-blue-900/50 text-blue-400'
+                          ? 'badge-bg-primary text-primary'
                           : convoy.status === 'completed'
-                          ? 'bg-green-900/50 text-green-400'
+                          ? 'badge-bg-success text-success'
                           : convoy.status === 'failed'
-                          ? 'bg-red-900/50 text-red-400'
-                          : 'bg-yellow-900/50 text-yellow-400'
+                          ? 'badge-bg-destructive text-destructive'
+                          : 'badge-bg-warning text-warning'
                       }`}
                     >
                       {convoy.status}

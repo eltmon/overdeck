@@ -55,15 +55,15 @@ export function TerminalView({ agentId }: TerminalViewProps) {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg flex flex-col h-[600px]">
-      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-        <h2 className="font-semibold text-white flex items-center gap-2">
+    <div className="bg-card rounded-lg flex flex-col h-[600px]">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <h2 className="font-semibold text-foreground flex items-center gap-2">
           <Terminal className="w-5 h-5" />
           {agentId}
         </h2>
         <button
           onClick={() => refetch()}
-          className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded"
           title="Refresh"
         >
           <RefreshCw className="w-4 h-4" />
@@ -72,30 +72,30 @@ export function TerminalView({ agentId }: TerminalViewProps) {
 
       <pre
         ref={outputRef}
-        className="flex-1 overflow-auto p-4 terminal-output text-gray-300 bg-gray-900"
+        className="flex-1 overflow-auto p-4 terminal-output text-foreground bg-background"
       >
         {isLoading ? (
-          <span className="text-gray-500">Loading...</span>
+          <span className="text-muted-foreground">Loading...</span>
         ) : output ? (
           output
         ) : (
-          <span className="text-gray-500">No output yet</span>
+          <span className="text-muted-foreground">No output yet</span>
         )}
       </pre>
 
-      <form onSubmit={handleSubmit} className="p-3 border-t border-gray-700">
+      <form onSubmit={handleSubmit} className="p-3 border-t border-border">
         <div className="flex gap-2">
           <input
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Send message to agent..."
-            className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="flex-1 bg-input border border-border rounded px-3 py-2 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
           />
           <button
             type="submit"
             disabled={!message.trim() || sendMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
             Send

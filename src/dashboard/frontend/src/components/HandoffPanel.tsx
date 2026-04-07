@@ -20,9 +20,9 @@ async function executeHandoff(agentId: string, toModel: string, reason?: string)
 }
 
 const MODEL_COLORS = {
-  opus: 'text-purple-400 bg-purple-900/20 border-purple-500/30',
-  sonnet: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
-  haiku: 'text-green-400 bg-green-900/20 border-green-500/30',
+  opus: 'text-signal-review badge-bg-secondary border-signal-review/30',
+  sonnet: 'text-primary badge-bg-primary border-primary/30',
+  haiku: 'text-success badge-bg-success border-success/30',
 };
 
 export function HandoffPanel({ agentId }: HandoffPanelProps) {
@@ -87,17 +87,17 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
 
       {/* Handoff Suggestion */}
       {suggestion.suggested && suggestion.suggestedModel && (
-        <div className="flex items-start gap-2 p-2 bg-orange-900/20 border border-orange-500/30 rounded">
-          <AlertCircle className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-2 p-2 badge-bg-warning border border-warning/30 rounded">
+          <AlertCircle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-orange-400 mb-1">
+            <div className="text-sm font-medium text-warning mb-1">
               Handoff Suggested
             </div>
             <div className="text-xs text-content-body mb-2">{suggestion.reason}</div>
             <button
               onClick={handleAutoHandoff}
               disabled={handoffMutation.isPending}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-content bg-orange-600 hover:bg-orange-500 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-content bg-warning hover:bg-warning/90 rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowRight className="w-3 h-3" />
               Hand off to {suggestion.suggestedModel}
@@ -113,21 +113,21 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
           <button
             onClick={() => handleHandoff('haiku')}
             disabled={handoffMutation.isPending || suggestion.currentModel === 'haiku'}
-            className="flex-1 px-2 py-1.5 text-xs font-medium text-green-400 bg-green-900/20 hover:bg-green-900/40 border border-green-500/30 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-2 py-1.5 text-xs font-medium text-success badge-bg-success hover:bg-success/20 border border-success/30 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Haiku
           </button>
           <button
             onClick={() => handleHandoff('sonnet')}
             disabled={handoffMutation.isPending || suggestion.currentModel === 'sonnet'}
-            className="flex-1 px-2 py-1.5 text-xs font-medium text-blue-400 bg-blue-900/20 hover:bg-blue-900/40 border border-blue-500/30 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-2 py-1.5 text-xs font-medium text-primary badge-bg-primary hover:bg-primary/20 border border-primary/30 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Sonnet
           </button>
           <button
             onClick={() => handleHandoff('opus')}
             disabled={handoffMutation.isPending || suggestion.currentModel === 'opus'}
-            className="flex-1 px-2 py-1.5 text-xs font-medium text-purple-400 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-500/30 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-2 py-1.5 text-xs font-medium text-signal-review badge-bg-secondary hover:bg-signal-review/20 border border-signal-review/30 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Opus
           </button>

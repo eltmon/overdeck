@@ -28,25 +28,25 @@ export function BudgetWidget({ issueId, spent, budget, className = '' }: BudgetW
       color: 'red',
       icon: AlertTriangle,
       message: 'Over budget',
-      barClass: 'bg-red-500',
-      textClass: 'text-red-400',
-      bgClass: 'bg-red-900/20 border-red-800',
+      barClass: 'bg-destructive',
+      textClass: 'text-destructive',
+      bgClass: 'badge-bg-destructive border-destructive/40',
     },
     warning: {
       color: 'yellow',
       icon: AlertTriangle,
       message: 'Approaching limit',
-      barClass: 'bg-yellow-500',
-      textClass: 'text-yellow-400',
-      bgClass: 'bg-yellow-900/20 border-yellow-800',
+      barClass: 'bg-warning',
+      textClass: 'text-warning',
+      bgClass: 'badge-bg-warning border-warning/40',
     },
     good: {
       color: 'green',
       icon: percent > 50 ? TrendingUp : CheckCircle,
       message: 'On track',
-      barClass: 'bg-green-500',
-      textClass: 'text-green-400',
-      bgClass: 'bg-green-900/20 border-green-800',
+      barClass: 'bg-success',
+      textClass: 'text-success',
+      bgClass: 'badge-bg-success border-success/40',
     },
   };
 
@@ -88,7 +88,7 @@ export function BudgetWidget({ issueId, spent, budget, className = '' }: BudgetW
         </div>
         <div className="text-right">
           <div className="text-content-subtle">Remaining</div>
-          <div className={`font-semibold ${remaining < 0 ? 'text-red-400' : config.textClass}`}>
+          <div className={`font-semibold ${remaining < 0 ? 'text-destructive' : config.textClass}`}>
             ${remaining < 0 ? '0.00' : remaining.toFixed(2)}
           </div>
         </div>
@@ -119,9 +119,9 @@ export function BudgetBar({ spent, budget, className = '', showLabel = true }: B
   const percent = (spent / budget) * 100;
 
   const barClass =
-    percent >= 100 ? 'bg-red-500' :
-    percent >= 80 ? 'bg-yellow-500' :
-    'bg-green-500';
+    percent >= 100 ? 'bg-destructive' :
+    percent >= 80 ? 'bg-warning' :
+    'bg-success';
 
   return (
     <div className={className}>

@@ -112,7 +112,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         ) : (
           <div
             className="h-10 rounded flex items-center justify-center text-[10px]"
-            style={{ background: 'rgba(10, 14, 26, 0.6)', color: 'var(--gv-text-dim)' }}
+            style={{ background: 'var(--gv-surface)', color: 'var(--gv-text-dim)' }}
           >
             no output
           </div>

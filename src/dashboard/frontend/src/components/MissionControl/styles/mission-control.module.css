@@ -1,5 +1,5 @@
-/* Codex-inspired design tokens for Mission Control */
-/* Isolated to Mission Control only - does not affect existing components */
+/* Codex-inspired design tokens for Command Deck */
+/* Isolated to Command Deck only - does not affect existing components */
 
 .missionControl {
   --mc-bg-main: #FFFFFF;
@@ -45,7 +45,7 @@
   height: 100%;
 }
 
-/* Mission Control always uses its own Codex light theme — no dark mode overrides.
+/* Command Deck always uses its own Codex light theme — no dark mode overrides.
    This is intentional: the Codex design language uses warm cream/white regardless
    of the surrounding dashboard theme. */
 

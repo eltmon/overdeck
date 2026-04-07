@@ -75,13 +75,13 @@ describe('ContainerCard', () => {
     const stopped = { ...mockContainer, status: 'stopped' as const };
     const { container } = render(<ContainerCard container={stopped} onClick={vi.fn()} />);
     expect(screen.getByText('stopped')).toBeTruthy();
-    expect(container.querySelector('.bg-red-500')).toBeTruthy();
+    expect(container.querySelector('.bg-destructive')).toBeTruthy();
   });
 
   it('shows unhealthy status with yellow dot', () => {
     const unhealthy = { ...mockContainer, status: 'unhealthy' as const };
     const { container } = render(<ContainerCard container={unhealthy} onClick={vi.fn()} />);
-    expect(container.querySelector('.bg-yellow-400')).toBeTruthy();
+    expect(container.querySelector('.bg-warning')).toBeTruthy();
   });
 });
 
