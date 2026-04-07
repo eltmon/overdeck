@@ -69,6 +69,12 @@ function getTabFromPath(): Tab {
   return PATH_TO_TAB[path] || 'kanban';
 }
 
+async function fetchBackendHealth(): Promise<{ version: string }> {
+  const res = await fetch('/api/version');
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+  return res.json();
+}
+
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
   const res = await fetch('/api/tracker-status');
   if (!res.ok) throw new Error('Failed to fetch tracker status');
@@ -120,6 +126,19 @@ export default function App() {
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
+
+  // Backend health check — poll every 5s so we catch outages quickly
+  const { isError: backendDown, failureCount: backendFailureCount } = useQuery({
+    queryKey: ['backend-health'],
+    queryFn: fetchBackendHealth,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+    retry: 1, // one retry before marking as error
+    retryDelay: 1000,
+    staleTime: 0,
+  });
+  // Only show banner after 2 consecutive failures to avoid flicker on transient errors
+  const showBackendBanner = backendDown && backendFailureCount >= 2;
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -268,6 +287,17 @@ export default function App() {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Backend Offline Banner — shown when /api/version fails repeatedly */}
+        {showBackendBanner && (
+          <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+            <p className="text-destructive text-sm font-semibold flex-1">
+              Backend is unreachable — dashboard data is stale. Check that <code className="font-mono bg-destructive/20 px-1 rounded">pan up</code> is running.
+            </p>
+            <span className="text-destructive/60 text-xs shrink-0 animate-pulse">● Retrying…</span>
+          </div>
+        )}
+
         {/* Missing Tracker API Key Banner */}
         {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
           <div className="bg-warning/10 border-b border-warning/30 px-4 py-2 flex items-center gap-3 shrink-0">
