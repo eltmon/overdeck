@@ -196,13 +196,19 @@ Panopticon integrates with [claude-code-router](https://github.com/musistudio/cl
 chmod 600 ~/.panopticon/config.yaml ~/.panopticon.env
 ```
 
-**Environment Variables:** API keys are loaded from `~/.panopticon.env`:
+**Environment Variables:** API keys and configuration are loaded from `~/.panopticon.env`:
 ```bash
 # ~/.panopticon.env
 KIMI_API_KEY="sk-kimi-..."
 OPENAI_API_KEY="sk-..."
 GOOGLE_AI_KEY="AIza..."
 ZAI_API_KEY="..."
+
+# Memory guard thresholds for agent spawning (PAN-513)
+# Warning tier: show confirmation dialog before spawning (default: 4 GB free)
+PAN_MEMORY_WARN_GB=4
+# Critical tier: hard block spawning (default: 2 GB free)
+PAN_MEMORY_BLOCK_GB=2
 ```
 
 In `config.yaml`, reference them with `$` syntax:
