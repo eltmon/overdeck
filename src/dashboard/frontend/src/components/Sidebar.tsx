@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
+import { MemoryIndicator } from './MemoryIndicator';
 import { useTheme } from '../hooks/useTheme';
 import type { Tab } from './Header';
 
@@ -183,7 +184,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
             <div className="px-3 py-2 space-y-1">
               <div className="flex items-center gap-2">
                 <CloisterStatusBar onOpenSettings={() => onTabChange('settings')} />
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-1.5">
+                  <MemoryIndicator />
                   <FreshnessIndicator />
                 </div>
               </div>
