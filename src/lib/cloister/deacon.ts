@@ -21,7 +21,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
-import { setReviewStatus } from '../review-status.js';
+import { setReviewStatus, loadReviewStatuses } from '../review-status.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -1325,6 +1325,83 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 }
 
 // ============================================================================
+// Post-review commit detection
+// ============================================================================
+
+/**
+ * Detect issues where the agent pushed new commits AFTER review passed.
+ *
+ * When review passes, specialists.ts snapshots the HEAD commit SHA into
+ * `reviewedAtCommit`. On each patrol, we check all passed/readyForMerge
+ * issues: if the workspace HEAD has moved past that snapshot, the review
+ * is stale and must be re-run.
+ *
+ * Guards:
+ *   - Only fires when reviewedAtCommit is populated (set since the review passed)
+ *   - Skips issues already merged (mergeStatus === 'merged')
+ *   - Skips issues whose workspace directory doesn't exist
+ */
+export async function checkPostReviewCommits(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const statuses = loadReviewStatuses();
+    const { resolveProjectFromIssue } = await import('../projects.js');
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      // Only check passed reviews not yet merged
+      if (status.mergeStatus === 'merged') continue;
+      if (!status.reviewedAtCommit) continue;
+      if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+
+      // Resolve workspace path
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
+      const workspacePath = join(
+        project.projectPath,
+        'workspaces',
+        `feature-${issueId.toLowerCase()}`,
+      );
+      if (!existsSync(workspacePath)) continue;
+
+      // Get current HEAD
+      let currentHead: string;
+      try {
+        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+        currentHead = stdout.trim();
+      } catch {
+        continue; // not a git repo or git unavailable
+      }
+
+      if (currentHead === status.reviewedAtCommit) continue;
+
+      // HEAD moved — new commits since review. Reset review pipeline.
+      console.log(
+        `[deacon] Post-review commit detected for ${issueId}: ` +
+        `was ${status.reviewedAtCommit.substring(0, 8)}, now ${currentHead.substring(0, 8)} — resetting review`,
+      );
+      setReviewStatus(issueId, {
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+        reviewedAtCommit: undefined,
+        reviewNotes: undefined,
+        testNotes: undefined,
+      });
+      actions.push(
+        `Reset review for ${issueId}: new commits after review passed ` +
+        `(${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`,
+      );
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error in checkPostReviewCommits:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // Ready-for-merge stuck detection (PAN-344)
 // ============================================================================
 
@@ -1959,6 +2036,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
+
+  // Detect new commits pushed after review passed — invalidate stale reviews
+  const postReviewActions = await checkPostReviewCommits();
+  actions.push(...postReviewActions);
+  for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
 
   // PAN-384: Check specialist queues and dispatch pending work.
   // This is the safety net for task_queued events that were missed (e.g., dashboard restart,
