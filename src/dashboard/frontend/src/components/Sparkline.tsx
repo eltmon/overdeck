@@ -9,12 +9,13 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  LineController,
   Filler,
   type ChartData,
   type ChartOptions,
 } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Filler);
 
 interface SparklineProps {
   data: number[];
