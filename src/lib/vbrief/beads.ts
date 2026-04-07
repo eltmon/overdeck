@@ -78,18 +78,23 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 
   // Verify db connectivity — the Dolt database for this project may not exist yet
   // on fresh installs (bd was installed but bd init was never run at the project root).
-  // If connectivity fails with "database not found", auto-initialize with the right prefix.
+  // If connectivity fails for any reason and a redirect exists, auto-initialize with
+  // the right prefix so beads creation can proceed without manual intervention.
   const issueLabel = plan.id.toLowerCase();
+  const redirectExists = existsSync(redirectPath);
   try {
     await execAsync('bd list --json --limit 0', {
       encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
     });
   } catch (connectErr: any) {
-    const msg = String(connectErr?.message ?? connectErr?.stderr ?? '');
-    if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-      // Derive prefix from issue label (pan-475 → prefix "pan-475")
+    // When redirect exists but DB is unreachable (not found, connection refused, timeout,
+    // or any other error), always attempt bd init --prefix to initialize the database.
+    // This covers fresh installs, corrupted DBs, and cases where the redirect was created
+    // but bd init was never run for this prefix.
+    if (redirectExists) {
       const prefix = issueLabel;
-      console.log(`[beads] Database unreachable — auto-running bd init --prefix ${prefix}`);
+      const errMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
+      console.log(`[beads] Database unreachable (${errMsg.split('\n')[0]}) — auto-running bd init --prefix ${prefix}`);
       try {
         await execAsync(`bd init --prefix ${prefix}`, {
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
