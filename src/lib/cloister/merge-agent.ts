@@ -1520,12 +1520,14 @@ INSTRUCTIONS:
 
 1. cd ${workspacePath}
 2. git fetch origin ${baseBranch}
-3. git rebase origin/${baseBranch}
-4. If rebase has ANY conflicts:
+3. Remove ephemeral planning artifacts before rebase (they always conflict):
+   git rm -rf .planning/ 2>/dev/null; git commit -m "chore: remove ephemeral planning artifacts before rebase" --allow-empty 2>/dev/null
+4. git rebase origin/${baseBranch}
+5. If rebase has conflicts in SOURCE CODE files (src/, packages/, tests/, scripts/):
    a. Immediately abort: git rebase --abort
    b. Report FAILURE — do NOT attempt to resolve conflicts manually
    c. The work agent or a human must resolve conflicts before merge can proceed
-5. If rebase succeeds cleanly: git push --force-with-lease origin ${featureBranch}
+6. If rebase succeeds cleanly (or only had .planning/ conflicts which were already removed): git push --force-with-lease origin ${featureBranch}
 6. Report completion by calling the Panopticon API:
    curl -s -X POST ${apiUrl}/api/specialists/done \\
      -H "Content-Type: application/json" \\
