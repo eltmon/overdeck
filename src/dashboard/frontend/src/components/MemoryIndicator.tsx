@@ -3,8 +3,11 @@ import { useEffect, useState } from 'react'
 interface SystemHealthResponse {
   memUsed: number
   memTotal: number
+  memFree: number
   memPercent: number
   cpu: number
+  warnThresholdBytes: number
+  blockThresholdBytes: number
   updatedAt: string
 }
 
@@ -40,7 +43,7 @@ export function MemoryIndicator() {
 
   if (!health || health.memTotal === 0) return null
 
-  const memFreeBytes = health.memTotal - health.memUsed
+  const memFreeBytes = health.memFree ?? (health.memTotal - health.memUsed)
   const freePercent = (memFreeBytes / health.memTotal) * 100
 
   let dotColor: string

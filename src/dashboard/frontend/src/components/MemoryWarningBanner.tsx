@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import { AlertTriangle, X, Square } from 'lucide-react'
 import { useDashboardStore, selectAgentList } from '../lib/store'
 
-// Default warning threshold: 4 GB free (matches backend default PAN_MEMORY_WARN_GB)
-const WARN_THRESHOLD_BYTES = 4 * 1024 ** 3
+// Fallback warning threshold when API hasn't responded yet: 4 GB free
+const WARN_THRESHOLD_BYTES_DEFAULT = 4 * 1024 ** 3
 
 // Re-show after dismiss if free memory drops another 512 MB below dismiss point
 const REDISPLAY_DROP_BYTES = 512 * 1024 * 1024
@@ -11,8 +11,11 @@ const REDISPLAY_DROP_BYTES = 512 * 1024 * 1024
 interface SystemHealthResponse {
   memUsed: number
   memTotal: number
+  memFree: number
   memPercent: number
   cpu: number
+  warnThresholdBytes: number
+  blockThresholdBytes: number
   updatedAt: string
 }
 
@@ -62,11 +65,13 @@ export function MemoryWarningBanner() {
 
   if (!health || health.memTotal === 0) return null
 
-  const memFreeBytes = health.memTotal - health.memUsed
-  if (memFreeBytes >= WARN_THRESHOLD_BYTES) return null
+  const memFreeBytes = health.memFree ?? (health.memTotal - health.memUsed)
+  const warnThreshold = health.warnThresholdBytes ?? WARN_THRESHOLD_BYTES_DEFAULT
+  if (memFreeBytes >= warnThreshold) return null
   if (dismissed) return null
 
-  const isCritical = memFreeBytes < 2 * 1024 ** 3 // < 2 GB = critical
+  const blockThreshold = health.blockThresholdBytes ?? (2 * 1024 ** 3)
+  const isCritical = memFreeBytes < blockThreshold
 
   const runningAgents = agents
     .filter((a) => a.status === 'running' || a.status === 'starting')
