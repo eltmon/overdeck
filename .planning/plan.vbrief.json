@@ -4,7 +4,7 @@
     "created": "2026-04-06T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-460: Dashboard rebrand: rename Mission Control, unified design system, fix light/dark mode",
-    "updated": "2026-04-07T03:16:24.466Z"
+    "updated": "2026-04-07T03:16:49.773Z"
   },
   "plan": {
     "id": "pan-460",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "8fde7348-c2e5-4991-bdab-b79e0b2686d8",
     "author": "agent:claude-opus-4-6",
-    "sequence": 12,
+    "sequence": 40,
     "created": "2026-04-06T18:00:00Z",
-    "updated": "2026-04-07T03:16:24.466Z",
+    "updated": "2026-04-07T03:16:49.773Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/460",
@@ -162,7 +162,7 @@
       {
         "id": "rename-command-deck",
         "title": "Rename Mission Control to Command Deck (frontend + server API)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -176,41 +176,46 @@
           {
             "id": "rename-command-deck.ac1",
             "title": "Component directory is CommandDeck/ with no remaining MissionControl references in frontend code",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.760Z"
           },
           {
             "id": "rename-command-deck.ac2",
             "title": "mission-control.module.css is deleted, Command Deck uses global semantic tokens",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.768Z"
           },
           {
             "id": "rename-command-deck.ac3",
             "title": "Server API endpoints are /api/command-deck/* with route file renamed to command-deck.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.769Z"
           },
           {
             "id": "rename-command-deck.ac4",
             "title": "No 'mission-control' or 'Mission Control' strings remain in codebase (except git history and design docs)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.769Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.760Z"
       },
       {
         "id": "token-migration-core",
         "title": "Migrate core layout and board components to semantic tokens",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -224,33 +229,37 @@
           {
             "id": "token-migration-core.ac1",
             "title": "KanbanBoard.tsx has zero hardcoded color classes (bg-gray-*, text-white, border-gray-*, etc.)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.771Z"
           },
           {
             "id": "token-migration-core.ac2",
             "title": "All core layout components use semantic tokens exclusively",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.771Z"
           },
           {
             "id": "token-migration-core.ac3",
             "title": "Board view renders correctly in both light and dark mode with no white-on-white or invisible text",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.771Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.771Z"
       },
       {
         "id": "token-migration-pages",
         "title": "Migrate all remaining page and feature components to semantic tokens",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -264,25 +273,28 @@
           {
             "id": "token-migration-pages.ac1",
             "title": "Zero hardcoded color classes remain in any frontend component file (grep confirms no bg-gray-*, text-white, border-gray-*, etc.)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.772Z"
           },
           {
             "id": "token-migration-pages.ac2",
             "title": "All pages render correctly in both light and dark mode",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.772Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.772Z"
       },
       {
         "id": "token-migration-settings",
         "title": "Migrate Settings and chat components to semantic tokens",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -296,25 +308,28 @@
           {
             "id": "token-migration-settings.ac1",
             "title": "Settings page renders correctly in both light and dark mode",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.772Z"
           },
           {
             "id": "token-migration-settings.ac2",
             "title": "Chat/conversation components use semantic tokens and render in both themes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.772Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.772Z"
       },
       {
         "id": "godview-tokens",
         "title": "Migrate God View to scoped semantic token overrides",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -328,25 +343,28 @@
           {
             "id": "godview-tokens.ac1",
             "title": "GodView/theme.css uses scoped semantic token overrides instead of hardcoded hex values",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.770Z"
           },
           {
             "id": "godview-tokens.ac2",
             "title": "God View retains its cyberpunk visual identity (neon colors, glow effects, scanline animation)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.770Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.770Z"
       },
       {
         "id": "component-patterns",
         "title": "Unify card, badge, button, and dialog patterns across all views",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -360,33 +378,37 @@
           {
             "id": "component-patterns.ac1",
             "title": "All cards use rounded-2xl, border-border, bg-card with inner shadow pattern",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.770Z"
           },
           {
             "id": "component-patterns.ac2",
             "title": "PlanDialog and all dialogs center on viewport (no right-anchor positioning bug)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.770Z"
           },
           {
             "id": "component-patterns.ac3",
             "title": "Badges use semantic color at /8 opacity pattern consistently",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.770Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.770Z"
       },
       {
         "id": "verification",
         "title": "Verify all pages in both themes, run quality gates",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T18:00:00Z",
         "metadata": {
@@ -400,44 +422,50 @@
           {
             "id": "verification.ac1",
             "title": "npm run typecheck passes with zero errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.773Z"
           },
           {
             "id": "verification.ac2",
             "title": "npm run lint passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.773Z"
           },
           {
             "id": "verification.ac3",
             "title": "npm test passes (root + frontend)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.773Z"
           },
           {
             "id": "verification.ac4",
             "title": "npm run build succeeds",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.773Z"
           },
           {
             "id": "verification.ac5",
             "title": "grep confirms zero hardcoded color classes (bg-gray-*, text-white, border-gray-*) in frontend src",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-07T03:16:49.773Z"
           }
-        ]
+        ],
+        "completed": "2026-04-07T03:16:49.772Z"
       }
     ],
     "edges": [
