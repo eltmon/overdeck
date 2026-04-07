@@ -22,11 +22,11 @@ async function fetchActivity(): Promise<ActivityEntry[]> {
 function StatusIcon({ status }: { status: ActivityEntry['status'] }) {
   switch (status) {
     case 'running':
-      return <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />;
+      return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
     case 'completed':
-      return <CheckCircle className="w-4 h-4 text-green-400" />;
+      return <CheckCircle className="w-4 h-4 text-success" />;
     case 'failed':
-      return <XCircle className="w-4 h-4 text-red-400" />;
+      return <XCircle className="w-4 h-4 text-destructive" />;
   }
 }
 
@@ -47,7 +47,7 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Terminal className="w-5 h-5 text-blue-400" />
+          <Terminal className="w-5 h-5 text-primary" />
           <h2 className="font-medium text-content">Activity Log</h2>
         </div>
         <button onClick={onClose} className="text-content-subtle hover:text-content p-1">
@@ -68,7 +68,7 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
             <p className="text-xs mt-1">Start an agent or create a workspace to see output here</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-700">
+          <div className="divide-y divide-border">
             {activities.map((activity) => (
               <div key={activity.id} className="p-3">
                 {/* Activity header */}
@@ -94,10 +94,10 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
                   <span
                     className={`text-xs px-2 py-0.5 rounded ${
                       activity.status === 'running'
-                        ? 'bg-blue-900/50 text-blue-400'
+                        ? 'badge-bg-primary text-primary'
                         : activity.status === 'completed'
-                        ? 'bg-green-900/50 text-green-400'
-                        : 'bg-red-900/50 text-red-400'
+                        ? 'badge-bg-success text-success-foreground'
+                        : 'badge-bg-destructive text-destructive-foreground'
                     }`}
                   >
                     {activity.status}

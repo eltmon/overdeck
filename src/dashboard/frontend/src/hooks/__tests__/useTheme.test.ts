@@ -78,7 +78,7 @@ describe('useTheme', () => {
 
       expect(result.current.theme).toBe('dark');
       expect(mockClassList.has('light')).toBe(false);
-      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('light');
+      expect(document.documentElement.classList.add).toHaveBeenCalledWith('dark');
     });
 
     it('should initialize with light theme when localStorage has light', () => {
@@ -91,7 +91,7 @@ describe('useTheme', () => {
       });
 
       expect(result.current.theme).toBe('light');
-      expect(document.documentElement.classList.add).toHaveBeenCalledWith('light');
+      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('dark');
     });
 
     it('should fall back to OS preference (dark) when localStorage is empty', () => {
@@ -120,7 +120,7 @@ describe('useTheme', () => {
       expect(localStorage.setItem).toHaveBeenCalledWith('panopticon.ui.theme', 'dark');
     });
 
-    it('should add light class to DOM when theme is light', () => {
+    it('should remove dark class from DOM when theme is light', () => {
       mockLocalStorage['panopticon.ui.theme'] = 'light';
 
       const { result } = renderHook(() => useTheme());
@@ -129,10 +129,10 @@ describe('useTheme', () => {
         result.current.initTheme();
       });
 
-      expect(document.documentElement.classList.add).toHaveBeenCalledWith('light');
+      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('dark');
     });
 
-    it('should remove light class from DOM when theme is dark', () => {
+    it('should add dark class to DOM when theme is dark', () => {
       mockLocalStorage['panopticon.ui.theme'] = 'dark';
 
       const { result } = renderHook(() => useTheme());
@@ -141,7 +141,7 @@ describe('useTheme', () => {
         result.current.initTheme();
       });
 
-      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('light');
+      expect(document.documentElement.classList.add).toHaveBeenCalledWith('dark');
     });
 
     it('should persist theme to localStorage when initializing from OS preference', () => {
@@ -218,8 +218,9 @@ describe('useTheme', () => {
       expect(localStorage.setItem).toHaveBeenCalledWith('panopticon.ui.theme', 'dark');
     });
 
-    it('should add light class to DOM when toggling to light', () => {
+    it('should remove dark class from DOM when toggling to light', () => {
       mockMatchMedia.matches = true; // OS prefers dark so init → dark
+      mockClassList.add('dark');
       const { result } = renderHook(() => useTheme());
 
       act(() => {
@@ -227,12 +228,11 @@ describe('useTheme', () => {
         result.current.toggleTheme();
       });
 
-      expect(document.documentElement.classList.add).toHaveBeenCalledWith('light');
+      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('dark');
     });
 
-    it('should remove light class from DOM when toggling to dark', () => {
+    it('should add dark class to DOM when toggling to dark', () => {
       mockLocalStorage['panopticon.ui.theme'] = 'light';
-      mockClassList.add('light');
 
       const { result } = renderHook(() => useTheme());
 
@@ -241,7 +241,7 @@ describe('useTheme', () => {
         result.current.toggleTheme();
       });
 
-      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('light');
+      expect(document.documentElement.classList.add).toHaveBeenCalledWith('dark');
     });
 
     it('should toggle multiple times correctly', () => {
@@ -327,11 +327,11 @@ describe('useTheme', () => {
         result.current.initTheme();
       });
 
-      // Light mode adds 'light' class (Tailwind uses 'dark' class for dark mode)
-      expect(document.documentElement.classList.add).toHaveBeenCalledWith('light');
+      // Light mode removes 'dark' class (Tailwind darkMode: 'class' uses 'dark' class)
+      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('dark');
     });
 
-    it('should remove light class for dark mode (Tailwind default)', () => {
+    it('should add dark class for dark mode (Tailwind default)', () => {
       mockLocalStorage['panopticon.ui.theme'] = 'dark';
 
       const { result } = renderHook(() => useTheme());
@@ -340,8 +340,8 @@ describe('useTheme', () => {
         result.current.initTheme();
       });
 
-      // Dark mode removes 'light' class
-      expect(document.documentElement.classList.remove).toHaveBeenCalledWith('light');
+      // Dark mode adds 'dark' class
+      expect(document.documentElement.classList.add).toHaveBeenCalledWith('dark');
     });
   });
 });

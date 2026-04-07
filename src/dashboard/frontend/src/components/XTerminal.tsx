@@ -527,7 +527,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
               type="checkbox"
               checked={autoCopyOnSelect}
               onChange={(e) => setAutoCopyOnSelect(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500"
+              className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary"
             />
             <span className="text-sm text-slate-300">Auto-copy on selection</span>
           </label>

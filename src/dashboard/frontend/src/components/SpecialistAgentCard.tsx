@@ -46,10 +46,10 @@ const STATE_LABEL = {
 };
 
 const STATE_COLOR = {
-  sleeping: 'text-blue-400',
-  active: 'text-green-400',
+  sleeping: 'text-primary',
+  active: 'text-success',
   uninitialized: 'text-content-muted',
-  suspended: 'text-yellow-400',
+  suspended: 'text-warning',
 };
 
 async function wakeSpecialist(name: string): Promise<void> {
@@ -370,9 +370,9 @@ export function SpecialistAgentCard({
   };
 
   const priorityColors = {
-    urgent: 'text-red-400',
-    high: 'text-orange-400',
-    normal: 'text-blue-400',
+    urgent: 'text-destructive',
+    high: 'text-warning-foreground',
+    normal: 'text-primary',
     low: 'text-content-subtle',
   };
 
@@ -380,17 +380,17 @@ export function SpecialistAgentCard({
     <div
       onClick={onSelect}
       className={`p-4 cursor-pointer transition-colors ${
-        isSelected ? 'bg-surface-overlay' : 'hover:bg-gray-750'
+        isSelected ? 'bg-surface-overlay' : 'hover:bg-muted'
       }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Brain className="w-5 h-5 text-purple-400" />
+          <Brain className="w-5 h-5 text-signal-review" />
           <div>
             <div className="font-medium text-content flex items-center gap-2">
               {specialist.displayName}
               {specialist.state === 'active' ? (
-                <Loader2 className="w-4 h-4 text-green-400 animate-spin" />
+                <Loader2 className="w-4 h-4 text-success animate-spin" />
               ) : (
                 <span className={`text-xs ${STATE_COLOR[specialist.state]}`}>
                   {STATE_EMOJI[specialist.state]}
@@ -399,7 +399,7 @@ export function SpecialistAgentCard({
               {queueData && queueData.totalCount > 0 && (
                 <button
                   onClick={toggleQueueExpanded}
-                  className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+                  className="text-xs text-warning hover:text-warning/80 flex items-center gap-1"
                   title={`${queueData.totalCount} queued task${queueData.totalCount > 1 ? 's' : ''}`}
                 >
                   ({queueData.totalCount})
@@ -414,7 +414,7 @@ export function SpecialistAgentCard({
             <div className="text-sm text-content-subtle">{specialist.description}</div>
             {/* Show current issue being worked on */}
             {specialist.currentIssue && (
-              <div className="text-xs text-cyan-400 mt-1 flex items-center gap-1">
+              <div className="text-xs text-signal-cost mt-1 flex items-center gap-1">
                 <span className="text-content-muted">Working on:</span>
                 <span className="font-mono">{specialist.currentIssue}</span>
                 {issueInfo && (
@@ -438,7 +438,7 @@ export function SpecialistAgentCard({
               {STATE_LABEL[specialist.state]}
             </div>
             {costData && costData.cost > 0 && (
-              <div className="text-xs text-green-400 font-medium" title="Total cost">
+              <div className="text-xs text-success font-medium" title="Total cost">
                 ${costData.cost.toFixed(4)}
               </div>
             )}
@@ -459,7 +459,7 @@ export function SpecialistAgentCard({
             {specialist.state !== 'uninitialized' && activityData && activityData.length > 0 && (
               <button
                 onClick={toggleActivityExpanded}
-                className="p-2 text-content-subtle hover:text-blue-400 hover:bg-surface-emphasis rounded"
+                className="p-2 text-content-subtle hover:text-primary hover:bg-surface-emphasis rounded"
                 title={`Show activity history (${activityData.length} entries)`}
               >
                 <Activity className="w-4 h-4" />
@@ -471,7 +471,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleResume}
                 disabled={resumeMutation.isPending}
-                className="p-2 text-content-subtle hover:text-green-400 hover:bg-surface-emphasis rounded disabled:opacity-50"
+                className="p-2 text-content-subtle hover:text-success hover:bg-surface-emphasis rounded disabled:opacity-50"
                 title="Resume specialist"
               >
                 <Play className="w-4 h-4" />
@@ -483,7 +483,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleWake}
                 disabled={wakeMutation.isPending || specialist.state === 'uninitialized'}
-                className="p-2 text-content-subtle hover:text-green-400 hover:bg-surface-emphasis rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 text-content-subtle hover:text-success hover:bg-surface-emphasis rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 title={
                   specialist.state === 'uninitialized'
                     ? 'Specialist not initialized - needs session ID'
@@ -499,7 +499,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleKill}
                 disabled={killMutation.isPending}
-                className="p-2 text-content-subtle hover:text-red-400 hover:bg-surface-emphasis rounded"
+                className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-emphasis rounded"
                 title="Kill specialist"
               >
                 <XCircle className="w-4 h-4" />
@@ -511,7 +511,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleReset}
                 disabled={resetMutation.isPending}
-                className="p-2 text-content-subtle hover:text-yellow-400 hover:bg-surface-emphasis rounded"
+                className="p-2 text-content-subtle hover:text-warning hover:bg-surface-emphasis rounded"
                 title="Reset specialist (clear session)"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -531,12 +531,12 @@ export function SpecialistAgentCard({
             {queueData.items.map((item, index) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between bg-gray-750 px-3 py-2 rounded text-xs"
+                className="flex items-center justify-between bg-muted px-3 py-2 rounded text-xs"
               >
                 <div className="flex items-center gap-2 flex-1">
                   <span className="text-content-muted">{index + 1}.</span>
                   {item.payload.issueId && (
-                    <span className="bg-purple-900/50 text-purple-300 px-1 rounded text-xs font-mono">
+                    <span className="badge-bg-signal-review text-signal-review-foreground px-1 rounded text-xs font-mono">
                       {item.payload.issueId.match(/^([A-Z]+)-/)?.[1] ?? '?'}
                     </span>
                   )}
@@ -554,7 +554,7 @@ export function SpecialistAgentCard({
                   <button
                     onClick={(e) => handleMoveUp(e, index)}
                     disabled={index === 0 || reorderQueueMutation.isPending}
-                    className="p-1 text-content-subtle hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="p-1 text-content-subtle hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Move up"
                   >
                     <MoveUp className="w-3 h-3" />
@@ -562,7 +562,7 @@ export function SpecialistAgentCard({
                   <button
                     onClick={(e) => handleMoveDown(e, index)}
                     disabled={index === queueData.items.length - 1 || reorderQueueMutation.isPending}
-                    className="p-1 text-content-subtle hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="p-1 text-content-subtle hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Move down"
                   >
                     <MoveDown className="w-3 h-3" />
@@ -570,7 +570,7 @@ export function SpecialistAgentCard({
                   <button
                     onClick={(e) => handleRemoveQueueItem(e, item.id)}
                     disabled={removeQueueItemMutation.isPending}
-                    className="p-1 text-content-subtle hover:text-red-400 disabled:opacity-50"
+                    className="p-1 text-content-subtle hover:text-destructive disabled:opacity-50"
                     title="Remove from queue"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -590,11 +590,11 @@ export function SpecialistAgentCard({
           </div>
           <div className="space-y-1">
             {activityData.slice().reverse().map((entry, index) => (
-              <div key={index} className="flex items-center gap-2 bg-gray-750 px-3 py-1.5 rounded text-xs">
+              <div key={index} className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded text-xs">
                 <span className="text-content-muted">
                   {new Date(entry.ts).toLocaleTimeString()}
                 </span>
-                <span className="text-blue-400 font-mono">{entry.tool}</span>
+                <span className="text-primary font-mono">{entry.tool}</span>
                 {entry.action && (
                   <span className="text-content-subtle truncate">
                     {entry.action.substring(0, 50)}
