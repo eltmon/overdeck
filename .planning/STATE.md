@@ -16,7 +16,7 @@ However, **none of these paths have test coverage**. The existing `beads.test.ts
 Bead closed, awaiting inspection.
 
 ## Completed Work
-- [x] feature-pan-489-msk: Add unit tests for createBeadsFromVBrief (commit: pending)
+- [x] feature-pan-489-msk: Add unit tests for createBeadsFromVBrief (commit: ab91a507)
 
 ## Remaining Work
 None
