@@ -24,7 +24,8 @@ import {
   Zap,
   Bot,
 } from 'lucide-react';
-import { useDashboardStore } from '../lib/store';
+import { useDashboardStore, selectAgentList, selectIssues } from '../lib/store';
+import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,8 +60,8 @@ async function callApi(path: string, method = 'POST'): Promise<void> {
 
 export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
-  const agents = useDashboardStore((s) => s.agents);
-  const issues = useDashboardStore((s) => s.issues);
+  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const issues = useDashboardStore(selectIssues) as Issue[];
 
   // Reset query when opened
   useEffect(() => {
@@ -178,11 +179,11 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
   const agentActions: PaletteAction[] = activeAgents.map((agent) => ({
     id: `agent-${agent.id}`,
-    label: agent.name ?? agent.id,
+    label: agent.issueId ?? agent.id,
     description: agent.issueId ? `Working on ${agent.issueId}` : agent.status,
     icon: User,
     group: 'Running Agents',
-    keywords: [agent.name ?? '', agent.issueId ?? '', agent.status],
+    keywords: [agent.id, agent.issueId ?? '', agent.status],
     onSelect: () => {
       if (agent.issueId) onNavigate('kanban', agent.issueId);
       else onNavigate('agents');

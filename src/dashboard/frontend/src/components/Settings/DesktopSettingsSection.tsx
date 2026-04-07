@@ -98,8 +98,8 @@ export function DesktopSettingsSection() {
         if (!section || !field) return prev;
         return {
           ...prev,
-          [section]: { ...(prev as Record<string, Record<string, unknown>>)[section], [field]: value },
-        } as DesktopSettings;
+          [section]: { ...(prev as unknown as Record<string, Record<string, unknown>>)[section], [field]: value },
+        } as unknown as DesktopSettings;
       });
     } catch {
       toast.error('Failed to save desktop setting');
