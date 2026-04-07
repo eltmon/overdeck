@@ -118,6 +118,7 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
           <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} />
+          <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={true} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           <div className={styles.composerToolbarSpacer} />

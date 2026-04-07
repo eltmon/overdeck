@@ -1695,12 +1695,22 @@
 .composerToolbar {
   display: flex;
   align-items: center;
-  gap: var(--mc-space-2);
-  padding: 0 var(--mc-space-3) var(--mc-space-3);
+  gap: 0;
+  padding: 0 var(--mc-space-2) var(--mc-space-3);
 }
 
 .composerToolbarSpacer {
   flex: 1;
+}
+
+/* Pipe divider between toolbar items (matches t3code style) */
+.composerToolbarDivider {
+  width: 1px;
+  height: 16px;
+  background: var(--mc-border-strong);
+  opacity: 0.5;
+  flex-shrink: 0;
+  margin: 0 var(--mc-space-1);
 }
 
 /* Send button — rounded, inside the box */
@@ -1736,24 +1746,24 @@
 .pickerBtn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px var(--mc-space-2);
-  font-size: var(--mc-font-size-xs);
-  border: 1px solid var(--mc-border);
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: var(--mc-font-size-sm);
+  border: none;
   border-radius: var(--mc-radius-sm);
-  background: var(--mc-bg-main);
-  color: var(--mc-text-secondary);
+  background: transparent;
+  color: var(--mc-text-muted);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .pickerBtn:hover:not(:disabled) {
-  border-color: var(--mc-border-strong);
+  background: var(--mc-bg-hover);
   color: var(--mc-text-primary);
 }
 
 .pickerBtn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -1765,7 +1775,14 @@
 }
 
 .pickerLabel {
-  font-size: var(--mc-font-size-xs);
+  font-size: var(--mc-font-size-sm);
+}
+
+/* Provider icon inside picker trigger button */
+.pickerProviderIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .pickerDropdown {
@@ -1775,9 +1792,9 @@
   background: var(--mc-bg-main);
   border: 1px solid var(--mc-border);
   border-radius: var(--mc-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
   z-index: 100;
-  min-width: 160px;
+  min-width: 260px;
   display: flex;
   flex-direction: column;
   padding: 4px;
@@ -1819,6 +1836,7 @@
 .pickerOptionLabel {
   flex: 1;
   text-align: left;
+  white-space: nowrap;
 }
 
 .pickerCostBadge {
