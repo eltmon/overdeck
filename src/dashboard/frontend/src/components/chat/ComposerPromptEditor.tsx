@@ -9,7 +9,7 @@
  * - Undo/redo via Lexical HistoryPlugin
  */
 
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useRef, useState, type RefObject } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -56,36 +56,38 @@ function saveDraft(conversationName: string, text: string): void {
 
 interface InnerPluginProps {
   conversationName: string;
-  disabled: boolean;
   onCommandKeyDown: (key: 'Enter') => void;
   onTextChange: (text: string) => void;
 }
 
 function ComposerPlugin({
   conversationName,
-  disabled,
   onCommandKeyDown,
   onTextChange,
 }: InnerPluginProps) {
   const [editor] = useLexicalComposerContext();
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Register Enter key handler
+  // Register Enter key handler.
+  // NOTE: We do NOT check `disabled` here — the submit handler owns that check.
+  // Checking disabled in the Lexical layer can silently swallow Enter if the
+  // closure captures a stale `disabled=true` value after a render cycle.
+  // When not disabled, we consume the event (return true) so no newline is inserted.
+  // When disabled, we still consume (return true) so behavior is consistent.
   useEffect(() => {
     return editor.registerCommand(
       KEY_ENTER_COMMAND,
       (event: KeyboardEvent | null) => {
-        if (disabled) return false;
         if (event?.shiftKey) return false; // Allow Shift+Enter to insert newline
 
-        // Submit
+        // Consume the event and delegate to the submit handler
         event?.preventDefault();
         onCommandKeyDown('Enter');
-        return true; // Consume the event
+        return true;
       },
       COMMAND_PRIORITY_HIGH,
     );
-  }, [editor, disabled, onCommandKeyDown]);
+  }, [editor, onCommandKeyDown]);
 
   // Debounced draft persistence
   const handleChange = useCallback(() => {
@@ -101,6 +103,23 @@ function ComposerPlugin({
   }, [editor, conversationName, onTextChange]);
 
   return <OnChangePlugin onChange={handleChange} />;
+}
+
+// ─── EditorRefPlugin — must be top-level so React doesn't remount it every render ─
+
+interface EditorRefPluginProps {
+  editorRef: RefObject<LexicalEditor | null>;
+}
+
+function EditorRefPlugin({ editorRef }: EditorRefPluginProps) {
+  const [editor] = useLexicalComposerContext();
+  useEffect(() => {
+    (editorRef as React.MutableRefObject<LexicalEditor | null>).current = editor;
+    return () => {
+      (editorRef as React.MutableRefObject<LexicalEditor | null>).current = null;
+    };
+  }, [editor, editorRef]);
+  return null;
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -153,17 +172,6 @@ export function ComposerPromptEditor({
     [onChange],
   );
 
-  // Expose editor instance via ref so parent can clear content on submit
-  function EditorRefPlugin() {
-    const [editor] = useLexicalComposerContext();
-    useEffect(() => {
-      if (editorRef) {
-        (editorRef as React.MutableRefObject<LexicalEditor | null>).current = editor;
-      }
-    }, [editor]);
-    return null;
-  }
-
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div className={`${styles.composerEditor} ${disabled ? styles.composerEditorDisabled : ''}`}>
@@ -184,11 +192,10 @@ export function ComposerPromptEditor({
         <HistoryPlugin />
         <ComposerPlugin
           conversationName={conversationName}
-          disabled={disabled}
           onCommandKeyDown={onCommandKeyDown}
           onTextChange={handleChange}
         />
-        <EditorRefPlugin />
+        {editorRef && <EditorRefPlugin editorRef={editorRef} />}
       </div>
     </LexicalComposer>
   );

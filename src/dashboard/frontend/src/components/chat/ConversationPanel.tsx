@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Loader2 } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
@@ -164,6 +164,10 @@ interface ConversationViewProps {
 }
 
 function ConversationView({ conversation, onResume, onArchive, resumePending }: ConversationViewProps) {
+  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
+  // Track count so we know when the server caught up
+  const prevServerCountRef = useRef(0);
+
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
@@ -172,9 +176,32 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
     refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
 
-  const messages = data?.messages ?? [];
+  const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
   const streaming = data?.streaming ?? false;
+
+  // Drop optimistic messages once the server has returned at least as many messages
+  // as we had before plus the optimistic ones (the real message has arrived).
+  const expectedCount = prevServerCountRef.current + optimisticMessages.length;
+  const serverCaughtUp = serverMessages.length >= expectedCount && optimisticMessages.length > 0;
+  const messages = serverCaughtUp ? serverMessages : [...serverMessages, ...optimisticMessages];
+
+  const handleMessageSent = useCallback((text: string) => {
+    prevServerCountRef.current = serverMessages.length;
+    const optimistic: ChatMessage = {
+      id: `optimistic-${Date.now()}`,
+      role: 'user',
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    setOptimisticMessages([optimistic]);
+  }, [serverMessages.length]);
+
+  // Clean up optimistic messages in an effect once the server catches up
+  useEffect(() => {
+    if (serverCaughtUp) setOptimisticMessages([]);
+  }, [serverCaughtUp]);
+
   const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
   const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
 
@@ -236,7 +263,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} />
+        <ComposerFooter conversation={conversation} onSend={handleMessageSent} />
       )}
     </div>
   );

@@ -45,11 +45,13 @@ async function sendConversationMessage(
 
 interface ComposerFooterProps {
   conversation: Conversation;
+  /** Called with the message text the instant it is sent — use for optimistic display */
+  onSend?: (text: string) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation }: ComposerFooterProps) {
+export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(loadStoredModel);
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
@@ -71,7 +73,14 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
 
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
-    if (!editor || isDisabled) return;
+    if (!editor) {
+      console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
+      return;
+    }
+    if (isDisabled) {
+      console.warn('[ComposerFooter] handleSubmit: isDisabled=true, sessionAlive=%s sending=%s', conversation.sessionAlive, sending);
+      return;
+    }
 
     // Read text directly from Lexical — don't trust React state which may be stale
     let messageText = '';
@@ -80,6 +89,9 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
     });
 
     if (!messageText) return;
+
+    // Optimistic: notify parent immediately so message appears before server round-trip
+    onSend?.(messageText);
 
     setSending(true);
     try {
@@ -98,7 +110,7 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
       // Refocus editor
       editor.focus();
     }
-  }, [conversation.name, isDisabled]);
+  }, [conversation.name, conversation.sessionAlive, sending, isDisabled, onSend]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
