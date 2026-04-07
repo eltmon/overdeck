@@ -3,14 +3,17 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-ryc: Add phase detection logic and active session derivation
+Implementing bead feature-pan-489-eds: Add phase tab strip and manual pin to TerminalPanel
 
 ## Completed Work
-(none yet)
+- [x] feature-pan-489-ryc: Add phase-utils.ts with detectPhase/getActiveSession/getProjectKey (commit: daccdadf)
+- [x] feature-pan-489-6e9: DetailPanelLayout fetches reviewStatus, derives activeSession, passes to TerminalPanel; TerminalPanel handles specialist vs agent sessions (commit: TBD)
 
 ## Remaining Work
-- [ ] feature-pan-489-ryc: Add phase detection logic and active session derivation
-- [ ] feature-pan-489-6e9: Extend DetailPanelLayout to derive and pass active session to TerminalPanel
+- [x] feature-pan-489-ryc: Add phase detection logic and active session derivation
+- [x] feature-pan-489-6e9: Extend DetailPanelLayout to derive and pass active session to TerminalPanel
+- [ ] feature-pan-489-eds: Add phase tab strip and manual pin to TerminalPanel
+- [ ] feature-pan-489-adu: Update InspectorPanel header with active phase indicator
 - [ ] feature-pan-489-eds: Add phase tab strip and manual pin to TerminalPanel
 - [ ] feature-pan-489-adu: Update InspectorPanel header with active phase indicator
 

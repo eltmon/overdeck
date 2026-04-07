@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 // react-resizable-panels v4 exports: Group, Panel, Separator (NOT PanelGroup/PanelResizeHandle)
 // v4 props: orientation (NOT direction), onLayoutChanged (NOT onLayout)
 import { Panel, Group, Separator } from 'react-resizable-panels';
+import { useQuery } from '@tanstack/react-query';
 import { InspectorPanel } from './InspectorPanel';
 import { TerminalPanel } from './TerminalPanel';
 import { Agent, Issue } from '../types';
+import type { ReviewStatus } from './inspector/types';
+import { getActiveSession } from './inspector/phase-utils';
 
 type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 
@@ -48,6 +51,20 @@ export interface DetailPanelLayoutProps {
 export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: DetailPanelLayoutProps) {
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
+
+  // Fetch review status here so both InspectorPanel (via react-query cache) and TerminalPanel
+  // share the same data without double-fetching.
+  const { data: reviewStatus } = useQuery<ReviewStatus>({
+    queryKey: ['review-status', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/review-status`);
+      if (!res.ok) throw new Error('Failed to fetch review status');
+      return res.json();
+    },
+    refetchInterval: 10000,
+  });
+
+  const activeSession = getActiveSession(issueId, agent?.id, reviewStatus);
 
   // Reset panel state when issue changes
   useEffect(() => {
@@ -160,7 +177,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: 
 
           <Panel id="terminal" minSize="30%">
             <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-              <TerminalPanel agent={agent} onClose={closeTerminal} />
+              <TerminalPanel agent={agent} activeSession={activeSession} onClose={closeTerminal} />
             </div>
           </Panel>
         </Group>

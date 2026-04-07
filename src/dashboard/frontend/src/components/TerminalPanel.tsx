@@ -3,9 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw } from 'lucide-react';
 import { Agent } from '../types';
 import { XTerminal } from './XTerminal';
+import type { ActiveSession } from './inspector/phase-utils';
 
 interface TerminalPanelProps {
-  agent: Agent;
+  agent?: Agent;
+  /** Override session derived from the current pipeline phase. When set, the panel
+   *  shows this session's terminal instead of the work agent's session. */
+  activeSession?: ActiveSession | null;
   onClose: () => void;
 }
 
@@ -16,33 +20,41 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
-export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
+export function TerminalPanel({ agent, activeSession, onClose }: TerminalPanelProps) {
   const terminalRef = useRef<HTMLPreElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+
+  // When an activeSession override is provided (specialist phase), skip the tmux-alive probe
+  // and always show XTerminal. The tmux-alive check only applies to the work agent session.
+  const agentId = agent?.id;
+  const isSpecialistSession = !!activeSession && activeSession.sessionName !== agentId;
 
   // Check if agent's tmux session is alive via a lightweight probe.
   // The store status can be stale after server restarts, so verify with the server.
   // Default to showing XTerminal (optimistic) — switch to raw log only if probe confirms dead.
   const { data: tmuxAlive } = useQuery({
-    queryKey: ['tmux-alive', agent.id],
+    queryKey: ['tmux-alive', agentId],
     queryFn: async () => {
-      const res = await fetch(`/api/agents/${agent.id}/tmux-alive`);
+      const res = await fetch(`/api/agents/${agentId}/tmux-alive`);
       if (!res.ok) return false;
       const data = await res.json();
       return data.alive === true;
     },
     refetchInterval: 10000,
+    // Skip the probe when no agent or when showing a specialist session
+    enabled: !!agentId && !isSpecialistSession,
   });
 
   // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined)
-  const isStopped = tmuxAlive === false;
+  // Specialist sessions always show XTerminal (they handle reconnect internally).
+  const isStopped = !isSpecialistSession && tmuxAlive === false;
 
   // Only poll output for stopped agents — running agents use XTerminal WebSocket
   const { data: output, refetch } = useQuery({
-    queryKey: ['agent-output', agent.id],
-    queryFn: () => fetchOutput(agent.id),
-    enabled: isStopped,
+    queryKey: ['agent-output', agentId],
+    queryFn: () => fetchOutput(agentId!),
+    enabled: isStopped && !!agentId,
   });
 
   useEffect(() => {
@@ -73,7 +85,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : agent.id}
+          {isStopped ? 'Last output' : (activeSession?.label ?? agentId ?? '')}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -110,7 +122,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         </pre>
       ) : (
         <div className="flex-1 min-h-0">
-          <XTerminal sessionName={agent.id} />
+          <XTerminal sessionName={activeSession?.sessionName ?? agentId ?? ''} />
         </div>
       )}
     </div>
