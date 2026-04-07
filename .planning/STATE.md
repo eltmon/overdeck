@@ -1,91 +1,35 @@
 # PAN-442: Electron Desktop App for Panopticon Dashboard
 
-## Status: Planning Complete
+## Status: In Progress
 
-## Decision Summary
+## Current Phase
+Implementing bead oe7 (electron-builder packaging) — committed scaffold + packaging config, ready to close.
 
-### Framework: Electron
-- Electron bundles Node.js natively, so `node-pty` and `better-sqlite3` work without modification
-- Electrobun rejected: Bun main process can't run native Node addons (node-pty exits with code 0)
-- Electron 40.x (latest stable, matches T3Code reference)
+## Completed Work
+- [x] oe7: Created apps/desktop/ scaffold with package.json (Electron 40.6.0 + electron-builder), tsdown.config.ts, tsconfig.json, resources/icon.{png,ico}, scripts/ (dev-electron.mjs, start-electron.mjs, electron-launcher.mjs, wait-for-resources.mjs, afterPack.cjs). Added apps/desktop to root workspaces. Fixed pre-existing KanbanBoard test. (commit: pending)
 
-### Architecture Decisions
+## Remaining Work
+- [ ] fkl: Embed dashboard server as child process in main.ts
+- [ ] 4yt: System tray with configurable status indicator
+- [ ] iyk: Menu bar with Panopticon actions
+- [ ] sc7: Native notifications with per-event-type configuration
+- [ ] 7pc: Auto-start with playful nag flow
+- [ ] pcu: Hybrid frontend loading (protocol + localhost)
+- [ ] ckt: Preload script with full IPC bridge
+- [ ] c8k: Desktop settings UI section in frontend
+- [ ] 0gm: Cmd+K command palette in frontend
+- [ ] crj: pan up prefers Electron app when installed
+- [ ] 1ng: npx panopticon server+browser launcher
+- [ ] 6ef: Final scaffold integration (close last)
 
-**Location:** `apps/desktop/` as a new Bun workspace
-- Follows T3Code's `apps/desktop/` pattern
-- Clean separation from CLI (`src/cli/`) and server (`src/dashboard/server/`)
+## Key Decisions
+- apps/desktop/ scaffold created as part of oe7 since it is the physical foundation — 6ef is the final integration bead
+- main.ts starts minimal; server spawning, tray, menu bar, notifications added incrementally
+- preload.ts starts as a stub; full IPC bridge added in ckt bead
+- resources/icon.{png,ico} generated via PIL from the panopticon SVG favicon
+- electron-builder config: Linux=AppImage x64, macOS=DMG arm64+x64
+- extraResources packages dist/dashboard/server.js and dist/dashboard/public/ from root dist/
+- afterPack.cjs runs electron-rebuild for node-pty and better-sqlite3
 
-**Server embedding:** Main process spawns `dist/dashboard/server.js` as child process
-- Uses `ELECTRON_RUN_AS_NODE=1` (same pattern as T3Code)
-- Bootstrap config passed via fd 3 (port, auth token, mode)
-- Exponential backoff restart on crash
-- Graceful shutdown: SIGTERM on app quit
-
-**Frontend loading: Hybrid approach**
-- **Dev mode:** BrowserWindow loads `http://localhost:<vite-port>` (Vite dev server with HMR)
-- **Packaged builds:** Custom `panopticon://` protocol serves static files from bundled `dist/dashboard/public/`
-- Avoids localhost exposure in production, maintains dev ergonomics
-
-**Build system:** tsdown for main.ts + preload.ts (CJS output to `dist-electron/`)
-- Reuses existing tsdown infrastructure
-- electron-builder for packaging (AppImage for Linux, DMG for macOS)
-
-### Feature Decisions
-
-**System tray (full):**
-- Color states: green (idle), yellow (agents working), red (attention needed)
-- Agent count badge overlay on tray icon
-- Rich tooltip: agent count, issues needing attention, last activity
-- Tray context menu: quick actions (start/stop cloister, emergency stop, open dashboard, quit)
-- All aspects configurable in Settings
-
-**Native notifications (configurable):**
-- Event types: INPUT_NEEDED, stuck agents, merge failures, work complete, planning done, merge ready
-- Per-event-type toggle in Settings
-- Uses Electron's `Notification` API (native OS notifications)
-
-**Auto-start with playful nag flow:**
-- Launch 1: Full dialog explaining value proposition, warm and inviting
-- Launches 2-5: In-app toasts with personality and countdown
-  - "Reminder 3 of 5 — Auto-start means never missing an agent asking for help"
-  - Buttons: [Enable (primary, inviting)] [Not yet] [Stop reminding me]
-  - "Enable" is always the most prominent, lowest-friction option
-- After 5 or "Stop reminding me": never prompt again
-- State tracked in Electron's `electron-store` or `conf`
-
-**Menu bar + command palette:**
-- Standard Electron menus: File, Edit, View, Window, Help
-- Panopticon menu: Start/Stop Cloister, Emergency Stop All, Open Workspace, Settings
-- Cmd+K / Ctrl+K command palette for quick access to all actions
-- Command palette searches: workspaces, agents, actions, settings
-
-**CLI integration:**
-- `pan up` detects installed Electron app and launches it instead of bare server
-- Falls back to bare server + browser if Electron not found
-- Detection: check for app binary in standard install locations
-
-**npx launcher:**
-- `npx panopticon` starts the dashboard server and opens localhost in default browser
-- No Electron download required — lowest friction for non-admin users
-- Separate from the Electron app distribution
-
-### Target Platforms
-- **Linux:** AppImage (primary)
-- **macOS:** DMG (arm64 + x64)
-- **Windows:** Follow-up issue — requires WSL2 for node-pty/tmux
-
-### Reference Architecture
-- T3Code (`/home/eltmon/Projects/t3code/apps/desktop/`) — Electron 40.6.0
-- Key patterns borrowed: child process server spawn, fd 3 bootstrap, tsdown CJS build, dev-electron script
-
-## Out of Scope
-- Windows support (follow-up issue)
-- Auto-update via electron-updater (follow-up — needs release infrastructure)
-- Code signing for macOS (follow-up — needs Apple Developer account setup)
-- Detachable terminal as native BrowserWindow (PAN-486 follow-up)
-
-## Technical Risks
-1. **Native addon rebuilds**: node-pty and better-sqlite3 need `electron-rebuild` for Electron's Node version
-2. **Custom protocol + WebSocket**: `panopticon://` protocol needs to handle WS connections to the embedded server correctly
-3. **macOS code signing**: Unsigned apps trigger Gatekeeper warnings — acceptable for alpha, needs signing for distribution
-4. **Bundle size**: Electron adds ~150MB — acceptable tradeoff for native experience
+## Specialist Feedback
+(none yet)
