@@ -1,6 +1,6 @@
 # PAN-462: Dashboard header metrics frozen — Handoffs, Escalations, Queue Depth
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
 Implementation complete — all beads closed
@@ -8,7 +8,7 @@ Implementation complete — all beads closed
 ## Completed Work
 - [x] feature-pan-489-arq: Fixed queueDepth in getSpecialistHandoffStats() to use live hook queues (commit: 7e1b79fa)
 - [x] feature-pan-489-8ks: Added updateSpecialistHandoffStatus + wired to specialists/done (commit: cccb5eac)
-- [x] feature-pan-489-dpu: Added todayEscalations to handoff stats, updated UI (commit: TBD)
+- [x] feature-pan-489-dpu: Added todayEscalations to handoff stats, updated UI (commit: 43446c30)
 
 ## Remaining Work
 (none)
