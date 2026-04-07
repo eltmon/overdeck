@@ -73,6 +73,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
   const [watchPlanning, setWatchPlanning] = useState(true);
+  // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
+  const watchPlanningRef = useRef(true);
   const [showTasksPanel, setShowTasksPanel] = useState(false);
   const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
   const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
@@ -174,7 +176,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               }
             } else if (event.type === 'complete') {
               setSetupSessionName(event.sessionName);
-              if (watchPlanning) {
+              if (watchPlanningRef.current) {
                 hasConnectedToSession.current = true;
                 queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
                 // Brief delay to let the user see the completed state
@@ -337,6 +339,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         .then((data: PlanningStatus & { planningCompleted?: boolean }) => {
           if (data.active) {
             // Session is running - connect to it directly (skip ready step)
+            if (!watchPlanningRef.current) { onClose(); return; }
             // Seed setupSessionName so XTerminal mounts immediately without waiting for statusQuery
             if (data.sessionName) setSetupSessionName(data.sessionName);
             hasConnectedToSession.current = true;
@@ -348,6 +351,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
           } else if (data.sessionName && data.hasPromptFile && ['In Planning', 'Planning', 'Discovery'].includes(issue.status)) {
             // Issue is in planning state with a known session that actually started work
             // (hasPromptFile confirms workspace was created successfully)
+            if (!watchPlanningRef.current) { onClose(); return; }
             if (data.sessionName) setSetupSessionName(data.sessionName);
             hasConnectedToSession.current = true;
             setStep('planning');
@@ -608,7 +612,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           <input
                             type="checkbox"
                             checked={watchPlanning}
-                            onChange={(e) => setWatchPlanning(e.target.checked)}
+                            onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
                             className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
                           />
                           <span className="text-sm text-content-body">
@@ -704,7 +708,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           <input
                             type="checkbox"
                             checked={watchPlanning}
-                            onChange={(e) => setWatchPlanning(e.target.checked)}
+                            onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
                             className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
                           />
                           <span className="text-sm text-content-body">
