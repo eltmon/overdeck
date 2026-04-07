@@ -1858,6 +1858,44 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     },
   });
 
+  const resumeSessionMutation = useMutation({
+    mutationFn: async () => {
+      const agentId = activeAgent?.id;
+      if (!agentId) throw new Error('No agent to resume');
+      const res = await fetch(`/api/agents/${agentId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let message = `Failed to resume session (${res.status})`;
+        try {
+          const data = JSON.parse(text);
+          message = data.error || message;
+        } catch {
+          message = text.length < 200 ? text : message;
+        }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+    onError: (err: Error) => {
+      showAlert({ message: `Failed to resume session: ${err.message}`, variant: 'error' });
+    },
+  });
+
+  const handleResumeSession = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resumeSessionMutation.mutate();
+  };
+
+  // In Review card with stopped agent = "session lost" / needs recovery
+  const isSessionLost = !isRunning && activeAgent?.status === 'stopped' && canonical === 'in_review';
+
   const [confirmingStart, setConfirmingStart] = useState(false);
   const confirmingStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1887,7 +1925,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       ref={cardRef}
       data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
-      className={`rounded-lg p-3 border border-divider border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-content-muted'} ${
+      className={`rounded-lg p-3 border border-divider border-l-4 cursor-pointer transition-all ${isSessionLost ? 'border-l-warning' : (priorityColors[issue.priority] || 'border-l-content-muted')} ${
         isSelected
           ? 'ring-2 ring-blue-500'
           : 'hover:border-divider'
@@ -1910,6 +1948,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
+            )}
+            {isSessionLost && (
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-warning text-warning-foreground"
+                title="Session lost — agent was running when the system stopped. Resume session to continue."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-warning-foreground animate-pulse" />
+                Session lost
+              </span>
             )}
             <a
               href={issue.url}
@@ -2307,12 +2354,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             vBRIEF
           </button>
           <button
-            onClick={handleStartAgent}
-            disabled={startAgentMutation.isPending}
-            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
+            onClick={handleResumeSession}
+            disabled={resumeSessionMutation.isPending}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
           >
-            {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Resume Agent'}
+            {resumeSessionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            {resumeSessionMutation.isPending ? 'Resuming...' : 'Resume Session'}
           </button>
           <button
             onClick={async (e) => {
@@ -2339,9 +2386,19 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         </div>
       )}
 
-      {/* In Review items - Reset Pipeline + Reopen + Deep Wipe */}
+      {/* In Review items - Resume Session (if lost) + Reset Pipeline + Reopen + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+          {isSessionLost && (
+            <button
+              onClick={handleResumeSession}
+              disabled={resumeSessionMutation.isPending}
+              className="flex items-center gap-1 text-xs font-medium text-warning-foreground hover:opacity-80 transition-colors disabled:opacity-50"
+            >
+              {resumeSessionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              {resumeSessionMutation.isPending ? 'Resuming...' : 'Resume Session'}
+            </button>
+          )}
           <ResetPipelineButton issue={issue} />
           <ReopenSection issue={issue} inline />
           <CancelButton issue={issue} />
