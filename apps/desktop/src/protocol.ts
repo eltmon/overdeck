@@ -33,7 +33,7 @@ let registered = false;
 
 // ─── Path resolution ──────────────────────────────────────────────────────────
 
-function resolveStaticPath(staticRoot: string, requestUrl: string): string {
+export function resolveStaticPath(staticRoot: string, requestUrl: string): string {
   const fallbackIndex = Path.join(staticRoot, "index.html");
 
   let url: URL;

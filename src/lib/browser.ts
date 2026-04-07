@@ -3,22 +3,27 @@
  * Used by `npx panopticon serve` to open the dashboard URL after server starts.
  */
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export async function openBrowser(url: string): Promise<void> {
-  let cmd: string;
-
   if (process.platform === "darwin") {
-    cmd = `open "${url}"`;
+    await execFileAsync("open", [url]);
   } else if (process.platform === "win32") {
-    cmd = `start "" "${url}"`;
+    // cmd.exe /c start is the standard way; /b runs without a new window
+    await execFileAsync("cmd", ["/c", "start", "", url]);
   } else {
-    // Linux: try xdg-open first, fall back to sensible-browser
-    cmd = `xdg-open "${url}" 2>/dev/null || sensible-browser "${url}" 2>/dev/null || true`;
+    // Linux: try xdg-open, fall back to sensible-browser
+    try {
+      await execFileAsync("xdg-open", [url]);
+    } catch {
+      try {
+        await execFileAsync("sensible-browser", [url]);
+      } catch {
+        // Best-effort: ignore if neither is available
+      }
+    }
   }
-
-  await execAsync(cmd);
 }
