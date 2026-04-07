@@ -37,6 +37,8 @@ export interface ReviewStatus {
   autoRequeueCount?: number;
   prUrl?: string;
   history?: StatusHistoryEntry[];
+  /** HEAD commit SHA at the time review passed — used to detect new commits after review */
+  reviewedAtCommit?: string;
 }
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
