@@ -26,6 +26,10 @@ node_fs = __toESM(node_fs);
 let node_path = require("node:path");
 node_path = __toESM(node_path);
 let electron = require("electron");
+let node_child_process = require("node:child_process");
+node_child_process = __toESM(node_child_process);
+let node_crypto = require("node:crypto");
+node_crypto = __toESM(node_crypto);
 //#region src/settings.ts
 /**
 * Desktop-specific settings, persisted to userData/desktop-settings.json.
@@ -182,6 +186,134 @@ function destroyTray() {
 	tray = null;
 }
 //#endregion
+//#region src/server.ts
+/**
+* Embedded dashboard server management.
+*
+* Spawns dist/dashboard/server.js (or the packaged equivalent) as a child
+* process, passing config via environment variables. Supports exponential-
+* backoff restart on crash. Graceful shutdown on app quit.
+*
+* Bootstrap config passed via env vars:
+*   PANOPTICON_PORT        — TCP port for HTTP + WS
+*   PANOPTICON_AUTH_TOKEN  — random hex token (future: auth middleware)
+*   PANOPTICON_MODE        — "desktop" (enables desktop-specific behaviours)
+*   PANOPTICON_NO_BROWSER  — "1" (suppresses auto browser open)
+*/
+const BASE_PORT = 7825;
+const MAX_RESTART_DELAY_MS = 3e4;
+const SIGTERM_GRACE_MS = 3e3;
+let serverProcess = null;
+let restartAttempt = 0;
+let restartTimer = null;
+let quitting = false;
+let onReadyCallback = null;
+function randomHex(bytes) {
+	return node_crypto.randomBytes(bytes).toString("hex");
+}
+function resolvePort() {
+	return BASE_PORT + restartAttempt % 10;
+}
+function startServer(onReady) {
+	onReadyCallback = onReady;
+	spawnServer();
+}
+function spawnServer() {
+	if (quitting) return;
+	const entry = resolveServerEntry();
+	if (!node_fs.existsSync(entry)) {
+		console.error(`[desktop/server] Server entry not found: ${entry}`);
+		console.error("[desktop/server] Run 'npm run build' to build the dashboard server first.");
+		return;
+	}
+	const port = resolvePort();
+	const authToken = randomHex(32);
+	const child = node_child_process.spawn(process.execPath, [entry], {
+		env: {
+			...process.env,
+			PANOPTICON_PORT: String(port),
+			PANOPTICON_AUTH_TOKEN: authToken,
+			PANOPTICON_MODE: "desktop",
+			PANOPTICON_NO_BROWSER: "1",
+			TERM: process.env.TERM || "xterm-256color",
+			COLORTERM: process.env.COLORTERM || "truecolor",
+			LANG: process.env.LANG || "en_US.UTF-8",
+			ELECTRON_RUN_AS_NODE: void 0
+		},
+		stdio: [
+			"ignore",
+			"pipe",
+			"pipe"
+		]
+	});
+	serverProcess = child;
+	child.stdout?.on("data", (chunk) => {
+		process.stdout.write(`[server] ${chunk}`);
+	});
+	child.stderr?.on("data", (chunk) => {
+		process.stderr.write(`[server] ${chunk}`);
+	});
+	child.on("spawn", () => {
+		console.log(`[desktop/server] spawned pid=${child.pid} port=${port}`);
+		waitForServer(`http://127.0.0.1:${port}`, () => {
+			console.log(`[desktop/server] ready on port ${port}`);
+			onReadyCallback?.(port, `ws://127.0.0.1:${port}`);
+		});
+	});
+	child.on("exit", (code, signal) => {
+		serverProcess = null;
+		console.warn(`[desktop/server] exited code=${String(code)} signal=${String(signal)}`);
+		if (!quitting) scheduleRestart();
+	});
+	child.on("error", (err) => {
+		console.error("[desktop/server] spawn error:", err);
+		serverProcess = null;
+		if (!quitting) scheduleRestart();
+	});
+}
+function waitForServer(url, callback, maxMs = 3e4) {
+	const start = Date.now();
+	const interval = setInterval(() => {
+		if (Date.now() - start > maxMs) {
+			clearInterval(interval);
+			callback();
+			return;
+		}
+		fetch(url + "/api/health", { signal: AbortSignal.timeout(1e3) }).then((r) => {
+			if (r.ok) {
+				clearInterval(interval);
+				callback();
+			}
+		}).catch(() => {});
+	}, 500);
+}
+function scheduleRestart() {
+	if (quitting) return;
+	restartAttempt++;
+	const delay = Math.min(1e3 * Math.pow(2, restartAttempt - 1), MAX_RESTART_DELAY_MS);
+	console.log(`[desktop/server] restarting in ${delay}ms (attempt ${restartAttempt})`);
+	restartTimer = setTimeout(() => {
+		restartTimer = null;
+		spawnServer();
+	}, delay);
+}
+function stopServer() {
+	quitting = true;
+	if (restartTimer) {
+		clearTimeout(restartTimer);
+		restartTimer = null;
+	}
+	const child = serverProcess;
+	if (!child) return;
+	serverProcess = null;
+	child.kill("SIGTERM");
+	setTimeout(() => {
+		try {
+			child.kill("SIGKILL");
+		} catch {}
+	}, SIGTERM_GRACE_MS).unref();
+}
+//#endregion
 //#region src/main.ts
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -324,11 +456,13 @@ electron.app.on("ready", () => {
 		const iconPath = resolveResourcePath("icon.png");
 		if (iconPath) electron.app.dock.setIcon(iconPath);
 	}
-	serverPort = 7825;
-	serverUrl = `http://127.0.0.1:${serverPort}`;
-	serverWsUrl = `ws://127.0.0.1:${serverPort}`;
 	createTray();
-	mainWindow = createWindow();
+	startServer((port, wsUrl) => {
+		serverPort = port;
+		serverUrl = `http://127.0.0.1:${port}`;
+		serverWsUrl = wsUrl;
+		mainWindow = createWindow();
+	});
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
@@ -340,6 +474,7 @@ electron.app.on("activate", () => showOrCreateWindow());
 electron.app.on("before-quit", () => {
 	isQuitting = true;
 	destroyTray();
+	stopServer();
 });
 //#endregion
 exports.DESKTOP_SCHEME = DESKTOP_SCHEME;

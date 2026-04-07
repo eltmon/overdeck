@@ -12,6 +12,7 @@ import {
 
 import { createTray, destroyTray } from "./tray.js";
 import { loadDesktopSettings } from "./settings.js";
+import { startServer, stopServer } from "./server.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -217,13 +218,14 @@ app.on("ready", () => {
     if (iconPath) app.dock.setIcon(iconPath);
   }
 
-  // Server embedding added in fkl bead; for now point at externally-running server
-  serverPort = 7825;
-  serverUrl = `http://127.0.0.1:${serverPort}`;
-  serverWsUrl = `ws://127.0.0.1:${serverPort}`;
-
   createTray();
-  mainWindow = createWindow();
+
+  startServer((port, wsUrl) => {
+    serverPort = port;
+    serverUrl = `http://127.0.0.1:${port}`;
+    serverWsUrl = wsUrl;
+    mainWindow = createWindow();
+  });
 });
 
 app.on("window-all-closed", () => {
@@ -238,4 +240,5 @@ app.on("activate", () => showOrCreateWindow());
 app.on("before-quit", () => {
   isQuitting = true;
   destroyTray();
+  stopServer();
 });
