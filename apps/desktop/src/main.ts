@@ -16,6 +16,7 @@ import { startServer, stopServer } from "./server.js";
 import { configureApplicationMenu } from "./menu.js";
 import { initializeNotifications, registerNotificationHandlers } from "./notifications.js";
 import { handleAutoStartNag } from "./autostart.js";
+import { registerDesktopProtocol } from "./protocol.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -225,6 +226,7 @@ app.on("ready", () => {
   registerNotificationHandlers();
   initializeNotifications();
   configureApplicationMenu();
+  registerDesktopProtocol();
 
   if (process.platform === "win32") {
     app.setAppUserModelId(APP_ID);
