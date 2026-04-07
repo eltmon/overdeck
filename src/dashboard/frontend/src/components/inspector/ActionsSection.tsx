@@ -219,7 +219,7 @@ export function ActionsSection({
               className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded hover:bg-primary/90 disabled:opacity-50 font-medium bg-primary"
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : startAgentMutation.isSuccess ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              {startAgentMutation.isPending ? (isResume ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (isResume ? 'Resumed!' : 'Started!') : (isResume ? 'Resume Agent' : 'Start Agent')}
+              {startAgentMutation.isPending ? (isResume ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (isResume ? 'Resumed!' : 'Started!') : (isResume ? 'Resume Session' : 'Start Agent')}
             </button>
             {!workspace?.exists && (
               <button

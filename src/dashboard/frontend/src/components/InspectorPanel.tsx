@@ -191,6 +191,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
+      // If there's a stopped agent, resume it instead of starting fresh
+      if (agent && agent.status === 'stopped') {
+        const res = await fetch(`/api/agents/${agent.id}/resume`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: message || undefined }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to resume session');
+        }
+        return res.json();
+      }
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
