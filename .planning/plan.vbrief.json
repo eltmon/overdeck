@@ -4,7 +4,7 @@
     "created": "2026-04-07T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-442: Electron desktop app for Panopticon dashboard",
-    "updated": "2026-04-07T14:22:12.834Z"
+    "updated": "2026-04-07T14:35:41.245Z"
   },
   "plan": {
     "id": "pan-442",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "c8f2a1d4-7e3b-4f6a-9d5c-2b8e4f1a3c7d",
     "author": "agent:claude-opus-4-6",
-    "sequence": 85,
+    "sequence": 111,
     "created": "2026-04-07T18:00:00Z",
-    "updated": "2026-04-07T14:22:12.834Z",
+    "updated": "2026-04-07T14:35:41.245Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/442",
@@ -84,7 +84,7 @@
             "completed": "2026-04-07T14:21:11.403Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.834Z"
+        "completed": "2026-04-07T14:35:41.245Z"
       },
       {
         "id": "server-embed",
@@ -137,7 +137,7 @@
             "completed": "2026-04-07T14:21:11.400Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.833Z"
+        "completed": "2026-04-07T14:35:41.244Z"
       },
       {
         "id": "hybrid-loading",
@@ -181,7 +181,7 @@
             "completed": "2026-04-07T14:21:11.395Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.831Z"
+        "completed": "2026-04-07T14:35:41.243Z"
       },
       {
         "id": "system-tray",
@@ -243,7 +243,7 @@
             "completed": "2026-04-07T14:21:11.396Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.832Z"
+        "completed": "2026-04-07T14:35:41.243Z"
       },
       {
         "id": "notifications",
@@ -287,7 +287,7 @@
             "completed": "2026-04-07T14:21:11.397Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.832Z"
+        "completed": "2026-04-07T14:35:41.244Z"
       },
       {
         "id": "auto-start",
@@ -340,7 +340,7 @@
             "completed": "2026-04-07T14:21:11.398Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.832Z"
+        "completed": "2026-04-07T14:35:41.244Z"
       },
       {
         "id": "menu-bar",
@@ -384,7 +384,7 @@
             "completed": "2026-04-07T14:21:11.397Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.832Z"
+        "completed": "2026-04-07T14:35:41.243Z"
       },
       {
         "id": "command-palette",
@@ -437,7 +437,7 @@
             "completed": "2026-04-07T14:21:11.401Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.833Z"
+        "completed": "2026-04-07T14:35:41.245Z"
       },
       {
         "id": "cli-integration",
@@ -481,7 +481,7 @@
             "completed": "2026-04-07T14:21:11.402Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.834Z"
+        "completed": "2026-04-07T14:35:41.245Z"
       },
       {
         "id": "npx-launcher",
@@ -516,7 +516,7 @@
             "completed": "2026-04-07T14:21:11.401Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.833Z"
+        "completed": "2026-04-07T14:35:41.245Z"
       },
       {
         "id": "desktop-settings",
@@ -560,7 +560,7 @@
             "completed": "2026-04-07T14:21:11.394Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.831Z"
+        "completed": "2026-04-07T14:35:41.243Z"
       },
       {
         "id": "packaging",
@@ -613,7 +613,7 @@
             "completed": "2026-04-07T14:21:11.394Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.830Z"
+        "completed": "2026-04-07T14:35:41.242Z"
       },
       {
         "id": "preload-bridge",
@@ -657,7 +657,7 @@
             "completed": "2026-04-07T14:21:11.399Z"
           }
         ],
-        "completed": "2026-04-07T14:22:12.833Z"
+        "completed": "2026-04-07T14:35:41.244Z"
       }
     ],
     "edges": [

@@ -30,3 +30,5 @@ All beads implemented and closed. Quality gates passing.
 ## Specialist Feedback
 (none)
 - **[2026-04-07T14:22Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-07T14:31Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+- **[2026-04-07T14:31Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
