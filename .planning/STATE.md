@@ -1,20 +1,18 @@
 # PAN-509: Inspector panel should show contextually relevant terminal based on pipeline phase
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-Implementing bead feature-pan-489-adu: Update InspectorPanel header with active phase indicator
+All beads complete — running quality gates and finalizing
 
 ## Completed Work
 - [x] feature-pan-489-ryc: Add phase-utils.ts with detectPhase/getActiveSession/getProjectKey (commit: daccdadf)
 - [x] feature-pan-489-6e9: DetailPanelLayout fetches reviewStatus, derives activeSession, passes to TerminalPanel; TerminalPanel handles specialist vs agent sessions (commit: b416473a)
-- [x] feature-pan-489-eds: TerminalPanel tab strip — shows Agent + active specialist tabs, auto badge, pin/unpin on click (commit: TBD)
+- [x] feature-pan-489-eds: TerminalPanel tab strip — shows Agent + active specialist tabs, auto badge, pin/unpin on click (commit: 60a81ca6)
+- [x] feature-pan-489-adu: InspectorPanel phase indicator banner — color-coded, animated dot, shown when specialist/verification active (commit: TBD)
 
 ## Remaining Work
-- [x] feature-pan-489-ryc: Add phase detection logic and active session derivation
-- [x] feature-pan-489-6e9: Extend DetailPanelLayout to derive and pass active session to TerminalPanel
-- [ ] feature-pan-489-eds: Add phase tab strip and manual pin to TerminalPanel
-- [ ] feature-pan-489-adu: Update InspectorPanel header with active phase indicator
+- None — all beads complete, tests passing
 - [ ] feature-pan-489-eds: Add phase tab strip and manual pin to TerminalPanel
 - [ ] feature-pan-489-adu: Update InspectorPanel header with active phase indicator
 

@@ -32,6 +32,8 @@ import { useConfirm } from './DialogProvider';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
+import { detectPhase } from './inspector/phase-utils';
+import type { PipelinePhase } from './inspector/phase-utils';
 
 interface SessionCost {
   id: string;
@@ -104,6 +106,15 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
+const PHASE_CONFIG: Record<PipelinePhase, { label: string; color: string; dotColor: string; pulse: boolean }> = {
+  verification: { label: 'Verifying', color: '#92400e', dotColor: '#f59e0b', pulse: true },
+  reviewing:    { label: 'Reviewing', color: '#78350f', dotColor: '#f97316', pulse: true },
+  testing:      { label: 'Testing',   color: '#1e3a5f', dotColor: '#60a5fa', pulse: true },
+  merging:      { label: 'Merging',   color: '#4c1d95', dotColor: '#a78bfa', pulse: true },
+  working:      { label: 'Working',   color: '#1e3a5f', dotColor: '#60a5fa', pulse: true },
+  idle:         { label: 'Idle',      color: '#1f2937', dotColor: '#6b7280', pulse: false },
+};
+
 export interface InspectorPanelProps {
   agent?: Agent;
   issueId: string;
@@ -164,6 +175,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     },
     refetchInterval: 30000,
   });
+
+  const currentPhase = detectPhase(reviewStatus);
+  // Only show phase indicator when a specialist is actively running
+  const showPhaseIndicator = currentPhase !== 'idle' && (currentPhase !== 'working' || !!agent);
 
   const { data: prdContent } = useQuery({
     queryKey: ['prd', issueId],
@@ -626,6 +641,26 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
             </button>
           </div>
         </div>
+
+        {/* Phase indicator — shown when a specialist or verification is active */}
+        {showPhaseIndicator && (() => {
+          const cfg = PHASE_CONFIG[currentPhase];
+          return (
+            <div
+              className="px-3 py-1.5 border-b border-pan-border flex items-center gap-2"
+              style={{ backgroundColor: `${cfg.color}33` }}
+              data-testid="phase-indicator"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.pulse ? 'animate-pulse' : ''}`}
+                style={{ backgroundColor: cfg.dotColor }}
+              />
+              <span className="text-[10px] font-medium" style={{ color: cfg.dotColor }}>
+                {cfg.label}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Issue title */}
         {issue && (
