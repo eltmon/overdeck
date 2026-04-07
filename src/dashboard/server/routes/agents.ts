@@ -1216,6 +1216,7 @@ const postAgentsRoute = HttpRouter.add(
       hasBeads = bdTasks.length > 0;
     } catch {}
 
+    let recoveryError: string | null = null;
     if (!hasBeads) {
       // Auto-recovery: beads DB may not have been initialized (fresh install, or planning
       // completed before bd init ran). Attempt to create beads from the vBRIEF plan now.
@@ -1227,18 +1228,26 @@ const postAgentsRoute = HttpRouter.add(
         if (hasBeads) {
           console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
         } else if (recovery.errors.length > 0) {
+          recoveryError = recovery.errors[0] ?? 'Unknown error during beads creation';
           console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);
+        } else {
+          recoveryError = 'createBeadsFromVBrief returned no beads and no errors';
         }
       } catch (recoveryErr: any) {
+        recoveryError = recoveryErr.message;
         console.warn(`[agents] Auto-recovery failed: ${recoveryErr.message}`);
       }
     }
 
     if (!hasBeads) {
+      const errorDetail = recoveryError
+        ? ` Recovery failed: ${recoveryError}.`
+        : '';
       return jsonResponse({
-        error: `No beads tasks found for ${issueId}. Planning artifacts exist but beads creation failed — re-run planning to regenerate.`,
+        error: `No beads tasks found for ${issueId}. Planning artifacts exist but beads creation failed —${errorDetail} Re-run planning to regenerate.`,
         hint: 'Click the Plan button to re-run planning, which will recreate beads from the vBRIEF plan.',
         issueId,
+        recoveryError,
       }, { status: 422 });
     }
 
