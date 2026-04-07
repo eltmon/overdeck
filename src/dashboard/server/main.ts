@@ -15,6 +15,8 @@ import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses } from '../../lib/review-status.js';
 import { getEventStore } from './event-store.js';
+import { getCloisterService } from '../../lib/cloister/service.js';
+import { shouldAutoStart } from '../../lib/cloister/config.js';
 
 declare const Bun: unknown;
 
@@ -68,6 +70,15 @@ clearStuckMergeStatuses();
 
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
+
+// Auto-start Cloister if configured (startup.auto_start = true in cloister config).
+// Without this, Cloister had to be manually started after every dashboard restart.
+if (shouldAutoStart()) {
+  getCloisterService().start().catch((err) => {
+    console.error('[panopticon] Cloister auto-start failed:', err);
+  });
+  console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
+}
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 
