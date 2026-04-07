@@ -41,7 +41,7 @@ async function spawnAndCreate(
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface DraftConversationPanelProps {
-  onPromoted: (conv: Conversation) => void;
+  onPromoted: (conv: Conversation, firstMessage: string) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
     setError(null);
     try {
       const conv = await spawnAndCreate(messageText, model, effort);
-      onPromoted(conv);
+      onPromoted(conv, messageText);
     } catch (err) {
       console.error('[DraftConversationPanel] Failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to create conversation');

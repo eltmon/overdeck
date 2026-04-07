@@ -9,6 +9,7 @@ import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
+import type { ChatMessage } from '../chat/chat-types';
 import type { Issue } from '../../types';
 import styles from './styles/mission-control.module.css';
 
@@ -127,9 +128,21 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
 
   const queryClient = useQueryClient();
 
-  const handleDraftPromoted = useCallback((conv: Conversation) => {
+  const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
     setIsDraft(false);
     setSelectedConversation(conv.name);
+    // Seed optimistic first message so it appears immediately before polling returns data
+    const optimistic: ChatMessage = {
+      id: `optimistic-${Date.now()}`,
+      role: 'user',
+      text: firstMessage,
+      createdAt: new Date().toISOString(),
+    };
+    queryClient.setQueryData(['conversation-messages', conv.name], {
+      messages: [optimistic],
+      workLog: [],
+      streaming: true,
+    });
     queryClient.invalidateQueries({ queryKey: ['conversations'] });
   }, [queryClient]);
 

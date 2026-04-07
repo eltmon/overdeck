@@ -120,16 +120,8 @@ function formatCost(cost: number): string {
 }
 
 // Get cost badge color based on amount
-function getLabelStyle(label: string): string {
-  const l = label.toLowerCase();
-  if (l === 'bug') return 'badge-bg-destructive text-destructive-foreground border badge-border-destructive';
-  if (l === 'security') return 'badge-bg-destructive text-destructive-foreground border badge-border-destructive';
-  if (l === 'enhancement') return 'badge-bg-primary text-primary border badge-border-primary';
-  if (l === 'improvement') return 'badge-bg-signal-cost text-signal-cost-foreground border badge-border-signal-cost';
-  if (l === 'planning' || l === 'in-planning') return 'badge-bg-signal-review text-signal-review-foreground border badge-border-signal-review';
-  if (l === 'in-progress') return 'badge-bg-primary text-primary border badge-border-primary';
-  if (l === 'in-review') return 'badge-bg-warning text-warning-foreground border badge-border-warning';
-  return 'bg-card text-muted-foreground border border-border';
+function getLabelStyle(_label: string): string {
+  return 'bg-muted text-muted-foreground border border-border';
 }
 
 function getCostColor(_cost: number): string {
@@ -687,9 +679,9 @@ export function ListIssueRow({
 
 const COLUMN_COLORS: Record<string, string> = {
   backlog: 'border-divider-strong',
-  todo: 'border-primary',
-  in_progress: 'border-warning',
-  in_review: 'border-signal-review',
+  todo: 'border-divider-strong',
+  in_progress: 'border-primary',
+  in_review: 'border-warning',
   done: 'border-success',
 };
 
@@ -1031,17 +1023,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       <div className="flex items-center gap-4 flex-wrap">
         {/* Cycle filter */}
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-content-subtle" />
-          <span className="text-sm text-content-subtle">Cycle:</span>
-          <div className="flex rounded-lg overflow-hidden border border-divider-strong">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">Cycle:</span>
+          <div className="flex rounded-lg overflow-hidden border border-border">
             {(['current', 'all', 'backlog', 'canceled'] as CycleFilter[]).map((cycle) => (
               <button
                 key={cycle}
                 onClick={() => setCycleFilter(cycle)}
-                className={`px-3 py-1 text-xs transition-colors ${
+                className={`px-3 py-1 text-xs font-medium transition-colors ${
                   cycleFilter === cycle
-                    ? 'bg-primary text-foreground'
-                    : 'bg-surface-raised text-content-subtle hover:text-content hover:bg-surface-overlay'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-foreground/70 hover:text-foreground hover:bg-accent'
                 }`}
               >
                 {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Canceled'}
@@ -1056,9 +1048,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             type="checkbox"
             checked={includeCompleted}
             onChange={(e) => setIncludeCompleted(e.target.checked)}
-            className="w-4 h-4 rounded border-divider-strong bg-surface-raised text-primary focus:ring-ring focus:ring-offset-surface"
+            className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-ring focus:ring-offset-surface"
           />
-          <span className="text-sm text-content-subtle">Include closed-out</span>
+          <span className="text-sm font-medium text-muted-foreground">Include closed-out</span>
         </label>
 
         {/* Refresh button */}
@@ -1071,43 +1063,49 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
               console.error('Refresh failed:', e);
             }
           }}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-content-subtle hover:text-content bg-surface-raised hover:bg-surface-overlay rounded transition-colors"
+          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-background border border-border hover:bg-accent rounded-lg transition-colors"
           title="Force refresh all trackers"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
 
         {/* Issue count */}
-        <span className="text-sm text-content-muted">
+        <span className="text-sm text-muted-foreground">
           {issues?.length || 0} issues
         </span>
 
         {/* Project filter */}
         {projects.length > 1 && (
           <>
-            <div className="w-px h-6 bg-surface-overlay" />
-            <span className="text-sm text-content-subtle">Projects:</span>
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => toggleProject(project.id)}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
-                  selectedProjects.size === 0 || selectedProjects.has(project.id)
-                    ? 'bg-surface-overlay text-content'
-                    : 'bg-surface-raised text-content-muted hover:text-content-body'
-                }`}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: project.color || '#6b7280' }}
-                />
-                {project.name}
-              </button>
-            ))}
+            <div className="w-px h-5 bg-border" />
+            <span className="text-sm font-medium text-muted-foreground">Projects:</span>
+            {projects.map((project) => {
+              const isExplicitlySelected = selectedProjects.has(project.id);
+              return (
+                <button
+                  key={project.id}
+                  onClick={() => toggleProject(project.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                    isExplicitlySelected
+                      ? 'bg-accent text-foreground border-foreground/20'
+                      : selectedProjects.size === 0
+                        ? 'bg-card text-foreground/70 border-foreground/15 hover:bg-accent hover:text-foreground hover:border-foreground/25'
+                        : 'bg-card text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground opacity-50'
+                  }`}
+                  title={isExplicitlySelected ? `Remove ${project.name} filter` : `Filter to ${project.name}`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: project.color || '#6b7280' }}
+                  />
+                  {project.name}
+                </button>
+              );
+            })}
             {selectedProjects.size > 0 && (
               <button
                 onClick={() => setSelectedProjects(new Set())}
-                className="text-xs text-content-subtle hover:text-content"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Clear
               </button>
@@ -1757,11 +1755,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   ) ?? false);
 
   const priorityColors: Record<number, string> = {
-    0: 'border-l-content-muted',
-    1: 'border-l-destructive',
-    2: 'border-l-warning',
-    3: 'border-l-warning',
-    4: 'border-l-primary',
+    0: 'border-l-border',         // no priority — neutral
+    1: 'border-l-destructive',    // urgent — red
+    2: 'border-l-warning',        // high — amber
+    3: 'border-l-muted-foreground', // medium — subtle gray
+    4: 'border-l-border',         // low — barely visible
   };
 
   // Kill agent mutation
@@ -2052,7 +2050,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Ready to merge badge — yellow indicator when review+tests passed */}
             {isReadyToMerge && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-yellow-900/60 text-yellow-300 border border-yellow-500/40 uppercase tracking-wide"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-success text-success-foreground uppercase tracking-wide"
                 title="Review and tests passed — ready for human merge approval"
               >
                 <GitMerge className="w-3 h-3" />
@@ -2062,7 +2060,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
             {isMerged && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold badge-bg-success text-success-foreground border badge-border-success uppercase tracking-wide"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-success text-success-foreground uppercase tracking-wide"
                 title="Branch verified merged into main"
               >
                 <GitMerge className="w-3 h-3" />
@@ -2072,7 +2070,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Needs close-out badge - amber indicator for reopened issues needing review */}
             {issue.labels?.some(l => l.toLowerCase() === 'needs-close-out') && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground border badge-border-warning"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
                 title="Reopened for close-out review — verify this work is complete, then click Close Out"
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -2132,7 +2130,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="View tasks for this issue"
           >
             <List className="w-3.5 h-3.5" />
@@ -2140,7 +2138,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="View vBRIEF plan for this issue"
           >
             <ScrollText className="w-3.5 h-3.5" />
@@ -2200,7 +2198,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors animate-pulse"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
             >
               <Eye className="w-3.5 h-3.5" />
               Watch Planning
@@ -2209,7 +2207,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-signal-review-foreground hover:text-signal-review-foreground/80'}`}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <FileText className="w-3.5 h-3.5" />
               {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
@@ -2219,7 +2217,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <>
               <button
                 onClick={() => onViewBeads && onViewBeads(issue)}
-                className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 title="View tasks for this issue"
               >
                 <List className="w-3.5 h-3.5" />
@@ -2227,7 +2225,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               </button>
               <button
                 onClick={() => onViewVBrief && onViewVBrief(issue)}
-                className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 title="View vBRIEF plan for this issue"
               >
                 <ScrollText className="w-3.5 h-3.5" />
@@ -2258,7 +2256,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors animate-pulse"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
             >
               <Eye className="w-3.5 h-3.5" />
               Watch Planning
@@ -2267,7 +2265,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-signal-review-foreground hover:text-signal-review-foreground/80'}`}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <FileText className="w-3.5 h-3.5" />
               {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
@@ -2275,7 +2273,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="View tasks for this issue"
           >
             <List className="w-3.5 h-3.5" />
@@ -2283,7 +2281,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="View vBRIEF plan for this issue"
           >
             <ScrollText className="w-3.5 h-3.5" />
@@ -2311,7 +2309,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 }).catch(err => console.error('Reset failed:', err));
               }
             }}
-            className="flex items-center gap-1 text-xs text-warning-foreground hover:text-warning-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="Reset to To Do - kills agents, resets Linear status"
           >
             <Undo className="w-3.5 h-3.5" />
@@ -2334,10 +2332,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Done items - Reopen + Close Out + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-success/30 flex-wrap">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="View tasks for this issue"
           >
             <List className="w-3.5 h-3.5" />
@@ -2345,7 +2343,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="View vBRIEF plan for this issue"
           >
             <ScrollText className="w-3.5 h-3.5" />
@@ -2403,7 +2401,7 @@ function ResetPipelineButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-warning-foreground hover:text-warning-foreground/80 transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       title="Reset pipeline state and re-run review & test"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
@@ -2477,7 +2475,7 @@ function CancelButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-warning-foreground/70 hover:text-warning-foreground transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors disabled:opacity-50"
       title="Cancel issue — stop agents, move to Canceled on tracker"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
@@ -2586,7 +2584,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
       <button
         onClick={handleReopen}
         disabled={reopenMutation.isPending}
-        className="flex items-center gap-1 text-xs text-warning-foreground hover:text-warning-foreground/80 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
         {reopenMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2604,7 +2602,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   if (inline) return content;
 
   return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-success/30">
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong">
       {content}
     </div>
   );
@@ -2644,7 +2642,7 @@ function CloseOutSection({ issue }: { issue: Issue }) {
       <button
         onClick={handleCloseOut}
         disabled={closeOutMutation.isPending}
-        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
         {closeOutMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />

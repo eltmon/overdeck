@@ -440,6 +440,10 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
         result.enabledProviders.add('kimi');
       }
+      if (config.api_keys.openrouter) {
+        result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
+        result.enabledProviders.add('openrouter');
+      }
     }
 
     // Merge overrides
