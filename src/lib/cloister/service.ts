@@ -67,6 +67,30 @@ import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
 
 /**
+ * Pure helper: from a map of review statuses, return the issue IDs that are
+ * orphaned in 'reviewing' state — i.e. reviewStatus='reviewing', no passed
+ * review in history, and not currently being handled by a running specialist.
+ *
+ * Extracted for unit-testability; called by startup recovery in Cloister.start().
+ */
+export function identifyOrphanedReviewingIssues(
+  statuses: Record<string, { reviewStatus: string; history?: Array<{ type: string; status: string }> }>,
+  activeReviewIssues: Set<string>,
+): string[] {
+  const orphaned: string[] = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (status.reviewStatus !== 'reviewing') continue;
+    const hasPassedReview = status.history?.some(
+      (h) => h.type === 'review' && h.status === 'passed',
+    );
+    if (hasPassedReview) continue;
+    if (activeReviewIssues.has(issueId.toUpperCase())) continue;
+    orphaned.push(issueId);
+  }
+  return orphaned;
+}
+
+/**
  * Write Cloister running state to file for cross-process visibility
  */
 function writeStateFile(running: boolean, pid?: number): void {
@@ -284,48 +308,36 @@ export class CloisterService {
     // stuck. On startup, find such issues and re-queue the review dispatch so work continues.
     try {
       const reviewStatuses = loadReviewStatuses();
-      const orphanedReviewing: string[] = [];
-      for (const [issueId, status] of Object.entries(reviewStatuses)) {
-        if (status.reviewStatus !== 'reviewing') continue;
-        // Skip if review already passed (history is ground truth)
-        const hasPassedReview = status.history?.some(
-          (h: { type: string; status: string }) => h.type === 'review' && h.status === 'passed'
-        );
-        if (hasPassedReview) continue;
-        orphanedReviewing.push(issueId);
+      const { resolveProjectFromIssue } = await import('../projects.js');
+      const { submitToSpecialistQueue, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+
+      // Build set of issue IDs actively being reviewed by a running specialist
+      const activeReviewIssues = new Set<string>();
+      try {
+        const projSpecs = await getAllProjectSpecialistStatuses();
+        for (const ps of projSpecs) {
+          if (ps.specialistType !== 'review-agent' || !ps.isRunning) continue;
+          const rs = getAgentRuntimeState(ps.tmuxSession);
+          if (rs?.state === 'active' && rs.currentIssue) {
+            activeReviewIssues.add(rs.currentIssue.toUpperCase());
+          }
+        }
+        // Also check global review-agent session
+        const globalSession = getTmuxSessionName('review-agent');
+        const globalRs = getAgentRuntimeState(globalSession);
+        if (globalRs?.state === 'active' && globalRs.currentIssue) {
+          activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
+        }
+      } catch {
+        // Non-fatal: if we can't check active sessions, re-queue all
       }
+
+      const orphanedReviewing = identifyOrphanedReviewingIssues(reviewStatuses, activeReviewIssues);
 
       if (orphanedReviewing.length > 0) {
         console.log(`  ⚠ Found ${orphanedReviewing.length} issue(s) with orphaned reviewStatus='reviewing'`);
-        const { resolveProjectFromIssue } = await import('../projects.js');
-        const { submitToSpecialistQueue, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
-
-        // Build set of issue IDs actively being reviewed by a running specialist
-        const activeReviewIssues = new Set<string>();
-        try {
-          const projSpecs = await getAllProjectSpecialistStatuses();
-          for (const ps of projSpecs) {
-            if (ps.specialistType !== 'review-agent' || !ps.isRunning) continue;
-            const rs = getAgentRuntimeState(ps.tmuxSession);
-            if (rs?.state === 'active' && rs.currentIssue) {
-              activeReviewIssues.add(rs.currentIssue.toUpperCase());
-            }
-          }
-          // Also check global review-agent session
-          const globalSession = getTmuxSessionName('review-agent');
-          const globalRs = getAgentRuntimeState(globalSession);
-          if (globalRs?.state === 'active' && globalRs.currentIssue) {
-            activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
-          }
-        } catch {
-          // Non-fatal: if we can't check active sessions, re-queue all
-        }
 
         for (const issueId of orphanedReviewing) {
-          if (activeReviewIssues.has(issueId.toUpperCase())) {
-            console.log(`  ✓ ${issueId}: review specialist is active — no recovery needed`);
-            continue;
-          }
 
           const agentId = `agent-${issueId.toLowerCase()}`;
           const agentState = getAgentState(agentId);

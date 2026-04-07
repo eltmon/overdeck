@@ -76,7 +76,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
         <span className="font-medium text-content text-sm">{agentId}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <XTerminal sessionName={agentId} />
+        <XTerminal sessionName={agentId} onDisconnect={() => setTerminalFailed(true)} />
       </div>
     </div>
   );
