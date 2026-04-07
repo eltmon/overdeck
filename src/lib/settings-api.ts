@@ -284,54 +284,68 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   };
 }
 
+type ProviderModelEntry = { id: ModelId; name: string; costPer1MTokens: number };
+
+export interface AvailableModelsResult {
+  anthropic: ProviderModelEntry[];
+  openai: ProviderModelEntry[];
+  google: ProviderModelEntry[];
+  zai: ProviderModelEntry[];
+  kimi: ProviderModelEntry[];
+  openrouter: ProviderModelEntry[];
+  /**
+   * Per-provider usability: true = provider is enabled and has credentials
+   * (or subscription), false = missing key or not enabled.
+   */
+  usable: {
+    anthropic: boolean;
+    openai: boolean;
+    google: boolean;
+    zai: boolean;
+    kimi: boolean;
+    openrouter: boolean;
+  };
+}
+
 /**
- * Get available models by provider (for model selection UI)
+ * Get available models by provider (for model selection UI).
+ *
+ * Always returns the full model list for every provider so the UI can show
+ * what's available. The `usable` map tells the UI which providers actually
+ * have credentials configured so it can highlight or auto-select accordingly.
+ *
+ * @param anthropicAuthed - true if the user has an active Claude Code
+ *   subscription session or ANTHROPIC_API_KEY set.
  */
-export function getAvailableModelsApi(): {
-  anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-} {
-  const result: {
-    anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  } = {
+export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsResult {
+  const { config } = loadConfig();
+
+  const result: AvailableModelsResult = {
     anthropic: [],
     openai: [],
     google: [],
     zai: [],
     kimi: [],
     openrouter: [],
+    usable: {
+      anthropic: anthropicAuthed,
+      openai: config.enabledProviders.has('openai') && !!config.apiKeys.openai,
+      google: config.enabledProviders.has('google') && !!config.apiKeys.google,
+      zai: config.enabledProviders.has('zai') && !!config.apiKeys.zai,
+      kimi: config.enabledProviders.has('kimi') && !!config.apiKeys.kimi,
+      openrouter: config.enabledProviders.has('openrouter') && !!config.apiKeys.openrouter,
+    },
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const entry: ProviderModelEntry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
     switch (capability.provider) {
-      case 'anthropic':
-        result.anthropic.push(entry);
-        break;
-      case 'openai':
-        result.openai.push(entry);
-        break;
-      case 'google':
-        result.google.push(entry);
-        break;
-      case 'zai':
-        result.zai.push(entry);
-        break;
-      case 'kimi':
-        result.kimi.push(entry);
-        break;
-      case 'openrouter':
-        result.openrouter.push(entry);
-        break;
+      case 'anthropic': result.anthropic.push(entry); break;
+      case 'openai': result.openai.push(entry); break;
+      case 'google': result.google.push(entry); break;
+      case 'zai': result.zai.push(entry); break;
+      case 'kimi': result.kimi.push(entry); break;
+      case 'openrouter': result.openrouter.push(entry); break;
     }
   }
 

@@ -93,9 +93,11 @@ const getSettingsRoute = HttpRouter.add(
 const getAvailableModelsRoute = HttpRouter.add(
   'GET',
   '/api/settings/available-models',
-  httpHandler(Effect.try({
-    try: () => jsonResponse(getAvailableModelsApi()),
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  httpHandler(Effect.promise(async () => {
+    // Include auth status so the UI knows which providers are actually usable
+    const auth = await getClaudeAuthStatus();
+    const anthropicAuthed = (auth.loggedIn && !auth.expired) || auth.hasAnthropicApiKey;
+    return jsonResponse(getAvailableModelsApi(anthropicAuthed));
   })),
 );
 
