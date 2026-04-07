@@ -142,6 +142,64 @@ If new non-JS files need to be available at runtime (templates, configs, etc.):
 3. Use `mkdir -p` + `cp` (not `cp -r` which nests on re-run)
 4. Verify the file is found both in dev mode (`tsx`) and production (`node dist/...`)
 
+## Electron Desktop App (`apps/desktop`)
+
+The `apps/desktop` workspace builds the native Electron app using tsdown (for main/preload) and electron-builder (for packaging).
+
+### Build Commands
+
+| Command | What it does |
+|---------|-------------|
+| `npm run build` (from `apps/desktop/`) | Compiles main.ts + preload.ts via tsdown → `dist-electron/` |
+| `dist:linux` | Packages as Linux AppImage (x64) |
+| `dist:mac` | Packages as macOS DMG (arm64 + x64 universal) |
+| `npm run dev` | Parallel: tsdown watch + Electron launcher |
+
+Run all commands from `apps/desktop/` (or use workspace syntax: `bun run --cwd apps/desktop ...`).
+
+### tsdown Config (`apps/desktop/tsdown.config.ts`)
+
+- **Entry points**: `src/main.ts`, `src/preload.ts`
+- **Format**: CJS (required by Electron's main process)
+- **Output**: `dist-electron/main.js`, `dist-electron/preload.js`
+- **`deps.neverBundle: ["electron"]`** — Electron is provided by the runtime, never bundled
+- **`deps.alwaysBundle`**: `@panopticon/*` workspace packages (contracts etc.)
+
+### Native Addon Rebuild
+
+After packaging, `scripts/afterPack.cjs` runs `electron-rebuild` to recompile native addons (`node-pty`, `better-sqlite3`) against the Electron Node.js version. This is required because these addons are compiled for the system Node.js version during `bun install`, which differs from Electron's embedded Node.js ABI.
+
+The `postinstall` script in `apps/desktop/package.json` also runs `electron-rebuild` after `bun install`.
+
+### Extra Resources
+
+electron-builder bundles the following into the packaged app under `resources/`:
+
+| Source | Destination | Purpose |
+|--------|-------------|---------|
+| `dist/dashboard/server.js` | `resources/server/server.js` | Embedded dashboard server |
+| `dist/dashboard/public/` | `resources/server/public/` | Static frontend assets |
+| `apps/desktop/resources/` | `resources/resources/` | App icons |
+
+Run `npm run build` (root) before `dist:linux` / `dist:mac` to ensure server.js and public/ are up to date.
+
+### Dev Workflow
+
+```bash
+# Terminal 1: build root (server + frontend)
+npm run build
+
+# Terminal 2: watch Electron main/preload
+cd apps/desktop && npm run dev:bundle
+
+# Terminal 3: launch Electron (restarts when dist-electron/ changes)
+cd apps/desktop && npm run dev:electron
+```
+
+In dev mode, the `BrowserWindow` loads from `VITE_DEV_SERVER_URL` (Vite HMR). In packaged mode it loads `panopticon://app/index.html` from bundled static assets.
+
+📖 **[Full desktop app reference →](./DESKTOP-APP.md)**
+
 ## Troubleshooting
 
 **"Template not found" errors**: The prompt `.md` files are missing from `dist/dashboard/prompts/`. Run `npm run build:dashboard:server` to copy them, or do a full `npm run build`.
