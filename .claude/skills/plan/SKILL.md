@@ -60,7 +60,7 @@ If `pan workspace` fails, fix the issue before continuing.
 
 ### Step 2: Fetch Issue Details
 
-**GitHub (PAN-*):** `gh issue view <number>`
+**GitHub (PAN-*):** `gh issue view <number> --json number,title,state,body,labels,url` (bare `gh issue view` exits non-zero due to GitHub deprecation warning — always use `--json`)
 **Linear:** Use `mcp__linear__get_issue` tool
 
 Read the FULL issue. Understand what's being asked.

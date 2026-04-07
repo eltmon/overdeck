@@ -45,10 +45,17 @@ gh issue list --json number,title,state,labels
 `assignees`, `author`, `body`, `closed`, `closedAt`, `comments`, `createdAt`, `id`, `labels`, `milestone`, `number`, `projectCards`, `projectItems`, `reactionGroups`, `state`, `title`, `updatedAt`, `url`
 
 ### `gh issue view`
+
+> **WARNING:** `gh issue view <number>` (without `--json`) exits non-zero due to a GitHub "Projects (classic) is being deprecated" GraphQL warning. **Always use `--json`.**
+
 ```bash
+# WRONG — exits non-zero due to deprecation warning
 gh issue view 123
+
+# CORRECT
 gh issue view 123 --json number,title,state,body
-gh issue view 123 --comments
+gh issue view 123 --json number,title,state,body,labels,url
+gh issue view 123 --json number,title,state,body,comments
 ```
 
 **Valid `--json` fields:** Same as `gh issue list`.
