@@ -1262,6 +1262,24 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
                 console.log(
                   `[deacon] Re-dispatched test for ${issueId} after orphan detection (project: ${resolved.projectKey})`,
                 );
+              } else if (result.error === 'specialist_busy') {
+                // Specialist busy — add to queue for later dispatch
+                const { submitToSpecialistQueue } = await import('./specialists.js');
+                submitToSpecialistQueue('test-agent', {
+                  priority: 'high',
+                  source: 'deacon-orphan-recovery',
+                  issueId,
+                  workspace,
+                  branch,
+                });
+                status.testStatus = 'testing'; // queued, will be picked up
+                modified = true;
+                actions.push(
+                  `Queued orphaned test for ${issueId} (specialist busy) — deacon will dispatch when idle`,
+                );
+                console.log(
+                  `[deacon] Specialist busy for ${issueId} — queued for later dispatch`,
+                );
               } else {
                 status.testStatus = 'dispatch_failed';
                 modified = true;
