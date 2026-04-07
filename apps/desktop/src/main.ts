@@ -10,6 +10,9 @@ import {
   shell,
 } from "electron";
 
+import { createTray, destroyTray } from "./tray.js";
+import { loadDesktopSettings } from "./settings.js";
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ROOT_DIR = Path.resolve(__dirname, "../../..");
@@ -172,6 +175,15 @@ export function dispatchMenuAction(action: string): void {
   }
 }
 
+// ─── Server API helper ────────────────────────────────────────────────────────
+
+export function callServerApi(path: string, method: string): void {
+  if (!serverUrl) return;
+  fetch(`${serverUrl}${path}`, { method }).catch((err: unknown) => {
+    console.error("[desktop] server API call failed:", err);
+  });
+}
+
 // ─── Protocol registration (before app.ready) ─────────────────────────────────
 
 protocol.registerSchemesAsPrivileged([
@@ -193,6 +205,7 @@ if (process.platform === "linux") {
 // ─── App Lifecycle ────────────────────────────────────────────────────────────
 
 app.on("ready", () => {
+  loadDesktopSettings();
   registerIpcHandlers();
 
   if (process.platform === "win32") {
@@ -204,11 +217,12 @@ app.on("ready", () => {
     if (iconPath) app.dock.setIcon(iconPath);
   }
 
-  // Server is started in server.ts; window opened after server is ready (server.ts)
-  // For now open window immediately — server embedding added in fkl bead
+  // Server embedding added in fkl bead; for now point at externally-running server
   serverPort = 7825;
   serverUrl = `http://127.0.0.1:${serverPort}`;
   serverWsUrl = `ws://127.0.0.1:${serverPort}`;
+
+  createTray();
   mainWindow = createWindow();
 });
 
@@ -223,4 +237,5 @@ app.on("activate", () => showOrCreateWindow());
 
 app.on("before-quit", () => {
   isQuitting = true;
+  destroyTray();
 });

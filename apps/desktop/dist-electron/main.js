@@ -26,6 +26,162 @@ node_fs = __toESM(node_fs);
 let node_path = require("node:path");
 node_path = __toESM(node_path);
 let electron = require("electron");
+//#region src/settings.ts
+/**
+* Desktop-specific settings, persisted to userData/desktop-settings.json.
+*
+* Covers: tray appearance, per-event notification toggles, auto-start config.
+* Loaded at app startup; updated via IPC from renderer.
+*/
+const DEFAULTS = {
+	tray: {
+		showBadge: true,
+		tooltipDetail: "full"
+	},
+	notifications: {
+		inputNeeded: true,
+		stuckAgents: true,
+		mergeFailures: true,
+		workComplete: true,
+		planningDone: false,
+		mergeReady: true
+	},
+	autoStart: {
+		enabled: false,
+		nagCount: 0,
+		nagDismissed: false
+	}
+};
+let settings = deepClone(DEFAULTS);
+function deepClone(obj) {
+	return JSON.parse(JSON.stringify(obj));
+}
+function settingsPath() {
+	return node_path.join(electron.app.getPath("userData"), "desktop-settings.json");
+}
+function loadDesktopSettings() {
+	try {
+		const raw = node_fs.readFileSync(settingsPath(), "utf8");
+		const parsed = JSON.parse(raw);
+		settings = {
+			tray: {
+				...DEFAULTS.tray,
+				...parsed.tray
+			},
+			notifications: {
+				...DEFAULTS.notifications,
+				...parsed.notifications
+			},
+			autoStart: {
+				...DEFAULTS.autoStart,
+				...parsed.autoStart
+			}
+		};
+	} catch {
+		settings = deepClone(DEFAULTS);
+	}
+}
+function getDesktopSettings() {
+	return settings;
+}
+//#endregion
+//#region src/tray.ts
+let tray = null;
+let pollTimer = null;
+const STATUS_COLORS = {
+	idle: "#22c55e",
+	working: "#f59e0b",
+	attention: "#ef4444"
+};
+function createTrayIcon(status) {
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+    <circle cx="8" cy="8" r="7" fill="${STATUS_COLORS[status]}" stroke="#00000033" stroke-width="0.5"/>
+    <ellipse cx="8" cy="8" rx="5.5" ry="3.8" stroke="#ffffff44" stroke-width="0.5" fill="none"/>
+    <circle cx="8" cy="8" r="2" fill="#ffffff99"/>
+    <circle cx="8" cy="8" r="1" fill="#00000066"/>
+  </svg>`;
+	return electron.nativeImage.createFromBuffer(Buffer.from(svg));
+}
+function buildTooltip(agentCount, attentionCount, lastActivity) {
+	if (getDesktopSettings().tray.tooltipDetail === "minimal") return `Panopticon — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
+	const lines = ["Panopticon"];
+	lines.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""} running`);
+	if (attentionCount > 0) lines.push(`⚠ ${attentionCount} need${attentionCount !== 1 ? "" : "s"} attention`);
+	if (lastActivity) lines.push(`Last: ${lastActivity}`);
+	return lines.join("\n");
+}
+function buildContextMenu() {
+	return electron.Menu.buildFromTemplate([
+		{
+			label: "Show Dashboard",
+			click: () => showOrCreateWindow()
+		},
+		{ type: "separator" },
+		{
+			label: "Start Cloister",
+			click: () => callServerApi("/api/cloister/start", "POST")
+		},
+		{
+			label: "Stop Cloister",
+			click: () => callServerApi("/api/cloister/stop", "POST")
+		},
+		{
+			label: "Emergency Stop All",
+			click: () => callServerApi("/api/agents/emergency-stop", "POST")
+		},
+		{ type: "separator" },
+		{
+			label: "Settings",
+			click: () => {
+				showOrCreateWindow();
+				dispatchMenuAction("open-settings");
+			}
+		},
+		{ type: "separator" },
+		{
+			label: "Quit",
+			click: () => {
+				electron.app.quit();
+			}
+		}
+	]);
+}
+async function refreshTrayStatus() {
+	if (!tray || isQuitting) return;
+	const url = serverUrl;
+	if (!url) return;
+	try {
+		const resp = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3e3) });
+		if (!resp.ok) return;
+		const data = await resp.json();
+		const agentCount = data.agentCount ?? 0;
+		const attentionCount = data.attentionCount ?? 0;
+		const lastActivity = data.lastActivity ?? null;
+		const status = attentionCount > 0 ? "attention" : agentCount > 0 ? "working" : "idle";
+		tray.setImage(createTrayIcon(status));
+		tray.setToolTip(buildTooltip(agentCount, attentionCount, lastActivity));
+		tray.setContextMenu(buildContextMenu());
+		if (getDesktopSettings().tray.showBadge && process.platform === "darwin" && electron.app.dock) electron.app.dock.setBadge(agentCount > 0 ? String(agentCount) : "");
+	} catch {}
+}
+function createTray() {
+	if (tray) return;
+	tray = new electron.Tray(createTrayIcon("idle"));
+	tray.setToolTip("Panopticon");
+	tray.setContextMenu(buildContextMenu());
+	tray.on("click", () => showOrCreateWindow());
+	pollTimer = setInterval(() => void refreshTrayStatus(), 5e3);
+	refreshTrayStatus();
+}
+function destroyTray() {
+	if (pollTimer) {
+		clearInterval(pollTimer);
+		pollTimer = null;
+	}
+	tray?.destroy();
+	tray = null;
+}
+//#endregion
 //#region src/main.ts
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -144,6 +300,12 @@ function dispatchMenuAction(action) {
 	if (win.webContents.isLoadingMainFrame()) win.webContents.once("did-finish-load", send);
 	else send();
 }
+function callServerApi(path, method) {
+	if (!serverUrl) return;
+	fetch(`${serverUrl}${path}`, { method }).catch((err) => {
+		console.error("[desktop] server API call failed:", err);
+	});
+}
 electron.protocol.registerSchemesAsPrivileged([{
 	scheme: DESKTOP_SCHEME,
 	privileges: {
@@ -155,6 +317,7 @@ electron.protocol.registerSchemesAsPrivileged([{
 }]);
 if (process.platform === "linux") electron.app.commandLine.appendSwitch("class", LINUX_WM_CLASS);
 electron.app.on("ready", () => {
+	loadDesktopSettings();
 	registerIpcHandlers();
 	if (process.platform === "win32") electron.app.setAppUserModelId(APP_ID);
 	if (process.platform === "darwin" && electron.app.dock) {
@@ -164,6 +327,7 @@ electron.app.on("ready", () => {
 	serverPort = 7825;
 	serverUrl = `http://127.0.0.1:${serverPort}`;
 	serverWsUrl = `ws://127.0.0.1:${serverPort}`;
+	createTray();
 	mainWindow = createWindow();
 });
 electron.app.on("window-all-closed", () => {
@@ -175,10 +339,12 @@ electron.app.on("window-all-closed", () => {
 electron.app.on("activate", () => showOrCreateWindow());
 electron.app.on("before-quit", () => {
 	isQuitting = true;
+	destroyTray();
 });
 //#endregion
 exports.DESKTOP_SCHEME = DESKTOP_SCHEME;
 exports.IPC = IPC;
+exports.callServerApi = callServerApi;
 exports.createWindow = createWindow;
 exports.dispatchMenuAction = dispatchMenuAction;
 Object.defineProperty(exports, "isQuitting", {
