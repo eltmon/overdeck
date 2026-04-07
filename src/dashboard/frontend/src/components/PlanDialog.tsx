@@ -73,6 +73,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
+  const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
+  const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);
@@ -87,6 +89,18 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
+  // Fetch settings to know the default planning-agent model
+  const settingsQuery = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error('Failed to load settings');
+      return res.json() as Promise<{ models: { overrides: Record<string, string> } }>;
+    },
+    staleTime: 60000,
+  });
+  const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
+
   // Start planning via SSE stream — replaces the old fire-and-forget mutation.
   // Uses fetch with streaming body parsing since EventSource only supports GET.
   const startPlanningViaSSE = useCallback(async () => {
@@ -99,7 +113,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, effort }),
       });
 
       if (!res.ok) {
@@ -200,7 +214,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       setError(err.message || 'Connection failed');
       setStep('error');
     }
-  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, watchPlanning, queryClient, onClose]);
+  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, effort, watchPlanning, queryClient, onClose]);
 
   // Legacy mutation wrapper — keeps the same handleStartPlanning interface
   const startPlanningMutation = {
@@ -752,6 +766,53 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
                           </span>
                         </label>
+
+                        {/* Model override */}
+                        <div>
+                          <label className="text-sm font-medium text-content-body mb-1.5 block">Model</label>
+                          <select
+                            value={modelOverride}
+                            onChange={(e) => setModelOverride(e.target.value)}
+                            className="w-full px-3 py-2 bg-surface-overlay border border-border rounded-lg text-sm text-content-body focus:outline-none focus:ring-1 focus:ring-signal-review"
+                          >
+                            <option value="">Settings default ({defaultPlanningModel})</option>
+                            <optgroup label="Anthropic">
+                              <option value="claude-opus-4-6">Claude Opus 4.6</option>
+                              <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                              <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                            </optgroup>
+                            <optgroup label="Kimi">
+                              <option value="kimi-k2.5">Kimi K2.5</option>
+                              <option value="kimi-k2">Kimi K2</option>
+                            </optgroup>
+                          </select>
+                        </div>
+
+                        {/* Effort level */}
+                        <div>
+                          <label className="text-sm font-medium text-content-body mb-1.5 block">Effort</label>
+                          <div className="flex gap-2">
+                            {(['low', 'medium', 'high'] as const).map((level) => (
+                              <button
+                                key={level}
+                                type="button"
+                                onClick={() => setEffort(level)}
+                                className={`flex-1 py-1.5 text-sm rounded-lg border transition-colors capitalize ${
+                                  effort === level
+                                    ? 'bg-signal-review/20 border-signal-review text-signal-review font-medium'
+                                    : 'bg-surface-overlay border-border text-content-subtle hover:text-content-body hover:border-border/80'
+                                }`}
+                              >
+                                {level}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-content-muted mt-1">
+                            {effort === 'low' && 'Quick planning — concise tasks, minimal exploration'}
+                            {effort === 'medium' && 'Balanced — standard planning depth (default)'}
+                            {effort === 'high' && 'Deep analysis — thorough exploration, edge cases, tradeoffs'}
+                          </p>
+                        </div>
                       </div>
 
                       <button

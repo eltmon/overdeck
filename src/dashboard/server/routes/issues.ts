@@ -410,6 +410,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       startDocker = false,
       workspaceLocation = 'local',
       shadowMode = false,
+      model: modelOverride,
+      effort,
     } = body as any;
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
@@ -603,6 +605,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             workspaceLocation: workspaceLocation as 'local' | 'remote',
             startDocker: body.startDocker,
             shadowMode,
+            model: modelOverride || undefined,
+            effort: effort || undefined,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });
