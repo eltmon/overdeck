@@ -1021,64 +1021,62 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   return (
     <div className="space-y-4">
       {/* Filter bar */}
-      <div className="flex items-center gap-4 flex-wrap">
-        {/* Cycle filter */}
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">Cycle:</span>
-          <div className="flex rounded-lg overflow-hidden border border-border">
-            {(['current', 'all', 'backlog', 'canceled'] as CycleFilter[]).map((cycle) => (
-              <button
-                key={cycle}
-                onClick={() => setCycleFilter(cycle)}
-                className={`px-3 py-1 text-xs font-medium transition-colors ${
-                  cycleFilter === cycle
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-foreground/70 hover:text-foreground hover:bg-accent'
-                }`}
-              >
-                {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Canceled'}
-              </button>
-            ))}
+      <div className="flex flex-col gap-2">
+        {/* Row 1: Cycle + controls */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Cycle:</span>
+            <div className="flex rounded-lg overflow-hidden border border-border">
+              {(['current', 'all', 'backlog', 'canceled'] as CycleFilter[]).map((cycle) => (
+                <button
+                  key={cycle}
+                  onClick={() => setCycleFilter(cycle)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    cycleFilter === cycle
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-foreground/70 hover:text-foreground hover:bg-accent'
+                  }`}
+                >
+                  {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Canceled'}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeCompleted}
+              onChange={(e) => setIncludeCompleted(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-ring focus:ring-offset-surface"
+            />
+            <span className="text-sm font-medium text-muted-foreground">Include closed-out</span>
+          </label>
+
+          <button
+            onClick={async () => {
+              try {
+                await fetch('/api/trackers/refresh', { method: 'POST' });
+                queryClient.invalidateQueries({ queryKey: ['issues'] });
+              } catch (e) {
+                console.error('Refresh failed:', e);
+              }
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-background border border-border hover:bg-accent rounded-lg transition-colors"
+            title="Force refresh all trackers"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+
+          <span className="text-sm text-muted-foreground">
+            {issues?.length || 0} issues
+          </span>
         </div>
 
-        {/* Include completed toggle */}
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={includeCompleted}
-            onChange={(e) => setIncludeCompleted(e.target.checked)}
-            className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-ring focus:ring-offset-surface"
-          />
-          <span className="text-sm font-medium text-muted-foreground">Include closed-out</span>
-        </label>
-
-        {/* Refresh button */}
-        <button
-          onClick={async () => {
-            try {
-              await fetch('/api/trackers/refresh', { method: 'POST' });
-              queryClient.invalidateQueries({ queryKey: ['issues'] });
-            } catch (e) {
-              console.error('Refresh failed:', e);
-            }
-          }}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-background border border-border hover:bg-accent rounded-lg transition-colors"
-          title="Force refresh all trackers"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Issue count */}
-        <span className="text-sm text-muted-foreground">
-          {issues?.length || 0} issues
-        </span>
-
-        {/* Project filter */}
+        {/* Row 2: Project filter */}
         {projects.length > 1 && (
-          <>
-            <div className="w-px h-5 bg-border" />
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-muted-foreground">Projects:</span>
             {projects.map((project) => {
               const isExplicitlySelected = selectedProjects.has(project.id);
@@ -1111,7 +1109,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                 Clear
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
 

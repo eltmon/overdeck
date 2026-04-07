@@ -1,4 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from './types';
 import { formatRelativeTime, isStale } from './utils';
 import { StatusHistory } from './StatusHistory';
@@ -11,7 +13,7 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
   return (
     <div className={`mb-2 p-2 rounded text-xs ${
       reviewStatus.updatedAt && isStale(reviewStatus.updatedAt)
-        ? 'bg-amber-900/20 border border-amber-700/30'
+        ? 'bg-surface-raised border border-warning/40'
         : 'bg-surface-emphasis/50'
     }`}>
       {reviewStatus.updatedAt && isStale(reviewStatus.updatedAt) && (
@@ -91,8 +93,16 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
           )}
         </div>
       )}
-      {reviewStatus.reviewNotes && <div className="mt-1 text-xs text-content-subtle">{reviewStatus.reviewNotes}</div>}
-      {reviewStatus.testNotes && <div className="mt-1 text-xs text-content-subtle">{reviewStatus.testNotes}</div>}
+      {reviewStatus.reviewNotes && (
+        <div className="mt-2 text-xs text-content prose-notes">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{reviewStatus.reviewNotes}</ReactMarkdown>
+        </div>
+      )}
+      {reviewStatus.testNotes && (
+        <div className="mt-2 text-xs text-content prose-notes">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{reviewStatus.testNotes}</ReactMarkdown>
+        </div>
+      )}
       {reviewStatus.history && reviewStatus.history.length > 0 && <StatusHistory history={reviewStatus.history} />}
     </div>
   );
