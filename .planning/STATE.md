@@ -20,3 +20,5 @@ None
 - [2026-04-06T14:55:20Z] review-agent → changes-requested (PAN-488 artifacts — not applicable to PAN-448)
 - [2026-04-06T15:41:26Z] review-agent → changes-requested (PAN-488 artifacts — not applicable to PAN-448)
 - **[2026-04-07T15:40Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
+- **[2026-04-07T15:44Z] verification-gate → FAILED** — `.planning/feedback/005-verification-gate-failed.md`
+- **[2026-04-07T15:44Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`

@@ -4,7 +4,7 @@
     "created": "2026-04-06T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-448: Start Agent confirmation timeout too short — button reverts before user can click",
-    "updated": "2026-04-07T15:43:31.821Z"
+    "updated": "2026-04-07T15:44:31.367Z"
   },
   "plan": {
     "id": "pan-448",
@@ -12,9 +12,9 @@
     "status": "completed",
     "uid": "37873ae2-7ac8-8a6a-6787-6038af3a0637",
     "author": "agent:claude-opus-4-6",
-    "sequence": 7,
+    "sequence": 9,
     "created": "2026-04-06T12:00:00Z",
-    "updated": "2026-04-07T15:43:31.821Z",
+    "updated": "2026-04-07T15:44:31.367Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/448",
@@ -53,7 +53,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T12:00:00Z",
-        "completed": "2026-04-07T15:43:31.821Z",
+        "completed": "2026-04-07T15:44:31.367Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-448"
