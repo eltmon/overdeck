@@ -6,15 +6,15 @@
 All work complete. Ready for merge.
 
 ## Completed Work
-- [x] feature-pan-489-pyv: Auto-create workspace in pan work issue when missing (commit: 899609cf)
+- [x] feature-pan-489-pyv: Auto-create workspace in pan work issue when missing (commit: 246ce8cc)
+- [x] fix(sync): move projects declaration before use, remove non-existent config.key (commit: 5fcbed42)
 
 ## Remaining Work
 None — all work completed
 
 ## Key Decisions
-- D1: Used `execAsync` (promisify(exec)) with `pan workspace create ${id} --local` — same pattern as dashboard agents.ts:1135-1148
-- D2: Used `join(projectRoot, 'workspaces', 'feature-${normalizedId}')` to construct expected workspace path post-creation
-- D3: On creation failure, show the error message and exit(1) — clean UX, no cryptic crashes
+- D1: Used execAsync with pan workspace create --local — same pattern as dashboard agents.ts:1135-1148
+- D2: sync.ts pre-existing typecheck errors fixed as required by verification gate
 
 ## Specialist Feedback
-(none yet)
+- [2026-04-07T03:17Z] verification-gate → FAILED — .planning/feedback/008-verification-gate-failed.md (fixed: moved projects declaration, removed config.key)
