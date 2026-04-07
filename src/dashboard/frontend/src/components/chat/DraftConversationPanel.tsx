@@ -68,8 +68,9 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
 
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
-    if (!editor || isEmpty || sending) return;
+    if (!editor || sending) return;
 
+    // Read directly from Lexical — React state may be stale if onChange hasn't fired yet
     let messageText = '';
     editor.read(() => {
       messageText = $getRoot().getTextContent().trim();
@@ -86,7 +87,7 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
       setError(err instanceof Error ? err.message : 'Failed to create conversation');
       setSending(false);
     }
-  }, [model, effort, onPromoted, isEmpty, sending]);
+  }, [model, effort, onPromoted, sending]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
