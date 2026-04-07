@@ -98,28 +98,37 @@ function StepRow({ stepNum, event, subSteps }: { stepNum: number; event?: SetupP
 
       {/* Sub-steps (indented under main step) */}
       {hasSubSteps && (
-        <div className="ml-12 mt-2 space-y-1.5 border-l border-divider pl-4">
+        <div className="ml-12 mt-2 space-y-2 border-l border-divider pl-4">
           {subSteps.map((sub, i) => {
             const SubIcon = getSubStepIcon(sub.label);
             return (
-              <div key={i} className={`flex items-center gap-3 transition-opacity duration-200 ${sub.status === 'active' ? '' : sub.status === 'complete' ? 'opacity-70' : 'opacity-40'}`}>
-                <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 ${
+              <div key={i} className={`flex items-start gap-3 transition-opacity duration-200 ${sub.status === 'active' ? '' : sub.status === 'complete' ? 'opacity-70' : 'opacity-40'}`}>
+                <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${
                   sub.status === 'complete' ? 'text-success/60' :
                   sub.status === 'active' ? 'text-signal-review' :
                   'text-content-muted/40'
                 }`} />
-                <span className={`text-xs ${
-                  sub.status === 'complete' ? 'text-success/80' :
-                  sub.status === 'active' ? 'text-content-body' :
-                  'text-content-muted'
-                }`}>
-                  {sub.label}
-                </span>
-                <span className="text-xs text-content-muted font-mono truncate">
-                  {sub.detail}
-                </span>
-                {sub.status === 'active' && <Loader2 className="w-3 h-3 text-signal-review animate-spin flex-shrink-0" />}
-                {sub.status === 'complete' && <CheckCircle2 className="w-3 h-3 text-success/60 flex-shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <span className={`text-xs ${
+                    sub.status === 'complete' ? 'text-success/80' :
+                    sub.status === 'active' ? 'text-content-body' :
+                    'text-content-muted'
+                  }`}>
+                    {sub.label}
+                  </span>
+                  {sub.detail && (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-xs text-content-muted font-mono leading-tight">
+                        {sub.detail}
+                      </span>
+                      {sub.status === 'active' && <Loader2 className="w-3 h-3 text-signal-review animate-spin flex-shrink-0" />}
+                      {sub.status === 'complete' && <CheckCircle2 className="w-3 h-3 text-success/60 flex-shrink-0" />}
+                    </div>
+                  )}
+                  {!sub.detail && sub.status === 'active' && (
+                    <Loader2 className="w-3 h-3 text-signal-review animate-spin mt-0.5" />
+                  )}
+                </div>
               </div>
             );
           })}
