@@ -58,6 +58,12 @@ const AGENT_DEFINITIONS = {
     description: 'Correctness-focused review',
     workType: 'convoy:correctness-reviewer' as WorkTypeId,
   },
+  requirementsReviewer: {
+    name: 'Requirements Reviewer',
+    icon: 'checklist',
+    description: 'Verifies requirements coverage vs issue + vBRIEF',
+    workType: 'convoy:requirements-reviewer' as WorkTypeId,
+  },
   synthesisAgent: {
     name: 'Synthesis Agent',
     icon: 'hub',
@@ -251,8 +257,8 @@ export function AgentCardsPanel({
           </span>
         </h3>
         <div className="bg-surface-raised rounded-xl border border-divider p-4 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(['securityReviewer', 'performanceReviewer', 'correctnessReviewer', 'synthesisAgent'] as const).map((key) => {
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {(['securityReviewer', 'performanceReviewer', 'correctnessReviewer', 'requirementsReviewer', 'synthesisAgent'] as const).map((key) => {
               const agent = AGENT_DEFINITIONS[key];
               const { model, isOverride } = getModel(agent.workType);
               return (

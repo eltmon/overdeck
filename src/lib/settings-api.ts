@@ -42,6 +42,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'convoy:security-reviewer': 'claude-opus-4-6', // SAFETY CRITICAL
     'convoy:performance-reviewer': 'claude-sonnet-4-6',
     'convoy:correctness-reviewer': 'claude-sonnet-4-6',
+    'convoy:requirements-reviewer': 'claude-sonnet-4-6',
     'convoy:synthesis-agent': 'claude-sonnet-4-6',
 
     // Subagents - speed-optimized (Haiku 2x faster, 1/3 cost)
