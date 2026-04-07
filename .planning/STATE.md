@@ -26,9 +26,11 @@ None
 - Fixed pre-existing TS errors in sync.ts: moved beads health-check block to after `projects` is declared (line 346), and changed `config.key` → `key` from destructure (key lives on the array item, not ProjectConfig).
 
 ## Specialist Feedback
-None yet.
+- [2026-04-07T02:56Z] verification-gate → FAILED — `.planning/feedback/001-verification-gate-failed.md`
+  Fixed: `selectIssuesByCycle` was not filtering `done` issues; commit c6703502.
 
 ---
+- **[2026-04-07T02:56Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 
 ## Decision: Add unit tests for createBeadsFromVBrief
 
