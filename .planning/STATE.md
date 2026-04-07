@@ -3,10 +3,11 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-d8c (startup recovery: re-dispatch orphaned reviewing issues)
+Implementing bead feature-pan-489-1nf (stale specialist state fix)
 
 ## Completed Work
 - [x] feature-pan-489-6t6: Fix atomicity — set reviewStatus=reviewing only after specialist dispatch in /review and /request-review routes (commit: 4e637b79)
+- [x] feature-pan-489-d8c: Startup recovery — re-dispatch orphaned reviewStatus=reviewing issues on Cloister start (commit: efb84d19)
 
 ## Remaining Work
 - [ ] feature-pan-489-d8c: Add startup recovery — re-dispatch orphaned reviewStatus=reviewing issues on Cloister start

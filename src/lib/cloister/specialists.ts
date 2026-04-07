@@ -672,11 +672,25 @@ ${basePrompt}`;
         const { getAgentRuntimeState } = await import('../agents.js');
         const existingState = getAgentRuntimeState(tmuxSession);
         if (existingState?.state === 'active') {
-          return {
-            success: false,
-            message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
-            error: 'specialist_busy',
-          };
+          // PAN-511: verify the session is actually running before treating it as busy.
+          // If state says 'active' but the process isn't alive (e.g. Claude Code crashed),
+          // the runtime.json is stale. Kill the dead session and spawn fresh instead of
+          // returning specialist_busy which would permanently block new dispatches.
+          const actuallyRunning = await isRunning(specialistType, projectKey);
+          if (actuallyRunning) {
+            return {
+              success: false,
+              message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
+              error: 'specialist_busy',
+            };
+          }
+          console.log(`[specialist] ${tmuxSession} state=active but not running — clearing stale state`);
+          const { saveAgentRuntimeState } = await import('../agents.js');
+          saveAgentRuntimeState(tmuxSession, {
+            state: 'idle',
+            lastActivity: new Date().toISOString(),
+            currentIssue: undefined,
+          });
         }
         // Stale session — kill it before spawning fresh
         console.log(`[specialist] Killing stale ${tmuxSession} session before respawn`);
