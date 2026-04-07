@@ -1,43 +1,21 @@
 /**
  * AgentOutputPanel - Shows live XTerminal for running agents/specialists.
  *
- * For all tmux sessions (agents and specialists), renders the XTerminal
- * WebSocket-based terminal view. For specialists with dead sessions,
- * falls back to showing the latest run log.
+ * Renders the XTerminal WebSocket-based terminal view. When the session ends
+ * (specialist completes, agent stops), shows a clean "session ended" state
+ * rather than attempting to display the raw log file.
  */
 
-import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
-import { FileText, Terminal } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 import { useState } from 'react';
 
 interface AgentOutputPanelProps {
   agentId: string;
 }
 
-// Parse specialist tmux session name: specialist-{projectKey}-{type}
-function parseSpecialistSession(agentId: string): { projectKey: string; type: string } | null {
-  const match = agentId.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
-  if (!match) return null;
-  return { projectKey: match[1], type: match[2] };
-}
-
 export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
-  const specialist = parseSpecialistSession(agentId);
   const [terminalFailed, setTerminalFailed] = useState(false);
-
-  // Fetch latest log for specialist agents (fallback when terminal disconnects)
-  const { data: logData } = useQuery({
-    queryKey: ['specialist-log', specialist?.projectKey, specialist?.type],
-    queryFn: async () => {
-      if (!specialist) return null;
-      const res = await fetch(`/api/specialists/${specialist.projectKey}/${specialist.type}/latest-log`);
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!specialist && terminalFailed,
-    staleTime: 10000,
-  });
 
   // Reset terminal failure state when agent changes
   const [prevAgent, setPrevAgent] = useState(agentId);
@@ -46,23 +24,16 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     setTerminalFailed(false);
   }
 
-  // Show log fallback for specialists when terminal has no session
-  if (specialist && terminalFailed && logData?.log) {
+  // Session ended — show clean placeholder instead of garbled raw log
+  if (terminalFailed) {
     return (
       <div className="bg-surface-raised rounded-lg h-full flex flex-col">
         <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
-          <FileText className="w-4 h-4 text-purple-400" />
+          <Terminal className="w-4 h-4 text-content-subtle" />
           <span className="font-medium text-content text-sm">{agentId}</span>
-          {logData?.file && (
-            <span className="text-xs text-content-muted ml-auto">
-              {logData.file} ({logData.totalRuns} total runs)
-            </span>
-          )}
         </div>
-        <div className="flex-1 overflow-auto p-4">
-          <pre className="text-xs text-content-body font-mono whitespace-pre-wrap leading-relaxed">
-            {logData.log}
-          </pre>
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-xs text-content-muted">Session ended</span>
         </div>
       </div>
     );

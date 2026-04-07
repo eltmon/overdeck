@@ -1147,7 +1147,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     }
 
     const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
+    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
 
     // Build a set of all active specialist sessions (global + per-project)
     // so we can check if ANY specialist is working on review/test tasks.
@@ -1205,6 +1205,92 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         status.reviewStatus = 'pending';
         modified = true;
         actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
+      }
+
+      // Re-dispatch pending reviews that should be in the pipeline.
+      // This covers the gap where checkOrphanedReviewStatuses resets reviewing → pending
+      // but nothing re-enqueues the issue. Conditions: reviewStatus=pending AND the issue
+      // has completed (completed.processed exists) AND has a PR (prUrl exists) AND no
+      // review agent is currently working on it.
+      const reviewQueuedOrActive = activeReviewSessions.has(issueId.toUpperCase());
+      if (
+        status.reviewStatus === 'pending' &&
+        !reviewQueuedOrActive &&
+        !hasPassedReview &&
+        status.prUrl
+      ) {
+        // Check completed.processed marker
+        const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
+        const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
+        if (existsSync(completedProcessedFile)) {
+          // Check review queue — maybe it's already enqueued
+          const reviewQueue = checkSpecialistQueue('review-agent');
+          const alreadyQueued = reviewQueue.items.some(
+            (item) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase(),
+          );
+
+          if (alreadyQueued) {
+            actions.push(`Review for ${issueId} already in queue — deacon will dispatch when idle`);
+            console.log(`[deacon] Review for ${issueId} is already queued — skipping re-dispatch`);
+          } else {
+            const agentState = getAgentState(agentIdForCheck);
+            const workspace = agentState?.workspace;
+
+            if (workspace) {
+              const branch = `feature/${issueId.toLowerCase()}`;
+              const { resolveProjectFromIssue } = await import('../projects.js');
+              const resolved = resolveProjectFromIssue(issueId);
+
+              if (resolved) {
+                const { spawnEphemeralSpecialist } = await import('./specialists.js');
+                const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+                  issueId,
+                  workspace,
+                  branch,
+                });
+                if (result.success) {
+                  setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+                  status.reviewStatus = 'reviewing';
+                  modified = true;
+                  actions.push(
+                    `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
+                  );
+                  console.log(
+                    `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection (project: ${resolved.projectKey})`,
+                  );
+                } else if (result.error === 'specialist_busy') {
+                  const { submitToSpecialistQueue } = await import('./specialists.js');
+                  submitToSpecialistQueue('review-agent', {
+                    priority: 'high',
+                    source: 'deacon-orphan-recovery',
+                    issueId,
+                    workspace,
+                    branch,
+                  });
+                  setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+                  status.reviewStatus = 'reviewing'; // queued, will be picked up
+                  modified = true;
+                  actions.push(
+                    `Queued pending review for ${issueId} (specialist busy) — deacon will dispatch when idle`,
+                  );
+                  console.log(`[deacon] Review specialist busy for ${issueId} — queued for later dispatch`);
+                } else {
+                  actions.push(
+                    `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+                  );
+                  console.log(
+                    `[deacon] Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+                  );
+                }
+              } else {
+                actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
+              }
+            } else {
+              actions.push(`Skipped pending review re-dispatch for ${issueId}: agent state unavailable`);
+              console.log(`[deacon] Skipped review re-dispatch for ${issueId} — agent state unavailable`);
+            }
+          }
+        }
       }
 
       // Check for orphaned testing status (includes dispatch_failed from PAN-369)
