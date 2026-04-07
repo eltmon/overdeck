@@ -93,15 +93,31 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     // but bd init was never run for this prefix.
     if (redirectExists) {
       const prefix = issueLabel;
-      const errMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
-      console.log(`[beads] Database unreachable (${errMsg.split('\n')[0]}) — auto-running bd init --prefix ${prefix}`);
+      const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
+
+      // Categorize the connectivity error for diagnostic clarity
+      let connectCategory: string;
+      if (connectErrMsg.toLowerCase().includes('connect') || connectErrMsg.toLowerCase().includes('refused') || connectErrMsg.toLowerCase().includes('econnrefused')) {
+        connectCategory = 'Dolt server not running';
+      } else if (connectErrMsg.toLowerCase().includes('not found') || connectErrMsg.toLowerCase().includes('not exist') || connectErrMsg.toLowerCase().includes('no such')) {
+        connectCategory = 'database not found';
+      } else {
+        connectCategory = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
+      }
+
+      console.log(`[beads] Database unreachable (${connectCategory}) — auto-running bd init --prefix ${prefix}`);
       try {
         await execAsync(`bd init --prefix ${prefix}`, {
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
         });
         console.log(`[beads] bd init succeeded for prefix ${prefix}`);
       } catch (initErr: any) {
-        console.warn(`[beads] bd init failed: ${initErr.message} — will attempt bead creation anyway`);
+        // Init failed — return early with a specific error so callers know exactly what happened
+        // rather than proceeding with bead creation against a broken database.
+        const initErrMsg = String(initErr?.message ?? initErr?.stderr ?? '');
+        const detail = `database init failed: ${initErrMsg.split('\n')[0]} (connectivity: ${connectCategory})`;
+        console.warn(`[beads] ${detail}`);
+        return { success: false, created: [], errors: [detail], beadIds };
       }
     }
   }
