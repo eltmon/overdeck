@@ -3,11 +3,12 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-eds: Add phase tab strip and manual pin to TerminalPanel
+Implementing bead feature-pan-489-adu: Update InspectorPanel header with active phase indicator
 
 ## Completed Work
 - [x] feature-pan-489-ryc: Add phase-utils.ts with detectPhase/getActiveSession/getProjectKey (commit: daccdadf)
-- [x] feature-pan-489-6e9: DetailPanelLayout fetches reviewStatus, derives activeSession, passes to TerminalPanel; TerminalPanel handles specialist vs agent sessions (commit: TBD)
+- [x] feature-pan-489-6e9: DetailPanelLayout fetches reviewStatus, derives activeSession, passes to TerminalPanel; TerminalPanel handles specialist vs agent sessions (commit: b416473a)
+- [x] feature-pan-489-eds: TerminalPanel tab strip — shows Agent + active specialist tabs, auto badge, pin/unpin on click (commit: TBD)
 
 ## Remaining Work
 - [x] feature-pan-489-ryc: Add phase detection logic and active session derivation
