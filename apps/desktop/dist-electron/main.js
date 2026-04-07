@@ -314,6 +314,140 @@ function stopServer() {
 	}, SIGTERM_GRACE_MS).unref();
 }
 //#endregion
+//#region src/menu.ts
+/**
+* Application menu bar for the Panopticon desktop app.
+*
+* Standard Electron menus: File, Edit, View, Window, Help
+* Plus a Panopticon menu with all orchestration actions.
+*
+* macOS: app name menu with About, Settings, Services etc.
+* Linux/Windows: Settings in File menu.
+*/
+async function fetchActiveWorkspaces() {
+	if (!serverUrl) return [];
+	try {
+		const resp = await fetch(`${serverUrl}/api/workspaces`, { signal: AbortSignal.timeout(2e3) });
+		if (!resp.ok) return [];
+		return (await resp.json()).workspaces?.slice(0, 10) ?? [];
+	} catch {
+		return [];
+	}
+}
+function buildMenuTemplate() {
+	const template = [];
+	if (process.platform === "darwin") template.push({
+		label: electron.app.name,
+		submenu: [
+			{ role: "about" },
+			{ type: "separator" },
+			{
+				label: "Settings...",
+				accelerator: "CmdOrCtrl+,",
+				click: () => {
+					showOrCreateWindow();
+					dispatchMenuAction("open-settings");
+				}
+			},
+			{ type: "separator" },
+			{ role: "services" },
+			{ type: "separator" },
+			{ role: "hide" },
+			{ role: "hideOthers" },
+			{ role: "unhide" },
+			{ type: "separator" },
+			{ role: "quit" }
+		]
+	});
+	template.push({
+		label: "File",
+		submenu: [...process.platform !== "darwin" ? [{
+			label: "Settings...",
+			accelerator: "CmdOrCtrl+,",
+			click: () => {
+				showOrCreateWindow();
+				dispatchMenuAction("open-settings");
+			}
+		}, { type: "separator" }] : [], { role: process.platform === "darwin" ? "close" : "quit" }]
+	});
+	template.push({ role: "editMenu" });
+	template.push({
+		label: "View",
+		submenu: [
+			{ role: "reload" },
+			{ role: "forceReload" },
+			{ role: "toggleDevTools" },
+			{ type: "separator" },
+			{ role: "resetZoom" },
+			{
+				role: "zoomIn",
+				accelerator: "CmdOrCtrl+="
+			},
+			{ role: "zoomOut" },
+			{ type: "separator" },
+			{ role: "togglefullscreen" }
+		]
+	});
+	template.push({ role: "windowMenu" });
+	template.push({
+		label: "Panopticon",
+		submenu: [
+			{
+				label: "Start Cloister",
+				click: () => callServerApi("/api/cloister/start", "POST")
+			},
+			{
+				label: "Stop Cloister",
+				click: () => callServerApi("/api/cloister/stop", "POST")
+			},
+			{
+				label: "Emergency Stop All Agents",
+				click: () => callServerApi("/api/agents/emergency-stop", "POST")
+			},
+			{ type: "separator" },
+			{
+				label: "Open Workspace",
+				id: "open-workspace-submenu",
+				submenu: [{
+					label: "Loading...",
+					enabled: false
+				}]
+			},
+			{ type: "separator" },
+			{
+				label: "Settings...",
+				accelerator: process.platform !== "darwin" ? "CmdOrCtrl+," : void 0,
+				click: () => {
+					showOrCreateWindow();
+					dispatchMenuAction("open-settings");
+				}
+			}
+		]
+	});
+	template.push({
+		role: "help",
+		submenu: [{
+			label: "Panopticon on GitHub",
+			click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli")
+		}, {
+			label: "Report an Issue",
+			click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli/issues")
+		}]
+	});
+	return template;
+}
+function configureApplicationMenu() {
+	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
+	electron.Menu.setApplicationMenu(menu);
+	const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+	if (panopticonMenu?.submenu) panopticonMenu.submenu.on("menu-will-show", () => {
+		fetchActiveWorkspaces().then((workspaces) => {
+			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
+			if (wsItem) wsItem.label = workspaces.length ? `Open Workspace (${workspaces.length})` : "Open Workspace";
+		});
+	});
+}
+//#endregion
 //#region src/main.ts
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -451,6 +585,7 @@ if (process.platform === "linux") electron.app.commandLine.appendSwitch("class",
 electron.app.on("ready", () => {
 	loadDesktopSettings();
 	registerIpcHandlers();
+	configureApplicationMenu();
 	if (process.platform === "win32") electron.app.setAppUserModelId(APP_ID);
 	if (process.platform === "darwin" && electron.app.dock) {
 		const iconPath = resolveResourcePath("icon.png");

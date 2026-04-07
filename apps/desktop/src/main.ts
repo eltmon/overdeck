@@ -13,6 +13,7 @@ import {
 import { createTray, destroyTray } from "./tray.js";
 import { loadDesktopSettings } from "./settings.js";
 import { startServer, stopServer } from "./server.js";
+import { configureApplicationMenu } from "./menu.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -208,6 +209,7 @@ if (process.platform === "linux") {
 app.on("ready", () => {
   loadDesktopSettings();
   registerIpcHandlers();
+  configureApplicationMenu();
 
   if (process.platform === "win32") {
     app.setAppUserModelId(APP_ID);
