@@ -15,6 +15,7 @@ import { loadDesktopSettings, getDesktopSettings, updateDesktopSetting } from ".
 import { startServer, stopServer } from "./server.js";
 import { configureApplicationMenu } from "./menu.js";
 import { initializeNotifications, registerNotificationHandlers } from "./notifications.js";
+import { handleAutoStartNag } from "./autostart.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -241,6 +242,7 @@ app.on("ready", () => {
     serverUrl = `http://127.0.0.1:${port}`;
     serverWsUrl = wsUrl;
     mainWindow = createWindow();
+    handleAutoStartNag();
   });
 });
 
