@@ -1953,7 +1953,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       // Second click — confirmed
       setConfirmingStart(false);
       if (confirmingStartTimer.current) clearTimeout(confirmingStartTimer.current);
-      startAgentMutation.mutate();
+      startAgentMutation.mutate({});
     } else {
       // First click — show inline confirm, auto-reset after 6s
       setConfirmingStart(true);
