@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle } from '../lib/store';
+import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 import {
   DndContext,
   DragOverlay,
@@ -1741,6 +1741,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     }
   }, [isSelected]);
 
+  // Review status for merge-readiness badge
+  const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
+  const isMerged = issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
+  const isReadyToMerge = !isMerged && reviewStatus?.readyForMerge === true;
+
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
   const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
@@ -2050,8 +2055,18 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               const difficulty = parseDifficultyLabel(issue.labels || []);
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
+            {/* Ready to merge badge — yellow indicator when review+tests passed */}
+            {isReadyToMerge && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-yellow-900/60 text-yellow-300 border border-yellow-500/40 uppercase tracking-wide"
+                title="Review and tests passed — ready for human merge approval"
+              >
+                <GitMerge className="w-3 h-3" />
+                Ready to Merge
+              </span>
+            )}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
-            {(issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged')) && (
+            {isMerged && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-green-900/60 text-green-300 border border-green-500/40 uppercase tracking-wide"
                 title="Branch verified merged into main"
