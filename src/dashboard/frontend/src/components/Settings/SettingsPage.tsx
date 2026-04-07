@@ -424,8 +424,8 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8 pb-32">
-      {/* Page Header */}
+    <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
+      {/* Page Header with inline action bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 mb-1">
@@ -433,6 +433,43 @@ export function SettingsPage() {
             <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
           </div>
           <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {saveMutation.isSuccess && (
+            <span className="flex items-center gap-1.5 text-success text-sm">
+              <CheckCircle className="w-4 h-4" />
+              Saved!
+            </span>
+          )}
+          {saveMutation.isError && (
+            <span className="flex items-center gap-1.5 text-destructive text-sm">
+              <AlertTriangle className="w-4 h-4" />
+              Save failed
+            </span>
+          )}
+          <button
+            onClick={handleRestoreOptimalDefaults}
+            className="px-4 py-2 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
+            title="Set all model assignments to research-based optimal defaults"
+          >
+            <Zap className="w-4 h-4" />
+            Optimal Defaults
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={!hasChanges}
+            className="px-4 py-2 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-40"
+          >
+            Undo
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!hasChanges || saveMutation.isPending}
+            className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-lg shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            Save Changes
+          </button>
         </div>
       </div>
 
@@ -731,18 +768,30 @@ export function SettingsPage() {
                               data-lpignore="true"
                               data-1p-ignore="true"
                               data-form-type="other"
-                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                              className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body ${apiKey ? 'pr-16' : 'pr-8'}`}
                             />
-                            <button
-                              onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                              className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
-                            >
-                              {showApiKey[provider.id] ? (
-                                <Eye className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4 opacity-50" />
-                              )}
-                            </button>
+                            {apiKey && (
+                              <button
+                                onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
+                                className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                                title={showApiKey[provider.id] ? 'Hide key' : 'Show key'}
+                              >
+                                {showApiKey[provider.id] ? (
+                                  <Eye className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4 opacity-50" />
+                                )}
+                              </button>
+                            )}
+                            {apiKey && (
+                              <button
+                                onClick={() => handleApiKeyChange(provider.id, '')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-destructive transition-colors"
+                                title="Delete API key"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         )}
                       </>
@@ -1081,50 +1130,6 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur-md border-t border-divider-strong shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-6 py-4 z-40">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-content-muted text-sm">
-            {saveMutation.isSuccess && (
-              <>
-                <CheckCircle className="w-4 h-4 text-success" />
-                <span className="text-success">Settings saved!</span>
-              </>
-            )}
-            {saveMutation.isError && (
-              <>
-                <AlertTriangle className="w-4 h-4 text-destructive" />
-                <span className="text-destructive">Error saving settings</span>
-              </>
-            )}
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={handleRestoreOptimalDefaults}
-              className="px-6 py-2 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
-              title="Set all model assignments to research-based optimal defaults"
-            >
-              <Zap className="w-4 h-4" />
-              Optimal Defaults
-            </button>
-            <button
-              onClick={handleReset}
-              disabled={!hasChanges}
-              className="px-6 py-2 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-50"
-            >
-              Undo Changes
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!hasChanges || saveMutation.isPending}
-              className="px-8 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-lg shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </footer>
 
       {/* Model Override Modal */}
       {modalWorkType && (

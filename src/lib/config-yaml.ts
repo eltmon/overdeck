@@ -424,26 +424,29 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
     }
 
     // Merge legacy API keys (for backward compatibility)
+    // If a `models.providers` section exists, the enabled state is already set above — don't
+    // override it here. Only auto-enable from API keys when there's no explicit providers config.
     if (config.api_keys) {
+      const hasProvidersConfig = !!config.models?.providers;
       if (config.api_keys.openai) {
         result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
-        result.enabledProviders.add('openai');
+        if (!hasProvidersConfig) result.enabledProviders.add('openai');
       }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
-        result.enabledProviders.add('google');
+        if (!hasProvidersConfig) result.enabledProviders.add('google');
       }
       if (config.api_keys.zai) {
         result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
-        result.enabledProviders.add('zai');
+        if (!hasProvidersConfig) result.enabledProviders.add('zai');
       }
       if (config.api_keys.kimi) {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
-        result.enabledProviders.add('kimi');
+        if (!hasProvidersConfig) result.enabledProviders.add('kimi');
       }
       if (config.api_keys.openrouter) {
         result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
-        result.enabledProviders.add('openrouter');
+        if (!hasProvidersConfig) result.enabledProviders.add('openrouter');
       }
     }
 
