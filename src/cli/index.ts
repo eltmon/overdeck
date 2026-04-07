@@ -307,6 +307,63 @@ program
       }
     }
 
+    // Check for installed Electron app — launch it instead of bare server
+    const electronAppPath = (() => {
+      const home = process.env.HOME || process.env.USERPROFILE || '';
+      const candidates: string[] = [];
+
+      if (process.platform === 'linux') {
+        // Installed AppImage or symlink in standard locations
+        candidates.push(
+          join(home, '.local', 'bin', 'panopticon'),
+          join(home, '.local', 'share', 'applications', 'panopticon'),
+          '/usr/local/bin/panopticon',
+          '/opt/panopticon/panopticon',
+        );
+        // Glob-style: $HOME/Applications/Panopticon*.AppImage
+        try {
+          const appsDir = join(home, 'Applications');
+          const { readdirSync } = require('fs') as typeof import('fs');
+          if (existsSync(appsDir)) {
+            const appImages = readdirSync(appsDir).filter(
+              (f: string) => f.startsWith('Panopticon') && f.endsWith('.AppImage'),
+            );
+            for (const f of appImages) candidates.push(join(appsDir, f));
+          }
+        } catch {
+          // ignore
+        }
+      } else if (process.platform === 'darwin') {
+        candidates.push(
+          '/Applications/Panopticon.app/Contents/MacOS/Panopticon',
+          join(home, 'Applications', 'Panopticon.app', 'Contents', 'MacOS', 'Panopticon'),
+        );
+      } else if (process.platform === 'win32') {
+        const localApp = process.env.LOCALAPPDATA || '';
+        candidates.push(join(localApp, 'Programs', 'panopticon', 'Panopticon.exe'));
+      }
+
+      return candidates.find((p) => existsSync(p)) ?? null;
+    })();
+
+    if (electronAppPath) {
+      console.log(chalk.dim(`Launching Panopticon desktop app...`));
+      console.log(chalk.dim(`  ${electronAppPath}`));
+      const { spawn } = await import('child_process');
+      const child = spawn(electronAppPath, [], {
+        detached: true,
+        stdio: 'ignore',
+        env: process.env,
+      });
+      child.on('error', (err) => {
+        console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
+        console.warn(chalk.dim('  Falling back to bare server mode'));
+      });
+      child.unref();
+      console.log(chalk.green('✓ Desktop app launched'));
+      return;
+    }
+
     // Start dashboard
     if (isProduction) {
       console.log(chalk.dim('Starting dashboard (bundled mode)...'));
