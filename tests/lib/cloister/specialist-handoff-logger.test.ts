@@ -11,9 +11,9 @@ import {
   getSpecialistHandoffStats,
   getTodaySpecialistHandoffs,
 } from '../../../src/lib/cloister/specialist-handoff-logger.js';
-import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { PANOPTICON_HOME } from '../../../src/lib/paths.js';
+import { PANOPTICON_HOME, AGENTS_DIR } from '../../../src/lib/paths.js';
 
 const TEST_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'specialist-handoffs.jsonl');
 const TEST_LOG_DIR = join(PANOPTICON_HOME, 'logs');
@@ -353,21 +353,35 @@ describe('specialist-handoff-logger', () => {
       expect(stats.successRate).toBe(1.0);
     });
 
-    it('should calculate queue depth (queued + processing)', () => {
+    it('should calculate queue depth from live hook files, not JSONL status', () => {
+      // Log handoffs with queued/processing status — these should NOT affect queueDepth
+      // because the JSONL is append-only and statuses are stale.
       const handoffs = [
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), status: 'queued' as const },
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'normal'), status: 'queued' as const },
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-3', 'normal'), status: 'processing' as const },
-        { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-4', 'normal'), status: 'completed' as const, result: 'success' as const },
-        { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-5', 'normal'), status: 'failed' as const },
       ];
-
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats();
+      // Without hook files: queueDepth = 0 (live hooks are authoritative)
+      const statsNoHooks = getSpecialistHandoffStats();
+      expect(statsNoHooks.queueDepth).toBe(0);
 
-      // 2 queued + 1 processing = 3
-      expect(stats.queueDepth).toBe(3);
+      // Write a hook.json for test-agent with 2 pending items
+      const testAgentDir = join(AGENTS_DIR, 'test-agent');
+      mkdirSync(testAgentDir, { recursive: true });
+      writeFileSync(
+        join(testAgentDir, 'hook.json'),
+        JSON.stringify({ agentId: 'test-agent', items: [{ id: 'a' }, { id: 'b' }] }),
+      );
+
+      try {
+        const statsWithHooks = getSpecialistHandoffStats();
+        expect(statsWithHooks.queueDepth).toBe(2);
+      } finally {
+        // Clean up hook file
+        rmSync(testAgentDir, { recursive: true, force: true });
+      }
     });
 
     it('should count today\'s handoffs correctly', () => {

@@ -3,14 +3,17 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-dpu: Today-scoped escalation count + UI label clarification
+Implementation complete — all beads closed
 
 ## Completed Work
 - [x] feature-pan-489-arq: Fixed queueDepth in getSpecialistHandoffStats() to use live hook queues (commit: 7e1b79fa)
-- [x] feature-pan-489-8ks: Added updateSpecialistHandoffStatus + wired to specialists/done (commit: TBD)
+- [x] feature-pan-489-8ks: Added updateSpecialistHandoffStatus + wired to specialists/done (commit: cccb5eac)
+- [x] feature-pan-489-dpu: Added todayEscalations to handoff stats, updated UI (commit: TBD)
 
 ## Remaining Work
-- [ ] feature-pan-489-dpu: Add today-scoped escalation count, clarify UI label
+(none)
+
+## Status: Implementation Complete
 
 ## Key Decisions
 
