@@ -22,6 +22,7 @@ import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { MemoryWarningBanner } from './components/MemoryWarningBanner';
 import { BootstrapGate } from './components/BootstrapGate';
 import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
@@ -351,6 +352,8 @@ export default function App() {
             <span className="text-destructive/60 text-xs shrink-0 animate-pulse">● Retrying…</span>
           </div>
         )}
+
+        <MemoryWarningBanner />
 
         {/* Missing Tracker API Key Banner */}
         {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
