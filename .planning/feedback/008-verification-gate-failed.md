@@ -1,15 +1,15 @@
 ---
 specialist: verification-gate
-issueId: PAN-506
+issueId: PAN-494
 outcome: failed
-timestamp: 2026-04-07T02:56:33Z
+timestamp: 2026-04-07T03:17:03Z
 ---
 
-VERIFICATION FAILED for PAN-506 (attempt 1/10):
+VERIFICATION FAILED for PAN-494 (attempt 1/10):
 
 Failed check: typecheck
 
-Verification FAILED at typecheck (1911ms):
+Verification FAILED at typecheck (2399ms):
 
 
 > panopticon-cli@0.6.0 typecheck
@@ -29,6 +29,6 @@ src/cli/commands/sync.ts(260,36): error TS2339: Property 'key' does not exist on
 3. Run the failing check locally to verify it passes
 4. Commit and push ALL changes
 5. ONLY THEN resubmit:
-curl -X POST http://localhost:3011/api/workspaces/PAN-506/request-review -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:3011/api/workspaces/PAN-494/request-review -H "Content-Type: application/json" -d '{}'
 
 Do NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.
