@@ -40,7 +40,7 @@ Add a `no-restricted-syntax` ESLint rule that flags `TryStatement` containing `Y
 - Extend existing `effect-patterns.test.ts` with a comment documenting the pattern (the ESLint rule is the real enforcement)
 
 ## Current Phase
-Implementing bead feature-pan-489-dzt: Add ESLint rule to prevent try/catch around yield* in Effect.gen
+Implementing bead feature-pan-489-svx: Verify typecheck, lint, and tests pass
 
 ## Completed Work
 - [x] feature-pan-489-2l3: Fixed 14 try/catch-around-yield* instances in routes/agents.ts (commit: cffb3138)
@@ -49,7 +49,7 @@ Implementing bead feature-pan-489-dzt: Add ESLint rule to prevent try/catch arou
 - [x] feature-pan-489-3hk: Fixed 1 try/catch-around-yield* instance in routes/specialists.ts — work state file parse (commit: pending)
 
 ## Remaining Work
-- [ ] feature-pan-489-dzt: Add ESLint rule to prevent try/catch around yield* in Effect.gen
+- [x] feature-pan-489-dzt: Added ESLint no-restricted-syntax rule to catch TryStatement:has(YieldExpression[delegate=true]) inside Effect.gen (commit: pending)
 - [ ] feature-pan-489-svx: Verify typecheck, lint, and tests pass
 
 ## Key Decisions

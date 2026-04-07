@@ -12,5 +12,13 @@
     "dist/",
     "node_modules/"
   ],
-  "rules": {}
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.object.name='Effect'][callee.property.name='gen'] TryStatement:has(YieldExpression[delegate=true])",
+        "message": "Avoid try/catch around yield* inside Effect.gen. Effect failures propagate through the fiber error channel, not as JS exceptions — the catch block never sees them. Use .pipe(Effect.catchAll(...)) or nested Effect.gen instead."
+      }
+    ]
+  }
 }
