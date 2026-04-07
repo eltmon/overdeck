@@ -1,338 +1,213 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-06T20:00:00Z",
+    "created": "2026-04-06T22:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-475: Enforce PR-based workflow — require reviews before merge"
+    "description": "Plan for PAN-512: Effect yield* failures not caught by JS try/catch — audit all agent route Effect.gen blocks"
   },
   "plan": {
-    "id": "pan-475",
-    "title": "Enforce PR-based workflow — require reviews before merge",
+    "id": "pan-512",
+    "title": "Effect yield* failures not caught by JS try/catch — audit all agent route Effect.gen blocks",
     "status": "approved",
-    "uid": "56a68971-5d64-4078-89fd-ca16d0f21367",
+    "uid": "56561b7c-9181-491b-8cc9-6c3955995da5",
     "author": "agent:claude-opus-4-6",
-    "sequence": 2,
-    "created": "2026-04-06T20:00:00Z",
-    "updated": "2026-04-06T22:43:19.263Z",
+    "sequence": 1,
+    "created": "2026-04-06T22:30:00.000Z",
+    "updated": "2026-04-06T22:30:00.000Z",
     "references": [
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/475",
-        "label": "PAN-475",
-        "type": "issue"
-      }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/512", "label": "PAN-512", "type": "issue" }
     ],
-    "tags": [
-      "workflow",
-      "merge",
-      "pr",
-      "ci",
-      "review"
-    ],
+    "tags": ["effect", "error-handling", "routes", "lint"],
     "narratives": {
-      "Problem": "Local workspaces merge via git merge, bypassing PRs. No audit trail, no CI gate, incomplete work reaches main uncaught, and hotfixes get wiped by merge-agent's git restore.",
-      "Proposal": "Replace local git merge with gh pr create + gh pr merge --squash for all workspaces. Review agent posts GitHub PR reviews. CI workflow enforces typecheck, lint, and tests on every PR."
+      "Problem": "JS try/catch around yield* inside Effect.gen is a no-op — Effect fiber failures bypass catch blocks entirely, causing silent error swallowing or uncaught 500s in 17 route handler locations.",
+      "Proposal": "Replace all 17 try/catch-around-yield* instances with proper Effect error combinators (catchAll, catchTag, either), and add an ESLint rule to prevent reintroduction."
     },
     "items": [
       {
-        "id": "ci-workflow",
-        "title": "Fix CI workflow to enforce quality gates on PRs",
-        "status": "completed",
+        "id": "fix-agents",
+        "title": "Fix 5 try/catch-around-yield* instances in routes/agents.ts",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-04-06T20:00:00Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-475"
-        },
-        "narrative": {
-          "Action": "Update .github/workflows/ci.yml: remove `|| true` from lint step so failures block PRs. Add a real test step running `npm test` (currently only does CLI smoke test). Ensure typecheck, lint, and test are all separate jobs that must pass for the PR to be mergeable."
-        },
-        "subItems": [
-          {
-            "id": "ci-workflow.ac1",
-            "title": "Lint failures cause CI to fail (no || true)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "ci-workflow.ac2",
-            "title": "CI runs npm test (Vitest suite), not just CLI smoke test",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "ci-workflow.ac3",
-            "title": "CI runs on pull_request events targeting main",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          }
-        ],
-        "completed": "2026-04-06T22:43:19.263Z"
-      },
-      {
-        "id": "pr-creation",
-        "title": "Create PR with rich description on work completion",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-06T20:00:00Z",
+        "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-475"
+          "issueLabel": "pan-512"
         },
         "narrative": {
-          "Action": "Expand ensurePRExists() in workspaces.ts to: (1) work for ALL workspaces, not just remote; (2) generate a rich PR body with issue link, beads task summary, and acceptance criteria checklist from the vBRIEF plan. Call ensurePRExists() during the work-completion flow (when pan work done triggers the specialist pipeline), not during triggerMerge(). Store the PR URL in review status so downstream agents can reference it."
+          "Action": "Replace try/catch blocks at lines ~218, ~362, ~1340, ~1346, ~1455, ~1487 with Effect.catchAll/Effect.either patterns. For the mixed JSON.parse+yield* case (line 218/362), separate the yield* from the sync parse."
         },
         "subItems": [
           {
-            "id": "pr-creation.ac1",
-            "title": "PR is created for local workspaces (not just remote)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-agents.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in agents.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "pr-creation.ac2",
-            "title": "PR body includes issue link, beads summary, and AC checklist",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-agents.ac2",
+            "title": "Agent start route still gracefully handles tmux kill-session failure (no existing session)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "pr-creation.ac3",
-            "title": "PR URL is stored in review status for downstream use",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-agents.ac3",
+            "title": "Docker availability check still sets dockerRunning=false on failure instead of crashing",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-06T22:43:19.263Z"
+        ]
       },
       {
-        "id": "review-github",
-        "title": "Review agent posts GitHub PR reviews",
-        "status": "completed",
+        "id": "fix-workspaces",
+        "title": "Fix 9 try/catch-around-yield* instances in routes/workspaces.ts",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-04-06T20:00:00Z",
+        "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-475"
+          "issueLabel": "pan-512"
         },
         "narrative": {
-          "Action": "After convoy synthesis in spawnReviewAgent() (review-agent.ts), post the review result as a GitHub PR review via `gh pr review <pr-url> --approve` or `--request-changes --body <synthesis>`. Keep existing feedback file writing for agent-to-agent communication. The PR URL comes from the ReviewContext (stored in review status during PR creation step)."
+          "Action": "Replace 9 try/catch blocks wrapping yield* calls with Effect error combinators. Special attention to: (1) the container control retry loop (needs Effect.either), (2) Docker check that returns 400 error response (needs Effect.catchAll returning Effect.succeed(jsonResponse)), (3) large .env repair block with multiple yield* calls."
         },
         "subItems": [
           {
-            "id": "review-github.ac1",
-            "title": "Review agent calls gh pr review --approve on pass",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-workspaces.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in workspaces.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "review-github.ac2",
-            "title": "Review agent calls gh pr review --request-changes with synthesis body on fail",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-workspaces.ac2",
+            "title": "Container control retry loop still tries multiple service names on failure",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "review-github.ac3",
-            "title": "Feedback files still written to .planning/feedback/ for agent consumption",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-workspaces.ac3",
+            "title": "Docker-not-running check still returns 400 JSON error (not 500)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-06T22:43:19.263Z"
+        ]
       },
       {
-        "id": "merge-pr-based",
-        "title": "Replace local git merge with rebase + gh pr merge --squash",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-06T20:00:00Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-475"
-        },
-        "narrative": {
-          "Action": "Rewrite triggerMerge() for local monorepo workspaces: (1) ensure PR exists, (2) call merge-agent to rebase feature branch on main and resolve conflicts, (3) push rebased branch, (4) call `gh pr merge --squash`, (5) run postMergeLifecycle(). Update buildMergePrompt() to instruct merge-agent to rebase instead of git merge. Remove the old local git merge code path. Keep the remote workspace path unchanged (already uses gh pr merge). Preserve all idempotency guards and mergeStatus state machine."
-        },
-        "subItems": [
-          {
-            "id": "merge-pr-based.ac1",
-            "title": "triggerMerge() uses gh pr merge --squash for local workspaces",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "merge-pr-based.ac2",
-            "title": "Merge agent rebases feature branch on main before merge",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "merge-pr-based.ac3",
-            "title": "Merge conflicts are resolved by merge-agent during rebase",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "merge-pr-based.ac4",
-            "title": "postMergeLifecycle() still runs after successful PR merge",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "merge-pr-based.ac5",
-            "title": "Idempotency guards and mergeStatus state machine preserved",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          }
-        ],
-        "completed": "2026-04-06T22:43:19.263Z"
-      },
-      {
-        "id": "correctness-completeness",
-        "title": "Extend correctness reviewer to flag incomplete work patterns",
-        "status": "completed",
+        "id": "fix-mission-control",
+        "title": "Fix 2 try/catch-around-yield* instances in routes/mission-control.ts",
+        "status": "pending",
         "priority": "medium",
-        "created": "2026-04-06T20:00:00Z",
+        "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-475"
+          "issueLabel": "pan-512"
         },
         "narrative": {
-          "Action": "Update the correctness convoy sub-agent prompt (code-review-correctness) to include consistency/completeness checks: (1) if a pattern is applied to some files in a directory, flag files that don't have it, (2) if beads tasks reference files, verify those files were actually modified, (3) if acceptance criteria exist in the vBRIEF plan, verify each one is addressed. This catches the PAN-470 class of bugs (httpHandler applied to 9/13 files)."
+          "Action": "Fix Linear comment sync and Rally story sync blocks. These already have partial inner Effect error handling (Effect.catchCause, Effect.tryPromise) — remove the redundant outer try/catch and ensure the inner handlers cover all failure paths."
         },
         "subItems": [
           {
-            "id": "correctness-completeness.ac1",
-            "title": "Correctness reviewer checks for inconsistent pattern application across related files",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "correctness-completeness.ac2",
-            "title": "Correctness reviewer verifies acceptance criteria from vBRIEF plan are addressed",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-mission-control.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in mission-control.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-06T22:43:19.263Z"
+        ]
       },
       {
-        "id": "docs-update",
-        "title": "Update CONTRIBUTING.md and work-agent prompt for PR workflow",
-        "status": "completed",
-        "priority": "low",
-        "created": "2026-04-06T20:00:00Z",
+        "id": "fix-specialists",
+        "title": "Fix 1 try/catch-around-yield* instance in routes/specialists.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-475"
+          "issueLabel": "pan-512"
         },
         "narrative": {
-          "Action": "Update CONTRIBUTING.md to accurately reflect the new PR-based merge flow (it already describes it aspirationally — make it factual). Update work-agent.md prompt to mention that `pan work done` creates a PR. Update merge-agent.md prompt to describe rebase-based conflict resolution instead of local git merge."
+          "Action": "Separate the yield* (file read) from the sync JSON.parse. yield* into a variable first, then try/catch only the JSON.parse."
         },
         "subItems": [
           {
-            "id": "docs-update.ac1",
-            "title": "CONTRIBUTING.md merge workflow section reflects actual PR-based flow",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "docs-update.ac2",
-            "title": "work-agent.md mentions PR creation on completion",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
-          },
-          {
-            "id": "docs-update.ac3",
-            "title": "merge-agent.md describes rebase + gh pr merge flow",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-06T22:43:19.263Z"
+            "id": "fix-specialists.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in specialists.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-06T22:43:19.263Z"
+        ]
+      },
+      {
+        "id": "eslint-rule",
+        "title": "Add ESLint rule to prevent try/catch around yield* in Effect.gen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Add a no-restricted-syntax ESLint rule (or custom rule) that flags TryStatement nodes containing YieldExpression descendants when inside an Effect.gen callback. Verify it catches the pattern and passes on legitimate try/catch (sync-only code). Must pass `npm run lint` after all fixes are applied."
+        },
+        "subItems": [
+          {
+            "id": "eslint-rule.ac1",
+            "title": "ESLint config contains a rule that flags try { yield* } catch inside generators",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "eslint-rule.ac2",
+            "title": "npm run lint passes with all 17 instances fixed",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates",
+        "title": "Verify typecheck, lint, and tests pass",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, and npm test. All must pass. No behavioral changes expected — the fixes make error handling actually work where it was silently broken before."
+        },
+        "subItems": [
+          {
+            "id": "quality-gates.ac1",
+            "title": "npm run typecheck passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "quality-gates.ac2",
+            "title": "npm run lint passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "quality-gates.ac3",
+            "title": "npm test passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
       }
     ],
     "edges": [
-      {
-        "from": "ci-workflow",
-        "to": "merge-pr-based",
-        "type": "blocks"
-      },
-      {
-        "from": "pr-creation",
-        "to": "review-github",
-        "type": "blocks"
-      },
-      {
-        "from": "pr-creation",
-        "to": "merge-pr-based",
-        "type": "blocks"
-      },
-      {
-        "from": "review-github",
-        "to": "merge-pr-based",
-        "type": "informs"
-      },
-      {
-        "from": "merge-pr-based",
-        "to": "docs-update",
-        "type": "informs"
-      }
+      { "from": "fix-agents", "to": "eslint-rule", "type": "informs" },
+      { "from": "fix-workspaces", "to": "eslint-rule", "type": "informs" },
+      { "from": "fix-mission-control", "to": "eslint-rule", "type": "informs" },
+      { "from": "fix-specialists", "to": "eslint-rule", "type": "informs" },
+      { "from": "fix-agents", "to": "quality-gates", "type": "blocks" },
+      { "from": "fix-workspaces", "to": "quality-gates", "type": "blocks" },
+      { "from": "fix-mission-control", "to": "quality-gates", "type": "blocks" },
+      { "from": "fix-specialists", "to": "quality-gates", "type": "blocks" },
+      { "from": "eslint-rule", "to": "quality-gates", "type": "blocks" }
     ]
   }
 }
