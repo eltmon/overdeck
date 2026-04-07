@@ -787,6 +787,155 @@ script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
 }
 
 /**
+ * Shared test-agent prompt builder — used by both buildTaskPrompt (ephemeral spawn)
+ * and wakeSpecialistWithTask (queue-based wake). Extracted to avoid the bug where
+ * ephemeral test specialists got empty prompts (PAN-XXX).
+ */
+async function buildTestAgentPromptContent(task: {
+  issueId: string;
+  branch?: string;
+  workspace?: string;
+}): Promise<string> {
+  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+  const testWorkspace = task.workspace || 'unknown';
+  const testGitInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
+  const testIsPolyrepo = testGitInfo.isPolyrepo;
+
+  const { extractTeamPrefix, findProjectByTeam } = await import('../projects.js');
+  const testTeamPrefix = extractTeamPrefix(task.issueId);
+  const testProjectConfig = testTeamPrefix ? findProjectByTeam(testTeamPrefix) : null;
+  const testConfigs = testProjectConfig?.tests;
+
+  let testCommands = '';
+  let baselineCommands = '';
+  const featureName = task.issueId.toLowerCase();
+  const mainWorkspacePath = testWorkspace.replace(/workspaces\/feature-[^/]+/, 'workspaces/main');
+  const projectRootPath = testProjectConfig?.path || testWorkspace.replace(/\/workspaces\/.*/, '');
+
+  if (testConfigs && Object.keys(testConfigs).length > 0) {
+    const testEntries = Object.entries(testConfigs);
+    const testSuites: string[] = [];
+    const baselineSuites: string[] = [];
+    for (const [name, cfg] of testEntries) {
+      const testDir = testIsPolyrepo
+        ? `${testWorkspace}/${cfg.path}`
+        : (cfg.path === '.' ? testWorkspace : `${testWorkspace}/${cfg.path}`);
+      const baseDir = testIsPolyrepo
+        ? `${mainWorkspacePath}/${cfg.path}`
+        : (cfg.path === '.' ? mainWorkspacePath : `${mainWorkspacePath}/${cfg.path}`);
+      const fallbackDir = cfg.path === '.' ? projectRootPath : `${projectRootPath}/${cfg.path}`;
+      testSuites.push(`echo "\\n=== Test suite: ${name} (${cfg.type}) ===" && cd "${testDir}" && ${cfg.command} 2>&1; echo "EXIT_CODE_${name}: $?"`);
+      baselineSuites.push(`echo "\\n=== Baseline: ${name} (${cfg.type}) ===" && cd "${baseDir}" 2>/dev/null && ${cfg.command} 2>&1 || (cd "${fallbackDir}" 2>/dev/null && ${cfg.command} 2>&1) || echo "BASELINE_SKIP_${name}: could not run baseline"; echo "EXIT_CODE_${name}: $?"`);
+    }
+    testCommands = testSuites.map((cmd, i) => `# Suite ${i + 1}\n${cmd}`).join('\n');
+    baselineCommands = baselineSuites.map((cmd, i) => `# Suite ${i + 1}\n${cmd}`).join('\n');
+  } else if (testIsPolyrepo) {
+    const testSuites: string[] = [];
+    const baselineSuites: string[] = [];
+    for (const gitDir of testGitInfo.gitDirs) {
+      const repoName = basename(gitDir);
+      testSuites.push(`echo "\\n=== ${repoName} ===" && cd "${gitDir}" && if [ -f pom.xml ]; then ./mvnw test 2>&1; elif [ -f package.json ]; then npm test 2>&1; else echo "No test runner found"; fi; echo "EXIT_CODE_${repoName}: $?"`);
+      const baseDir = `${mainWorkspacePath}/${repoName}`;
+      baselineSuites.push(`echo "\\n=== Baseline: ${repoName} ===" && cd "${baseDir}" 2>/dev/null && if [ -f pom.xml ]; then ./mvnw test 2>&1; elif [ -f package.json ]; then npm test 2>&1; else echo "No test runner found"; fi; echo "EXIT_CODE_${repoName}: $?"`);
+    }
+    testCommands = testSuites.join('\n');
+    baselineCommands = baselineSuites.join('\n');
+  } else {
+    testCommands = `cd "${testWorkspace}" && npm test 2>&1; echo "EXIT_CODE: $?"`;
+    baselineCommands = `cd "${mainWorkspacePath}" 2>/dev/null && npm test 2>&1 || (cd "${projectRootPath}" && npm test 2>&1); echo "EXIT_CODE: $?"`;
+  }
+
+  const testConfigSummary = testConfigs
+    ? Object.entries(testConfigs).map(([name, cfg]) => `- **${name}** (${cfg.type}): \`${cfg.command}\` in \`${cfg.path}/\``).join('\n')
+    : testIsPolyrepo
+      ? testGitInfo.gitDirs.map(d => `- **${basename(d)}**: auto-detected`).join('\n')
+      : '- Single test suite at workspace root';
+
+  const timeoutMs = testConfigs && Object.values(testConfigs).some(c => c.type === 'maven') ? '600000' : '300000';
+
+  return `Your task:
+1. Run ALL test suites — redirect output to file, read only summaries
+2. If ALL pass, skip baseline and report PASS
+3. If failures, run baseline on main and compare
+4. Only fail for NEW regressions (not pre-existing)
+5. Update status via API when done
+
+## Test Suites
+
+${testConfigSummary}
+
+## CRITICAL: Context Management — Output Redirection
+
+**NEVER let full test output flow into your context.** Always redirect to file and read only summaries.
+
+## CRITICAL: Bash Timeout for Test Commands
+
+**ALWAYS use timeout: ${timeoutMs} when running test commands.**
+
+## Step 1: Run Feature Branch Tests
+
+\`\`\`bash
+(
+${testCommands}
+) > /tmp/test-feature.txt 2>&1
+# Use timeout: ${timeoutMs} for this command
+echo "--- Feature test output tail ---"
+tail -40 /tmp/test-feature.txt
+grep "EXIT_CODE" /tmp/test-feature.txt
+\`\`\`
+
+## Step 2: Check Results
+
+- If ALL exit codes are 0 → skip baseline, go to "Update Status"
+- If any failures → continue to Step 3
+
+## Step 3: Baseline Comparison (ONLY if failures found)
+
+\`\`\`bash
+(
+${baselineCommands}
+) > /tmp/test-main.txt 2>&1
+# Use timeout: ${timeoutMs} for this command
+echo "--- Baseline test output tail ---"
+tail -40 /tmp/test-main.txt
+grep "EXIT_CODE" /tmp/test-main.txt
+\`\`\`
+
+Then compare failures:
+\`\`\`bash
+grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-feature.txt | head -30
+grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-main.txt | head -30
+\`\`\`
+
+**Pass criteria:** Feature branch introduces ZERO new test failures vs main.
+**Fail criteria:** Feature branch introduces NEW failures not present on main.
+
+## REQUIRED: Update Status via API
+
+You MUST execute the appropriate curl command and verify it succeeds.
+
+If NO new regressions (tests PASS):
+\`\`\`bash
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary]"}' | jq .
+\`\`\`
+
+If NEW regressions found (tests FAIL):
+\`\`\`bash
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures]"}' | jq .
+\`\`\`
+
+## Container Smoke Test
+
+After unit tests pass, verify Docker workspace frontend is accessible if containers are running:
+\`\`\`bash
+docker ps --filter "name=${featureName}" --format "{{.Names}} {{.Status}}" 2>/dev/null
+\`\`\`
+
+IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
+}
+
+/**
  * Build task prompt for a specialist
  */
 async function buildTaskPrompt(
@@ -844,8 +993,12 @@ Update status via API:
 - If review passes: POST with {"reviewStatus":"passed"} then queue test-agent`;
       break;
 
-    // test-agent: detailed prompt is in the second switch block below (line ~2173)
-    // Do NOT add an inline stub here — it would shadow the detailed template.
+    case 'test-agent': {
+      // Delegate to shared test-agent prompt builder
+      const testPrompt = await buildTestAgentPromptContent(task);
+      prompt += testPrompt;
+      break;
+    }
 
     case 'merge-agent': {
       const bInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
