@@ -75,6 +75,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [shadowMode, setShadowMode] = useState(false);
   const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
   const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
+  const [copyConfig, setCopyConfig] = useState(false);
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);
@@ -113,7 +114,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, effort }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, copyConfig, model: modelOverride || undefined, effort }),
       });
 
       if (!res.ok) {
@@ -813,6 +814,19 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             {effort === 'high' && 'Deep analysis — thorough exploration, edge cases, tradeoffs'}
                           </p>
                         </div>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={copyConfig}
+                            onChange={(e) => setCopyConfig(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-green-500 focus:ring-green-500 focus:ring-offset-gray-800"
+                          />
+                          <span className="text-sm text-content-body">
+                            Copy live config for UAT
+                            <span className="text-content-muted ml-1">(copies ~/.panopticon config + API keys into workspace)</span>
+                          </span>
+                        </label>
                       </div>
 
                       <button

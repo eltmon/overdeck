@@ -18,6 +18,7 @@ import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import { loadSettings, getAgentCommand, isAnthropicModel } from '../settings.js';
 import { createWorkspace } from '../workspace-manager.js';
+import { copyLiveConfigToWorkspace } from '../copy-live-config.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -95,6 +96,8 @@ export interface SpawnPlanningOptions {
   model?: string;
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
+  /** Copy live ~/.panopticon config into workspace for UAT testing. */
+  copyConfig?: boolean;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -403,7 +406,7 @@ Start by exploring the codebase to understand the context, then begin the discov
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, copyConfig, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -475,6 +478,21 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     }
 
     progress(1, 'Creating workspace', workspaceCreated ? 'Workspace ready' : 'Already exists', 'complete');
+
+    // ── Optional: Copy live config for UAT ────────────────────────────────
+    if (copyConfig) {
+      try {
+        const configResult = await copyLiveConfigToWorkspace(workspacePath, { updateCompose: !!startDocker });
+        if (configResult.copied.length > 0) {
+          console.log(`[start-planning] Copied live config: ${configResult.copied.join(', ')}`);
+        }
+        if (configResult.errors.length > 0) {
+          console.warn(`[start-planning] Config copy warnings: ${configResult.errors.join(', ')}`);
+        }
+      } catch (err: any) {
+        console.warn(`[start-planning] Failed to copy live config (non-fatal): ${err.message}`);
+      }
+    }
 
     // ── Step 2: Prepare planning environment ──────────────────────────────
     progress(2, 'Preparing planning environment', '.planning/ directory structure');

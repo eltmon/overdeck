@@ -24,6 +24,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 import { loadConfig } from '../../lib/config.js';
+import { copyLiveConfigToWorkspace } from '../../lib/copy-live-config.js';
 import { createFlyProviderFromConfig, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import {
@@ -207,6 +208,12 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('Update skills/agents/rules in an existing workspace')
     .option('--force', 'Overwrite user-modified files')
     .action(updateCommand);
+
+  workspace
+    .command('copy-config <issueId>')
+    .description('Copy live ~/.panopticon config into workspace for UAT testing')
+    .option('--update-compose', 'Inject .panopticon/ volume mount into docker-compose files')
+    .action(copyConfigCommand);
 }
 
 interface CreateOptions {
@@ -1442,6 +1449,63 @@ async function updateCommand(issueId: string, options: UpdateOptions): Promise<v
 
   } catch (error: any) {
     spinner.fail(`Failed to update workspace: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+interface CopyConfigOptions {
+  updateCompose?: boolean;
+}
+
+async function copyConfigCommand(issueId: string, options: CopyConfigOptions): Promise<void> {
+  const spinner = ora('Copying live config into workspace...').start();
+
+  try {
+    const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const folderName = `feature-${normalizedId}`;
+
+    const teamPrefix = extractTeamPrefix(issueId);
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+    if (!projectConfig) {
+      spinner.fail(`No project found for issue ${issueId}`);
+      process.exit(1);
+    }
+
+    const workspaceConfig = projectConfig.workspace;
+    const workspacesDir = join(projectConfig.path, workspaceConfig?.workspaces_dir || 'workspaces');
+    const workspacePath = join(workspacesDir, folderName);
+
+    if (!existsSync(workspacePath)) {
+      spinner.fail(`Workspace not found: ${workspacePath}`);
+      process.exit(1);
+    }
+
+    const result = await copyLiveConfigToWorkspace(workspacePath, { updateCompose: !!options.updateCompose });
+
+    if (result.errors.length > 0) {
+      spinner.warn(`Completed with warnings`);
+      for (const err of result.errors) {
+        console.log(chalk.yellow(`  ! ${err}`));
+      }
+    } else {
+      spinner.succeed(`Config copied to workspace .panopticon/`);
+    }
+
+    if (result.copied.length > 0) {
+      for (const f of result.copied) {
+        console.log(chalk.green(`  ✓ ${f}`));
+      }
+    }
+    if (result.skipped.length > 0) {
+      for (const f of result.skipped) {
+        console.log(chalk.dim(`  - ${f}`));
+      }
+    }
+    console.log(chalk.dim(`  .panopticon/ added to .git/info/exclude`));
+
+  } catch (error: any) {
+    spinner.fail(`Failed to copy config: ${error.message}`);
     process.exit(1);
   }
 }

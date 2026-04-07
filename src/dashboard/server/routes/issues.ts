@@ -412,9 +412,10 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       shadowMode = false,
       model: modelOverride,
       effort,
+      copyConfig = false,
     } = body as any;
 
-    console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
+    console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}, copyConfig=${copyConfig}`);
 
     // Check if a work agent is already running
     const issueLowerForCheck = id.toLowerCase();
@@ -607,6 +608,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             shadowMode,
             model: modelOverride || undefined,
             effort: effort || undefined,
+            copyConfig,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });
