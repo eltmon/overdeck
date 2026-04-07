@@ -362,6 +362,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
           try {
             const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
             execSync(`bd init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
+            try { execSync('git config beads.role contributor', { cwd: config.path, stdio: 'pipe' }); } catch { /* non-fatal */ }
             beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
           } catch {
             beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);

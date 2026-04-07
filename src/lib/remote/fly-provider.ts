@@ -384,7 +384,7 @@ export class FlyProvider implements RemoteProvider {
   async initBeads(vmName: string, workspacePath: string = '/workspace'): Promise<boolean> {
     const result = await this.ssh(
       vmName,
-      `cd ${workspacePath} && bd init --prefix PAN 2>&1 || bd init 2>&1`
+      `cd ${workspacePath} && (bd init --prefix PAN 2>&1 || bd init 2>&1) && git config beads.role contributor`
     );
     return result.exitCode === 0;
   }

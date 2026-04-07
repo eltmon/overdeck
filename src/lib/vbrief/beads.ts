@@ -61,6 +61,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
       // No main .beads/ and no local .beads/ — fall back to bd init
       try {
         await execAsync('bd init', { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] Initialized beads database in ${workspacePath}`);
       } catch (initErr: any) {
         return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
@@ -110,6 +111,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
         await execAsync(`bd init --prefix ${prefix}`, {
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
         });
+        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] bd init succeeded for prefix ${prefix}`);
       } catch (initErr: any) {
         // Init failed — return early with a specific error so callers know exactly what happened

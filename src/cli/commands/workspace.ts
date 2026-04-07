@@ -126,6 +126,7 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
 
       const prefix = 'workspace';
       await execAsync(`bd init --prefix ${prefix}`, { cwd: workspacePath, encoding: 'utf-8' });
+      await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
 
       const title = `${issueId.toUpperCase()}: Implementation`;
       const { stdout } = await execAsync(
