@@ -65,6 +65,8 @@ interface ModelGroup {
   provider: string;
   label: string;
   models: PickerModel[];
+  /** True if this provider has credentials configured and is usable */
+  usable: boolean;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -98,6 +100,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
   {
     provider: 'anthropic',
     label: 'Anthropic',
+    usable: true, // optimistic — assume authed if we can't check
     models: [
       { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'max'] },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', effortLevels: ['low', 'medium', 'high'] },
@@ -140,56 +143,56 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Fetch available models from the API on mount
+  // Fetch available models + auth status on mount
   useEffect(() => {
     async function loadModels() {
       try {
         const [availRes, orRes, authRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
-            Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
+            Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>> & {
+              usable?: Record<string, boolean>;
+            }
           >,
           fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
-            models: Array<{
-              id: string;
-              name: string;
-              promptCostPer1M: number;
-              supportsThinking: boolean;
-            }>;
+            models: Array<{ id: string; name: string; promptCostPer1M: number; supportsThinking: boolean }>;
             favorites: string[];
           }>,
           fetch('/api/settings/claude-auth').then((r) => r.json()) as Promise<ClaudeAuthStatus>,
         ]);
 
         const avail = availRes.status === 'fulfilled' ? availRes.value : {};
+        const usable: Record<string, boolean> = (avail as any).usable ?? {};
         const orData = orRes.status === 'fulfilled' ? orRes.value : { models: [], favorites: [] };
         const auth = authRes.status === 'fulfilled' ? authRes.value : null;
 
-        // Determine Anthropic auth mode for badge display
-        let anthropicAuthMode: PickerModel['authMode'] = 'noauth';
+        // Anthropic auth mode — server already checked credentials; reflect it via usable.anthropic
+        const anthropicUsable = usable.anthropic ?? false;
+        let anthropicAuthMode: PickerModel['authMode'] = anthropicUsable ? 'key' : 'noauth';
         let anthropicBadge: string | undefined;
         if (auth?.loggedIn && auth.subscriptionType) {
           anthropicAuthMode = 'sub';
-          anthropicBadge = auth.subscriptionType.toUpperCase(); // "MAX" or "PRO"
+          anthropicBadge = auth.subscriptionType.toUpperCase();
         } else if (auth?.hasAnthropicApiKey) {
           anthropicAuthMode = 'key';
-          anthropicBadge = undefined; // already have cost display
         }
 
         const newGroups: ModelGroup[] = [];
 
-        // Static providers (excluding openrouter — handled separately)
+        // Build provider groups — all providers shown, but `usable` flag drives UI treatment
         for (const [prov, models] of Object.entries(avail)) {
-          if (prov === 'openrouter') continue;
+          if (prov === 'openrouter' || prov === 'usable') continue;
           if (!Array.isArray(models) || models.length === 0) continue;
+          const provUsable = prov === 'anthropic' ? anthropicUsable : (usable[prov] ?? false);
           newGroups.push({
             provider: prov,
             label: PROVIDER_LABELS[prov] ?? prov,
+            usable: provUsable,
             models: models.map((m) => ({
               id: m.id,
               label: m.name,
               provider: prov,
               costDisplay: prov === 'anthropic' && anthropicAuthMode === 'sub'
-                ? undefined  // subscription — no per-token cost shown
+                ? undefined
                 : formatCost(m.costPer1MTokens),
               effortLevels: STATIC_EFFORT_LEVELS[m.id] ?? [],
               authMode: prov === 'anthropic' ? anthropicAuthMode : undefined,
@@ -198,15 +201,14 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
           });
         }
 
-        // OpenRouter favorites
+        // OpenRouter favorites (always usable if they appear — key already validated)
         const orFavorites: string[] = orData.favorites ?? [];
-        const orFavoriteModels = (orData.models ?? []).filter((m) =>
-          orFavorites.includes(m.id),
-        );
+        const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.includes(m.id));
         if (orFavoriteModels.length > 0) {
           newGroups.push({
             provider: 'openrouter',
             label: 'OpenRouter',
+            usable: usable.openrouter ?? false,
             models: orFavoriteModels.map((m) => ({
               id: m.id,
               label: m.name,
@@ -219,12 +221,26 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
         if (newGroups.length > 0) {
           setGroups(newGroups);
+
+          // Auto-select: if the currently stored model belongs to an unusable provider,
+          // switch to the first model from the first usable provider.
+          const currentProvider = newGroups.flatMap(g => g.models).find(m => m.id === value)?.provider;
+          const currentGroupUsable = newGroups.find(g => g.provider === currentProvider)?.usable ?? true;
+          if (!currentGroupUsable) {
+            const firstUsableGroup = newGroups.find(g => g.usable && g.models.length > 0);
+            if (firstUsableGroup) {
+              const firstModel = firstUsableGroup.models[0]!;
+              onChange(firstModel.id, firstModel.effortLevels);
+              localStorage.setItem(MODEL_STORAGE_KEY, firstModel.id);
+            }
+          }
         }
       } catch {
         // Keep fallback groups on error
       }
     }
     void loadModels();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Find selected model across all groups
@@ -277,25 +293,29 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
       {open && (
         <div className={styles.pickerDropdown}>
           {groups.map((group) => (
-            <div key={group.provider}>
+            <div key={group.provider} className={!group.usable ? styles.pickerGroupDisabled : undefined}>
               {groups.length > 1 && (
-                <div className={styles.pickerGroupHeader}>{group.label}</div>
+                <div className={styles.pickerGroupHeader}>
+                  {group.label}
+                  {!group.usable && (
+                    <span className={styles.pickerGroupNoKey}>no key</span>
+                  )}
+                </div>
               )}
               {group.models.map((model) => (
                 <button
                   key={model.id}
                   className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                  onClick={() => handleSelect(model)}
+                  onClick={() => group.usable ? handleSelect(model) : undefined}
+                  disabled={!group.usable}
                   type="button"
+                  title={!group.usable ? 'Configure an API key in Settings to use this provider' : undefined}
                 >
                   <span className={styles.pickerOptionLabel}>{model.label}</span>
-                  {model.authBadge && (
+                  {model.authBadge && group.usable && (
                     <span className={styles.pickerAuthBadge}>{model.authBadge}</span>
                   )}
-                  {model.authMode === 'noauth' && !model.authBadge && (
-                    <span className={styles.pickerAuthBadgeWarn}>No key</span>
-                  )}
-                  {!model.authBadge && model.authMode !== 'noauth' && model.costDisplay && (
+                  {model.costDisplay && group.usable && !model.authBadge && (
                     <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
                   )}
                 </button>
