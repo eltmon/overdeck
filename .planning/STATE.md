@@ -21,3 +21,4 @@ All beads complete — running tests and finalizing
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-07T04:40Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
