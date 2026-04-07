@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X,
@@ -203,6 +204,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     },
     onSuccess: () => {
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 
