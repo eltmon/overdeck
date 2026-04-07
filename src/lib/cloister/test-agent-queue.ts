@@ -5,7 +5,7 @@
  */
 
 import { setReviewStatus } from '../review-status.js';
-import { spawnEphemeralSpecialist } from './specialists.js';
+import { spawnEphemeralSpecialist, submitToSpecialistQueue } from './specialists.js';
 import { resolveProjectFromIssue } from '../projects.js';
 
 /**
@@ -46,8 +46,20 @@ export async function autoQueueTestAgentAndNotify(
       setReviewStatus(issueId, { testStatus: 'testing' });
       testTaskDelivered = true;
       console.log(`[test-queue] Spawned test specialist for ${issueId} (${resolved.projectKey})`);
+    } else if (result.error === 'specialist_busy') {
+      // Specialist is busy with another task — add to queue for deacon to drain
+      console.log(`[test-queue] Specialist busy for ${issueId} — queuing for deacon dispatch`);
+      submitToSpecialistQueue('test-agent', {
+        priority: 'high',
+        source: 'test-queue',
+        issueId,
+        workspace,
+        branch,
+      });
+      setReviewStatus(issueId, { testStatus: 'testing' });
+      testTaskDelivered = true; // notify agent that tests are queued
     } else {
-      // Retry once after 2s
+      // Non-busy failure — retry once after 2s
       console.log(`[test-queue] First spawn failed for ${issueId}: ${result.message}. Retrying in 2s...`);
       await new Promise((r) => setTimeout(r, 2000));
 
@@ -61,6 +73,18 @@ export async function autoQueueTestAgentAndNotify(
         setReviewStatus(issueId, { testStatus: 'testing' });
         testTaskDelivered = true;
         console.log(`[test-queue] Spawned test specialist for ${issueId} on retry`);
+      } else if (retry.error === 'specialist_busy') {
+        // Became busy between attempts — queue it
+        console.log(`[test-queue] Specialist became busy for ${issueId} — queuing for deacon dispatch`);
+        submitToSpecialistQueue('test-agent', {
+          priority: 'high',
+          source: 'test-queue',
+          issueId,
+          workspace,
+          branch,
+        });
+        setReviewStatus(issueId, { testStatus: 'testing' });
+        testTaskDelivered = true;
       } else {
         console.error(`[test-queue] Both spawn attempts failed for ${issueId}: ${retry.message}`);
         setReviewStatus(issueId, {

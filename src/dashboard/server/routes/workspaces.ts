@@ -2463,11 +2463,19 @@ ${workspaceAccessInstructions}
 
             if (!reviewResult.success) {
               if (reviewResult.error === 'specialist_busy') {
-                console.warn(
-                  `[review] review-agent busy for ${issueId}, reverting to pending for retry`
+                console.log(
+                  `[review] review-agent busy for ${issueId} — queuing for deacon dispatch`
                 );
+                const { submitToSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
+                submitToSpecialistQueue('review-agent', {
+                  priority: 'high',
+                  source: 'review-pipeline',
+                  issueId,
+                  branch: branchName,
+                  workspace: workspacePath,
+                });
                 completePendingOperation(issueId, null);
-                setReviewStatus(issueId, { reviewStatus: 'pending' });
+                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
                 return;
               }
               console.warn(
@@ -2717,10 +2725,18 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           remainingRequeues: MAX_AUTO_REQUEUE - newCount,
         });
       } else if (result.error === 'specialist_busy') {
-        console.warn(
-          `[request-review] Review specialist busy for ${issueId}, reverting to pending`
+        console.log(
+          `[request-review] Review specialist busy for ${issueId} — queuing for deacon dispatch`
         );
-        setReviewStatus(issueId, { reviewStatus: 'pending' });
+        const { submitToSpecialistQueue } = yield* Effect.promise(async () => import('../../../lib/cloister/specialists.js'));
+        submitToSpecialistQueue('review-agent', {
+          priority: 'high',
+          source: 'request-review',
+          issueId,
+          workspace: workspacePath,
+          branch: branchName,
+        });
+        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         return jsonResponse(
           {
             success: false,
