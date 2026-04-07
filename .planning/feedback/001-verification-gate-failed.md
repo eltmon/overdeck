@@ -1,65 +1,84 @@
 ---
 specialist: verification-gate
-issueId: PAN-488
+issueId: PAN-475
 outcome: failed
-timestamp: 2026-04-06T14:49:53Z
+timestamp: 2026-04-06T23:52:12Z
 ---
 
-VERIFICATION FAILED for PAN-488 (attempt 1/3):
+VERIFICATION FAILED for PAN-475 (attempt 1/10):
 
-Failed check: vbrief-ac
+Failed check: test
 
-Acceptance criteria check FAILED — 24/24 AC incomplete:
+Verification FAILED at test (59204ms):
 
-### Add docs/REPO-ARTIFACTS.md to the workspace branch (1/1 incomplete)
-  - [ ] docs/REPO-ARTIFACTS.md exists in the workspace and is committed to the feature branch
+ault)
+Warning: An update to TestComponent inside a test was not wrapped in act(...).
 
-### Rename all project-level .panopticon/ path references to .pan/ (3/3 incomplete)
-  - [ ] All project-level .panopticon/ path references updated to .pan/ (grep confirms zero remaining project-level references)
-  - [ ] Convoy outputs unify under .pan/convoy (triage and health share one directory)
-  - [ ] Existing unit tests for cost WAL pass after path rename
+When testing, code that causes React state updates should be wrapped into act(...):
 
-### Rename .panopticon.yaml to .pan.yaml with backwards compat (3/3 incomplete)
-  - [ ] .pan.yaml is loaded as the canonical config filename
-  - [ ] .panopticon.yaml falls back with stderr deprecation warning
-  - [ ] Existing workspaces with .panopticon.yaml continue to work (backwards compat verified in tests)
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
 
-### Change archive structure from flat to per-issue subdirectory (3/3 incomplete)
-  - [ ] complete-planning archives to docs/prds/active/<issue-id>/ subdirectory
-  - [ ] movePrd uses subdirectory format for completed PRDs
-  - [ ] findWorkspacePath includes feature-${numericSuffix} candidate
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at TestComponent (/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-475/node_modules/.bun/@testing-library+react@16.3.2/node_modules/@testing-library/react/dist/pure.js:328:5)
 
-### Add .pan/skills/ as a sync source with correct precedence (3/3 incomplete)
-  - [ ] .pan/skills/ in project repo is discovered and synced to .claude/skills/
-  - [ ] User-owned .claude/skills/<name>/ are never overwritten by .pan/skills/<name>/
-  - [ ] pan sync --dry-run shows .pan/skills/ source files correctly
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
-### Implement multi-tool sync for all 6 AI tool targets (4/4 incomplete)
-  - [ ] pan sync writes to all tools listed in also_sync (global + per-project merged)
-  - [ ] Each tool adapter produces correct format (mdc, AGENTS.md blocks, etc.)
-  - [ ] pan sync --dry-run shows multi-tool output correctly
-  - [ ] Per-project also_sync merges with global (never replaces)
+ FAIL  src/dashboard/frontend/src/__tests__/store.test.ts > selectIssuesByCycle > excludes done and canceled issues when includeCompleted=false
+AssertionError: expected [ 'PAN-1', 'PAN-2', 'PAN-3', 'PAN-5' ] to deeply equal [ 'PAN-1', 'PAN-2', 'PAN-5' ]
 
-### Safe migration of existing .panopticon/ subdirs in workspaces (3/3 incomplete)
-  - [ ] pan sync migrates existing .panopticon/ subdirs to .pan/ in active workspaces (non-destructive)
-  - [ ] Migration skips if .pan/ subdir already exists (handles partial previous runs safely)
-  - [ ] Migration never touches ~/.panopticon/ (global tool dir)
+- Expected
++ Received
 
-### Add .pan/events/, .pan/convoy/, .pan/prompts/ to .gitignore (2/2 incomplete)
-  - [ ] .pan/events/, .pan/convoy/, .pan/prompts/ are gitignored in new workspaces
-  - [ ] .pan/ itself and .planning/ are NOT gitignored
+  Array [
+    "PAN-1",
+    "PAN-2",
++   "PAN-3",
+    "PAN-5",
+  ]
 
-### Update documentation to match implemented behavior (2/2 incomplete)
-  - [ ] All documentation references to .panopticon.yaml updated to .pan.yaml
-  - [ ] docs/REPO-ARTIFACTS.md matches implemented behavior exactly
+ ❯ src/dashboard/frontend/src/__tests__/store.test.ts:281:35
+    279|   it('excludes done and canceled issues when includeCompleted=false', …
+    280|     const result = selectIssuesByCycle('current', false)(state) as Arr…
+    281|     expect(result.map(i => i.id)).toEqual(['PAN-1', 'PAN-2', 'PAN-5'])
+       |                                   ^
+    282|   })
+    283| 
 
-## REQUIRED: Complete all acceptance criteria BEFORE resubmitting
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
-1. Review the incomplete AC above
-2. Implement the missing requirements and write tests
-3. Update plan.vbrief.json subItem statuses to 'completed'
+ FAIL  src/dashboard/frontend/src/__tests__/store.test.ts > selectIssuesByCycle > filters by state field as well as canonicalStatus
+AssertionError: expected [ 'A', 'C' ] to deeply equal [ 'C' ]
+
+- Expected
++ Received
+
+  Array [
++   "A",
+    "C",
+  ]
+
+ ❯ src/dashboard/frontend/src/__tests__/store.test.ts:297:35
+    295|     const s: DashboardState = { ...emptyState, issuesRaw: mixedIssues }
+    296|     const result = selectIssuesByCycle('all', false)(s) as Array<{ id:…
+    297|     expect(result.map(i => i.id)).toEqual(['C'])
+       |                                   ^
+    298|   })
+    299| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+
+## REQUIRED: Fix the failing check BEFORE resubmitting
+
+1. Read the error output above carefully
+2. Fix the code causing the failure
+3. Run the failing check locally to verify it passes
 4. Commit and push ALL changes
 5. ONLY THEN resubmit:
-curl -X POST http://localhost:3011/api/workspaces/PAN-488/request-review -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:3011/api/workspaces/PAN-475/request-review -H "Content-Type: application/json" -d '{}'
 
-Do NOT resubmit until all AC are completed.
+Do NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.

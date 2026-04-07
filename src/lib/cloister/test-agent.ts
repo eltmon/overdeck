@@ -15,12 +15,6 @@ const __dirname = dirname(__filename);
 import { PANOPTICON_HOME } from '../paths.js';
 import { extractAcceptanceCriteria, formatAcceptanceCriteria } from '../vbrief/acceptance-criteria.js';
 import { processIfBlocks } from '../template.js';
-import {
-  getSessionId,
-  setSessionId,
-  recordWake,
-  getTmuxSessionName,
-} from './specialists.js';
 import { loadCloisterConfig } from './config.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -543,9 +537,6 @@ export async function spawnTestAgent(context: TestContext): Promise<TestResult> 
 
   console.log(`[test-agent] Detected test command: ${testCommand}`);
 
-  // Get existing session ID for resuming
-  const sessionId = getSessionId('test-agent');
-
   // Build prompt
   const prompt = buildTestPrompt(context);
 
@@ -566,19 +557,18 @@ export async function spawnTestAgent(context: TestContext): Promise<TestResult> 
 
   // Create launcher script for safe prompt handling
   // Use Haiku for test agent (cheaper, simpler tasks), interactive mode (no --print)
+  // NEVER use --resume: test runs are stateless; resuming a stale session causes Claude
+  // to report old failures from conversation history instead of re-running the tests.
   const launcherScript = join(testAgentDir, 'launcher.sh');
-  const resumeArg = sessionId ? `--resume ${sessionId}` : '';
 
   writeFileSync(launcherScript, `#!/bin/bash
 cd "${workingDir}"
 export PANOPTICON_AGENT_ID=test-agent
 prompt=$(cat "${promptFile}")
-exec claude --model haiku --dangerously-skip-permissions ${resumeArg} "$prompt" 2>&1 | tee "${outputFile}"
+exec claude --model haiku --dangerously-skip-permissions "$prompt" 2>&1 | tee "${outputFile}"
 `, { mode: 0o755 });
 
   const tmuxSessionName = 'test-agent';
-
-  console.log(`[test-agent] Session: ${sessionId || 'new session'}`);
 
   try {
     // Kill any existing test-agent session first
@@ -633,24 +623,11 @@ exec claude --model haiku --dangerously-skip-permissions ${resumeArg} "$prompt" 
         detectedTestCommand: testCommand,
       };
 
-      logTestHistory(context, result, sessionId || undefined);
+      logTestHistory(context, result);
       return result;
     }
 
     console.log(`[test-agent] Completed, parsing output`);
-
-    // Try to extract new session ID from output
-    if (!sessionId && output) {
-      const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/i);
-      if (sessionMatch) {
-        const newSessionId = sessionMatch[1];
-        setSessionId('test-agent', newSessionId);
-        recordWake('test-agent', newSessionId);
-        console.log(`[test-agent] Captured session ID: ${newSessionId}`);
-      }
-    } else if (sessionId) {
-      recordWake('test-agent');
-    }
 
     // Parse output for results
     const result = parseAgentOutput(output);
@@ -658,7 +635,7 @@ exec claude --model haiku --dangerously-skip-permissions ${resumeArg} "$prompt" 
     result.output = output;
 
     // Log to history
-    logTestHistory(context, result, sessionId || undefined);
+    logTestHistory(context, result);
 
     return result;
   } catch (error: any) {
@@ -684,7 +661,7 @@ exec claude --model haiku --dangerously-skip-permissions ${resumeArg} "$prompt" 
       detectedTestCommand: testCommand,
     };
 
-    logTestHistory(context, result, sessionId || undefined);
+    logTestHistory(context, result);
 
     return result;
   }
