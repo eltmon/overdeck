@@ -515,63 +515,6 @@ export function SettingsPage() {
         </div>
       )}
 
-      {/* Smart Model Selection Hero */}
-      <section className="mb-10">
-        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
-          <div className="flex flex-col lg:flex-row">
-            {/* Visualization */}
-            <div className="lg:w-2/5 bg-surface p-8 flex flex-col justify-center items-center border-b lg:border-b-0 lg:border-r border-divider relative overflow-hidden">
-              <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_50%,#3b82f6_0%,transparent_70%)]" />
-              <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-xs">
-                <div className="flex items-center justify-between w-full">
-                  <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <Terminal className="w-5 h-5 text-content-subtle" />
-                  </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-primary to-divider-strong mx-2" />
-                  <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <User className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-primary to-divider mx-2" />
-                  <div className="size-12 rounded-lg bg-primary flex items-center justify-center shadow-lg">
-                    <Zap className="w-5 h-5 text-content" />
-                  </div>
-                </div>
-                <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-content-muted">
-                  <span>Task</span>
-                  <span>Capability</span>
-                  <span>Model</span>
-                </div>
-              </div>
-            </div>
-            {/* Content */}
-            <div className="lg:w-3/5 p-8">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-0.5 badge-bg-primary text-primary text-[10px] font-bold uppercase tracking-wider rounded border badge-border-primary">Active</span>
-                <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
-              </div>
-              <p className="text-content-muted mb-6 leading-relaxed">
-                Panopticon automatically routes tasks to the optimal model based on capabilities, token budget, and latency requirements.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
-                  <div>
-                    <p className="text-sm font-semibold text-content">Capability Matching</p>
-                    <p className="text-xs text-content-muted">Best model for each task type</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
-                  <div>
-                    <p className="text-sm font-semibold text-content">Cost Optimization</p>
-                    <p className="text-xs text-content-muted">Balance performance vs spend</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Claude Code Authentication */}
       <section className="mb-12">
