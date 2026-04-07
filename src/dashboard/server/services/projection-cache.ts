@@ -33,11 +33,11 @@ const CACHE_KEY = 'dashboard';
 
 export function createProjectionCache(db: DbAdapter): ProjectionCache {
   const loadStmt = db.prepare<CacheRow>(
-    `SELECT key, data, sequence, updated_at FROM projection_cache WHERE key = :key`,
+    `SELECT key, data, sequence, updated_at FROM projection_cache WHERE key = ?`,
   );
   const upsertStmt = db.prepare<void>(
     `INSERT INTO projection_cache (key, data, sequence, updated_at)
-     VALUES (:key, :data, :sequence, :updated_at)
+     VALUES (?, ?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET
        data = excluded.data,
        sequence = excluded.sequence,
@@ -49,7 +49,7 @@ export function createProjectionCache(db: DbAdapter): ProjectionCache {
 
   function load(): DashboardSnapshot | null {
     try {
-      const row = loadStmt.get({ key: CACHE_KEY });
+      const row = loadStmt.get([CACHE_KEY]);
       if (!row) return null;
       const parsed = JSON.parse(row.data) as DashboardSnapshot;
       console.log(
@@ -70,12 +70,12 @@ export function createProjectionCache(db: DbAdapter): ProjectionCache {
     pendingSnapshot = null;
     debounceTimer = null;
     try {
-      upsertStmt.run({
-        key: CACHE_KEY,
-        data: JSON.stringify(snapshot),
-        sequence: snapshot.sequence,
-        updated_at: new Date().toISOString(),
-      });
+      upsertStmt.run([
+        CACHE_KEY,
+        JSON.stringify(snapshot),
+        snapshot.sequence,
+        new Date().toISOString(),
+      ]);
     } catch (err) {
       console.warn('[projection-cache] Failed to save snapshot:', err);
     }

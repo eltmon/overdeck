@@ -1,6 +1,6 @@
 # PAN-491: bun:sqlite named param binding broken in event-store.ts
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
 ## Problem
 
@@ -11,12 +11,7 @@
 The primary fix for `event-store.ts` was applied in commit `b2ade102` on `feature/pan-488` and **already merged to main**. That commit converted all SQL in `event-store.ts` from named parameters (`:name`/`$name`) to positional parameters (`?`) with array bindings, which work identically across both runtimes.
 
 ## Remaining Work
-
-**`src/dashboard/server/services/projection-cache.ts`** has the exact same bug:
-- Line 36: `WHERE key = :key` with `loadStmt.get({ key: CACHE_KEY })`
-- Lines 39-44: `VALUES (:key, :data, :sequence, :updated_at)` with `upsertStmt.run({ key, data, sequence, updated_at })`
-
-This doesn't manifest currently because the dashboard runs under Node 22, but it's a latent bug that will break if the server ever runs under Bun.
+None — all work complete.
 
 ## Approach
 
@@ -42,11 +37,14 @@ Files checked for named-param binding issues:
 
 **Simple** — single file, mechanical change following an established pattern.
 
+## Current Phase
+All work complete. Ready for review.
+
 ## Completed Work
-(none yet)
+- [x] feature-pan-489-7nk: Convert projection-cache.ts to positional SQL params (commit: 89e7cd8c)
 
 ## Key Decisions
-(none yet)
+- D1: Pre-existing typecheck errors in sync.ts and build errors in frontend are unrelated to this fix and existed before this branch.
 
 ## Specialist Feedback
 (none yet)
