@@ -1118,11 +1118,14 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
             let branch: string | undefined;
 
             if (existsSync(workStateFile)) {
-              try {
-                const workState = JSON.parse(yield* Effect.promise(() => readFile(workStateFile, 'utf-8')));
-                workspace = workState.workspace;
-                branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-              } catch {}
+              const workStateContent = yield* Effect.promise(() => readFile(workStateFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+              if (workStateContent !== null) {
+                try {
+                  const workState = JSON.parse(workStateContent);
+                  workspace = workState.workspace;
+                  branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+                } catch {}
+              }
             }
 
             submitToSpecialistQueue('test-agent', {
