@@ -25,3 +25,4 @@ Bead ei5 complete. Moving to bead 5c9 (Rename Mission Control to Command Deck).
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-07T03:17Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
