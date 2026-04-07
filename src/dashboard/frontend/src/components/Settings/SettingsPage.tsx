@@ -153,6 +153,7 @@ const AGENT_CATEGORIES: AgentCategory[] = [
       { id: 'convoy:security-reviewer' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
       { id: 'convoy:performance-reviewer' as WorkTypeId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
       { id: 'convoy:correctness-reviewer' as WorkTypeId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
+      { id: 'convoy:requirements-reviewer' as WorkTypeId, name: 'Requirements', icon: ClipboardList, description: 'Requirements coverage vs issue + vBRIEF', implemented: true },
       { id: 'convoy:synthesis-agent' as WorkTypeId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
     ],
   },

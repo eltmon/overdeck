@@ -174,6 +174,7 @@ function mapConvoyRoleToWorkType(role: string): WorkTypeId | null {
     'security': 'convoy:security-reviewer',
     'performance': 'convoy:performance-reviewer',
     'correctness': 'convoy:correctness-reviewer',
+    'requirements': 'convoy:requirements-reviewer',
     'synthesis': 'convoy:synthesis-agent',
   };
 
