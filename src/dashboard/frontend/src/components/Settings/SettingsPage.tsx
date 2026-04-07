@@ -147,7 +147,7 @@ const AGENT_CATEGORIES: AgentCategory[] = [
     ],
   },
   {
-    name: 'Convoy Reviewers',
+    name: 'Review Panel',
     icon: SplitSquareVertical,
     agents: [
       { id: 'convoy:security-reviewer' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
