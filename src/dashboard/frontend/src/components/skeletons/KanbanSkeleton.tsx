@@ -1,10 +1,10 @@
 /** Shimmer skeleton for the Kanban board — matches the 4-column layout (todo → done). */
 export function KanbanSkeleton() {
   const columns = [
-    { title: 'Todo', color: 'border-blue-500' },
+    { title: 'Todo', color: 'border-primary' },
     { title: 'In Progress', color: 'border-yellow-500' },
     { title: 'In Review', color: 'border-purple-500' },
-    { title: 'Done', color: 'border-green-500' },
+    { title: 'Done', color: 'border-success' },
   ]
 
   return (
@@ -12,10 +12,10 @@ export function KanbanSkeleton() {
       {columns.map((col) => (
         <div
           key={col.title}
-          className={`border-t-4 ${col.color} bg-pan-panel-left rounded-lg min-w-[280px] flex-1`}
+          className={`border-t-4 ${col.color} bg-surface-raised rounded-lg min-w-[280px] flex-1`}
         >
           {/* Column header */}
-          <div className="px-4 py-3 border-b border-pan-border">
+          <div className="px-4 py-3 border-b border-divider">
             <div className="flex items-center justify-between">
               <div className="h-4 w-24 animate-pulse bg-surface-2 rounded" />
               <div className="h-4 w-6 animate-pulse bg-surface-2 rounded" />

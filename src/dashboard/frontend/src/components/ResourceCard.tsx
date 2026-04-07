@@ -26,10 +26,10 @@ interface AgentCardProps {
 }
 
 const STATUS_DOT: Record<ContainerStats['status'], string> = {
-  running: 'bg-green-500',
-  stopped: 'bg-red-500',
-  unhealthy: 'bg-yellow-400',
-  restarting: 'bg-orange-400',
+  running: 'bg-success',
+  stopped: 'bg-destructive',
+  unhealthy: 'bg-warning',
+  restarting: 'bg-warning',
 };
 
 const STATUS_LABEL: Record<ContainerStats['status'], string> = {
@@ -40,13 +40,13 @@ const STATUS_LABEL: Record<ContainerStats['status'], string> = {
 };
 
 const AGENT_STATUS_DOT: Record<Agent['status'], string> = {
-  healthy: 'bg-green-500',
-  warning: 'bg-yellow-400',
-  stuck: 'bg-orange-400',
-  dead: 'bg-red-500',
+  healthy: 'bg-success',
+  warning: 'bg-warning',
+  stuck: 'bg-warning',
+  dead: 'bg-destructive',
   stopped: 'bg-surface-overlay',
-  starting: 'bg-purple-400',
-  failed: 'bg-red-600',
+  starting: 'bg-signal-review',
+  failed: 'bg-destructive',
 };
 
 export function ContainerCard({ container, history, onClick }: ContainerCardProps) {
@@ -58,7 +58,7 @@ export function ContainerCard({ container, history, onClick }: ContainerCardProp
   return (
     <button
       onClick={() => onClick(container)}
-      className="w-full text-left bg-surface-raised border border-divider rounded-lg p-3 hover:border-blue-500/50 hover:bg-surface-overlay transition-colors"
+      className="w-full text-left bg-surface-raised border border-divider rounded-lg p-3 hover:border-primary/50 hover:bg-surface-overlay transition-colors"
     >
       <div className="flex items-center gap-2 mb-2">
         <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[container.status]}`} />
@@ -92,7 +92,7 @@ export function AgentCard({ agent, onNavigate }: AgentCardProps) {
   return (
     <button
       onClick={() => onNavigate(agent.id)}
-      className="w-full text-left bg-surface-raised border border-divider rounded-lg p-3 hover:border-blue-500/50 hover:bg-surface-overlay transition-colors"
+      className="w-full text-left bg-surface-raised border border-divider rounded-lg p-3 hover:border-primary/50 hover:bg-surface-overlay transition-colors"
     >
       <div className="flex items-center gap-2 mb-2">
         <span className={`w-2 h-2 rounded-full shrink-0 ${AGENT_STATUS_DOT[agent.status]}`} />
@@ -111,13 +111,13 @@ export function AgentCard({ agent, onNavigate }: AgentCardProps) {
           <span className="text-content">{agent.runtime}</span>
         </div>
         {agent.consecutiveFailures > 0 && (
-          <div className="flex justify-between text-orange-400">
+          <div className="flex justify-between text-warning">
             <span>Failures</span>
             <span>{agent.consecutiveFailures}</span>
           </div>
         )}
       </div>
-      <div className="mt-1.5 text-xs text-blue-400">Click to view in Agents →</div>
+      <div className="mt-1.5 text-xs text-primary">Click to view in Agents →</div>
     </button>
   );
 }

@@ -91,9 +91,9 @@ async function fetchSpecialistHandoffStats(): Promise<SpecialistHandoffStats> {
 }
 
 const MODEL_COLORS = {
-  opus: 'text-purple-400 bg-purple-900/20 border-purple-500/30',
-  sonnet: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
-  haiku: 'text-green-400 bg-green-900/20 border-green-500/30',
+  opus: 'text-signal-review badge-bg-secondary border-signal-review/30',
+  sonnet: 'text-primary badge-bg-primary border-primary/30',
+  haiku: 'text-success badge-bg-success border-success/30',
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -104,30 +104,30 @@ const TRIGGER_LABELS: Record<string, string> = {
 };
 
 const TRIGGER_COLORS: Record<string, string> = {
-  stuck_escalation: 'text-red-400',
-  test_failure: 'text-orange-400',
-  task_complete: 'text-blue-400',
+  stuck_escalation: 'text-destructive',
+  test_failure: 'text-warning',
+  task_complete: 'text-primary',
   manual: 'text-content-subtle',
 };
 
 const SPECIALIST_COLORS = {
-  'review-agent': 'text-purple-400 bg-purple-900/20 border-purple-500/30',
-  'test-agent': 'text-green-400 bg-green-900/20 border-green-500/30',
-  'merge-agent': 'text-blue-400 bg-blue-900/20 border-blue-500/30',
+  'review-agent': 'text-signal-review badge-bg-secondary border-signal-review/30',
+  'test-agent': 'text-success badge-bg-success border-success/30',
+  'merge-agent': 'text-primary badge-bg-primary border-primary/30',
   'issue-agent': 'text-cyan-400 bg-cyan-900/20 border-cyan-500/30',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  queued: 'text-yellow-400',
-  processing: 'text-blue-400',
-  completed: 'text-green-400',
-  failed: 'text-red-400',
+  queued: 'text-warning',
+  processing: 'text-primary',
+  completed: 'text-success',
+  failed: 'text-destructive',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  urgent: 'text-red-400',
-  high: 'text-orange-400',
-  normal: 'text-blue-400',
+  urgent: 'text-destructive',
+  high: 'text-warning',
+  normal: 'text-primary',
   low: 'text-content-subtle',
 };
 
@@ -183,7 +183,7 @@ export function HandoffsPage() {
           </div>
           <div className="p-4 bg-surface-raised rounded-lg border border-divider">
             <div className="text-sm text-content-subtle mb-1">Success Rate</div>
-            <div className="text-2xl font-bold text-green-400">
+            <div className="text-2xl font-bold text-success">
               {(stats.successRate * 100).toFixed(0)}%
             </div>
           </div>
@@ -216,7 +216,7 @@ export function HandoffsPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-750 text-left text-sm text-content-subtle">
+              <tr className="bg-surface-emphasis text-left text-sm text-content-subtle">
                 <th className="px-4 py-3">Timestamp</th>
                 <th className="px-4 py-3">Agent</th>
                 <th className="px-4 py-3">Transition</th>
@@ -231,7 +231,7 @@ export function HandoffsPage() {
                 handoffsData.handoffs.map((handoff, index) => (
                   <tr
                     key={`${handoff.timestamp}-${index}`}
-                    className="border-t border-divider hover:bg-gray-750"
+                    className="border-t border-divider hover:bg-surface-emphasis"
                   >
                     <td className="px-4 py-3 text-content-subtle">
                       <div className="flex items-center gap-1">
@@ -283,9 +283,9 @@ export function HandoffsPage() {
                     </td>
                     <td className="px-4 py-3">
                       {handoff.success ? (
-                        <span className="text-green-400 text-xs">✓ Success</span>
+                        <span className="text-success text-xs">✓ Success</span>
                       ) : (
-                        <span className="text-red-400 text-xs" title={handoff.errorMessage}>
+                        <span className="text-destructive text-xs" title={handoff.errorMessage}>
                           ✗ Failed
                         </span>
                       )}
@@ -322,13 +322,13 @@ export function HandoffsPage() {
             </div>
             <div className="p-4 bg-surface-raised rounded-lg border border-divider">
               <div className="text-sm text-content-subtle mb-1">Queue Depth</div>
-              <div className="text-2xl font-bold text-orange-400">
+              <div className="text-2xl font-bold text-warning">
                 {specialistStats.queueDepth}
               </div>
             </div>
             <div className="p-4 bg-surface-raised rounded-lg border border-divider">
               <div className="text-sm text-content-subtle mb-1">Success Rate</div>
-              <div className="text-2xl font-bold text-green-400">
+              <div className="text-2xl font-bold text-success">
                 {(specialistStats.successRate * 100).toFixed(0)}%
               </div>
             </div>
@@ -351,7 +351,7 @@ export function HandoffsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-750 text-left text-sm text-content-subtle">
+                <tr className="bg-surface-emphasis text-left text-sm text-content-subtle">
                   <th className="px-4 py-3">Timestamp</th>
                   <th className="px-4 py-3">Issue</th>
                   <th className="px-4 py-3">Transition</th>
@@ -363,7 +363,7 @@ export function HandoffsPage() {
               <tbody className="text-sm">
                 {specialistHandoffsData && specialistHandoffsData.handoffs.length > 0 ? (
                   specialistHandoffsData.handoffs.map((handoff) => (
-                    <tr key={handoff.id} className="border-t border-divider hover:bg-gray-750">
+                    <tr key={handoff.id} className="border-t border-divider hover:bg-surface-emphasis">
                       <td className="px-4 py-3 text-content-subtle">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />

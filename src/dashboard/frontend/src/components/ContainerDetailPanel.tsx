@@ -77,10 +77,10 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-divider shrink-0">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-            container.status === 'running' ? 'bg-green-500' :
-            container.status === 'unhealthy' ? 'bg-yellow-400' :
-            container.status === 'restarting' ? 'bg-orange-400' :
-            'bg-red-500'
+            container.status === 'running' ? 'bg-success' :
+            container.status === 'unhealthy' ? 'bg-warning' :
+            container.status === 'restarting' ? 'bg-warning' :
+            'bg-destructive'
           }`} />
           <h2 className="font-semibold text-content text-sm flex-1 truncate" title={container.name}>
             {container.name}
@@ -106,7 +106,7 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-xs transition-colors ${
                 activeTab === tab.id
-                  ? 'text-blue-400 border-b-2 border-blue-500 -mb-px'
+                  ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-content-subtle hover:text-content'
               }`}
             >
@@ -256,7 +256,7 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
                       const isSensitive = /token|secret|key|pass|pwd|auth/i.test(key ?? '');
                       return (
                         <div key={i} className="text-xs font-mono flex gap-1 flex-wrap">
-                          <span className="text-blue-400">{key}</span>
+                          <span className="text-primary">{key}</span>
                           <span className="text-content-subtle">=</span>
                           <span className="text-content break-all">
                             {isSensitive ? '***' : val}

@@ -12,7 +12,7 @@ export function SpecialistRunLog() {
   if (!project || !type || !runId) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-red-400">Invalid parameters</div>
+        <div className="text-destructive">Invalid parameters</div>
       </div>
     );
   }

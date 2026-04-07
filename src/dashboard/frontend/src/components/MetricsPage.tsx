@@ -63,7 +63,7 @@ export function MetricsPage() {
           {/* Cost Today */}
           <div className="bg-surface-raised border border-divider rounded-lg p-6">
             <div className="flex items-center gap-3 mb-3">
-              <DollarSign className="w-6 h-6 text-green-400" />
+              <DollarSign className="w-6 h-6 text-success" />
               <h3 className="text-lg font-semibold text-content">Cost Today (UTC)</h3>
             </div>
             <div className="text-3xl font-bold text-content mb-2">
@@ -75,7 +75,7 @@ export function MetricsPage() {
           {/* Active Agents */}
           <div className="bg-surface-raised border border-divider rounded-lg p-6">
             <div className="flex items-center gap-3 mb-3">
-              <TrendingUp className="w-6 h-6 text-blue-400" />
+              <TrendingUp className="w-6 h-6 text-primary" />
               <h3 className="text-lg font-semibold text-content">Active Agents</h3>
             </div>
             <div className="text-3xl font-bold text-content mb-2">
@@ -89,7 +89,7 @@ export function MetricsPage() {
           {/* Stuck Agents */}
           <div className="bg-surface-raised border border-divider rounded-lg p-6">
             <div className="flex items-center gap-3 mb-3">
-              <AlertTriangle className="w-6 h-6 text-red-400" />
+              <AlertTriangle className="w-6 h-6 text-destructive" />
               <h3 className="text-lg font-semibold text-content">Stuck Agents</h3>
             </div>
             <div className="text-3xl font-bold text-content mb-2">
@@ -103,7 +103,7 @@ export function MetricsPage() {
           {/* Handoffs */}
           <div className="bg-surface-raised border border-divider rounded-lg p-6">
             <div className="flex items-center gap-3 mb-3">
-              <ArrowRightLeft className="w-6 h-6 text-purple-400" />
+              <ArrowRightLeft className="w-6 h-6 text-signal-review" />
               <h3 className="text-lg font-semibold text-content">Handoffs Today</h3>
             </div>
             <div className="text-3xl font-bold text-content mb-2">-</div>
@@ -128,7 +128,7 @@ export function MetricsPage() {
                     <span className="text-lg font-bold text-content-muted">#{index + 1}</span>
                     <span className="text-content font-mono text-sm">{agent.agentId}</span>
                   </div>
-                  <span className="text-green-400 font-semibold">
+                  <span className="text-success font-semibold">
                     ${agent.cost.toFixed(2)}
                   </span>
                 </div>
@@ -152,7 +152,7 @@ export function MetricsPage() {
                     <span className="text-lg font-bold text-content-muted">#{index + 1}</span>
                     <span className="text-content font-mono text-sm">{issue.issueId}</span>
                   </div>
-                  <span className="text-green-400 font-semibold">
+                  <span className="text-success font-semibold">
                     ${issue.cost.toFixed(2)}
                   </span>
                 </div>

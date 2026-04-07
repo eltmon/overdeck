@@ -33,10 +33,10 @@ interface CostBreakdownData {
 
 // Stage display config: label, color
 const STAGE_CONFIG: Record<string, { label: string; color: string }> = {
-  planning: { label: 'Planning', color: 'text-purple-400' },
-  implementation: { label: 'Implementation', color: 'text-blue-400' },
+  planning: { label: 'Planning', color: 'text-signal-review' },
+  implementation: { label: 'Implementation', color: 'text-primary' },
   review: { label: 'Review', color: 'text-amber-400' },
-  test: { label: 'Testing', color: 'text-green-400' },
+  test: { label: 'Testing', color: 'text-success' },
   merge: { label: 'Merge', color: 'text-emerald-400' },
   interactive: { label: 'Interactive', color: 'text-cyan-400' },
   unknown: { label: 'Other', color: 'text-content-subtle' },
@@ -122,7 +122,7 @@ export function CostBreakdownModal({ issueId, isOpen, onClose }: CostBreakdownMo
           )}
 
           {error && (
-            <div className="text-red-400 text-sm p-3 bg-red-900/20 rounded">
+            <div className="text-destructive text-sm p-3 badge-bg-destructive rounded">
               Failed to load cost data: {(error as Error).message}
             </div>
           )}
@@ -211,7 +211,7 @@ export function CostBreakdownModal({ issueId, isOpen, onClose }: CostBreakdownMo
                           </div>
                           <div className="h-1 bg-surface-overlay rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-blue-500/60 rounded-full transition-all"
+                              className="h-full bg-primary/60 rounded-full transition-all"
                               style={{ width: `${Math.max(pct, 1)}%` }}
                             />
                           </div>

@@ -134,12 +134,12 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-end">
       <div className="bg-surface w-full max-w-4xl h-full shadow-xl flex flex-col animate-slide-in-right">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-divider flex items-center justify-between bg-gray-850">
+        <div className="px-6 py-4 border-b border-divider flex items-center justify-between bg-surface-emphasis">
           <div className="flex items-center gap-3">
             {isSpecialist ? (
-              <Brain className="w-6 h-6 text-purple-400" />
+              <Brain className="w-6 h-6 text-signal-review" />
             ) : (
-              <Activity className="w-6 h-6 text-blue-400" />
+              <Activity className="w-6 h-6 text-primary" />
             )}
             <div>
               <h2 className="text-xl font-semibold text-content flex items-center gap-2">
@@ -157,7 +157,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
               )}
               {isSpecialist && !specialist && ephemeralInfo && (
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                  <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                     {ephemeralInfo.projectKey.toUpperCase()}
                   </span>
                   <span className="text-sm text-content-subtle">{ephemeralInfo.specialistType} (ephemeral)</span>
@@ -280,7 +280,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
             <h3 className="text-sm font-semibold text-content-subtle uppercase mb-3">
               Terminal Output
             </h3>
-            <div className="bg-gray-950 rounded-lg overflow-hidden">
+            <div className="bg-surface rounded-lg overflow-hidden">
               <TerminalView agentId={agentId} />
             </div>
           </div>

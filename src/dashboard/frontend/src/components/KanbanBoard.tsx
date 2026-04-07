@@ -1236,8 +1236,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           <div className="flex gap-4 overflow-x-auto pb-4">
             {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
               <DroppableColumn key={status} status={status}>
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-pan-panel-left rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-pan-panel-left/80' : ''}`}>
-                  <div className="px-4 py-3 border-b border-pan-border bg-pan-panel-left">
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                  <div className="px-4 py-3 border-b border-divider bg-surface-raised">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
                       <span className="text-sm text-content-subtle">{grouped[status].length}</span>
@@ -1758,11 +1758,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   ) ?? false);
 
   const priorityColors: Record<number, string> = {
-    0: 'border-l-gray-500',
-    1: 'border-l-red-500',
-    2: 'border-l-orange-500',
-    3: 'border-l-yellow-500',
-    4: 'border-l-blue-500',
+    0: 'border-l-content-muted',
+    1: 'border-l-destructive',
+    2: 'border-l-warning',
+    3: 'border-l-warning',
+    4: 'border-l-primary',
   };
 
   // Kill agent mutation
@@ -1881,11 +1881,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       ref={cardRef}
       data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
-      className={`rounded-lg p-3 border border-pan-border border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
+      className={`rounded-lg p-3 border border-divider border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-content-muted'} ${
         isSelected
           ? 'ring-2 ring-blue-500'
-          : 'hover:border-pan-border/80'
-      } ${isRunning ? 'badge-bg-primary' : 'bg-pan-panel-right'}`}
+          : 'hover:border-divider'
+      } ${isRunning ? 'badge-bg-primary' : 'bg-surface'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">

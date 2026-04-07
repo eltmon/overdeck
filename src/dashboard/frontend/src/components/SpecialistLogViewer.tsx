@@ -79,10 +79,10 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
           const regex = new RegExp(`(${searchTerm})`, 'gi');
           const parts = line.split(regex);
           return (
-            <div key={i} className="bg-yellow-900 bg-opacity-20">
+            <div key={i} className="badge-bg-warning">
               {parts.map((part, j) =>
                 regex.test(part) ? (
-                  <span key={j} className="bg-yellow-400 text-black">
+                  <span key={j} className="bg-warning text-white">
                     {part}
                   </span>
                 ) : (
@@ -108,7 +108,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
             <div className="text-sm text-content-subtle font-mono">{runId}</div>
           </div>
           {isStreaming && (
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <div className="flex items-center gap-2 text-sm text-success">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>Streaming...</span>
             </div>
@@ -121,7 +121,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
             placeholder="Search logs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-3 py-1 bg-surface-raised text-content text-sm rounded border border-divider-strong focus:border-blue-500 focus:outline-none"
+            className="px-3 py-1 bg-surface-raised text-content text-sm rounded border border-divider-strong focus:border-primary focus:outline-none"
           />
           <label className="flex items-center gap-2 text-sm text-content-subtle">
             <input
@@ -154,7 +154,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
       {/* Log content */}
       <div className="flex-1 overflow-auto p-4">
         {error ? (
-          <div className="text-red-400">{error}</div>
+          <div className="text-destructive">{error}</div>
         ) : (
           <pre className="text-sm text-content-body font-mono whitespace-pre-wrap">
             {highlightedLog}

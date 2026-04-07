@@ -35,16 +35,16 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
 
   if (!doc) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-32 text-text-muted text-sm">
         No plan available
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white overflow-hidden">
+    <div className="flex flex-col h-full bg-card text-foreground overflow-hidden">
       {/* Tab bar */}
-      <div className="flex border-b border-gray-700 shrink-0">
+      <div className="flex border-b border-border shrink-0">
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -53,8 +53,8 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
               tab === id
-                ? 'text-white border-b-2 border-blue-500'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'text-foreground border-b-2 border-primary'
+                : 'text-text-muted hover:text-text-secondary'
             }`}
           >
             <Icon className="w-4 h-4" />
@@ -83,7 +83,7 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
         )}
 
         {tab === 'raw' && (
-          <pre className="p-4 text-xs text-green-300 font-mono whitespace-pre-wrap break-all">
+          <pre className="p-4 text-xs text-success font-mono whitespace-pre-wrap break-all">
             {JSON.stringify(doc, null, 2)}
           </pre>
         )}
@@ -104,7 +104,7 @@ function DAGPlaceholder({ issueId }: { issueId: string }) {
 
   if (!DAGViewer) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-32 text-text-muted text-sm">
         Loading DAG...
       </div>
     );

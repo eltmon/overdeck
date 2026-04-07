@@ -11,9 +11,9 @@ interface ResourceBarProps {
 }
 
 function getBarColor(value: number): string {
-  if (value >= 85) return 'bg-red-500';
-  if (value >= 60) return 'bg-yellow-400';
-  return 'bg-green-500';
+  if (value >= 85) return 'bg-destructive';
+  if (value >= 60) return 'bg-warning';
+  return 'bg-success';
 }
 
 export function ResourceBar({ value, label, showValue = true, className = '' }: ResourceBarProps) {

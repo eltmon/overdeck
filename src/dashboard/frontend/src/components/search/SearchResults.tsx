@@ -20,19 +20,19 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const PRIORITY_COLORS: Record<number, string> = {
   0: 'text-content-muted',
-  1: 'text-red-500',
-  2: 'text-orange-500',
-  3: 'text-yellow-500',
-  4: 'text-blue-500',
+  1: 'text-destructive',
+  2: 'text-warning',
+  3: 'text-warning',
+  4: 'text-primary',
 };
 
 const STATUS_COLORS: Record<string, string> = {
   backlog: 'bg-surface-emphasis',
-  todo: 'bg-blue-600',
-  in_progress: 'bg-yellow-600',
-  in_review: 'bg-pink-600',
-  done: 'bg-green-600',
-  canceled: 'bg-gray-500',
+  todo: 'bg-primary',
+  in_progress: 'bg-warning',
+  in_review: 'bg-signal-review',
+  done: 'bg-success',
+  canceled: 'bg-content-muted',
 };
 
 export function SearchResults({ groupedResults, onSelect, onExternalLink }: SearchResultsProps) {
@@ -51,7 +51,7 @@ export function SearchResults({ groupedResults, onSelect, onExternalLink }: Sear
                 key={issue.id}
                 value={issue.identifier}
                 onSelect={() => onSelect(issue.identifier)}
-                className="px-4 py-3 cursor-pointer hover:bg-surface-overlay transition-colors border-b border-gray-750 last:border-b-0 aria-selected:bg-surface-overlay"
+                className="px-4 py-3 cursor-pointer hover:bg-surface-overlay transition-colors border-b border-divider last:border-b-0 aria-selected:bg-surface-overlay"
               >
                 <div className="flex items-start gap-3">
                   {/* Project color indicator */}
@@ -76,8 +76,8 @@ export function SearchResults({ groupedResults, onSelect, onExternalLink }: Sear
 
                       {/* Status badge */}
                       <span
-                        className={`px-2 py-0.5 rounded text-xs text-content ${
-                          STATUS_COLORS[canonicalStatus] || 'bg-surface-emphasis'
+                        className={`px-2 py-0.5 rounded text-xs text-white ${
+                          STATUS_COLORS[canonicalStatus] || 'bg-surface-emphasis text-content-subtle'
                         }`}
                       >
                         {issue.status}
@@ -126,7 +126,7 @@ export function SearchResults({ groupedResults, onSelect, onExternalLink }: Sear
                   {/* External link */}
                   <button
                     onClick={(e) => onExternalLink(issue.url, e)}
-                    className="p-1 text-content-subtle hover:text-blue-400 hover:bg-surface-emphasis rounded transition-colors shrink-0"
+                    className="p-1 text-content-subtle hover:text-primary hover:bg-surface-emphasis rounded transition-colors shrink-0"
                     title="Open in tracker"
                   >
                     <ExternalLink className="w-4 h-4" />

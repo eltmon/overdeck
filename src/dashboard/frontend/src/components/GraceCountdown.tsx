@@ -114,12 +114,12 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
   const progressPercent = (remainingSeconds / (gracePeriod.duration / 1000)) * 100;
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-yellow-900 bg-opacity-20 border border-yellow-600 rounded-lg">
-      <Clock className="w-5 h-5 text-yellow-400" />
+    <div className="flex items-center gap-3 p-3 badge-bg-warning border badge-border-warning rounded-lg">
+      <Clock className="w-5 h-5 text-warning" />
 
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-yellow-400">
+          <span className="text-sm font-medium text-warning">
             {gracePeriod.paused ? 'Paused' : 'Finishing in'}
           </span>
           <span className="text-lg font-mono text-content">{formatTime(remainingSeconds)}</span>
@@ -128,7 +128,7 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
         {!gracePeriod.paused && (
           <div className="w-full bg-surface-overlay rounded-full h-2">
             <div
-              className="bg-yellow-400 h-2 rounded-full transition-all duration-1000"
+              className="bg-warning h-2 rounded-full transition-all duration-1000"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -140,7 +140,7 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
           <button
             onClick={handleResume}
             disabled={resumeMutation.isPending}
-            className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900 hover:bg-opacity-30 rounded disabled:opacity-50"
+            className="p-2 text-warning hover:text-warning/80 hover:bg-warning/10 rounded disabled:opacity-50"
             title="Resume countdown"
           >
             <Play className="w-4 h-4" />
@@ -149,7 +149,7 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
           <button
             onClick={handlePause}
             disabled={pauseMutation.isPending}
-            className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900 hover:bg-opacity-30 rounded disabled:opacity-50"
+            className="p-2 text-warning hover:text-warning/80 hover:bg-warning/10 rounded disabled:opacity-50"
             title="Pause countdown"
           >
             <Pause className="w-4 h-4" />
@@ -159,7 +159,7 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
         <button
           onClick={handleExit}
           disabled={exitMutation.isPending}
-          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900 hover:bg-opacity-30 rounded disabled:opacity-50"
+          className="p-2 text-destructive hover:text-destructive/80 hover:bg-destructive/10 rounded disabled:opacity-50"
           title="Terminate now"
         >
           <XCircle className="w-4 h-4" />

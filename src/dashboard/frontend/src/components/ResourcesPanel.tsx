@@ -115,7 +115,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
 
   if (error) {
     return (
-      <div className="p-6 text-red-400 text-sm">Failed to load resources: {(error as Error).message}</div>
+      <div className="p-6 text-destructive text-sm">Failed to load resources: {(error as Error).message}</div>
     );
   }
 
@@ -144,7 +144,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
               onClick={() => setGroupBy(g)}
               className={`px-2 py-0.5 rounded text-xs transition-colors ${
                 groupBy === g
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-primary text-white'
                   : 'text-content-subtle hover:text-content hover:bg-surface-overlay'
               }`}
             >

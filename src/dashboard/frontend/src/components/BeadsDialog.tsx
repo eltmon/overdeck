@@ -50,7 +50,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
-            <List className="w-5 h-5 text-green-400" />
+            <List className="w-5 h-5 text-success" />
             <h2 className="font-semibold text-content">Tasks: {issueId}</h2>
           </div>
           <button
@@ -83,7 +83,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
           )}
 
           {error && (
-            <div className="text-red-400 text-center py-8">
+            <div className="text-destructive text-center py-8">
               Failed to load tasks
             </div>
           )}
@@ -101,11 +101,11 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
               {/* Summary stats */}
               <div className="flex items-center gap-4 text-xs text-content-subtle mb-3 pb-3 border-b border-divider">
                 <span className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full" />
+                  <div className="w-2 h-2 bg-primary rounded-full" />
                   {openTasks.length} open
                 </span>
                 <span className="flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3 text-green-400" />
+                  <CheckCircle className="w-3 h-3 text-success" />
                   {closedTasks.length} closed
                 </span>
               </div>
@@ -129,7 +129,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
         {/* Footer */}
         <div className="px-4 py-3 border-t border-divider text-xs text-content-muted flex items-center justify-between">
           <span>{data?.count || 0} task{data?.count !== 1 ? 's' : ''}</span>
-          <span className="text-gray-600">Beads</span>
+          <span className="text-content-subtle">Beads</span>
         </div>
       </div>
     </div>
@@ -139,14 +139,14 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
 function TaskItem({ task }: { task: BeadTask }) {
   const statusColors = {
     open: 'bg-surface-overlay/50 border-divider-strong',
-    in_progress: 'bg-blue-900/20 border-blue-600/50',
-    closed: 'bg-green-900/20 border-green-600/30 opacity-60',
+    in_progress: 'badge-bg-primary border-primary/40',
+    closed: 'badge-bg-success border-success/30 opacity-60',
   };
 
   const statusIcons = {
-    open: <div className="w-4 h-4 border-2 border-gray-400 rounded-full" />,
-    in_progress: <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />,
-    closed: <CheckCircle className="w-4 h-4 text-green-400" />,
+    open: <div className="w-4 h-4 border-2 border-border rounded-full" />,
+    in_progress: <Loader2 className="w-4 h-4 text-primary animate-spin" />,
+    closed: <CheckCircle className="w-4 h-4 text-success" />,
   };
 
   return (
@@ -159,7 +159,7 @@ function TaskItem({ task }: { task: BeadTask }) {
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           <span className="text-xs text-content-muted">{task.id}</span>
           {task.blockedBy.length > 0 && (
-            <span className="flex items-center gap-1 text-xs text-orange-400">
+            <span className="flex items-center gap-1 text-xs text-warning">
               <Clock className="w-3 h-3" />
               Blocked
             </span>
@@ -168,9 +168,9 @@ function TaskItem({ task }: { task: BeadTask }) {
             <span
               key={label}
               className={`text-xs px-1.5 py-0.5 rounded ${
-                label.includes('simple') || label.includes('trivial') ? 'bg-green-900/50 text-green-400' :
-                label.includes('medium') ? 'bg-yellow-900/50 text-yellow-400' :
-                label.includes('complex') || label.includes('hard') ? 'bg-red-900/50 text-red-400' :
+                label.includes('simple') || label.includes('trivial') ? 'badge-bg-success text-success' :
+                label.includes('medium') ? 'badge-bg-warning text-warning' :
+                label.includes('complex') || label.includes('hard') ? 'badge-bg-destructive text-destructive' :
                 'bg-surface-overlay text-content-body'
               }`}
             >
