@@ -112,6 +112,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
         existingHub.clients.add(ws);
+        // Most recently connected client takes over as input client
+        existingHub.inputClient = ws;
 
         // Force a SIGWINCH repaint so the new tab gets the current terminal state.
         // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
@@ -153,7 +155,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
               // Invalid JSON, treat as terminal input
             }
           }
-          // Forward input to PTY
+          // Only the active input client forwards keystrokes to the PTY.
+          // This prevents double-echo when multiple browser tabs have the same terminal open.
+          if (existingHub.inputClient !== ws) return;
           try {
             existingHub.pty.write(message);
           } catch { /* ignore */ }
@@ -201,6 +205,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         clients: new Set([ws]),
         cols: 120,
         rows: 29,
+        inputClient: ws, // first client is the initial input client
       };
 
       const startLocalPty = (cols: number, rows: number) => {
@@ -309,7 +314,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
           }
         }
 
-        // Terminal input — buffer if PTY not ready yet
+        // Terminal input — only forward if this client is the active input client.
+        // This prevents double-echo if multiple tabs have the same session open.
+        if (hub.inputClient !== ws) return;
         if (ptyProcess) {
           ptyProcess.write(message);
         } else {
