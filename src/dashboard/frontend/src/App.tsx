@@ -19,7 +19,8 @@ import { SearchModal } from './components/search/SearchModal';
 import { MissionControl } from './components/MissionControl';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
-import { Header, Tab } from './components/Header';
+import { Tab } from './components/Header';
+import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
 import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
@@ -45,7 +46,7 @@ interface TrackerStatus {
 
 const TAB_PATHS: Record<Tab, string> = {
   kanban: '/',
-  'mission-control': '/mission-control',
+  'command-deck': '/command-deck',
   agents: '/agents',
   resources: '/resources',
   convoys: '/convoys',
@@ -231,49 +232,53 @@ export default function App() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden transition-colors duration-150" style={{ backgroundColor: '#101622' }}>
+    <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
-      <Header
+
+      {/* Collapsible sidebar navigation */}
+      <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSearchOpen={() => setIsSearchOpen(true)}
       />
 
-      {/* Missing Tracker API Key Banner */}
-      {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
-        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center gap-3 shrink-0">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-          <p className="text-amber-400 text-sm flex-1">
-            <span className="font-semibold">Missing API key{missingKeyTrackers.length > 1 ? 's' : ''}:</span>{' '}
-            {missingKeyTrackers.map(t => (
-              <span key={t.type}>
-                {t.name} (<code className="font-mono text-xs bg-amber-500/20 px-1 rounded">{t.envVar}</code>)
-              </span>
-            )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ', ', curr], [] as React.ReactNode[])}.{' '}
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Missing Tracker API Key Banner */}
+        {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
+          <div className="bg-warning/10 border-b border-warning/30 px-4 py-2 flex items-center gap-3 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-warning-foreground shrink-0" />
+            <p className="text-warning-foreground text-sm flex-1">
+              <span className="font-semibold">Missing API key{missingKeyTrackers.length > 1 ? 's' : ''}:</span>{' '}
+              {missingKeyTrackers.map(t => (
+                <span key={t.type}>
+                  {t.name} (<code className="font-mono text-xs bg-warning/20 px-1 rounded">{t.envVar}</code>)
+                </span>
+              )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ', ', curr], [] as React.ReactNode[])}.{' '}
+              <button
+                onClick={() => setActiveTab('settings')}
+                className="underline hover:opacity-80 font-semibold"
+              >
+                Configure in Settings
+              </button>
+            </p>
             <button
-              onClick={() => setActiveTab('settings')}
-              className="underline hover:text-amber-300 font-semibold"
+              onClick={() => setTrackerBannerDismissed(true)}
+              className="text-warning-foreground/60 hover:text-warning-foreground shrink-0"
+              title="Dismiss"
             >
-              Configure in Settings
+              ✕
             </button>
-          </p>
-          <button
-            onClick={() => setTrackerBannerDismissed(true)}
-            className="text-amber-400/60 hover:text-amber-400 shrink-0"
-            title="Dismiss"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      <main className="flex-1 flex overflow-hidden">
-        {activeTab === 'mission-control' && (
-          <div className="w-full h-full">
-            <MissionControl issues={issues} />
           </div>
         )}
+
+        <main className="flex-1 flex overflow-hidden">
+          {activeTab === 'command-deck' && (
+            <div className="w-full h-full">
+              <MissionControl issues={issues} />
+            </div>
+          )}
         {activeTab === 'kanban' && (
           <BootstrapGate fallback={
             <div className="flex-1 overflow-auto p-6 w-full">
@@ -374,7 +379,8 @@ export default function App() {
             </div>
           </BootstrapGate>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog
