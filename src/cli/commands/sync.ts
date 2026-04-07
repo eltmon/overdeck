@@ -241,6 +241,37 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.info('No hooks to sync');
   }
 
+  // Migrate .panopticon/ → .pan/ and run multi-tool sync in all registered projects
+  const projects = listProjects();
+
+  // Ensure beads database exists for each registered project (first-time setup guard).
+  // bd install puts the binary in PATH, but bd init must be run once per project to
+  // create the Dolt database. Without it, workspace beads creation silently fails.
+  if (projects.length > 0 && checkCommand('bd')) {
+    for (const { key: projectKey, config } of projects) {
+      if (!existsSync(config.path)) continue;
+      const mainBeadsDir = join(config.path, '.beads');
+      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
+      // Test connectivity. If the database is missing, auto-init.
+      try {
+        execSync('bd list --json --limit 0 2>&1', { cwd: config.path, stdio: 'pipe', timeout: 8000 });
+      } catch (e: any) {
+        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
+        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
+          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
+          try {
+            const prefix = projectKey.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            execSync(`bd init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
+            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
+          } catch {
+            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
+          }
+        }
+      }
+    }
+  }
+
+
   // Check jq availability (required by statusline, beads, specialists)
   if (!checkCommand('jq')) {
     console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));

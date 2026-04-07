@@ -131,6 +131,15 @@ export function killSession(name: string): void {
 
 const execAsync = promisify(exec);
 
+export async function sessionExistsAsync(name: string): Promise<boolean> {
+  try {
+    await execAsync(`tmux has-session -t ${name} 2>/dev/null`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Send keys to a tmux session (async, non-blocking).
  * Uses load-buffer + paste-buffer for reliable delivery, with a delay before Enter.
