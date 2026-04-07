@@ -99,6 +99,16 @@ export interface SpecialistHealthState {
 }
 
 /**
+ * PAN-464: Tracks restart history for a workspace container.
+ */
+export interface ContainerRestartRecord {
+  count: number;          // Total restart attempts
+  firstRestart: string;   // ISO 8601 — when the first restart in the current burst happened
+  lastRestart: string;    // ISO 8601 — when the most recent restart happened
+  gaveUp?: boolean;       // True when max restarts exceeded — skip future auto-restarts
+}
+
+/**
  * Complete health check state for all specialists
  */
 export interface DeaconState {
@@ -108,6 +118,7 @@ export interface DeaconState {
   recentDeaths: string[];        // ISO timestamps of recent deaths
   lastMassDeathAlert?: string;   // ISO 8601
   mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
+  containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
 }
 
 /**
@@ -2051,10 +2062,49 @@ async function checkSpecialistQueues(): Promise<string[]> {
   return actions;
 }
 
+// PAN-464: Container restart backoff configuration
+const CONTAINER_RESTART_BACKOFF_MS = 60_000;   // Minimum 60s between restart attempts
+const CONTAINER_RESTART_MAX_COUNT = 5;          // Give up after 5 restarts
+const CONTAINER_RESTART_WINDOW_MS = 30 * 60_000; // Reset burst count after 30 min of quiet
+
+/**
+ * PAN-464: Compute exponential backoff delay for a container given its restart history.
+ * Returns delay in ms. Delay doubles each attempt: 60s, 120s, 240s, 480s, max 5 min.
+ */
+function containerRestartBackoffMs(count: number): number {
+  const base = CONTAINER_RESTART_BACKOFF_MS;
+  const max = 5 * 60_000; // 5 minutes cap
+  return Math.min(base * Math.pow(2, count - 1), max);
+}
+
+/**
+ * PAN-464: Kill orphaned host processes (e.g., Vite, node) for a workspace path.
+ * Orphaned Vite watchers exhaust inotify handles, causing ENOSPC in containers.
+ * Runs before restarting the container so the root cause is cleared.
+ */
+async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<void> {
+  try {
+    const { stdout } = await execAsync(
+      `lsof +D "${workspacePath}" -t 2>/dev/null || true`,
+      { encoding: 'utf-8', timeout: 10000 },
+    );
+    const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
+    const safePids = pids.filter(p => p !== String(process.pid));
+    if (safePids.length > 0) {
+      await execAsync(`kill ${safePids.join(' ')} 2>/dev/null || true`, { encoding: 'utf-8', timeout: 5000 });
+      console.log(`[deacon] Killed ${safePids.length} orphaned process(es) in ${workspacePath} before container restart`);
+    }
+  } catch {
+    // Non-fatal — proceed with restart even if cleanup fails
+  }
+}
+
 /**
  * PAN-464: Check Docker container health for active workspaces.
  * Crashed containers (e.g., Vite ENOSPC) break the UAT environment.
- * Auto-restart them so the workspace remains usable.
+ * Auto-restarts them with exponential backoff (60s → 120s → 240s → 5 min cap).
+ * Gives up after 5 restarts within 30 minutes to avoid restart loops.
+ * Kills orphaned host processes before restarting to fix the inotify root cause.
  */
 async function checkWorkspaceContainerHealth(): Promise<string[]> {
   const actions: string[] = [];
@@ -2067,7 +2117,12 @@ async function checkWorkspaceContainerHealth(): Promise<string[]> {
     const crashed = stdout.trim().split('\n').filter(Boolean);
     if (crashed.length === 0) return actions;
 
-    // Check if the workspace's agent is still active (only restart if agent is working)
+    const state = loadState();
+    if (!state.containerRestarts) state.containerRestarts = {};
+    let stateDirty = false;
+
+    const now = Date.now();
+
     for (const line of crashed) {
       const [name] = line.split('|');
       if (!name) continue;
@@ -2086,16 +2141,72 @@ async function checkWorkspaceContainerHealth(): Promise<string[]> {
         continue;
       }
 
+      // PAN-464: Backoff / give-up logic
+      const record = state.containerRestarts[name];
+      if (record) {
+        const windowStart = now - CONTAINER_RESTART_WINDOW_MS;
+        const firstRestartMs = new Date(record.firstRestart).getTime();
+
+        // Reset burst counter if the last restart was > 30 min ago (container ran stably for a while)
+        if (firstRestartMs < windowStart) {
+          delete state.containerRestarts[name];
+          stateDirty = true;
+        } else {
+          // Still within the burst window
+          if (record.gaveUp) {
+            console.log(`[deacon] Container ${name} exceeded max restarts — skipping (gave up)`);
+            continue;
+          }
+          const backoffMs = containerRestartBackoffMs(record.count);
+          const msSinceLast = now - new Date(record.lastRestart).getTime();
+          if (msSinceLast < backoffMs) {
+            console.log(`[deacon] Container ${name} in backoff (${Math.round((backoffMs - msSinceLast) / 1000)}s remaining)`);
+            continue;
+          }
+          if (record.count >= CONTAINER_RESTART_MAX_COUNT) {
+            record.gaveUp = true;
+            stateDirty = true;
+            const msg = `[deacon] Container ${name} exceeded max restarts (${CONTAINER_RESTART_MAX_COUNT}) — giving up`;
+            console.warn(msg);
+            actions.push(msg);
+            continue;
+          }
+        }
+      }
+
+      // Kill orphaned host processes (Vite, node) before restarting to fix inotify root cause
+      try {
+        const { resolveProjectFromIssue } = await import('../projects.js');
+        const issueUpper = issueLower.toUpperCase();
+        const resolved = resolveProjectFromIssue(issueUpper);
+        if (resolved) {
+          const workspacePath = `${resolved.projectPath}/workspaces/feature-${issueLower}`;
+          await killOrphanedWorkspaceProcesses(workspacePath);
+        }
+      } catch {
+        // Project not resolvable — skip orphan cleanup, still attempt restart
+      }
+
       // Restart the container
       try {
         await execAsync(`docker restart ${name}`, { encoding: 'utf-8', timeout: 30000 });
-        const msg = `[deacon] Auto-restarted crashed container ${name} (agent ${agentId} is active)`;
+        const existing = state.containerRestarts[name];
+        state.containerRestarts[name] = {
+          count: (existing?.count ?? 0) + 1,
+          firstRestart: existing?.firstRestart ?? new Date().toISOString(),
+          lastRestart: new Date().toISOString(),
+        };
+        stateDirty = true;
+        const count = state.containerRestarts[name].count;
+        const msg = `[deacon] Auto-restarted crashed container ${name} (attempt ${count}/${CONTAINER_RESTART_MAX_COUNT})`;
         console.log(msg);
         actions.push(msg);
       } catch (restartErr: any) {
         console.warn(`[deacon] Failed to restart ${name}: ${restartErr.message}`);
       }
     }
+
+    if (stateDirty) saveState(state);
   } catch {
     // Docker not available or other error — skip silently
   }
