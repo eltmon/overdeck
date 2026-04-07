@@ -33,6 +33,20 @@ This means:
 - If a feature genuinely cannot be completed in one session (e.g., token limits), the agent should document exactly what remains and NOT signal completion. The issue stays open until ALL work is done.
 - PRD phases are implementation guidance, not separate deliverables.
 
+## CRITICAL: Always Use `--json` with `gh issue view`
+
+`gh issue view <number>` (without `--json`) returns a non-zero exit code because GitHub's "Projects (classic) is being deprecated" GraphQL warning pollutes the output. Always use the `--json` flag:
+
+```bash
+# WRONG — exits non-zero due to deprecation warning
+gh issue view 123
+
+# CORRECT — suppresses warning, exits 0
+gh issue view 123 --json number,title,state,body,labels,url
+```
+
+This applies everywhere: skill files, agent prompts, shell scripts, and ad-hoc commands.
+
 ## CRITICAL: No Blocking Calls in Dashboard Server Code
 
 **NEVER use `execSync`, `readFileSync`, `writeFileSync`, `readdirSync`, or `statSync` in any code reachable from the dashboard server** (Effect route handlers in `src/dashboard/server/routes/`, services in `src/dashboard/server/services/`, or any module imported by them).
