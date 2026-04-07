@@ -753,13 +753,13 @@ const getWorkspaceRoute = HttpRouter.add(
           : null;
 
         if (urlSourceFile) {
-          try {
-            const content = yield* Effect.promise(() => readFile(urlSourceFile, 'utf-8'));
-            const urlMatches = content.matchAll(/(\w+):\s*(https?:\/\/[^\s\n]+)/gi);
+          const urlContent = yield* Effect.promise(() => readFile(urlSourceFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+          if (urlContent !== null) {
+            const urlMatches = urlContent.matchAll(/(\w+):\s*(https?:\/\/[^\s\n]+)/gi);
             for (const match of urlMatches) {
               services.push({ name: match[1], url: match[2] });
             }
-          } catch {}
+          }
         }
 
         if (services.length === 0) {
@@ -1103,12 +1103,12 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     }
 
     console.log(`Removing corrupted workspace: ${workspacePath}`);
-    try {
-      yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
-        encoding: 'utf-8',
-        maxBuffer: 50 * 1024 * 1024,
-      }));
-    } catch {
+    let rmFailed = false;
+    yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
+      encoding: 'utf-8',
+      maxBuffer: 50 * 1024 * 1024,
+    })).pipe(Effect.catchAll(() => Effect.sync(() => { rmFailed = true; })));
+    if (rmFailed) {
       console.log('Regular rm failed, using Docker to clean up root-owned files...');
       yield* Effect.promise(() => execAsync(
         `docker run --rm -v "${workspacePath}:/cleanup" alpine sh -c "rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?* 2>/dev/null || true"`,
@@ -1161,9 +1161,11 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace is already containerized' }, { status: 400 });
     }
 
-    try {
-      yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' }));
-    } catch {
+    const dockerRunning1 = yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' })).pipe(
+      Effect.map(() => true),
+      Effect.catchAll(() => Effect.succeed(false))
+    );
+    if (!dockerRunning1) {
       return jsonResponse(
         { error: 'Docker is not running. Start Docker Desktop first.' },
         { status: 400 }
@@ -1291,7 +1293,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
     if (!existsSync(join(workspacePlanningDir, 'STATE.md'))) {
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
       if (existsSync(legacyPlanningDir)) {
-        try {
+        yield* Effect.gen(function* () {
           yield* Effect.promise(() => mkdir(workspacePlanningDir, { recursive: true }));
           yield* Effect.promise(() => execAsync(
             `cp -r "${legacyPlanningDir}/"* "${workspacePlanningDir}/"`,
@@ -1300,9 +1302,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
           console.log(
             `[workspace/start] Copied planning from ${legacyPlanningDir} to workspace for ${issueId}`
           );
-        } catch (e) {
-          console.warn(`[workspace/start] Could not copy planning: ${e}`);
-        }
+        }).pipe(Effect.catchAll((e) => Effect.sync(() => console.warn(`[workspace/start] Could not copy planning: ${e}`))));
       }
     }
 
@@ -1310,16 +1310,12 @@ const postWorkspaceStartRoute = HttpRouter.add(
     if (!existsSync(workspaceBeadsDir)) {
       const projectRootBeadsDir = join(projectPath, '.beads');
       if (existsSync(projectRootBeadsDir)) {
-        try {
-          yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, {
-            encoding: 'utf-8',
-          }));
-          console.log(
-            `[workspace/start] Copied beads from project root to workspace for ${issueId}`
-          );
-        } catch (e) {
-          console.warn(`[workspace/start] Could not copy beads: ${e}`);
-        }
+        yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, {
+          encoding: 'utf-8',
+        })).pipe(
+          Effect.tap(() => Effect.sync(() => console.log(`[workspace/start] Copied beads from project root to workspace for ${issueId}`))),
+          Effect.catchAll((e) => Effect.sync(() => console.warn(`[workspace/start] Could not copy beads: ${e}`)))
+        );
       }
     }
 
@@ -1329,15 +1325,15 @@ const postWorkspaceStartRoute = HttpRouter.add(
 
     if (!existsSync(devScript)) {
       if (existsSync(devScriptInContainer)) {
-        try {
+        let repairErr: unknown = null;
+        yield* Effect.gen(function* () {
           yield* Effect.promise(() => symlink('.devcontainer/dev', devScript));
           yield* Effect.promise(() => chmod(devScriptInContainer, 0o755));
           console.log(`[workspace/start] Repaired: created ./dev symlink for ${issueId}`);
-        } catch (repairErr) {
+        }).pipe(Effect.catchAll((e) => Effect.sync(() => { repairErr = e; })));
+        if (repairErr !== null) {
           return jsonResponse(
-            {
-              error: `Workspace has no ./dev script and repair failed: ${repairErr}`,
-            },
+            { error: `Workspace has no ./dev script and repair failed: ${repairErr}` },
             { status: 400 }
           );
         }
@@ -1370,7 +1366,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
       }
 
       if (needsRepair) {
-        try {
+        yield* Effect.gen(function* () {
           const placeholders: Record<string, string> = { FEATURE_FOLDER: featureFolder };
           for (const [portName, portConfig] of Object.entries(
             projectConfig.workspace.ports
@@ -1416,18 +1412,18 @@ const postWorkspaceStartRoute = HttpRouter.add(
           console.log(
             `[workspace/start] Repaired: created .env with port assignments for ${issueId}`
           );
-        } catch (envErr) {
-          console.warn(
-            `[workspace/start] Could not repair .env for ${issueId}: ${envErr}`
-          );
-        }
+        }).pipe(Effect.catchAll((envErr) => Effect.sync(() =>
+          console.warn(`[workspace/start] Could not repair .env for ${issueId}: ${envErr}`)
+        )));
       }
     }
 
     // Check Docker is running
-    try {
-      yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' }));
-    } catch {
+    const dockerRunning2 = yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' })).pipe(
+      Effect.map(() => true),
+      Effect.catchAll(() => Effect.succeed(false))
+    );
+    if (!dockerRunning2) {
       return jsonResponse(
         { error: 'Docker is not running. Start Docker Desktop first.' },
         { status: 400 }
@@ -1436,7 +1432,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
 
     // Pre-start Flyway repair if applicable
     if (projectConfig?.workspace?.database?.migrations?.type === 'flyway') {
-      try {
+      yield* Effect.gen(function* () {
         const composePaths = [
           join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
           join(workspacePath, 'docker-compose.yml'),
@@ -1465,11 +1461,9 @@ const postWorkspaceStartRoute = HttpRouter.add(
             }
           }
         }
-      } catch (preCheckErr: any) {
-        console.log(
-          `[workspace/start] Pre-start Flyway check skipped: ${preCheckErr.message}`
-        );
-      }
+      }).pipe(Effect.catchAll((preCheckErr: any) => Effect.sync(() =>
+        console.log(`[workspace/start] Pre-start Flyway check skipped: ${preCheckErr.message}`)
+      )));
     }
 
     const activityId = Date.now().toString();
@@ -1669,9 +1663,11 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
       );
     }
 
-    try {
-      yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' }));
-    } catch {
+    const dockerRunning3 = yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' })).pipe(
+      Effect.map(() => true),
+      Effect.catchAll(() => Effect.succeed(false))
+    );
+    if (!dockerRunning3) {
       return jsonResponse(
         { error: 'Docker is not running. Start Docker Desktop first.' },
         { status: 400 }
@@ -1715,22 +1711,20 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         projectName
       ) {
         const pgContainer = `${projectName}-postgres-1`;
-        try {
-          const result = yield* Effect.promise(() => repairFlywayIfNeeded(
-            issueId,
-            pgContainer,
-            'myn',
-            pConfig,
-            workspacePath!
-          ));
-          if (result.repaired) {
-            console.log(`[container-control] ${result.message}`);
-          }
-        } catch (repairErr: any) {
-          console.warn(
-            `[container-control] Flyway pre-check failed (non-fatal): ${repairErr.message}`
-          );
-        }
+        yield* Effect.promise(() => repairFlywayIfNeeded(
+          issueId,
+          pgContainer,
+          'myn',
+          pConfig,
+          workspacePath!
+        )).pipe(
+          Effect.tap((result) => Effect.sync(() => {
+            if (result.repaired) console.log(`[container-control] ${result.message}`);
+          })),
+          Effect.catchAll((repairErr: any) => Effect.sync(() =>
+            console.warn(`[container-control] Flyway pre-check failed (non-fatal): ${repairErr.message}`)
+          ))
+        );
       }
     }
 
@@ -1738,17 +1732,18 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     let lastError = '';
 
     for (const serviceName of serviceNames) {
-      try {
-        const cmd = `docker compose -f "${composeFile}" ${projectName ? `--project-name "${projectName}"` : ''} ${action} ${serviceName}`;
-        console.log(`[container-control] Running: ${cmd}`);
-        yield* Effect.promise(() => execAsync(cmd, { encoding: 'utf-8', timeout: 30000 }));
+      const cmd = `docker compose -f "${composeFile}" ${projectName ? `--project-name "${projectName}"` : ''} ${action} ${serviceName}`;
+      console.log(`[container-control] Running: ${cmd}`);
+      const cmdError = yield* Effect.promise(() => execAsync(cmd, { encoding: 'utf-8', timeout: 30000 })).pipe(
+        Effect.map(() => null as string | null),
+        Effect.catchAll((err: any) => Effect.succeed(err.message || String(err)))
+      );
+      if (cmdError === null) {
         success = true;
-        console.log(
-          `[container-control] Successfully ${action}ed ${serviceName} for ${issueId}`
-        );
+        console.log(`[container-control] Successfully ${action}ed ${serviceName} for ${issueId}`);
         break;
-      } catch (err: any) {
-        lastError = err.message || String(err);
+      } else {
+        lastError = cmdError;
       }
     }
 
@@ -1856,11 +1851,9 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
 
     console.log(`[refresh-db] Starting DB refresh for ${issueId} (project: ${projectName})`);
 
-    try {
-      yield* Effect.promise(() => execAsync(`docker stop "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 }));
-    } catch {
-      console.log(`[refresh-db] API container not running or already stopped`);
-    }
+    yield* Effect.promise(() => execAsync(`docker stop "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 })).pipe(
+      Effect.catchAll(() => Effect.sync(() => console.log(`[refresh-db] API container not running or already stopped`)))
+    );
 
     yield* Effect.promise(() => execAsync(
       `docker exec "${pgContainer}" psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'myn' AND pid <> pg_backend_pid();"`,
@@ -1891,20 +1884,18 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
     ));
     console.log(`[refresh-db] Flyway setup: ${repairResult.message}`);
 
-    try {
-      yield* Effect.promise(() => execAsync(`docker start "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 }));
-    } catch {
-      console.log(`[refresh-db] Could not start API container (may need manual start)`);
-    }
+    yield* Effect.promise(() => execAsync(`docker start "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 })).pipe(
+      Effect.catchAll(() => Effect.sync(() => console.log(`[refresh-db] Could not start API container (may need manual start)`)))
+    );
 
     let customerCount = 0;
-    try {
-      const { stdout } = yield* Effect.promise(() => execAsync(
-        `docker exec "${pgContainer}" psql -U postgres -d myn -t -A -c "SELECT count(*) FROM customer;"`,
-        { encoding: 'utf-8', timeout: 10000 }
-      ));
-      customerCount = parseInt(stdout.trim(), 10) || 0;
-    } catch {}
+    const countResult = yield* Effect.promise(() => execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d myn -t -A -c "SELECT count(*) FROM customer;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    )).pipe(Effect.catchAll(() => Effect.succeed(null as { stdout: string } | null)));
+    if (countResult !== null) {
+      customerCount = parseInt(countResult.stdout.trim(), 10) || 0;
+    }
 
     console.log(
       `[refresh-db] DB refresh complete for ${issueId}: ${customerCount} customers`
@@ -2026,7 +2017,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           process.env.DASHBOARD_URL ||
           `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
         const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above BEFORE resubmitting\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests to verify your fixes\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
-        try {
+        yield* Effect.gen(function* () {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
           ));
@@ -2050,9 +2041,9 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
             );
           }
-        } catch (err) {
-          console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
-        }
+        }).pipe(Effect.catchAll((err) => Effect.sync(() =>
+          console.error(`[review-status] Failed to send feedback to ${agentId}:`, err)
+        )));
       }
 
       if (reviewStatus === 'passed') {
@@ -2071,19 +2062,16 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         const { autoQueueTestAgentAndNotify } = yield* Effect.promise(() => import(
           '../../../lib/cloister/test-agent-queue.js'
         ));
-        try {
+        yield* Effect.gen(function* () {
           yield* Effect.promise(() => autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent));
           yield* Effect.promise(() => Effect.runPromise(eventStore.append({
             type: 'pipeline.test-started',
             timestamp: new Date().toISOString(),
             payload: { issueId },
           })));
-        } catch (err) {
-          console.error(
-            `[review-status] Unhandled error in autoQueueTestAgentAndNotify for ${issueId}:`,
-            err
-          );
-        }
+        }).pipe(Effect.catchAll((err) => Effect.sync(() =>
+          console.error(`[review-status] Unhandled error in autoQueueTestAgentAndNotify for ${issueId}:`, err)
+        )));
       } else if (['blocked', 'failed'].includes(reviewStatus)) {
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-completed',
@@ -2124,7 +2112,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           process.env.DASHBOARD_URL ||
           `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
         const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures BEFORE resubmitting\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite to verify your fixes pass\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
-        try {
+        yield* Effect.gen(function* () {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
           ));
@@ -2148,9 +2136,9 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
             );
           }
-        } catch (err) {
-          console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
-        }
+        }).pipe(Effect.catchAll((err) => Effect.sync(() =>
+          console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err)
+        )));
       }
 
       if (testStatus === 'passed') {
@@ -2159,16 +2147,16 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId, passed: true },
         })));
-        try {
-          const agentId = `agent-${issueId.toLowerCase()}`;
+        {
+          const notifyAgentId = `agent-${issueId.toLowerCase()}`;
           yield* Effect.promise(() => messageAgent(
-            agentId,
+            notifyAgentId,
             `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`
-          ));
-          console.log(`[review-status] Notified ${agentId} that all checks passed`);
-        } catch (err) {
-          console.log(
-            `[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`
+          )).pipe(
+            Effect.tap(() => Effect.sync(() => console.log(`[review-status] Notified ${notifyAgentId} that all checks passed`))),
+            Effect.catchAll((err) => Effect.sync(() =>
+              console.log(`[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`)
+            ))
           );
         }
       }
@@ -2634,10 +2622,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     let requestReviewCommits: Record<string, string> | undefined;
     if (!workspaceInfo.isRemote) {
-      try {
+      yield* Effect.gen(function* () {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         requestReviewCommits = yield* Effect.promise(() => getWorkspaceGitInfo(workspacePath));
-      } catch {}
+      }).pipe(Effect.catchAll(() => Effect.void));
     }
 
     const reqVerifyOutcome = yield* Effect.promise(() => runVerificationForIssue(
@@ -2679,22 +2667,19 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       `[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`
     );
 
-    try {
+    let requestReviewError: Error | null = null;
+    type ReviewOutcome =
+      | { tag: 'no-project' }
+      | { tag: 'success' }
+      | { tag: 'busy' }
+      | { tag: 'dispatch-failed'; error: string }
+      | { tag: 'error' };
+    const reviewOutcome: ReviewOutcome = yield* Effect.gen(function* () {
       const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import(
         '../../../lib/cloister/specialists.js'
       ));
       const resolved = resolveProjectFromIssue(issueId);
-
-      if (!resolved) {
-        return jsonResponse(
-          {
-            success: false,
-            error: `No project configured for ${issueId}. Add it to projects.yaml.`,
-            autoRequeueCount: newCount,
-          },
-          { status: 500 }
-        );
-      }
+      if (!resolved) return { tag: 'no-project' } as const;
 
       const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
         issueId,
@@ -2709,55 +2694,53 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId },
         })));
-        return jsonResponse({
-          success: true,
-          queued: false,
-          message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
-          autoRequeueCount: newCount,
-          remainingRequeues: MAX_AUTO_REQUEUE - newCount,
-        });
+        return { tag: 'success' } as const;
       } else if (result.error === 'specialist_busy') {
-        console.warn(
-          `[request-review] Review specialist busy for ${issueId}, reverting to pending`
-        );
-        setReviewStatus(issueId, { reviewStatus: 'pending' });
-        return jsonResponse(
-          {
-            success: false,
-            error: 'Review specialist busy, will retry',
-            retryable: true,
-            autoRequeueCount: newCount,
-          },
-          { status: 409 }
-        );
+        console.warn(`[request-review] Review specialist busy for ${issueId}, reverting to pending`);
+        return { tag: 'busy' } as const;
       } else {
-        console.warn(
-          `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${result.error}`
-        );
-        setReviewStatus(issueId, {
-          reviewStatus: 'dispatch_failed',
-          reviewNotes: `Dispatch failed: ${result.error || result.message}`,
-        });
-        return jsonResponse(
-          {
-            success: false,
-            error: result.error || 'Failed to spawn review specialist',
-            autoRequeueCount: newCount,
-          },
-          { status: 500 }
-        );
+        console.warn(`[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${result.error}`);
+        return { tag: 'dispatch-failed', error: result.error || result.message } as const;
       }
-    } catch (error: any) {
-      console.error(`[request-review] Error:`, error);
-      setReviewStatus(issueId, {
-        reviewStatus: 'dispatch_failed',
-        reviewNotes: `Dispatch error: ${error.message}`,
-      });
+    }).pipe(Effect.catchAll((e: any) => Effect.sync(() => { requestReviewError = e; return { tag: 'error' } as const; })));
+
+    if (reviewOutcome.tag === 'error') {
+      const errMsg = requestReviewError?.message ?? 'unknown error';
+      console.error(`[request-review] Error:`, requestReviewError);
+      setReviewStatus(issueId, { reviewStatus: 'dispatch_failed', reviewNotes: `Dispatch error: ${errMsg}` });
+      return jsonResponse({ success: false, error: errMsg, autoRequeueCount: newCount }, { status: 500 });
+    }
+    if (reviewOutcome.tag === 'no-project') {
       return jsonResponse(
-        { success: false, error: error.message, autoRequeueCount: newCount },
+        { success: false, error: `No project configured for ${issueId}. Add it to projects.yaml.`, autoRequeueCount: newCount },
         { status: 500 }
       );
     }
+    if (reviewOutcome.tag === 'success') {
+      return jsonResponse({
+        success: true,
+        queued: false,
+        message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
+        autoRequeueCount: newCount,
+        remainingRequeues: MAX_AUTO_REQUEUE - newCount,
+      });
+    }
+    if (reviewOutcome.tag === 'busy') {
+      setReviewStatus(issueId, { reviewStatus: 'pending' });
+      return jsonResponse(
+        { success: false, error: 'Review specialist busy, will retry', retryable: true, autoRequeueCount: newCount },
+        { status: 409 }
+      );
+    }
+    // dispatch-failed
+    setReviewStatus(issueId, {
+      reviewStatus: 'dispatch_failed',
+      reviewNotes: `Dispatch failed: ${(reviewOutcome as any).error}`,
+    });
+    return jsonResponse(
+      { success: false, error: (reviewOutcome as any).error || 'Failed to spawn review specialist', autoRequeueCount: newCount },
+      { status: 500 }
+    );
   }))
 );
 
@@ -2809,12 +2792,10 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       verificationCycleCount: 0,
     });
 
-    try {
-      const { resetPostMergeState } = yield* Effect.promise(() => import(
-        '../../../lib/cloister/merge-agent.js'
-      ));
-      resetPostMergeState(issueId);
-    } catch {}
+    yield* Effect.promise(() => import('../../../lib/cloister/merge-agent.js')).pipe(
+      Effect.tap((mod) => Effect.sync(() => mod.resetPostMergeState(issueId))),
+      Effect.catchAll(() => Effect.void)
+    );
 
     console.log(
       `[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`
@@ -2822,10 +2803,11 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
 
     const rerun = (body as any)?.rerun === true;
     if (rerun) {
-      try {
-        const { dispatchToSpecialist } = yield* Effect.promise(() => import(
-          '../../../lib/cloister/specialists.js'
-        ));
+      const dispatchModule = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js')).pipe(
+        Effect.catchAll((rerunErr) => Effect.sync(() => { console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${rerunErr}`); return null as any; }))
+      );
+      if (dispatchModule) {
+        const { dispatchToSpecialist } = dispatchModule;
         const resolved = resolveProjectFromIssue(issueId);
         if (resolved) {
           const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -2847,9 +2829,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               if (result.success) {
                 console.log(`[reset-review] Re-dispatched review for ${issueId}`);
               } else {
-                console.warn(
-                  `[reset-review] Re-dispatch failed for ${issueId}: ${result.error}`
-                );
+                console.warn(`[reset-review] Re-dispatch failed for ${issueId}: ${result.error}`);
                 setReviewStatus(issueId, { reviewStatus: 'pending' });
               }
             })
@@ -2858,12 +2838,8 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               setReviewStatus(issueId, { reviewStatus: 'pending' });
             });
         } else {
-          console.warn(
-            `[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`
-          );
+          console.warn(`[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`);
         }
-      } catch (rerunErr) {
-        console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${rerunErr}`);
       }
     }
 
@@ -3298,19 +3274,22 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         `[approve] Review+test already passed for ${issueId}, forwarding to merge endpoint...`
       );
       const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-      try {
+      let forwardErr: Error | null = null;
+      const forwardResult = yield* Effect.gen(function* () {
         const mergeRes = yield* Effect.promise(() => fetch(
           `http://localhost:${apiPort}/api/workspaces/${issueId}/merge`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' } }
         ));
         const mergeData = (yield* Effect.promise(() => mergeRes.json())) as any;
-        return jsonResponse(mergeData, { status: mergeRes.status });
-      } catch (err: any) {
+        return { data: mergeData, status: mergeRes.status };
+      }).pipe(Effect.catchAll((e) => Effect.sync(() => { forwardErr = e as Error; return null as any; })));
+      if (forwardErr !== null) {
         return jsonResponse(
-          { error: `Failed to forward to merge: ${err.message}` },
+          { error: `Failed to forward to merge: ${forwardErr.message}` },
           { status: 500 }
         );
       }
+      return jsonResponse(forwardResult.data, { status: forwardResult.status });
     }
 
     return yield* Effect.promise(async () => {

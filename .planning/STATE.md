@@ -40,13 +40,13 @@ Add a `no-restricted-syntax` ESLint rule that flags `TryStatement` containing `Y
 - Extend existing `effect-patterns.test.ts` with a comment documenting the pattern (the ESLint rule is the real enforcement)
 
 ## Current Phase
-Implementing bead feature-pan-489-2l3: Fix all try/catch-around-yield* instances in routes/agents.ts
+Implementing bead feature-pan-489-ejs: Fix all try/catch-around-yield* instances in routes/workspaces.ts
 
 ## Completed Work
-- [x] feature-pan-489-2l3: Fixed 14 try/catch-around-yield* instances in routes/agents.ts — remote/local state reads, stopped agent state+runtime reads, cost parsing, workspace creation, planning/beads copy, readPlan import, bd list, beads auto-recovery, rename planning prompt, tmux kill-session, rm completed marker, docker checks (commit: pending)
+- [x] feature-pan-489-2l3: Fixed 14 try/catch-around-yield* instances in routes/agents.ts (commit: cffb3138)
+- [x] feature-pan-489-ejs: Fixed 22 try/catch-around-yield* instances in routes/workspaces.ts — URL file read, rm/docker fallback, 3x docker info checks, planning/beads copy, symlink+chmod, .env repair, Flyway checks, container loop, feedback send, messageAgent, git info, spawnEphemeralSpecialist, resetPostMergeState, dispatchToSpecialist, fetch forward, docker stop/start, customerCount (commit: pending)
 
 ## Remaining Work
-- [ ] feature-pan-489-ejs: Fix 9 try/catch-around-yield* instances in routes/workspaces.ts
 - [ ] feature-pan-489-wmt: Fix 2 try/catch-around-yield* instances in routes/mission-control.ts
 - [ ] feature-pan-489-3hk: Fix 1 try/catch-around-yield* instance in routes/specialists.ts
 - [ ] feature-pan-489-dzt: Add ESLint rule to prevent try/catch around yield* in Effect.gen
