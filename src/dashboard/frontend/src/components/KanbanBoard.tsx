@@ -1858,6 +1858,17 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     },
   });
 
+  const [isResuming, setIsResuming] = useState(false);
+  const resumingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear "resuming" state once the agent is actually running, or after 60s safety valve
+  useEffect(() => {
+    if (isResuming && isRunning) {
+      setIsResuming(false);
+      if (resumingTimeoutRef.current) clearTimeout(resumingTimeoutRef.current);
+    }
+  }, [isResuming, isRunning]);
+
   const resumeSessionMutation = useMutation({
     mutationFn: async () => {
       const agentId = activeAgent?.id;
@@ -1881,6 +1892,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       return res.json();
     },
     onSuccess: () => {
+      setIsResuming(true);
+      resumingTimeoutRef.current = setTimeout(() => setIsResuming(false), 60000);
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (err: Error) => {
@@ -1894,7 +1907,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   };
 
   // In Review card with stopped agent = "session lost" / needs recovery
-  const isSessionLost = !isRunning && activeAgent?.status === 'stopped' && canonical === 'in_review';
+  const isSessionLost = !isRunning && !isResuming && activeAgent?.status === 'stopped' && canonical === 'in_review';
 
   const [confirmingStart, setConfirmingStart] = useState(false);
   const confirmingStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1948,6 +1961,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
+            )}
+            {isResuming && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-primary text-primary-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Resuming…
+              </span>
             )}
             {isSessionLost && (
               <span
@@ -2358,8 +2377,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             disabled={resumeSessionMutation.isPending}
             className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
           >
-            {resumeSessionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {resumeSessionMutation.isPending ? 'Resuming...' : 'Resume Session'}
+            {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            {(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}
           </button>
           <button
             onClick={async (e) => {
@@ -2389,14 +2408,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {/* In Review items - Resume Session (if lost) + Reset Pipeline + Reopen + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
-          {isSessionLost && (
+          {(isSessionLost || isResuming) && (
             <button
               onClick={handleResumeSession}
-              disabled={resumeSessionMutation.isPending}
+              disabled={resumeSessionMutation.isPending || isResuming}
               className="flex items-center gap-1 text-xs font-medium text-warning-foreground hover:opacity-80 transition-colors disabled:opacity-50"
             >
-              {resumeSessionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              {resumeSessionMutation.isPending ? 'Resuming...' : 'Resume Session'}
+              {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              {(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}
             </button>
           )}
           <ResetPipelineButton issue={issue} />
