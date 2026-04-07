@@ -63,7 +63,7 @@ export function createWorktree(
 
   // Configure beads role so agents don't get "beads.role not configured" warnings
   try {
-    execSync('git config beads.role agent', { cwd: targetPath, stdio: 'pipe' });
+    execSync('git config beads.role contributor', { cwd: targetPath, stdio: 'pipe' });
   } catch { /* non-fatal */ }
 }
 

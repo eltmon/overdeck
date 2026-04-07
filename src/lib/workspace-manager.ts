@@ -249,7 +249,7 @@ async function createWorktree(
     await execAsync('git restore .', { cwd: targetPath }).catch(() => {});
 
     // Configure beads role so agents don't get "beads.role not configured" warnings
-    await execAsync('git config beads.role agent', { cwd: targetPath }).catch(() => {});
+    await execAsync('git config beads.role contributor', { cwd: targetPath }).catch(() => {});
 
     return { success: true, message: `Created worktree at ${targetPath}` };
   } catch (error) {
