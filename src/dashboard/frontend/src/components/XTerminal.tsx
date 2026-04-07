@@ -291,6 +291,22 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         term!.scrollLines(scrollLines);
       };
       terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
+
+      // Register input/resize handlers once per terminal instance.
+      // Using wsRef.current ensures they always send to the current WebSocket,
+      // even after reconnects — this avoids accumulating duplicate handlers
+      // that would send each keystroke multiple times.
+      term.onData((data: string) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(data);
+        }
+      });
+
+      term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
     }
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
@@ -441,18 +457,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
     };
-
-    term.onData((data: string) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
-
-    term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-      }
-    });
 
     const handleResize = debounce(() => {
       if (ws.readyState === WebSocket.OPEN) {
