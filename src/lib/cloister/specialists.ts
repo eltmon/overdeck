@@ -87,8 +87,7 @@ function getProviderEnvForModel(model: string): Record<string, string> {
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }
-  console.warn(`[specialist] No API key for ${provider.displayName}, falling back to Anthropic`);
-  return {};
+  throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
 }
 
 /**

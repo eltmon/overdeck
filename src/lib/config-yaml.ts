@@ -78,6 +78,7 @@ export interface YamlConfig {
     google?: string;
     zai?: string;
     kimi?: string;
+    openrouter?: string;
   };
 
   /** Tracker API keys (override environment variables) */
