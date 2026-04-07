@@ -276,9 +276,9 @@ describe('selectIssuesByCycle', () => {
   ]
   const state: DashboardState = { ...emptyState, issuesRaw: issues }
 
-  it('excludes done and canceled issues when includeCompleted=false', () => {
+  it('excludes canceled issues but keeps done when includeCompleted=false', () => {
     const result = selectIssuesByCycle('current', false)(state) as Array<{ id: string }>
-    expect(result.map(i => i.id)).toEqual(['PAN-1', 'PAN-2', 'PAN-5'])
+    expect(result.map(i => i.id)).toEqual(['PAN-1', 'PAN-2', 'PAN-3', 'PAN-5'])
   })
 
   it('includes all issues when includeCompleted=true', () => {
@@ -294,7 +294,7 @@ describe('selectIssuesByCycle', () => {
     ]
     const s: DashboardState = { ...emptyState, issuesRaw: mixedIssues }
     const result = selectIssuesByCycle('all', false)(s) as Array<{ id: string }>
-    expect(result.map(i => i.id)).toEqual(['C'])
+    expect(result.map(i => i.id)).toEqual(['A', 'C'])
   })
 
   it('returns empty array when no issues', () => {

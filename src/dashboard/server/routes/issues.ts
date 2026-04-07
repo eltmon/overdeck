@@ -48,6 +48,7 @@ import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js'
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
+import { sessionExists } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -947,9 +948,18 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // Update Linear/GitHub issue state
     let newState = 'Planned';
 
+    // Skip status reset if a work agent is already running — complete-planning fires after
+    // planning finishes, but the user may have already clicked "Start Agent". Resetting the
+    // issue to Planned would undo that and flash the card back to To Do.
+    const workAgentSession = `agent-${issueLower}`;
+    const workAgentAlreadyRunning = sessionExists(workAgentSession);
+    if (workAgentAlreadyRunning) {
+      console.log(`[complete-planning] Work agent ${workAgentSession} is already running — skipping status reset to Planned`);
+    }
+
     // For Linear: check if already in a 'started' state — if so, skip the transition
-    let skipStateUpdate = false;
-    if (!githubCheck?.isGitHub) {
+    let skipStateUpdate = workAgentAlreadyRunning;
+    if (!skipStateUpdate && !githubCheck?.isGitHub) {
       const currentIssue = yield* linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)));
       if (currentIssue?.state.name && currentIssue.state.name.toLowerCase() !== 'in planning' && currentIssue.state.name.toLowerCase() !== 'planning') {
         // Check if already in a "started" state by seeing if it's not an unstarted/planning state

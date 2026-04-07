@@ -30,7 +30,8 @@ export type LifecycleRunner = (pending: PendingLifecycleData) => Promise<void>;
  */
 async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<void> {
   const { postMergeLifecycle, notifyTldrDaemon } = await import('../../lib/cloister/merge-agent.js');
-  await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch);
+  // skipDeploy: we ARE the fresh rebuilt process — skip step 0 to avoid infinite rebuild loop
+  await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
   if (pending.sourceBranch) {
     await notifyTldrDaemon(pending.projectPath, pending.sourceBranch);
   }

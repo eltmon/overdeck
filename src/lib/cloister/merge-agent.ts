@@ -228,7 +228,7 @@ const _completedPostMerge = new Set<string>();
 const _closeIssueFailures = new Map<string, number>();
 const MAX_CLOSE_RETRIES = 3;
 
-export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<void> {
+export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId)) {
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
@@ -239,31 +239,36 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
   // The fresh process reads the pending file on startup and runs the lifecycle steps
   // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
-  const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
-  const repoRoot = __dirname.includes('/src/')
-    ? __dirname.replace(/\/src\/.*$/, '')
-    : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
-  const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
+  //
+  // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
+  // dynamic imports already resolve correctly and spawning again would create an infinite loop.
+  if (!options?.skipDeploy) {
+    const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
+    const repoRoot = __dirname.includes('/src/')
+      ? __dirname.replace(/\/src\/.*$/, '')
+      : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
+    const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
-  try {
-    const pendingData = JSON.stringify({
-      issueId,
-      projectPath,
-      sourceBranch: sourceBranch ?? '',
-      timestamp: Date.now(),
-    });
-    await writeFile(pendingFile, pendingData, 'utf-8');
-    console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
+    try {
+      const pendingData = JSON.stringify({
+        issueId,
+        projectPath,
+        sourceBranch: sourceBranch ?? '',
+        timestamp: Date.now(),
+      });
+      await writeFile(pendingFile, pendingData, 'utf-8');
+      console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
 
-    const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? ''], {
-      detached: true,
-      stdio: 'ignore',
-    });
-    child.unref();
-    console.log(`[merge-agent] Spawned detached deploy script (pid ${child.pid}) — server will restart with new build`);
-    return;
-  } catch (err: any) {
-    console.warn(`[merge-agent] Failed to spawn deploy script: ${err.message}. Falling through to in-process lifecycle (may fail on stale chunks).`);
+      const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? ''], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.unref();
+      console.log(`[merge-agent] Spawned detached deploy script (pid ${child.pid}) — server will restart with new build`);
+      return;
+    } catch (err: any) {
+      console.warn(`[merge-agent] Failed to spawn deploy script: ${err.message}. Falling through to in-process lifecycle (may fail on stale chunks).`);
+    }
   }
 
   console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
