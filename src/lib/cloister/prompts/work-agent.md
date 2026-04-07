@@ -323,6 +323,8 @@ pan work done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creat
 
 **`pan work done` creates a GitHub PR automatically.** The review and test specialists run against this PR. When both pass, the human clicks MERGE in the dashboard, which rebases the feature branch onto main and merges via `gh pr merge --squash`.
 
+**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Always re-run `pan work done` after any new commits, even if you were told "review already passed". Do NOT assume a prior passing review still covers new code.
+
 **WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan work done` to signal completion.
 {{/env}}
 {{#env REMOTE}}
