@@ -23,6 +23,11 @@ None — all 6 vBRIEF items completed
 ## Specialist Feedback
 (none yet)
 - **[2026-04-06T23:52Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-06T23:58Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+- **[2026-04-07T00:08Z] test-agent → FAILED** — `.planning/feedback/003-test-agent-failed.md`
+- **[2026-04-07T00:09Z] test-agent → FAILED** — `.planning/feedback/004-test-agent-failed.md`
+- **[2026-04-07T00:11Z] test-agent → FAILED** — `.planning/feedback/005-test-agent-failed.md`
+- **[2026-04-07T00:15Z] test-agent → FAILED** — `.planning/feedback/006-test-agent-failed.md`
 
 ## Problem
 
