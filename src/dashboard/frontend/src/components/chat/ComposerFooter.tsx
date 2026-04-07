@@ -12,6 +12,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { SendHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
@@ -34,7 +35,10 @@ async function sendConversationMessage(
       body: JSON.stringify({ message }),
     },
   );
-  if (!res.ok) throw new Error('Failed to send message');
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
+  }
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -67,9 +71,9 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
 
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
-    if (!editor || isEmpty || isDisabled) return;
+    if (!editor || isDisabled) return;
 
-    // Read text from Lexical state
+    // Read text directly from Lexical — don't trust React state which may be stale
     let messageText = '';
     editor.read(() => {
       messageText = $getRoot().getTextContent().trim();
@@ -88,12 +92,13 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
       setText('');
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to send message');
     } finally {
       setSending(false);
       // Refocus editor
       editor.focus();
     }
-  }, [conversation.name, isEmpty, isDisabled]);
+  }, [conversation.name, isDisabled]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
