@@ -139,7 +139,7 @@ async function spawnConversationSession(
         // Suppress the native Anthropic key so OpenRouter is used exclusively
         providerEnvExports.push(`export ANTHROPIC_API_KEY=""`);
       } else {
-        console.warn('[conversations] OpenRouter model selected but no API key configured');
+        throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
       }
     }
   }

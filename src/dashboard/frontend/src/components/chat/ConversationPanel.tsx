@@ -206,14 +206,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
   const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
 
   // "Working" = session is alive AND either:
-  // - server reports streaming (incomplete assistant message with recent file activity)
+  // - server reports streaming (file modified < 5s ago with no terminal stop_reason)
   // - last message is from the user (waiting for assistant response)
-  // - last assistant message has no completedAt (still generating)
+  // We intentionally omit `!lastMsg.completedAt` — that caused the indicator to
+  // stick forever when completedAt was undefined due to missing/null timestamps.
   const lastMsg = messages[messages.length - 1];
   const isWorking = conversation.sessionAlive && messages.length > 0 && (
     streaming ||
-    lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    lastMsg?.role === 'user'
   );
 
   return (

@@ -267,7 +267,12 @@ export async function parseConversationMessages(
           // createdAt = when the user sent the request (for duration calculation)
           // completedAt = when this assistant response finished
           createdAt: lastUserTimestamp ?? entry.timestamp ?? new Date().toISOString(),
-          completedAt: msg.stop_reason === 'end_turn' ? (entry.timestamp ?? undefined) : undefined,
+          // Any terminal stop reason (end_turn, max_tokens, stop_sequence) marks the response as done.
+          // tool_use means more exchanges are coming, so leave completedAt unset.
+          // Use || fallback in case entry.timestamp is null (not just undefined).
+          completedAt: (msg.stop_reason && msg.stop_reason !== 'tool_use')
+            ? (entry.timestamp || new Date().toISOString())
+            : undefined,
           streaming: !msg.stop_reason,
         };
       }
