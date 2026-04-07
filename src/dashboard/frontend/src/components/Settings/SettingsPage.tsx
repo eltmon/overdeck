@@ -424,53 +424,62 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
-      {/* Page Header with inline action bar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Settings className="w-8 h-8 text-primary" />
-            <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
+    <div>
+      {/* Sticky action bar */}
+      <div className="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm border-b border-divider shadow-sm">
+        <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex items-center justify-between py-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-primary" />
+            <h1 className="text-content text-lg font-black tracking-tight">Settings</h1>
           </div>
-          <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
+          <div className="flex items-center gap-3">
+            {saveMutation.isSuccess && (
+              <span className="flex items-center gap-1.5 text-success text-sm">
+                <CheckCircle className="w-4 h-4" />
+                Saved!
+              </span>
+            )}
+            {saveMutation.isError && (
+              <span className="flex items-center gap-1.5 text-destructive text-sm">
+                <AlertTriangle className="w-4 h-4" />
+                Save failed
+              </span>
+            )}
+            <button
+              onClick={handleRestoreOptimalDefaults}
+              className="px-3 py-1.5 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              title="Set all model assignments to research-based optimal defaults"
+            >
+              <Zap className="w-4 h-4" />
+              Optimal Defaults
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={!hasChanges}
+              className="px-3 py-1.5 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-40"
+            >
+              Undo
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saveMutation.isPending}
+              className="px-5 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-md shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Changes
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {saveMutation.isSuccess && (
-            <span className="flex items-center gap-1.5 text-success text-sm">
-              <CheckCircle className="w-4 h-4" />
-              Saved!
-            </span>
-          )}
-          {saveMutation.isError && (
-            <span className="flex items-center gap-1.5 text-destructive text-sm">
-              <AlertTriangle className="w-4 h-4" />
-              Save failed
-            </span>
-          )}
-          <button
-            onClick={handleRestoreOptimalDefaults}
-            className="px-4 py-2 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
-            title="Set all model assignments to research-based optimal defaults"
-          >
-            <Zap className="w-4 h-4" />
-            Optimal Defaults
-          </button>
-          <button
-            onClick={handleReset}
-            disabled={!hasChanges}
-            className="px-4 py-2 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-40"
-          >
-            Undo
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || saveMutation.isPending}
-            className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-lg shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save Changes
-          </button>
+      </div>
+
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
+      {/* Page Header */}
+      <div className="flex flex-col gap-1 mb-8">
+        <div className="flex items-center gap-2 mb-1">
+          <Settings className="w-8 h-8 text-primary" />
+          <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
         </div>
+        <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
       </div>
 
       {/* Deprecation Warning Banner */}
@@ -1130,6 +1139,8 @@ export function SettingsPage() {
         </div>
       </section>
 
+
+      </div>{/* end max-w content */}
 
       {/* Model Override Modal */}
       {modalWorkType && (
