@@ -51,4 +51,7 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint || true  # Don't fail on lint warnings for now
+        run: npm run lint
+
+      - name: Test
+        run: npm test

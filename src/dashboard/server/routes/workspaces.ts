@@ -357,26 +357,116 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
   }
 }
 
+/**
+ * Build a rich PR body with issue link, beads task summary, and AC checklist
+ * from the vBRIEF plan. Exported for testing.
+ */
+export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
+  const lines: string[] = [];
+
+  lines.push(`Closes #${issueId.split('-')[1] || issueId}`);
+  lines.push('');
+
+  // Acceptance criteria checklist from vBRIEF plan items
+  try {
+    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+    if (existsSync(planPath)) {
+      const raw = await readFile(planPath, 'utf-8');
+      const doc = JSON.parse(raw);
+      const items: Array<{ status: string; title: string }> = doc?.plan?.items ?? [];
+      if (items.length > 0) {
+        lines.push('## Acceptance Criteria');
+        lines.push('');
+        for (const item of items) {
+          const checked = item.status === 'completed' ? 'x' : ' ';
+          lines.push(`- [${checked}] ${item.title}`);
+        }
+        lines.push('');
+      }
+    }
+  } catch {
+    // No vBRIEF plan — omit checklist
+  }
+
+  // Beads task summary from .beads/issues.jsonl (if available)
+  try {
+    let beadsPath: string | null = null;
+    const workspaceBeadsRedirect = join(workspacePath, '.beads', 'redirect');
+    if (existsSync(workspaceBeadsRedirect)) {
+      const redirectTarget = (await readFile(workspaceBeadsRedirect, 'utf-8')).trim();
+      const resolvedPath = redirectTarget.startsWith('/')
+        ? redirectTarget
+        : join(workspacePath, '.beads', redirectTarget);
+      beadsPath = join(resolvedPath, 'issues.jsonl');
+    }
+    const localBeadsPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!beadsPath && existsSync(localBeadsPath)) beadsPath = localBeadsPath;
+
+    if (beadsPath && existsSync(beadsPath)) {
+      const issueLower = issueId.toLowerCase();
+      const beads = (await readFile(beadsPath, 'utf-8'))
+        .split('\n')
+        .filter(l => l.trim())
+        .map(l => {
+          try { return JSON.parse(l); } catch { return null; }
+        })
+        .filter(b => b && b.labels?.some((lbl: string) => lbl.toLowerCase() === issueLower));
+
+      if (beads.length > 0) {
+        lines.push('## Implementation Tasks');
+        lines.push('');
+        for (const bead of beads) {
+          const checked = bead.status === 'closed' ? 'x' : ' ';
+          lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
+        }
+        lines.push('');
+      }
+    }
+  } catch {
+    // No beads — omit task list
+  }
+
+  return lines.join('\n') || `Automated PR for ${issueId}`;
+}
+
 async function ensurePRExists(
-  issueId: string
+  issueId: string,
+  options?: { cwd?: string; branchName?: string }
 ): Promise<{ created: boolean; prUrl?: string; error?: string }> {
   try {
     const issueLower = issueId.toLowerCase();
-    const branchName = `feature/${issueLower}`;
+    const branchName = options?.branchName ?? `feature/${issueLower}`;
+    const execOptions: Parameters<typeof execAsync>[1] = { encoding: 'utf-8' };
+    if (options?.cwd) execOptions.cwd = options.cwd;
+
     // Check for existing PR
     const { stdout: existingOut } = await execAsync(
       `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
-      { encoding: 'utf-8' }
+      execOptions
     );
     const existing = existingOut.trim();
     if (existing) return { created: false, prUrl: existing };
-    // Create PR
-    const { stdout: createOut } = await execAsync(
-      `gh pr create --head ${branchName} --base main --title "${issueId}" --body "Automated PR for ${issueId}" --json url --jq .url`,
-      { encoding: 'utf-8' }
-    );
-    const prUrl = createOut.trim();
-    return { created: true, prUrl };
+
+    // Build rich PR body if workspace path is available
+    const prBody = options?.cwd ? await buildRichPRBody(issueId, options.cwd) : `Automated PR for ${issueId}`;
+
+    // Write body to a temp file to avoid shell escaping issues
+    const { tmpdir } = await import('os');
+    const { join: pathJoin } = await import('path');
+    const { writeFile: writeFileAsync, unlink: unlinkAsync } = await import('fs/promises');
+    const bodyFile = pathJoin(tmpdir(), `pan-pr-body-${issueId}-${Date.now()}.md`);
+    await writeFileAsync(bodyFile, prBody, 'utf-8');
+
+    try {
+      const { stdout: createOut } = await execAsync(
+        `gh pr create --head ${branchName} --base main --title "${issueId}" --body-file "${bodyFile}" --json url --jq .url`,
+        execOptions
+      );
+      const prUrl = createOut.trim();
+      return { created: true, prUrl };
+    } finally {
+      unlinkAsync(bodyFile).catch(() => {});
+    }
   } catch (err: any) {
     return { created: false, error: err.message };
   }
@@ -2221,6 +2311,23 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               } catch {}
             }
 
+            // Create GitHub PR (or retrieve existing) so review/test agents have a PR URL
+            try {
+              const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName });
+              if (prResult.prUrl) {
+                setReviewStatus(issueId, { prUrl: prResult.prUrl });
+                if (prResult.created) {
+                  console.log(`[review] Created PR for ${issueId}: ${prResult.prUrl}`);
+                } else {
+                  console.log(`[review] Existing PR for ${issueId}: ${prResult.prUrl}`);
+                }
+              } else {
+                console.warn(`[review] Could not create PR for ${issueId}: ${prResult.error}`);
+              }
+            } catch (prErr: any) {
+              console.warn(`[review] PR creation failed for ${issueId}: ${prErr.message}`);
+            }
+
             const verifyOutcome = await runVerificationForIssue(
               issueId,
               workspacePath,
@@ -2943,9 +3050,8 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
         completePendingOperation(issueId, null);
 
-        // Signal merge complete
-        const { onMergeComplete } = await import('../../../lib/cloister/merge-agent.js');
-        onMergeComplete(issueId);
+        const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
+        await postMergeLifecycle(issueId, projectPath);
 
         return {
           success: true,
@@ -3069,8 +3175,8 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
       completePendingOperation(issueId, null);
 
-      const { onMergeComplete } = await import('../../../lib/cloister/merge-agent.js');
-      onMergeComplete(issueId);
+      const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
+      await postMergeLifecycle(issueId, projectPath);
 
       return {
         success: true,
@@ -3080,51 +3186,66 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       };
     }
 
-    // Monorepo / single-repo merge
-    try {
-      await execAsync(`git push origin ${branchName}`, {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-      });
-    } catch (pushErr: any) {
-      console.log(`Feature branch push note: ${pushErr.message}`);
+    // Monorepo / single-repo merge: PR-based flow
+    // Step 1: Ensure PR exists (creates if needed)
+    const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName });
+    if (!prResult.prUrl) {
+      const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
+      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: 400, error };
     }
 
-    const { spawnMergeAgentForBranches, onMergeComplete } = await import(
+    const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
+    if (!prMatch) {
+      const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
+      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: 400, error };
+    }
+    const prNumber = prMatch[1];
+
+    // Step 2: Rebase feature branch onto main (merge-agent handles conflict resolution)
+    const { spawnRebaseAgentForBranch, postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
 
-    console.log(`[merge] Starting merge-agent for ${issueId}...`);
+    console.log(`[merge] Rebasing ${branchName} onto main for ${issueId}...`);
+    const rebaseResult = await spawnRebaseAgentForBranch(workspacePath, branchName, 'main', issueId);
 
-    const mergeResult = await spawnMergeAgentForBranches(projectPath, branchName, 'main', issueId);
-
-    if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
-      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
-      completePendingOperation(issueId, null);
-      onMergeComplete(issueId);
-      return {
-        success: true,
-        statusCode: 200,
-        message: `Successfully merged ${issueId} to main and closed issue`,
-        testsStatus: 'PASS',
-      };
-    } else if (mergeResult.success) {
-      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
-      completePendingOperation(issueId, null);
-      onMergeComplete(issueId);
-      return {
-        success: true,
-        statusCode: 200,
-        message: `Merged ${issueId} to main and closed issue`,
-        testsStatus: mergeResult.testsStatus,
-        note: mergeResult.testsStatus === 'SKIP' ? 'Tests were skipped' : undefined,
-      };
-    } else {
-      const error = mergeResult.reason || mergeResult.notes || 'Merge failed';
+    if (!rebaseResult.success) {
+      const error = rebaseResult.reason || 'Rebase failed';
       setReviewStatus(issueId, { mergeStatus: 'failed' });
       completePendingOperation(issueId, error);
-      return { success: false, statusCode: 500, error, mergeResult };
+      return { success: false, statusCode: 500, error };
     }
+
+    // Step 3: Merge PR via GitHub (squash merge for clean history)
+    try {
+      console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
+      const { stdout: mergeOutput } = await execAsync(
+        `gh pr merge ${prNumber} --squash`,
+        { cwd: workspacePath, encoding: 'utf-8' }
+      );
+      console.log(`[merge] PR merged: ${mergeOutput.trim()}`);
+    } catch (prMergeErr: any) {
+      const error = `gh pr merge failed: ${prMergeErr.message}`;
+      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: 500, error };
+    }
+
+    // Step 4: Post-merge lifecycle (move PRD, close issue, compact beads, etc.)
+    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+    completePendingOperation(issueId, null);
+    await postMergeLifecycle(issueId, projectPath, branchName);
+
+    return {
+      success: true,
+      statusCode: 200,
+      message: `Successfully merged PR #${prNumber} for ${issueId}`,
+      prUrl: prResult.prUrl,
+    };
   } catch (error: any) {
     console.error(`[merge] Error:`, error);
     setReviewStatus(issueId, { mergeStatus: 'failed' });

@@ -358,6 +358,64 @@ function parseConvoySynthesis(convoyOutputDir: string): ReviewResult {
 }
 
 /**
+ * Post a GitHub PR review (approve or request-changes) based on the convoy result.
+ * Non-fatal: logs errors but does not throw.
+ */
+async function postGitHubPRReview(
+  context: ReviewContext,
+  result: ReviewResult,
+  convoyOutputDir: string,
+): Promise<void> {
+  if (!context.prUrl) return;
+
+  try {
+    // Extract PR number from URL
+    const prMatch = context.prUrl.match(/\/pull\/(\d+)/);
+    if (!prMatch) {
+      console.warn(`[review-agent] Cannot post GitHub review: invalid PR URL ${context.prUrl}`);
+      return;
+    }
+    const prNumber = prMatch[1];
+
+    // Read synthesis body for the review comment
+    let reviewBody = result.notes || 'Automated review by Panopticon review-agent.';
+    const synthesisPath = join(convoyOutputDir, 'synthesis.md');
+    if (existsSync(synthesisPath)) {
+      const synthesis = readFileSync(synthesisPath, 'utf-8');
+      // Truncate to 65,000 chars (GitHub PR review body limit is 65,536)
+      reviewBody = synthesis.slice(0, 65000);
+    }
+
+    // Write body to temp file to avoid shell escaping issues
+    const { tmpdir } = await import('os');
+    const { join: pathJoin } = await import('path');
+    const { writeFile: writeFileAsync, unlink: unlinkAsync } = await import('fs/promises');
+    const bodyFile = pathJoin(tmpdir(), `pan-review-body-${context.issueId}-${Date.now()}.md`);
+    await writeFileAsync(bodyFile, reviewBody, 'utf-8');
+
+    try {
+      let event: string;
+      if (result.reviewResult === 'APPROVED') {
+        event = 'approve';
+      } else if (result.reviewResult === 'CHANGES_REQUESTED') {
+        event = 'request-changes';
+      } else {
+        event = 'comment';
+      }
+      await execAsync(
+        `gh pr review ${prNumber} --${event} --body-file "${bodyFile}"`,
+        { cwd: context.projectPath, encoding: 'utf-8' },
+      );
+      console.log(`[review-agent] Posted GitHub PR review (${event}) for PR #${prNumber}`);
+    } finally {
+      unlinkAsync(bodyFile).catch(() => {});
+    }
+  } catch (err: any) {
+    console.warn(`[review-agent] Failed to post GitHub PR review: ${err.message}`);
+  }
+}
+
+/**
  * Spawn review-agent to review a pull request
  *
  * Now uses convoy system with parallel specialized reviewers.
@@ -404,6 +462,9 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
 
     // Log to history
     logReviewHistory(context, result, convoy.id);
+
+    // Post GitHub PR review (approve or request-changes) in addition to feedback files
+    await postGitHubPRReview(context, result, completedConvoy.outputDir);
 
     // Send feedback to work agent
     await sendFeedbackToWorkAgent(context, result);

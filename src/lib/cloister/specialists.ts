@@ -711,7 +711,11 @@ ${basePrompt}`;
     const launcherScript = join(agentDir, 'launcher.sh');
     const innerScript = join(agentDir, 'run-claude.sh');
 
-    // Inner script: the actual Claude invocation with resume/fallback logic
+    // Inner script: the actual Claude invocation.
+    // test-agent NEVER resumes — each test run is stateless and must start fresh to avoid
+    // reporting cached analysis from prior runs (accumulated history caused repeated false-FAILs
+    // even after the underlying bug was fixed). All other specialists accumulate context.
+    const useResume = specialistType !== 'test-agent';
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
@@ -720,7 +724,7 @@ export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
 prompt=$(cat "${promptFile}")
 
-# Resume existing session (normal case — accumulates context over time)
+${useResume ? `# Resume existing session (accumulates context over time)
 claude ${permissionFlags} --resume "${sessionId}" --model ${model} "$prompt"
 exit_code=$?
 
@@ -728,7 +732,8 @@ exit_code=$?
 if [ $exit_code -ne 0 ]; then
   echo "[launcher] First run — creating session"
   claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
-fi
+fi` : `# test-agent: always fresh session — no --resume to prevent stale result reporting
+claude ${permissionFlags} --model ${model} "$prompt"`}
 
 # Signal completion
 echo ""
