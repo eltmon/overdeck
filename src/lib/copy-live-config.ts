@@ -12,7 +12,7 @@
  * containers can access the config at ~/.panopticon/ inside the container.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
