@@ -300,6 +300,69 @@ export async function parseConversationMessages(
   return { messages, workLog, byteOffset: newByteOffset, streaming, totalCost };
 }
 
+// ─── Compact boundary offset cache ───────────────────────────────────────────
+
+/**
+ * In-memory cache mapping JSONL file path → last compact_boundary byte offset.
+ * Persists across requests so we don't re-scan the entire file each time.
+ */
+const compactOffsetCache = new Map<string, { boundaryOffset: number; fileSize: number }>();
+
+/**
+ * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
+ *
+ * Uses an in-memory cache keyed by file path + size. When the file grows beyond
+ * the cached size, only the new portion is scanned. Returns 0 if no boundary found.
+ */
+export async function findLastCompactBoundary(sessionFile: string): Promise<number> {
+  const buffer = await readFile(sessionFile);
+  const fileSize = buffer.length;
+  const text = buffer.toString('utf-8');
+
+  const cached = compactOffsetCache.get(sessionFile);
+
+  // If file hasn't grown since last scan, return cached offset
+  if (cached && cached.fileSize === fileSize) {
+    return cached.boundaryOffset;
+  }
+
+  // Scan from the cached offset (or start) forward — compact boundaries only append
+  const scanFrom = cached?.boundaryOffset ?? 0;
+  let lastBoundaryOffset = cached?.boundaryOffset ?? 0;
+
+  // Walk through lines, tracking byte position
+  let bytePos = 0;
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (bytePos >= scanFrom && line.trim()) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+          lastBoundaryOffset = bytePos;
+        }
+      } catch { /* skip invalid lines */ }
+    }
+    bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+  }
+
+  compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, fileSize });
+  return lastBoundaryOffset;
+}
+
+/**
+ * Parse a JSONL session file starting from the last compact boundary.
+ *
+ * Returns only messages from the current context window — everything after
+ * the most recent compaction. For sessions that have never been compacted,
+ * returns all messages.
+ */
+export async function parseFromLastCompactBoundary(
+  sessionFile: string,
+): Promise<ParseResult> {
+  const boundaryOffset = await findLastCompactBoundary(sessionFile);
+  return parseConversationMessages(sessionFile, boundaryOffset);
+}
+
 // ─── File watcher ─────────────────────────────────────────────────────────────
 
 export interface ConversationWatchHandle {

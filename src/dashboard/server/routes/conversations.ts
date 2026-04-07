@@ -38,6 +38,7 @@ import { getProviderForModel, getProviderEnv } from '../../../lib/providers.js';
 import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import {
   parseConversationMessages,
+  parseFromLastCompactBoundary,
 } from '../services/conversation-service.js';
 
 const execAsync = promisify(exec);
@@ -469,7 +470,12 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
 
         try {
-          const result = await parseConversationMessages(sessionFile, 0);
+          // Specialists: parse only from the last compact_boundary so the display
+          // shows only the current context window, not the full 30-day history.
+          const isSpecialist = !conv && /^specialist-/.test(name);
+          const result = isSpecialist
+            ? await parseFromLastCompactBoundary(sessionFile)
+            : await parseConversationMessages(sessionFile, 0);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
           if (result.totalCost > 0 && conv) {
