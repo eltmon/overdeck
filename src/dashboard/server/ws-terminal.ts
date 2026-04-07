@@ -208,8 +208,22 @@ export function setupTerminalWebSocket(server: http.Server): void {
         inputClient: ws, // first client is the initial input client
       };
 
-      const startLocalPty = (cols: number, rows: number) => {
+      const startLocalPty = async (cols: number, rows: number) => {
         if (ptyStarted) return;
+
+        // Check if the tmux session exists before spawning the PTY.
+        // If we spawn without checking, tmux prints "can't find session" to the PTY,
+        // that error text is relayed to the client as a WebSocket message, which
+        // confuses the client's reconnect counter (it looks like real terminal data).
+        // Close cleanly with no data so the client just sees ws.onclose.
+        try {
+          await execAsync(`tmux has-session -t ${JSON.stringify(sessionName)}`);
+        } catch {
+          console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+          ws.close(1000, 'session-not-found');
+          return;
+        }
+
         ptyStarted = true;
         lastResizeCols = cols;
         lastResizeRows = rows;

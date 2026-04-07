@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Loader2, ChevronRight, ChevronDown, GripHorizontal } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronDown, GripHorizontal, Terminal, FileText } from 'lucide-react';
 import styles from '../styles/mission-control.module.css';
 import { XTerminal } from '../../XTerminal';
 
@@ -87,6 +87,7 @@ function getPreviewLine(transcript: string): string {
 export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded = false }: AgentSectionProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [viewMode, setViewMode] = useState<'transcript' | 'terminal'>('transcript');
   // null = natural height (no constraint), number = user-set max-height
   const [customHeight, setCustomHeight] = useState<number | null>(null);
   const isDragging = useRef(false);
@@ -100,16 +101,19 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
     }
   }, [section.status]);
 
-  // Scroll to bottom only for running sections (tail-follow)
+  // Scroll to bottom: tail-follow when running, and on initial transcript view
   useEffect(() => {
-    if (contentRef.current && expanded && section.status === 'running') {
+    const shouldScroll =
+      (section.status === 'running' && viewMode === 'transcript') ||
+      (viewMode === 'transcript' && expanded);
+    if (contentRef.current && shouldScroll) {
       requestAnimationFrame(() => {
         if (contentRef.current) {
           contentRef.current.scrollTop = contentRef.current.scrollHeight;
         }
       });
     }
-  }, [section.transcript, section.status, expanded]);
+  }, [section.transcript, section.status, expanded, viewMode]);
 
   // Resize drag handlers — dragging sets a max-height constraint
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -222,18 +226,39 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
       {/* Full content when expanded */}
       {expanded && (
         <>
-          {section.tmuxSession ? (
+          {/* Transcript / Terminal toggle — only when a live session exists */}
+          {section.tmuxSession && (
+            <div className={styles.viewToggle} onClick={e => e.stopPropagation()}>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('transcript')}
+              >
+                <FileText size={11} />
+                Transcript
+              </button>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('terminal')}
+              >
+                <Terminal size={11} />
+                Terminal
+              </button>
+            </div>
+          )}
+
+          {/* Terminal view — only render when selected (xterm.js crashes with visibility:hidden) */}
+          {section.tmuxSession && viewMode === 'terminal' ? (
             <div ref={contentRef} className={contentClass} style={{ ...contentStyle, padding: 0, overflow: 'hidden' }}>
               <XTerminal sessionName={section.tmuxSession} />
             </div>
           ) : (
-          <div
-            ref={contentRef}
-            className={contentClass}
-            style={contentStyle}
-          >
-            {section.transcript || '(no output yet)'}
-          </div>
+            <div
+              ref={contentRef}
+              className={contentClass}
+              style={contentStyle}
+            >
+              {section.transcript || '(no output yet)'}
+            </div>
           )}
 
           {/* Resize handle — drag to constrain, double-click to toggle */}

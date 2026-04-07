@@ -38,6 +38,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   const fitAddon = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
+  const hadFirstData = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxReconnectAttempts = 5;
   const [shouldReconnect, setShouldReconnect] = useState(true);
@@ -304,8 +305,10 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     ws.onopen = () => {
       console.log('XTerminal: WebSocket opened');
-      reconnectAttempts.current = 0;
-      term!.clear();
+      // Do NOT reset reconnectAttempts or clear the terminal here — the server
+      // may close immediately if the tmux session doesn't exist yet. Clearing
+      // here causes the screen to flash on every failed reconnect attempt.
+      // Both reset and clear happen only when we receive data (session alive).
 
       // CRITICAL: Send dimensions IMMEDIATELY on connection, before any data flows
       // The server waits for this resize message before starting the SSH session
@@ -391,6 +394,14 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         if (debugMsgCount <= 20 || debugMsgCount % 100 === 0) {
           console.log(`XTerminal-debug: RECV #${debugMsgCount} len=${dataStr.length}`);
         }
+      }
+
+      // Session is alive — clear reconnect messages and reset counter.
+      // Only do this on first data after (re)connect to avoid clearing mid-session.
+      if (reconnectAttempts.current > 0 || !hadFirstData.current) {
+        hadFirstData.current = true;
+        term!.clear();
+        reconnectAttempts.current = 0;
       }
 
       // Add to queue and trigger processing
