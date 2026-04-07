@@ -4,7 +4,7 @@
  * Displays Cloister service status and agent health summary in the dashboard header.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap } from 'lucide-react';
 import { useState } from 'react';
 
@@ -21,39 +21,10 @@ interface CloisterStatus {
   agentsNeedingAttention: string[];
 }
 
-interface CloisterConfig {
-  startup: {
-    auto_start: boolean;
-  };
-  thresholds: {
-    stale_minutes: number;
-    warning_minutes: number;
-    stuck_minutes: number;
-  };
-  specialists: {
-    enabled: string[];
-  };
-}
-
 async function fetchCloisterStatus(): Promise<CloisterStatus> {
   const res = await fetch('/api/cloister/status');
   if (!res.ok) throw new Error('Failed to fetch Cloister status');
   return res.json();
-}
-
-async function fetchCloisterConfig(): Promise<CloisterConfig> {
-  const res = await fetch('/api/cloister/config');
-  if (!res.ok) throw new Error('Failed to fetch Cloister config');
-  return res.json();
-}
-
-async function updateCloisterConfig(config: Partial<CloisterConfig>): Promise<void> {
-  const res = await fetch('/api/cloister/config', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
-  });
-  if (!res.ok) throw new Error('Failed to update Cloister config');
 }
 
 async function startCloister(): Promise<void> {
@@ -72,21 +43,13 @@ async function emergencyStop(): Promise<{ killedAgents: string[] }> {
   return res.json();
 }
 
-export function CloisterStatusBar() {
+export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
-  const queryClient = useQueryClient();
-
   const { data: status, refetch } = useQuery({
     queryKey: ['cloister-status'],
     queryFn: fetchCloisterStatus,
     refetchInterval: 10000, // Refresh every 10 seconds
-  });
-
-  const { data: config } = useQuery({
-    queryKey: ['cloister-config'],
-    queryFn: fetchCloisterConfig,
   });
 
   const { data: specialistsData } = useQuery({
@@ -101,13 +64,6 @@ export function CloisterStatusBar() {
 
   const runningEphemeral: Array<{ projectKey: string; specialistType: string }> =
     (specialistsData?.projects ?? []).filter((p: { isRunning: boolean }) => p.isRunning);
-
-  const configMutation = useMutation({
-    mutationFn: updateCloisterConfig,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cloister-config'] });
-    },
-  });
 
   const handleToggle = async () => {
     setIsToggling(true);
@@ -127,13 +83,6 @@ export function CloisterStatusBar() {
     await emergencyStop();
     setShowEmergencyConfirm(false);
     refetch();
-  };
-
-  const handleAutoStartToggle = () => {
-    if (!config) return;
-    configMutation.mutate({
-      startup: { auto_start: !config.startup.auto_start },
-    });
   };
 
   if (!status) {
@@ -233,43 +182,14 @@ export function CloisterStatusBar() {
           </div>
         )}
 
-        {/* Settings */}
-        <div className="relative">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-1 rounded text-xs transition-colors ${
-              showSettings
-                ? 'bg-surface-emphasis text-content'
-                : 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
-            }`}
-            title="Cloister settings"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Settings Dropdown */}
-          {showSettings && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-surface-raised border border-divider rounded-lg shadow-lg z-50">
-              <div className="p-3">
-                <div className="text-xs text-content-subtle font-medium mb-2">Settings</div>
-
-                {/* Auto-start checkbox */}
-                <label className="flex items-center gap-2 cursor-pointer hover:bg-surface-overlay/50 rounded px-2 py-1.5 -mx-2">
-                  <input
-                    type="checkbox"
-                    checked={config?.startup.auto_start ?? true}
-                    onChange={handleAutoStartToggle}
-                    disabled={configMutation.isPending}
-                    className="w-4 h-4 rounded border-divider-strong bg-surface-overlay text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-content-body">
-                    Auto-start on dashboard launch
-                  </span>
-                </label>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Settings — navigates to Settings page */}
+        <button
+          onClick={onOpenSettings}
+          className="p-1 rounded text-xs bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
+          title="Open Settings"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

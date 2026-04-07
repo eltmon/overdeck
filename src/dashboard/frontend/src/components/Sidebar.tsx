@@ -182,7 +182,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
           {!collapsed && (
             <div className="px-3 py-2 space-y-1">
               <div className="flex items-center gap-2">
-                <CloisterStatusBar />
+                <CloisterStatusBar onOpenSettings={() => onTabChange('settings')} />
                 <div className="ml-auto">
                   <FreshnessIndicator />
                 </div>
