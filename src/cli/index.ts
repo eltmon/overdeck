@@ -599,5 +599,66 @@ program
     await program.parseAsync(['cost', 'sync'], { from: 'user' });
   });
 
+// ─── npx panopticon — server + browser launcher ───────────────────────────────
+// Low-friction entry point: no Electron required.
+// Starts the dashboard server and opens the browser to the dashboard URL.
+// Usage: npx panopticon  (or: npx panopticon serve)
+
+program
+  .command('serve')
+  .description('Start the dashboard server and open it in the default browser (npx launcher)')
+  .option('--port <port>', 'Port to listen on', '7825')
+  .action(async (options: { port: string }) => {
+    const { spawn } = await import('child_process');
+    const { join, dirname } = await import('path');
+    const { fileURLToPath } = await import('url');
+    const { existsSync } = await import('fs');
+
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
+    const port = parseInt(options.port, 10) || 7825;
+    const url = `http://localhost:${port}`;
+
+    if (!existsSync(bundledServer)) {
+      console.error(chalk.red('Error: Dashboard server not found.'));
+      console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
+      process.exit(1);
+    }
+
+    const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
+    const node22 = existsSync(nvmNode) ? nvmNode : 'node';
+
+    console.log(chalk.bold('Panopticon Dashboard'));
+    console.log(chalk.dim(`Starting server on port ${port}...`));
+
+    const server = spawn(node22, [bundledServer], {
+      stdio: 'inherit',
+      env: { ...process.env, PANOPTICON_PORT: String(port) },
+    });
+
+    server.on('error', (err) => {
+      console.error(chalk.red('Failed to start dashboard:'), err.message);
+      process.exit(1);
+    });
+
+    // Open browser after server has had a moment to start
+    setTimeout(async () => {
+      console.log(`  ${chalk.cyan(url)}`);
+      try {
+        const { openBrowser } = await import('../lib/browser.js');
+        await openBrowser(url);
+      } catch {
+        // If openBrowser fails, show URL for manual opening
+        console.log(chalk.dim(`  Open your browser to: ${url}`));
+      }
+    }, 1_500);
+  });
+
+// Default action: show help (Commander default) unless no args → serve
+if (process.argv.length === 2) {
+  // npx panopticon with no args → act as serve
+  process.argv.push('serve');
+}
+
 // Parse and execute
 await program.parseAsync();
