@@ -1,31 +1,21 @@
 # PAN-448: Start Agent confirmation timeout too short
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
-## Problem
-The "Start Agent" button uses a timeout-based two-click confirm pattern. The timeout (currently 7s after being bumped from 6s) races against the user — the button reverts before they can click "Confirm". Increasing the timeout is a bandaid; the root issue is the time-based dismiss.
+## Current Phase
+All work done. Committing and signaling completion.
 
-## Decision
-Replace the `setTimeout` auto-reset with a proper dismiss pattern:
-- Confirmation stays visible indefinitely until explicitly dismissed
-- Dismiss triggers: click outside the button, press Escape
-- Follows existing pattern in `ContainerSection.tsx:38-44` (mousedown + ref)
+## Completed Work
+- [x] feature-pan-489-17u: Replace setTimeout confirm with click-outside/Escape dismiss pattern in KanbanBoard.tsx (commit: pending)
 
-## Scope
-- **Single file**: `src/dashboard/frontend/src/components/KanbanBoard.tsx`
-- Remove `confirmingStartTimer` ref and `setTimeout` call
-- Add a `startButtonRef` to the confirm button
-- Add `useEffect` with `mousedown` (click-outside) and `keydown` (Escape) listeners when `confirmingStart` is true
-- Clean up timer ref on unmount (existing) → replace with effect cleanup
+## Remaining Work
+None
 
-## Out of Scope
-- Other confirm patterns in the dashboard (deep-wipe has its own modal)
-- Adding a dismiss timeout as a fallback
-- Changing the visual appearance of the confirm state
+## Key Decisions
+- D1: Used `mousedown` instead of `click` for outside-click detection, consistent with `ContainerSection.tsx:38-44` pattern already in the codebase
+- D2: Two `ref={startButtonRef}` assignments needed — the button renders in two different layouts (one for full card view, one for compact view)
 
-## Acceptance Criteria
-1. Clicking "Start Agent" shows "Click to confirm" — it stays visible indefinitely
-2. Clicking the button again triggers the agent start
-3. Clicking anywhere outside the button dismisses the confirm state
-4. Pressing Escape dismisses the confirm state
-5. No `setTimeout` in the confirm flow
+## Specialist Feedback
+- [2026-04-06T14:49:53Z] verification-gate → failed (PAN-488 artifacts — not applicable to PAN-448)
+- [2026-04-06T14:55:20Z] review-agent → changes-requested (PAN-488 artifacts — not applicable to PAN-448)
+- [2026-04-06T15:41:26Z] review-agent → changes-requested (PAN-488 artifacts — not applicable to PAN-448)

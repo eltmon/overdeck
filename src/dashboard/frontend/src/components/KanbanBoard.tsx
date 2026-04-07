@@ -1921,19 +1921,35 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     && activeAgent?.runtimeState !== 'completed';
 
   const [confirmingStart, setConfirmingStart] = useState(false);
-  const confirmingStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!confirmingStart) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (startButtonRef.current && !startButtonRef.current.contains(e.target as Node)) {
+        setConfirmingStart(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmingStart(false);
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [confirmingStart]);
 
   const handleStartAgent = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirmingStart) {
       // Second click — confirmed
       setConfirmingStart(false);
-      if (confirmingStartTimer.current) clearTimeout(confirmingStartTimer.current);
       startAgentMutation.mutate();
     } else {
-      // First click — show inline confirm, auto-reset after 7s
+      // First click — show inline confirm, stays until clicked outside or Escape
       setConfirmingStart(true);
-      confirmingStartTimer.current = setTimeout(() => setConfirmingStart(false), 7000);
     }
   };
 
@@ -2328,6 +2344,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 vBRIEF
               </button>
               <button
+                ref={startButtonRef}
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending}
                 className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
