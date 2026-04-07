@@ -1,75 +1,25 @@
 ---
 specialist: verification-gate
-issueId: PAN-475
+issueId: PAN-506
 outcome: failed
-timestamp: 2026-04-06T23:52:12Z
+timestamp: 2026-04-07T02:56:33Z
 ---
 
-VERIFICATION FAILED for PAN-475 (attempt 1/10):
+VERIFICATION FAILED for PAN-506 (attempt 1/10):
 
-Failed check: test
+Failed check: typecheck
 
-Verification FAILED at test (59204ms):
+Verification FAILED at typecheck (1911ms):
 
-ault)
-Warning: An update to TestComponent inside a test was not wrapped in act(...).
 
-When testing, code that causes React state updates should be wrapped into act(...):
+> panopticon-cli@0.6.0 typecheck
+> tsc --noEmit
 
-act(() => {
-  /* fire events that update state */
-});
-/* assert on the output */
-
-This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
-    at TestComponent (/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-475/node_modules/.bun/@testing-library+react@16.3.2/node_modules/@testing-library/react/dist/pure.js:328:5)
-
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  src/dashboard/frontend/src/__tests__/store.test.ts > selectIssuesByCycle > excludes done and canceled issues when includeCompleted=false
-AssertionError: expected [ 'PAN-1', 'PAN-2', 'PAN-3', 'PAN-5' ] to deeply equal [ 'PAN-1', 'PAN-2', 'PAN-5' ]
-
-- Expected
-+ Received
-
-  Array [
-    "PAN-1",
-    "PAN-2",
-+   "PAN-3",
-    "PAN-5",
-  ]
-
- ❯ src/dashboard/frontend/src/__tests__/store.test.ts:281:35
-    279|   it('excludes done and canceled issues when includeCompleted=false', …
-    280|     const result = selectIssuesByCycle('current', false)(state) as Arr…
-    281|     expect(result.map(i => i.id)).toEqual(['PAN-1', 'PAN-2', 'PAN-5'])
-       |                                   ^
-    282|   })
-    283| 
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
-
- FAIL  src/dashboard/frontend/src/__tests__/store.test.ts > selectIssuesByCycle > filters by state field as well as canonicalStatus
-AssertionError: expected [ 'A', 'C' ] to deeply equal [ 'C' ]
-
-- Expected
-+ Received
-
-  Array [
-+   "A",
-    "C",
-  ]
-
- ❯ src/dashboard/frontend/src/__tests__/store.test.ts:297:35
-    295|     const s: DashboardState = { ...emptyState, issuesRaw: mixedIssues }
-    296|     const result = selectIssuesByCycle('all', false)(s) as Array<{ id:…
-    297|     expect(result.map(i => i.id)).toEqual(['C'])
-       |                                   ^
-    298|   })
-    299| 
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
-
+src/cli/commands/sync.ts(247,7): error TS2448: Block-scoped variable 'projects' used before its declaration.
+src/cli/commands/sync.ts(247,7): error TS2454: Variable 'projects' is used before being assigned.
+src/cli/commands/sync.ts(248,30): error TS2448: Block-scoped variable 'projects' used before its declaration.
+src/cli/commands/sync.ts(248,30): error TS2454: Variable 'projects' is used before being assigned.
+src/cli/commands/sync.ts(260,36): error TS2339: Property 'key' does not exist on type 'ProjectConfig'.
 
 
 ## REQUIRED: Fix the failing check BEFORE resubmitting
@@ -79,6 +29,6 @@ AssertionError: expected [ 'A', 'C' ] to deeply equal [ 'C' ]
 3. Run the failing check locally to verify it passes
 4. Commit and push ALL changes
 5. ONLY THEN resubmit:
-curl -X POST http://localhost:3011/api/workspaces/PAN-475/request-review -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:3011/api/workspaces/PAN-506/request-review -H "Content-Type: application/json" -d '{}'
 
 Do NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.

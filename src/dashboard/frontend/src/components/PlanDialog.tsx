@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
@@ -76,6 +77,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);
   const [showTasksPanel, setShowTasksPanel] = useState(false);
+  const [beadsWarning, setBeadsWarning] = useState<string | null>(null);
   const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
   const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
 
@@ -235,11 +237,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       if (!completeRes.ok) {
         console.warn('Failed to mark planning complete, continuing anyway');
       }
+      const completeData = await completeRes.json().catch(() => ({}));
 
-      return stopData;
+      return { ...stopData, beadsWarning: completeData.beadsWarning ?? null };
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+      if (data?.beadsWarning) {
+        setBeadsWarning(data.beadsWarning);
+        toast.warning(data.beadsWarning, { duration: 10000 });
+      }
       setStep('complete');
     },
     onError: (err: Error) => {
@@ -875,6 +882,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     <p className="text-content-subtle text-center max-w-md mb-6">
                       The planning session has ended. Review the plan and start the execution agent.
                     </p>
+
+                    {/* Beads warning — shown when beads creation failed during planning */}
+                    {beadsWarning && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
+                          <p className="text-sm text-yellow-300">{beadsWarning}</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* PRD Link */}
                     {getPrdPath() && (
