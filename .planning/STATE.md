@@ -1,6 +1,6 @@
 # PAN-507: beads db not initialized on fresh install
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
 ## Context
 
@@ -11,6 +11,24 @@ The three-layer fix for PAN-507 is already landed on main (commit `a2663a0b`):
 3. **`pan sync` health check** (`src/cli/commands/sync.ts:244-269`) — tests connectivity per project and auto-inits on failure
 
 However, **none of these paths have test coverage**. The existing `beads.test.ts` only covers `syncBeadStatusToVBrief` and `getVBriefACStatus`.
+
+## Current Phase
+Bead closed, awaiting inspection.
+
+## Completed Work
+- [x] feature-pan-489-msk: Add unit tests for createBeadsFromVBrief (commit: pending)
+
+## Remaining Work
+None
+
+## Key Decisions
+- Created `src/lib/vbrief/__tests__/create-beads.test.ts` as a separate file (not added to beads.test.ts) to avoid vi.mock() interference with existing sync-only tests in that file.
+- Fixed pre-existing TS errors in sync.ts: moved beads health-check block to after `projects` is declared (line 346), and changed `config.key` → `key` from destructure (key lives on the array item, not ProjectConfig).
+
+## Specialist Feedback
+None yet.
+
+---
 
 ## Decision: Add unit tests for createBeadsFromVBrief
 
