@@ -259,27 +259,32 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 export function syncBeadStatusToVBrief(
   beadId: string,
   workspacePath: string,
-  status: VBriefItemStatus = 'completed'
+  status: VBriefItemStatus = 'completed',
+  /** Optional: bead title from caller (e.g. bd list --json output). Falls back to .beads/issues.jsonl lookup. */
+  knownTitle?: string
 ): string | null {
   try {
     const doc = readWorkspacePlan(workspacePath);
     if (!doc) return null;
 
-    // Read bead title from .beads/issues.jsonl
-    const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(beadsFile)) return null;
+    let beadTitle: string | null = knownTitle ?? null;
 
-    const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
-    let beadTitle: string | null = null;
-    for (const line of lines) {
-      try {
-        const bead = JSON.parse(line);
-        if (bead.id === beadId && bead.title) {
-          beadTitle = bead.title as string;
-          break;
+    // Fallback: read bead title from .beads/issues.jsonl (legacy flat-file beads)
+    if (!beadTitle) {
+      const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
+      if (existsSync(beadsFile)) {
+        const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const bead = JSON.parse(line);
+            if (bead.id === beadId && bead.title) {
+              beadTitle = bead.title as string;
+              break;
+            }
+          } catch {
+            // skip malformed lines
+          }
         }
-      } catch {
-        // skip malformed lines
       }
     }
 
