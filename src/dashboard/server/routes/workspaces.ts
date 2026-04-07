@@ -26,7 +26,7 @@ import { httpHandler } from './http-handler.js';
  */
 
 import { exec, spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -359,9 +359,9 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
 
 /**
  * Build a rich PR body with issue link, beads task summary, and AC checklist
- * from the vBRIEF plan.
+ * from the vBRIEF plan. Exported for testing.
  */
-function buildRichPRBody(issueId: string, workspacePath: string): string {
+export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
   lines.push(`Closes #${issueId.split('-')[1] || issueId}`);
@@ -369,15 +369,20 @@ function buildRichPRBody(issueId: string, workspacePath: string): string {
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const plan = readWorkspacePlan(workspacePath);
-    if (plan?.plan?.items?.length) {
-      lines.push('## Acceptance Criteria');
-      lines.push('');
-      for (const item of plan.plan.items) {
-        const checked = item.status === 'completed' ? 'x' : ' ';
-        lines.push(`- [${checked}] ${item.title}`);
+    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+    if (existsSync(planPath)) {
+      const raw = await readFile(planPath, 'utf-8');
+      const doc = JSON.parse(raw);
+      const items: Array<{ status: string; title: string }> = doc?.plan?.items ?? [];
+      if (items.length > 0) {
+        lines.push('## Acceptance Criteria');
+        lines.push('');
+        for (const item of items) {
+          const checked = item.status === 'completed' ? 'x' : ' ';
+          lines.push(`- [${checked}] ${item.title}`);
+        }
+        lines.push('');
       }
-      lines.push('');
     }
   } catch {
     // No vBRIEF plan — omit checklist
@@ -388,7 +393,7 @@ function buildRichPRBody(issueId: string, workspacePath: string): string {
     let beadsPath: string | null = null;
     const workspaceBeadsRedirect = join(workspacePath, '.beads', 'redirect');
     if (existsSync(workspaceBeadsRedirect)) {
-      const redirectTarget = readFileSync(workspaceBeadsRedirect, 'utf-8').trim();
+      const redirectTarget = (await readFile(workspaceBeadsRedirect, 'utf-8')).trim();
       const resolvedPath = redirectTarget.startsWith('/')
         ? redirectTarget
         : join(workspacePath, '.beads', redirectTarget);
@@ -399,7 +404,7 @@ function buildRichPRBody(issueId: string, workspacePath: string): string {
 
     if (beadsPath && existsSync(beadsPath)) {
       const issueLower = issueId.toLowerCase();
-      const beads = readFileSync(beadsPath, 'utf-8')
+      const beads = (await readFile(beadsPath, 'utf-8'))
         .split('\n')
         .filter(l => l.trim())
         .map(l => {
@@ -443,7 +448,7 @@ async function ensurePRExists(
     if (existing) return { created: false, prUrl: existing };
 
     // Build rich PR body if workspace path is available
-    const prBody = options?.cwd ? buildRichPRBody(issueId, options.cwd) : `Automated PR for ${issueId}`;
+    const prBody = options?.cwd ? await buildRichPRBody(issueId, options.cwd) : `Automated PR for ${issueId}`;
 
     // Write body to a temp file to avoid shell escaping issues
     const { tmpdir } = await import('os');
