@@ -1830,12 +1830,22 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   };
 
   const startAgentMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (vars?: { bypassMemoryWarning?: boolean }) => {
+      const body: Record<string, unknown> = { issueId: issue.identifier };
+      if (vars?.bypassMemoryWarning) body.bypassMemoryWarning = true;
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: issue.identifier }),
+        body: JSON.stringify(body),
       });
+      if (res.status === 422) {
+        const data = await res.json().catch(() => ({}));
+        if (data.memoryBlocked) {
+          const hint = data.flyHint ?? 'Consider offloading to a remote runner: pan issue <id> --remote';
+          throw new Error(`${data.error ?? 'System memory critically low — cannot spawn agent.'} ${hint}`);
+        }
+        throw new Error(data.error ?? `Failed to start agent (${res.status})`);
+      }
       if (!res.ok) {
         // Handle non-JSON responses (e.g., Traefik 502 "Bad Gateway")
         const text = await res.text();
@@ -1850,7 +1860,25 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      if (data?.memoryWarning) {
+        const freeGB = data.memFreeBytes != null
+          ? (data.memFreeBytes / 1024 ** 3).toFixed(1)
+          : '?';
+        const totalGB = data.memTotalBytes != null
+          ? (data.memTotalBytes / 1024 ** 3).toFixed(0)
+          : '?';
+        const proceed = await confirm({
+          title: 'Memory Warning',
+          message: `System memory is low: ${freeGB} GB free of ${totalGB} GB. Spawning a new agent may cause system instability. Proceed anyway?`,
+          confirmLabel: 'Spawn Anyway',
+          cancelLabel: 'Cancel',
+        });
+        if (proceed) {
+          startAgentMutation.mutate({ bypassMemoryWarning: true });
+        }
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['issues'] });
     },
