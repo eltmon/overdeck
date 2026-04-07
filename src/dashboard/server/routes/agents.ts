@@ -858,11 +858,27 @@ const postAgentResumeRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const result = yield* Effect.promise(() => resumeAgent(id, message));
     if (result.success) {
-      // Emit domain event so the read model updates agent status from 'stopped' to 'running'
+      // Emit agent.started event so the read model transitions agent status
+      // from 'stopped' → 'running' and the frontend updates immediately.
+      const agentState = getAgentState(id);
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.started',
         timestamp: new Date().toISOString(),
-        payload: { agentId: id },
+        payload: {
+          agentId: id,
+          issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
+          agent: {
+            id,
+            issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
+            workspace: agentState?.workspace,
+            runtime: agentState?.runtime,
+            model: agentState?.model,
+            status: 'running',
+            startedAt: agentState?.startedAt,
+            lastActivity: new Date().toISOString(),
+            phase: agentState?.phase,
+          },
+        },
       })));
       return jsonResponse({ success: true });
     } else {
