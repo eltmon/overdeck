@@ -110,6 +110,21 @@ export function getShadowModeFromEnv(): boolean {
 }
 
 /**
+ * Get memory guard thresholds from environment variables.
+ * PAN_MEMORY_WARN_GB: warning threshold in GB (default 4)
+ * PAN_MEMORY_BLOCK_GB: critical block threshold in GB (default 2)
+ */
+export function getMemoryThresholds(): { warnBytes: number; blockBytes: number } {
+  const GB = 1024 ** 3;
+  const warnGB = parseFloat(process.env.PAN_MEMORY_WARN_GB ?? '4');
+  const blockGB = parseFloat(process.env.PAN_MEMORY_BLOCK_GB ?? '2');
+  return {
+    warnBytes: (isNaN(warnGB) ? 4 : warnGB) * GB,
+    blockBytes: (isNaN(blockGB) ? 2 : blockGB) * GB,
+  };
+}
+
+/**
  * Check if ~/.panopticon.env file exists
  */
 export function hasEnvFile(): boolean {

@@ -29,7 +29,7 @@ import { httpHandler } from "./http-handler.js";
 import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, freemem, totalmem } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -57,6 +57,7 @@ import {
   stopAgent,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
+import { getMemoryThresholds } from '../../../lib/env-loader.js';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -1111,7 +1112,7 @@ const postAgentsRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
 
-    const { issueId, projectId } = body as any;
+    const { issueId, projectId, bypassMemoryWarning } = body as any;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
@@ -1153,6 +1154,40 @@ const postAgentsRoute = HttpRouter.add(
         }, { status: 422 });
       }
     }
+
+    // ─── Memory guard (PAN-513) ─────────────────────────────────────────────
+    if (!bypassMemoryWarning) {
+      const memFreeBytes = freemem();
+      const memTotalBytes = totalmem();
+      const { warnBytes, blockBytes } = getMemoryThresholds();
+
+      if (memFreeBytes < blockBytes) {
+        const freeGB = (memFreeBytes / 1024 ** 3).toFixed(1);
+        const totalGB = (memTotalBytes / 1024 ** 3).toFixed(0);
+        return jsonResponse(
+          {
+            error: `System memory critically low: ${freeGB} GB free of ${totalGB} GB. Cannot spawn new agent.`,
+            memoryBlocked: true,
+            memFreeBytes,
+            memTotalBytes,
+            flyHint: 'Consider offloading to a remote runner: pan issue <id> --remote',
+          },
+          { status: 422 },
+        );
+      }
+
+      if (memFreeBytes < warnBytes) {
+        const freeGB = (memFreeBytes / 1024 ** 3).toFixed(1);
+        const totalGB = (memTotalBytes / 1024 ** 3).toFixed(0);
+        return jsonResponse({
+          memoryWarning: true,
+          message: `System memory low: ${freeGB} GB free of ${totalGB} GB. Proceed with caution.`,
+          memFreeBytes,
+          memTotalBytes,
+        });
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
