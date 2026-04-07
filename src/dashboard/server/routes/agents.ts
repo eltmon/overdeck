@@ -1254,18 +1254,18 @@ const postAgentsRoute = HttpRouter.add(
           yield* Effect.promise(() => execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
         // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
-        // Capture the result as Either so exit-1 doesn't propagate as an Effect failure.
+        // Handle exit-1 in the Promise so it never becomes an Effect failure.
         const diffResult = yield* Effect.promise(() =>
           execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' })
             .then(() => false)   // exit 0 → nothing staged
             .catch(() => true)   // exit 1 → has staged changes
         );
         if (diffResult) {
-          yield* Effect.promise(() => execAsync(`git commit -m "Planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
+          yield* Effect.promise(() => execAsync(`git commit -m "chore: planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
           const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
           pushChild.unref();
         }
-      }).pipe(Effect.catchAll(() => Effect.void));
+      }).pipe(Effect.catch(() => Effect.void));
     }
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
