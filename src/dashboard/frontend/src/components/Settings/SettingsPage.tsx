@@ -223,6 +223,27 @@ export function SettingsPage() {
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [clearingCache, setClearingCache] = useState(false);
+  const [claudeAuth, setClaudeAuth] = useState<{
+    installed: boolean;
+    loggedIn: boolean;
+    expired: boolean;
+    subscriptionType: string | null;
+    rateLimitTier: string | null;
+    expiresAt: number | null;
+    hasAnthropicApiKey: boolean;
+  } | null>(null);
+  const [refreshingAuth, setRefreshingAuth] = useState(false);
+
+  const fetchClaudeAuth = async () => {
+    setRefreshingAuth(true);
+    try {
+      const res = await fetch('/api/settings/claude-auth');
+      if (res.ok) setClaudeAuth(await res.json());
+    } catch { /* ignore */ }
+    finally { setRefreshingAuth(false); }
+  };
+
+  useEffect(() => { void fetchClaudeAuth(); }, []);
 
   useEffect(() => {
     if (settings && !formData) {
@@ -503,6 +524,90 @@ export function SettingsPage() {
         </div>
       </section>
 
+      {/* Claude Code Authentication */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          Claude Code
+          <div className="h-px flex-1 bg-divider-strong" />
+        </h2>
+        <div className="bg-surface-raised border border-divider rounded-xl p-6 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              {/* Status dot */}
+              <div className={`mt-1 w-3 h-3 rounded-full shrink-0 ${
+                claudeAuth?.loggedIn ? 'bg-success' :
+                claudeAuth?.expired ? 'bg-warning' :
+                claudeAuth?.installed ? 'bg-destructive' :
+                'bg-muted-foreground'
+              }`} />
+              <div>
+                {claudeAuth === null ? (
+                  <p className="text-content-body text-sm">Checking authentication status…</p>
+                ) : !claudeAuth.installed ? (
+                  <>
+                    <p className="text-content font-semibold">Claude Code not detected</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      Install Claude Code to use subscription-based authentication.
+                    </p>
+                  </>
+                ) : claudeAuth.loggedIn ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <p className="text-content font-semibold">Logged in</p>
+                      {claudeAuth.subscriptionType && (
+                        <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+                          {claudeAuth.subscriptionType.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    {claudeAuth.rateLimitTier && (
+                      <p className="text-content-muted text-xs mt-1">
+                        Rate tier: <code className="font-mono text-content-subtle">{claudeAuth.rateLimitTier}</code>
+                      </p>
+                    )}
+                    {claudeAuth.hasAnthropicApiKey && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                        <p className="text-warning text-xs">
+                          <code className="font-mono">ANTHROPIC_API_KEY</code> is set — this overrides subscription auth for direct API calls
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : claudeAuth.expired ? (
+                  <>
+                    <p className="text-content font-semibold text-warning">Session expired</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      Your Claude Code session has expired. Run <code className="font-mono bg-surface-overlay px-1 rounded">claude</code> in the terminal and use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code> to re-authenticate.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-content font-semibold">Not logged in</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      No active subscription session. To log in, type <code className="font-mono bg-surface-overlay px-1 rounded">! claude</code> in the command bar, then use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code>.
+                    </p>
+                    {claudeAuth.hasAnthropicApiKey && (
+                      <p className="text-content-subtle text-xs mt-2">
+                        Falling back to <code className="font-mono">ANTHROPIC_API_KEY</code> for Anthropic models.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => void fetchClaudeAuth()}
+              disabled={refreshingAuth}
+              className="shrink-0 p-2 rounded-lg border border-divider hover:border-divider-strong text-content-muted hover:text-content transition-colors disabled:opacity-50"
+              title="Refresh auth status"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshingAuth ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Provider Configuration */}
       <section className="mb-12">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
@@ -536,6 +641,12 @@ export function SettingsPage() {
                     <provider.icon className="w-5 h-5 text-content-subtle" />
                   </div>
                   <span className="font-bold text-content">{provider.name}</span>
+                  {/* Subscription badge in the Anthropic card header */}
+                  {isDefault && claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
+                    <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+                      {claudeAuth.subscriptionType.toUpperCase()}
+                    </span>
+                  )}
                   <div className="ml-auto">
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
@@ -554,57 +665,85 @@ export function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="relative">
-                    <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
-                    {/* Check if it's an unresolved env var reference */}
-                    {apiKey.startsWith('$') ? (
-                      <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-warning text-xs">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
-                        </div>
-                        <p className="text-[10px] text-warning/70 mt-1">
-                          Set this environment variable or enter the key directly below
-                        </p>
-                        <input
-                          type="text"
-                          placeholder={provider.placeholder}
-                          onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                          autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
-                        />
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type={showApiKey[provider.id] ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                          disabled={isDefault}
-                          placeholder={provider.placeholder}
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck={false}
-                          data-lpignore="true"
-                          data-1p-ignore="true"
-                          data-form-type="other"
-                          className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary ${
-                            isDefault ? 'cursor-not-allowed text-content-muted' : 'text-content-body'
-                          }`}
-                        />
-                        {!isDefault && (
-                          <button
-                            onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                            className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
-                          >
-                            {showApiKey[provider.id] ? (
-                              <Eye className="w-4 h-4" />
-                            ) : (
-                              <Eye className="w-4 h-4 opacity-50" />
-                            )}
-                          </button>
+                    {/* Anthropic: show authentication method rather than raw API key field */}
+                    {isDefault ? (
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
+                        {claudeAuth?.loggedIn ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                            <div className="w-2 h-2 rounded-full bg-success shrink-0" />
+                            <span className="text-xs text-success font-medium">
+                              Subscription{claudeAuth.subscriptionType ? ` — ${claudeAuth.subscriptionType.toUpperCase()} plan` : ''}
+                            </span>
+                          </div>
+                        ) : claudeAuth?.hasAnthropicApiKey ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <Key className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="text-xs text-primary font-medium">API Key (via env)</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20">
+                            <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                            <span className="text-xs text-warning">Not authenticated — see Claude Code section above</span>
+                          </div>
+                        )}
+                        {claudeAuth?.hasAnthropicApiKey && claudeAuth.loggedIn && (
+                          <p className="text-[10px] text-warning mt-1.5 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <code className="font-mono">ANTHROPIC_API_KEY</code> overrides subscription for direct API calls
+                          </p>
                         )}
                       </div>
+                    ) : (
+                      <>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
+                        {/* Check if it's an unresolved env var reference */}
+                        {apiKey.startsWith('$') ? (
+                          <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 text-warning text-xs">
+                              <AlertTriangle className="w-4 h-4" />
+                              <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
+                            </div>
+                            <p className="text-[10px] text-warning/70 mt-1">
+                              Set this environment variable or enter the key directly below
+                            </p>
+                            <input
+                              type="text"
+                              placeholder={provider.placeholder}
+                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                              autoComplete="off"
+                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                            />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              type={showApiKey[provider.id] ? 'text' : 'password'}
+                              value={apiKey}
+                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                              placeholder={provider.placeholder}
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="off"
+                              spellCheck={false}
+                              data-lpignore="true"
+                              data-1p-ignore="true"
+                              data-form-type="other"
+                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                            />
+                            <button
+                              onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
+                              className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                            >
+                              {showApiKey[provider.id] ? (
+                                <Eye className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4 opacity-50" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   {/* Action Buttons */}

@@ -13,6 +13,16 @@ import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface ClaudeAuthStatus {
+  installed: boolean;
+  loggedIn: boolean;
+  expired: boolean;
+  subscriptionType: string | null;
+  rateLimitTier: string | null;
+  expiresAt: number | null;
+  hasAnthropicApiKey: boolean;
+}
+
 interface PickerModel {
   id: string;
   label: string;
@@ -21,6 +31,15 @@ interface PickerModel {
   costDisplay?: string;
   /** Effort levels supported by this model. Empty = effort not supported. */
   effortLevels: readonly string[];
+  /**
+   * For Anthropic models:
+   *   "sub"   — available via active subscription (MAX / Pro)
+   *   "key"   — requires ANTHROPIC_API_KEY
+   *   "noauth" — no subscription and no key configured
+   */
+  authMode?: 'sub' | 'key' | 'noauth';
+  /** Short label shown in the badge, e.g. "MAX", "Pro", "API Key" */
+  authBadge?: string;
 }
 
 interface ModelGroup {
@@ -106,7 +125,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
   useEffect(() => {
     async function loadModels() {
       try {
-        const [availRes, orRes] = await Promise.allSettled([
+        const [availRes, orRes, authRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
             Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
           >,
@@ -119,10 +138,23 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
             }>;
             favorites: string[];
           }>,
+          fetch('/api/settings/claude-auth').then((r) => r.json()) as Promise<ClaudeAuthStatus>,
         ]);
 
         const avail = availRes.status === 'fulfilled' ? availRes.value : {};
         const orData = orRes.status === 'fulfilled' ? orRes.value : { models: [], favorites: [] };
+        const auth = authRes.status === 'fulfilled' ? authRes.value : null;
+
+        // Determine Anthropic auth mode for badge display
+        let anthropicAuthMode: PickerModel['authMode'] = 'noauth';
+        let anthropicBadge: string | undefined;
+        if (auth?.loggedIn && auth.subscriptionType) {
+          anthropicAuthMode = 'sub';
+          anthropicBadge = auth.subscriptionType.toUpperCase(); // "MAX" or "PRO"
+        } else if (auth?.hasAnthropicApiKey) {
+          anthropicAuthMode = 'key';
+          anthropicBadge = undefined; // already have cost display
+        }
 
         const newGroups: ModelGroup[] = [];
 
@@ -137,8 +169,12 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
               id: m.id,
               label: m.name,
               provider: prov,
-              costDisplay: formatCost(m.costPer1MTokens),
+              costDisplay: prov === 'anthropic' && anthropicAuthMode === 'sub'
+                ? undefined  // subscription — no per-token cost shown
+                : formatCost(m.costPer1MTokens),
               effortLevels: STATIC_EFFORT_LEVELS[m.id] ?? [],
+              authMode: prov === 'anthropic' ? anthropicAuthMode : undefined,
+              authBadge: prov === 'anthropic' ? anthropicBadge : undefined,
             })),
           });
         }
@@ -195,6 +231,8 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
   }
 
   const label = selectedModel?.label ?? value;
+  // Append plan badge to trigger button label for subscribed Anthropic models
+  const triggerBadge = selectedModel?.authBadge ?? null;
 
   return (
     <div ref={ref} className={styles.pickerContainer}>
@@ -205,6 +243,9 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         type="button"
       >
         <span className={styles.pickerLabel}>{label}</span>
+        {triggerBadge && (
+          <span className={styles.pickerAuthBadge}>{triggerBadge}</span>
+        )}
         <ChevronDown size={11} />
       </button>
 
@@ -223,7 +264,13 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
                   type="button"
                 >
                   <span className={styles.pickerOptionLabel}>{model.label}</span>
-                  {model.costDisplay && (
+                  {model.authBadge && (
+                    <span className={styles.pickerAuthBadge}>{model.authBadge}</span>
+                  )}
+                  {model.authMode === 'noauth' && !model.authBadge && (
+                    <span className={styles.pickerAuthBadgeWarn}>No key</span>
+                  )}
+                  {!model.authBadge && model.authMode !== 'noauth' && model.costDisplay && (
                     <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
                   )}
                 </button>

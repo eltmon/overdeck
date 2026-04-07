@@ -23,6 +23,7 @@ import {
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
 } from '../../../lib/settings-api.js';
+import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 
@@ -415,6 +416,17 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/settings/claude-auth ────────────────────────────────────
+
+const getClaudeAuthRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/claude-auth',
+  httpHandler(Effect.promise(async () => {
+    const status = await getClaudeAuthStatus();
+    return jsonResponse(status);
+  })),
+);
+
 // ─── Route: POST /api/settings/openrouter/test-key ───────────────────────────
 
 const postOpenRouterTestKeyRoute = HttpRouter.add(
@@ -446,6 +458,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
   postOpenRouterTestKeyRoute,
+  getClaudeAuthRoute,
 );
 
 export default settingsRouteLayer;
