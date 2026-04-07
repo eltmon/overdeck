@@ -805,59 +805,61 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
       });
 
     } else if (tracker === 'linear') {
-      try {
-        const issue = yield* linear.getIssue(issueId).pipe(Effect.catchCause(() => Effect.succeed(null)));
-        if (!issue) {
-          return jsonResponse({ error: 'Linear not configured or issue not found' }, { status: 400 });
-        }
-        const comments = yield* linear.getComments(issue.id).pipe(Effect.catchCause(() => Effect.succeed([])));
-        if (comments.length > 0) {
-          const filename = `linear-${issueId}-comments.md`;
-          const commentBody = comments.map((c: { author: string; createdAt: string; body: string }) =>
-            `## ${c.author} (${c.createdAt})\n\n${c.body}\n\n---\n`
-          ).join('\n');
-          yield* Effect.tryPromise({
-            try: () => writeFile(join(discussionsDir, filename), `# Linear Comments for ${issueId}\n\nSynced: ${new Date().toISOString()}\n\n---\n\n` + commentBody, 'utf-8'),
-            catch: (err) => new Error(String(err)),
-          });
-          syncedFiles.push(filename);
-        }
-      } catch (err) { console.warn(`Failed to sync Linear comments for ${issueId}:`, err); }
+      const issue = yield* linear.getIssue(issueId).pipe(Effect.catchCause(() => Effect.succeed(null)));
+      if (!issue) {
+        return jsonResponse({ error: 'Linear not configured or issue not found' }, { status: 400 });
+      }
+      const comments = yield* linear.getComments(issue.id).pipe(Effect.catchCause(() => Effect.succeed([])));
+      if (comments.length > 0) {
+        const filename = `linear-${issueId}-comments.md`;
+        const commentBody = comments.map((c: { author: string; createdAt: string; body: string }) =>
+          `## ${c.author} (${c.createdAt})\n\n${c.body}\n\n---\n`
+        ).join('\n');
+        const linearWriteOk = yield* Effect.tryPromise({
+          try: () => writeFile(join(discussionsDir, filename), `# Linear Comments for ${issueId}\n\nSynced: ${new Date().toISOString()}\n\n---\n\n` + commentBody, 'utf-8'),
+          catch: (err) => new Error(String(err)),
+        }).pipe(
+          Effect.map(() => true),
+          Effect.catchAll((err) => Effect.sync(() => { console.warn(`Failed to sync Linear comments for ${issueId}:`, err); return false; }))
+        );
+        if (linearWriteOk) syncedFiles.push(filename);
+      }
 
     } else if (tracker === 'rally') {
-      try {
-        const issueDataService = getIssueDataService();
-        const allIssues = issueDataService.getIssues() as Record<string, unknown>[];
-        const parentFeature = allIssues.find((i) => i['source'] === 'rally' && i['identifier'] === issueId);
-        const childStories = allIssues.filter((i) => i['source'] === 'rally' && i['parentRef'] === issueId);
+      const issueDataService = getIssueDataService();
+      const allIssues = issueDataService.getIssues() as Record<string, unknown>[];
+      const parentFeature = allIssues.find((i) => i['source'] === 'rally' && i['identifier'] === issueId);
+      const childStories = allIssues.filter((i) => i['source'] === 'rally' && i['parentRef'] === issueId);
 
-        if (childStories.length > 0 || parentFeature) {
-          const filename = `rally-${issueId}-stories.md`;
-          const lines: string[] = [`# Rally Stories for ${issueId}`, '', `Synced: ${new Date().toISOString()}`, ''];
+      if (childStories.length > 0 || parentFeature) {
+        const filename = `rally-${issueId}-stories.md`;
+        const lines: string[] = [`# Rally Stories for ${issueId}`, '', `Synced: ${new Date().toISOString()}`, ''];
 
-          if (parentFeature) {
-            const pf = parentFeature as { title?: string; rawTrackerState?: string; status?: string; derivedStatus?: string; totalChildCount?: number; completedChildCount?: number; inProgressChildCount?: number };
-            lines.push(`**Feature**: ${pf.title}`, `**Rally State**: ${pf.rawTrackerState || pf.status}`);
-            if (pf.derivedStatus) lines.push(`**Derived Status**: ${pf.derivedStatus}`);
-            lines.push(`**Stories**: ${pf.totalChildCount || childStories.length} total, ${pf.completedChildCount || 0} done, ${pf.inProgressChildCount || 0} active`, '');
-          }
-
-          lines.push('---', '', '## Child Stories', '');
-          for (const story of childStories) {
-            const s = story as { status?: string; identifier?: string; title?: string; rawTrackerState?: string; assignee?: { name?: string } };
-            const statusEmoji = s.status === 'Done' ? '✅' : s.status === 'In Progress' ? '🔄' : s.status === 'In Review' ? '👀' : '⬜';
-            lines.push(`- ${statusEmoji} **${s.identifier}**: ${s.title}`, `  - Status: ${s.rawTrackerState || s.status}`);
-            if (s.assignee?.name) lines.push(`  - Assignee: ${s.assignee.name}`);
-            lines.push('');
-          }
-
-          yield* Effect.tryPromise({
-            try: () => writeFile(join(discussionsDir, filename), lines.join('\n'), 'utf-8'),
-            catch: (err) => new Error(String(err)),
-          });
-          syncedFiles.push(filename);
+        if (parentFeature) {
+          const pf = parentFeature as { title?: string; rawTrackerState?: string; status?: string; derivedStatus?: string; totalChildCount?: number; completedChildCount?: number; inProgressChildCount?: number };
+          lines.push(`**Feature**: ${pf.title}`, `**Rally State**: ${pf.rawTrackerState || pf.status}`);
+          if (pf.derivedStatus) lines.push(`**Derived Status**: ${pf.derivedStatus}`);
+          lines.push(`**Stories**: ${pf.totalChildCount || childStories.length} total, ${pf.completedChildCount || 0} done, ${pf.inProgressChildCount || 0} active`, '');
         }
-      } catch (err) { console.warn(`Failed to sync Rally stories for ${issueId}:`, err); }
+
+        lines.push('---', '', '## Child Stories', '');
+        for (const story of childStories) {
+          const s = story as { status?: string; identifier?: string; title?: string; rawTrackerState?: string; assignee?: { name?: string } };
+          const statusEmoji = s.status === 'Done' ? '✅' : s.status === 'In Progress' ? '🔄' : s.status === 'In Review' ? '👀' : '⬜';
+          lines.push(`- ${statusEmoji} **${s.identifier}**: ${s.title}`, `  - Status: ${s.rawTrackerState || s.status}`);
+          if (s.assignee?.name) lines.push(`  - Assignee: ${s.assignee.name}`);
+          lines.push('');
+        }
+
+        const rallyWriteOk = yield* Effect.tryPromise({
+          try: () => writeFile(join(discussionsDir, filename), lines.join('\n'), 'utf-8'),
+          catch: (err) => new Error(String(err)),
+        }).pipe(
+          Effect.map(() => true),
+          Effect.catchAll((err) => Effect.sync(() => { console.warn(`Failed to sync Rally stories for ${issueId}:`, err); return false; }))
+        );
+        if (rallyWriteOk) syncedFiles.push(filename);
+      }
     }
 
     return jsonResponse({ synced: syncedFiles.length, files: syncedFiles });
