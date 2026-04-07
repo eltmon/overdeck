@@ -214,24 +214,30 @@ const getAgentsRoute = HttpRouter.add(
             const inLocalList = agentLines.some(line => line.startsWith(dir + '|'));
             const remoteStateFile = join(agentsDir, dir, 'remote-state.json');
             if (existsSync(remoteStateFile)) {
-              try {
-                const state = JSON.parse(yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')));
-                if (state.location === 'remote' && state.status === 'running' && !inLocalList) {
-                  remoteAgentIds.push(dir);
-                }
-              } catch {}
+              const remoteContent = yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+              if (remoteContent !== null) {
+                try {
+                  const state = JSON.parse(remoteContent);
+                  if (state.location === 'remote' && state.status === 'running' && !inLocalList) {
+                    remoteAgentIds.push(dir);
+                  }
+                } catch {}
+              }
             }
             if (!inLocalList && !remoteAgentIds.includes(dir)) {
               const localStateFile = join(agentsDir, dir, 'state.json');
               if (existsSync(localStateFile)) {
-                try {
-                  const state = JSON.parse(yield* Effect.promise(() => readFile(localStateFile, 'utf-8')));
-                  if (state.status === 'starting') {
-                    startingAgentIds.push(dir);
-                  } else if (state.status === 'failed') {
-                    failedAgentIds.push(dir);
-                  }
-                } catch {}
+                const localContent = yield* Effect.promise(() => readFile(localStateFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+                if (localContent !== null) {
+                  try {
+                    const state = JSON.parse(localContent);
+                    if (state.status === 'starting') {
+                      startingAgentIds.push(dir);
+                    } else if (state.status === 'failed') {
+                      failedAgentIds.push(dir);
+                    }
+                  } catch {}
+                }
               }
             }
           }
@@ -354,12 +360,18 @@ const getAgentsRoute = HttpRouter.add(
             if (alreadyListed.has(dir)) continue;
             const stateFile = join(agentsDir, dir, 'state.json');
             if (!existsSync(stateFile)) continue;
-            try {
-              const state = JSON.parse(yield* Effect.promise(() => readFile(stateFile, 'utf-8')));
+            const stateContent = yield* Effect.promise(() => readFile(stateFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+            if (stateContent === null) continue;
+            {
+              let state: any;
+              try { state = JSON.parse(stateContent); } catch { continue; }
               const runtimeFile = join(agentsDir, dir, 'runtime.json');
               let runtimeData: any = {};
               if (existsSync(runtimeFile)) {
-                try { runtimeData = JSON.parse(yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'))); } catch {}
+                const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+                if (runtimeContent !== null) {
+                  try { runtimeData = JSON.parse(runtimeContent); } catch {}
+                }
               }
               const hasCompletedMarker = existsSync(join(agentsDir, dir, 'completed')) ||
                 existsSync(join(agentsDir, dir, 'completed.processed'));
@@ -392,7 +404,7 @@ const getAgentsRoute = HttpRouter.add(
                 resolution: runtimeData.resolution || 'working',
                 resolutionCount: runtimeData.resolutionCount || 0,
               });
-            } catch {}
+            }
           }
         }
 
@@ -552,13 +564,16 @@ const postAgentMessageRoute = HttpRouter.add(
     let vmName = '';
 
     if (existsSync(remoteStateFile)) {
-      try {
-        const state = JSON.parse(yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')));
-        if (state.location === 'remote' && state.vmName) {
-          isRemote = true;
-          vmName = state.vmName;
-        }
-      } catch {}
+      const remoteStateContent = yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+      if (remoteStateContent !== null) {
+        try {
+          const state = JSON.parse(remoteStateContent);
+          if (state.location === 'remote' && state.vmName) {
+            isRemote = true;
+            vmName = state.vmName;
+          }
+        } catch {}
+      }
     }
 
     if (isRemote && vmName) {
@@ -1030,23 +1045,26 @@ const getAgentCostRoute = HttpRouter.add(
       };
 
       if (existsSync(sessionsIndexPath)) {
-        try {
-          const indexContent = JSON.parse(yield* Effect.promise(() => readFile(sessionsIndexPath, 'utf-8')));
-          for (const sessionEntry of (indexContent.entries || [])) {
-            if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-              yield* Effect.promise(() => parseJsonlCost(sessionEntry.fullPath));
+        const sessionsIndexContent = yield* Effect.promise(() => readFile(sessionsIndexPath, 'utf-8')).pipe(Effect.catchAll(() => Effect.succeed(null as string | null)));
+        if (sessionsIndexContent !== null) {
+          let indexContent: any;
+          try { indexContent = JSON.parse(sessionsIndexContent); } catch {}
+          if (indexContent) {
+            for (const sessionEntry of (indexContent.entries || [])) {
+              if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
+                yield* Effect.promise(() => parseJsonlCost(sessionEntry.fullPath)).pipe(Effect.catchAll(() => Effect.void));
+              }
             }
           }
-        } catch {}
+        }
       }
 
       if (inputTokens === 0 && existsSync(projectDir)) {
-        try {
-          const files = (yield* Effect.promise(() => readdir(projectDir))).filter(f => f.endsWith('.jsonl'));
-          for (const file of files) {
-            yield* Effect.promise(() => parseJsonlCost(join(projectDir, file)));
-          }
-        } catch {}
+        const projectFiles = yield* Effect.promise(() => readdir(projectDir)).pipe(Effect.catchAll(() => Effect.succeed([] as string[])));
+        const jsonlFiles = projectFiles.filter(f => f.endsWith('.jsonl'));
+        for (const file of jsonlFiles) {
+          yield* Effect.promise(() => parseJsonlCost(join(projectDir, file))).pipe(Effect.catchAll(() => Effect.void));
+        }
       }
     }
 
@@ -1133,15 +1151,15 @@ const postAgentsRoute = HttpRouter.add(
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
-      try {
-        const nodeDir = dirname(process.execPath);
-        yield* Effect.promise(() => execAsync(
-          `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
-        ));
-      } catch (wsErr) {
+      const nodeDir = dirname(process.execPath);
+      let wsCreateErr: Error | null = null;
+      yield* Effect.promise(() => execAsync(
+        `pan workspace create ${issueId} --local`,
+        { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
+      )).pipe(Effect.catchAll((e) => Effect.sync(() => { wsCreateErr = e as Error; })));
+      if (wsCreateErr) {
         return jsonResponse({
-          error: `Failed to create workspace for ${issueId}: ${(wsErr as Error).message}`,
+          error: `Failed to create workspace for ${issueId}: ${wsCreateErr.message}`,
           hint: 'Try creating the workspace manually: pan workspace create ' + issueId + ' --local',
         }, { status: 500 });
       }
@@ -1161,19 +1179,19 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (planningDir && planningDir !== workspacePlanningDir) {
-      try {
-        yield* Effect.promise(() => execAsync(`cp -r "${planningDir}" "${workspacePlanningDir}"`, { encoding: 'utf-8' }));
-        planningDir = workspacePlanningDir;
-      } catch {}
+      const sourcePlanningDir = planningDir;
+      const cpPlanningOk = yield* Effect.promise(() => execAsync(`cp -r "${sourcePlanningDir}" "${workspacePlanningDir}"`, { encoding: 'utf-8' })).pipe(
+        Effect.map(() => true),
+        Effect.catchAll(() => Effect.succeed(false))
+      );
+      if (cpPlanningOk) planningDir = workspacePlanningDir;
     }
 
     const workspaceBeadsDir = join(workspacePath, '.beads');
     if (!existsSync(workspaceBeadsDir)) {
       const projectRootBeadsDir = join(projectPath, '.beads');
       if (existsSync(projectRootBeadsDir)) {
-        try {
-          yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' }));
-        } catch {}
+        yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' })).pipe(Effect.catchAll(() => Effect.void));
       }
     }
 
@@ -1193,49 +1211,53 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: 422 });
     }
 
-    try {
+    {
       const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
-      const planDoc = readPlan(planPath);
-      const itemCount = planDoc?.plan?.items?.length ?? 0;
-      if (itemCount === 0) {
-        return jsonResponse({
-          error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
-          hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
-          issueId,
-        }, { status: 422 });
-      }
-    } catch {}
+      try {
+        const planDoc = readPlan(planPath);
+        const itemCount = planDoc?.plan?.items?.length ?? 0;
+        if (itemCount === 0) {
+          return jsonResponse({
+            error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
+            hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
+            issueId,
+          }, { status: 422 });
+        }
+      } catch {}
+    }
 
     let hasBeads = false;
-    try {
-      const { stdout: bdOutput } = yield* Effect.promise(() => execAsync(
-        `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-      ));
-      const bdTasks = JSON.parse(bdOutput.trim() || '[]');
-      hasBeads = bdTasks.length > 0;
-    } catch {}
+    const bdListResult = yield* Effect.promise(() => execAsync(
+      `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+    )).pipe(Effect.catchAll(() => Effect.succeed(null as { stdout: string } | null)));
+    if (bdListResult !== null) {
+      try {
+        const bdTasks = JSON.parse(bdListResult.stdout.trim() || '[]');
+        hasBeads = bdTasks.length > 0;
+      } catch {}
+    }
 
     let recoveryError: string | null = null;
     if (!hasBeads) {
       // Auto-recovery: beads DB may not have been initialized (fresh install, or planning
       // completed before bd init ran). Attempt to create beads from the vBRIEF plan now.
       console.log(`[agents] No beads for ${issueId} — attempting auto-recovery via createBeadsFromVBrief`);
-      try {
-        const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-        const recovery = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
-        hasBeads = recovery.created.length > 0;
-        if (hasBeads) {
-          console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
-        } else if (recovery.errors.length > 0) {
-          recoveryError = recovery.errors[0] ?? 'Unknown error during beads creation';
-          console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);
-        } else {
-          recoveryError = 'createBeadsFromVBrief returned no beads and no errors';
+      const beadsModule = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js')).pipe(
+        Effect.catchAll((e) => Effect.sync(() => { console.warn(`[agents] Auto-recovery failed: ${(e as any).message}`); return null as any; }))
+      );
+      if (beadsModule) {
+        const recovery = yield* Effect.promise(() => beadsModule.createBeadsFromVBrief(workspacePath)).pipe(
+          Effect.catchAll((e) => Effect.sync(() => { console.warn(`[agents] Auto-recovery failed: ${(e as any).message}`); return null as any; }))
+        );
+        if (recovery) {
+          hasBeads = recovery.created.length > 0;
+          if (hasBeads) {
+            console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
+          } else if (recovery.errors.length > 0) {
+            console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);
+          }
         }
-      } catch (recoveryErr: any) {
-        recoveryError = recoveryErr.message;
-        console.warn(`[agents] Auto-recovery failed: ${recoveryErr.message}`);
       }
     }
 
@@ -1279,9 +1301,7 @@ const postAgentsRoute = HttpRouter.add(
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
     if (existsSync(planningPromptPath)) {
-      try {
-        yield* Effect.promise(() => rename(planningPromptPath, planningPromptPath + '.archived'));
-      } catch {}
+      yield* Effect.promise(() => rename(planningPromptPath, planningPromptPath + '.archived')).pipe(Effect.catchAll(() => Effect.void));
     }
 
     if (isRemote && workspaceMetadata) {
@@ -1346,13 +1366,11 @@ const postAgentsRoute = HttpRouter.add(
 
     if (existingAgentState && savedSessionId && (existingAgentState.status === 'stopped' || existingAgentState.status === 'completed')) {
       // Kill any zombie tmux session before resuming
-      try {
-        yield* Effect.promise(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }));
-      } catch { /* No existing session — good */ }
+      yield* Effect.promise(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' })).pipe(Effect.catchAll(() => Effect.void)); /* No existing session — good */
 
       // Remove completed marker so the agent can work again
       const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
-      try { yield* Effect.promise(() => rm(completedFile, { force: true })); } catch { /* non-fatal */ }
+      yield* Effect.promise(() => rm(completedFile, { force: true })).pipe(Effect.catchAll(() => Effect.void)); /* non-fatal */
 
       // Build context-rich resume prompt from STATE.md, beads, and feedback
       const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
@@ -1460,11 +1478,10 @@ const postAgentsRoute = HttpRouter.add(
     };
 
     if (existsSync(workspacePath) && existsSync(devScript)) {
-      let dockerRunning = false;
-      try {
-        yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' }));
-        dockerRunning = true;
-      } catch {}
+      const dockerRunning = yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' })).pipe(
+        Effect.map(() => true),
+        Effect.catchAll(() => Effect.succeed(false))
+      );
 
       if (dockerRunning) {
         const getComposeProjectName = async (id: string, pPath?: string): Promise<string> => {
@@ -1493,18 +1510,18 @@ const postAgentsRoute = HttpRouter.add(
         const featureName = yield* Effect.promise(() => getComposeProjectName(issueId, projectPath));
         let containersReady = false;
 
-        try {
-          const { stdout: existing } = yield* Effect.promise(() => execAsync(
-            `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
-            { encoding: 'utf-8' }
-          ));
-          const runningContainers = existing.trim().split('\n').filter(Boolean);
+        const dockerPsResult = yield* Effect.promise(() => execAsync(
+          `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+          { encoding: 'utf-8' }
+        )).pipe(Effect.catchAll(() => Effect.succeed(null as { stdout: string } | null)));
+        if (dockerPsResult !== null) {
+          const runningContainers = dockerPsResult.stdout.trim().split('\n').filter(Boolean);
           const allHealthy = runningContainers.length > 0 && runningContainers.every(line => {
             const status = line.split('|')[1] || '';
             return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
           });
           if (allHealthy) containersReady = true;
-        } catch {}
+        }
 
         if (!containersReady) {
           const earlyAgentId = `agent-${issueLower}`;

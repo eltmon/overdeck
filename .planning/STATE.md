@@ -1,6 +1,6 @@
 # PAN-512: Effect yield* failures not caught by JS try/catch
 
-## Status: Planning Complete
+## Status: In Progress
 
 ## Problem
 
@@ -38,6 +38,28 @@ Add a `no-restricted-syntax` ESLint rule that flags `TryStatement` containing `Y
 - All 17 instances in 4 route files
 - 1 ESLint rule addition
 - Extend existing `effect-patterns.test.ts` with a comment documenting the pattern (the ESLint rule is the real enforcement)
+
+## Current Phase
+Implementing bead feature-pan-489-2l3: Fix all try/catch-around-yield* instances in routes/agents.ts
+
+## Completed Work
+- [x] feature-pan-489-2l3: Fixed 14 try/catch-around-yield* instances in routes/agents.ts — remote/local state reads, stopped agent state+runtime reads, cost parsing, workspace creation, planning/beads copy, readPlan import, bd list, beads auto-recovery, rename planning prompt, tmux kill-session, rm completed marker, docker checks (commit: pending)
+
+## Remaining Work
+- [ ] feature-pan-489-ejs: Fix 9 try/catch-around-yield* instances in routes/workspaces.ts
+- [ ] feature-pan-489-wmt: Fix 2 try/catch-around-yield* instances in routes/mission-control.ts
+- [ ] feature-pan-489-3hk: Fix 1 try/catch-around-yield* instance in routes/specialists.ts
+- [ ] feature-pan-489-dzt: Add ESLint rule to prevent try/catch around yield* in Effect.gen
+- [ ] feature-pan-489-svx: Verify typecheck, lint, and tests pass
+
+## Key Decisions
+- Fixed ALL try/catch-around-yield* instances in agents.ts (14 total, planning said 5 — the count was conservative)
+- Pattern: readFile/execAsync → .pipe(Effect.catchAll(() => Effect.succeed(null))) then try/catch around JSON.parse separately
+- For "return on error" pattern: used local variable + Effect.catchAll to capture the error, then check after
+- For "set flag on success" (docker, cp): used Effect.map(() => true).pipe(Effect.catchAll(() => Effect.succeed(false)))
+
+## Specialist Feedback
+(none yet)
 
 ## Out of Scope
 
