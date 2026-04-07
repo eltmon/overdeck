@@ -85,8 +85,28 @@ function loadDesktopSettings() {
 		settings = deepClone(DEFAULTS);
 	}
 }
+function saveDesktopSettings() {
+	try {
+		node_fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2));
+	} catch {
+		console.error("[desktop] failed to save desktop settings");
+	}
+}
 function getDesktopSettings() {
 	return settings;
+}
+/**
+* Update a single setting by dotted key (e.g. "notifications.inputNeeded").
+* Returns true if the key was found and updated.
+*/
+function updateDesktopSetting(key, value) {
+	const [section, field] = key.split(".");
+	if (!section || !field) return false;
+	const s = settings;
+	if (!s[section] || !(field in s[section])) return false;
+	s[section][field] = value;
+	saveDesktopSettings();
+	return true;
 }
 //#endregion
 //#region src/tray.ts
@@ -448,6 +468,47 @@ function configureApplicationMenu() {
 	});
 }
 //#endregion
+//#region src/notifications.ts
+/**
+* Native desktop notifications for Panopticon events.
+*
+* Event types and their default enabled state (all configurable in Settings):
+*   inputNeeded   — Agent needs user input (default: on)
+*   stuckAgents   — Agent has been stuck > threshold (default: on)
+*   mergeFailures — Merge specialist failed (default: on)
+*   workComplete  — Agent signalled work done (default: on)
+*   planningDone  — Planning session complete (default: off)
+*   mergeReady    — PR ready for human merge (default: on)
+*
+* Notifications are sent from:
+* 1. Renderer → main via IPC (pan:notify) — for events the frontend detects
+* 2. Main process directly — in future when subscribing to domain events via WS
+*/
+function sendNotification(eventType, title, body) {
+	if (!getDesktopSettings().notifications[eventType]) return;
+	if (!electron.Notification.isSupported()) return;
+	const notification = new electron.Notification({
+		title,
+		body,
+		icon: resolveResourcePath("icon.png") ?? void 0,
+		silent: false
+	});
+	notification.on("click", () => showOrCreateWindow());
+	notification.show();
+}
+function registerNotificationHandlers() {
+	electron.ipcMain.handle(IPC.NOTIFY, (_event, eventType, title, body) => {
+		if (typeof eventType === "string" && typeof title === "string" && typeof body === "string") sendNotification(eventType, title, body);
+	});
+}
+/**
+* Called at app.ready to request notification permission on macOS.
+* On Linux/Windows, Notification.isSupported() handles availability.
+*/
+function initializeNotifications() {
+	if (!electron.Notification.isSupported()) console.log("[desktop/notifications] native notifications not supported on this platform");
+}
+//#endregion
 //#region src/main.ts
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -514,6 +575,11 @@ function registerIpcHandlers() {
 		}
 		if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
 		await electron.shell.openExternal(parsed.toString());
+	});
+	electron.ipcMain.handle(IPC.GET_DESKTOP_SETTINGS, () => getDesktopSettings());
+	electron.ipcMain.handle(IPC.UPDATE_DESKTOP_SETTING, (_event, key, value) => {
+		if (typeof key !== "string") return;
+		if (updateDesktopSetting(key, value) && key === "autoStart.enabled") electron.app.setLoginItemSettings({ openAtLogin: value === true });
 	});
 }
 function createWindow() {
@@ -585,6 +651,8 @@ if (process.platform === "linux") electron.app.commandLine.appendSwitch("class",
 electron.app.on("ready", () => {
 	loadDesktopSettings();
 	registerIpcHandlers();
+	registerNotificationHandlers();
+	initializeNotifications();
 	configureApplicationMenu();
 	if (process.platform === "win32") electron.app.setAppUserModelId(APP_ID);
 	if (process.platform === "darwin" && electron.app.dock) {

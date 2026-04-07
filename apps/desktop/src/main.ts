@@ -11,9 +11,10 @@ import {
 } from "electron";
 
 import { createTray, destroyTray } from "./tray.js";
-import { loadDesktopSettings } from "./settings.js";
+import { loadDesktopSettings, getDesktopSettings, updateDesktopSetting } from "./settings.js";
 import { startServer, stopServer } from "./server.js";
 import { configureApplicationMenu } from "./menu.js";
+import { initializeNotifications, registerNotificationHandlers } from "./notifications.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -113,6 +114,17 @@ function registerIpcHandlers(): void {
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
     await shell.openExternal(parsed.toString());
   });
+
+  ipcMain.handle(IPC.GET_DESKTOP_SETTINGS, () => getDesktopSettings());
+
+  ipcMain.handle(IPC.UPDATE_DESKTOP_SETTING, (_event, key: unknown, value: unknown) => {
+    if (typeof key !== "string") return;
+    const updated = updateDesktopSetting(key, value);
+    // Apply auto-start setting immediately
+    if (updated && key === "autoStart.enabled") {
+      app.setLoginItemSettings({ openAtLogin: value === true });
+    }
+  });
 }
 
 // ─── Window ───────────────────────────────────────────────────────────────────
@@ -209,6 +221,8 @@ if (process.platform === "linux") {
 app.on("ready", () => {
   loadDesktopSettings();
   registerIpcHandlers();
+  registerNotificationHandlers();
+  initializeNotifications();
   configureApplicationMenu();
 
   if (process.platform === "win32") {
