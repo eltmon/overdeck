@@ -5,9 +5,43 @@
  * to JSONL file for tracking and analysis in the dashboard.
  */
 
-import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { PANOPTICON_HOME } from '../paths.js';
+import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
+
+/**
+ * Known specialist agent IDs — matches SpecialistType in specialists.ts.
+ * Used to compute live queue depth from hook.json files.
+ */
+const KNOWN_SPECIALISTS = [
+  'review-agent',
+  'test-agent',
+  'merge-agent',
+  'inspect-agent',
+  'uat-agent',
+] as const;
+
+/**
+ * Compute live queue depth by reading each specialist's hook.json.
+ *
+ * The JSONL log is append-only so status fields never update. We use the
+ * actual hook queue files (written by pushToHook / popFromHook in hooks.ts)
+ * to get the real-time pending item count instead.
+ */
+function getLiveQueueDepth(): number {
+  let depth = 0;
+  for (const specialistId of KNOWN_SPECIALISTS) {
+    const hookFile = join(AGENTS_DIR, specialistId, 'hook.json');
+    if (!existsSync(hookFile)) continue;
+    try {
+      const hook = JSON.parse(readFileSync(hookFile, 'utf-8')) as { items: unknown[] };
+      depth += hook.items?.length ?? 0;
+    } catch {
+      // Corrupt hook file — skip
+    }
+  }
+  return depth;
+}
 
 /**
  * Specialist handoff event structure
@@ -187,14 +221,13 @@ export function getSpecialistHandoffStats(): {
       }
     }
 
-    // Count queue depth (queued or processing)
-    if (event.status === 'queued' || event.status === 'processing') {
-      stats.queueDepth++;
-    }
   }
 
   // Calculate success rate
   stats.successRate = completedCount > 0 ? successCount / completedCount : 0;
+
+  // Compute live queue depth from actual hook files (not stale JSONL status)
+  stats.queueDepth = getLiveQueueDepth();
 
   return stats;
 }
