@@ -1520,15 +1520,22 @@ INSTRUCTIONS:
 
 1. cd ${workspacePath}
 2. git fetch origin ${baseBranch}
-3. Remove ephemeral planning artifacts before rebase (they always conflict):
-   git rm -rf .planning/ 2>/dev/null; git commit -m "chore: remove ephemeral planning artifacts before rebase" --allow-empty 2>/dev/null
-4. git rebase origin/${baseBranch}
-5. If rebase has conflicts in SOURCE CODE files (src/, packages/, tests/, scripts/):
+3. Check if rebase is needed:
+   \`\`\`bash
+   BEHIND=$(git rev-list --count HEAD..origin/${baseBranch})
+   echo "Commits behind origin/${baseBranch}: $BEHIND"
+   \`\`\`
+4. If BEHIND is 0: skip rebase entirely — branch is already up to date. Go to step 7.
+5. If BEHIND > 0: Remove .planning/ first (ephemeral artifacts always conflict), then rebase:
+   \`\`\`bash
+   git rm -rf .planning/ 2>/dev/null && git commit -m "chore: remove planning artifacts before rebase" 2>/dev/null
+   git rebase origin/${baseBranch}
+   \`\`\`
+6. If rebase has conflicts:
    a. Immediately abort: git rebase --abort
    b. Report FAILURE — do NOT attempt to resolve conflicts manually
-   c. The work agent or a human must resolve conflicts before merge can proceed
-6. If rebase succeeds cleanly (or only had .planning/ conflicts which were already removed): git push --force-with-lease origin ${featureBranch}
-6. Report completion by calling the Panopticon API:
+7. git push --force-with-lease origin ${featureBranch}
+8. Report completion by calling the Panopticon API:
    curl -s -X POST ${apiUrl}/api/specialists/done \\
      -H "Content-Type: application/json" \\
      -d '{"specialist":"merge","issueId":"${issueId}","status":"passed","notes":"Rebase onto ${baseBranch} complete"}'
