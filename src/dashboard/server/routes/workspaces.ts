@@ -459,10 +459,11 @@ async function ensurePRExists(
 
     try {
       const { stdout: createOut } = await execAsync(
-        `gh pr create --head ${branchName} --base main --title "${issueId}" --body-file "${bodyFile}" --json url --jq .url`,
+        `gh pr create --head ${branchName} --base main --title "${issueId}" --body-file "${bodyFile}"`,
         execOptions
       );
-      const prUrl = createOut.trim();
+      // gh pr create prints the PR URL as the last line of stdout
+      const prUrl = createOut.trim().split('\n').pop()?.trim() || createOut.trim();
       return { created: true, prUrl };
     } finally {
       unlinkAsync(bodyFile).catch(() => {});
