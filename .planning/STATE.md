@@ -8,7 +8,7 @@ All beads implemented and tested. Committing bead 3 (tests) and calling pan work
 ## Completed Work
 - [x] feature-pan-489-ipe: Add restart backoff + tracking + orphaned process cleanup to checkWorkspaceContainerHealth() (commit: 5719bccf)
 - [x] feature-pan-489-2ug: Alert agent via tmux on crash (restart notification + gave-up warning + restart-failed alert) (commit: 18e0181e)
-- [x] feature-pan-489-38u: 12 unit tests for backoff calculation + container health all scenarios (commit: TBD)
+- [x] feature-pan-489-38u: 12 unit tests for backoff calculation + container health all scenarios (commit: afee0300)
 
 ## Remaining Work
 (none)
