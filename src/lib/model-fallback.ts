@@ -153,15 +153,8 @@ export function applyFallback(
     return modelId;
   }
 
-  // Provider disabled - lookup fallback
-  const fallback = FALLBACK_MAP[modelId] || DEFAULT_FALLBACK;
-
-  // Log fallback for visibility
-  console.warn(
-    `Model ${modelId} requires ${provider} API key - falling back to ${fallback}`
-  );
-
-  return fallback;
+  // Provider disabled — throw rather than silently charge a different provider
+  throw new Error(`Model "${modelId}" requires a ${provider} API key which is not configured. Add it in Settings to use this model.`);
 }
 
 /**

@@ -47,8 +47,7 @@ function getProviderEnvForModel(model: string): Record<string, string> {
     if (apiKey) {
       return getProviderEnv(provider, apiKey);
     }
-    console.warn('Warning: No OpenRouter API key configured');
-    return {};
+    throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
   }
 
   const settings = loadSettings();
@@ -56,8 +55,7 @@ function getProviderEnvForModel(model: string): Record<string, string> {
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }
-  console.warn(`Warning: No API key configured for ${provider.displayName}, falling back to Anthropic`);
-  return {};
+  throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
 }
 
 // ============================================================================
