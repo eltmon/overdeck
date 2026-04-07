@@ -263,12 +263,12 @@ export function ModelOverrideModal({
               <h1 className="text-content tracking-tight text-2xl font-bold">Select Model</h1>
               <div className="flex items-center gap-3">
                 <span className="text-content-muted text-sm">Task:</span>
-                <span className="text-blue-400 font-medium">{workTypeName}</span>
+                <span className="text-primary font-medium">{workTypeName}</span>
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-content-muted text-xs">Needs:</span>
                 {requiredCapabilities.map(cap => (
-                  <span key={cap} className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">
+                  <span key={cap} className="text-[10px] px-2 py-0.5 rounded badge-bg-primary text-primary font-medium">
                     {CAPABILITY_INFO[cap].name}
                   </span>
                 ))}
@@ -302,16 +302,16 @@ export function ModelOverrideModal({
                     title={model.description}
                     className={`group flex items-center gap-4 px-6 py-3.5 cursor-pointer transition-all border-l-2 ${
                       isSelected
-                        ? 'bg-blue-500/10 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+                        ? 'badge-bg-primary border-primary shadow-[0_0_15px_var(--primary)]'
                         : isRecommended
-                          ? 'bg-blue-500/5 border-blue-400/50 hover:bg-blue-500/10'
+                          ? 'badge-bg-primary border-primary/50 hover:bg-primary/10'
                           : 'border-transparent hover:bg-surface-overlay'
                     }`}
                   >
                     <div className={`flex items-center justify-center rounded-lg shrink-0 size-10 transition-colors ${
-                      isSelected || isRecommended ? 'bg-blue-500/20' : 'bg-surface-emphasis group-hover:bg-divider'
+                      isSelected || isRecommended ? 'badge-bg-primary' : 'bg-surface-emphasis group-hover:bg-divider'
                     }`}>
-                      <span className={`material-symbols-outlined text-xl ${isSelected || isRecommended ? 'text-blue-400' : 'text-content-muted'}`}>
+                      <span className={`material-symbols-outlined text-xl ${isSelected || isRecommended ? 'text-primary' : 'text-content-muted'}`}>
                         {model.icon}
                       </span>
                     </div>
@@ -322,17 +322,17 @@ export function ModelOverrideModal({
                           {model.name}
                         </p>
                         {isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-content font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-primary text-[9px] text-white font-bold uppercase tracking-tight shrink-0">
                             Best Fit
                           </span>
                         )}
                         {model.tier === 'premium' && !isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[9px] text-amber-400 font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full badge-bg-warning text-[9px] text-warning font-bold uppercase tracking-tight shrink-0">
                             Premium
                           </span>
                         )}
                         {model.tier === 'fast' && (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[9px] text-emerald-400 font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full badge-bg-success text-[9px] text-success font-bold uppercase tracking-tight shrink-0">
                             Fast
                           </span>
                         )}
@@ -347,7 +347,7 @@ export function ModelOverrideModal({
                               title={CAPABILITY_INFO[cap].description}
                               className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                 isMatching
-                                  ? 'bg-blue-500/20 text-blue-300'
+                                  ? 'badge-bg-primary text-primary'
                                   : 'bg-surface-emphasis text-content-subtle border border-divider'
                               }`}
                             >
@@ -361,14 +361,14 @@ export function ModelOverrideModal({
                     {/* Match indicator */}
                     <div className="flex items-center gap-2 shrink-0">
                       {matchScore === 1 ? (
-                        <span className="text-emerald-400 text-xs font-bold">100%</span>
+                        <span className="text-success text-xs font-bold">100%</span>
                       ) : matchScore >= 0.5 ? (
-                        <span className="text-amber-400 text-xs font-bold">{Math.round(matchScore * 100)}%</span>
+                        <span className="text-warning text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       ) : (
                         <span className="text-content-muted text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       )}
                       {isSelected && (
-                        <span className="material-symbols-outlined text-blue-400">check_circle</span>
+                        <span className="material-symbols-outlined text-primary">check_circle</span>
                       )}
                     </div>
                   </div>
@@ -384,7 +384,7 @@ export function ModelOverrideModal({
             {isOverride && (
               <button
                 onClick={() => { onRemove(); onClose(); }}
-                className="text-rose-400 hover:text-rose-300 text-sm font-medium transition-colors"
+                className="text-destructive hover:text-destructive/80 text-sm font-medium transition-colors"
               >
                 Remove Override
               </button>
@@ -400,7 +400,7 @@ export function ModelOverrideModal({
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-6 py-2 rounded-lg bg-blue-500 text-content font-bold hover:bg-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="px-6 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Apply Selection
             </button>

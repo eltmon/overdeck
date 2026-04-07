@@ -19,11 +19,11 @@ export function VBriefNarratives({ narratives }: VBriefNarrativesProps) {
   if (sections.length === 0) return null;
 
   return (
-    <div className="p-4 border-b border-gray-700 space-y-4">
+    <div className="p-4 border-b border-border space-y-4">
       {sections.map(key => (
         <div key={key}>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{key}</h3>
-          <div className="prose prose-invert prose-sm max-w-none text-gray-300">
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">{key}</h3>
+          <div className="prose prose-invert prose-sm max-w-none text-text-secondary">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {narratives[key]!}
             </ReactMarkdown>

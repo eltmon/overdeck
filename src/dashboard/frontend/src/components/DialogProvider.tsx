@@ -86,9 +86,9 @@ function ConfirmDialogContent({
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-divider">
           {isDestructive ? (
-            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
           ) : (
-            <Info className="w-5 h-5 text-blue-400 shrink-0" />
+            <Info className="w-5 h-5 text-info shrink-0" />
           )}
           <h3 id="dialog-title" className="text-lg font-semibold text-content">{options.title}</h3>
         </div>
@@ -112,8 +112,8 @@ function ConfirmDialogContent({
             onClick={onConfirm}
             className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
               isDestructive
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90'
             }`}
           >
             {options.confirmLabel || 'Confirm'}
@@ -146,9 +146,9 @@ function AlertDialogContent({
   }, [onClose]);
 
   const iconMap = {
-    info: <Info className="w-5 h-5 text-blue-400 shrink-0" />,
-    error: <XCircle className="w-5 h-5 text-red-400 shrink-0" />,
-    success: <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />,
+    info: <Info className="w-5 h-5 text-info shrink-0" />,
+    error: <XCircle className="w-5 h-5 text-destructive shrink-0" />,
+    success: <CheckCircle className="w-5 h-5 text-success shrink-0" />,
   };
 
   const variant = options.variant || 'info';
@@ -186,7 +186,7 @@ function AlertDialogContent({
           <button
             ref={closeRef}
             onClick={onClose}
-            className="px-4 py-2 rounded text-sm bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+            className="px-4 py-2 rounded text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
           >
             OK
           </button>

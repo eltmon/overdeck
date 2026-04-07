@@ -33,11 +33,11 @@ import { DeepWipeDialog } from './DeepWipeDialog';
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
-  trivial: 'bg-green-900/50 text-green-400',
-  simple: 'bg-green-900/50 text-green-400',
-  medium: 'bg-yellow-900/50 text-yellow-400',
-  complex: 'bg-orange-900/50 text-orange-400',
-  expert: 'bg-red-900/50 text-red-400',
+  trivial: 'badge-bg-success text-success-foreground',
+  simple: 'badge-bg-success text-success-foreground',
+  medium: 'badge-bg-warning text-warning-foreground',
+  complex: 'badge-bg-warning text-warning-foreground',
+  expert: 'badge-bg-destructive text-destructive-foreground',
 };
 
 // Difficulty badge component
@@ -72,7 +72,7 @@ function AgentBadge({
   const conflictClass = isConflict ? 'animate-[pulse_2s_ease-in-out_infinite]' : '';
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs text-blue-400 ${conflictClass}`}>
+    <span className={`inline-flex items-center gap-1 text-xs text-primary ${conflictClass}`}>
       <span>{icon}</span>
       <span>{name}</span>
     </span>
@@ -122,14 +122,14 @@ function formatCost(cost: number): string {
 // Get cost badge color based on amount
 function getLabelStyle(label: string): string {
   const l = label.toLowerCase();
-  if (l === 'bug') return 'bg-red-900/40 text-red-400 border border-red-500/30';
-  if (l === 'security') return 'bg-red-900/40 text-red-300 border border-red-500/30';
-  if (l === 'enhancement') return 'bg-blue-900/40 text-blue-400 border border-blue-500/30';
-  if (l === 'improvement') return 'bg-cyan-900/40 text-cyan-400 border border-cyan-500/30';
-  if (l === 'planning' || l === 'in-planning') return 'bg-purple-900/40 text-purple-400 border border-purple-500/30';
-  if (l === 'in-progress') return 'bg-blue-900/40 text-blue-400 border border-blue-500/30';
-  if (l === 'in-review') return 'bg-amber-900/40 text-amber-400 border border-amber-500/30';
-  return 'bg-gray-800/60 text-gray-400 border border-gray-600/30';
+  if (l === 'bug') return 'badge-bg-destructive text-destructive-foreground border badge-border-destructive';
+  if (l === 'security') return 'badge-bg-destructive text-destructive-foreground border badge-border-destructive';
+  if (l === 'enhancement') return 'badge-bg-primary text-primary border badge-border-primary';
+  if (l === 'improvement') return 'badge-bg-signal-cost text-signal-cost-foreground border badge-border-signal-cost';
+  if (l === 'planning' || l === 'in-planning') return 'badge-bg-signal-review text-signal-review-foreground border badge-border-signal-review';
+  if (l === 'in-progress') return 'badge-bg-primary text-primary border badge-border-primary';
+  if (l === 'in-review') return 'badge-bg-warning text-warning-foreground border badge-border-warning';
+  return 'bg-card text-muted-foreground border border-border';
 }
 
 function getCostColor(_cost: number): string {
@@ -378,7 +378,7 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
   if (compact) {
     return (
       <span
-        className="w-2 h-2 rounded-full bg-purple-500 shrink-0"
+        className="w-2 h-2 rounded-full badge-bg-signal-review shrink-0"
         title={`Rally: ${trackerState} → Pan: ${shadowLabel}`}
       />
     );
@@ -386,12 +386,12 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
 
   return (
     <div className="flex items-center gap-1 text-xs">
-      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-700/50 text-gray-300">
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-foreground">
         <ExternalLink className="w-2.5 h-2.5" />
         {trackerState}
       </span>
       <span className="text-content-muted">→</span>
-      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded badge-bg-signal-review text-signal-review-foreground">
         <Eye className="w-2.5 h-2.5" />
         {shadowLabel}
       </span>
@@ -422,15 +422,15 @@ function FeatureCard({
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
   return (
-    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-indigo-500 overflow-hidden">
+    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-primary overflow-hidden">
       <div
         onClick={onToggle}
-        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-indigo-900/20 transition-colors"
+        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
       >
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+          <ChevronDown className="w-4 h-4 text-primary/70 shrink-0 mt-0.5" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+          <ChevronRight className="w-4 h-4 text-primary/70 shrink-0 mt-0.5" />
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -445,13 +445,13 @@ function FeatureCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-xs font-medium text-indigo-300 hover:text-indigo-200 flex items-center gap-1"
+              className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1"
             >
               <span>{feature.identifier}</span>
               <ExternalLink className="w-2.5 h-2.5 opacity-50" />
             </a>
             {hasDerivedDiff && (
-              <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/50 text-amber-400">
+              <span className="px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground">
                 derived
               </span>
             )}
@@ -462,9 +462,9 @@ function FeatureCard({
           {/* Progress bar and summary */}
           {total > 0 && (
             <div className="mt-2">
-              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all"
+                  className="h-full bg-success rounded-full transition-all"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
@@ -472,7 +472,7 @@ function FeatureCard({
                 <span className="text-xs text-content-muted">
                   {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
                 </span>
-                <span className="text-xs text-indigo-400">
+                <span className="text-xs text-primary/70">
                   {childCount} in column
                 </span>
               </div>
@@ -493,10 +493,10 @@ function CompactChildCard({
   agents: Agent[];
 }) {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
-  const dotColor = canonical === 'done' ? 'bg-green-400' :
-                   canonical === 'in_progress' ? 'bg-yellow-400' :
-                   canonical === 'in_review' ? 'bg-pink-400' :
-                   'bg-gray-500';
+  const dotColor = canonical === 'done' ? 'bg-success' :
+                   canonical === 'in_progress' ? 'bg-warning' :
+                   canonical === 'in_review' ? 'bg-signal-review' :
+                   'bg-muted-foreground';
 
   const issueIdLower = issue.identifier.toLowerCase();
   const hasAgent = agents.some(
@@ -510,14 +510,14 @@ function CompactChildCard({
         href={issue.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs text-content-subtle hover:text-blue-400 shrink-0"
+        className="text-xs text-content-subtle hover:text-primary shrink-0"
       >
         {issue.identifier}
       </a>
       <span className="text-xs text-content-body truncate flex-1">{issue.title}</span>
       <TrackerShadowBadges issue={issue} compact />
       {hasAgent && (
-        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
+        <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
       )}
     </div>
   );
@@ -555,11 +555,11 @@ export function ListIssueRow({
   }, [isSelected]);
 
   // Status indicator color
-  const statusColor = canonical === 'done' ? 'bg-green-400' :
-                      canonical === 'in_review' ? 'bg-pink-400' :
-                      canonical === 'in_progress' ? 'bg-yellow-400' :
-                      canonical === 'todo' ? 'bg-blue-400' :
-                      'bg-gray-500';
+  const statusColor = canonical === 'done' ? 'bg-success' :
+                      canonical === 'in_review' ? 'bg-signal-review' :
+                      canonical === 'in_progress' ? 'bg-warning' :
+                      canonical === 'todo' ? 'bg-primary' :
+                      'bg-muted-foreground';
 
   // Get cost for this issue
   const cost = issueCosts[issue.identifier.toLowerCase()];
@@ -596,7 +596,7 @@ export function ListIssueRow({
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className="text-xs text-content-subtle hover:text-blue-400 shrink-0 font-mono"
+        className="text-xs text-content-subtle hover:text-primary shrink-0 font-mono"
       >
         {issue.identifier}
       </a>
@@ -609,8 +609,8 @@ export function ListIssueRow({
       }`}>{issue.title}</span>
 
       {/* Priority indicator */}
-      {issue.priority === 1 && <span className="text-xs text-red-400 font-medium shrink-0">Urgent</span>}
-      {issue.priority === 2 && <span className="text-xs text-orange-400 font-medium shrink-0">High</span>}
+      {issue.priority === 1 && <span className="text-xs text-destructive-foreground font-medium shrink-0">Urgent</span>}
+      {issue.priority === 2 && <span className="text-xs text-warning-foreground font-medium shrink-0">High</span>}
 
       {/* Difficulty badge */}
       {difficulty && (
@@ -637,12 +637,12 @@ export function ListIssueRow({
 
       {/* Running agent indicator */}
       {isRunning && (
-        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
+        <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
       )}
 
       {/* Specialist indicators */}
       {issueSpecialists.map(s => (
-        <span key={s.name} className="text-xs text-blue-400 shrink-0" title={`${s.displayName} specialist`}>
+        <span key={s.name} className="text-xs text-primary shrink-0" title={`${s.displayName} specialist`}>
           {s.name === 'review-agent' ? '👁️' : s.name === 'test-agent' ? '🧪' : s.name === 'merge-agent' ? '🔀' : '🤖'}
         </span>
       ))}
@@ -656,7 +656,7 @@ export function ListIssueRow({
               e.stopPropagation();
               onPlan(issue);
             }}
-            className="p-1 text-content-subtle hover:text-blue-400 transition-colors"
+            className="p-1 text-content-subtle hover:text-primary transition-colors"
             title="Plan issue"
           >
             <Play className="w-3.5 h-3.5" />
@@ -693,10 +693,10 @@ export function ListIssueRow({
 
 const COLUMN_COLORS: Record<string, string> = {
   backlog: 'border-divider-strong',
-  todo: 'border-blue-600',
-  in_progress: 'border-yellow-500',
-  in_review: 'border-pink-500',
-  done: 'border-green-500',
+  todo: 'border-primary',
+  in_progress: 'border-warning',
+  in_review: 'border-signal-review',
+  done: 'border-success',
 };
 
 const COLUMN_TITLES: Record<string, string> = {
@@ -1046,7 +1046,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                 onClick={() => setCycleFilter(cycle)}
                 className={`px-3 py-1 text-xs transition-colors ${
                   cycleFilter === cycle
-                    ? 'bg-blue-600 text-content'
+                    ? 'bg-primary text-foreground'
                     : 'bg-surface-raised text-content-subtle hover:text-content hover:bg-surface-overlay'
                 }`}
               >
@@ -1062,7 +1062,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             type="checkbox"
             checked={includeCompleted}
             onChange={(e) => setIncludeCompleted(e.target.checked)}
-            className="w-4 h-4 rounded border-divider-strong bg-surface-raised text-blue-600 focus:ring-blue-500 focus:ring-offset-surface"
+            className="w-4 h-4 rounded border-divider-strong bg-surface-raised text-primary focus:ring-ring focus:ring-offset-surface"
           />
           <span className="text-sm text-content-subtle">Include closed-out</span>
         </label>
@@ -1129,7 +1129,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             <div key={label} className="bg-surface-raised rounded-lg">
               <div className="px-4 py-3 border-b border-divider">
                 <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-blue-400" />
+                  <Tag className="w-4 h-4 text-primary" />
                   <h3 className="font-semibold text-content">{label}</h3>
                   <span className="text-sm text-content-subtle">({labelIssues.length})</span>
                 </div>
@@ -1197,7 +1197,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             <div key={group.name} className="bg-surface-raised rounded-lg">
               <div className="px-4 py-3 border-b border-divider">
                 <div className="flex items-center gap-2">
-                  <X className="w-4 h-4 text-red-400" />
+                  <X className="w-4 h-4 text-destructive-foreground" />
                   <h3 className="font-semibold text-content">{group.name}</h3>
                   <span className="text-sm text-content-subtle">({group.issues.length})</span>
                 </div>
@@ -1236,8 +1236,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           <div className="flex gap-4 overflow-x-auto pb-4">
             {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
               <DroppableColumn key={status} status={status}>
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-pan-panel-left rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-pan-panel-left/80' : ''}`}>
-                  <div className="px-4 py-3 border-b border-pan-border bg-pan-panel-left">
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                  <div className="px-4 py-3 border-b border-divider bg-surface-raised">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
                       <span className="text-sm text-content-subtle">{grouped[status].length}</span>
@@ -1437,7 +1437,7 @@ function ColumnContent({
               onToggle={() => toggleFeature(feature.identifier)}
             />
             {isExpanded && (
-              <div className="ml-3 border-l-2 border-indigo-700/30 pl-1">
+              <div className="ml-3 border-l-2 border-primary/20 pl-1">
                 {group.children.map(child => (
                   <CompactChildCard
                     key={child.id}
@@ -1538,8 +1538,8 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
-          <div className="p-2 bg-amber-900/50 rounded-lg">
-            <AlertTriangle className="w-6 h-6 text-amber-400" />
+          <div className="p-2 badge-bg-warning rounded-lg">
+            <AlertTriangle className="w-6 h-6 text-warning-foreground" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-content mb-2">
@@ -1561,7 +1561,7 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
               </button>
               <button
                 onClick={onConfirm}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-content rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-warning hover:bg-warning/90 text-foreground rounded-lg transition-colors text-sm"
               >
                 Move Anyway
               </button>
@@ -1595,8 +1595,8 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
-          <div className="p-2 bg-green-900/50 rounded-lg">
-            <Check className="w-6 h-6 text-green-400" />
+          <div className="p-2 badge-bg-success rounded-lg">
+            <Check className="w-6 h-6 text-success-foreground" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-content mb-2">
@@ -1613,7 +1613,7 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
                   type="checkbox"
                   checked={cleanupWorkspace}
                   onChange={(e) => setCleanupWorkspace(e.target.checked)}
-                  className="rounded border-divider-strong bg-surface-overlay text-green-500 focus:ring-green-500"
+                  className="rounded border-divider-strong bg-surface-overlay text-success focus:ring-ring"
                 />
                 Clean up workspace
               </label>
@@ -1622,7 +1622,7 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
                   type="checkbox"
                   checked={stopAgents}
                   onChange={(e) => setStopAgents(e.target.checked)}
-                  className="rounded border-divider-strong bg-surface-overlay text-green-500 focus:ring-green-500"
+                  className="rounded border-divider-strong bg-surface-overlay text-success focus:ring-ring"
                 />
                 Stop running agents
               </label>
@@ -1640,7 +1640,7 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
               </button>
               <button
                 onClick={() => onSync(true, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-content rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-success hover:bg-success/90 text-foreground rounded-lg transition-colors text-sm"
               >
                 Sync to {trackerName}
               </button>
@@ -1668,7 +1668,7 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
         <span className="text-sm text-content-body">Issue moved</span>
         <button
           onClick={onUndo}
-          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
         >
           <Undo className="w-4 h-4" />
           Undo
@@ -1693,7 +1693,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
-            <List className="w-5 h-5 text-green-400" />
+            <List className="w-5 h-5 text-success-foreground" />
             <h2 className="font-semibold text-content">Tasks: {issue.identifier}</h2>
           </div>
           <button
@@ -1758,11 +1758,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   ) ?? false);
 
   const priorityColors: Record<number, string> = {
-    0: 'border-l-gray-500',
-    1: 'border-l-red-500',
-    2: 'border-l-orange-500',
-    3: 'border-l-yellow-500',
-    4: 'border-l-blue-500',
+    0: 'border-l-content-muted',
+    1: 'border-l-destructive',
+    2: 'border-l-warning',
+    3: 'border-l-warning',
+    4: 'border-l-primary',
   };
 
   // Kill agent mutation
@@ -1881,11 +1881,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       ref={cardRef}
       data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
-      className={`rounded-lg p-3 border border-pan-border border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
+      className={`rounded-lg p-3 border border-divider border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-content-muted'} ${
         isSelected
           ? 'ring-2 ring-blue-500'
-          : 'hover:border-pan-border/80'
-      } ${isRunning ? 'bg-blue-900/20' : 'bg-pan-panel-right'}`}
+          : 'hover:border-divider'
+      } ${isRunning ? 'badge-bg-primary' : 'bg-surface'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -1900,9 +1900,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {isRunning && (
               <div className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
             )}
             <a
@@ -1910,7 +1910,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-sm font-medium text-content hover:text-blue-400 flex items-center gap-1"
+              className="text-sm font-medium text-content hover:text-primary flex items-center gap-1"
             >
               {issue.source === 'github' && (
                 <span title="GitHub Issue">
@@ -1946,7 +1946,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {planningAgent?.status === 'failed' && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPlan(); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/50 text-red-300 animate-pulse hover:bg-red-800/60 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-destructive text-destructive-foreground animate-pulse hover:bg-destructive/30 transition-colors cursor-pointer"
                 title={planningAgent.error ? `Planning failed: ${planningAgent.error}` : 'Planning agent failed to start — click to retry'}
               >
                 <XCircle className="w-3 h-3" />
@@ -1957,7 +1957,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {planningAgent && planningAgent.status !== 'stopped' && planningAgent.status !== 'failed' && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPlan(); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-900/50 text-purple-300 animate-pulse hover:bg-purple-800/60 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-signal-review text-signal-review-foreground animate-pulse hover:bg-signal-review/30 transition-colors cursor-pointer"
                 title="Click to watch planning session"
               >
                 <Sparkles className="w-3 h-3" />
@@ -1978,8 +1978,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <span
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                   (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
-                    ? 'bg-cyan-900/50 text-cyan-400'
-                    : 'bg-gray-800/60 text-gray-400 border border-gray-600/30'
+                    ? 'badge-bg-signal-cost text-signal-cost-foreground'
+                    : 'bg-card text-muted-foreground border border-border'
                 }`}
                 title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
@@ -1994,7 +1994,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Review Ready badge - prominent indicator that agent completed work */}
             {isReviewReady && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-600 text-content animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground animate-pulse"
                 title="Agent completed work - ready for human review"
               >
                 <CheckCheck className="w-3 h-3" />
@@ -2008,7 +2008,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   e.stopPropagation();
                   onPlan();
                 }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-content animate-pulse cursor-pointer hover:bg-amber-500"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse cursor-pointer hover:bg-warning/90"
                 title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
               >
                 <HelpCircle className="w-3 h-3" />
@@ -2018,7 +2018,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Lifecycle resolution badges (PAN-309) */}
             {!isTerminal && agent?.resolution === 'done' && !agent?.hasPendingQuestion && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-700 text-content"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
                 title="Agent evidence shows work is complete — waiting for agent to call pan work done"
               >
                 <CheckCircle className="w-3 h-3" />
@@ -2027,7 +2027,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {!isTerminal && agent?.resolution === 'stuck' && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-700 text-content animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground animate-pulse"
                 title={`Agent appears stuck — no clear progress signal after ${agent.resolutionCount || 0} check(s). Consider sending a message.`}
               >
                 <XCircle className="w-3 h-3" />
@@ -2036,7 +2036,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {!isTerminal && agent?.resolution === 'needs_input' && !agent?.hasPendingQuestion && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-700 text-content animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse"
                 title="Agent stopped because it needs human input or hit a blocker"
               >
                 <AlertCircle className="w-3 h-3" />
@@ -2053,7 +2053,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
             {(issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged')) && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-green-900/60 text-green-300 border border-green-500/40 uppercase tracking-wide"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold badge-bg-success text-success-foreground border badge-border-success uppercase tracking-wide"
                 title="Branch verified merged into main"
               >
                 <GitMerge className="w-3 h-3" />
@@ -2063,7 +2063,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Needs close-out badge - amber indicator for reopened issues needing review */}
             {issue.labels?.some(l => l.toLowerCase() === 'needs-close-out') && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/60 text-amber-400 border border-amber-600/40"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground border badge-border-warning"
                 title="Reopened for close-out review — verify this work is complete, then click Close Out"
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -2115,7 +2115,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <button
             onClick={handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              isSelected ? 'text-blue-400' : 'text-content-subtle hover:text-content'
+              isSelected ? 'text-primary' : 'text-content-subtle hover:text-content'
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
@@ -2123,7 +2123,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
             title="View tasks for this issue"
           >
             <List className="w-3.5 h-3.5" />
@@ -2131,7 +2131,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
             title="View vBRIEF plan for this issue"
           >
             <ScrollText className="w-3.5 h-3.5" />
@@ -2140,7 +2140,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              showMessageInput ? 'text-blue-400' : 'text-content-subtle hover:text-content'
+              showMessageInput ? 'text-primary' : 'text-content-subtle hover:text-content'
             }`}
           >
             <MessageCircle className="w-3.5 h-3.5" />
@@ -2149,7 +2149,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <button
             onClick={handleKill}
             disabled={killMutation.isPending}
-            className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
+            className="flex items-center gap-1 text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors ml-auto"
           >
             {killMutation.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2170,13 +2170,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 bg-surface-raised text-content text-sm px-3 py-1.5 rounded border border-divider-strong focus:border-blue-500 focus:outline-none"
+              className="flex-1 bg-surface-raised text-content text-sm px-3 py-1.5 rounded border border-divider-strong focus:border-primary focus:outline-none"
               autoFocus
             />
             <button
               type="submit"
               disabled={!messageInput.trim() || sendMessageMutation.isPending}
-              className="px-3 py-1.5 bg-blue-600 text-content text-sm rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 bg-primary text-foreground text-sm rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sendMessageMutation.isPending ? '...' : 'Send'}
             </button>
@@ -2191,7 +2191,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+              className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors animate-pulse"
             >
               <Eye className="w-3.5 h-3.5" />
               Watch Planning
@@ -2200,7 +2200,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
+              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-signal-review-foreground hover:text-signal-review-foreground/80'}`}
             >
               <FileText className="w-3.5 h-3.5" />
               {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
@@ -2210,7 +2210,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <>
               <button
                 onClick={() => onViewBeads && onViewBeads(issue)}
-                className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+                className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
                 title="View tasks for this issue"
               >
                 <List className="w-3.5 h-3.5" />
@@ -2218,7 +2218,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               </button>
               <button
                 onClick={() => onViewVBrief && onViewVBrief(issue)}
-                className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
                 title="View vBRIEF plan for this issue"
               >
                 <ScrollText className="w-3.5 h-3.5" />
@@ -2227,7 +2227,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <button
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending}
-                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
+                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
                 title="Start implementation agent"
               >
                 {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -2249,7 +2249,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+              className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors animate-pulse"
             >
               <Eye className="w-3.5 h-3.5" />
               Watch Planning
@@ -2258,7 +2258,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
+              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-signal-review-foreground hover:text-signal-review-foreground/80'}`}
             >
               <FileText className="w-3.5 h-3.5" />
               {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
@@ -2266,7 +2266,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
             title="View tasks for this issue"
           >
             <List className="w-3.5 h-3.5" />
@@ -2274,7 +2274,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
             title="View vBRIEF plan for this issue"
           >
             <ScrollText className="w-3.5 h-3.5" />
@@ -2283,7 +2283,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <button
             onClick={handleStartAgent}
             disabled={startAgentMutation.isPending}
-            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
+            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
           >
             {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Resume Agent'}
@@ -2302,7 +2302,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 }).catch(err => console.error('Reset failed:', err));
               }
             }}
-            className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-warning-foreground hover:text-warning-foreground/80 transition-colors"
             title="Reset to To Do - kills agents, resets Linear status"
           >
             <Undo className="w-3.5 h-3.5" />
@@ -2325,10 +2325,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Done items - Reopen + Close Out + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30 flex-wrap">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-success/30 flex-wrap">
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
             title="View tasks for this issue"
           >
             <List className="w-3.5 h-3.5" />
@@ -2336,7 +2336,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-signal-review-foreground hover:text-signal-review-foreground/80 transition-colors"
             title="View vBRIEF plan for this issue"
           >
             <ScrollText className="w-3.5 h-3.5" />
@@ -2394,7 +2394,7 @@ function ResetPipelineButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-warning-foreground hover:text-warning-foreground/80 transition-colors disabled:opacity-50"
       title="Reset pipeline state and re-run review & test"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
@@ -2413,7 +2413,7 @@ function DeepWipeButton({ issue }: { issue: Issue }) {
           e.stopPropagation();
           setIsOpen(true);
         }}
-        className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors ml-auto"
+        className="flex items-center gap-1 text-xs text-destructive-foreground/60 hover:text-destructive-foreground transition-colors ml-auto"
         title="Deep wipe: delete workspace, branches, agent state — start completely fresh"
       >
         <Trash2 className="w-3.5 h-3.5" />
@@ -2468,7 +2468,7 @@ function CancelButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-orange-400/70 hover:text-orange-400 transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-warning-foreground/70 hover:text-warning-foreground transition-colors disabled:opacity-50"
       title="Cancel issue — stop agents, move to Canceled on tracker"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
@@ -2577,7 +2577,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
       <button
         onClick={handleReopen}
         disabled={reopenMutation.isPending}
-        className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 text-xs text-warning-foreground hover:text-warning-foreground/80 transition-colors disabled:opacity-50"
       >
         {reopenMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2587,7 +2587,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
         {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
       </button>
       {reopenMutation.isError && (
-        <span className="text-xs text-red-400">{(reopenMutation.error as Error).message}</span>
+        <span className="text-xs text-destructive-foreground">{(reopenMutation.error as Error).message}</span>
       )}
     </>
   );
@@ -2595,7 +2595,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   if (inline) return content;
 
   return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-success/30">
       {content}
     </div>
   );
@@ -2635,7 +2635,7 @@ function CloseOutSection({ issue }: { issue: Issue }) {
       <button
         onClick={handleCloseOut}
         disabled={closeOutMutation.isPending}
-        className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
       >
         {closeOutMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2645,7 +2645,7 @@ function CloseOutSection({ issue }: { issue: Issue }) {
         {closeOutMutation.isPending ? 'Closing out...' : 'Close Out'}
       </button>
       {closeOutMutation.isError && (
-        <span className="text-xs text-red-400">{(closeOutMutation.error as Error).message}</span>
+        <span className="text-xs text-destructive-foreground">{(closeOutMutation.error as Error).message}</span>
       )}
     </>
   );

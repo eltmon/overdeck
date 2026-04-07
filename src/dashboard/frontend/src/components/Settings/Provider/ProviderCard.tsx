@@ -75,8 +75,8 @@ export function ProviderCard({
                 className={cn(
                   'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
                   compatibility === 'direct'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    ? 'badge-bg-success text-success-foreground border badge-border-success'
+                    : 'badge-bg-primary text-primary border badge-border-primary'
                 )}
                 title={
                   compatibility === 'direct'

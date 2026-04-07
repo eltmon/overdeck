@@ -102,7 +102,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         <pre
           ref={terminalRef}
           onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-gray-300"
+          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
           style={{ backgroundColor: bgTerminal }}
         >
           {output || 'No saved output available.'}

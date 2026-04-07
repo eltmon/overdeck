@@ -39,28 +39,28 @@ function StepRow({ stepNum, event }: { stepNum: number; event?: DeepWipeProgress
   return (
     <div className={`flex items-start gap-4 transition-opacity duration-300 ${isPending ? 'opacity-35' : ''}`}>
       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 transition-colors duration-300 ${
-        isComplete ? 'bg-red-500/20' :
-        isActive ? 'bg-orange-500/20' :
-        isError ? 'bg-red-500/30' :
+        isComplete ? 'badge-bg-destructive' :
+        isActive ? 'badge-bg-warning' :
+        isError ? 'bg-destructive/20' :
         'border border-divider'
       }`}>
-        {isComplete && <CheckCircle2 className="w-4 h-4 text-red-400" />}
-        {isActive && <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />}
-        {isError && <AlertCircle className="w-4 h-4 text-red-400" />}
+        {isComplete && <CheckCircle2 className="w-4 h-4 text-destructive" />}
+        {isActive && <Loader2 className="w-4 h-4 text-warning animate-spin" />}
+        {isError && <AlertCircle className="w-4 h-4 text-destructive" />}
         {isPending && <Circle className="w-4 h-4 text-content-muted" />}
       </div>
       <div className="flex-1 py-1">
         <p className={`text-sm font-medium transition-colors duration-300 ${
-          isComplete ? 'text-red-400' :
+          isComplete ? 'text-destructive' :
           isActive ? 'text-content' :
-          isError ? 'text-red-400' :
+          isError ? 'text-destructive' :
           'text-content-muted'
         }`}>
           {event?.label || defaultLabel}
         </p>
         {event?.detail && (
           <p className={`text-xs mt-0.5 font-mono ${
-            isError ? 'text-red-400/80' : 'text-content-muted'
+            isError ? 'text-destructive/80' : 'text-content-muted'
           }`}>
             {event.detail}
           </p>
@@ -68,9 +68,9 @@ function StepRow({ stepNum, event }: { stepNum: number; event?: DeepWipeProgress
       </div>
       <div className="flex-shrink-0 mt-1.5">
         <Icon className={`w-4 h-4 ${
-          isComplete ? 'text-red-400/50' :
-          isActive ? 'text-orange-400/50' :
-          isError ? 'text-red-400/50' :
+          isComplete ? 'text-destructive/50' :
+          isActive ? 'text-warning/50' :
+          isError ? 'text-destructive/50' :
           'text-content-muted/30'
         }`} />
       </div>
@@ -190,7 +190,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
         <div className="flex items-center justify-between px-6 py-4 border-b border-divider">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center">
-              <Trash2 className="w-5 h-5 text-red-400" />
+              <Trash2 className="w-5 h-5 text-destructive" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-content">Deep Wipe: {issue.identifier}</h2>
@@ -211,10 +211,10 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
         <div className="p-6">
           {state === 'idle' && (
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-8 h-8 text-red-400" />
+              <div className="w-16 h-16 rounded-full badge-bg-destructive flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-destructive" />
               </div>
-              <p className="text-sm text-content-body mb-2">This will <span className="text-red-400 font-medium">permanently destroy</span>:</p>
+              <p className="text-sm text-content-body mb-2">This will <span className="text-destructive font-medium">permanently destroy</span>:</p>
               <ul className="text-sm text-content-subtle space-y-1 mb-6">
                 <li>All running agents for this issue</li>
                 <li>Workspace directory and all files</li>
@@ -230,7 +230,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
                 </button>
                 <button
                   onClick={handleWipe}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-content rounded-lg transition-colors font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium"
                 >
                   <Trash2 className="w-4 h-4" />
                   Wipe Everything
@@ -261,7 +261,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
                 <div className="w-full h-1.5 bg-surface-overlay rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ease-out ${
-                      state === 'complete' ? 'bg-red-500' : 'bg-gradient-to-r from-red-500 to-orange-500'
+                      state === 'complete' ? 'bg-destructive' : 'bg-gradient-to-r from-destructive to-warning'
                     }`}
                     style={{ width: `${progressPct}%` }}
                   />
@@ -270,15 +270,15 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
 
               {/* Error */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-red-400 font-mono">{error}</p>
+                <div className="badge-bg-destructive border badge-border-destructive rounded-lg p-3 mb-4">
+                  <p className="text-xs text-destructive font-mono">{error}</p>
                 </div>
               )}
 
               {/* Complete state */}
               {state === 'complete' && (
                 <div className="text-center">
-                  <p className="text-sm text-red-400 font-medium mb-3">
+                  <p className="text-sm text-destructive font-medium mb-3">
                     {issue.identifier} has been completely wiped.
                   </p>
                   <button

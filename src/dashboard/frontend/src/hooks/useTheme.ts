@@ -8,45 +8,46 @@ interface ThemeState {
   initTheme: () => void;
 }
 
+function applyTheme(theme: Theme) {
+  const html = document.documentElement;
+  // Suppress transitions during theme switch to prevent flash
+  html.classList.add('no-transitions');
+  if (theme === 'dark') {
+    html.classList.add('dark');
+  } else {
+    html.classList.remove('dark');
+  }
+  // Remove no-transitions after two animation frames (allows repaint)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      html.classList.remove('no-transitions');
+    });
+  });
+}
+
 export const useTheme = create<ThemeState>((set, get) => ({
   theme: 'dark', // Default, will be overridden by initTheme()
 
   toggleTheme: () => {
     const newTheme = get().theme === 'dark' ? 'light' : 'dark';
-
-    // Update DOM
-    if (newTheme === 'light') {
-      document.documentElement.classList.add('light');
-    } else {
-      document.documentElement.classList.remove('light');
-    }
-
-    // Persist to localStorage
+    applyTheme(newTheme);
     localStorage.setItem('panopticon.ui.theme', newTheme);
-
-    // Update state
     set({ theme: newTheme });
   },
 
   initTheme: () => {
-    // Read from localStorage, default to dark
     const stored = localStorage.getItem('panopticon.ui.theme');
     const validStored: Theme | null = stored === 'light' || stored === 'dark' ? stored : null;
     const theme = validStored || 'dark';
-
-    // Persist to localStorage if not already valid (first visit or invalid value)
     if (!validStored) {
       localStorage.setItem('panopticon.ui.theme', theme);
     }
-
-    // Update DOM
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
+    // Flash prevention script already set the class, but sync state with DOM
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('light');
+      document.documentElement.classList.remove('dark');
     }
-
-    // Update state
     set({ theme });
   },
 }));

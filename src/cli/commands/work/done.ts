@@ -206,6 +206,29 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       }
 
+      // Sync closed beads to vBRIEF AC status before running the AC check.
+      // The work agent closes beads via bd close, but nothing syncs that to
+      // the plan's AC subItems until now.
+      try {
+        const { stdout } = await execAsync(
+          `bd list --status closed -l "${issueId.toLowerCase()}" --json --limit 0`,
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        const closedBeads = JSON.parse(stdout || '[]');
+        let synced = 0;
+        for (const bead of closedBeads) {
+          if (bead.id) {
+            const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
+            if (itemId) synced++;
+          }
+        }
+        if (synced > 0) {
+          console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
+        }
+      } catch {
+        // Non-fatal — sync failure shouldn't block completion check
+      }
+
       // Check 3: vBRIEF acceptance criteria completion
       try {
         const acStatus = getVBriefACStatus(workspacePath);
@@ -235,37 +258,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.error(chalk.dim('  Use --force to skip checks.'));
         console.error('');
         process.exit(1);
-      }
-    }
-  }
-
-  // Sync closed beads to vBRIEF AC status before signaling completion.
-  // The work agent closes beads via bd close, but nothing syncs that to
-  // the plan's AC subItems. Do it here so the verification gate sees
-  // completed AC when it checks.
-  {
-    const { getAgentState } = await import('../../../lib/agents.js');
-    const agentState = getAgentState(`agent-${issueId.toLowerCase()}`);
-    const workspacePath = agentState?.workspace;
-    if (workspacePath && existsSync(workspacePath)) {
-      try {
-        const { stdout } = await execAsync(
-          `bd list --status closed -l "${issueId.toLowerCase()}" --json --limit 0`,
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        const closedBeads = JSON.parse(stdout || '[]');
-        let synced = 0;
-        for (const bead of closedBeads) {
-          if (bead.id) {
-            const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed');
-            if (itemId) synced++;
-          }
-        }
-        if (synced > 0) {
-          console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
-        }
-      } catch {
-        // Non-fatal — sync failure shouldn't block completion
       }
     }
   }

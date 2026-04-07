@@ -1,0 +1,233 @@
+import { useEffect, useState, useCallback } from 'react';
+import {
+  Eye, LayoutGrid, Bot, Server, Network, ArrowRightLeft,
+  Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
+  Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
+} from 'lucide-react';
+import { CloisterStatusBar } from './CloisterStatusBar';
+import { FreshnessIndicator } from './FreshnessIndicator';
+import { useTheme } from '../hooks/useTheme';
+import type { Tab } from './Header';
+
+const SIDEBAR_STORAGE_KEY = 'panopticon.ui.sidebarCollapsed';
+
+const NAV_GROUPS = [
+  {
+    label: 'Operations',
+    items: [
+      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
+      { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
+      { id: 'agents' as Tab, label: 'Agents', icon: Bot },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    items: [
+      { id: 'resources' as Tab, label: 'Resources', icon: Server },
+      { id: 'convoys' as Tab, label: 'Convoys', icon: Network },
+      { id: 'handoffs' as Tab, label: 'Handoffs', icon: ArrowRightLeft },
+    ],
+  },
+  {
+    label: 'Observability',
+    items: [
+      { id: 'activity' as Tab, label: 'Activity', icon: Terminal },
+      { id: 'metrics' as Tab, label: 'Metrics', icon: BarChart3 },
+      { id: 'costs' as Tab, label: 'Costs', icon: DollarSign },
+      { id: 'health' as Tab, label: 'Health', icon: HeartPulse },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
+      { id: 'settings' as Tab, label: 'Settings', icon: Settings },
+      { id: 'god-view' as Tab, label: 'God View', icon: Zap },
+    ],
+  },
+] as const;
+
+interface SidebarProps {
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
+  onSearchOpen: () => void;
+}
+
+export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) {
+  const { theme, toggleTheme } = useTheme();
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+  });
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+      return next;
+    });
+  }, []);
+
+  // Keyboard shortcut: [ to toggle collapse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '[' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        toggleCollapsed();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toggleCollapsed]);
+
+  return (
+    <>
+      {/* Mobile hamburger button — only visible on small screens */}
+      <button
+        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
+      >
+        <Menu className="w-4 h-4" />
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`
+          flex flex-col shrink-0 bg-card border-r border-border
+          transition-all duration-200 ease-in-out overflow-hidden
+          fixed md:relative inset-y-0 left-0 z-40
+          ${collapsed ? 'w-12' : 'w-64'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+      >
+        {/* ─── Header: Logo + Collapse button ─── */}
+        <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-border">
+          {!collapsed && (
+            <button
+              onClick={() => onTabChange('kanban')}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0"
+              title="Go to Board"
+            >
+              <Eye className="w-5 h-5 text-primary shrink-0" />
+              <span className="text-base font-semibold text-foreground font-display truncate">
+                Panopticon
+              </span>
+            </button>
+          )}
+          {collapsed && (
+            <button
+              onClick={() => onTabChange('kanban')}
+              className="flex items-center justify-center w-full hover:opacity-80 transition-opacity"
+              title="Go to Board"
+            >
+              <Eye className="w-5 h-5 text-primary" />
+            </button>
+          )}
+          {!collapsed && (
+            <button
+              onClick={toggleCollapsed}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+              title="Collapse sidebar ([)"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* ─── Nav groups ─── */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className={collapsed ? 'mb-2' : 'mb-1'}>
+              {!collapsed && (
+                <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1 first:mt-2">
+                  {group.label}
+                </p>
+              )}
+              {collapsed && <div className="h-px mx-2 bg-border my-2" />}
+              {group.items.map(({ id, label, icon: Icon }) => {
+                const isActive = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => { onTabChange(id); setMobileOpen(false); }}
+                    title={collapsed ? label : undefined}
+                    className={`
+                      w-full flex items-center gap-3 transition-colors duration-150 text-sm font-medium
+                      ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-1.5'}
+                      ${isActive
+                        ? 'bg-accent text-foreground border-l-2 border-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground border-l-2 border-transparent'
+                      }
+                    `}
+                  >
+                    <Icon className={`shrink-0 ${collapsed ? 'w-4 h-4' : 'w-4 h-4'}`} />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* ─── Footer: Status + Search + Theme toggle ─── */}
+        <div className="shrink-0 border-t border-border">
+          {!collapsed && (
+            <div className="px-3 py-2 space-y-1">
+              <div className="flex items-center gap-2">
+                <CloisterStatusBar />
+                <div className="ml-auto">
+                  <FreshnessIndicator />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onSearchOpen}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  title="Search (press /)"
+                >
+                  <span>Search</span>
+                  <kbd className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
+                    /
+                  </kbd>
+                </button>
+                <button
+                  onClick={toggleTheme}
+                  className="ml-auto p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                >
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+          {collapsed && (
+            <div className="flex flex-col items-center gap-1 py-2">
+              <button
+                onClick={toggleCollapsed}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title="Expand sidebar ([)"
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}

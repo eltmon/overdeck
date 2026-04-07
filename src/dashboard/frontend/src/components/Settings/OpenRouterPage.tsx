@@ -116,13 +116,13 @@ export function OpenRouterPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="size-10 rounded flex items-center justify-center bg-blue-500/20">
-          <Globe className="size-5 text-blue-400" />
+        <div className="size-10 rounded flex items-center justify-center badge-bg-primary">
+          <Globe className="size-5 text-primary" />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-lg leading-tight">OpenRouter</h3>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider badge-bg-primary text-primary border badge-border-primary">
               Router
             </span>
           </div>
@@ -158,8 +158,8 @@ export function OpenRouterPage({
               placeholder="sk-or-..."
               className={cn(
                 'w-full bg-surface border rounded-md px-3 py-2 pr-10 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none transition-colors',
-                keyStatus === 'valid' ? 'border-emerald-500/50' :
-                keyStatus === 'invalid' ? 'border-red-500/50' :
+                keyStatus === 'valid' ? 'border-success/50' :
+                keyStatus === 'invalid' ? 'border-destructive/50' :
                 'border-divider focus:border-accent-muted'
               )}
             />
@@ -178,26 +178,26 @@ export function OpenRouterPage({
             {keyStatus === 'testing' ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : keyStatus === 'valid' ? (
-              <CheckCircle className="size-3.5 text-emerald-400" />
+              <CheckCircle className="size-3.5 text-success" />
             ) : keyStatus === 'invalid' ? (
-              <XCircle className="size-3.5 text-red-400" />
+              <XCircle className="size-3.5 text-destructive" />
             ) : null}
             Test Key
           </button>
         </div>
         {keyStatus === 'valid' && (
-          <p className="text-xs text-emerald-400 flex items-center gap-1">
+          <p className="text-xs text-success flex items-center gap-1">
             <CheckCircle className="size-3" /> API key is valid
           </p>
         )}
         {keyStatus === 'invalid' && keyError && (
-          <p className="text-xs text-red-400 flex items-center gap-1">
+          <p className="text-xs text-destructive flex items-center gap-1">
             <XCircle className="size-3" /> {keyError}
           </p>
         )}
         <p className="text-xs text-text-muted">
           Get your API key at{' '}
-          <span className="text-blue-400 font-mono">openrouter.ai/settings/keys</span>
+          <span className="text-primary font-mono">openrouter.ai/settings/keys</span>
           {' '}— free tier available, no credit card required
         </p>
       </div>
@@ -207,7 +207,7 @@ export function OpenRouterPage({
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-semibold text-sm text-text-primary">Model Catalog</h4>
           <span className="text-xs text-text-muted">
-            Star models to add them to Mission Control's model picker
+            Star models to add them to Command Deck's model picker
           </span>
         </div>
         <OpenRouterModelBrowser

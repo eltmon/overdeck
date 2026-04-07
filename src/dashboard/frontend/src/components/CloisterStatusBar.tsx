@@ -148,7 +148,7 @@ export function CloisterStatusBar() {
       {/* Cloister Status Indicator */}
       <div className="flex items-center gap-1" title={status.running ? 'Cloister: Running' : 'Cloister: Stopped'}>
         {status.running ? (
-          <Bell className="w-3.5 h-3.5 text-green-400" />
+          <Bell className="w-3.5 h-3.5 text-success" />
         ) : (
           <BellOff className="w-3.5 h-3.5 text-content-muted" />
         )}
@@ -158,13 +158,13 @@ export function CloisterStatusBar() {
       {status.running && status.summary.total > 0 && (
         <div className="flex items-center gap-1 text-xs">
           {status.summary.active > 0 && (
-            <span className="text-green-400">{status.summary.active}</span>
+            <span className="text-success">{status.summary.active}</span>
           )}
           {status.summary.warning > 0 && (
-            <span className="text-orange-400">{status.summary.warning}</span>
+            <span className="text-warning">{status.summary.warning}</span>
           )}
           {status.summary.stuck > 0 && (
-            <span className="text-red-400">{status.summary.stuck}</span>
+            <span className="text-destructive">{status.summary.stuck}</span>
           )}
         </div>
       )}
@@ -172,7 +172,7 @@ export function CloisterStatusBar() {
       {/* Running Ephemeral Specialists Indicator */}
       {runningEphemeral.length > 0 && (
         <span
-          className="flex items-center gap-0.5 text-xs text-green-400"
+          className="flex items-center gap-0.5 text-xs text-success"
           title={`Ephemeral: ${runningEphemeral.map(p => `${p.projectKey.toUpperCase()} ${p.specialistType}`).join(', ')}`}
         >
           <Zap className="w-3 h-3" />
@@ -183,7 +183,7 @@ export function CloisterStatusBar() {
       {/* Warning Indicator */}
       {hasWarnings && (
         <span title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`}>
-          <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+          <AlertTriangle className="w-3.5 h-3.5 text-warning" />
         </span>
       )}
 
@@ -198,7 +198,7 @@ export function CloisterStatusBar() {
               ? 'bg-surface-emphasis text-content-subtle cursor-wait'
               : status.running
               ? 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
-              : 'bg-blue-600 text-content hover:bg-blue-700'
+              : 'bg-primary text-white hover:bg-primary/90'
           }`}
         >
           {isToggling
@@ -210,17 +210,17 @@ export function CloisterStatusBar() {
         {!showEmergencyConfirm ? (
           <button
             onClick={() => setShowEmergencyConfirm(true)}
-            className="p-1 rounded text-xs bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors"
+            className="p-1 rounded text-xs badge-bg-destructive text-destructive border badge-border-destructive hover:bg-destructive/20 transition-colors"
             title="Emergency stop - kill all agents"
           >
             <StopCircle className="w-3.5 h-3.5" />
           </button>
         ) : (
-          <div className="flex items-center gap-1 px-2 py-0.5 bg-red-600/20 rounded border border-red-600/30">
-            <span className="text-xs text-red-300">Kill all?</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 badge-bg-destructive rounded border badge-border-destructive">
+            <span className="text-xs text-destructive">Kill all?</span>
             <button
               onClick={handleEmergencyStop}
-              className="px-1.5 py-0.5 rounded text-xs bg-red-600 text-content hover:bg-red-700"
+              className="px-1.5 py-0.5 rounded text-xs bg-destructive text-white hover:bg-destructive/90"
             >
               Yes
             </button>
@@ -260,7 +260,7 @@ export function CloisterStatusBar() {
                     checked={config?.startup.auto_start ?? true}
                     onChange={handleAutoStartToggle}
                     disabled={configMutation.isPending}
-                    className="w-4 h-4 rounded border-divider-strong bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                    className="w-4 h-4 rounded border-divider-strong bg-surface-overlay text-primary focus:ring-primary"
                   />
                   <span className="text-sm text-content-body">
                     Auto-start on dashboard launch

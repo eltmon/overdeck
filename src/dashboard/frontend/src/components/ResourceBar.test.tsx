@@ -26,25 +26,25 @@ describe('ResourceBar', () => {
 
   it('renders green bar for value < 60', () => {
     const { container } = render(<ResourceBar value={30} />);
-    const bar = container.querySelector('.bg-green-500');
+    const bar = container.querySelector('.bg-success');
     expect(bar).toBeTruthy();
   });
 
   it('renders yellow bar for value between 60 and 85', () => {
     const { container } = render(<ResourceBar value={70} />);
-    const bar = container.querySelector('.bg-yellow-400');
+    const bar = container.querySelector('.bg-warning');
     expect(bar).toBeTruthy();
   });
 
   it('renders red bar for value >= 85', () => {
     const { container } = render(<ResourceBar value={90} />);
-    const bar = container.querySelector('.bg-red-500');
+    const bar = container.querySelector('.bg-destructive');
     expect(bar).toBeTruthy();
   });
 
   it('renders red bar at exactly 85', () => {
     const { container } = render(<ResourceBar value={85} />);
-    const bar = container.querySelector('.bg-red-500');
+    const bar = container.querySelector('.bg-destructive');
     expect(bar).toBeTruthy();
   });
 

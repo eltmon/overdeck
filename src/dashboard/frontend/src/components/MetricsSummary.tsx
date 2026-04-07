@@ -92,7 +92,7 @@ export function MetricsSummary() {
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-400" />
+            <DollarSign className="w-5 h-5 text-success" />
             <span className="text-sm text-content-subtle">Cost Today (UTC)</span>
           </div>
         </div>
@@ -111,7 +111,7 @@ export function MetricsSummary() {
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-400" />
+            <Users className="w-5 h-5 text-primary" />
             <span className="text-sm text-content-subtle">Agents</span>
           </div>
         </div>
@@ -128,7 +128,7 @@ export function MetricsSummary() {
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <AlertTriangle className="w-5 h-5 text-destructive" />
             <span className="text-sm text-content-subtle">Stuck Agents</span>
           </div>
         </div>
@@ -160,7 +160,7 @@ export function MetricsSummary() {
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-400" />
+            <TrendingUp className="w-5 h-5 text-signal-review" />
             <span className="text-sm text-content-subtle">Cost Escalations</span>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function MetricsSummary() {
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-orange-400" />
+            <Layers className="w-5 h-5 text-warning" />
             <span className="text-sm text-content-subtle">Queue Depth</span>
           </div>
         </div>

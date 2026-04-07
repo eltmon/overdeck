@@ -104,10 +104,10 @@ function formatTokens(tokens: number): string {
 }
 
 function getSuccessColor(rate: number): string {
-  if (rate >= 0.9) return 'text-green-400';
-  if (rate >= 0.7) return 'text-yellow-400';
-  if (rate >= 0.5) return 'text-orange-400';
-  return 'text-red-400';
+  if (rate >= 0.9) return 'text-success';
+  if (rate >= 0.7) return 'text-warning';
+  if (rate >= 0.5) return 'text-warning';
+  return 'text-destructive';
 }
 
 function getRuntimeIcon(runtime: string): string {
@@ -144,8 +144,8 @@ export function RuntimeComparison() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
-          <p className="text-red-400">Failed to load runtime metrics</p>
+        <div className="badge-bg-destructive border border-destructive/30 rounded-lg p-4">
+          <p className="text-destructive">Failed to load runtime metrics</p>
         </div>
       </div>
     );
@@ -218,7 +218,7 @@ export function RuntimeComparison() {
               <DollarSign className="w-4 h-4" />
               Total Cost
             </div>
-            <div className="text-2xl font-bold text-green-400">{formatCost(aggregated.totalCost)}</div>
+            <div className="text-2xl font-bold text-success">{formatCost(aggregated.totalCost)}</div>
           </div>
         </div>
       )}
@@ -251,13 +251,13 @@ export function RuntimeComparison() {
                 </td>
                 <td className="text-right p-4">
                   <div className="flex items-center justify-end gap-2">
-                    <span className="text-green-400" title="Successful">
+                    <span className="text-success" title="Successful">
                       {runtime.successfulTasks}
                     </span>
                     <span className="text-content-muted">/</span>
                     <span>{runtime.totalTasks}</span>
                     {runtime.failedTasks > 0 && (
-                      <span className="text-red-400 text-sm" title="Failed">
+                      <span className="text-destructive text-sm" title="Failed">
                         ({runtime.failedTasks} failed)
                       </span>
                     )}
@@ -274,7 +274,7 @@ export function RuntimeComparison() {
                 <td className="text-right p-4 text-content-body">
                   {formatCost(runtime.avgCost)}
                 </td>
-                <td className="text-right p-4 font-medium text-green-400">
+                <td className="text-right p-4 font-medium text-success">
                   {formatCost(runtime.totalCost)}
                 </td>
                 <td className="text-right p-4 text-content-body">
@@ -311,7 +311,7 @@ export function RuntimeComparison() {
                       <span className={getSuccessColor(stats.successRate)}>
                         {formatPercent(stats.successRate)}
                       </span>
-                      <span className="text-green-400 w-16 text-right">
+                      <span className="text-success w-16 text-right">
                         {formatCost(stats.totalCost)}
                       </span>
                     </div>
@@ -350,7 +350,7 @@ export function RuntimeComparison() {
                       <span className={getSuccessColor(stats.successRate)}>
                         {formatPercent(stats.successRate)}
                       </span>
-                      <span className="text-green-400">{formatCost(stats.totalCost)}</span>
+                      <span className="text-success">{formatCost(stats.totalCost)}</span>
                     </div>
                   </div>
                 ))
@@ -404,7 +404,7 @@ export function RuntimeComparison() {
                     >
                       <div className="h-16 flex items-end">
                         <div
-                          className="w-3 bg-blue-500 rounded-t transition-all group-hover:bg-blue-400"
+                          className="w-3 bg-primary rounded-t transition-all group-hover:bg-primary/80"
                           style={{ height: `${height}px` }}
                         />
                       </div>

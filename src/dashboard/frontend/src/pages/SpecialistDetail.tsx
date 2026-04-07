@@ -71,16 +71,16 @@ async function fetchGracePeriod(project: string, type: string): Promise<GracePer
 }
 
 const STATUS_ICONS = {
-  passed: <CheckCircle className="w-4 h-4 text-green-400" />,
-  failed: <XCircle className="w-4 h-4 text-red-400" />,
-  blocked: <AlertCircle className="w-4 h-4 text-yellow-400" />,
+  passed: <CheckCircle className="w-4 h-4 text-success" />,
+  failed: <XCircle className="w-4 h-4 text-destructive" />,
+  blocked: <AlertCircle className="w-4 h-4 text-warning" />,
   incomplete: <Clock className="w-4 h-4 text-content-subtle" />,
 };
 
 const STATUS_COLORS = {
-  passed: 'bg-green-900 bg-opacity-20 text-green-400 border-green-600',
-  failed: 'bg-red-900 bg-opacity-20 text-red-400 border-red-600',
-  blocked: 'bg-yellow-900 bg-opacity-20 text-yellow-400 border-yellow-600',
+  passed: 'badge-bg-success text-success border-success/40',
+  failed: 'badge-bg-destructive text-destructive border-destructive/40',
+  blocked: 'badge-bg-warning text-warning border-warning/40',
   incomplete: 'bg-surface bg-opacity-20 text-content-subtle border-divider-strong',
 };
 
@@ -132,7 +132,7 @@ export function SpecialistDetail() {
   });
 
   if (!project || !type) {
-    return <div className="text-red-400">Invalid parameters</div>;
+    return <div className="text-destructive">Invalid parameters</div>;
   }
 
   if (runsLoading) {
@@ -166,7 +166,7 @@ export function SpecialistDetail() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <Brain className="w-8 h-8 text-purple-400" />
+          <Brain className="w-8 h-8 text-signal-review" />
           <div>
             <h1 className="text-2xl font-bold text-content">
               {project} / {type}
@@ -185,17 +185,17 @@ export function SpecialistDetail() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="p-4 bg-green-900 bg-opacity-20 border border-green-600 rounded-lg">
-          <div className="text-green-400 text-2xl font-bold">{stats.passed}</div>
-          <div className="text-green-300 text-sm">Passed</div>
+        <div className="p-4 badge-bg-success border border-success/40 rounded-lg">
+          <div className="text-success text-2xl font-bold">{stats.passed}</div>
+          <div className="text-success/80 text-sm">Passed</div>
         </div>
-        <div className="p-4 bg-red-900 bg-opacity-20 border border-red-600 rounded-lg">
-          <div className="text-red-400 text-2xl font-bold">{stats.failed}</div>
-          <div className="text-red-300 text-sm">Failed</div>
+        <div className="p-4 badge-bg-destructive border border-destructive/40 rounded-lg">
+          <div className="text-destructive text-2xl font-bold">{stats.failed}</div>
+          <div className="text-destructive/80 text-sm">Failed</div>
         </div>
-        <div className="p-4 bg-yellow-900 bg-opacity-20 border border-yellow-600 rounded-lg">
-          <div className="text-yellow-400 text-2xl font-bold">{stats.blocked}</div>
-          <div className="text-yellow-300 text-sm">Blocked</div>
+        <div className="p-4 badge-bg-warning border border-warning/40 rounded-lg">
+          <div className="text-warning text-2xl font-bold">{stats.blocked}</div>
+          <div className="text-warning/80 text-sm">Blocked</div>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ export function SpecialistDetail() {
           <button
             onClick={() => regenerateMutation.mutate()}
             disabled={regenerateMutation.isPending}
-            className="flex items-center gap-2 px-3 py-1 text-sm text-blue-400 hover:text-blue-300 hover:bg-surface-overlay rounded disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1 text-sm text-primary hover:text-primary/80 hover:bg-surface-overlay rounded disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
             Regenerate
@@ -255,7 +255,7 @@ export function SpecialistDetail() {
 
                   <Link
                     to={`/specialists/${project}/${type}/runs/${run.runId}`}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-surface-overlay rounded"
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-primary hover:text-primary/80 hover:bg-surface-overlay rounded"
                   >
                     <Eye className="w-4 h-4" />
                     View Log

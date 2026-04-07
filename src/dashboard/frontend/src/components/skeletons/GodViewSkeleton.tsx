@@ -3,7 +3,7 @@ export function GodViewSkeleton() {
   return (
     <div className="god-view flex flex-col h-full">
       {/* Top bar skeleton */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-pan-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-divider shrink-0">
         <div className="h-4 w-48 animate-pulse bg-surface-2 rounded" />
         <div className="h-4 w-24 animate-pulse bg-surface-2 rounded" />
       </div>
