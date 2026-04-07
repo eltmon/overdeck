@@ -1,6 +1,6 @@
 # PAN-512: Effect yield* failures not caught by JS try/catch
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Problem
 
@@ -40,7 +40,7 @@ Add a `no-restricted-syntax` ESLint rule that flags `TryStatement` containing `Y
 - Extend existing `effect-patterns.test.ts` with a comment documenting the pattern (the ESLint rule is the real enforcement)
 
 ## Current Phase
-Implementing bead feature-pan-489-svx: Verify typecheck, lint, and tests pass
+All beads complete. Ready to push and signal completion.
 
 ## Completed Work
 - [x] feature-pan-489-2l3: Fixed 14 try/catch-around-yield* instances in routes/agents.ts (commit: cffb3138)
@@ -50,7 +50,7 @@ Implementing bead feature-pan-489-svx: Verify typecheck, lint, and tests pass
 
 ## Remaining Work
 - [x] feature-pan-489-dzt: Added ESLint no-restricted-syntax rule to catch TryStatement:has(YieldExpression[delegate=true]) inside Effect.gen (commit: pending)
-- [ ] feature-pan-489-svx: Verify typecheck, lint, and tests pass
+- [x] feature-pan-489-svx: Typecheck passes (pre-existing sync.ts errors only), lint passes (no ESLint violations), tests 2217 pass (3 pre-existing frontend failures from missing @testing-library/react) (commit: pending)
 
 ## Key Decisions
 - Fixed ALL try/catch-around-yield* instances in agents.ts (14 total, planning said 5 — the count was conservative)
