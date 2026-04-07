@@ -25,7 +25,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between">
               <span className="text-content-subtle">{label}</span>
-              <span {className="text-content">{value}</span>
+              <span className="text-content">{value}</span>
             </div>
           ))}
           <div className="flex items-center justify-between">
