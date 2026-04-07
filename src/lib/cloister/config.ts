@@ -25,8 +25,11 @@ export interface HealthThresholds {
  */
 export interface AutoActions {
   poke_on_warning: boolean;
+  poke_on_stuck: boolean;   // Poke agents idle > stuck threshold (default: true)
   kill_on_stuck: boolean;
   restart_on_kill: boolean;
+  /** Minimum ms between pokes for the same agent. Prevents spam on repeated health checks. Default: 30 min */
+  poke_cooldown_ms: number;
 }
 
 /**
@@ -190,8 +193,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   },
   auto_actions: {
     poke_on_warning: true,
-    kill_on_stuck: false, // Manual by default for safety
+    poke_on_stuck: true,   // Poke agents that have been idle > stuck threshold
+    kill_on_stuck: false,  // Manual by default for safety
     restart_on_kill: false,
+    poke_cooldown_ms: 30 * 60 * 1000, // 30 min between pokes for the same agent
   },
   monitoring: {
     check_interval: 60, // 1 minute

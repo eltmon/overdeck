@@ -188,6 +188,7 @@ export class CloisterService {
   private spawnsPaused: boolean = false;
   private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
+  private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
 
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
@@ -421,16 +422,29 @@ export class CloisterService {
       // Check for agents needing attention
       const needsAttention = getAgentsNeedingAttention(agentHealths);
 
+      const pokeCooldownMs = this.config.auto_actions.poke_cooldown_ms ?? 30 * 60 * 1000;
+      const now = Date.now();
+
       for (const health of needsAttention) {
+        const lastPoke = this.lastPokeTimestamps.get(health.agentId) ?? 0;
+        const cooledDown = (now - lastPoke) >= pokeCooldownMs;
+
         if (health.state === 'warning') {
           this.emit({ type: 'agent_warning', agentId: health.agentId, health });
 
-          // Auto-poke if configured
-          if (this.config.auto_actions.poke_on_warning) {
+          // Auto-poke if configured and cooldown elapsed
+          if (this.config.auto_actions.poke_on_warning && cooledDown) {
             this.pokeAgent(health.agentId);
+            this.lastPokeTimestamps.set(health.agentId, now);
           }
         } else if (health.state === 'stuck') {
           this.emit({ type: 'agent_stuck', agentId: health.agentId, health });
+
+          // Auto-poke stuck agents if configured and cooldown elapsed
+          if ((this.config.auto_actions.poke_on_stuck ?? true) && cooledDown) {
+            this.pokeAgent(health.agentId);
+            this.lastPokeTimestamps.set(health.agentId, now);
+          }
 
           // Auto-kill if configured (dangerous!)
           if (this.config.auto_actions.kill_on_stuck) {

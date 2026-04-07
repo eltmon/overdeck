@@ -290,3 +290,22 @@ body::after {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
   }
 }
+
+/* ─── Ready-to-merge shimmer animation ─── */
+@keyframes badge-shimmer {
+  0%   { background-position: 150% 50%; }
+  100% { background-position: -50% 50%; }
+}
+
+@layer utilities {
+  .badge-shimmer-rtm {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--success) 8%, transparent) 0%,
+      color-mix(in srgb, var(--success) 22%, transparent) 50%,
+      color-mix(in srgb, var(--success) 8%, transparent) 100%
+    );
+    background-size: 250% 100%;
+    animation: badge-shimmer 2.8s ease-in-out infinite;
+  }
+}
