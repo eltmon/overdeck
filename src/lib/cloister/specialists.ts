@@ -788,9 +788,9 @@ script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
 /**
  * Shared test-agent prompt builder — used by both buildTaskPrompt (ephemeral spawn)
  * and wakeSpecialistWithTask (queue-based wake). Extracted to avoid the bug where
- * ephemeral test specialists got empty prompts (PAN-XXX).
+ * ephemeral test specialists got empty prompts.
  */
-async function buildTestAgentPromptContent(task: {
+export async function buildTestAgentPromptContent(task: {
   issueId: string;
   branch?: string;
   workspace?: string;

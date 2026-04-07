@@ -1,5 +1,6 @@
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
+const execAsync = promisify(exec);
 import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { PANOPTICON_HOME } from './paths.js';
@@ -83,6 +84,15 @@ export function sessionExists(name: string): boolean {
   }
 }
 
+export async function sessionExistsAsync(name: string): Promise<boolean> {
+  try {
+    await execAsync(`tmux has-session -t ${name} 2>/dev/null`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function createSession(
   name: string,
   cwd: string,
@@ -128,8 +138,6 @@ export function createSession(
 export function killSession(name: string): void {
   execSync(`tmux kill-session -t ${name}`);
 }
-
-const execAsync = promisify(exec);
 
 /**
  * Send keys to a tmux session (async, non-blocking).

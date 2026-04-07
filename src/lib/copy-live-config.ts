@@ -12,7 +12,7 @@
  * containers can access the config at ~/.panopticon/ inside the container.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -49,10 +49,10 @@ function updateGitExclude(workspacePath: string): void {
   const gitInfoDir = join(workspacePath, '.git', 'info');
   const excludeFile = join(gitInfoDir, 'exclude');
 
-  // Worktrees have .git as a file pointing to the parent, not a directory.
-  // In that case the git/info/exclude lives in the worktree's gitdir.
+  // Worktrees have .git as a *file* (not a directory) pointing to the parent gitdir.
+  // Regular repos have .git as a directory. Handle both cases.
   const gitPath = join(workspacePath, '.git');
-  if (existsSync(gitPath)) {
+  if (existsSync(gitPath) && statSync(gitPath).isFile()) {
     const gitContent = readFileSync(gitPath, 'utf-8').trim();
     if (gitContent.startsWith('gitdir:')) {
       const worktreeGitDir = gitContent.replace('gitdir:', '').trim();

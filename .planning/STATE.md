@@ -18,4 +18,4 @@ None
 - D4: Config copy in `spawnPlanningSession` is non-fatal (warns on error, doesn't abort) so a missing config file never blocks planning.
 
 ## Specialist Feedback
-(none yet)
+- **[2026-04-07T06:02Z] review-agent → CHANGES-REQUESTED** — addressed: sessionExists→async, duplicate listProjects, unused projectKey, PAN-XXX placeholder, added tests for copy-live-config and buildTestAgentPromptContent
