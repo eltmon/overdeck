@@ -2071,7 +2071,7 @@ const CONTAINER_RESTART_WINDOW_MS = 30 * 60_000; // Reset burst count after 30 m
  * PAN-464: Compute exponential backoff delay for a container given its restart history.
  * Returns delay in ms. Delay doubles each attempt: 60s, 120s, 240s, 480s, max 5 min.
  */
-function containerRestartBackoffMs(count: number): number {
+export function containerRestartBackoffMs(count: number): number {
   const base = CONTAINER_RESTART_BACKOFF_MS;
   const max = 5 * 60_000; // 5 minutes cap
   return Math.min(base * Math.pow(2, count - 1), max);
@@ -2106,7 +2106,7 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
  * Gives up after 5 restarts within 30 minutes to avoid restart loops.
  * Kills orphaned host processes before restarting to fix the inotify root cause.
  */
-async function checkWorkspaceContainerHealth(): Promise<string[]> {
+export async function checkWorkspaceContainerHealth(): Promise<string[]> {
   const actions: string[] = [];
   try {
     // Find all workspace-related containers that are exited (crashed)
@@ -2157,12 +2157,7 @@ async function checkWorkspaceContainerHealth(): Promise<string[]> {
             console.log(`[deacon] Container ${name} exceeded max restarts — skipping (gave up)`);
             continue;
           }
-          const backoffMs = containerRestartBackoffMs(record.count);
-          const msSinceLast = now - new Date(record.lastRestart).getTime();
-          if (msSinceLast < backoffMs) {
-            console.log(`[deacon] Container ${name} in backoff (${Math.round((backoffMs - msSinceLast) / 1000)}s remaining)`);
-            continue;
-          }
+          // Check max count BEFORE backoff — if we've hit the limit, give up regardless of timing
           if (record.count >= CONTAINER_RESTART_MAX_COUNT) {
             record.gaveUp = true;
             stateDirty = true;
@@ -2179,6 +2174,12 @@ async function checkWorkspaceContainerHealth(): Promise<string[]> {
             } catch {
               // Agent may not be interactive (e.g., waiting for input) — non-fatal
             }
+            continue;
+          }
+          const backoffMs = containerRestartBackoffMs(record.count);
+          const msSinceLast = now - new Date(record.lastRestart).getTime();
+          if (msSinceLast < backoffMs) {
+            console.log(`[deacon] Container ${name} in backoff (${Math.round((backoffMs - msSinceLast) / 1000)}s remaining)`);
             continue;
           }
         }
