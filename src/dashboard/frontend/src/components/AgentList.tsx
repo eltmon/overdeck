@@ -1,12 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useDashboardStore, selectAgentList, selectSpecialistList } from '../lib/store';
-import { Brain, Cpu, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
+import { useDashboardStore, selectSpecialistList } from '../lib/store';
+import { Brain, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
 import { type SpecialistAgent } from './SpecialistAgentCard';
-import { IssueAgentCard, type IssueAgent, type CloisterHealth } from './IssueAgentCard';
-
-interface CloisterHealthResponse {
-  agents: CloisterHealth[];
-}
 
 interface CloisterStatus {
   running: boolean;
@@ -60,12 +55,6 @@ async function fetchProjectSpecialists(): Promise<ProjectSpecialistStatus[]> {
   return (data.projects ?? []).filter((p: ProjectSpecialistStatus) => p.isRunning || p.metadata?.currentRun || p.metadata?.lastRunAt);
 }
 
-async function fetchCloisterHealth(): Promise<CloisterHealthResponse> {
-  const res = await fetch('/api/cloister/agents/health');
-  if (!res.ok) throw new Error('Failed to fetch Cloister health');
-  return res.json();
-}
-
 async function fetchCloisterStatus(): Promise<CloisterStatus> {
   const res = await fetch('/api/cloister/status');
   if (!res.ok) throw new Error('Failed to fetch Cloister status');
@@ -105,25 +94,13 @@ function formatTimeAgo(timestamp: string | null): string {
 
 export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const queryClient = useQueryClient();
-  // Agents and specialists from Zustand store (event-sourced — no polling)
-  const agentsFromStore = useDashboardStore(selectAgentList);
-  const agents = agentsFromStore as unknown as IssueAgent[];
-  const agentsLoading = false;
-  const agentsError = null;
 
   const specialistsFromStore = useDashboardStore(selectSpecialistList);
   const specialists = specialistsFromStore as unknown as SpecialistAgent[];
-  const specialistsLoading = false;
 
   const { data: runningProjectSpecialists } = useQuery({
     queryKey: ['project-specialists-running'],
     queryFn: fetchProjectSpecialists,
-    refetchInterval: 5000,
-  });
-
-  const { data: cloisterHealth } = useQuery({
-    queryKey: ['cloister-health'],
-    queryFn: fetchCloisterHealth,
     refetchInterval: 5000,
   });
 
@@ -159,24 +136,6 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
   // Get recent activity (last 5)
   const recentActivity = (activity || []).slice(-5).reverse();
-
-  if (agentsLoading || specialistsLoading) {
-    return (
-      <div className="bg-surface-raised rounded-lg p-6">
-        <div className="text-content-subtle">Loading agents...</div>
-      </div>
-    );
-  }
-
-  if (agentsError) {
-    return (
-      <div className="bg-surface-raised rounded-lg p-6">
-        <div className="text-destructive">Error: {(agentsError as Error).message}</div>
-      </div>
-    );
-  }
-
-  const runningAgents = agents?.filter((a) => a.status !== 'dead') || [];
 
   return (
     <div className="space-y-4">
@@ -354,38 +313,6 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
         </div>
       )}
 
-      {/* Issue Agents Section */}
-      <div className="bg-surface-raised rounded-lg">
-        <div className="px-4 py-3 border-b border-divider">
-          <h2 className="font-semibold text-content flex items-center gap-2">
-            <Cpu className="w-5 h-5" />
-            Issue Agents ({runningAgents.length})
-          </h2>
-        </div>
-
-        <div className="divide-y divide-gray-700">
-          {runningAgents.length === 0 ? (
-            <div className="p-8 text-center text-content-muted">
-              No agents running. Use{' '}
-              <code className="bg-surface-overlay px-2 py-1 rounded">/work-issue</code> to spawn one.
-            </div>
-          ) : (
-            runningAgents.map((agent) => {
-              const health = cloisterHealth?.agents.find((h) => h.agentId === agent.id);
-
-              return (
-                <IssueAgentCard
-                  key={agent.id}
-                  agent={agent}
-                  health={health}
-                  onSelect={() => onSelectAgent(agent.id === selectedAgent ? null : agent.id)}
-                  isSelected={agent.id === selectedAgent}
-                />
-              );
-            })
-          )}
-        </div>
-      </div>
     </div>
   );
 }
