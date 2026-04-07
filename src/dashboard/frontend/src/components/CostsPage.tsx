@@ -13,13 +13,14 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  LineController,
   Filler,
   Tooltip,
   type ChartData,
   type ChartOptions,
 } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Filler, Tooltip);
 
 // ============== Types ==============
 
