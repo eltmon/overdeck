@@ -132,9 +132,10 @@ export function OpenRouterPage({
         </div>
         <button
           onClick={onToggleEnabled}
+          title={enabled ? 'Disable OpenRouter' : 'Enable OpenRouter'}
           className={cn(
             'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-            enabled ? 'bg-accent' : 'bg-surface-active'
+            enabled ? 'bg-primary' : 'bg-surface-emphasis'
           )}
         >
           <span

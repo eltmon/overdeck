@@ -1,8 +1,8 @@
 # Panopticon Style Guide
 
-**Version:** 1.0
+**Version:** 1.1
 **Issue:** PAN-460
-**Last Updated:** 2026-04-05
+**Last Updated:** 2026-04-07
 **Design Reference:** T3Code (`/home/eltmon/Projects/t3code/apps/web/src/index.css`)
 
 ---
@@ -233,12 +233,49 @@ Colors are defined as CSS custom properties on `:root` (light) and via `@variant
 
 | Token | Color | Meaning |
 |-------|-------|---------|
-| `--info` / `--primary` | Blue | Primary actions, active state, info |
+| `--info` / `--primary` | Blue | Primary actions, active state, machine working |
 | `--success` | Emerald | Healthy, running, completed, merged |
-| `--warning` | Amber | Planning, in-progress, needs attention |
-| `--destructive` | Red | Error, stuck, dead, failed |
+| `--warning` | Amber | Needs human attention, in review, waiting for action |
+| `--destructive` | Red | Error, stuck, dead, failed, urgent |
 | `--signal-review` | Purple | In review, specialist activity |
 | `--signal-cost` | Cyan | Cost figures, token counts, metrics |
+
+### Color Restraint (Data-Dense Views)
+
+In dense views like the Kanban board, uncontrolled color usage creates noise that degrades signal clarity. When every element is colored, nothing is colored.
+
+**Maximum one colored signal per card.** Each card communicates ONE primary status signal through color. All other elements default to neutral (`text-muted-foreground`, `border-border`).
+
+**Three-tier signal hierarchy:**
+
+| Tier | Element | Color source | Purpose |
+|------|---------|-------------|---------|
+| 1 | Left border (`border-l-4`) | Priority heat-map | Urgent=red, High=amber, Medium=gray, Low=invisible |
+| 2 | Column top border (4px) | Pipeline state | Idle=neutral, Active=primary, Review=warning, Done=success |
+| 3 | Special-state badge only | Semantic token | `READY TO MERGE`, `MERGED`, `STUCK` — genuine exceptions |
+
+**Labels: always neutral.** Category labels (bug, enhancement, planning) use `badge-bg-muted` / `text-muted-foreground`. Labels are taxonomy, not status. Coloring them creates false signals.
+
+**Action links: always monochromatic.** The footer row of card actions (Plan, Tasks, vBRIEF, Reset, Cancel, etc.) uses `text-muted-foreground hover:text-foreground`. Only two exceptions are allowed:
+- Primary CTA (Start Agent / Resume Agent): `text-primary` — it's the single most important action
+- Destructive action (Kill / Wipe): `text-destructive-foreground` — there is at most one per card
+
+**Exception — live agent-state badges:** Inline badges reflecting real-time agent state (`⊙ Input`, `✦ Planning`, `⚠ Stuck`) may use semantic color because they represent live, immediately actionable conditions requiring user response.
+
+**Badge opacity: 8% background, 32% border.** Use `badge-bg-{signal}` (8% color-mix) and `badge-border-{signal}` (32% color-mix). Higher opacity backgrounds create too much noise in a list of many cards.
+
+### Column Semantic Colors (Kanban Pipeline)
+
+Column top borders communicate pipeline state, not arbitrary decoration:
+
+| Column | Border class | Color | Signal |
+|--------|-------------|-------|--------|
+| Backlog / To Do | `border-divider-strong` | Neutral | Queued — no action needed |
+| In Progress | `border-primary` | Blue | Machine actively working |
+| In Review | `border-warning` | Amber | Waiting for human action |
+| Done | `border-success` | Green | Work complete |
+
+This means amber always means "a human needs to do something." Blue means "a machine is doing something." This mapping must be consistent across all views.
 
 ### Forbidden Patterns
 
@@ -896,11 +933,47 @@ Minimum interactive element size: **32px** (h-8). Prefer **36px** (h-9) for prim
 
 ### Board (Kanban)
 
-- Column headers: `font-body text-sm font-medium text-muted-foreground uppercase tracking-wider`
-- Column count badge: `text-xs text-muted-foreground ml-1`
-- Cards use left accent border for status (see Cards section)
-- Stats bar at top uses compact card variant with `p-3`
-- Filter pills: `bg-secondary rounded-full text-xs px-2 py-0.5`
+See Section 3 "Color Restraint" for the core color philosophy. Implementation details:
+
+**Columns**
+- Column wrapper: `border-t-4 {COLUMN_COLOR} bg-card rounded-xl`
+- Column header: `text-base font-medium text-foreground` (DM Sans, not Space Grotesk — "g" in "In Progress")
+- Column count badge: `text-xs text-muted-foreground`
+- Column accent colors follow pipeline semantics — see "Column Semantic Colors" in Section 3
+
+**Cards**
+- Card container: `rounded-xl border border-border bg-card border-l-4 {PRIORITY_COLOR}`
+- Priority left borders (heat-map): urgent=`border-l-destructive`, high=`border-l-warning`, medium=`border-l-muted-foreground`, low/none=`border-l-border`
+- Card title: `text-sm font-medium text-foreground`
+- Issue ID / external link: `text-xs text-muted-foreground`
+- Cost display: `text-xs text-signal-cost` (cyan — always uses signal-cost for money)
+
+**Labels (taxonomy tags)**
+- Always: `badge-bg-muted text-muted-foreground border border-border`
+- No semantic color regardless of label value. Labels describe type, not urgency.
+
+**Agent-state badges (live status)**
+- `READY TO MERGE`: `badge-bg-success badge-border-success text-success-foreground uppercase tracking-wide`
+- `MERGED`: `badge-bg-success text-success-foreground uppercase tracking-wide`
+- `STUCK`: `badge-bg-destructive badge-border-destructive text-destructive-foreground`
+- `⊙ Input` / `✦ Planning`: semantic color appropriate to state — these require human or system action
+
+**Card footer actions**
+- Default link: `text-muted-foreground hover:text-foreground transition-colors`
+- Primary CTA (Start Agent / Resume Agent): `text-primary hover:text-primary/80 transition-colors`
+- Single destructive (Kill / Wipe): `text-destructive-foreground hover:text-destructive transition-colors`
+- Rule: one primary, one destructive — everything else is neutral
+
+**Filter bar**
+- Cycle buttons (Current / All / Backlog / Canceled): inactive=`bg-background text-foreground/70 hover:text-foreground hover:bg-accent`, active=`bg-primary text-primary-foreground`
+- Project pills: rounded-full with `border border-foreground/15`; selected=`bg-accent text-foreground border-foreground/20`; deselected=`opacity-50`
+- Labels: `text-muted-foreground font-medium`
+
+**Metrics row (stat tiles)**
+- Container: `bg-card border border-border` — inherits theme, never hardcoded colors
+- Icon colors: Cost=`text-success`, Agents=`text-primary`, Stuck=`text-destructive` (if >0) else `text-muted-foreground`, Handoffs=`text-signal-cost`, Escalations=`text-signal-review`, Queue=`text-warning`
+- Label: `text-xs text-muted-foreground`
+- Value: `text-sm font-medium text-foreground font-display` (Space Grotesk for numbers)
 
 ### Command Deck (formerly Mission Control)
 
@@ -959,20 +1032,27 @@ design/
 For developers implementing components, this is the TL;DR:
 
 ```
-SURFACES:     bg-background → bg-card → bg-accent (darker to lighter)
-TEXT:         text-foreground / text-muted-foreground / text-card-foreground
-BORDERS:     border-border (always — never hardcode gray)
-PRIMARY:     bg-primary / text-primary (blue)
-SIGNALS:     success/warning/destructive/info + signal-review/signal-cost
-BADGE BG:    bg-{signal}/8 text-{signal}-foreground border-{signal}/32
-CARDS:       rounded-2xl border border-border bg-card p-6
-BUTTONS:     rounded-lg h-9 px-3 text-sm font-medium
-DIALOGS:     rounded-2xl bg-popover shadow-lg/5 centered on viewport
-RADIUS:      sm=6 md=8 lg=10 xl=14 2xl=18 3xl=22 4xl=26
-FONT DISPLAY: Space Grotesk
-FONT BODY:    DM Sans
-FONT CODE:    SF Mono
-NOISE:       body::after with feTurbulence at 3.5% opacity
-SCROLLBAR:   6px wide, transparent track, 10-15% opacity thumb
-TRANSITIONS: 200ms ease-in-out (default)
+SURFACES:      bg-background → bg-card → bg-accent (darker to lighter)
+TEXT:          text-foreground / text-muted-foreground / text-card-foreground
+BORDERS:       border-border (always — never hardcode gray)
+PRIMARY:       bg-primary / text-primary (blue)
+SIGNALS:       success/warning/destructive/info + signal-review/signal-cost
+BADGE BG:      badge-bg-{signal} (8% color-mix) + badge-border-{signal} (32%)
+CARDS:         rounded-2xl border border-border bg-card p-6
+BUTTONS:       rounded-lg h-9 px-3 text-sm font-medium
+DIALOGS:       rounded-2xl bg-popover shadow-lg/5 centered on viewport
+RADIUS:        sm=6 md=8 lg=10 xl=14 2xl=18 3xl=22 4xl=26
+FONT DISPLAY:  Space Grotesk (numbers, brand only)
+FONT BODY:     DM Sans (everything else)
+FONT CODE:     SF Mono
+NOISE:         body::after with feTurbulence at 3.5% opacity
+SCROLLBAR:     6px wide, transparent track, 10-15% opacity thumb
+TRANSITIONS:   200ms ease-in-out (default)
+
+COLOR RESTRAINT (dense views):
+  Max 1 colored signal per card
+  Labels: always neutral (badge-bg-muted)
+  Action links: always muted-foreground (1 primary CTA + 1 destructive max)
+  Column colors: neutral=idle, primary=machine working, warning=human needed, success=done
+  Priority border: destructive=urgent, warning=high, muted-foreground=medium, border=low
 ```

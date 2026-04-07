@@ -242,19 +242,19 @@ body::after {
 /* These provide theme-aware opacity backgrounds for status badges and pills. */
 @layer utilities {
   .badge-bg-success {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
+    background: color-mix(in srgb, var(--success) 8%, transparent);
   }
   .badge-bg-warning {
-    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
   }
   .badge-bg-destructive {
-    background: color-mix(in srgb, var(--destructive) 12%, transparent);
+    background: color-mix(in srgb, var(--destructive) 8%, transparent);
   }
   .badge-bg-signal-review {
-    background: color-mix(in srgb, var(--signal-review) 12%, transparent);
+    background: color-mix(in srgb, var(--signal-review) 8%, transparent);
   }
   .badge-bg-primary {
-    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
   }
   .badge-bg-muted {
     background: color-mix(in srgb, var(--foreground) 6%, transparent);
@@ -278,13 +278,13 @@ body::after {
     border-color: color-mix(in srgb, var(--foreground) 12%, transparent);
   }
   .badge-bg-signal-cost {
-    background: color-mix(in srgb, var(--signal-cost) 12%, transparent);
+    background: color-mix(in srgb, var(--signal-cost) 8%, transparent);
   }
   .badge-border-signal-cost {
     border-color: color-mix(in srgb, var(--signal-cost) 32%, transparent);
   }
   .badge-bg-info {
-    background: color-mix(in srgb, var(--info) 12%, transparent);
+    background: color-mix(in srgb, var(--info) 8%, transparent);
   }
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);

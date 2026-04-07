@@ -51,25 +51,22 @@ interface MetricTileProps {
   label: string;
   value: string | number;
   subtext?: string;
-  color?: string;
+  iconClass?: string;
 }
 
-function MetricTile({ icon, label, value, subtext, color = '#92a4c9' }: MetricTileProps) {
+function MetricTile({ icon, label, value, subtext, iconClass = 'text-muted-foreground' }: MetricTileProps) {
   return (
-    <div
-      className="flex items-center gap-3 px-4 py-2.5 rounded-lg border min-w-0"
-      style={{ backgroundColor: '#161b26', borderColor: '#232f48' }}
-    >
-      <div className="shrink-0" style={{ color }}>
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-border bg-card min-w-0">
+      <div className={`shrink-0 ${iconClass}`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-xs" style={{ color: '#92a4c9' }}>{label}</div>
-        <div className="text-sm font-semibold text-white leading-tight" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="text-sm font-medium text-foreground leading-tight font-display">
           {value}
         </div>
         {subtext && (
-          <div className="text-[10px] truncate" style={{ color: '#92a4c9' }}>{subtext}</div>
+          <div className="text-[10px] text-muted-foreground truncate">{subtext}</div>
         )}
       </div>
     </div>
@@ -107,40 +104,40 @@ export function MetricsSummaryRow() {
         icon={<DollarSign className="w-4 h-4" />}
         label="Cost Today"
         value={`$${metrics.today.totalCost.toFixed(2)}`}
-        color="#4ade80"
+        iconClass="text-success"
       />
       <MetricTile
         icon={<Users className="w-4 h-4" />}
         label="Agents"
         value={`${metrics.today.activeCount} / ${metrics.today.agentCount}`}
         subtext={`${metrics.today.activeCount} active`}
-        color="#60a5fa"
+        iconClass="text-primary"
       />
       <MetricTile
         icon={<AlertTriangle className="w-4 h-4" />}
         label="Stuck"
         value={metrics.today.stuckCount}
         subtext={`${metrics.today.warningCount} warnings`}
-        color={metrics.today.stuckCount > 0 ? '#f87171' : '#92a4c9'}
+        iconClass={metrics.today.stuckCount > 0 ? 'text-destructive' : 'text-muted-foreground'}
       />
       <MetricTile
         icon={<GitBranch className="w-4 h-4" />}
         label="Handoffs"
         value={specialistStats?.todayCount ?? 0}
         subtext={specialistStats ? `${(specialistStats.successRate * 100).toFixed(0)}% success` : undefined}
-        color="#22d3ee"
+        iconClass="text-signal-cost"
       />
       <MetricTile
         icon={<TrendingUp className="w-4 h-4" />}
         label="Escalations"
         value={costEscalations}
-        color="#c084fc"
+        iconClass="text-signal-review"
       />
       <MetricTile
         icon={<Layers className="w-4 h-4" />}
         label="Queue Depth"
         value={specialistStats?.queueDepth ?? 0}
-        color="#fb923c"
+        iconClass="text-warning"
       />
     </div>
   );
