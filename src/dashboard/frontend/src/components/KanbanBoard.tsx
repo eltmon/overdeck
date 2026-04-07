@@ -1897,6 +1897,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (err: Error) => {
+      // If the agent is already running, the store snapshot is just stale — refresh it silently
+      if (err.message.includes('runtime=active') || err.message.includes('status=running')) {
+        setIsResuming(false);
+        queryClient.invalidateQueries({ queryKey: ['agents'] });
+        return;
+      }
       showAlert({ message: `Failed to resume session: ${err.message}`, variant: 'error' });
     },
   });

@@ -219,6 +219,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
     },
     onError: (err: Error) => {
+      // Agent already running — store snapshot is stale, just refresh
+      if (err.message.includes('runtime=active') || err.message.includes('status=running')) {
+        setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 500);
+        return;
+      }
       toast.error(err.message, { duration: 8000 });
     },
   });
