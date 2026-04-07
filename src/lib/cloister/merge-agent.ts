@@ -1119,23 +1119,10 @@ PHASE 1 — SYNC & BASELINE (before merge):
 PHASE 2 — MERGE:
 6. git merge ${sourceBranch}
 7. If clean merge: the merge commit is auto-created (or fast-forward). Skip to Phase 3.
-8. If conflicts: resolve them following these steps EXACTLY:
-   a. For each conflicted file, read it, find all \`<<<<<<<\`, \`=======\`, \`>>>>>>>\` markers,
-      and edit the file to resolve the conflict (keeping the correct code from both sides).
-   b. After resolving EACH file, stage it immediately: \`git add <file>\`
-      CRITICAL: You MUST run \`git add\` for every resolved file. Without this, git still
-      considers the file unmerged and the merge commit will fail.
-   c. If you use a subagent to resolve conflicts, the subagent MUST run \`git add <file>\`
-      after editing each file. Include this instruction explicitly in any subagent prompt.
-   d. After all files are resolved and staged, verify no conflict markers remain:
-      \`grep -rn '<<<<<<< ' src/ tests/ --include='*.ts' --include='*.tsx' --include='*.js'\`
-      (Ignore matches in documentation/prompt files that reference markers as examples.)
-   e. If markers remain, resolve them and \`git add\` again.
-   f. Complete the merge: \`git commit --no-edit\` (uses the auto-generated merge message)
-   g. Verify the commit succeeded: \`git log --oneline -1\` should show a merge commit.
-
-   For .planning/ files: accept the source branch version or delete — these are ephemeral.
-   For .claude/settings.local.json: merge both permission entries.
+8. If conflicts:
+   a. Immediately abort: git merge --abort
+   b. ROLLBACK — report FAILURE with note "Merge conflicts detected — work agent must rebase before merge"
+   c. Do NOT attempt to manually resolve conflicts. The work agent or human must handle this.
 
 PHASE 3 — VERIFY:
 9. Build the project to verify no compile errors:
@@ -1534,13 +1521,11 @@ INSTRUCTIONS:
 1. cd ${workspacePath}
 2. git fetch origin ${baseBranch}
 3. git rebase origin/${baseBranch}
-4. If conflicts during rebase:
-   a. For each conflicted file: read it, resolve the conflict markers (keep the correct content from both sides), then:
-      git add <resolved-file>
-   b. After staging all resolved files: git rebase --continue
-   c. Repeat steps a-b for each commit in the rebase if multiple conflicts arise
-   d. If conflicts are irresolvable: git rebase --abort, then report failure
-5. git push --force-with-lease origin ${featureBranch}
+4. If rebase has ANY conflicts:
+   a. Immediately abort: git rebase --abort
+   b. Report FAILURE — do NOT attempt to resolve conflicts manually
+   c. The work agent or a human must resolve conflicts before merge can proceed
+5. If rebase succeeds cleanly: git push --force-with-lease origin ${featureBranch}
 6. Report completion by calling the Panopticon API:
    curl -s -X POST ${apiUrl}/api/specialists/done \\
      -H "Content-Type: application/json" \\
@@ -1549,10 +1534,17 @@ INSTRUCTIONS:
 IMPORTANT:
 - Work ONLY in ${workspacePath} — do NOT modify the main repo
 - Do NOT run git merge — this is a rebase, not a merge
-- For .planning/ files in conflicts: keep the feature branch (ours) version
 - Do NOT run build or tests — CI handles validation after PR merge
 - Use --force-with-lease (never --force) for the push
 - Report completion immediately after the push
+
+IF REBASE FAILS (conflicts):
+After aborting, report failure so the work agent can fix it:
+\`\`\`bash
+curl -s -X POST ${apiUrl}/api/specialists/done \\
+  -H "Content-Type: application/json" \\
+  -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"Rebase conflicts with main — work agent must run: git fetch origin main && git rebase origin/main, resolve conflicts, then resubmit"}'
+\`\`\`
 
 CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.`;
 
