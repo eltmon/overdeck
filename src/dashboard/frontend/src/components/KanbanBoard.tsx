@@ -29,6 +29,7 @@ import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { DeepWipeDialog } from './DeepWipeDialog';
+import { useUIPreferences } from '../hooks/useUIPreferences';
 
 
 // Difficulty badge colors
@@ -1359,7 +1360,7 @@ function ColumnContent({
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
     const workAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'agent' && a.agentPhase !== 'planning'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase !== 'planning'
     );
     const planningAgent = agents.find(
       (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase === 'planning' && a.status !== 'stopped'
@@ -1725,6 +1726,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const { prefs } = useUIPreferences();
 
   // Auto-scroll into view when selected via search
   useEffect(() => {
@@ -1745,6 +1747,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
   const agent = activeAgent || planningAgent;
+
+  // Compute agent idle duration for "inactive" badge
+  const agentIdleMinutes = (() => {
+    if (!agent?.lastActivity || !isRunning) return 0;
+    const ms = Date.now() - new Date(agent.lastActivity).getTime();
+    return Math.floor(ms / 60000);
+  })();
+  // Show inactive badge when agent hasn't acted in > 30 min (stuck threshold)
+  const isAgentIdle = agentIdleMinutes >= 30;
 
   // Check if issue has "Review Ready" label (agent completed work)
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled
@@ -2040,6 +2051,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Blocked
               </span>
             )}
+            {/* Idle badge — time-based health indicator. Shows when agent hasn't been active for 30+ min */}
+            {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
+                title={`Agent has not been active for ${agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h ${agentIdleMinutes % 60}m` : `${agentIdleMinutes}m`} — Deacon will poke it`}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h idle` : `${agentIdleMinutes}m idle`}
+              </span>
+            )}
             {/* Tracker vs Shadow state badges */}
             {issue.source === 'rally' && <TrackerShadowBadges issue={issue} />}
             {/* Difficulty badge */}
@@ -2047,10 +2068,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               const difficulty = parseDifficultyLabel(issue.labels || []);
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
-            {/* Ready to merge badge — yellow indicator when review+tests passed */}
+            {/* Ready to merge badge — shimmer draws attention to human-action-required state */}
             {isReadyToMerge && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-success text-success-foreground uppercase tracking-wide"
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-success-foreground uppercase tracking-wide ${prefs.readyToMergeShimmer ? 'badge-shimmer-rtm' : 'badge-bg-success'}`}
                 title="Review and tests passed — ready for human merge approval"
               >
                 <GitMerge className="w-3 h-3" />

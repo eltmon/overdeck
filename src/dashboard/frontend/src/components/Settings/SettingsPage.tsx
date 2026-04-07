@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { OpenRouterPage } from './OpenRouterPage';
 import {
   ModelOverrideModal,
@@ -208,6 +209,7 @@ function getModelDisplay(modelId?: string): string {
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
+  const { prefs: uiPrefs, update: updateUIPrefs } = useUIPreferences();
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -1007,6 +1009,37 @@ export function SettingsPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Appearance */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          <Eye className="w-6 h-6 text-primary" />
+          Appearance
+        </h2>
+        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div>
+              <h3 className="text-sm font-bold text-content flex items-center gap-2">
+                <GitMerge className="w-4 h-4 text-success" />
+                Ready to Merge shimmer
+              </h3>
+              <p className="text-xs text-content-muted mt-1">
+                Animate the "READY TO MERGE" badge with a subtle shimmer to draw attention to cards awaiting your merge approval.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={uiPrefs.readyToMergeShimmer}
+              onClick={() => updateUIPrefs({ readyToMergeShimmer: !uiPrefs.readyToMergeShimmer })}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${uiPrefs.readyToMergeShimmer ? 'bg-primary' : 'bg-input'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ${uiPrefs.readyToMergeShimmer ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
         </div>
       </section>
 
