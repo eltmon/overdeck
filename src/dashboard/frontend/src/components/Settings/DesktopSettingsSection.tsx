@@ -14,41 +14,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Monitor, Bell, ToggleLeft, ToggleRight, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// ─── Bridge types ─────────────────────────────────────────────────────────────
+// ─── Bridge types (re-exported for convenience) ───────────────────────────────
 
-interface DesktopSettings {
-  tray: {
-    showBadge: boolean;
-    tooltipDetail: 'minimal' | 'full';
-  };
-  notifications: {
-    inputNeeded: boolean;
-    stuckAgents: boolean;
-    mergeFailures: boolean;
-    workComplete: boolean;
-    planningDone: boolean;
-    mergeReady: boolean;
-  };
-  autoStart: {
-    enabled: boolean;
-    nagCount: number;
-    nagDismissed: boolean;
-  };
-}
-
+type DesktopSettings = PanopticonBridgeDesktopSettings;
 type NotificationEventType = keyof DesktopSettings['notifications'];
-
-interface PanopticonBridge {
-  isDesktopApp(): boolean;
-  getDesktopSettings(): Promise<DesktopSettings>;
-  updateDesktopSetting(key: string, value: unknown): Promise<void>;
-}
-
-declare global {
-  interface Window {
-    panopticonBridge?: PanopticonBridge;
-  }
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

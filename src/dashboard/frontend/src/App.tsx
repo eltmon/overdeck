@@ -16,6 +16,7 @@ import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
+import { CommandPalette } from './components/CommandPalette';
 import { MissionControl } from './components/MissionControl';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
@@ -125,6 +126,7 @@ export default function App() {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
   // Backend health check — poll every 5s so we catch outages quickly
@@ -255,18 +257,70 @@ export default function App() {
     setCurrentConfirmation(null);
   }, []);
 
-  // Global keyboard shortcut for search
+  // Global keyboard shortcuts: / for search, Cmd+K for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+      const isMac = navigator.platform.includes('Mac');
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+      const target = e.target as HTMLElement;
+      const inInput = ['INPUT', 'TEXTAREA'].includes(target.tagName);
+
+      if (e.key === '/' && !inInput) {
         e.preventDefault();
         setIsSearchOpen(true);
+      } else if (e.key === 'k' && isCmdOrCtrl && !e.shiftKey) {
+        e.preventDefault();
+        setIsPaletteOpen((prev) => !prev);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Listen for menu actions from desktop app (open-settings, etc.)
+  useEffect(() => {
+    const bridge = window.panopticonBridge;
+    if (!bridge) return;
+    const unsub = bridge.onMenuAction((action: string) => {
+      if (action === 'open-settings') {
+        setActiveTab('settings');
+      } else if (action.startsWith('open-workspace:')) {
+        const issueId = action.slice('open-workspace:'.length);
+        setActiveTab('kanban');
+        if (issueId) setSelectedIssue(issueId);
+      } else if (action.startsWith('auto-start-nag:')) {
+        // Format: auto-start-nag:<count>:<max>
+        setIsPaletteOpen(false);
+        // Let the nag toast be handled below
+        const parts = action.split(':');
+        const count = parseInt(parts[1] ?? '0', 10);
+        const max = parseInt(parts[2] ?? '5', 10);
+        showAutoStartNag(count, max);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Auto-start nag toast for desktop app (launched 2-5 times without enabling)
+  function showAutoStartNag(count: number, max: number): void {
+    const messages = [
+      "Auto-start means never missing an agent asking for help.",
+      "Your agents could be waiting for you right now.",
+      "Panopticon works best when it's always watching.",
+      "One click enables auto-start. You can disable it anytime.",
+    ];
+    const msg = messages[(count - 2) % messages.length] ?? messages[0];
+    toast(`Reminder ${count} of ${max} — ${msg}`, {
+      duration: 8_000,
+      action: {
+        label: 'Enable',
+        onClick: () => {
+          void window.panopticonBridge?.updateDesktopSetting('autoStart.enabled', true);
+        },
+      },
+    });
+  }
 
   const handleSelectIssueFromSearch = useCallback((issueId: string) => {
     setSelectedIssue(issueId);
@@ -455,6 +509,16 @@ export default function App() {
         onSelectIssue={handleSelectIssueFromSearch}
         cycleFilter="current"
         includeCompletedFilter={false}
+      />
+
+      {/* Command Palette — Cmd+K / Ctrl+K */}
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        onNavigate={(tab, issueId) => {
+          setActiveTab(tab as Tab);
+          if (issueId) setSelectedIssue(issueId);
+        }}
       />
 
       {/* Toast Notifications */}
