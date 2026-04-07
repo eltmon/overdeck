@@ -8,12 +8,12 @@
   "plan": {
     "id": "pan-512",
     "title": "Effect yield* failures not caught by JS try/catch — audit all agent route Effect.gen blocks",
-    "status": "approved",
+    "status": "completed",
     "uid": "56561b7c-9181-491b-8cc9-6c3955995da5",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-06T22:30:00.000Z",
-    "updated": "2026-04-06T22:30:00.000Z",
+    "updated": "2026-04-07T03:40:00.000Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/512", "label": "PAN-512", "type": "issue" }
     ],
@@ -26,7 +26,8 @@
       {
         "id": "fix-agents",
         "title": "Fix 5 try/catch-around-yield* instances in routes/agents.ts",
-        "status": "pending",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
         "priority": "high",
         "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
@@ -40,19 +41,22 @@
           {
             "id": "fix-agents.ac1",
             "title": "No JS try/catch blocks contain yield* calls in agents.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-agents.ac2",
             "title": "Agent start route still gracefully handles tmux kill-session failure (no existing session)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-agents.ac3",
             "title": "Docker availability check still sets dockerRunning=false on failure instead of crashing",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -60,7 +64,8 @@
       {
         "id": "fix-workspaces",
         "title": "Fix 9 try/catch-around-yield* instances in routes/workspaces.ts",
-        "status": "pending",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
         "priority": "high",
         "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
@@ -74,19 +79,22 @@
           {
             "id": "fix-workspaces.ac1",
             "title": "No JS try/catch blocks contain yield* calls in workspaces.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-workspaces.ac2",
             "title": "Container control retry loop still tries multiple service names on failure",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-workspaces.ac3",
             "title": "Docker-not-running check still returns 400 JSON error (not 500)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -94,7 +102,8 @@
       {
         "id": "fix-mission-control",
         "title": "Fix 2 try/catch-around-yield* instances in routes/mission-control.ts",
-        "status": "pending",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
         "priority": "medium",
         "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
@@ -108,7 +117,8 @@
           {
             "id": "fix-mission-control.ac1",
             "title": "No JS try/catch blocks contain yield* calls in mission-control.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -116,7 +126,8 @@
       {
         "id": "fix-specialists",
         "title": "Fix 1 try/catch-around-yield* instance in routes/specialists.ts",
-        "status": "pending",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
         "priority": "medium",
         "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
@@ -130,7 +141,8 @@
           {
             "id": "fix-specialists.ac1",
             "title": "No JS try/catch blocks contain yield* calls in specialists.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -138,7 +150,8 @@
       {
         "id": "eslint-rule",
         "title": "Add ESLint rule to prevent try/catch around yield* in Effect.gen",
-        "status": "pending",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
         "priority": "high",
         "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
@@ -152,13 +165,15 @@
           {
             "id": "eslint-rule.ac1",
             "title": "ESLint config contains a rule that flags try { yield* } catch inside generators",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "eslint-rule.ac2",
             "title": "npm run lint passes with all 17 instances fixed",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -166,7 +181,8 @@
       {
         "id": "quality-gates",
         "title": "Verify typecheck, lint, and tests pass",
-        "status": "pending",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
         "priority": "high",
         "created": "2026-04-06T22:30:00.000Z",
         "metadata": {
@@ -180,19 +196,22 @@
           {
             "id": "quality-gates.ac1",
             "title": "npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "quality-gates.ac2",
             "title": "npm run lint passes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "quality-gates.ac3",
             "title": "npm test passes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
