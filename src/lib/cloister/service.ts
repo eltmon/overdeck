@@ -259,6 +259,87 @@ export class CloisterService {
       console.error('  ✗ Failed to clear stale specialist currentIssue states:', error);
     }
 
+    // PAN-511: Startup recovery for orphaned reviewStatus='reviewing' issues.
+    // If Cloister crashes after reviewStatus was set to 'reviewing' but before the specialist
+    // completes (or if Fix 1 wasn't in place and status was set pre-dispatch), the issue is
+    // stuck. On startup, find such issues and re-queue the review dispatch so work continues.
+    try {
+      const reviewStatuses = loadReviewStatuses();
+      const orphanedReviewing: string[] = [];
+      for (const [issueId, status] of Object.entries(reviewStatuses)) {
+        if (status.reviewStatus !== 'reviewing') continue;
+        // Skip if review already passed (history is ground truth)
+        const hasPassedReview = status.history?.some(
+          (h: { type: string; status: string }) => h.type === 'review' && h.status === 'passed'
+        );
+        if (hasPassedReview) continue;
+        orphanedReviewing.push(issueId);
+      }
+
+      if (orphanedReviewing.length > 0) {
+        console.log(`  ⚠ Found ${orphanedReviewing.length} issue(s) with orphaned reviewStatus='reviewing'`);
+        const { resolveProjectFromIssue } = await import('../projects.js');
+        const { submitToSpecialistQueue, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+
+        // Build set of issue IDs actively being reviewed by a running specialist
+        const activeReviewIssues = new Set<string>();
+        try {
+          const projSpecs = await getAllProjectSpecialistStatuses();
+          for (const ps of projSpecs) {
+            if (ps.specialistType !== 'review-agent' || !ps.isRunning) continue;
+            const rs = getAgentRuntimeState(ps.tmuxSession);
+            if (rs?.state === 'active' && rs.currentIssue) {
+              activeReviewIssues.add(rs.currentIssue.toUpperCase());
+            }
+          }
+          // Also check global review-agent session
+          const globalSession = getTmuxSessionName('review-agent');
+          const globalRs = getAgentRuntimeState(globalSession);
+          if (globalRs?.state === 'active' && globalRs.currentIssue) {
+            activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
+          }
+        } catch {
+          // Non-fatal: if we can't check active sessions, re-queue all
+        }
+
+        for (const issueId of orphanedReviewing) {
+          if (activeReviewIssues.has(issueId.toUpperCase())) {
+            console.log(`  ✓ ${issueId}: review specialist is active — no recovery needed`);
+            continue;
+          }
+
+          const agentId = `agent-${issueId.toLowerCase()}`;
+          const agentState = getAgentState(agentId);
+          const workspace = agentState?.workspace;
+
+          if (!workspace) {
+            console.log(`  ⚠ ${issueId}: orphaned reviewing but no workspace found — resetting to pending`);
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+            continue;
+          }
+
+          const resolved = resolveProjectFromIssue(issueId);
+          if (!resolved) {
+            console.log(`  ⚠ ${issueId}: orphaned reviewing but no project configured — resetting to pending`);
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+            continue;
+          }
+
+          const branch = `feature/${issueId.toLowerCase()}`;
+          submitToSpecialistQueue('review-agent', {
+            priority: 'high',
+            source: 'startup-recovery',
+            issueId,
+            workspace,
+            branch,
+          });
+          console.log(`  ✓ Queued recovery review dispatch for ${issueId} (project: ${resolved.projectKey})`);
+        }
+      }
+    } catch (error) {
+      console.error('  ✗ Failed to recover orphaned reviewing issues:', error);
+    }
+
     // PAN-378: Global specialists removed — per-project ephemeral specialists handle all work.
     // No initialization needed; specialists are spawned on-demand via spawnEphemeralSpecialist().
     console.log('  → Specialists: per-project ephemeral mode (no global pool)');

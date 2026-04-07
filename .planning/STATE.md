@@ -3,13 +3,12 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-6t6 (fix atomicity: reviewStatus=reviewing only after dispatch)
+Implementing bead feature-pan-489-d8c (startup recovery: re-dispatch orphaned reviewing issues)
 
 ## Completed Work
-(none yet — first bead in progress)
+- [x] feature-pan-489-6t6: Fix atomicity — set reviewStatus=reviewing only after specialist dispatch in /review and /request-review routes (commit: 4e637b79)
 
 ## Remaining Work
-- [ ] feature-pan-489-6t6: Fix atomicity — set reviewStatus=reviewing only after specialist dispatch in /review and /request-review routes
 - [ ] feature-pan-489-d8c: Add startup recovery — re-dispatch orphaned reviewStatus=reviewing issues on Cloister start
 - [ ] feature-pan-489-1nf: Fix stale specialist state — handle active-but-not-running specialist in spawnEphemeralSpecialist
 
