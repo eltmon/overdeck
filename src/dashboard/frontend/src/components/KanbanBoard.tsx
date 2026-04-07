@@ -422,15 +422,15 @@ function FeatureCard({
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
   return (
-    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-indigo-500 overflow-hidden">
+    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-primary overflow-hidden">
       <div
         onClick={onToggle}
-        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-indigo-900/20 transition-colors"
+        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
       >
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+          <ChevronDown className="w-4 h-4 text-primary/70 shrink-0 mt-0.5" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+          <ChevronRight className="w-4 h-4 text-primary/70 shrink-0 mt-0.5" />
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -445,7 +445,7 @@ function FeatureCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-xs font-medium text-indigo-300 hover:text-indigo-200 flex items-center gap-1"
+              className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1"
             >
               <span>{feature.identifier}</span>
               <ExternalLink className="w-2.5 h-2.5 opacity-50" />
@@ -472,7 +472,7 @@ function FeatureCard({
                 <span className="text-xs text-content-muted">
                   {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
                 </span>
-                <span className="text-xs text-indigo-400">
+                <span className="text-xs text-primary/70">
                   {childCount} in column
                 </span>
               </div>
@@ -1437,7 +1437,7 @@ function ColumnContent({
               onToggle={() => toggleFeature(feature.identifier)}
             />
             {isExpanded && (
-              <div className="ml-3 border-l-2 border-indigo-700/30 pl-1">
+              <div className="ml-3 border-l-2 border-primary/20 pl-1">
                 {group.children.map(child => (
                   <CompactChildCard
                     key={child.id}
@@ -2325,7 +2325,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Done items - Reopen + Close Out + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30 flex-wrap">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-success/30 flex-wrap">
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
             className="flex items-center gap-1 text-xs text-success-foreground hover:text-success-foreground/80 transition-colors"
@@ -2595,7 +2595,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   if (inline) return content;
 
   return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-success/30">
       {content}
     </div>
   );

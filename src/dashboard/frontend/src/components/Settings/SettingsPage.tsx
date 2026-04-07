@@ -262,7 +262,7 @@ export function SettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -270,7 +270,7 @@ export function SettingsPage() {
   if (error || !formData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-400">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
+        <div className="text-destructive">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
       </div>
     );
   }
@@ -406,7 +406,7 @@ export function SettingsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 mb-1">
-            <Settings className="w-8 h-8 text-blue-400" />
+            <Settings className="w-8 h-8 text-primary" />
             <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
           </div>
           <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
@@ -415,29 +415,29 @@ export function SettingsPage() {
 
       {/* Deprecation Warning Banner */}
       {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-6">
+        <div className="badge-bg-warning border badge-border-warning rounded-xl px-4 py-3 mb-6">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <AlertTriangle className="w-6 h-6 text-warning shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-amber-400 font-semibold mb-2">
+              <p className="text-warning font-semibold mb-2">
                 Deprecated Model IDs Detected
               </p>
               <div className="space-y-1">
                 {formData.deprecation_warnings.map((warning, idx) => (
-                  <p key={idx} className="text-amber-400/90 text-sm">
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">{warning.workType}</span>
+                  <p key={idx} className="text-warning/90 text-sm">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded">{warning.workType}</span>
                     {': '}
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded line-through">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded line-through">
                       {warning.from}
                     </span>
                     {' → '}
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded">
                       {warning.to}
                     </span>
                   </p>
                 ))}
               </div>
-              <p className="text-amber-400/80 text-xs mt-3">
+              <p className="text-warning/80 text-xs mt-3">
                 Click <span className="font-semibold">Save</span> to automatically migrate to current model IDs. A backup will be created before migration.
               </p>
             </div>
@@ -457,12 +457,12 @@ export function SettingsPage() {
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
                     <Terminal className="w-5 h-5 text-content-subtle" />
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-blue-500 to-divider-strong mx-2" />
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-primary to-divider-strong mx-2" />
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <User className="w-5 h-5 text-blue-400" />
+                    <User className="w-5 h-5 text-primary" />
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-blue-500 to-divider mx-2" />
-                  <div className="size-12 rounded-lg bg-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-primary to-divider mx-2" />
+                  <div className="size-12 rounded-lg bg-primary flex items-center justify-center shadow-lg">
                     <Zap className="w-5 h-5 text-content" />
                   </div>
                 </div>
@@ -476,7 +476,7 @@ export function SettingsPage() {
             {/* Content */}
             <div className="lg:w-3/5 p-8">
               <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider rounded border border-blue-500/20">Active</span>
+                <span className="px-2 py-0.5 badge-bg-primary text-primary text-[10px] font-bold uppercase tracking-wider rounded border badge-border-primary">Active</span>
                 <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
               </div>
               <p className="text-content-muted mb-6 leading-relaxed">
@@ -484,14 +484,14 @@ export function SettingsPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
+                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Capability Matching</p>
                     <p className="text-xs text-content-muted">Best model for each task type</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
+                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Cost Optimization</p>
                     <p className="text-xs text-content-muted">Balance performance vs spend</p>
@@ -520,13 +520,13 @@ export function SettingsPage() {
                 key={provider.id}
                 className={`bg-surface-raised border rounded-xl p-5 relative transition-colors shadow-sm ${
                   isDefault
-                    ? 'border-blue-500/50 shadow-lg shadow-blue-500/5'
+                    ? 'border-primary/50 shadow-lg shadow-primary/5'
                     : 'border-divider hover:border-divider-strong'
                 }`}
               >
                 {isDefault && (
                   <div className="absolute -top-3 right-4">
-                    <span className="bg-blue-500 text-content text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
+                    <span className="bg-primary text-primary-foreground text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
                       Default
                     </span>
                   </div>
@@ -541,7 +541,7 @@ export function SettingsPage() {
                       onClick={() => handleProviderToggle(provider.id)}
                       disabled={isDefault}
                       className={`w-10 h-5 rounded-full relative transition-colors ${
-                        isEnabled ? 'bg-blue-500' : 'bg-surface-emphasis'
+                        isEnabled ? 'bg-primary' : 'bg-surface-emphasis'
                       } ${isDefault ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <div
@@ -557,12 +557,12 @@ export function SettingsPage() {
                     <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
                     {/* Check if it's an unresolved env var reference */}
                     {apiKey.startsWith('$') ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
+                      <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 text-warning text-xs">
                           <AlertTriangle className="w-4 h-4" />
                           <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
                         </div>
-                        <p className="text-[10px] text-amber-400/70 mt-1">
+                        <p className="text-[10px] text-warning/70 mt-1">
                           Set this environment variable or enter the key directly below
                         </p>
                         <input
@@ -570,7 +570,7 @@ export function SettingsPage() {
                           placeholder={provider.placeholder}
                           onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                           autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                       </div>
                     ) : (
@@ -588,7 +588,7 @@ export function SettingsPage() {
                           data-lpignore="true"
                           data-1p-ignore="true"
                           data-form-type="other"
-                          className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                          className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary ${
                             isDefault ? 'cursor-not-allowed text-content-muted' : 'text-content-body'
                           }`}
                         />
@@ -614,7 +614,7 @@ export function SettingsPage() {
                       {apiKey && !apiKey.startsWith('$') && (
                         <button
                           onClick={() => setModelsModalProvider(provider.id)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-xs text-blue-400 transition-colors w-full"
+                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 badge-bg-primary hover:bg-primary/20 border badge-border-primary rounded-lg text-xs text-primary transition-colors w-full"
                         >
                           <BarChart3 className="w-3.5 h-3.5" />
                           View Models
@@ -636,7 +636,7 @@ export function SettingsPage() {
                             Test 2+3
                           </button>
                           {testResults[provider.id] && (
-                            <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-green-400' : 'text-red-400'}`}>
+                            <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-success' : 'text-destructive'}`}>
                               {testResults[provider.id]?.success ? (
                                 <CheckCircle className="w-3.5 h-3.5" />
                               ) : (
@@ -703,8 +703,8 @@ export function SettingsPage() {
                   <div className="relative">
                     <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key / Token</label>
                     {trackerKey.startsWith('$') ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
+                      <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 text-warning text-xs">
                           <AlertTriangle className="w-4 h-4" />
                           <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{trackerKey}</code></span>
                         </div>
@@ -713,7 +713,7 @@ export function SettingsPage() {
                           placeholder={tracker.placeholder}
                           onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
                           autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                       </div>
                     ) : (
@@ -730,7 +730,7 @@ export function SettingsPage() {
                           data-lpignore="true"
                           data-1p-ignore="true"
                           data-form-type="other"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                         <button
                           onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
@@ -805,36 +805,36 @@ export function SettingsPage() {
                           ? 'opacity-50 bg-surface-emphasis border-divider cursor-not-allowed'
                           : `cursor-pointer ${
                             isDeprecated
-                              ? 'bg-amber-500/10 border-amber-500/50 hover:border-amber-500/70 hover:bg-amber-500/15'
+                              ? 'badge-bg-warning border-warning/50 hover:border-warning/70 hover:bg-warning/15'
                               : isGoodFit
-                                ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+                                ? 'badge-bg-success border-success/30 hover:border-success/50 hover:bg-success/10'
                                 : isOkFit
-                                  ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
-                                  : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
+                                  ? 'badge-bg-warning border-warning/30 hover:border-warning/50 hover:bg-warning/10'
+                                  : 'badge-bg-destructive border-destructive/30 hover:border-destructive/50 hover:bg-destructive/10'
                             }`
                       }`}
                     >
                       {isDeprecated && (
                         <div className="absolute top-1 right-1">
-                          <span className="bg-amber-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                          <span className="bg-warning text-foreground text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
                             DEPRECATED
                           </span>
                         </div>
                       )}
                       {!agent.implemented && (
                         <div className="absolute top-1 right-1">
-                          <span className="bg-gray-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                          <span className="bg-muted-foreground text-foreground text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
                             NOT YET IMPLEMENTED
                           </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between mb-2">
                         <agent.icon className={`w-4 h-4 ${
-                          isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                          isDeprecated ? 'text-warning' : isGoodFit ? 'text-success' : isOkFit ? 'text-warning' : 'text-destructive'
                         }`} />
                         {agent.implemented && (
                           <span className={`text-[9px] font-bold ${
-                            isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                            isDeprecated ? 'text-warning' : isGoodFit ? 'text-success' : isOkFit ? 'text-warning' : 'text-destructive'
                           }`}>
                             {Math.round(score * 100)}%
                           </span>
@@ -853,8 +853,8 @@ export function SettingsPage() {
                               title={`${CAPABILITY_INFO[cap].name}: ${hasIt ? 'Model has this' : 'Model missing this'}`}
                               className={`text-[8px] px-1 py-0.5 rounded ${
                                 hasIt
-                                  ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-rose-500/20 text-rose-400'
+                                  ? 'badge-bg-success text-success-foreground'
+                                  : 'badge-bg-destructive text-destructive-foreground'
                               }`}
                             >
                               {CAPABILITY_INFO[cap].name}
@@ -900,7 +900,7 @@ export function SettingsPage() {
                 }
               }}
               disabled={clearingCache}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-amber-500/50 hover:bg-amber-500/10 text-content-muted hover:text-amber-400 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-warning/50 hover:bg-warning/10 text-content-muted hover:text-warning transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {clearingCache ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
@@ -915,21 +915,21 @@ export function SettingsPage() {
           <div className="flex items-center gap-2 text-content-muted text-sm">
             {saveMutation.isSuccess && (
               <>
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                <span className="text-green-400">Settings saved!</span>
+                <CheckCircle className="w-4 h-4 text-success" />
+                <span className="text-success">Settings saved!</span>
               </>
             )}
             {saveMutation.isError && (
               <>
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span className="text-red-400">Error saving settings</span>
+                <AlertTriangle className="w-4 h-4 text-destructive" />
+                <span className="text-destructive">Error saving settings</span>
               </>
             )}
           </div>
           <div className="flex gap-4">
             <button
               onClick={handleRestoreOptimalDefaults}
-              className="px-6 py-2 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              className="px-6 py-2 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
               title="Set all model assignments to research-based optimal defaults"
             >
               <Zap className="w-4 h-4" />
@@ -945,7 +945,7 @@ export function SettingsPage() {
             <button
               onClick={handleSave}
               disabled={!hasChanges || saveMutation.isPending}
-              className="px-8 py-2 bg-blue-500 hover:bg-blue-400 text-content font-black rounded-lg transition-all shadow-lg shadow-blue-500/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-lg shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               Save Changes
@@ -978,7 +978,7 @@ export function SettingsPage() {
               <div className="flex items-center gap-3">
                 {(() => {
                   const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
-                  return Icon ? <Icon className="w-5 h-5 text-blue-400" /> : null;
+                  return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
                 })()}
                 <h3 className="text-content text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
@@ -1010,8 +1010,8 @@ export function SettingsPage() {
                 if (isEnvVarRef) {
                   return (
                     <div className="text-center py-8">
-                      <AlertTriangle className="w-10 h-10 text-amber-500 mb-2 mx-auto" />
-                      <p className="text-amber-400">API key configured via environment variable</p>
+                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
+                      <p className="text-warning">API key configured via environment variable</p>
                       <p className="text-content-muted text-sm mt-1">
                         <code className="font-mono bg-surface-overlay px-1 rounded">{providerApiKey}</code> is not set
                       </p>
@@ -1042,9 +1042,9 @@ export function SettingsPage() {
                               <h4 className="text-content font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                  model.tier === 'premium' ? 'bg-purple-500/20 text-purple-400' :
-                                  model.tier === 'balanced' ? 'bg-blue-500/20 text-blue-400' :
-                                  'bg-emerald-500/20 text-emerald-400'
+                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
+                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
+                                  'badge-bg-success text-success-foreground'
                                 }`}>
                                   {model.tier}
                                 </span>
@@ -1068,7 +1068,7 @@ export function SettingsPage() {
                             <button
                               onClick={() => handleTestModel(modelsModalProvider, model.id)}
                               disabled={isTesting}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
                             >
                               {isTesting ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -1078,7 +1078,7 @@ export function SettingsPage() {
                               Test 2+3
                             </button>
                             {testResult && (
-                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
                                 {testResult.success ? (
                                   <CheckCircle className="w-3.5 h-3.5" />
                                 ) : (

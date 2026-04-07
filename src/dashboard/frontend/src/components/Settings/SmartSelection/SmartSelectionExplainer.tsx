@@ -53,28 +53,28 @@ export function SmartSelectionExplainer() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="bg-surface rounded-lg p-3 border border-divider">
               <div className="flex items-center gap-2 mb-1">
-                <span className="material-symbols-outlined text-amber-400 text-base">architecture</span>
+                <span className="material-symbols-outlined text-warning text-base">architecture</span>
                 <span className="font-medium">Planning & Architecture</span>
               </div>
               <p className="text-content-muted">Claude Opus 4.6 - Best for complex reasoning</p>
             </div>
             <div className="bg-surface rounded-lg p-3 border border-divider">
               <div className="flex items-center gap-2 mb-1">
-                <span className="material-symbols-outlined text-blue-400 text-base">code</span>
+                <span className="material-symbols-outlined text-primary text-base">code</span>
                 <span className="font-medium">Code Generation</span>
               </div>
               <p className="text-content-muted">Kimi K2.5 or Claude Sonnet - Excellent coding capability</p>
             </div>
             <div className="bg-surface rounded-lg p-3 border border-divider">
               <div className="flex items-center gap-2 mb-1">
-                <span className="material-symbols-outlined text-green-400 text-base">speed</span>
+                <span className="material-symbols-outlined text-success text-base">speed</span>
                 <span className="font-medium">Quick Commands</span>
               </div>
               <p className="text-content-muted">Fast models prioritized for responsive interaction</p>
             </div>
             <div className="bg-surface rounded-lg p-3 border border-divider">
               <div className="flex items-center gap-2 mb-1">
-                <span className="material-symbols-outlined text-red-400 text-base">security</span>
+                <span className="material-symbols-outlined text-destructive text-base">security</span>
                 <span className="font-medium">Security Review</span>
               </div>
               <p className="text-content-muted">Premium models only - security is non-negotiable</p>

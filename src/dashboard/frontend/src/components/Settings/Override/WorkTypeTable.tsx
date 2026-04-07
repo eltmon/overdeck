@@ -73,7 +73,7 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
                   {isOverridden ? (
                     <button
                       onClick={() => onRemoveOverride(workType.id)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
+                      className="text-destructive hover:text-destructive/80 transition-colors"
                       title="Remove override"
                     >
                       <X className="w-4 h-4" />
