@@ -91,7 +91,30 @@ async function respondToConfirmation(id: string, confirmed: boolean): Promise<vo
 
 export default function App() {
   const [activeTab, setActiveTabState] = useState<Tab>(getTabFromPath);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgentState] = useState<string | null>(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#agent=')) return decodeURIComponent(hash.slice(7));
+    return null;
+  });
+  const setSelectedAgent = useCallback((id: string | null) => {
+    setSelectedAgentState(id);
+    if (id) {
+      window.history.replaceState(null, '', `${window.location.pathname}#agent=${encodeURIComponent(id)}`);
+    } else {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+  // Sync deep-link on hash change (browser back/forward or direct navigation)
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#agent=')) {
+        setSelectedAgentState(decodeURIComponent(hash.slice(7)));
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -302,14 +325,18 @@ export default function App() {
         )}
         {activeTab === 'agents' && (
           <BootstrapGate fallback={<AgentListSkeleton />}>
-            <div className="p-6 w-full">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="flex w-full h-full overflow-hidden">
+              <div className={`${selectedAgent ? 'w-1/2 lg:w-5/12' : 'w-full'} overflow-y-auto p-6`}>
                 <AgentList
                   selectedAgent={selectedAgent}
                   onSelectAgent={setSelectedAgent}
                 />
-                {selectedAgent && <AgentOutputPanel agentId={selectedAgent} />}
               </div>
+              {selectedAgent && (
+                <div className="flex-1 min-w-0 h-full flex flex-col border-l border-divider">
+                  <AgentOutputPanel agentId={selectedAgent} />
+                </div>
+              )}
             </div>
           </BootstrapGate>
         )}

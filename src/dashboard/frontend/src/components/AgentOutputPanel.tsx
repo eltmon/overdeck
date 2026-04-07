@@ -70,12 +70,12 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
 
   // Live XTerminal for all sessions (agents and specialists)
   return (
-    <div className="bg-surface-raised rounded-lg h-full flex flex-col">
-      <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-divider flex items-center gap-2 shrink-0 bg-surface-raised">
         <Terminal className="w-4 h-4 text-green-400" />
         <span className="font-medium text-content text-sm">{agentId}</span>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <XTerminal sessionName={agentId} />
       </div>
     </div>
