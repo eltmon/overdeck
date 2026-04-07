@@ -166,7 +166,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     queryKey: ['prd', issueId],
     queryFn: async () => {
       try {
-        const res = await fetch(`/api/mission-control/planning/${issueId}`);
+        const res = await fetch(`/api/command-deck/planning/${issueId}`);
         if (!res.ok) return null;
         const data = await res.json();
         return data.prd || null;

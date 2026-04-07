@@ -25,7 +25,7 @@ interface ProjectData {
 }
 
 async function fetchProjects(): Promise<ProjectData[]> {
-  const res = await fetch('/api/mission-control/projects');
+  const res = await fetch('/api/command-deck/projects');
   if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
@@ -66,7 +66,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   const currentWidth = useRef(sidebarWidth);
 
   const { data: projects = [], isLoading } = useQuery({
-    queryKey: ['mission-control-projects'],
+    queryKey: ['command-deck-projects'],
     queryFn: fetchProjects,
     refetchInterval: 10000,
   });
@@ -184,7 +184,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
         {/* Sidebar: Project Tree */}
         <div className={styles.sidebar} style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>Mission Control</h2>
+            <h2 className={styles.sidebarTitle}>Command Deck</h2>
             <p className={styles.sidebarSubtitle}>Active features across projects</p>
           </div>
 

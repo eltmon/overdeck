@@ -207,7 +207,7 @@ export function OpenRouterPage({
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-semibold text-sm text-text-primary">Model Catalog</h4>
           <span className="text-xs text-text-muted">
-            Star models to add them to Mission Control's model picker
+            Star models to add them to Command Deck's model picker
           </span>
         </div>
         <OpenRouterModelBrowser
