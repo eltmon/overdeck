@@ -2169,6 +2169,16 @@ async function checkWorkspaceContainerHealth(): Promise<string[]> {
             const msg = `[deacon] Container ${name} exceeded max restarts (${CONTAINER_RESTART_MAX_COUNT}) — giving up`;
             console.warn(msg);
             actions.push(msg);
+            // PAN-464: Alert agent that the container gave up — manual intervention required
+            try {
+              await sendKeysAsync(
+                agentId,
+                `⚠️  Deacon alert: container "${name}" has crashed ${CONTAINER_RESTART_MAX_COUNT} times and auto-restart gave up. The UAT environment at feature-${issueLower}.pan.localhost may be broken. Manual intervention required — check docker logs or re-containerize.`,
+                'deacon:container-gave-up',
+              );
+            } catch {
+              // Agent may not be interactive (e.g., waiting for input) — non-fatal
+            }
             continue;
           }
         }
@@ -2201,8 +2211,28 @@ async function checkWorkspaceContainerHealth(): Promise<string[]> {
         const msg = `[deacon] Auto-restarted crashed container ${name} (attempt ${count}/${CONTAINER_RESTART_MAX_COUNT})`;
         console.log(msg);
         actions.push(msg);
+        // PAN-464: Alert agent that its container crashed and was restarted
+        try {
+          await sendKeysAsync(
+            agentId,
+            `ℹ️  Deacon: container "${name}" crashed and was auto-restarted (attempt ${count}/${CONTAINER_RESTART_MAX_COUNT}). The UAT environment should recover in ~30s. No action needed unless this keeps happening.`,
+            'deacon:container-restarted',
+          );
+        } catch {
+          // Agent may not be interactive — non-fatal
+        }
       } catch (restartErr: any) {
         console.warn(`[deacon] Failed to restart ${name}: ${restartErr.message}`);
+        // PAN-464: Alert agent that restart failed
+        try {
+          await sendKeysAsync(
+            agentId,
+            `⚠️  Deacon alert: container "${name}" crashed and restart failed (${(restartErr as Error).message}). The UAT environment at feature-${issueLower}.pan.localhost is likely broken.`,
+            'deacon:container-restart-failed',
+          );
+        } catch {
+          // Non-fatal
+        }
       }
     }
 

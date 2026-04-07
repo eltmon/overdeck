@@ -3,13 +3,13 @@
 ## Status: In Progress
 
 ## Current Phase
-Bead 1 implemented. Committing and closing bead, then moving to bead 2 (agent alerting).
+Bead 2 implemented. Committing and closing bead, then moving to bead 3 (unit tests).
 
 ## Completed Work
-- [x] feature-pan-489-ipe: Add restart backoff + tracking + orphaned process cleanup to checkWorkspaceContainerHealth() (commit: TBD)
+- [x] feature-pan-489-ipe: Add restart backoff + tracking + orphaned process cleanup to checkWorkspaceContainerHealth() (commit: 5719bccf)
+- [x] feature-pan-489-2ug: Alert agent via tmux on crash (restart notification + gave-up warning + restart-failed alert) (commit: TBD)
 
 ## Remaining Work
-- [ ] feature-pan-489-2ug: Alert agent via tmux when its workspace container crashes
 - [ ] feature-pan-489-38u: Add unit tests for container health backoff and agent alerting
 
 ## Key Decisions
