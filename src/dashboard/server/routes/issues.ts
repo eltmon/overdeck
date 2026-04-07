@@ -849,8 +849,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     }
 
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
-    const gitPushed = yield* Effect.promise(async (): Promise<boolean> => {
-      if (!projectPath) return false;
+    const { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
+      if (!projectPath) return { pushed: false, beadsWarning: null };
 
       const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
@@ -859,7 +859,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       if (existsSync(workspacePlanningDir)) planningDir = workspacePlanningDir;
       else if (existsSync(legacyPlanningDir)) planningDir = legacyPlanningDir;
 
-      if (!planningDir) return false;
+      if (!planningDir) return { pushed: false, beadsWarning: null };
 
       try {
         const gitRoot = planningDir.includes('/workspaces/')
@@ -867,6 +867,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           : projectPath;
 
         // Create beads from vBRIEF plan if available
+        let beadsWarning: string | null = null;
         const { findPlan } = await import('../../../lib/vbrief/io.js');
         const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
         if (findPlan(gitRoot)) {
@@ -875,7 +876,15 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
             if (beadsResult.created.length > 0) {
               console.log(`[complete-planning] Created ${beadsResult.created.length} beads from vBRIEF plan`);
             }
+            if (!beadsResult.success || beadsResult.errors.length > 0) {
+              const detail = beadsResult.errors.length > 0
+                ? beadsResult.errors[0]
+                : 'Beads creation did not complete successfully';
+              beadsWarning = `Beads tasks were not created: ${detail}. Start Agent will attempt recovery, or re-run planning to regenerate.`;
+              console.warn(`[complete-planning] createBeadsFromVBrief warning: ${beadsWarning}`);
+            }
           } catch (vbriefErr: any) {
+            beadsWarning = `Beads tasks were not created: ${vbriefErr.message}. Start Agent will attempt recovery, or re-run planning to regenerate.`;
             console.warn(`[complete-planning] createBeadsFromVBrief failed: ${vbriefErr.message}`);
           }
         }
@@ -933,15 +942,15 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           if (remotes.trim()) {
             const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
             pushChild.unref();
-            return true;
+            return { pushed: true, beadsWarning };
           } else {
-            return true;
+            return { pushed: true, beadsWarning };
           }
         } catch { /* Non-fatal */ }
       } catch (gitErr) {
         console.error('Git commit/push failed:', gitErr);
       }
-      return false;
+      return { pushed: false, beadsWarning: null };
     });
 
     // Update Linear/GitHub issue state
@@ -1002,6 +1011,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       issueId: id,
       newState,
       gitPushed,
+      ...(beadsWarning ? { beadsWarning } : {}),
       message: gitPushed
         ? 'Planning complete and pushed to git - ready for execution'
         : 'Planning complete - ready for execution',

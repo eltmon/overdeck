@@ -1469,6 +1469,206 @@ Report any issues or conflicts you encountered.`;
 }
 
 /**
+ * Rebase a feature branch onto a base branch and push, using the merge-agent
+ * specialist for conflict resolution.
+ *
+ * Used by the PR-based merge flow: triggerMerge() calls this to prepare the
+ * feature branch, then calls `gh pr merge --squash` once the rebase is done.
+ */
+export async function spawnRebaseAgentForBranch(
+  workspacePath: string,
+  featureBranch: string,
+  baseBranch: string,
+  issueId: string,
+): Promise<MergeResult> {
+  console.log(`[merge-agent] Starting rebase of ${featureBranch} onto ${baseBranch} for ${issueId}`);
+  logActivity('rebase_start', `Rebasing ${featureBranch} onto ${baseBranch} for ${issueId}`);
+
+  // Pre-flight: verify feature branch is pushed to remote
+  try {
+    const { stdout: remoteBranches } = await execAsync(
+      `git ls-remote --heads origin ${featureBranch}`,
+      { cwd: workspacePath, encoding: 'utf-8' },
+    );
+    if (!remoteBranches.trim()) {
+      const message = `Branch ${featureBranch} is not pushed to remote`;
+      console.error(`[merge-agent] ${message}`);
+      return { success: false, reason: message };
+    }
+  } catch {
+    const message = `Cannot verify remote branch ${featureBranch}`;
+    console.error(`[merge-agent] ${message}`);
+    return { success: false, reason: message };
+  }
+
+  // Record current remote HEAD of feature branch to detect rebase completion
+  let headBefore: string;
+  try {
+    await execAsync(`git fetch origin ${featureBranch}`, { cwd: workspacePath, encoding: 'utf-8' });
+    const { stdout } = await execAsync(`git rev-parse origin/${featureBranch}`, {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+    });
+    headBefore = stdout.trim();
+  } catch (err: any) {
+    return { success: false, reason: `Failed to get remote HEAD: ${err.message}` };
+  }
+
+  // Build rebase task prompt
+  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+
+  const taskPrompt = `REBASE TASK for ${issueId}:
+
+WORKSPACE: ${workspacePath}
+FEATURE BRANCH: ${featureBranch}
+BASE BRANCH: ${baseBranch}
+
+INSTRUCTIONS:
+
+1. cd ${workspacePath}
+2. git fetch origin ${baseBranch}
+3. git rebase origin/${baseBranch}
+4. If conflicts during rebase:
+   a. For each conflicted file: read it, resolve the conflict markers (keep the correct content from both sides), then:
+      git add <resolved-file>
+   b. After staging all resolved files: git rebase --continue
+   c. Repeat steps a-b for each commit in the rebase if multiple conflicts arise
+   d. If conflicts are irresolvable: git rebase --abort, then report failure
+5. git push --force-with-lease origin ${featureBranch}
+6. Report completion by calling the Panopticon API:
+   curl -s -X POST ${apiUrl}/api/specialists/done \\
+     -H "Content-Type: application/json" \\
+     -d '{"specialist":"merge","issueId":"${issueId}","status":"passed","notes":"Rebase onto ${baseBranch} complete"}'
+
+IMPORTANT:
+- Work ONLY in ${workspacePath} — do NOT modify the main repo
+- Do NOT run git merge — this is a rebase, not a merge
+- For .planning/ files in conflicts: keep the feature branch (ours) version
+- Do NOT run build or tests — CI handles validation after PR merge
+- Use --force-with-lease (never --force) for the push
+- Report completion immediately after the push
+
+CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.`;
+
+  // Resolve project for per-project ephemeral specialist
+  const resolvedProject = resolveProjectFromIssue(issueId);
+  const mergeProjectKey = resolvedProject?.projectKey ?? null;
+  const mergeSession = getTmuxSessionName('merge-agent', mergeProjectKey ?? undefined);
+
+  if (!resolvedProject) {
+    console.warn(`[merge-agent] Could not resolve project for ${issueId} — using global specialist`);
+  }
+
+  // Wait for specialist to be idle (same as spawnMergeAgentForBranches)
+  if (mergeProjectKey) {
+    const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../agents.js');
+    const IDLE_POLL_INTERVAL = 3000;
+    const IDLE_MAX_WAIT = 360000;
+    const idleStart = Date.now();
+
+    while (Date.now() - idleStart < IDLE_MAX_WAIT) {
+      const state = getAgentRuntimeState(mergeSession);
+      if (!state || state.state === 'idle' || state.state === 'suspended') break;
+      try {
+        await execAsync(`tmux has-session -t "${mergeSession}" 2>/dev/null`);
+      } catch {
+        saveAgentRuntimeState(mergeSession, { state: 'idle', lastActivity: new Date().toISOString() });
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, IDLE_POLL_INTERVAL));
+    }
+  }
+
+  // Wake the merge-agent specialist
+  let wakeResult: { success: boolean; message: string };
+  if (mergeProjectKey) {
+    wakeResult = await spawnEphemeralSpecialist(mergeProjectKey, 'merge-agent', {
+      issueId,
+      branch: featureBranch,
+      workspace: workspacePath,
+      promptOverride: taskPrompt,
+    });
+  } else {
+    wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+      issueId,
+    });
+  }
+
+  if (!wakeResult.success) {
+    return {
+      success: false,
+      reason: `Failed to wake merge-agent specialist: ${wakeResult.message}`,
+    };
+  }
+
+  console.log(`[merge-agent] Rebase specialist woken for ${issueId}, polling for completion...`);
+
+  // Poll for rebase completion: remote feature branch HEAD should change after rebase + push
+  const POLL_INTERVAL = 5000;
+  const MAX_WAIT = 10 * 60 * 1000; // 10 minutes
+
+  const startTime = Date.now();
+  while (Date.now() - startTime < MAX_WAIT) {
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+
+    try {
+      await execAsync(`git fetch origin ${featureBranch}`, {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }).catch(() => {});
+
+      const { stdout: remoteHeadRaw } = await execAsync(
+        `git rev-parse origin/${featureBranch}`,
+        { cwd: workspacePath, encoding: 'utf-8' },
+      );
+      const remoteHead = remoteHeadRaw.trim();
+
+      if (remoteHead !== headBefore) {
+        console.log(`[merge-agent] Rebase complete for ${issueId}, new remote HEAD: ${remoteHead}`);
+        logActivity('rebase_complete', `Rebase completed for ${issueId}`);
+        return { success: true, reason: 'Rebase completed successfully' };
+      }
+    } catch {
+      // Continue polling
+    }
+
+    // Check if specialist stopped
+    if (!(await isRunning('merge-agent', mergeProjectKey ?? undefined))) {
+      // Final check: maybe rebase succeeded just before specialist stopped
+      try {
+        await execAsync(`git fetch origin ${featureBranch}`, {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+        }).catch(() => {});
+        const { stdout } = await execAsync(`git rev-parse origin/${featureBranch}`, {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+        });
+        if (stdout.trim() !== headBefore) {
+          console.log(`[merge-agent] Rebase detected after specialist stopped for ${issueId}`);
+          return { success: true, reason: 'Rebase completed (detected after specialist stopped)' };
+        }
+      } catch {}
+
+      return {
+        success: false,
+        reason: 'merge-agent specialist stopped before completing rebase',
+      };
+    }
+  }
+
+  logActivity('rebase_timeout', `Rebase timed out for ${issueId}`);
+  return {
+    success: false,
+    reason: 'Timeout waiting for rebase to complete (10 minutes)',
+  };
+}
+
+/**
  * Salvage a stranded merge commit — if the specialist merged locally but died
  * before pushing, detect the unpushed merge and push it ourselves.
  *
