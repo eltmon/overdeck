@@ -4,6 +4,7 @@
 .missionControl {
   --mc-bg-main: #FFFFFF;
   --mc-bg-sidebar: #FAF9F7;
+  --mc-bg-secondary: #F7F6F3;
   --mc-bg-hover: #F3F2EF;
   --mc-bg-selected: #EDE9E3;
   --mc-text-primary: #1A1A1A;
@@ -45,9 +46,19 @@
   height: 100%;
 }
 
-/* Command Deck always uses its own Codex light theme — no dark mode overrides.
-   This is intentional: the Codex design language uses warm cream/white regardless
-   of the surrounding dashboard theme. */
+/* Dark mode overrides — mirrors the dashboard's .dark token values */
+:global(.dark) .missionControl {
+  --mc-bg-main:     #0c1018;
+  --mc-bg-sidebar:  #111520;
+  --mc-bg-secondary:#0e1320;
+  --mc-bg-hover:    #161d2b;
+  --mc-bg-selected: #1a2438;
+  --mc-text-primary:   #f3f4f6;
+  --mc-text-secondary: #9ca3af;
+  --mc-text-muted:     #6b7280;
+  --mc-border:         #1e2a3a;
+  --mc-border-strong:  #2a3a50;
+}
 
 /* Layout */
 .layout {
