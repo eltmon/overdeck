@@ -590,16 +590,10 @@ export function ListIssueRow({
       {/* Status indicator */}
       <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
 
-      {/* Issue identifier */}
-      <a
-        href={issue.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="text-xs text-content-subtle hover:text-primary shrink-0 font-mono"
-      >
+      {/* Issue identifier — clicking selects the card, use ExternalLink icon to open in tracker */}
+      <span className="text-xs text-content-subtle shrink-0 font-mono">
         {issue.identifier}
-      </a>
+      </span>
 
       {/* Title - dimmed/strikethrough for canceled issues */}
       <span className={`text-sm truncate flex-1 min-w-0 ${

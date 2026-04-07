@@ -1827,3 +1827,30 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* Subscription plan badge (e.g. "MAX", "Pro") */
+.pickerAuthBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-primary, #6366f1) 18%, transparent);
+  color: var(--color-primary, #6366f1);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #6366f1) 30%, transparent);
+}
+
+.pickerAuthBadgeWarn {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 25%, transparent);
+}
