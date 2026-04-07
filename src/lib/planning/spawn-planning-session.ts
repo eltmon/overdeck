@@ -91,6 +91,10 @@ export interface SpawnPlanningOptions {
   workspaceLocation: 'local' | 'remote';
   startDocker?: boolean;
   shadowMode?: boolean;
+  /** Optional model override — if omitted, the planning-agent setting is used. */
+  model?: string;
+  /** Optional effort level — controls how thorough the planning agent is. */
+  effort?: 'low' | 'medium' | 'high';
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -134,7 +138,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string): string {
+export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high'): string {
   const issueLower = issue.identifier.toLowerCase();
   const version = getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -209,6 +213,25 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
 `;
   }
 
+  const effortSection = effort && effort !== 'medium' ? `
+## Planning Effort: ${effort === 'high' ? 'High (Deep Analysis)' : 'Low (Quick Planning)'}
+
+${effort === 'high'
+    ? `**The user has requested HIGH effort planning.** Be exceptionally thorough:
+- Explore more of the codebase before concluding — check adjacent files, not just the obvious ones
+- Identify edge cases, potential failure modes, and risks
+- Consider multiple implementation approaches and explain tradeoffs
+- Ask more clarifying questions when scope is ambiguous
+- Break down tasks into finer-grained subtasks`
+    : `**The user has requested LOW effort planning.** Be concise and fast:
+- Focus on the most critical decisions only
+- Keep the task list tight — 3–5 items max unless truly necessary
+- Skip deep exploration; read only the directly relevant files
+- Ask only essential clarifying questions`
+  }
+
+` : '';
+
   return `<!-- panopticon:orchestration-context-start -->
 <!-- This is Panopticon orchestration context injected automatically.
      It contains planning session setup instructions, not agent reasoning.
@@ -237,7 +260,7 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
 When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
 
 ---
-
+${effortSection}
 ## Issue Details
 - **ID:** ${issue.identifier}
 - **Title:** ${issue.title}
@@ -380,7 +403,7 @@ Start by exploring the codebase to understand the context, then begin the discov
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -492,11 +515,12 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 3: Load specs & PRDs ────────────────────────────────────────
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
 
-    // Determine planning model (before prompt so it's injected)
+    // Determine planning model — explicit override takes precedence over settings
     const agentSettings = loadSettings();
-    const planningModel = (agentSettings.models as any).planning_agent
+    const settingsModel = (agentSettings.models as any).planning_agent
       || agentSettings.models.complexity?.expert
       || 'claude-opus-4-6';
+    const planningModel = modelOverride || settingsModel;
 
     // Discover and copy PRD files to workspace
     const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
@@ -520,7 +544,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(4, 'Configuring agent', planningModel);
 
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-    const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel);
+    const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     writeFileSync(planningPromptPath, planningPrompt);
     const agentCmd = getAgentCommand(planningModel);
     const cmdWithArgs = agentCmd.args.length > 0
