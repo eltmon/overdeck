@@ -11,6 +11,7 @@ import { jsonResponse } from "../http-helpers.js";
 
 import { exec } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -430,21 +431,48 @@ const getConversationMessagesRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       try {
         const conv = getConversationByName(name);
+
+        // Fall back to specialist session file when name is a specialist tmux session
+        // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
+        let sessionFile: string | null | undefined = conv?.sessionFile;
         if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+          const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+          if (specialistMatch) {
+            const [, project, type] = specialistMatch;
+            const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
+            const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
+            try {
+              const { readFile, readdir } = await import('node:fs/promises');
+              const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
+              if (sessionId) {
+                const claudeProjects = join(homedir(), '.claude', 'projects');
+                const dirs = await readdir(claudeProjects);
+                for (const dir of dirs) {
+                  const candidate = join(claudeProjects, dir, `${sessionId}.jsonl`);
+                  if (existsSync(candidate)) {
+                    sessionFile = candidate;
+                    break;
+                  }
+                }
+              }
+            } catch { /* session file not found */ }
+          }
+          if (!sessionFile) {
+            return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+          }
         }
 
-        if (!conv.sessionFile) {
+        if (!sessionFile) {
           // Session file should always be set (deterministic from --session-id).
           // If missing, it's a legacy conversation — return empty.
           return jsonResponse({ messages: [], workLog: [], streaming: false });
         }
 
         try {
-          const result = await parseConversationMessages(conv.sessionFile, 0);
+          const result = await parseConversationMessages(sessionFile, 0);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
-          if (result.totalCost > 0) {
+          if (result.totalCost > 0 && conv) {
             updateConversationCost(name, result.totalCost);
           }
 

@@ -1,54 +1,142 @@
 /**
- * AgentOutputPanel - Shows live XTerminal for running agents/specialists.
+ * AgentOutputPanel - Activity/Terminal split view for agents and specialists.
  *
- * Renders the XTerminal WebSocket-based terminal view. When the session ends
- * (specialist completes, agent stops), shows a clean "session ended" state
- * rather than attempting to display the raw log file.
+ * For specialists:
+ *   - Running: shows live XTerminal (same as review agent in Image 1)
+ *   - Down: shows ConversationPanel with JSONL (same as Command Deck in Image 2)
+ *
+ * For work agents: Activity shows the issue conversation, Terminal shows XTerminal.
  */
 
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
-import { Terminal } from 'lucide-react';
-import { useState } from 'react';
+import { ActivityView } from './MissionControl/ActivityView';
+import { ConversationPanel } from './chat/ConversationPanel';
+import type { Conversation } from './MissionControl/ConversationList';
+import { useDashboardStore, selectAgentById } from '../lib/store';
+import styles from './MissionControl/styles/mission-control.module.css';
 
 interface AgentOutputPanelProps {
   agentId: string;
 }
 
-export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
-  const [terminalFailed, setTerminalFailed] = useState(false);
+// Parse specialist tmux session name: specialist-{projectKey}-{type}
+function parseSpecialistSession(agentId: string): { projectKey: string; type: string } | null {
+  const match = agentId.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+  if (!match) return null;
+  return { projectKey: match[1], type: match[2] };
+}
 
-  // Reset terminal failure state when agent changes
+// Derive issueId for work agents: agent-pan-505 → PAN-505
+function deriveWorkAgentIssueId(agentId: string, agentIssueId?: string): string | null {
+  if (agentIssueId) return agentIssueId;
+  const match = agentId.match(/^agent-([a-z]+)-(\d+)$/i);
+  if (match) return `${match[1].toUpperCase()}-${match[2]}`;
+  return null;
+}
+
+export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
+  const [viewMode, setViewMode] = useState<'activity' | 'terminal'>('activity');
+
+  const agent = useDashboardStore(selectAgentById(agentId));
+  const specialist = parseSpecialistSession(agentId);
+
+  // Reset view mode when agent changes
   const [prevAgent, setPrevAgent] = useState(agentId);
   if (agentId !== prevAgent) {
     setPrevAgent(agentId);
-    setTerminalFailed(false);
+    setViewMode('activity');
   }
 
-  // Session ended — show clean placeholder instead of garbled raw log
-  if (terminalFailed) {
-    return (
-      <div className="bg-surface-raised rounded-lg h-full flex flex-col">
-        <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-content-subtle" />
-          <span className="font-medium text-content text-sm">{agentId}</span>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <span className="text-xs text-content-muted">Session ended</span>
-        </div>
-      </div>
-    );
-  }
+  // Fetch specialist runtime state
+  const { data: specData } = useQuery({
+    queryKey: ['specialist-panel-status', agentId],
+    queryFn: async () => {
+      if (!specialist) return null;
+      const res = await fetch(`/api/specialists/${specialist.projectKey}/${specialist.type}/status`);
+      if (!res.ok) return null;
+      return res.json() as Promise<{ isRunning: boolean; sessionId?: string }>;
+    },
+    enabled: !!specialist,
+    refetchInterval: 5000,
+  });
 
-  // Live XTerminal for all sessions (agents and specialists)
+  const specialistIsRunning = specData?.isRunning ?? false;
+
+  // Build a Conversation object for specialists so ConversationPanel can fetch the JSONL
+  const specialistConversation = useMemo<Conversation | null>(() => {
+    if (!specialist) return null;
+    return {
+      id: 0,
+      name: agentId,
+      tmuxSession: agentId,
+      status: specialistIsRunning ? 'active' : 'ended',
+      cwd: '',
+      issueId: null,
+      createdAt: new Date().toISOString(),
+      endedAt: specialistIsRunning ? null : new Date().toISOString(),
+      lastAttachedAt: null,
+      sessionAlive: specialistIsRunning,
+      sessionFile: null, // Backend resolves this from the specialist .session file
+    };
+  }, [specialist, agentId, specialistIsRunning]);
+
+  // For work agents: derive from store or agentId pattern
+  const workAgentIssueId = specialist ? null : deriveWorkAgentIssueId(agentId, agent?.issueId);
+
+  const label = specialist
+    ? `${specialist.projectKey} / ${specialist.type.replace('-agent', '')}`
+    : agentId;
+
   return (
     <div className="bg-surface-raised rounded-lg h-full flex flex-col">
-      <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
-        <Terminal className="w-4 h-4 text-green-400" />
-        <span className="font-medium text-content text-sm">{agentId}</span>
+      {/* Header */}
+      <div className="px-4 py-2 border-b border-divider flex items-center gap-2 flex-shrink-0">
+        <span className="font-medium text-content text-sm flex-1 truncate">{label}</span>
+        <div className={styles.viewToggle}>
+          <button
+            className={`${styles.viewToggleBtn} ${viewMode === 'activity' ? styles.viewToggleBtnActive : ''}`}
+            onClick={() => setViewMode('activity')}
+          >
+            Activity
+          </button>
+          <button
+            className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+            onClick={() => setViewMode('terminal')}
+          >
+            Terminal
+          </button>
+        </div>
       </div>
-      <div className="flex-1 min-h-0">
-        <XTerminal sessionName={agentId} onDisconnect={() => setTerminalFailed(true)} />
-      </div>
+
+      {/* Activity view */}
+      {viewMode === 'activity' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {specialist ? (
+            specialistIsRunning ? (
+              // Live specialist → show XTerminal
+              <XTerminal sessionName={agentId} />
+            ) : specialistConversation ? (
+              // Down specialist → show JSONL conversation (same as Command Deck)
+              <ConversationPanel conversation={specialistConversation} />
+            ) : null
+          ) : workAgentIssueId ? (
+            <ActivityView issueId={workAgentIssueId} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-xs text-content-muted">
+              No issue associated with this session
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Terminal view — always XTerminal */}
+      {viewMode === 'terminal' && (
+        <div className="flex-1 min-h-0">
+          <XTerminal sessionName={agentId} />
+        </div>
+      )}
     </div>
   );
 }
