@@ -248,12 +248,12 @@ export function AgentCardsPanel({
         </div>
       </div>
 
-      {/* Convoy Review Panel */}
+      {/* Review Panel */}
       <div>
         <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           <span className="inline-flex items-center gap-2">
             <span className="material-symbols-outlined text-base">diversity_3</span>
-            Convoy (Parallel Review Panel)
+            Review Panel
           </span>
         </h3>
         <div className="bg-surface-raised rounded-xl border border-divider p-4 shadow-sm">
