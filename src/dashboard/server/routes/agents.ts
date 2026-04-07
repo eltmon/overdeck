@@ -1243,7 +1243,9 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (planningDir) {
-      try {
+      // Commit planning artifacts before handing off to the work agent.
+      // The entire block is best-effort — never let git errors abort the agent start.
+      yield* Effect.gen(function* () {
         const gitRoot = planningDir.includes('/workspaces/')
           ? workspacePath
           : projectPath;
@@ -1251,14 +1253,19 @@ const postAgentsRoute = HttpRouter.add(
         if (existsSync(join(gitRoot, 'STATE.md'))) {
           yield* Effect.promise(() => execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
-        try {
-          yield* Effect.promise(() => execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' }));
-        } catch {
+        // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
+        // Capture the result as Either so exit-1 doesn't propagate as an Effect failure.
+        const diffResult = yield* Effect.promise(() =>
+          execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' })
+            .then(() => false)   // exit 0 → nothing staged
+            .catch(() => true)   // exit 1 → has staged changes
+        );
+        if (diffResult) {
           yield* Effect.promise(() => execAsync(`git commit -m "Planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
           const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
           pushChild.unref();
         }
-      } catch {}
+      }).pipe(Effect.catchAll(() => Effect.void));
     }
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
