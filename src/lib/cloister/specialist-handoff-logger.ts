@@ -242,3 +242,67 @@ export function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
   const today = new Date().toISOString().split('T')[0];
   return events.filter(e => e.timestamp.startsWith(today));
 }
+
+/**
+ * Update the status of a specialist handoff record in the JSONL log.
+ *
+ * Finds the most recent queued/processing entry for the given issueId +
+ * toSpecialist pair and rewrites it in-place. Called by /api/specialists/done
+ * so that success-rate calculations reflect actual outcomes rather than always
+ * reading 0% (because the log is append-only and entries never change status
+ * without this function).
+ *
+ * @param issueId - Issue ID (case-sensitive, use normalised form)
+ * @param toSpecialist - Specialist agent name e.g. 'review-agent'
+ * @param status - New status to set
+ * @param result - Optional outcome ('success' | 'failure')
+ * @returns true if a record was found and updated
+ */
+export function updateSpecialistHandoffStatus(
+  issueId: string,
+  toSpecialist: string,
+  status: 'processing' | 'completed' | 'failed',
+  result?: 'success' | 'failure',
+): boolean {
+  if (!existsSync(SPECIALIST_HANDOFF_LOG_FILE)) return false;
+
+  const content = readFileSync(SPECIALIST_HANDOFF_LOG_FILE, 'utf-8');
+  const lines = content.trim().split('\n').filter(l => l.trim());
+
+  // Scan in reverse to find the most recent matching active record
+  let matchIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const event = JSON.parse(lines[i]) as SpecialistHandoff;
+      if (
+        event.issueId === issueId &&
+        event.toSpecialist === toSpecialist &&
+        (event.status === 'queued' || event.status === 'processing')
+      ) {
+        matchIdx = i;
+        break;
+      }
+    } catch {
+      // Skip malformed line
+    }
+  }
+
+  if (matchIdx === -1) return false;
+
+  try {
+    const event = JSON.parse(lines[matchIdx]) as SpecialistHandoff;
+    const updated: SpecialistHandoff = {
+      ...event,
+      status,
+      ...(result !== undefined ? { result } : {}),
+      ...(status === 'completed' || status === 'failed'
+        ? { completedAt: new Date().toISOString() }
+        : {}),
+    };
+    lines[matchIdx] = JSON.stringify(updated);
+    writeFileSync(SPECIALIST_HANDOFF_LOG_FILE, lines.join('\n') + '\n', 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}

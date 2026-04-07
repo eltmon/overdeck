@@ -335,6 +335,18 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
           }
         }
+
+        // Update specialist handoff log so success-rate metrics reflect actual outcome
+        const { updateSpecialistHandoffStatus } = await import('../../../lib/cloister/specialist-handoff-logger.js');
+        const updated = updateSpecialistHandoffStatus(
+          normalizedIssueId,
+          `${specialist}-agent`,
+          status === 'passed' ? 'completed' : 'failed',
+          status === 'passed' ? 'success' : 'failure',
+        );
+        if (updated) {
+          console.log(`[specialists/done] Updated handoff log: ${specialist}-agent ${normalizedIssueId} → ${status}`);
+        }
       } catch (err) {
         console.error(`[specialists/done] Error managing specialist state:`, err);
       }
