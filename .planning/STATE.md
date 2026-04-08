@@ -23,6 +23,7 @@ None — all beads implemented and closed.
 - [2026-04-08T12:12Z] review-agent → CHANGES-REQUESTED — missing tests for getConversationById
 - [2026-04-08T12:20Z] verification-gate → FAILED — test (pre-existing work-types counts)
 - [2026-04-08T12:23Z] review-agent → PASSED
+- **[2026-04-08T12:26Z] test-agent → FAILED** — `.planning/feedback/005-test-agent-failed.md`
 
 ## Summary
 
