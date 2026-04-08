@@ -54,7 +54,7 @@ function saveDraft(conversationName: string, text: string): void {
 
 // ─── Slash commands ───────────────────────────────────────────────────────────
 
-interface SlashCommand {
+export interface SlashCommand {
   id: string;
   label: string;
   description: string;
@@ -202,7 +202,7 @@ interface SlashMenuProps {
   anchorRect: DOMRect | null;
 }
 
-function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, anchorRect }: SlashMenuProps) {
+export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, anchorRect }: SlashMenuProps) {
   const filtered = commands.filter(
     (cmd) =>
       cmd.label.toLowerCase().includes(filter.toLowerCase()) ||
@@ -264,7 +264,7 @@ export function ComposerPromptEditor({
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const [filterText, setFilterText] = useState('');
 
   const initialConfig = {
     namespace: `composer:${conversationName}`,
@@ -298,6 +298,7 @@ export function ComposerPromptEditor({
     }
     setIsSlashMenuOpen(true);
     setSelectedIndex(0);
+    setFilterText('');
   }, []);
 
   const handleSlashSelect = useCallback(
@@ -334,8 +335,14 @@ export function ComposerPromptEditor({
   useEffect(() => {
     if (!isSlashMenuOpen) return;
 
+    const filtered = SLASH_COMMANDS.filter(
+      (cmd) =>
+        cmd.label.toLowerCase().includes(filterText.toLowerCase()) ||
+        cmd.description.toLowerCase().includes(filterText.toLowerCase()),
+    );
+    if (filtered.length === 0) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      const filtered = SLASH_COMMANDS;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((i) => (i + 1) % filtered.length);
@@ -348,15 +355,20 @@ export function ComposerPromptEditor({
       } else if (e.key === 'Escape') {
         e.preventDefault();
         handleSlashClose();
+      } else if (e.key === 'Backspace') {
+        setFilterText((prev) => prev.slice(0, -1));
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Track filter text as user types to narrow the command list
+        setFilterText((prev) => prev + e.key);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSlashMenuOpen, selectedIndex, handleSlashSelect, handleSlashClose]);
+  }, [isSlashMenuOpen, selectedIndex, filterText, handleSlashSelect, handleSlashClose]);
 
   return (
-    <div ref={editorContainerRef} style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }}>
       <LexicalComposer initialConfig={initialConfig}>
         <div className={`${styles.composerEditor} ${disabled ? styles.composerEditorDisabled : ''}`}>
           <PlainTextPlugin
@@ -386,7 +398,7 @@ export function ComposerPromptEditor({
       {isSlashMenuOpen && (
         <SlashMenu
           commands={SLASH_COMMANDS}
-          filter=""
+          filter={filterText}
           selectedIndex={selectedIndex}
           onSelect={handleSlashSelect}
           onClose={handleSlashClose}

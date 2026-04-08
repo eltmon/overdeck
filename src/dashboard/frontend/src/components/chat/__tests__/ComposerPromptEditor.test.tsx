@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { ComposerPromptEditor } from '../ComposerPromptEditor';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { ComposerPromptEditor, SlashMenu, type SlashCommand } from '../ComposerPromptEditor';
 
 // Mock the CSS module — must match class names used in ComposerPromptEditor
 vi.mock('../MissionControl/styles/mission-control.module.css', () => ({
@@ -100,6 +100,16 @@ vi.mock('lexical', () => ({
   COMMAND_PRIORITY_HIGH: 1,
   LexicalEditor: class {},
 }));
+
+// Test commands — mirrors SLASH_COMMANDS from ComposerPromptEditor
+const TEST_COMMANDS: SlashCommand[] = [
+  { id: 'model', label: '/model', description: 'Switch the AI model for this conversation', insert: '/model ' },
+  { id: 'context', label: '/context', description: 'Add context from a file or URL', insert: '/context ' },
+  { id: 'effort', label: '/effort', description: 'Set effort level (low, medium, high)', insert: '/effort ' },
+  { id: 'cancel', label: '/cancel', description: 'Cancel the current operation', insert: '/cancel' },
+];
+
+const noop = () => {};
 
 describe('ComposerPromptEditor', () => {
   const mockOnCommandKeyDown = vi.fn();
@@ -226,5 +236,178 @@ describe('ComposerPromptEditor', () => {
         screen.queryByRole('listbox', { name: 'Slash commands' }),
       ).not.toBeInTheDocument();
     });
+
+    it('selects /model command and closes the menu', () => {
+      render(
+        <ComposerPromptEditor
+          conversationName="test-conversation"
+          onCommandKeyDown={mockOnCommandKeyDown}
+        />,
+      );
+
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
+      expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
+
+      // Click /model button
+      fireEvent.click(screen.getByText('/model'));
+
+      // Menu should close after selection
+      expect(
+        screen.queryByRole('listbox', { name: 'Slash commands' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('navigates down with ArrowDown and wraps around', () => {
+      render(
+        <ComposerPromptEditor
+          conversationName="test-conversation"
+          onCommandKeyDown={mockOnCommandKeyDown}
+        />,
+      );
+
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
+      expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
+
+      // Initially /model is selected (index 0)
+      expect(screen.getByText('/model').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowDown → /context selected
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowDown' });
+      });
+      expect(screen.getByText('/context').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowDown → /effort selected
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowDown' });
+      });
+      expect(screen.getByText('/effort').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowDown → /cancel selected (wraps)
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowDown' });
+      });
+      expect(screen.getByText('/cancel').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowDown → wraps back to /model
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowDown' });
+      });
+      expect(screen.getByText('/model').closest('button')).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('navigates up with ArrowUp and wraps around', () => {
+      render(
+        <ComposerPromptEditor
+          conversationName="test-conversation"
+          onCommandKeyDown={mockOnCommandKeyDown}
+        />,
+      );
+
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
+
+      // Initially /model is selected (index 0)
+      expect(screen.getByText('/model').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowUp from /model wraps to /cancel
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowUp' });
+      });
+      expect(screen.getByText('/cancel').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowUp → /effort
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowUp' });
+      });
+      expect(screen.getByText('/effort').closest('button')).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+});
+
+describe('SlashMenu filter', () => {
+  it('shows all commands when filter is empty', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter=""
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    expect(screen.getByText('/model')).toBeInTheDocument();
+    expect(screen.getByText('/context')).toBeInTheDocument();
+    expect(screen.getByText('/effort')).toBeInTheDocument();
+    expect(screen.getByText('/cancel')).toBeInTheDocument();
+  });
+
+  it('filters commands by label when user types', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter="ext"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    // 'ext' matches /context label only (via '/context' → '/conte**xt**')
+    expect(screen.queryByText('/model')).not.toBeInTheDocument();
+    expect(screen.getByText('/context')).toBeInTheDocument();
+    expect(screen.queryByText('/effort')).not.toBeInTheDocument();
+    expect(screen.queryByText('/cancel')).not.toBeInTheDocument();
+  });
+
+  it('filters commands by description when label does not match', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter="cancel"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    // 'cancel' matches /cancel label and 'Cancel the current operation' description
+    expect(screen.getByText('/cancel')).toBeInTheDocument();
+    expect(screen.queryByText('/model')).not.toBeInTheDocument();
+  });
+
+  it('returns null when no commands match the filter', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter="zzz"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('is case-insensitive when filtering', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter="ILE"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    // 'ILE' (case-insensitive) matches /context via "fILE"
+    expect(screen.getByText('/context')).toBeInTheDocument();
+    expect(screen.queryByText('/model')).not.toBeInTheDocument();
   });
 });
