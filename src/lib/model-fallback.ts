@@ -11,7 +11,7 @@ import { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './s
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'openrouter';
 
 /**
  * Map of model ID to provider
@@ -42,6 +42,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Kimi models
   'kimi-k2': 'kimi',
   'kimi-k2.5': 'kimi',
+
+  // MiniMax models
+  'minimax-m2.7': 'minimax',
+  'minimax-m2.7-highspeed': 'minimax',
 };
 
 /**
@@ -74,6 +78,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // Kimi → Anthropic
   'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
+
+  // MiniMax → Anthropic
+  'minimax-m2.7': 'claude-sonnet-4-6', // Near-Opus performance → Sonnet
+  'minimax-m2.7-highspeed': 'claude-sonnet-4-6', // Same quality, faster → Sonnet
 };
 
 /**

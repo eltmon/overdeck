@@ -70,7 +70,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
+  provider: 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'openrouter';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -464,6 +464,54 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 98, // 256K context
     },
     notes: 'Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MINIMAX MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'minimax-m2.7': {
+    model: 'minimax-m2.7',
+    provider: 'minimax',
+    displayName: 'MiniMax M2.7',
+    costPer1MTokens: 1.5, // $0.30 in / $1.20 out
+    contextWindow: 128000,
+    skills: {
+      'code-generation': 90, // 56.22% SWE-Pro, near Opus level
+      'code-review': 88,
+      debugging: 88,
+      planning: 85,
+      documentation: 85,
+      testing: 86,
+      security: 80,
+      performance: 82,
+      synthesis: 90, // Self-evolving agent capabilities
+      speed: 80, // 10B active params (MoE)
+      'context-length': 85, // 128K context
+    },
+    notes: 'Self-evolving model, 10B active params, near-Opus SWE-Pro at 1/50th the cost.',
+  },
+
+  'minimax-m2.7-highspeed': {
+    model: 'minimax-m2.7-highspeed',
+    provider: 'minimax',
+    displayName: 'MiniMax M2.7 Highspeed',
+    costPer1MTokens: 1.5, // Same pricing as M2.7
+    contextWindow: 128000,
+    skills: {
+      'code-generation': 90,
+      'code-review': 88,
+      debugging: 88,
+      planning: 85,
+      documentation: 85,
+      testing: 86,
+      security: 80,
+      performance: 82,
+      synthesis: 90,
+      speed: 92, // 100 tps — 66% faster than standard
+      'context-length': 85,
+    },
+    notes: 'Identical quality to M2.7, 66% faster output (100 tps). Best for high-throughput agent work.',
   },
 };
 

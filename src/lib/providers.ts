@@ -8,9 +8,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './settings.js';
+import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel, MiniMaxModel } from './settings.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai' | 'openrouter';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai' | 'minimax' | 'openrouter';
 
 /**
  * Provider compatibility types
@@ -97,6 +97,16 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     description: 'Requires claude-code-router for API translation',
   },
 
+  minimax: {
+    name: 'minimax',
+    displayName: 'MiniMax',
+    compatibility: 'direct',
+    baseUrl: 'https://api.minimax.io/anthropic',
+    models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
+    tested: true,
+    description: 'Anthropic-compatible API, 10B active params, 100 tps highspeed variant',
+  },
+
   openrouter: {
     name: 'openrouter',
     displayName: 'OpenRouter',
@@ -140,6 +150,11 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // Check Kimi models
   if (['kimi-k2', 'kimi-k2.5'].includes(modelId)) {
     return PROVIDERS.kimi;
+  }
+
+  // Check MiniMax models
+  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(modelId)) {
+    return PROVIDERS.minimax;
   }
 
   // Default to Anthropic if unknown
