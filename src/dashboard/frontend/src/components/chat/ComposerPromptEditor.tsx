@@ -23,7 +23,6 @@ import {
   $createTextNode,
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
-  $createTextNode as $createLexicalTextNode,
 } from 'lexical';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
