@@ -159,9 +159,12 @@ export async function generateContextDigest(
     const promptFile = join(tempDir, `digest-prompt-${Date.now()}.md`);
     writeFileSync(promptFile, prompt, 'utf-8');
 
-    // Run Claude Code with the prompt
+    // Run Claude Code with the prompt (include provider env vars for non-Anthropic models)
+    const { getProviderEnvForModel } = await import('../agents.js');
+    const providerEnv = getProviderEnvForModel(model);
+    const envPrefix = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ');
     const { stdout, stderr } = await execAsync(
-      `claude --dangerously-skip-permissions --model ${model} "$(cat '${promptFile}')"`,
+      `${envPrefix ? envPrefix + ' ' : ''}claude --dangerously-skip-permissions --model ${model} "$(cat '${promptFile}')"`,
       {
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer

@@ -55,6 +55,8 @@ import {
   resumeAgent,
   messageAgent,
   stopAgent,
+  getProviderExportsForModel,
+  getProviderTmuxFlags,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import {
@@ -1388,14 +1390,21 @@ const postAgentsRoute = HttpRouter.add(
       // Fresh session with context prompt (not --resume, which has interactive prompts
       // and loses prompt caching). The resume prompt contains STATE.md, beads, feedback,
       // and optional user message — everything the agent needs to pick up where it left off.
-      const agentModel = existingAgentState.model || 'claude-sonnet-4-6';
-      const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
+      // Use current config model (not the stale model from state.json)
+      let agentModel = existingAgentState.model || 'claude-sonnet-4-6';
+      try {
+        const { getModelId } = yield* Effect.promise(() => import('../../../lib/work-type-router.js'));
+        agentModel = getModelId(`issue-agent:${phase}` as any);
+      } catch { /* fall back to state model */ }
+      const providerExports = getProviderExportsForModel(agentModel);
+      const resumeContent = `#!/bin/bash\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
       yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
 
       // Spawn tmux session with fresh claude session
       const escapedCwd = workspacePath.replace(/"/g, '\\"');
+      const providerFlags = getProviderTmuxFlags(agentModel);
       yield* Effect.promise(() => execAsync(
-        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "bash ${resumeLauncher}"`,
+        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
         { encoding: 'utf-8' }
       ));
 
