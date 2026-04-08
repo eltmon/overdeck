@@ -549,8 +549,21 @@ const getTrackerStatusRoute = HttpRouter.add(
         isPrimary: boolean;
       }> = [];
 
+      // Only report trackers that have at least one project using them
+      const projects = listProjects();
+      const cfgs = projects.map(p => p.config as Record<string, unknown>);
+      const trackerHasProjects: Record<string, boolean> = {
+        linear: cfgs.some(c => !!c.linear_project),
+        github: cfgs.some(c => !!c.github_repo),
+        rally: cfgs.some(c => !!c.rally_project),
+        gitlab: cfgs.some(c => !!c.gitlab_repo),
+      };
+
       const trackersToCheck = [primary, secondary].filter(Boolean) as string[];
       for (const trackerType of trackersToCheck) {
+        // Skip trackers that no project uses
+        if (trackerHasProjects[trackerType] === false) continue;
+
         const envVar = trackerEnvVars[trackerType] || `${trackerType.toUpperCase()}_API_KEY`;
         const hasEnvKey = !!process.env[envVar];
         const hasConfigKey = !!((yamlConfig.trackerKeys || {}) as Record<string, string | undefined>)[trackerType];
