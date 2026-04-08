@@ -484,6 +484,59 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     }
 
+    // When merge fails with conflicts, automatically send rebase instructions to the work agent.
+    // This closes the automation loop: merge conflict → work agent rebases → resubmits → merge retries.
+    if (specialist === 'merge' && status === 'failed' && notes?.toLowerCase().includes('conflict')) {
+      yield* Effect.promise(async () => {
+        try {
+          const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+          const { sessionExists } = await import('../../../lib/tmux.js');
+          const { messageAgent } = await import('../../../lib/agents.js');
+
+          if (sessionExists(workAgentId)) {
+            // Agent is running — send rebase instructions directly
+            const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
+            await messageAgent(workAgentId, rebaseMsg);
+            console.log(`[specialists/done] Sent rebase instructions to ${workAgentId}`);
+          } else {
+            // Agent is stopped — restart it with rebase instructions
+            try {
+              const { resumeAgent } = await import('../../../lib/agents.js');
+              const result = await resumeAgent(workAgentId, `MERGE CONFLICT: Your branch has conflicts with main. Run: git fetch origin main && git rebase origin/main, resolve conflicts, push with --force-with-lease, then resubmit for review.`);
+              if (result.success) {
+                console.log(`[specialists/done] Resumed ${workAgentId} with rebase instructions`);
+              } else {
+                console.log(`[specialists/done] Could not resume ${workAgentId}: ${result.error}`);
+              }
+            } catch (resumeErr: any) {
+              console.warn(`[specialists/done] Could not restart work agent for rebase: ${resumeErr.message}`);
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[specialists/done] Failed to send rebase feedback to work agent: ${err.message}`);
+        }
+      });
+    }
+
+    // When review fails, send feedback to work agent so it can fix the issues
+    if (specialist === 'review' && status === 'failed' && notes) {
+      yield* Effect.promise(async () => {
+        try {
+          const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+          const { sessionExists } = await import('../../../lib/tmux.js');
+          const { messageAgent } = await import('../../../lib/agents.js');
+
+          if (sessionExists(workAgentId)) {
+            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"`;
+            await messageAgent(workAgentId, reviewMsg);
+            console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
+          }
+        } catch (err: any) {
+          console.warn(`[specialists/done] Failed to send review feedback: ${err.message}`);
+        }
+      });
+    }
+
     // Emit domain event for specialist completion/failure
     if (status === 'passed') {
       yield* eventStore.append({
