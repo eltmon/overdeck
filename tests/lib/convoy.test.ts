@@ -337,15 +337,15 @@ Minimal prompt.
       expect(result.valid).toBe(true);
     });
 
-    it('should have 4 agents: 3 parallel + 1 synthesis', async () => {
+    it('should have 5 agents: 4 parallel + 1 synthesis', async () => {
       const { CODE_REVIEW_TEMPLATE } = await import('../../src/lib/convoy-templates.js');
 
-      expect(CODE_REVIEW_TEMPLATE.agents).toHaveLength(4);
+      expect(CODE_REVIEW_TEMPLATE.agents).toHaveLength(5);
 
       const parallelAgents = CODE_REVIEW_TEMPLATE.agents.filter(a => a.parallel);
       const sequentialAgents = CODE_REVIEW_TEMPLATE.agents.filter(a => !a.parallel);
 
-      expect(parallelAgents).toHaveLength(3);
+      expect(parallelAgents).toHaveLength(4);
       expect(sequentialAgents).toHaveLength(1);
       expect(sequentialAgents[0].role).toBe('synthesis');
     });
@@ -355,7 +355,7 @@ Minimal prompt.
 
       const synthesis = CODE_REVIEW_TEMPLATE.agents.find(a => a.role === 'synthesis');
       expect(synthesis).toBeDefined();
-      expect(synthesis?.dependsOn).toEqual(['correctness', 'security', 'performance']);
+      expect(synthesis?.dependsOn).toEqual(['correctness', 'security', 'performance', 'requirements']);
     });
   });
 });
