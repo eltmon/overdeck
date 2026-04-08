@@ -615,13 +615,14 @@ function CompactChildCard({
   );
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-overlay/50 transition-colors group">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-overlay/50 transition-colors group">
       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
       <a
         href={issue.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs text-content-subtle hover:text-primary shrink-0"
+        onClick={(e) => e.stopPropagation()}
+        className="text-xs font-medium text-primary/70 hover:text-primary shrink-0"
       >
         {issue.identifier}
       </a>
