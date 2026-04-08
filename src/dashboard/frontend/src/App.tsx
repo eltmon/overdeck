@@ -433,7 +433,7 @@ export default function App() {
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
-              <MissionControl issues={issues} />
+              <MissionControl issues={issues} convId={selectedConvId} />
             </div>
           )}
         {activeTab === 'kanban' && (

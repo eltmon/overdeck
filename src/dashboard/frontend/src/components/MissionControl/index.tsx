@@ -51,11 +51,13 @@ async function fetchVersion(): Promise<{ version: string }> {
 
 interface MissionControlProps {
   issues?: Issue[];
+  /** Deep-link conversation ID — selects this conversation on mount */
+  convId?: string | null;
 }
 
 type SidebarTab = 'conversations' | 'projects';
 
-export function MissionControl({ issues = [] }: MissionControlProps) {
+export function MissionControl({ issues = [], convId }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
@@ -113,12 +115,23 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     refetchInterval: 10000,
   });
 
+<<<<<<< HEAD
   // Auto-select the first conversation when the list loads
   useEffect(() => {
     if (conversations.length > 0 && selectedConversation === null) {
       setSelectedConversation(conversations[0].name);
     }
   }, [conversations, selectedConversation]);
+=======
+  // Select conversation by deep-link ID on mount
+  useEffect(() => {
+    if (!convId || conversations.length === 0) return;
+    const conv = conversations.find((c) => String(c.id) === convId);
+    if (conv) {
+      setSelectedConversation(conv.name);
+    }
+  }, [convId, conversations]);
+>>>>>>> 96cabc6f (feat(frontend): pass convId prop to MissionControl for deep-linking)
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
