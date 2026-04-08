@@ -1295,9 +1295,29 @@ const postIssueReopenRoute = HttpRouter.add(
       newState = 'Open';
 
     } else if (githubCheck.isGitHub) {
-      // Also clean up done/needs-close-out labels and ensure in-progress is set
+      // Also clean up done/needs-close-out/merged labels and ensure in-progress is set
       yield* lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void));
       yield* lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void));
+      yield* lifecycle.removeLabel(id, 'merged').pipe(Effect.catch(() => Effect.void));
+
+      // Reopen closed (not merged) PR for the feature branch if one exists
+      yield* Effect.promise(async () => {
+        try {
+          const branchName = `feature/${id.toLowerCase()}`;
+          const { stdout } = await execAsync(
+            `gh pr list --head ${branchName} --state closed --json number,mergedAt --limit 1`,
+            { encoding: 'utf-8', timeout: 15000 }
+          );
+          const prs = JSON.parse(stdout.trim() || '[]');
+          if (prs.length > 0 && !prs[0].mergedAt) {
+            await execAsync(`gh pr reopen ${prs[0].number}`, { encoding: 'utf-8', timeout: 15000 });
+            console.log(`[reopen] Reopened PR #${prs[0].number} for ${id}`);
+          }
+        } catch (err: any) {
+          console.warn(`[reopen] Could not reopen PR for ${id}: ${err.message}`);
+        }
+      });
+
       issueDataService.invalidateTracker('github').catch(() => {});
       newState = 'In Progress';
 

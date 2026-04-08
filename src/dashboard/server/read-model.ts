@@ -9,8 +9,11 @@
  * no Schema crashes. This is the T3Code pattern.
  */
 
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { Effect, Layer, ServiceMap } from 'effect';
 import type { DashboardSnapshot, DomainEvent } from '@panopticon/contracts';
+import { AGENTS_DIR } from '../../lib/paths.js';
 import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
@@ -217,19 +220,29 @@ export const ReadModelServiceLive = Layer.effect(
         for (let i = 0; i < running.length; i++) {
           const a = running[i]
           const enrichment = enrichmentResults[i]
+          // Check if the agent completed normally (completed/completed.processed marker).
+          // This distinguishes "session lost mid-review" from "agent finished and transitioned to in_review".
+          const agentDir = join(AGENTS_DIR, a.id);
+          const completedNormally =
+            existsSync(join(agentDir, 'completed')) ||
+            existsSync(join(agentDir, 'completed.processed'));
           agentsById[a.id] = {
             id: a.id,
             issueId: a.issueId,
             workspace: a.workspace || undefined,
             runtime: a.runtime || undefined,
             model: a.model || undefined,
-            status: toAgentStatus(a.status),
+            // Reconcile on-disk status with live tmux state: if the tmux session is
+            // active but state.json says 'stopped', the agent is actually running
+            // (e.g. resumed outside the API, or state.json write was missed).
+            status: toAgentStatus(a.tmuxActive && a.status === 'stopped' ? 'running' : a.status),
             startedAt: a.startedAt || undefined,
             lastActivity: a.lastActivity || undefined,
             branch: a.branch || undefined,
             costSoFar: a.costSoFar,
             sessionId: a.sessionId || undefined,
             phase: toAgentPhase(a.phase),
+            runtimeState: completedNormally ? 'completed' : undefined,
             // Enrichment fields (PAN-440)
             agentPhase: enrichment ? toAgentPhase(enrichment.agentPhase) : undefined,
             hasPendingQuestion: enrichment?.hasPendingQuestion,
