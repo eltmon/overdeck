@@ -41,6 +41,7 @@ import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { OpenRouterPage } from './OpenRouterPage';
+import { DesktopSettingsSection } from './DesktopSettingsSection';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -1240,6 +1241,9 @@ export function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Desktop App settings — shown only inside Electron */}
+      <DesktopSettingsSection />
     </div>
   );
 }
