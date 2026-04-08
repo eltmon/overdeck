@@ -75,12 +75,17 @@ const execAsync = promisify(exec);
 // ─── Package version ──────────────────────────────────────────────────────────
 
 function readPackageVersion(): string {
-  const base = dirname(fileURLToPath(import.meta.url));
-  for (const levels of [['..', '..', '..'], ['..', '..', '..', '..']]) {
-    const candidate = join(base, ...levels, 'package.json');
+  // Walk up from the running script to find the nearest package.json.
+  // Works for both source (src/dashboard/server/routes/) and bundled (dist/dashboard/) layouts.
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    const candidate = join(dir, 'package.json');
     try {
       return JSON.parse(readFileSync(candidate, 'utf-8')).version;
-    } catch { /* try next */ }
+    } catch { /* try parent */ }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
   return '0.0.0';
 }
