@@ -1537,9 +1537,10 @@ INSTRUCTIONS:
 7. git push --force-with-lease origin ${featureBranch}
 8. Merge the PR via GitHub CLI (this is the ACTUAL merge to main):
    \`\`\`bash
-   gh pr merge --squash --admin --head ${featureBranch} --repo eltmon/panopticon-cli
+   gh pr merge --squash --head ${featureBranch} --repo eltmon/panopticon-cli
    \`\`\`
-   Use --admin to bypass branch protection (required). Do NOT use --auto flag.
+   Do NOT use --auto or --admin flags. Panopticon reports commit statuses via GitHub App,
+   so branch protection checks will pass automatically.
    If this fails, report FAILURE — do NOT report success without a merged PR.
 9. Report completion by calling the Panopticon API:
    curl -s -X POST ${apiUrl}/api/specialists/done \\

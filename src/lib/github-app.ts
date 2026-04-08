@@ -140,6 +140,7 @@ export async function configureWorkspaceForBot(
 ): Promise<void> {
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
+  const { writeFileSync } = await import('fs');
   const execAsync = promisify(exec);
   const { name, email } = getBotIdentity();
 
@@ -147,9 +148,16 @@ export async function configureWorkspaceForBot(
   await execAsync(`git config user.name "${name}"`, { cwd: workspacePath, encoding: 'utf-8' });
   await execAsync(`git config user.email "${email}"`, { cwd: workspacePath, encoding: 'utf-8' });
 
-  // Set remote URL to HTTPS with token (replaces SSH)
-  const httpsUrl = `https://x-access-token:${token}@github.com/${owner}/${repo}.git`;
+  // Use git credential store with a workspace-local credential file.
+  // Token is refreshed at workspace creation (~1hr TTL). For long sessions,
+  // call refreshWorkspaceToken() to get a fresh one.
+  const credFile = join(workspacePath, '.git', 'pan-credentials');
+  writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
+
+  // Set remote to HTTPS and configure credential store
+  const httpsUrl = `https://github.com/${owner}/${repo}.git`;
   await execAsync(`git remote set-url origin "${httpsUrl}"`, { cwd: workspacePath, encoding: 'utf-8' });
+  await execAsync(`git config credential.helper "store --file=${credFile}"`, { cwd: workspacePath, encoding: 'utf-8' });
 }
 
 /**
@@ -193,4 +201,41 @@ export async function reportCommitStatus(
     const text = await response.text();
     console.warn(`[github-app] Failed to report status: ${response.status} ${text}`);
   }
+}
+
+/**
+ * Refresh the installation token for a workspace (call when token expires).
+ * Updates the credential file in-place.
+ */
+export async function refreshWorkspaceToken(
+  workspacePath: string,
+): Promise<void> {
+  const config = loadGitHubAppConfig();
+  if (!config) throw new Error('GitHub App not configured');
+
+  const { token } = await generateInstallationToken(config);
+  const { writeFileSync } = await import('fs');
+  const credFile = join(workspacePath, '.git', 'pan-credentials');
+  writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
+}
+
+/**
+ * Get GitHub App status for `pan status` display
+ */
+export function getAppStatus(): {
+  configured: boolean;
+  appId?: string;
+  installationId?: string;
+  mode: 'app' | 'fallback';
+} {
+  const config = loadGitHubAppConfig();
+  if (config) {
+    return {
+      configured: true,
+      appId: config.appId,
+      installationId: config.installationId,
+      mode: 'app',
+    };
+  }
+  return { configured: false, mode: 'fallback' };
 }
