@@ -3,14 +3,13 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing beads one at a time. Just completed sqlite-migration bead.
+Completed jsonl-truncation bead (includes integration). Moving to tests.
 
 ## Completed Work
 - [x] feature-pan-489-1n7: Add SQLite session_compact_offsets table (commit: 42239bf6)
+- [x] feature-pan-489-unc: Implement JSONL truncation on compaction (commit: adeb406d) — includes integration into spawnEphemeralSpecialist
 
 ## Remaining Work
-- [ ] feature-pan-489-unc: Implement JSONL truncation on compaction
-- [ ] feature-pan-489-o9e: Integrate rotation check into spawnEphemeralSpecialist pre-launch
 - [ ] feature-pan-489-76t: Add unit tests for rotation and truncation logic
 
 ## Key Decisions
