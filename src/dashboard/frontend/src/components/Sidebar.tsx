@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Eye, LayoutGrid, Bot, Server, Network, ArrowRightLeft,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
@@ -59,6 +60,15 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: versionData } = useQuery({
+    queryKey: ['version'],
+    queryFn: async () => {
+      const res = await fetch('/api/version');
+      if (!res.ok) return null;
+      return res.json() as Promise<{ version: string }>;
+    },
+    staleTime: Infinity,
+  });
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed(prev => {
@@ -120,6 +130,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Panopticon
               </span>
+              {versionData?.version && (
+                <span className="text-[10px] text-muted-foreground font-normal">v{versionData.version}</span>
+              )}
             </button>
           )}
           {collapsed && (
