@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'child_process';
-import { existsSync, readdirSync, statSync, symlinkSync, mkdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlinkSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -345,6 +345,22 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
+
+  // Enforce Playwright MCP --isolated flag to prevent stale zoom/profile state
+  const mcpPath = join(homedir(), '.claude', 'mcp.json');
+  try {
+    if (existsSync(mcpPath)) {
+      const mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+      const pw = mcpConfig?.mcpServers?.playwright;
+      if (pw && Array.isArray(pw.args) && !pw.args.includes('--isolated')) {
+        pw.args.push('--isolated');
+        writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+        console.log(chalk.green('✓ Added --isolated to Playwright MCP (prevents stale zoom/profile state)'));
+      }
+    }
+  } catch {
+    // Non-fatal — skip if mcp.json can't be read/written
+  }
 
   // Ensure beads database exists for each registered project (first-time setup guard).
   // bd install puts the binary in PATH, but bd init must be run once per project to
