@@ -94,6 +94,12 @@ export function initHealthDatabase(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_timestamp
       ON health_events(timestamp);
+
+    CREATE TABLE IF NOT EXISTS session_compact_offsets (
+      session_id TEXT PRIMARY KEY,
+      boundary_byte_offset INTEGER NOT NULL,
+      rotated_at TEXT NOT NULL
+    );
   `);
 
   // Run cleanup on initialization
@@ -393,4 +399,35 @@ export function getDatabaseStats(): {
     oldestEvent,
     newestEvent,
   };
+}
+
+// ─── Session Compact Offsets ───────────────────────────────────────────────────
+
+/**
+ * Record that a session's JSONL has been truncated to a compact boundary.
+ * Idempotent: updates existing record if session_id already exists.
+ */
+export function upsertBoundaryRotated(sessionId: string, boundaryByteOffset: number): void {
+  const database = getHealthDatabase();
+  const stmt = database.prepare(`
+    INSERT INTO session_compact_offsets (session_id, boundary_byte_offset, rotated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(session_id) DO UPDATE SET
+      boundary_byte_offset = excluded.boundary_byte_offset,
+      rotated_at = excluded.rotated_at
+  `);
+  stmt.run(sessionId, boundaryByteOffset, new Date().toISOString());
+}
+
+/**
+ * Get the recorded boundary byte offset for a session, if any.
+ * Returns null if the session has never been rotated.
+ */
+export function getBoundaryRotated(sessionId: string): number | null {
+  const database = getHealthDatabase();
+  const stmt = database.prepare(`
+    SELECT boundary_byte_offset FROM session_compact_offsets WHERE session_id = ?
+  `);
+  const row = stmt.get(sessionId) as { boundary_byte_offset: number } | undefined;
+  return row?.boundary_byte_offset ?? null;
 }
