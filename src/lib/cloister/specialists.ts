@@ -131,7 +131,8 @@ function claudeProjectDir(cwd: string): string {
  * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
  * Returns 0 if no boundary found.
  */
-function findLastCompactBoundarySync(sessionFile: string): number {
+export function findLastCompactBoundarySync(sessionFile: string): number {
+  if (!existsSync(sessionFile)) return 0;
   const buffer = readFileSync(sessionFile);
   const text = buffer.toString('utf-8');
 
@@ -167,7 +168,7 @@ function findLastCompactBoundarySync(sessionFile: string): number {
  *
  * Returns the byte offset of the boundary that was truncated to, or 0 if no truncation needed.
  */
-function truncateToCompactBoundarySync(sessionFile: string): number {
+export function truncateToCompactBoundarySync(sessionFile: string): number {
   const buffer = readFileSync(sessionFile);
   const text = buffer.toString('utf-8');
 
