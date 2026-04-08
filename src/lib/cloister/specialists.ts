@@ -398,6 +398,33 @@ export function getSessionId(name: SpecialistType, projectKey?: string): string 
  * @param sessionId - Session ID to store
  * @param projectKey - Optional project key (per-project specialists only)
  */
+/**
+ * Get the current session generation (for rotating session IDs).
+ * Returns 0 if no generation file exists.
+ */
+export function getSessionGeneration(name: SpecialistType, projectKey?: string): number {
+  const genFile = getSessionFilePath(name, projectKey) + '.gen';
+  if (!existsSync(genFile)) return 0;
+  try {
+    return parseInt(readFileSync(genFile, 'utf-8').trim(), 10) || 0;
+  } catch { return 0; }
+}
+
+/**
+ * Bump the session generation — next dispatch will use a new session ID.
+ * Old JSONL files are preserved (not deleted).
+ */
+export function bumpSessionGeneration(name: SpecialistType, projectKey?: string): number {
+  const genFile = getSessionFilePath(name, projectKey) + '.gen';
+  const dir = projectKey
+    ? join(SPECIALISTS_DIR, 'projects', projectKey)
+    : SPECIALISTS_DIR;
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const newGen = getSessionGeneration(name, projectKey) + 1;
+  writeFileSync(genFile, String(newGen));
+  return newGen;
+}
+
 export function setSessionId(name: SpecialistType, sessionId: string, projectKey?: string): void {
   const sessionFile = getSessionFilePath(name, projectKey);
   const dir = projectKey
@@ -699,11 +726,12 @@ ${basePrompt}`;
     const promptFile = join(agentDir, 'task-prompt.md');
     writeFileSync(promptFile, taskPrompt);
 
-    // Deterministic session ID: same specialist + project always gets the same UUID.
-    // The UUID is computed from the identity string — no session file needed for dispatch.
+    // Deterministic session ID: same specialist + project + generation gets the same UUID.
+    // Bumping the generation (via API) rotates to a fresh session without deleting old JONLs.
     // --resume is always the default (session exists from prior runs).
     // On very first cold start, --resume fails and the launcher falls back to --session-id.
-    const sessionName = `specialist-${projectKey}-${specialistType}`;
+    const gen = getSessionGeneration(specialistType, projectKey);
+    const sessionName = `specialist-${projectKey}-${specialistType}-gen${gen}`;
     const sessionId = deterministicUUID(sessionName);
 
     // Write session file for informational purposes (pan specialists list)

@@ -1798,6 +1798,33 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/specialists/projects/:project/:name/reset-session ───────
+// Bumps the session generation so the next dispatch starts a fresh Claude session.
+// Old JSONL files are preserved.
+
+const postProjectSpecialistResetSessionRoute = HttpRouter.add(
+  'POST',
+  '/api/specialists/projects/:project/:name/reset-session',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const projectKey = params['project'] ?? '';
+    const name = params['name'] ?? '';
+
+    const { bumpSessionGeneration } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const specialistType = name as any;
+    const newGen = bumpSessionGeneration(specialistType, projectKey);
+
+    // Also kill the tmux session so it doesn't linger with old context
+    const tmuxSession = `specialist-${projectKey}-${name}`;
+    try {
+      yield* Effect.promise(() => execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null`, { encoding: 'utf-8' }));
+    } catch { /* no session to kill */ }
+
+    console.log(`[specialist] Reset session for ${projectKey}/${name} → generation ${newGen}`);
+    return jsonResponse({ success: true, specialist: name, project: projectKey, generation: newGen });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 //
 // ORDERING RULES (important for Effect HttpRouter):
@@ -1845,6 +1872,7 @@ export const specialistsRouteLayer = Layer.mergeAll(
   postProjectSpecialistCompleteRoute,       // /complete
   getProjectSpecialistLatestLogRoute,       // /latest-log
   postProjectSpecialistLogsCleanupRoute,    // /logs/cleanup
+  postProjectSpecialistResetSessionRoute,  // /reset-session
 );
 
 export default specialistsRouteLayer;
