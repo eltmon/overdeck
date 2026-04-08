@@ -57,6 +57,7 @@ import {
   stopAgent,
   getProviderExportsForModel,
   getProviderTmuxFlags,
+  listRunningAgents,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import {
@@ -1691,6 +1692,57 @@ const getAgentTmuxAliveRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/agents/restart-all ──────────────────────────────────────
+//
+// Stop all running workspace agents, then re-start each by POSTing to
+// the start-agent endpoint internally. Cloister handles model routing,
+// workspace setup, and beads enforcement.
+
+const postAgentsRestartAllRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/restart-all',
+  Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      try {
+        const running = listRunningAgents().filter(a => a.tmuxActive);
+        const results: { id: string; issueId: string; model: string; status: string }[] = [];
+
+        for (const agent of running) {
+          try {
+            // Stop the agent (captures output, kills tmux, marks stopped)
+            stopAgent(agent.id);
+
+            // Re-start via internal API call — reuses all existing start-agent logic
+            const res = await fetch('http://localhost:3011/api/agents', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ issueId: agent.issueId }),
+            });
+
+            if (res.ok) {
+              results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'restarted' });
+            } else {
+              const err = await res.json().catch(() => ({ error: res.statusText }));
+              results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${(err as any).error ?? res.statusText}` });
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[agents] Failed to restart ${agent.id}:`, msg);
+            results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${msg}` });
+          }
+        }
+
+        const succeeded = results.filter(r => r.status === 'restarted').length;
+        console.log(`[agents] Restarted ${succeeded}/${running.length} workspace agents`);
+        return jsonResponse({ restarted: succeeded, total: running.length, results });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to restart agents: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
@@ -1712,6 +1764,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentHandoffsRoute,
   getAgentCostRoute,
   postAgentsRoute,
+  postAgentsRestartAllRoute,
   getAgentTmuxAliveRoute,
 );
 

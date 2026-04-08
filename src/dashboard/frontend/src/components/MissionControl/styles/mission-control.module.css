@@ -1475,6 +1475,21 @@
   flex: 1;
 }
 
+.workLogResult {
+  margin: 2px 0 4px 18px;
+  padding: 6px 8px;
+  background: var(--mc-bg-secondary, rgba(0,0,0,0.2));
+  border-radius: 4px;
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+
 .workLogExpandBtn {
   background: none;
   border: none;
@@ -1904,4 +1919,109 @@
   background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
   color: var(--color-warning, #f59e0b);
   border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 25%, transparent);
+}
+
+/* ─── Restart Popover ────────────────────────────────────────────────────── */
+
+.restartPopover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  width: 240px;
+  background: var(--mc-bg-primary);
+  border: 1px solid var(--mc-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: var(--mc-space-2);
+  margin-top: 4px;
+}
+
+.restartPopoverTitle {
+  font-size: var(--mc-font-size-sm);
+  font-weight: 600;
+  color: var(--mc-text-primary);
+  padding: 2px 4px;
+}
+
+.restartPopoverDivider {
+  height: 1px;
+  background: var(--mc-border);
+  margin: var(--mc-space-1) 0;
+}
+
+.restartPopoverLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-primary);
+  transition: background 0.1s;
+}
+
+.restartPopoverLabel:hover {
+  background: var(--mc-bg-hover);
+}
+
+.restartPopoverLabel input[type="checkbox"] {
+  accent-color: var(--mc-accent);
+  margin: 0;
+}
+
+.restartPopoverCount {
+  color: var(--mc-text-muted);
+  font-size: var(--mc-font-size-xs);
+  margin-left: auto;
+}
+
+.restartPopoverActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.restartPopoverCancel {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-secondary);
+  background: transparent;
+  border: 1px solid var(--mc-border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.restartPopoverCancel:hover {
+  background: var(--mc-bg-hover);
+}
+
+.restartPopoverConfirm {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: var(--mc-font-size-xs);
+  color: white;
+  background: var(--mc-accent);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.restartPopoverConfirm:hover {
+  opacity: 0.9;
+}
+
+.restartPopoverConfirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.restartPopoverError {
+  color: var(--mc-error);
+  font-size: var(--mc-font-size-xs);
+  padding: 4px;
+  margin-top: 2px;
 }

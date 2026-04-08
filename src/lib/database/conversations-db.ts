@@ -33,6 +33,10 @@ export interface Conversation {
   totalCost: number;
   /** ISO timestamp when archived, null = not archived. */
   archivedAt: string | null;
+  /** Model used to spawn this conversation (e.g. 'minimax-m2.7-highspeed'). Null = default. */
+  model: string | null;
+  /** Effort level (e.g. 'low', 'medium', 'high'). Null = default. */
+  effort: string | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -54,6 +58,8 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     titleSeed: (row['title_seed'] as string | null) ?? null,
     totalCost: (row['total_cost'] as number) ?? 0,
     archivedAt: (row['archived_at'] as string | null) ?? null,
+    model: (row['model'] as string | null) ?? null,
+    effort: (row['effort'] as string | null) ?? null,
   };
 }
 
@@ -65,7 +71,7 @@ export function listConversations(): Conversation[] {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at
+              title_source, title_seed, total_cost, archived_at, model, effort
        FROM conversations
        WHERE archived_at IS NULL
        ORDER BY created_at DESC`,
@@ -80,7 +86,7 @@ export function getConversationByName(name: string): Conversation | null {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at
+              title_source, title_seed, total_cost, archived_at, model, effort
        FROM conversations
        WHERE name = ?`,
     )
@@ -99,13 +105,15 @@ export function createConversation(opts: {
   title?: string;
   titleSource?: TitleSource;
   titleSeed?: string;
+  model?: string;
+  effort?: string;
 }): Conversation {
   const db = getDatabase();
   const now = new Date().toISOString();
   const result = db
     .prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file, title, title_source, title_seed)
-       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file, title, title_source, title_seed, model, effort)
+       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       opts.name,
@@ -117,12 +125,14 @@ export function createConversation(opts: {
       opts.title ?? null,
       opts.titleSource ?? null,
       opts.titleSeed ?? null,
+      opts.model ?? null,
+      opts.effort ?? null,
     );
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at
+              title_source, title_seed, total_cost, archived_at, model, effort
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -202,6 +212,14 @@ export function updateConversationCost(name: string, totalCost: number): void {
   db.prepare(
     `UPDATE conversations SET total_cost = ? WHERE name = ?`,
   ).run(totalCost, name);
+}
+
+/** Update the model for a conversation (used by backfill). */
+export function updateConversationModel(name: string, model: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET model = ? WHERE name = ? AND model IS NULL`,
+  ).run(model, name);
 }
 
 /**

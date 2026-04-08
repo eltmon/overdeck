@@ -333,6 +333,7 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
 const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 
 function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
+  const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--mc-text-secondary)',
     tool: 'var(--mc-accent)',
@@ -341,33 +342,57 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
   };
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
+  const hasResult = !!entry.result;
 
   return (
-    <div className={styles.workLogEntry}>
-      {isTerminal ? (
-        <span
-          className={styles.workLogTerminalIcon}
-          style={{ color: toneColor[entry.tone] }}
-        >
-          {'>_'}
-        </span>
-      ) : (
-        <Circle
-          size={6}
-          style={{
-            fill: toneColor[entry.tone],
-            color: toneColor[entry.tone],
-            flexShrink: 0,
-            marginTop: 2,
-          }}
-        />
-      )}
-      <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
-      {entry.detail && (
-        <span className={styles.workLogDetail} title={entry.detail}>
-          {entry.detail.slice(0, 80)}
-          {entry.detail.length > 80 ? '…' : ''}
-        </span>
+    <div>
+      <div
+        className={styles.workLogEntry}
+        style={hasResult ? { cursor: 'pointer' } : undefined}
+        onClick={hasResult ? () => setShowResult(prev => !prev) : undefined}
+      >
+        {isTerminal ? (
+          <span
+            className={styles.workLogTerminalIcon}
+            style={{ color: toneColor[entry.tone] }}
+          >
+            {'>_'}
+          </span>
+        ) : (
+          <Circle
+            size={6}
+            style={{
+              fill: toneColor[entry.tone],
+              color: toneColor[entry.tone],
+              flexShrink: 0,
+              marginTop: 2,
+            }}
+          />
+        )}
+        <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
+        {entry.detail && (
+          <span className={styles.workLogDetail} title={entry.detail}>
+            {entry.detail.slice(0, 80)}
+            {entry.detail.length > 80 ? '…' : ''}
+          </span>
+        )}
+        {hasResult && (
+          <ChevronRight
+            size={10}
+            style={{
+              flexShrink: 0,
+              marginLeft: 'auto',
+              transition: 'transform 0.15s',
+              transform: showResult ? 'rotate(90deg)' : 'none',
+              color: 'var(--mc-text-muted)',
+            }}
+          />
+        )}
+      </div>
+      {showResult && entry.result && (
+        <pre className={styles.workLogResult}>
+          {entry.result}
+        </pre>
       )}
     </div>
   );

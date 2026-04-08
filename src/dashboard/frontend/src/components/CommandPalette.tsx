@@ -23,6 +23,7 @@ import {
   User,
   Zap,
   Bot,
+  RefreshCw,
 } from 'lucide-react';
 import { useDashboardStore, selectAgentList, selectIssues } from '../lib/store';
 import type { Issue, Agent } from '../types';
@@ -117,6 +118,24 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       keywords: ['kill', 'abort', 'stop all', 'halt'],
       destructive: true,
       onSelect: () => void callApi('/api/agents/emergency-stop'),
+    },
+    {
+      id: 'restart-conversations',
+      label: 'Restart All Conversations',
+      description: 'Re-spawn all active conversations with their stored model',
+      icon: RefreshCw,
+      group: 'Orchestration',
+      keywords: ['restart', 'respawn', 'conversations', 'model', 'refresh'],
+      onSelect: () => void callApi('/api/conversations/restart-all'),
+    },
+    {
+      id: 'restart-agents',
+      label: 'Restart All Workspace Agents',
+      description: 'Stop and re-start all running workspace agents',
+      icon: RefreshCw,
+      group: 'Orchestration',
+      keywords: ['restart', 'respawn', 'agents', 'workspace', 'refresh'],
+      onSelect: () => void callApi('/api/agents/restart-all'),
     },
     {
       id: 'open-settings',
