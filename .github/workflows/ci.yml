@@ -22,9 +22,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - uses: oven/setup-bun@v1
-        with:
-          bun-version: latest
+      - name: Install Bun
+        run: curl -fsSL https://bun.sh/install | bash
+
+      - name: Add Bun to PATH
+        run: echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -46,9 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven/setup-bun@v1
-        with:
-          bun-version: latest
+      - name: Install Bun
+        run: curl -fsSL https://bun.sh/install | bash
+
+      - name: Add Bun to PATH
+        run: echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
