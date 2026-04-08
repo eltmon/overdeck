@@ -23,7 +23,7 @@
 ### Quick Install
 
 ```bash
-npm install -g panopticon-cli && pan install && pan sync && pan up
+npm install -g panopticon-cli && pan install && pan up
 ```
 
 **That's it!** Dashboard runs at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).

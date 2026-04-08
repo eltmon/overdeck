@@ -26,7 +26,7 @@ Panopticon is an open-source control plane for multi-agent software development.
 ## Quick Start
 
 ```bash
-npx panopticon-cli@latest install && pan sync && pan up
+npx panopticon-cli@latest install && pan up
 ```
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
@@ -73,7 +73,7 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 | **Cloister Lifecycle Manager** | Automatic model routing, stuck detection, cost tracking, and specialist handoffs |
 | **Mission Control** | 13-view dashboard — project tree, activity feed, kanban board, agent status, costs, metrics, and more |
 | **PRD-Driven Workflow** | Opus writes a PRD before implementation starts; agents are blocked without one |
-| **70+ Universal Skills** | Pre-built skills ship out of the box, synced via `pan sync` — one SKILL.md works across all AI tools |
+| **70+ Universal Skills** | Pre-built skills ship out of the box, auto-synced on every `pan up` — one SKILL.md works across all AI tools |
 | **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all from one dashboard |
 | **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, Zhipu — route by task type, capability, and budget |
 | **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via Fly.io) |
