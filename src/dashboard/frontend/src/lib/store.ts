@@ -116,8 +116,7 @@ export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =
     // "Include closed-out" controls the closed-out label, not the Done column.
     return issues.filter(
       (i) =>
-        i['state'] !== 'canceled' && i['canonicalStatus'] !== 'canceled' &&
-        i['state'] !== 'done' && i['canonicalStatus'] !== 'done',
+        i['state'] !== 'canceled' && i['canonicalStatus'] !== 'canceled',
     )
   }
 

@@ -1537,7 +1537,7 @@ INSTRUCTIONS:
 7. git push --force-with-lease origin ${featureBranch}
 8. Merge the PR via GitHub CLI (this is the ACTUAL merge to main):
    \`\`\`bash
-   gh pr merge --squash --head ${featureBranch} --repo eltmon/panopticon-cli
+   gh pr merge ${featureBranch} --squash
    \`\`\`
    Do NOT use --auto or --admin flags. Panopticon reports commit statuses via GitHub App,
    so branch protection checks will pass automatically.
