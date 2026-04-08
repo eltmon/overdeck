@@ -246,6 +246,37 @@ const postTestApiKeyRoute = HttpRouter.add(
           break;
         }
 
+        case 'minimax': {
+          const apiModel = model || 'MiniMax-M2.7-highspeed';
+          try {
+            const resp = await fetch('https://api.minimax.io/anthropic/v1/messages', {
+              method: 'POST',
+              headers: {
+                'x-api-key': apiKey,
+                'Content-Type': 'application/json',
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({ model: apiModel, max_tokens: 10, messages: [{ role: 'user', content: testPrompt }] }),
+            });
+            latencyMs = Date.now() - startTime;
+            if (resp.ok) {
+              const data = await resp.json() as { content?: Array<{ text?: string }> };
+              response = data.content?.[0]?.text?.trim() || '';
+              success = response.includes(expectedAnswer);
+              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
         default:
           error = `Unknown provider: ${provider}`;
       }

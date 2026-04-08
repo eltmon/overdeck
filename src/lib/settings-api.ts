@@ -85,6 +85,7 @@ export interface ApiSettingsConfig {
       google: boolean;
       zai: boolean;
       kimi: boolean;
+      minimax: boolean;
       openrouter: boolean;
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
@@ -95,6 +96,7 @@ export interface ApiSettingsConfig {
     google?: string;
     zai?: string;
     kimi?: string;
+    minimax?: string;
     openrouter?: string;
   };
   openrouter?: {
@@ -137,6 +139,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         google: config.enabledProviders.has('google'),
         zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
+        minimax: config.enabledProviders.has('minimax'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
       overrides: config.overrides,
@@ -164,6 +167,7 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
         google: settings.models.providers.google,
         zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
+        minimax: settings.models.providers.minimax,
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
@@ -365,6 +369,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         google: false,
         zai: false,
         kimi: true, // Kimi K2.5 used for implementation work agent
+        minimax: false,
         openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
