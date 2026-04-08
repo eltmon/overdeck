@@ -7,6 +7,43 @@
  * (inside Docker); these stubs prevent TS2307 errors in non-Docker envs.
  */
 
+// ─── Panopticon Desktop Bridge ────────────────────────────────────────────────
+// Injected by apps/desktop/src/preload.ts via contextBridge.exposeInMainWorld.
+// Only present when running inside the Electron desktop app.
+
+interface PanopticonBridgeDesktopSettings {
+  tray: { showBadge: boolean; tooltipDetail: 'minimal' | 'full' };
+  notifications: {
+    inputNeeded: boolean;
+    stuckAgents: boolean;
+    mergeFailures: boolean;
+    workComplete: boolean;
+    planningDone: boolean;
+    mergeReady: boolean;
+  };
+  autoStart: { enabled: boolean; nagCount: number; nagDismissed: boolean };
+}
+
+interface PanopticonBridge {
+  isDesktopApp(): boolean;
+  getServerUrl(): string | null;
+  getWsUrl(): string | null;
+  pickFolder(): Promise<string | null>;
+  openExternal(url: string): Promise<void>;
+  onMenuAction(listener: (action: string) => void): () => void;
+  getDesktopSettings(): Promise<PanopticonBridgeDesktopSettings>;
+  updateDesktopSetting(key: string, value: unknown): Promise<void>;
+  notify(
+    eventType: keyof PanopticonBridgeDesktopSettings['notifications'],
+    title: string,
+    body: string,
+  ): Promise<void>;
+}
+
+interface Window {
+  panopticonBridge?: PanopticonBridge;
+}
+
 declare module 'framer-motion' {
   import * as React from 'react';
 

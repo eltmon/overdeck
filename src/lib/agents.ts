@@ -940,8 +940,13 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   const allowedRuntimeStates = ['suspended', 'idle'];
   const allowedAgentStatuses = ['stopped', 'completed'];
 
+  // Also allow resuming a "running" agent with no live tmux session — this happens after
+  // a system crash where tmux was killed but state.json was never updated to 'stopped'.
+  const isCrashed = agentState?.status === 'running' && !sessionExists(normalizedId);
+
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
-    || (agentState && allowedAgentStatuses.includes(agentState.status));
+    || (agentState && allowedAgentStatuses.includes(agentState.status))
+    || isCrashed;
 
   if (!canResume) {
     return {

@@ -2336,6 +2336,37 @@ export function getLastPatrolResult(): PatrolResult | null {
 /**
  * Start the deacon patrol loop
  */
+/**
+ * On startup, detect agents whose state.json claims 'running' or 'starting' but have
+ * no live tmux session — this happens after a system crash where tmux was killed but
+ * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
+ */
+function recoverOrphanedAgents(): void {
+  if (!existsSync(AGENTS_DIR)) return;
+  let dirs: string[];
+  try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
+  catch { return; }
+
+  let recovered = 0;
+  for (const dir of dirs) {
+    const stateFile = join(AGENTS_DIR, dir, 'state.json');
+    if (!existsSync(stateFile)) continue;
+    try {
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      if (state.status !== 'running' && state.status !== 'starting') continue;
+      if (sessionExists(dir)) continue; // truly still running
+      // Orphaned — crashed agent with no tmux session
+      const oldStatus = state.status;
+      state.status = 'stopped';
+      state.stoppedAt = new Date().toISOString();
+      writeFileSync(stateFile, JSON.stringify(state, null, 2));
+      recovered++;
+      console.log(`[deacon] Recovered orphaned agent ${dir} (${oldStatus}→stopped)`);
+    } catch { /* non-fatal */ }
+  }
+  if (recovered > 0) console.log(`[deacon] Startup recovery: ${recovered} orphaned agent(s) reset to stopped`);
+}
+
 export function startDeacon(): void {
   if (deaconInterval) {
     console.log('[deacon] Already running');
@@ -2344,6 +2375,9 @@ export function startDeacon(): void {
 
   config = loadConfig();
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
+
+  // Recover agents whose tmux sessions were killed by a system crash
+  recoverOrphanedAgents();
 
   // Run initial patrol
   runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));

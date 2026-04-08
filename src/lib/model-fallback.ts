@@ -153,8 +153,10 @@ export function applyFallback(
     return modelId;
   }
 
-  // Provider disabled — throw rather than silently charge a different provider
-  throw new Error(`Model "${modelId}" requires a ${provider} API key which is not configured. Add it in Settings to use this model.`);
+  // Provider disabled — fall back to the equivalent Anthropic model
+  const fallback = getFallbackModel(modelId);
+  console.warn(`Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`);
+  return fallback;
 }
 
 /**

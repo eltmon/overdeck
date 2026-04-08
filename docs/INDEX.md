@@ -78,6 +78,7 @@
 |----------|-------------|
 | [SETTINGS-UI-DESIGN.md](./SETTINGS-UI-DESIGN.md) | Settings page design and implementation |
 | [god-view.md](./god-view.md) | God View — real-time agent activity command center (PAN-341) |
+| [DESKTOP-APP.md](./DESKTOP-APP.md) | Electron desktop app — tray, notifications, auto-start, IPC bridge, protocol handler |
 
 ---
 
@@ -156,6 +157,12 @@
 - **"__dirname"** / **"bundled server"** / **"prompt template"** → BUILD.md
 - **"dist"** / **"production build"** → BUILD.md
 - **"node-pty"** / **"bun dashboard"** / **"pan up node"** / **"terminal PTY"** / **"circular ESM"** → `.claude/rules/dashboard-node22-only.md`, CLAUDE.md
+- **"electron"** / **"desktop"** / **"AppImage"** / **"DMG"** / **"electron-builder"** → DESKTOP-APP.md, BUILD.md
+- **"tray"** / **"system tray"** / **"notification"** / **"auto-start"** / **"nag"** → DESKTOP-APP.md
+- **"command palette"** / **"Cmd+K"** / **"Ctrl+K"** → DESKTOP-APP.md
+- **"contextBridge"** / **"IPC bridge"** / **"panopticonBridge"** / **"preload"** → DESKTOP-APP.md
+- **"panopticon://"** / **"custom protocol"** / **"path traversal"** → DESKTOP-APP.md
+- **"npx panopticon serve"** / **"browser-only"** → DESKTOP-APP.md, USAGE.md
 
 ### Testing
 - **"test"** / **"testing"** → TESTING.md, E2E_TEST_PLAN.md, TESTING-PROVIDERS.md
@@ -179,6 +186,7 @@
 - **"settings"** / **"settings page"** → SETTINGS-UI-DESIGN.md
 - **"dashboard"** → README.md
 - **"UI"** / **"frontend"** → SETTINGS-UI-DESIGN.md
+- **"desktop app"** / **"electron"** / **"tray"** / **"command palette"** → DESKTOP-APP.md
 
 ### Planning
 - **"PRD"** / **"requirements"** → PRD.md, prds/active/, prds/completed/

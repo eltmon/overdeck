@@ -307,6 +307,63 @@ program
       }
     }
 
+    // Check for installed Electron app — launch it instead of bare server
+    const electronAppPath = (() => {
+      const home = process.env.HOME || process.env.USERPROFILE || '';
+      const candidates: string[] = [];
+
+      if (process.platform === 'linux') {
+        // Installed AppImage or symlink in standard locations
+        candidates.push(
+          join(home, '.local', 'bin', 'panopticon'),
+          join(home, '.local', 'share', 'applications', 'panopticon'),
+          '/usr/local/bin/panopticon',
+          '/opt/panopticon/panopticon',
+        );
+        // Glob-style: $HOME/Applications/Panopticon*.AppImage
+        try {
+          const appsDir = join(home, 'Applications');
+          const { readdirSync } = require('fs') as typeof import('fs');
+          if (existsSync(appsDir)) {
+            const appImages = readdirSync(appsDir).filter(
+              (f: string) => f.startsWith('Panopticon') && f.endsWith('.AppImage'),
+            );
+            for (const f of appImages) candidates.push(join(appsDir, f));
+          }
+        } catch {
+          // ignore
+        }
+      } else if (process.platform === 'darwin') {
+        candidates.push(
+          '/Applications/Panopticon.app/Contents/MacOS/Panopticon',
+          join(home, 'Applications', 'Panopticon.app', 'Contents', 'MacOS', 'Panopticon'),
+        );
+      } else if (process.platform === 'win32') {
+        const localApp = process.env.LOCALAPPDATA || '';
+        candidates.push(join(localApp, 'Programs', 'panopticon', 'Panopticon.exe'));
+      }
+
+      return candidates.find((p) => existsSync(p)) ?? null;
+    })();
+
+    if (electronAppPath) {
+      console.log(chalk.dim(`Launching Panopticon desktop app...`));
+      console.log(chalk.dim(`  ${electronAppPath}`));
+      const { spawn } = await import('child_process');
+      const child = spawn(electronAppPath, [], {
+        detached: true,
+        stdio: 'ignore',
+        env: process.env,
+      });
+      child.on('error', (err) => {
+        console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
+        console.warn(chalk.dim('  Falling back to bare server mode'));
+      });
+      child.unref();
+      console.log(chalk.green('✓ Desktop app launched'));
+      return;
+    }
+
     // Start dashboard
     if (isProduction) {
       console.log(chalk.dim('Starting dashboard (bundled mode)...'));
@@ -541,6 +598,67 @@ program
     // Forward to subcommand — avoids duplicating logic
     await program.parseAsync(['cost', 'sync'], { from: 'user' });
   });
+
+// ─── npx panopticon — server + browser launcher ───────────────────────────────
+// Low-friction entry point: no Electron required.
+// Starts the dashboard server and opens the browser to the dashboard URL.
+// Usage: npx panopticon  (or: npx panopticon serve)
+
+program
+  .command('serve')
+  .description('Start the dashboard server and open it in the default browser (npx launcher)')
+  .option('--port <port>', 'Port to listen on', '7825')
+  .action(async (options: { port: string }) => {
+    const { spawn } = await import('child_process');
+    const { join, dirname } = await import('path');
+    const { fileURLToPath } = await import('url');
+    const { existsSync } = await import('fs');
+
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
+    const port = parseInt(options.port, 10) || 7825;
+    const url = `http://localhost:${port}`;
+
+    if (!existsSync(bundledServer)) {
+      console.error(chalk.red('Error: Dashboard server not found.'));
+      console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
+      process.exit(1);
+    }
+
+    const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
+    const node22 = existsSync(nvmNode) ? nvmNode : 'node';
+
+    console.log(chalk.bold('Panopticon Dashboard'));
+    console.log(chalk.dim(`Starting server on port ${port}...`));
+
+    const server = spawn(node22, [bundledServer], {
+      stdio: 'inherit',
+      env: { ...process.env, PANOPTICON_PORT: String(port) },
+    });
+
+    server.on('error', (err) => {
+      console.error(chalk.red('Failed to start dashboard:'), err.message);
+      process.exit(1);
+    });
+
+    // Open browser after server has had a moment to start
+    setTimeout(async () => {
+      console.log(`  ${chalk.cyan(url)}`);
+      try {
+        const { openBrowser } = await import('../lib/browser.js');
+        await openBrowser(url);
+      } catch {
+        // If openBrowser fails, show URL for manual opening
+        console.log(chalk.dim(`  Open your browser to: ${url}`));
+      }
+    }, 1_500);
+  });
+
+// Default action: show help (Commander default) unless no args → serve
+if (process.argv.length === 2) {
+  // npx panopticon with no args → act as serve
+  process.argv.push('serve');
+}
 
 // Parse and execute
 await program.parseAsync();
