@@ -56,6 +56,7 @@ export interface YamlConfig {
       google?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
+      minimax?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
     };
 
@@ -78,6 +79,7 @@ export interface YamlConfig {
     google?: string;
     zai?: string;
     kimi?: string;
+    minimax?: string;
     openrouter?: string;
   };
 
@@ -132,6 +134,7 @@ export interface NormalizedConfig {
     google?: string;
     zai?: string;
     kimi?: string;
+    minimax?: string;
     openrouter?: string;
   };
 
@@ -408,6 +411,15 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         }
       }
 
+      // MiniMax
+      const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
+      if (minimax.enabled) {
+        result.enabledProviders.add('minimax');
+        if (minimax.api_key) {
+          result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
+        }
+      }
+
       // OpenRouter
       const openrouter = normalizeProviderConfig(providers.openrouter);
       if (openrouter.enabled) {
@@ -443,6 +455,10 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       if (config.api_keys.kimi) {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
         if (!hasProvidersConfig) result.enabledProviders.add('kimi');
+      }
+      if (config.api_keys.minimax) {
+        result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
+        if (!hasProvidersConfig) result.enabledProviders.add('minimax');
       }
       if (config.api_keys.openrouter) {
         result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);

@@ -165,6 +165,11 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     return { provider: 'google', model };
   }
 
+  // MiniMax models
+  if (model.includes('minimax')) {
+    return { provider: 'custom', model };
+  }
+
   // Default to anthropic/claude
   return { provider: 'anthropic', model: 'claude-sonnet-4' };
 }
