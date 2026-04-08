@@ -26,3 +26,4 @@ All beads completed, ready for review
 - **[2026-04-08T05:00Z] verification-gate → FAILED** — `.planning/feedback/007-verification-gate-failed.md`
 - **[2026-04-08T05:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/008-review-agent-changes-requested.md`
 - **[2026-04-08T06:32Z] review-agent → FIX SUBMITTED** — removed e.preventDefault() so / inserts normally; added ComposerPromptEditor.test.tsx with 8 tests; all 354 tests pass (commit: c61620a6)
+- **[2026-04-08T10:38Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/009-review-agent-changes-requested.md`
