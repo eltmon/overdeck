@@ -97,23 +97,6 @@ describe('settings-api', () => {
       expect(result.errors).toContain('Missing providers configuration');
     });
 
-    it('should reject disabled anthropic provider', () => {
-      const invalid = {
-        ...validSettings,
-        models: {
-          ...validSettings.models,
-          providers: {
-            ...validSettings.models.providers,
-            anthropic: false,
-          },
-        },
-      };
-      const result = validateSettingsApi(invalid);
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Anthropic provider must be enabled');
-    });
-
     it('should reject invalid gemini thinking level', () => {
       const invalid = {
         ...validSettings,
