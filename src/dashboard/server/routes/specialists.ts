@@ -612,7 +612,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
     // Get specialist model from work-type router (config.yaml)
     let specModel = 'claude-sonnet-4-6';
     try {
-      const { getModelId } = await import('../../../lib/work-type-router.js');
+      const { getModelId } = yield* Effect.promise(() => import('../../../lib/work-type-router.js'));
       const workTypeId = `specialist-${name}` as any;
       specModel = getModelId(workTypeId);
     } catch { /* fall back to default */ }
