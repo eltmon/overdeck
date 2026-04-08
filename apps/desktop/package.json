@@ -1,20 +1,30 @@
 {
-  "name": "@panopticon/desktop",
+  "name": "panopticon",
   "version": "0.6.0",
-  "private": true,
+  "description": "Panopticon — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
+  "bin": {
+    "panopticon": "./bin/panopticon.mjs"
+  },
+  "files": [
+    "bin",
+    "dist-electron",
+    "server",
+    "resources"
+  ],
   "scripts": {
     "dev": "bun run --parallel dev:bundle dev:electron",
     "dev:bundle": "tsdown --watch",
     "dev:electron": "bun run scripts/dev-electron.mjs",
     "build": "tsdown",
+    "build:publish": "node scripts/build-for-publish.mjs",
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "dist:linux": "electron-builder --linux AppImage",
     "dist:mac": "electron-builder --mac dmg --universal",
-    "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3"
+    "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3 2>/dev/null; exit 0"
   },
   "dependencies": {
     "conf": "^13.0.0",
@@ -27,8 +37,11 @@
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
     "tsdown": "^0.21.7",
-    "typescript": "catalog:",
+    "typescript": "^5.7.3",
     "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "build": {
     "appId": "com.panopticon.app",

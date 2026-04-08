@@ -59,8 +59,11 @@ const terminalWindows = new Map<string, BrowserWindow>();
 
 export function resolveResourcePath(fileName: string): string | null {
   const candidates = [
-    Path.join(__dirname, "../resources", fileName),
+    // Packaged (electron-builder): resources are in process.resourcesPath/resources/
     Path.join(process.resourcesPath ?? "", "resources", fileName),
+    // npx / global-install: resources are bundled at <package>/resources/
+    Path.join(__dirname, "../resources", fileName),
+    // Dev: resources are in the monorepo
     Path.join(ROOT_DIR, "apps/desktop/resources", fileName),
   ];
   for (const candidate of candidates) {
@@ -70,17 +73,26 @@ export function resolveResourcePath(fileName: string): string | null {
 }
 
 export function resolveServerEntry(): string {
-  if (!app.isPackaged) {
-    return Path.join(ROOT_DIR, "dist/dashboard/server.js");
+  if (app.isPackaged) {
+    return Path.join(process.resourcesPath ?? "", "server/server.js");
   }
-  return Path.join(process.resourcesPath ?? "", "server/server.js");
+  // npx / global-install: server bundle is at <package>/server/server.js
+  const npxBundle = Path.join(__dirname, "../server/server.js");
+  if (FS.existsSync(npxBundle)) return npxBundle;
+  // Dev mode: server is built in the monorepo root
+  return Path.join(ROOT_DIR, "dist/dashboard/server.js");
 }
 
 export function resolveServerStaticDir(): string | null {
-  const candidates = [
-    Path.join(ROOT_DIR, "dist/dashboard/public"),
-    Path.join(process.resourcesPath ?? "", "server/public"),
-  ];
+  const candidates: string[] = [];
+  if (app.isPackaged) {
+    candidates.push(Path.join(process.resourcesPath ?? "", "server/public"));
+  } else {
+    // npx / global-install: static assets are at <package>/server/public
+    candidates.push(Path.join(__dirname, "../server/public"));
+    // Dev mode fallback
+    candidates.push(Path.join(ROOT_DIR, "dist/dashboard/public"));
+  }
   for (const candidate of candidates) {
     if (FS.existsSync(Path.join(candidate, "index.html"))) {
       return candidate;
