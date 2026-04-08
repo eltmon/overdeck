@@ -1717,6 +1717,51 @@
   user-select: none;
 }
 
+/* Slash command menu */
+.slashMenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 320px;
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: var(--mc-space-1);
+  overflow: hidden;
+}
+
+.slashMenuItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: var(--mc-space-2) var(--mc-space-3);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--mc-radius-sm);
+  text-align: left;
+  gap: 2px;
+}
+
+.slashMenuItem:hover,
+.slashMenuItemSelected {
+  background: var(--mc-bg-hover);
+}
+
+.slashMenuLabel {
+  font-size: var(--mc-font-size-base);
+  font-family: var(--mc-font-mono);
+  color: var(--mc-text-primary);
+  font-weight: 500;
+}
+
+.slashMenuDescription {
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-secondary);
+}
+
 /* Toolbar row: inside the box, below the textarea */
 .composerToolbar {
   display: flex;

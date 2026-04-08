@@ -263,7 +263,7 @@ export default function App() {
       const isMac = navigator.platform.includes('Mac');
       const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
       const target = e.target as HTMLElement;
-      const inInput = ['INPUT', 'TEXTAREA'].includes(target.tagName);
+      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
       if (e.key === '/' && !inInput) {
         e.preventDefault();

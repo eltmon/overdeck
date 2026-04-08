@@ -125,6 +125,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
       .mockRejectedValueOnce(dbError)                                  // bd list --json --limit 0
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix pan-init
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // git config beads.role contributor
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
