@@ -130,18 +130,16 @@ async function spawnConversationSession(
   const providerEnvExports: string[] = [];
   if (model) {
     const provider = getProviderForModel(model);
-    if (provider.name === 'openrouter') {
+    if (provider.name !== 'anthropic') {
       const { config } = loadYamlConfig();
-      const apiKey = config.apiKeys.openrouter;
+      const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
       if (apiKey) {
         const providerEnv = getProviderEnv(provider, apiKey);
         for (const [key, val] of Object.entries(providerEnv)) {
           providerEnvExports.push(`export ${key}="${val}"`);
         }
-        // Suppress the native Anthropic key so OpenRouter is used exclusively
-        providerEnvExports.push(`export ANTHROPIC_API_KEY=""`);
       } else {
-        throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
+        throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
       }
     }
   }
