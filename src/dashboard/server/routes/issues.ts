@@ -1402,6 +1402,20 @@ const postIssueReopenRoute = HttpRouter.add(
       timestamp: new Date().toISOString(),
       payload: { issueId: issueIdentifier, status: newState, canonicalStatus: 'in_progress' },
     });
+    // Emit pipeline reset so frontend read model clears the stale readyForMerge badge
+    yield* eventStore.append({
+      type: 'pipeline.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        issueId: issueIdentifier,
+        status: {
+          issueId: issueIdentifier,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+        },
+      },
+    });
     try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
     return jsonResponse({
