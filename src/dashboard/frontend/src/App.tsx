@@ -362,9 +362,13 @@ export default function App() {
   }, []);
 
   // Standalone terminal route — no sidebar/chrome
+  // Browser popup uses /terminal/{sessionName} pathname; Electron uses ?terminal={sessionName} query param
   const terminalPath = window.location.pathname;
-  if (terminalPath.startsWith('/terminal/')) {
-    const sessionName = terminalPath.replace('/terminal/', '');
+  const terminalSession = new URLSearchParams(window.location.search).get('terminal');
+  if (terminalPath.startsWith('/terminal/') || terminalSession) {
+    const sessionName = terminalPath.startsWith('/terminal/')
+      ? terminalPath.replace('/terminal/', '')
+      : terminalSession!;
     return (
       <div className="h-screen overflow-hidden" style={{ backgroundColor: '#0d1117' }}>
         <EventRouter />
