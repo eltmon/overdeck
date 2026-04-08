@@ -24,7 +24,6 @@ import {
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
   $createTextNode as $createLexicalTextNode,
-  $setTextContent,
 } from 'lexical';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
@@ -308,17 +307,18 @@ export function ComposerPromptEditor({
       const editor = editorRef?.current;
       if (editor) {
         editor.update(() => {
-          // Delete the '/' character that triggered the menu
           const root = $getRoot();
-          const lastChild = root.getLastChild();
-          if (lastChild && lastChild.getTextContent().endsWith('/')) {
-            const text = lastChild.getTextContent();
-            // Remove the trailing /
-            $setTextContent(lastChild, text.slice(0, -1));
-          }
-          // Insert the command text
-          const textNode = $createLexicalTextNode(command.insert);
-          root.append(textNode);
+          // Get current text content
+          const fullText = $getRoot().getTextContent();
+          // Remove the trailing '/' that triggered the menu
+          const textWithoutSlash = fullText.endsWith('/')
+            ? fullText.slice(0, -1)
+            : fullText;
+          // Clear and rebuild with command inserted
+          root.clear();
+          const para = $createParagraphNode();
+          para.append($createTextNode(textWithoutSlash + command.insert));
+          root.append(para);
         });
       }
       setIsSlashMenuOpen(false);
