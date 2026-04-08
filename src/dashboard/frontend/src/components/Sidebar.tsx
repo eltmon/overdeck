@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Eye, LayoutGrid, Bot, Server, Network, ArrowRightLeft,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
+  Hammer, Loader2,
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
@@ -65,9 +66,20 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
     queryFn: async () => {
       const res = await fetch('/api/version');
       if (!res.ok) return null;
-      return res.json() as Promise<{ version: string }>;
+      return res.json() as Promise<{ version: string; isDev?: boolean }>;
     },
     staleTime: Infinity,
+  });
+
+  const isDev = versionData?.isDev ?? false;
+
+  const rebuildMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/dev/rebuild', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Build failed');
+      return data;
+    },
   });
 
   const toggleCollapsed = useCallback(() => {
@@ -211,18 +223,68 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                     /
                   </kbd>
                 </button>
-                <button
-                  onClick={toggleTheme}
-                  className="ml-auto p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                  title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                </button>
+                <div className="ml-auto flex items-center gap-1">
+                  {isDev && (
+                    <button
+                      onClick={() => rebuildMutation.mutate()}
+                      disabled={rebuildMutation.isPending}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                      title={rebuildMutation.isPending ? 'Building...' : 'Rebuild Panopticon (npm run build)'}
+                    >
+                      {rebuildMutation.isPending
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Hammer className="w-4 h-4" />}
+                    </button>
+                  )}
+                  <button
+                    onClick={toggleTheme}
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                  >
+                    {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                  isDev
+                    ? 'bg-amber-500/15 text-amber-500'
+                    : 'bg-emerald-500/15 text-emerald-500'
+                }`}>
+                  {isDev ? 'DEV' : 'PROD'}
+                </span>
+                {rebuildMutation.isSuccess && (
+                  <span className="text-[10px] text-emerald-500">Build complete</span>
+                )}
+                {rebuildMutation.isError && (
+                  <span className="text-[10px] text-destructive" title={(rebuildMutation.error as Error)?.message}>
+                    Build failed
+                  </span>
+                )}
               </div>
             </div>
           )}
           {collapsed && (
             <div className="flex flex-col items-center gap-1 py-2">
+              <span className={`text-[8px] font-semibold uppercase tracking-wider px-1 py-0.5 rounded ${
+                isDev
+                  ? 'bg-amber-500/15 text-amber-500'
+                  : 'bg-emerald-500/15 text-emerald-500'
+              }`}>
+                {isDev ? 'DEV' : 'PROD'}
+              </span>
+              {isDev && (
+                <button
+                  onClick={() => rebuildMutation.mutate()}
+                  disabled={rebuildMutation.isPending}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                  title={rebuildMutation.isPending ? 'Building...' : 'Rebuild'}
+                >
+                  {rebuildMutation.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Hammer className="w-3.5 h-3.5" />}
+                </button>
+              )}
               <button
                 onClick={toggleCollapsed}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

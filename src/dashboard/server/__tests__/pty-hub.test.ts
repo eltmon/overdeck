@@ -21,6 +21,8 @@ function makeHub(...clients: WebSocket[]): PtyHub {
     clients: new Set(clients),
     cols: 120,
     rows: 30,
+    inputClient: null,
+    clientBlackout: new Map(),
   };
 }
 
@@ -54,6 +56,26 @@ describe('broadcastToHub', () => {
   it('does nothing with an empty client set', () => {
     const hub = makeHub();
     expect(() => broadcastToHub(hub, 'noop')).not.toThrow();
+  });
+
+  it('skips clients within their blackout window', () => {
+    const open = makeMockWs(WebSocket.OPEN);
+    const hub = makeHub(open);
+    hub.clientBlackout.set(open, Date.now() + 10_000); // 10s blackout
+
+    broadcastToHub(hub, 'scrollback-flood');
+
+    expect(open.send).not.toHaveBeenCalled();
+  });
+
+  it('forwards to clients whose blackout has expired', () => {
+    const open = makeMockWs(WebSocket.OPEN);
+    const hub = makeHub(open);
+    hub.clientBlackout.set(open, Date.now() - 1); // expired 1ms ago
+
+    broadcastToHub(hub, 'normal-data');
+
+    expect(open.send).toHaveBeenCalledWith('normal-data');
   });
 });
 

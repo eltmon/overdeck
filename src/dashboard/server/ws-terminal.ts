@@ -114,6 +114,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
         existingHub.clients.add(ws);
         // Most recently connected client takes over as input client
         existingHub.inputClient = ws;
+        // 200ms blackout — prevents scrollback flood from existing PTY's tmux buffer
+        existingHub.clientBlackout.set(ws, Date.now() + 200);
 
         // Force a SIGWINCH repaint so the new tab gets the current terminal state.
         // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
@@ -206,6 +208,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         cols: 120,
         rows: 29,
         inputClient: ws, // first client is the initial input client
+        clientBlackout: new Map([[ws, Date.now() + 200]]), // 200ms blackout before forwarding starts
       };
 
       const startLocalPty = async (cols: number, rows: number) => {
