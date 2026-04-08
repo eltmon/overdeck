@@ -27,6 +27,7 @@ import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
+import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
@@ -360,10 +361,25 @@ export default function App() {
     setActiveTab('kanban');
   }, []);
 
+  // Standalone terminal route — no sidebar/chrome
+  const terminalPath = window.location.pathname;
+  if (terminalPath.startsWith('/terminal/')) {
+    const sessionName = terminalPath.replace('/terminal/', '');
+    return (
+      <div className="h-screen overflow-hidden" style={{ backgroundColor: '#0d1117' }}>
+        <EventRouter />
+        <StandaloneTerminal sessionName={sessionName} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
+
+      {/* Collapsible sidebar navigation */}
+      <Sidebar
 
       {/* Collapsible sidebar navigation */}
       <Sidebar
