@@ -20,6 +20,7 @@ import {
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
+  getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
 } from '../../../lib/settings-api.js';
@@ -108,6 +109,17 @@ const getOptimalDefaultsRoute = HttpRouter.add(
   '/api/settings/optimal-defaults',
   httpHandler(Effect.try({
     try: () => jsonResponse(getOptimalDefaultsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+// ─── Route: GET /api/settings/minimax-defaults ───────────────────────────────
+
+const getMiniMaxDefaultsRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/minimax-defaults',
+  httpHandler(Effect.try({
+    try: () => jsonResponse(getMiniMaxDefaultsApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -247,29 +259,34 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'minimax': {
-          const apiModel = model || 'MiniMax-M2.7-highspeed';
+          const apiModel = model || 'MiniMax-M2.7';
           try {
             const resp = await fetch('https://api.minimax.io/anthropic/v1/messages', {
               method: 'POST',
               headers: {
-                'x-api-key': apiKey,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
                 'anthropic-version': '2023-06-01',
               },
-              body: JSON.stringify({ model: apiModel, max_tokens: 10, messages: [{ role: 'user', content: testPrompt }] }),
+              body: JSON.stringify({ model: apiModel, max_tokens: 256, messages: [{ role: 'user', content: testPrompt }] }),
             });
             latencyMs = Date.now() - startTime;
             if (resp.ok) {
-              const data = await resp.json() as { content?: Array<{ text?: string }> };
-              response = data.content?.[0]?.text?.trim() || '';
+              const data = await resp.json() as { content?: Array<{ type?: string; text?: string; thinking?: string }> };
+              // MiniMax returns thinking + text blocks; extract the text block
+              const textBlock = data.content?.find(b => b.type === 'text');
+              response = textBlock?.text?.trim() || data.content?.[0]?.text?.trim() || '';
               success = response.includes(expectedAnswer);
               if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-            } else if (resp.status === 401) {
-              error = 'Invalid API key';
-            } else if (resp.status === 404) {
-              error = `Model not found: ${apiModel}`;
             } else {
-              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+              const body = (await resp.text()).slice(0, 200);
+              if (resp.status === 401) {
+                error = 'Invalid API key';
+              } else if (resp.status === 404) {
+                error = `Model not found: ${apiModel}`;
+              } else {
+                error = `HTTP ${resp.status}: ${body}`;
+              }
             }
           } catch (err) {
             error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
@@ -485,6 +502,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getSettingsRoute,
   getAvailableModelsRoute,
   getOptimalDefaultsRoute,
+  getMiniMaxDefaultsRoute,
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
   putSettingsRoute,
