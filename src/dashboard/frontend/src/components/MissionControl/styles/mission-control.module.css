@@ -92,20 +92,76 @@
 }
 
 .sidebarHeader {
-  padding: var(--mc-space-4) var(--mc-space-4) var(--mc-space-3);
+  padding: var(--mc-space-3) var(--mc-space-4) var(--mc-space-3);
   border-bottom: 1px solid var(--mc-border);
+  flex-shrink: 0;
+}
+
+.sidebarHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mc-space-2);
 }
 
 .sidebarTitle {
   font-size: var(--mc-font-size-md);
   font-weight: 600;
-  margin: 0 0 var(--mc-space-1);
+  margin: 0;
 }
 
 .sidebarSubtitle {
   font-size: var(--mc-font-size-sm);
   color: var(--mc-text-secondary);
   margin: 0;
+}
+
+/* Segmented control */
+.segmentControl {
+  display: flex;
+  background: var(--mc-bg-main);
+  border-radius: var(--mc-radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmentButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mc-space-1);
+  padding: var(--mc-space-1) var(--mc-space-2);
+  border: none;
+  background: transparent;
+  border-radius: calc(var(--mc-radius) - 2px);
+  font-size: var(--mc-font-size-xs);
+  font-weight: 500;
+  font-family: var(--mc-font-family);
+  color: var(--mc-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.segmentButton:hover {
+  color: var(--mc-text-primary);
+}
+
+.segmentButtonActive {
+  background: var(--mc-bg-sidebar);
+  color: var(--mc-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.segmentCount {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mc-text-muted);
+  background: var(--mc-bg-hover);
+  padding: 0 5px;
+  border-radius: 8px;
+  line-height: 16px;
 }
 
 .projectTree {
@@ -991,7 +1047,6 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 .conversationSection {
-  border-bottom: 1px solid var(--mc-border);
   flex-shrink: 0;
 }
 
