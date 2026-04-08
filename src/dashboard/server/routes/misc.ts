@@ -36,6 +36,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/metrics/tasks
  *   POST /api/shadow/:issueId/monitor
  *   POST /api/shadow/:issueId/observe
+ *   POST /api/dev/rebuild
  */
 
 import { exec } from 'node:child_process';
@@ -91,6 +92,20 @@ function readPackageVersion(): string {
 }
 
 const panopticonVersion: string = readPackageVersion();
+
+// Dev mode: true when running from the repo checkout (src/ directory exists)
+const panopticonDevMode: boolean = (() => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
+      return true;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return false;
+})();
 
 // ─── IssueDataService singleton (for cache-status) ───────────────────────────
 
@@ -739,7 +754,7 @@ const postDeaconPatrolRoute = HttpRouter.add(
 const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
-  Effect.sync(() => jsonResponse({ version: panopticonVersion })),
+  Effect.sync(() => jsonResponse({ version: panopticonVersion, isDev: panopticonDevMode })),
 );
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────
@@ -1668,6 +1683,49 @@ const postShadowObserveRoute = HttpRouter.add(
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
+// ─── Route: POST /api/dev/rebuild ──────────────────────────────────────────────
+// Dev-only: runs `npm run build` in the project root and returns when done.
+
+// Find the project root (directory with package.json + src/dashboard)
+const panopticonProjectRoot: string | null = (() => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+})();
+
+const postDevRebuildRoute = HttpRouter.add(
+  'POST',
+  '/api/dev/rebuild',
+  Effect.gen(function* () {
+    if (!panopticonDevMode || !panopticonProjectRoot) {
+      return jsonResponse({ error: 'Rebuild only available in dev mode' }, { status: 403 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const { stdout, stderr } = await execAsync('npm run build', {
+          cwd: panopticonProjectRoot,
+          timeout: 120_000,
+        });
+        return jsonResponse({
+          ok: true,
+          stdout: stdout.slice(-2000),
+          stderr: stderr.slice(-2000),
+        });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: `Build failed: ${msg}` }, { status: 500 });
+      }
+    });
+  }),
+);
+
 export const miscRouteLayer = Layer.mergeAll(
   postTrackersRefreshRoute,
   getProjectMappingsRoute,
@@ -1702,6 +1760,7 @@ export const miscRouteLayer = Layer.mergeAll(
   getMetricsTasksRoute,
   postShadowMonitorRoute,
   postShadowObserveRoute,
+  postDevRebuildRoute,
 );
 
 export default miscRouteLayer;
