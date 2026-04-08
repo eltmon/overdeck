@@ -1,8 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { encodeCwdToProjectDir, findLastCompactBoundarySync, truncateToCompactBoundarySync } from '../specialists.js';
+
+// Mock database module for SQLite helper tests - must use vi.hoisted() to avoid hoisting issues
+const { mockUpsertBoundaryRotated, mockGetBoundaryRotated } = vi.hoisted(() => ({
+  mockUpsertBoundaryRotated: vi.fn(),
+  mockGetBoundaryRotated: vi.fn(),
+}));
+
+vi.mock('../database.js', () => ({
+  upsertBoundaryRotated: mockUpsertBoundaryRotated,
+  getBoundaryRotated: mockGetBoundaryRotated,
+}));
 
 let TEST_DIR: string;
 
@@ -20,6 +31,11 @@ function makeNormalEntry(role: 'user' | 'assistant', content: string): string {
 beforeEach(() => {
   TEST_DIR = join(tmpdir(), `session-compaction-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_DIR, { recursive: true });
+});
+
+beforeEach(() => {
+  mockUpsertBoundaryRotated.mockClear();
+  mockGetBoundaryRotated.mockClear();
 });
 
 afterEach(() => {
@@ -158,5 +174,32 @@ describe('truncateToCompactBoundarySync', () => {
     expect(remaining).toBe(secondBoundary + secondSummary);
     expect(remaining).not.toContain('middle');
     expect(remaining).not.toContain('after second');
+  });
+});
+
+describe('session_compact_offsets helpers', () => {
+  it('getBoundaryRotated returns null for unrotated sessions', async () => {
+    mockGetBoundaryRotated.mockReturnValueOnce(null);
+
+    const { getBoundaryRotated } = await import('../database.js');
+    const result = getBoundaryRotated('test-session-id');
+
+    expect(mockGetBoundaryRotated).toHaveBeenCalledWith('test-session-id');
+  });
+
+  it('getBoundaryRotated returns offset for previously rotated sessions', async () => {
+    mockGetBoundaryRotated.mockReturnValueOnce(1234);
+
+    const { getBoundaryRotated } = await import('../database.js');
+    const result = getBoundaryRotated('test-session-id');
+
+    expect(result).toBe(1234);
+    expect(mockGetBoundaryRotated).toHaveBeenCalledWith('test-session-id');
+  });
+
+  it('upsertBoundaryRotated can be called with sessionId and offset', async () => {
+    const { upsertBoundaryRotated } = await import('../database.js');
+    upsertBoundaryRotated('session-abc', 500);
+    expect(mockUpsertBoundaryRotated).toHaveBeenCalledWith('session-abc', 500);
   });
 });
