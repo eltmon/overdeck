@@ -33,7 +33,7 @@ export interface ParseResult {
  * Claude encodes the CWD by replacing path separators with hyphens
  * (e.g. /home/user/Projects/foo → -home-user-Projects-foo).
  */
-function encodeCwdToProjectDir(cwd: string): string {
+export function encodeCwdToProjectDir(cwd: string): string {
   return cwd.replace(/\//g, '-');
 }
 

@@ -23,6 +23,7 @@ import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCred
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
+import { upsertBoundaryRotated, getBoundaryRotated } from './database.js';
 
 const execAsync = promisify(exec);
 
@@ -108,6 +109,106 @@ function buildTmuxEnvFlags(env: Record<string, string>): string {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
+}
+
+/**
+ * Encode a filesystem path to the Claude Code project directory name.
+ * Claude encodes the CWD by replacing path separators with hyphens
+ * (e.g. /home/user/Projects/foo → -home-user-Projects-foo).
+ */
+export function encodeCwdToProjectDir(cwd: string): string {
+  return cwd.replace(/\//g, '-');
+}
+
+/**
+ * Returns ~/.claude/projects/<encoded-cwd>/
+ */
+function claudeProjectDir(cwd: string): string {
+  return join(homedir(), '.claude', 'projects', encodeCwdToProjectDir(cwd));
+}
+
+/**
+ * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
+ * Returns 0 if no boundary found.
+ */
+function findLastCompactBoundarySync(sessionFile: string): number {
+  const buffer = readFileSync(sessionFile);
+  const text = buffer.toString('utf-8');
+
+  let lastBoundaryOffset = 0;
+  let bytePos = 0;
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (line.trim()) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+          lastBoundaryOffset = bytePos;
+        }
+      } catch { /* skip invalid lines */ }
+    }
+    bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+  }
+
+  return lastBoundaryOffset;
+}
+
+/**
+ * Truncate a JSONL session file to just after the compact boundary + isCompactSummary entries.
+ *
+ * After Claude compacts, the JSONL contains:
+ * 1. Lines before the boundary (old context - to be discarded)
+ * 2. compact_boundary system entry
+ * 3. isCompactSummary user entry with narrative summary
+ * 4. New conversation continues...
+ *
+ * This function keeps only entries 2 and 3, discarding the old context.
+ * The file shrinks immediately so new spawns start from a small file.
+ *
+ * Returns the byte offset of the boundary that was truncated to, or 0 if no truncation needed.
+ */
+function truncateToCompactBoundarySync(sessionFile: string): number {
+  const buffer = readFileSync(sessionFile);
+  const text = buffer.toString('utf-8');
+
+  const boundaryOffset = findLastCompactBoundarySync(sessionFile);
+  if (boundaryOffset === 0) return 0; // No boundary - no truncation
+
+  // Find the compact_boundary line and the following isCompactSummary line
+  let bytePos = 0;
+  let boundaryLineOffset = 0;
+  let summaryLineOffset = 0;
+  let foundSummary = false;
+
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineByteLength = Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+
+    if (bytePos === boundaryOffset) {
+      // This is the boundary line
+      boundaryLineOffset = bytePos;
+    } else if (bytePos > boundaryOffset && !foundSummary && line.trim()) {
+      // After boundary - check if this is the isCompactSummary entry
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === 'user' && entry.isCompactSummary === true) {
+          summaryLineOffset = bytePos;
+          foundSummary = true;
+          // Continue to end of this line
+          const endOfSummaryLine = bytePos + lineByteLength;
+          // Truncate to just after summary line
+          const newContent = text.slice(boundaryLineOffset, endOfSummaryLine);
+          writeFileSync(sessionFile, newContent, 'utf-8');
+          return boundaryLineOffset;
+        }
+      } catch { /* skip invalid lines */ }
+    }
+
+    bytePos += lineByteLength;
+  }
+
+  return 0; // No summary found after boundary - no truncation
 }
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -750,6 +851,33 @@ ${basePrompt}`;
 
     // Write session file for informational purposes (pan specialists list)
     setSessionId(specialistType, sessionId, projectKey);
+
+    // ─── Session compaction rotation (PAN-542) ─────────────────────────────────
+    // test-agent is excluded: stateless, no resume, no JSONL to rotate.
+    // For all other specialists, check if the session JSONL has an un-rotated
+    // compact_boundary and truncate to just the boundary + isCompactSummary entries.
+    if (specialistType !== 'test-agent') {
+      const jsonlPath = join(claudeProjectDir(cwd), `${sessionId}.jsonl`);
+      if (existsSync(jsonlPath)) {
+        try {
+          const boundaryOffset = findLastCompactBoundarySync(jsonlPath);
+          if (boundaryOffset > 0) {
+            // Check if already rotated for this boundary
+            const previousOffset = getBoundaryRotated(sessionId);
+            if (previousOffset === null || previousOffset < boundaryOffset) {
+              const truncatedOffset = truncateToCompactBoundarySync(jsonlPath);
+              if (truncatedOffset > 0) {
+                upsertBoundaryRotated(sessionId, truncatedOffset);
+                console.log(`[specialist] Rotated compact boundary at offset ${truncatedOffset} for session ${sessionId.slice(0, 8)}...`);
+              }
+            }
+          }
+        } catch (error) {
+          // Non-fatal: truncation failure shouldn't block specialist spawn
+          console.warn(`[specialist] Failed to rotate session compaction for ${sessionId.slice(0, 8)}...:`, error);
+        }
+      }
+    }
 
     console.log(`[specialist] Dispatching ${specialistType} for ${projectKey}/${task.issueId} (session: ${sessionId.slice(0, 8)}...)`);
 
