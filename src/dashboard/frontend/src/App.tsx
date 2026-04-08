@@ -145,11 +145,11 @@ export default function App() {
   // Sync conversation deep-link on popstate (browser back/forward)
   useEffect(() => {
     const onPopState = () => {
-      setSelectedConvIdState(getConvIdFromPath());
+      setSelectedConvId(getConvIdFromPath());
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [setSelectedConvId]);
 
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
@@ -433,7 +433,7 @@ export default function App() {
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
-              <MissionControl issues={issues} convId={selectedConvId} />
+              <MissionControl issues={issues} convId={selectedConvId} onConvIdChange={setSelectedConvId} />
             </div>
           )}
         {activeTab === 'kanban' && (

@@ -18,6 +18,7 @@ None — all beads implemented and closed.
 
 ## Specialist Feedback
 None yet.
+- **[2026-04-08T12:02Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 
 ## Summary
 

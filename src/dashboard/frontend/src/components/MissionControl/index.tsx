@@ -53,11 +53,13 @@ interface MissionControlProps {
   issues?: Issue[];
   /** Deep-link conversation ID — selects this conversation on mount */
   convId?: string | null;
+  /** Called when the selected conversation changes so App can sync the URL */
+  onConvIdChange?: (id: string | null) => void;
 }
 
 type SidebarTab = 'conversations' | 'projects';
 
-export function MissionControl({ issues = [], convId }: MissionControlProps) {
+export function MissionControl({ issues = [], convId, onConvIdChange }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
@@ -115,23 +117,34 @@ export function MissionControl({ issues = [], convId }: MissionControlProps) {
     refetchInterval: 10000,
   });
 
-<<<<<<< HEAD
-  // Auto-select the first conversation when the list loads
+  // Select conversation by deep-link ID on mount, or auto-select first conversation
   useEffect(() => {
-    if (conversations.length > 0 && selectedConversation === null) {
+    if (conversations.length === 0) return;
+    if (convId) {
+      const conv = conversations.find((c) => String(c.id) === convId);
+      if (conv) {
+        setSelectedConversation(conv.name);
+        return;
+      }
+    }
+    // Auto-select first conversation if none selected
+    if (selectedConversation === null) {
       setSelectedConversation(conversations[0].name);
     }
-  }, [conversations, selectedConversation]);
-=======
-  // Select conversation by deep-link ID on mount
+  }, [convId, conversations, selectedConversation]);
+
+  // Sync URL when selected conversation changes (e.g. user clicks a conversation in the list)
   useEffect(() => {
-    if (!convId || conversations.length === 0) return;
-    const conv = conversations.find((c) => String(c.id) === convId);
-    if (conv) {
-      setSelectedConversation(conv.name);
+    if (!onConvIdChange) return;
+    if (!selectedConversation) {
+      onConvIdChange(null);
+      return;
     }
-  }, [convId, conversations]);
->>>>>>> 96cabc6f (feat(frontend): pass convId prop to MissionControl for deep-linking)
+    const conv = conversations.find((c) => c.name === selectedConversation);
+    if (conv) {
+      onConvIdChange(String(conv.id));
+    }
+  }, [selectedConversation, conversations, onConvIdChange]);
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
