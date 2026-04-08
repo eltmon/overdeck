@@ -4,7 +4,7 @@
     "created": "2026-04-08T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-486: Detachable terminal — popout workspace terminal into OS window",
-    "updated": "2026-04-08T04:45:18.937Z"
+    "updated": "2026-04-08T05:01:23.905Z"
   },
   "plan": {
     "id": "pan-486",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "9d74e4e3-fc34-4939-a32f-5569300f015a",
     "author": "agent:minimax-m2.7-highspeed",
-    "sequence": 12,
+    "sequence": 18,
     "created": "2026-04-08T00:00:00.000Z",
-    "updated": "2026-04-08T04:45:18.937Z",
+    "updated": "2026-04-08T05:01:23.905Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/486",
@@ -62,7 +62,7 @@
             "completed": "2026-04-08T04:45:18.937Z"
           }
         ],
-        "completed": "2026-04-08T04:45:18.937Z"
+        "completed": "2026-04-08T05:01:23.905Z"
       },
       {
         "id": "popout-terminal-helper",
@@ -88,7 +88,7 @@
             "completed": "2026-04-08T04:45:18.936Z"
           }
         ],
-        "completed": "2026-04-08T04:45:18.936Z"
+        "completed": "2026-04-08T05:01:23.904Z"
       },
       {
         "id": "standalone-terminal-route",
@@ -123,7 +123,7 @@
             "completed": "2026-04-08T04:45:18.935Z"
           }
         ],
-        "completed": "2026-04-08T04:45:18.935Z"
+        "completed": "2026-04-08T05:01:23.903Z"
       },
       {
         "id": "electron-preload",
@@ -139,7 +139,7 @@
           "Action": "Add OPEN_TERMINAL_WINDOW IPC channel and openTerminalWindow(sessionName, title) method to preload.ts PanopticonBridge type and implementation."
         },
         "subItems": [],
-        "completed": "2026-04-08T04:45:18.936Z"
+        "completed": "2026-04-08T05:01:23.904Z"
       },
       {
         "id": "electron-browser-window",
@@ -165,7 +165,7 @@
             "completed": "2026-04-08T04:45:18.936Z"
           }
         ],
-        "completed": "2026-04-08T04:45:18.936Z"
+        "completed": "2026-04-08T05:01:23.904Z"
       },
       {
         "id": "always-on-top-toggle",
@@ -181,7 +181,7 @@
           "Action": "Add Pin/PinOff toggle button in StandaloneTerminal header. In Electron, sends SET_ALWAYS_ON_TOP IPC. In browser popup, calls popupWindow.focus() as fallback (browser cannot control always-on-top)."
         },
         "subItems": [],
-        "completed": "2026-04-08T04:45:18.936Z"
+        "completed": "2026-04-08T05:01:23.904Z"
       }
     ],
     "edges": [
