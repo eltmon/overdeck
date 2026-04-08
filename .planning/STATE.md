@@ -1,5 +1,18 @@
 # Planning State — PAN-486: Detachable Terminal
 
+## Status: Implementation Complete
+
+## Current Phase
+All beads implemented and committed. Running test suite before signaling completion.
+
+## Completed Work
+- [x] `feature-pan-489-blq`: Add detach button to TerminalPanel header (commit: a1dff3cc)
+- [x] `feature-pan-489-b4h`: Implement popoutTerminal() helper with browser/electron runtime detection (commit: 73891d23)
+- [x] `feature-pan-489-omn`: Create StandaloneTerminal component and /terminal/:sessionName route (commit: 5564111b)
+- [x] `feature-pan-489-yvk`: Extend panopticonBridge with openTerminalWindow IPC (commit: d2be3576)
+- [x] `feature-pan-489-72x`: Add Electron BrowserWindow creation for terminal popout (commit: d2be3576)
+- [x] `feature-pan-489-zvj`: Add always-on-top toggle to standalone terminal header (commit: 585652b7)
+
 ## Discovery Decisions
 
 ### PAN-484 Status
@@ -66,41 +79,10 @@ The standalone terminal uses the **same tmux session** as the dashboard panel. T
 
 ---
 
-## Component Details
+## Key Decisions
 
-### StandaloneTerminal (new)
-- Renders a header bar with: title ("agent-PAN-486 · PAN-486") + always-on-top toggle
-- Renders `XTerminal` below the header
-- Applies terminal-themed CSS (dark background, no dashboard chrome)
-- No sidebar, no header — full focus on terminal
+- **D1**: Used `?terminal=` query param for Electron windows instead of URL path — `panopticon://` protocol scheme doesn't support path routing for SPA, so the URL path `/terminal/{sessionName}` only works in browser popup mode
+- **D2**: SET_ALWAYS_ON_TOP IPC sends to focused window — the terminal window is focused when the user clicks the toggle, so `BrowserWindow.getFocusedWindow()` correctly targets it
 
-### Always-on-Top Toggle
-- Icon button in header (Pin or PinOff from lucide-react)
-- Tracks `isAlwaysOnTop` state
-- **Electron**: sends IPC `set-always-on-top` to main process → `win.setAlwaysOnTop(bool)`
-- **Browser**: calls `popupWindow.focus()` (browser popups can't control always-on-top; acceptable limitation)
-
-### IPC Protocol for Electron Window
-```
-Renderer → Main (IPC):
-  OPEN_TERMINAL_WINDOW { sessionName, title }
-  SET_ALWAYS_ON_TOP { value: boolean }
-  SET_WINDOW_TITLE { title: string }
-
-Main → Renderer (IPC):
-  None needed — renderer sets title before window shown
-```
-
----
-
-## Acceptance Criteria
-
-1. **Detach button visible** in terminal panel header (TerminalPanel.tsx) — right side, next to close button
-2. **Browser popup** opens at `/terminal/{sessionName}` with only the terminal + header (no dashboard chrome)
-3. **Electron window** opens as frameless native window with same content
-4. **Same tmux session** — popout shares the PTY with dashboard panel (no new session spawned)
-5. **Window title** reflects "agent-{issueId} · {issueId}"
-6. **Closing popup** does NOT kill the tmux session (pty-hub keeps PTY alive while any client is connected)
-7. **Re-clicking detach** re-focuses existing popup (window naming via `window.open` name parameter)
-8. **Always-on-top toggle** works in Electron window
-9. **Works in both** single-agent view (AgentOutputPanel) and other views (Kanban board cards)
+## Specialist Feedback
+None — all beads closed with passing inspections.
