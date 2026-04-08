@@ -43,6 +43,7 @@ import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
 } from '../services/conversation-service.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
 const execAsync = promisify(exec);
 
@@ -73,7 +74,7 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
 
 /** Compute the deterministic JSONL session file path from cwd + session UUID. */
 function sessionFilePath(cwd: string, sessionId: string): string {
-  const encodedCwd = cwd.replace(/\//g, '-');
+  const encodedCwd = encodeClaudeProjectDir(cwd);
   return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
 }
 

@@ -12,6 +12,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
 import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
 /** Detect AI provider from model name */
 function providerFromModel(model: string): AIProvider {
@@ -38,11 +39,11 @@ export interface ParseResult {
 
 /**
  * Encode a filesystem path to the Claude Code project directory name.
- * Claude encodes the CWD by replacing path separators with hyphens
- * (e.g. /home/user/Projects/foo → -home-user-Projects-foo).
+ * Delegates to the shared encodeClaudeProjectDir() which matches
+ * Claude Code's actual encoding (all non-alphanumeric chars → hyphens).
  */
 function encodeCwdToProjectDir(cwd: string): string {
-  return cwd.replace(/\//g, '-');
+  return encodeClaudeProjectDir(cwd);
 }
 
 /** Returns ~/.claude/projects/<encoded-cwd>/ */

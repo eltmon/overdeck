@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
+import { encodeClaudeProjectDir } from '../paths.js';
 import { TokenUsage, calculateCost, getPricing, AIProvider, logCost, CostEntry } from '../cost.js';
 
 // Claude Code JSONL message format
@@ -393,7 +394,7 @@ export function getActiveSessionModel(workspacePath: string): string | null {
     // e.g., /home/user/projects/myn/workspaces/feature-min-664
     //    -> -home-user-projects-myn-workspaces-feature-min-664
     // NOTE: The directory name KEEPS the leading dash
-    const projectDirName = workspacePath.replace(/\//g, '-');
+    const projectDirName = encodeClaudeProjectDir(workspacePath);
     const projectDir = join(CLAUDE_PROJECTS_DIR, projectDirName);
 
     // Find most recently modified session file
