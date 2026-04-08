@@ -1,51 +1,32 @@
 # Planning: PAN-557 — Conversation Deep Linking & Copy Buttons
 
-## Status: In Progress
-
-## Current Phase
-Implementing beads one at a time. Bead 1 (GET /api/conversations/:id endpoint) complete.
+## Status: Implementation Complete
 
 ## Completed Work
 - [x] bead-1: Add GET /api/conversations/:id endpoint (commit: fee83b67)
+- [x] bead-2: Add /conv/:id route in App.tsx (commit: dfc8f9d5)
+- [x] bead-3: Pass convId prop to MissionControl (commit: 96cabc6f)
+- [x] bead-4: Add copy-link button in ConversationPanel header (commit: 1246e566)
+- [x] bead-5: Add copy-link button in ConversationList (commit: 403a1428)
 
 ## Remaining Work
-- [ ] bead-2: Add /conv/:id route in App.tsx
-- [ ] bead-3: Pass convId prop to MissionControl
-- [ ] bead-4: Add copy-link button in ConversationPanel header
-- [ ] bead-5: Add copy-link button in ConversationList
+None — all beads implemented and closed.
 
 ## Key Decisions
 - D1: Using numeric database `id` for deep linking (not `name`) — `id` is stable, `name` can be user-renamed
 - D2: `/conv/:id` path opens Mission Control tab with conversation loaded — no separate tab needed
 
 ## Specialist Feedback
-- None yet
+None yet.
 
-## Context
+## Summary
 
-Conversations (user-driven Claude Code sessions spawned from Mission Control) are currently not directly linkable. Selection is internal React state only (`selectedConversation: string | null`). Users cannot share a URL to a specific conversation.
-
-### Deep Link URL Format
-- **Path**: `/conv/:id` where `id` is the conversation's numeric database primary key
-- **Rationale**: `id` is stable; `name` can be user-renamed. Using `/conv/` (not `/convoy/`) avoids confusion with the Convoy feature area.
-
-### Deep Link Navigation Behavior
-- Navigating to `/conv/:id` opens the Mission Control tab (kanban) with the specific conversation loaded in the main panel.
-- No separate "conv" tab needed — conversations are already managed in Mission Control.
-
-### Copy Button Feedback
-- Icon swap: `Copy` → `Check` (lucide-react) for 2 seconds, then reverts
-- Same pattern used by code block copy buttons in `ChatMarkdown.tsx`
-
-## Affected Files
-
-| File | Change |
-|------|--------|
-| `App.tsx` | Add `/conv/:id` route handler, sync URL to MissionControl |
-| `MissionControl/index.tsx` | Accept `convId` prop, load conversation by ID on mount |
-| `MissionControl/ConversationList.tsx` | Add copy-link button next to archive button |
-| `chat/ConversationPanel.tsx` | Add copy-link button in header |
-| Dashboard server | Add `GET /api/conversations/:id` endpoint |
+Implemented conversation deep linking (PAN-557) with five beads:
+1. Backend endpoint `GET /api/conversations/:id` with `getConversationById` in DB layer
+2. Frontend route `/conv/:id` in App.tsx with URL state management
+3. MissionControl accepts `convId` prop and auto-selects conversation on mount
+4. Copy-link button in ConversationPanel header (Copy→Check icon swap)
+5. Copy-link button in ConversationList items (hover-reveal pattern)
 
 ## Out of Scope
 - Changing how conversations are stored/named
