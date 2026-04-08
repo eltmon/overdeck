@@ -56,12 +56,12 @@ export async function getClaudeAuthStatus(): Promise<ClaudeAuthStatus> {
       if (oauth.accessToken) {
         expiresAt = typeof oauth.expiresAt === 'number' ? oauth.expiresAt : null;
         const now = Date.now();
-        if (expiresAt && expiresAt < now) {
-          expired = true;
-          loggedIn = false;
-        } else {
-          loggedIn = true;
-        }
+        expired = !!(expiresAt && expiresAt < now);
+        // Treat as logged in if an access token exists — Claude Code auto-refreshes
+        // expired tokens transparently. Only mark as not-logged-in if there's no
+        // token at all. The dashboard doesn't make API calls itself, so an expired
+        // token doesn't affect functionality.
+        loggedIn = true;
         subscriptionType = typeof oauth.subscriptionType === 'string' ? oauth.subscriptionType : null;
         rateLimitTier = typeof oauth.rateLimitTier === 'string' ? oauth.rateLimitTier : null;
       }
