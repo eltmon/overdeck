@@ -1,6 +1,4 @@
-# State: PAN-560 - RallyClient Effect Service Fix
-
-## Status: Implementation Complete
+# State: PAN-560 Planning
 
 ## Issue
 **PAN-560:** RallyClient Effect service crashes on dashboard startup in v0.6.0
@@ -19,9 +17,9 @@ return yield* RallyClient.pipe(Effect.provide(RallyClientLive));
 Error: Fiber.runLoop: Not a valid effect: { "_id": "Service", "key": "panopticon/dashboard/RallyClient" }
 ```
 
-## Fix Applied
+## Fix
 
-Replaced `Layer.effect` + broken delegation with `Layer.unwrap` + `Effect.gen`, which properly handles conditional Layer returns:
+Replace `Layer.effect` + broken delegation with `Layer.unwrap` + `Effect.gen`, which properly handles conditional Layer returns:
 
 ```typescript
 export const RallyClientOptionalLive = Layer.unwrap(
@@ -41,20 +39,19 @@ export const RallyClientOptionalLive = Layer.unwrap(
 );
 ```
 
-## Completed Work
-- [x] pan-560: Fix RallyClientOptionalLive layer composition (commit: 4d2a5210)
+**Why this works:**
+- `Layer.unwrap(Effect<Layer<A>>)` unwraps an Effect returning a Layer into a Layer
+- `Effect.gen` allows conditional logic returning different Layers
+- `Layer.succeed(ServiceTag, impl)` creates a Layer that provides the implementation directly
+- No more broken `yield* Service.pipe(Effect.provide(...))` anti-pattern
 
-## Remaining Work
-None
+## Affected File
+- `src/dashboard/server/services/rally-client.ts`
 
-## Key Decisions
-- Used `Layer.succeed(RallyClient, ...)` for the no-op case instead of returning a raw object - this creates a proper Layer that can be flattened by Layer.unwrap
-- Used `satisfies RallyClientShape` instead of `as RallyClientShape` for type safety
+## Acceptance Criteria
+1. Dashboard starts without `Fiber.runLoop` crash
+2. When Rally is not configured, the service returns `TrackerNotConfigured` errors (not crash)
+3. Existing rally-client tests continue to pass
 
-## Acceptance Criteria (all met)
-1. Dashboard starts without `Fiber.runLoop` crash ✓
-2. When Rally is not configured, the service returns `TrackerNotConfigured` errors (not crash) ✓
-3. Existing rally-client tests continue to pass ✓ (6 tests)
-
-## Specialist Feedback
-None
+## Difficulty: Simple
+Single file bug fix, obvious correct change.
