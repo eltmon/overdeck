@@ -53,6 +53,7 @@ const mockLinearUpdateState = vi.fn();
 const mockGitHubAddLabel = vi.fn();
 const mockGitHubRemoveLabel = vi.fn();
 const mockGitHubCloseIssue = vi.fn();
+const mockGitHubReopenIssue = vi.fn();
 const mockRallyUpdateState = vi.fn();
 
 async function makeTestLayer() {
@@ -76,7 +77,7 @@ async function makeTestLayer() {
     addLabel: mockGitHubAddLabel,
     removeLabel: mockGitHubRemoveLabel,
     closeIssue: mockGitHubCloseIssue,
-    reopenIssue: vi.fn(),
+    reopenIssue: mockGitHubReopenIssue,
     ensureLabel: vi.fn(),
     addComment: vi.fn(),
     getComments: vi.fn(),
@@ -121,6 +122,7 @@ describe('IssueLifecycle — integration', () => {
     mockGitHubAddLabel.mockReturnValue(ok(undefined));
     mockGitHubRemoveLabel.mockReturnValue(ok(undefined));
     mockGitHubCloseIssue.mockReturnValue(ok(undefined));
+    mockGitHubReopenIssue.mockReturnValue(ok(undefined));
     mockRallyUpdateState.mockReturnValue(ok(undefined));
   });
 
