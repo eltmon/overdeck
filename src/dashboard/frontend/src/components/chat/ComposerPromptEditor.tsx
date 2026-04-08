@@ -136,7 +136,6 @@ function ComposerPlugin({
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const target = e.target as HTMLElement;
         if (target === root || root.contains(target)) {
-          e.preventDefault();
           onSlashKey();
         }
       }
