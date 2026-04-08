@@ -259,7 +259,8 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
 
 /**
  * Get the command to run an agent with a specific model
- * Returns 'claude' for Anthropic models, 'claude-code-router' for others
+ * Always uses 'claude' CLI — non-Anthropic models work via ANTHROPIC_BASE_URL env var
+ * pointing to their Anthropic-compatible endpoint.
  */
 export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
   if (isAnthropicModel(modelId)) {
@@ -268,9 +269,10 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
       args: ['--model', getClaudeModelFlag(modelId)],
     };
   }
-  // Non-Anthropic models require the router
+  // Non-Anthropic direct providers: use claude CLI with the model name as-is.
+  // The caller must set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN env vars.
   return {
-    command: 'claude-code-router',
-    args: [],
+    command: 'claude',
+    args: ['--model', modelId],
   };
 }
