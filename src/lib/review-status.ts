@@ -118,11 +118,14 @@ export function setReviewStatus(
 
   // readyForMerge is true when all required gates pass.
   // If uatStatus exists (UAT specialist has been involved), it must also be 'passed'.
+  // verificationStatus must not be 'failed' — verification catches pre-existing test breakage
+  // that scoped test runs (e2e/dashboard) may miss.
   const readyForMerge = update.readyForMerge !== undefined
     ? update.readyForMerge
     : (
         merged.reviewStatus === 'passed' &&
         merged.testStatus === 'passed' &&
+        merged.verificationStatus !== 'failed' &&
         merged.mergeStatus !== 'merged' &&
         // If UAT has been initiated, it must pass too
         (merged.uatStatus === undefined || merged.uatStatus === 'passed')
