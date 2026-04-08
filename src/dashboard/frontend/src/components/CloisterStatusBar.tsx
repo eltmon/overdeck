@@ -4,9 +4,11 @@
  * Displays Cloister service status and agent health summary in the dashboard header.
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { useDashboardStore, selectAgentList } from '../lib/store';
 
 interface CloisterStatus {
   running: boolean;
@@ -43,13 +45,27 @@ async function emergencyStop(): Promise<{ killedAgents: string[] }> {
   return res.json();
 }
 
+async function fetchConversations(): Promise<{ sessionAlive: boolean }[]> {
+  const res = await fetch('/api/conversations');
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
+  const [showRestartPopover, setShowRestartPopover] = useState(false);
+  const [restartConversations, setRestartConversations] = useState(true);
+  const [restartAgents, setRestartAgents] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
+  const queryClient = useQueryClient();
+
   const { data: status, refetch } = useQuery({
     queryKey: ['cloister-status'],
     queryFn: fetchCloisterStatus,
-    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchInterval: 10000,
   });
 
   const { data: specialistsData } = useQuery({
@@ -62,8 +78,58 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     refetchInterval: 30000,
   });
 
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    refetchInterval: 10000,
+  });
+
+  const agents = useDashboardStore(selectAgentList);
+  const runningAgentCount = agents.filter(a => a.status === 'running').length;
+  const aliveConversationCount = conversations.filter(c => c.sessionAlive).length;
+
   const runningEphemeral: Array<{ projectKey: string; specialistType: string }> =
     (specialistsData?.projects ?? []).filter((p: { isRunning: boolean }) => p.isRunning);
+
+  const openPopover = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPopoverPos({ left: rect.left, bottom: window.innerHeight - rect.top + 8 });
+    }
+    setShowRestartPopover(true);
+  }, []);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showRestartPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target as Node) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as Node)
+      ) {
+        setShowRestartPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showRestartPopover]);
+
+  const restartMutation = useMutation({
+    mutationFn: async ({ convs, doAgents }: { convs: boolean; doAgents: boolean }) => {
+      const promises: Promise<Response>[] = [];
+      if (convs) promises.push(fetch('/api/conversations/restart-all', { method: 'POST' }));
+      if (doAgents) promises.push(fetch('/api/agents/restart-all', { method: 'POST' }));
+      const results = await Promise.all(promises);
+      for (const r of results) {
+        if (!r.ok) throw new Error(`Restart failed: ${r.statusText}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      refetch();
+      setShowRestartPopover(false);
+    },
+  });
 
   const handleToggle = async () => {
     setIsToggling(true);
@@ -83,6 +149,11 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     await emergencyStop();
     setShowEmergencyConfirm(false);
     refetch();
+  };
+
+  const handleRestart = () => {
+    if (!restartConversations && !restartAgents) return;
+    restartMutation.mutate({ convs: restartConversations, doAgents: restartAgents });
   };
 
   if (!status) {
@@ -154,6 +225,69 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
             ? (status.running ? '...' : '...')
             : (status.running ? 'Pause' : 'Start')}
         </button>
+
+        {/* Restart Sessions */}
+        <button
+          ref={buttonRef}
+          onClick={() => showRestartPopover ? setShowRestartPopover(false) : openPopover()}
+          className="p-1 rounded text-xs bg-surface-overlay text-content-body border border-border hover:bg-surface-emphasis transition-colors"
+          title="Restart sessions"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${restartMutation.isPending ? 'animate-spin' : ''}`} />
+        </button>
+        {showRestartPopover && popoverPos && createPortal(
+          <div
+            ref={popoverRef}
+            style={{ position: 'fixed', zIndex: 9999, left: popoverPos.left, bottom: popoverPos.bottom, width: 256, borderRadius: 6, border: '1px solid var(--border, #333)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', backgroundColor: 'var(--card, #0c1018)' }}
+          >
+              <div className="px-3 py-2 text-xs font-semibold text-foreground border-b border-border">
+                Restart Sessions
+              </div>
+              <div className="p-2 space-y-1">
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-foreground hover:bg-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={restartConversations}
+                    onChange={e => setRestartConversations(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Conversations</span>
+                  <span className="ml-auto text-muted-foreground">({aliveConversationCount} active)</span>
+                </label>
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-foreground hover:bg-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={restartAgents}
+                    onChange={e => setRestartAgents(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Workspace Agents</span>
+                  <span className="ml-auto text-muted-foreground">({runningAgentCount} active)</span>
+                </label>
+              </div>
+              <div className="flex justify-end gap-1.5 px-3 py-2 border-t border-border">
+                <button
+                  onClick={() => setShowRestartPopover(false)}
+                  className="px-2 py-1 rounded text-xs text-foreground bg-muted hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRestart}
+                  disabled={restartMutation.isPending || (!restartConversations && !restartAgents)}
+                  className="px-2 py-1 rounded text-xs text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restartMutation.isPending ? 'Restarting...' : 'Restart'}
+                </button>
+              </div>
+              {restartMutation.isError && (
+                <div className="px-3 py-1.5 text-xs text-destructive border-t border-border">
+                  {(restartMutation.error as Error).message}
+                </div>
+              )}
+          </div>,
+          document.body,
+        )}
 
         {/* Emergency Stop */}
         {!showEmergencyConfirm ? (

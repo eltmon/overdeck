@@ -196,15 +196,26 @@ export async function parseConversationMessages(
       } else if (Array.isArray(rawContent)) {
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
-            // Complete a pending WorkLogEntry
+            // Complete a pending WorkLogEntry with result content
             const pending = pendingToolUse.get(block.tool_use_id);
             if (pending) {
               pendingToolUse.delete(block.tool_use_id);
+              // Extract result text from tool_result content
+              let resultText: string | undefined;
+              if (typeof block.content === 'string') {
+                resultText = block.content;
+              } else if (Array.isArray(block.content)) {
+                resultText = (block.content as Array<{ type?: string; text?: string }>)
+                  .filter(b => b.type === 'text' && b.text)
+                  .map(b => b.text)
+                  .join('\n');
+              }
               workLog.push({
                 ...pending,
                 detail: block.is_error
-                  ? `Error: ${JSON.stringify(block.content)}`
+                  ? `Error: ${resultText ?? JSON.stringify(block.content)}`
                   : pending.detail,
+                result: resultText,
                 tone: block.is_error ? 'error' : pending.tone,
               });
             }

@@ -12,9 +12,11 @@ import { jsonResponse } from "../http-helpers.js";
 import { exec } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
+import { createReadStream } from 'node:fs';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -30,6 +32,7 @@ import {
   updateSessionFile,
   updateConversationTitle,
   updateConversationCost,
+  updateConversationModel,
   archiveConversation,
   canReplaceTitle,
 } from '../../../lib/database/conversations-db.js';
@@ -106,6 +109,59 @@ async function tmuxSessionExists(sessionName: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Extract the model from a Claude Code JSONL session file by reading
+ * until the first assistant message with a model field.
+ * Reads line-by-line to avoid loading the entire file into memory.
+ */
+async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
+  try {
+    if (!existsSync(sessionFile)) return null;
+    const stream = createReadStream(sessionFile, { encoding: 'utf-8' });
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    try {
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        const entry = JSON.parse(line);
+        if (entry.type === 'assistant' && entry.message?.model) {
+          return entry.message.model as string;
+        }
+      }
+    } finally {
+      rl.close();
+      stream.destroy();
+    }
+  } catch {
+    // Corrupt or unreadable file — skip
+  }
+  return null;
+}
+
+/**
+ * Backfill model column for existing conversations that have a session file
+ * but no model stored. Runs once on server startup (async, non-blocking).
+ */
+async function backfillConversationModels(): Promise<void> {
+  const convs = listConversations();
+  let backfilled = 0;
+  for (const conv of convs) {
+    if (conv.model || !conv.sessionFile) continue;
+    const model = await extractModelFromSessionFile(conv.sessionFile);
+    if (model) {
+      updateConversationModel(conv.name, model);
+      backfilled++;
+    }
+  }
+  if (backfilled > 0) {
+    console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
+  }
+}
+
+// Fire-and-forget backfill on module load
+void backfillConversationModels().catch((err: unknown) => {
+  console.error('[conversations] Model backfill failed:', err);
+});
 
 /**
  * Spawn a new tmux session running claude.
@@ -321,6 +377,8 @@ const postConversationRoute = HttpRouter.add(
           title,
           titleSource: 'auto',
           titleSeed: title,
+          model,
+          effort,
         });
 
         // Wait for Claude Code to be ready, send message, and generate title — all async.
@@ -404,7 +462,7 @@ const postConversationResumeRoute = HttpRouter.add(
         const oldSessionId = conv.sessionFile
           ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
           : undefined;
-        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), undefined, undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
           (err: unknown) => {
             console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
           },
@@ -596,6 +654,63 @@ const postConversationArchiveRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/restart-all ─────────────────────────────
+//
+// Kill all active conversation tmux sessions and re-spawn them with
+// their stored model/effort. Useful when model persistence was fixed
+// and existing sessions need to pick up the correct model.
+
+const postConversationRestartAllRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/restart-all',
+  Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      try {
+        const allConvs = listConversations();
+        // Filter to conversations with a live tmux session
+        const convs: typeof allConvs = [];
+        for (const c of allConvs) {
+          if (await tmuxSessionExists(c.tmuxSession)) convs.push(c);
+        }
+        const results: { name: string; model: string | null; status: string }[] = [];
+
+        for (const conv of convs) {
+          try {
+            // Kill existing tmux session
+            await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+            // Re-spawn with stored model
+            const oldSessionId = conv.sessionFile
+              ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
+              : undefined;
+            await spawnConversationSession(
+              conv.tmuxSession,
+              conv.cwd,
+              oldSessionId ?? randomUUID(),
+              conv.model ?? undefined,
+              conv.effort ?? undefined,
+              conv.issueId ?? undefined,
+              !!oldSessionId,
+            );
+            markConversationActive(conv.name);
+            results.push({ name: conv.name, model: conv.model, status: 'restarted' });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
+            results.push({ name: conv.name, model: conv.model, status: `failed: ${msg}` });
+          }
+        }
+
+        console.log(`[conversations] Restarted ${results.filter(r => r.status === 'restarted').length}/${convs.length} conversations`);
+        return jsonResponse({ restarted: results.length, results });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to restart conversations: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -604,6 +719,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  postConversationRestartAllRoute,
   postConversationArchiveRoute,
   getConversationMessagesRoute,
   postConversationMessageRoute,

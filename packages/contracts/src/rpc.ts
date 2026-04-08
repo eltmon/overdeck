@@ -73,6 +73,8 @@ export const WorkLogEntry = Schema.Struct({
   createdAt: Schema.String,
   label: Schema.String,
   detail: Schema.optional(Schema.String),
+  /** Tool result output (populated when tool_result is received). */
+  result: Schema.optional(Schema.String),
   command: Schema.optional(Schema.String),
   changedFiles: Schema.optional(Schema.Array(Schema.String)),
   tone: Schema.Literals(['thinking', 'tool', 'info', 'error']),
