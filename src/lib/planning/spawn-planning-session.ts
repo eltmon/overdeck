@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
-import { loadSettings, getAgentCommand, isAnthropicModel } from '../settings.js';
+import { getAgentCommand, isAnthropicModel } from '../settings.js';
+import { loadConfig as loadYamlConfig } from '../config-yaml.js';
+import { getProviderForModel, getProviderEnv } from '../providers.js';
 import { createWorkspace } from '../workspace-manager.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -515,11 +517,12 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 3: Load specs & PRDs ────────────────────────────────────────
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
 
-    // Determine planning model — explicit override takes precedence over settings
-    const agentSettings = loadSettings();
-    const settingsModel = (agentSettings.models as any).planning_agent
-      || agentSettings.models.complexity?.expert
-      || 'claude-opus-4-6';
+    // Determine planning model — explicit override takes precedence over work-type router
+    let settingsModel = 'claude-opus-4-6';
+    try {
+      const { getModelId } = await import('../work-type-router.js');
+      settingsModel = getModelId('planning-agent');
+    } catch { /* fall back to default */ }
     const planningModel = modelOverride || settingsModel;
 
     // Discover and copy PRD files to workspace
@@ -551,6 +554,20 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
       : `${agentCmd.command} --dangerously-skip-permissions`;
 
+    // Get provider env vars for non-Anthropic models
+    let providerExports = '';
+    const provider = getProviderForModel(planningModel);
+    if (provider.name !== 'anthropic') {
+      const { config } = loadYamlConfig();
+      const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+      if (apiKey) {
+        const envVars = getProviderEnv(provider, apiKey);
+        providerExports = Object.entries(envVars)
+          .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
+          .join('\n');
+      }
+    }
+
     // ── Write launcher script ──────────────────────────────────────────────
     const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
@@ -565,6 +582,7 @@ export LC_ALL=C.UTF-8
 export PANOPTICON_AGENT_ID="${sessionName}"
 export PANOPTICON_ISSUE_ID="${issue.identifier}"
 export PANOPTICON_SESSION_TYPE="planning"
+${providerExports}
 cd "${workspacePath}"
 prompt=$(cat "${promptFile}")
 trap '' HUP

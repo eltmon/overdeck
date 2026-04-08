@@ -311,7 +311,6 @@ export function SettingsPage() {
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
 
   const handleProviderToggle = (provider: Provider) => {
-    if (provider === 'anthropic') return;
     setFormData({
       ...formData,
       models: {
@@ -703,7 +702,7 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PROVIDERS.map((provider) => {
             const isDefault = provider.id === 'anthropic';
-            const isEnabled = isDefault || formData.models.providers[provider.id];
+            const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
 
             return (
@@ -736,10 +735,9 @@ export function SettingsPage() {
                   <div className="ml-auto">
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
-                      disabled={isDefault}
                       className={`w-10 h-5 rounded-full relative transition-colors ${
                         isEnabled ? 'bg-primary' : 'bg-surface-emphasis'
-                      } ${isDefault ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                      } cursor-pointer`}
                     >
                       <div
                         className={`absolute top-0.5 size-4 bg-white rounded-full transition-all ${
