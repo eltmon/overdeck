@@ -6,7 +6,7 @@
  */
 
 import { autoUpdater, UpdateInfo } from "electron-updater";
-import { BrowserWindow, app } from "electron";
+import { BrowserWindow } from "electron";
 
 // Auto-updater configuration
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
