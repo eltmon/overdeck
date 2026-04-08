@@ -178,6 +178,7 @@ describe('IssueLifecycle Effect service', () => {
         prefix: 'APP',
         number: 42,
       });
+      mockGitHubReopenIssue.mockReturnValue(ok(undefined));
     });
 
     it('adds in-progress label and removes conflicting labels', async () => {

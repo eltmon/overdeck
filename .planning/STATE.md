@@ -87,3 +87,5 @@ The standalone terminal uses the **same tmux session** as the dashboard panel. T
 ## Specialist Feedback
 None — all beads closed with passing inspections.
 - **[2026-04-08T04:45Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-08T04:47Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-08T04:49Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
