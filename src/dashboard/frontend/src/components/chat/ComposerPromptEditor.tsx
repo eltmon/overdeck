@@ -23,9 +23,8 @@ import {
   $createTextNode,
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
-  $getTextContent,
-  $insertNodes,
   $createTextNode as $createLexicalTextNode,
+  $setTextContent,
 } from 'lexical';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
@@ -315,7 +314,7 @@ export function ComposerPromptEditor({
           if (lastChild && lastChild.getTextContent().endsWith('/')) {
             const text = lastChild.getTextContent();
             // Remove the trailing /
-            lastChild.setTextContent(text.slice(0, -1));
+            $setTextContent(lastChild, text.slice(0, -1));
           }
           // Insert the command text
           const textNode = $createLexicalTextNode(command.insert);
