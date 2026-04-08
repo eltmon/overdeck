@@ -12,6 +12,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
 import { calculateCost, getPricing } from '../../../lib/cost.js';
+import { encodeCwdToProjectDir } from '../../../lib/cloister/specialists.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,15 +28,6 @@ export interface ParseResult {
 }
 
 // ─── CWD encoding ─────────────────────────────────────────────────────────────
-
-/**
- * Encode a filesystem path to the Claude Code project directory name.
- * Claude encodes the CWD by replacing path separators with hyphens
- * (e.g. /home/user/Projects/foo → -home-user-Projects-foo).
- */
-export function encodeCwdToProjectDir(cwd: string): string {
-  return cwd.replace(/\//g, '-');
-}
 
 /** Returns ~/.claude/projects/<encoded-cwd>/ */
 function claudeProjectDir(cwd: string): string {

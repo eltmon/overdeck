@@ -212,6 +212,42 @@ export function truncateToCompactBoundarySync(sessionFile: string): number {
   return 0; // No summary found after boundary - no truncation
 }
 
+/**
+ * Rotate session JSONL to compact boundary if an un-rotated boundary exists.
+ * test-agent is excluded: stateless, no resume, no JSONL to rotate.
+ *
+ * Exported for unit testing — prefer calling via rotateSessionCompactionIfNeeded.
+ */
+export function rotateSessionCompactionIfNeeded(
+  specialistType: SpecialistType,
+  jsonlPath: string,
+  sessionId: string,
+): void {
+  if (specialistType === 'test-agent') {
+    return;
+  }
+  if (!existsSync(jsonlPath)) {
+    return;
+  }
+  try {
+    const boundaryOffset = findLastCompactBoundarySync(jsonlPath);
+    if (boundaryOffset > 0) {
+      // Check if already rotated for this boundary
+      const previousOffset = getBoundaryRotated(sessionId);
+      if (previousOffset === null || previousOffset < boundaryOffset) {
+        const truncatedOffset = truncateToCompactBoundarySync(jsonlPath);
+        if (truncatedOffset > 0) {
+          upsertBoundaryRotated(sessionId, truncatedOffset);
+          console.log(`[specialist] Rotated compact boundary at offset ${truncatedOffset} for session ${sessionId.slice(0, 8)}...`);
+        }
+      }
+    }
+  } catch (error) {
+    // Non-fatal: truncation failure shouldn't block specialist spawn
+    console.warn(`[specialist] Failed to rotate session compaction for ${sessionId.slice(0, 8)}...:`, error);
+  }
+}
+
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
 const TASKS_DIR = join(SPECIALISTS_DIR, 'tasks');
@@ -857,28 +893,8 @@ ${basePrompt}`;
     // test-agent is excluded: stateless, no resume, no JSONL to rotate.
     // For all other specialists, check if the session JSONL has an un-rotated
     // compact_boundary and truncate to just the boundary + isCompactSummary entries.
-    if (specialistType !== 'test-agent') {
-      const jsonlPath = join(claudeProjectDir(cwd), `${sessionId}.jsonl`);
-      if (existsSync(jsonlPath)) {
-        try {
-          const boundaryOffset = findLastCompactBoundarySync(jsonlPath);
-          if (boundaryOffset > 0) {
-            // Check if already rotated for this boundary
-            const previousOffset = getBoundaryRotated(sessionId);
-            if (previousOffset === null || previousOffset < boundaryOffset) {
-              const truncatedOffset = truncateToCompactBoundarySync(jsonlPath);
-              if (truncatedOffset > 0) {
-                upsertBoundaryRotated(sessionId, truncatedOffset);
-                console.log(`[specialist] Rotated compact boundary at offset ${truncatedOffset} for session ${sessionId.slice(0, 8)}...`);
-              }
-            }
-          }
-        } catch (error) {
-          // Non-fatal: truncation failure shouldn't block specialist spawn
-          console.warn(`[specialist] Failed to rotate session compaction for ${sessionId.slice(0, 8)}...:`, error);
-        }
-      }
-    }
+    const jsonlPath = join(claudeProjectDir(cwd), `${sessionId}.jsonl`);
+    rotateSessionCompactionIfNeeded(specialistType, jsonlPath, sessionId);
 
     console.log(`[specialist] Dispatching ${specialistType} for ${projectKey}/${task.issueId} (session: ${sessionId.slice(0, 8)}...)`);
 
