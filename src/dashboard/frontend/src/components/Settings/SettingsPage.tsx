@@ -109,6 +109,7 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
   { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
   { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
 ];
 
 // Tracker definitions
@@ -205,6 +206,7 @@ function getModelDisplay(modelId?: string): string {
   if (modelId.includes('gemini')) return modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
   if (modelId.includes('kimi')) return modelId.includes('k2.5') || modelId.includes('2.5') ? 'Kimi K2.5' : 'Kimi K2';
   if (modelId.includes('glm')) return 'GLM-4';
+  if (modelId.includes('minimax')) return modelId.includes('highspeed') ? 'M2.7 HS' : 'M2.7';
   return modelId;
 }
 

@@ -20,6 +20,7 @@ const PROVIDER_INFO: Record<
   google: { displayName: 'Google Vertex AI', icon: 'google', iconColor: '#4285F4', compatibility: 'router' },
   zai: { displayName: 'Z.AI (GLM)', icon: 'api', iconColor: '#94a3b8', compatibility: 'direct' },
   kimi: { displayName: 'Kimi (Moonshot)', icon: 'rocket_launch', iconColor: '#6366f1', compatibility: 'direct' },
+  minimax: { displayName: 'MiniMax', icon: 'speed', iconColor: '#f59e0b', compatibility: 'direct' },
   openrouter: { displayName: 'OpenRouter', icon: 'hub', iconColor: '#6B7F8E', compatibility: 'direct' },
 };
 

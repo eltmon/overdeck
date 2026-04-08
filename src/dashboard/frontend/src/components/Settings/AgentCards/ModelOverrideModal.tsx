@@ -72,6 +72,13 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
     ],
   },
+  minimax: {
+    name: 'MiniMax',
+    models: [
+      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
+      { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
+    ],
+  },
 };
 
 // Work type to required capabilities mapping
@@ -176,6 +183,12 @@ export function getModelById(id: ModelId): ModelDef | undefined {
     if (idLower.includes('air')) return models.find(m => m.id === 'glm-4-air');
     if (idLower.includes('long') || idLower.includes('1m')) return models.find(m => m.id === 'glm-4-long');
     return models.find(m => m.id === 'glm-4-plus');
+  }
+
+  // MiniMax models
+  if (idLower.includes('minimax')) {
+    if (idLower.includes('highspeed')) return models.find(m => m.id === 'minimax-m2.7-highspeed');
+    return models.find(m => m.id === 'minimax-m2.7');
   }
 
   return undefined;
