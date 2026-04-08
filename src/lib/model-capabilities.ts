@@ -474,22 +474,22 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     model: 'minimax-m2.7',
     provider: 'minimax',
     displayName: 'MiniMax M2.7',
-    costPer1MTokens: 1.5, // $0.30 in / $1.20 out
-    contextWindow: 128000,
+    costPer1MTokens: 1.5, // $0.30/M in + $1.20/M out, blended ~$0.06/M with auto-cache
+    contextWindow: 204800,
     skills: {
-      'code-generation': 90, // 56.22% SWE-Pro, near Opus level
+      'code-generation': 90, // 56.22% SWE-Pro (Opus ~57-58%), 55.6% VIBE-Pro
       'code-review': 88,
-      debugging: 88,
+      debugging: 88, // 57.0% Terminal Bench 2
       planning: 85,
       documentation: 85,
       testing: 86,
       security: 80,
       performance: 82,
-      synthesis: 90, // Self-evolving agent capabilities
+      synthesis: 90, // Self-evolving agent, 97% skill adherence on complex tasks
       speed: 80, // 10B active params (MoE)
-      'context-length': 85, // 128K context
+      'context-length': 92, // 204K context
     },
-    notes: 'Self-evolving model, 10B active params, near-Opus SWE-Pro at 1/50th the cost.',
+    notes: '10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache.',
   },
 
   'minimax-m2.7-highspeed': {
@@ -497,7 +497,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     provider: 'minimax',
     displayName: 'MiniMax M2.7 Highspeed',
     costPer1MTokens: 1.5, // Same pricing as M2.7
-    contextWindow: 128000,
+    contextWindow: 204800,
     skills: {
       'code-generation': 90,
       'code-review': 88,
@@ -508,10 +508,10 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       security: 80,
       performance: 82,
       synthesis: 90,
-      speed: 92, // 100 tps — 66% faster than standard
-      'context-length': 85,
+      speed: 92, // 100 tps, 3x faster than Opus
+      'context-length': 92,
     },
-    notes: 'Identical quality to M2.7, 66% faster output (100 tps). Best for high-throughput agent work.',
+    notes: 'Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work.',
   },
 };
 
