@@ -16,7 +16,8 @@ import { getDevrootPath } from '../config.js';
 import { getProject } from '../projects.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
-import { loadSettings, type ModelId } from '../settings.js';
+import type { ModelId } from '../settings.js';
+import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
@@ -82,8 +83,16 @@ function getProviderEnvForModel(model: string): Record<string, string> {
   const provider = getProviderForModel(model as ModelId);
   if (provider.name === 'anthropic') return {};
 
-  const settings = loadSettings();
-  const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
+  // OpenRouter has its own key path
+  if (provider.name === 'openrouter') {
+    const { config } = loadYamlConfig();
+    const apiKey = config.apiKeys.openrouter;
+    if (apiKey) return getProviderEnv(provider, apiKey);
+    throw new Error(`OpenRouter API key not configured. Add your key in Settings before using model "${model}".`);
+  }
+
+  const { config } = loadYamlConfig();
+  const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }

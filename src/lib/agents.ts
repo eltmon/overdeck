@@ -9,7 +9,7 @@ import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
-import { loadSettings, type ModelId } from './settings.js';
+import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
@@ -50,8 +50,8 @@ function getProviderEnvForModel(model: string): Record<string, string> {
     throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
   }
 
-  const settings = loadSettings();
-  const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
+  const { config } = loadYamlConfig();
+  const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }
@@ -431,14 +431,8 @@ function determineModel(options: SpawnOptions): string {
       return getModelId(workType);
     }
 
-    // LEGACY: Complexity-based routing (deprecated but kept for backward compat)
-    if (options.difficulty) {
-      const settings = loadSettings();
-      if (settings.models.complexity[options.difficulty]) {
-        console.warn(`Using legacy complexity-based routing for ${options.difficulty}. Consider migrating to work types.`);
-        return settings.models.complexity[options.difficulty];
-      }
-    }
+    // LEGACY: Complexity-based routing removed — settings.json no longer exists.
+    // All model routing goes through work-type-router via config.yaml.
 
     // Fall back to default model from Cloister config or claude-sonnet-4-6
     try {
