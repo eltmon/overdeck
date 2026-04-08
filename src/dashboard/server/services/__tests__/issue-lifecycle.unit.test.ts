@@ -300,7 +300,7 @@ describe('IssueLifecycle — integration', () => {
         addLabel: vi.fn(),
         removeLabel: vi.fn(),
         closeIssue: vi.fn(),
-        reopenIssue: vi.fn(),
+        reopenIssue: mockGitHubReopenIssue,
         ensureLabel: vi.fn(),
         addComment: vi.fn(),
         getComments: vi.fn(),
