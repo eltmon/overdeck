@@ -1535,17 +1535,23 @@ INSTRUCTIONS:
    a. Immediately abort: git rebase --abort
    b. Report FAILURE — do NOT attempt to resolve conflicts manually
 7. git push --force-with-lease origin ${featureBranch}
-8. Report completion by calling the Panopticon API:
+8. Merge the PR via GitHub CLI (this is the ACTUAL merge to main):
+   \`\`\`bash
+   gh pr merge --squash --head ${featureBranch} --repo eltmon/panopticon-cli
+   \`\`\`
+   If this fails, report FAILURE — do NOT report success without a merged PR.
+9. Report completion by calling the Panopticon API:
    curl -s -X POST ${apiUrl}/api/specialists/done \\
      -H "Content-Type: application/json" \\
-     -d '{"specialist":"merge","issueId":"${issueId}","status":"passed","notes":"Rebase onto ${baseBranch} complete"}'
+     -d '{"specialist":"merge","issueId":"${issueId}","status":"passed","notes":"Rebased and merged PR via gh pr merge --squash"}'
 
 IMPORTANT:
 - Work ONLY in ${workspacePath} — do NOT modify the main repo
-- Do NOT run git merge — this is a rebase, not a merge
+- Do NOT run git merge locally — use gh pr merge --squash to merge via GitHub
 - Do NOT run build or tests — CI handles validation after PR merge
 - Use --force-with-lease (never --force) for the push
-- Report completion immediately after the push
+- The PR MUST be merged via gh pr merge before reporting success
+- Report completion immediately after the PR merge
 
 IF REBASE FAILS (conflicts):
 After aborting, report failure so the work agent can fix it:
@@ -1555,7 +1561,16 @@ curl -s -X POST ${apiUrl}/api/specialists/done \\
   -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"Rebase conflicts with main — work agent must run: git fetch origin main && git rebase origin/main, resolve conflicts, then resubmit"}'
 \`\`\`
 
-CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.`;
+IF gh pr merge FAILS:
+Report failure — do NOT report success:
+\`\`\`bash
+curl -s -X POST ${apiUrl}/api/specialists/done \\
+  -H "Content-Type: application/json" \\
+  -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"Rebase succeeded but gh pr merge --squash failed"}'
+\`\`\`
+
+CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
+CRITICAL: Success means the PR is MERGED on GitHub. Rebase alone is NOT success.`;
 
   // Resolve project for per-project ephemeral specialist
   const resolvedProject = resolveProjectFromIssue(issueId);
