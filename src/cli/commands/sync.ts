@@ -346,7 +346,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
 
+  // Ensure beads database exists for each registered project (first-time setup guard).
+  // bd install puts the binary in PATH, but bd init must be run once per project to
+  // create the Dolt database. Without it, workspace beads creation silently fails.
   // Migrate .panopticon/ → .pan/ and run multi-tool sync in all registered projects
+
   for (const { config } of projects) {
     if (!existsSync(config.path)) continue;
 
