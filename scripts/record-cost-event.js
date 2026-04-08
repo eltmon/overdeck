@@ -191,6 +191,20 @@ const DEFAULT_PRICING = [
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "MiniMax-M2.7",
+		inputPer1k: 3e-4,
+		outputPer1k: .0012,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "MiniMax-M2.7-highspeed",
+		inputPer1k: 3e-4,
+		outputPer1k: .0012,
+		currency: "USD"
 	}
 ];
 /**
@@ -391,7 +405,9 @@ function initSchema(db) {
       title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
       title_seed       TEXT,                               -- original auto-generated title for replacement check
       total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
-      archived_at      TEXT                                -- ISO timestamp when archived, null = active
+      archived_at      TEXT,                               -- ISO timestamp when archived, null = active
+      model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
+      effort           TEXT                                -- effort level (e.g. 'low', 'medium', 'high')
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -400,7 +416,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
   `);
-	db.pragma(`user_version = 12`);
+	db.pragma(`user_version = 13`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -408,7 +424,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 12) return;
+	if (currentVersion === 13) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -513,7 +529,15 @@ function runMigrations(db) {
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(archived_at)`);
 		} catch {}
 	}
-	db.pragma(`user_version = 12`);
+	if (currentVersion < 13) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN model TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN effort TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 13`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
@@ -7477,6 +7501,7 @@ for (const line of lines) {
 		let provider = "anthropic";
 		if (model.includes("gpt")) provider = "openai";
 		else if (model.includes("gemini")) provider = "google";
+		else if (model.includes("kimi") || model.toLowerCase().startsWith("minimax")) provider = "custom";
 		const pricing = getPricing(provider, model);
 		if (!pricing) continue;
 		const cost = calculateCost({

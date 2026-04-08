@@ -196,6 +196,8 @@ for (const line of lines) {
       provider = 'openai';
     } else if (model.includes('gemini')) {
       provider = 'google';
+    } else if (model.includes('kimi') || model.toLowerCase().startsWith('minimax')) {
+      provider = 'custom';
     }
 
     // Get pricing and calculate cost
