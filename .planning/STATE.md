@@ -1,6 +1,6 @@
 # Planning: PAN-557 — Conversation Deep Linking & Copy Buttons
 
-## Status: Implementation Complete
+## Status: Ready for Merge (Review Passed)
 
 ## Completed Work
 - [x] bead-1: Add GET /api/conversations/:id endpoint (commit: fee83b67)
@@ -15,13 +15,14 @@ None — all beads implemented and closed.
 ## Key Decisions
 - D1: Using numeric database `id` for deep linking (not `name`) — `id` is stable, `name` can be user-renamed
 - D2: `/conv/:id` path opens Mission Control tab with conversation loaded — no separate tab needed
+- D3: URL sync via setSelectedConvId callback passed to MissionControl as onConvIdChange prop
 
 ## Specialist Feedback
-None yet.
-- **[2026-04-08T12:02Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
-- **[2026-04-08T12:07Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
-- **[2026-04-08T12:12Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
-- **[2026-04-08T12:20Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
+- [2026-04-08T12:02Z] verification-gate → FAILED — frontend-typecheck (setSelectedConvId unused)
+- [2026-04-08T12:07Z] verification-gate → FAILED — test (pre-existing reopenIssue mock bug)
+- [2026-04-08T12:12Z] review-agent → CHANGES-REQUESTED — missing tests for getConversationById
+- [2026-04-08T12:20Z] verification-gate → FAILED — test (pre-existing work-types counts)
+- [2026-04-08T12:23Z] review-agent → PASSED
 
 ## Summary
 
@@ -31,6 +32,10 @@ Implemented conversation deep linking (PAN-557) with five beads:
 3. MissionControl accepts `convId` prop and auto-selects conversation on mount
 4. Copy-link button in ConversationPanel header (Copy→Check icon swap)
 5. Copy-link button in ConversationList items (hover-reveal pattern)
+
+Also fixed pre-existing issues encountered during review:
+- Missing reopenIssue mock in issue-lifecycle.test.ts
+- Stale work-types.test.ts counts (4 convoy → 5, 19 total → 20)
 
 ## Out of Scope
 - Changing how conversations are stored/named
