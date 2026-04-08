@@ -285,6 +285,113 @@ export function groupByCanceledType(issues: Issue[]): { name: string; issues: Is
 }
 
 /**
+ * Generate mock Rally data for visual testing when no Rally connection exists.
+ * Enable via URL param: ?mockRally=true
+ */
+function generateMockRallyData(): Issue[] {
+  const rallyProject: LinearProject = { id: 'mock-rally-project', name: 'HS POS Integrations', color: '#3b82f6' };
+  const rallyProject2: LinearProject = { id: 'mock-rally-project-2', name: 'HSv3', color: '#10b981' };
+
+  const features: Issue[] = [
+    // Feature in To Do — no children in this column
+    {
+      id: 'mock-f1', identifier: 'F28993', title: 'Delete/Anonymize PII for Ex-Employees in Payroll Integration',
+      status: 'To Do', priority: 2, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', totalChildCount: 3, completedChildCount: 0, inProgressChildCount: 0,
+    },
+    // Feature in To Do — no children
+    {
+      id: 'mock-f2', identifier: 'F29398', title: 'Implement Event-Driven Architecture for Real-Time Sync',
+      status: 'To Do', priority: 2, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', totalChildCount: 5, completedChildCount: 0, inProgressChildCount: 2,
+    },
+    // Feature in In Progress — derived status, with children in column
+    {
+      id: 'mock-f3', identifier: 'F29390', title: 'Dir Dev – Small Business Onboarding Flow Redesign',
+      status: 'In Progress', priority: 1, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', derivedStatus: 'in_progress',
+      totalChildCount: 4, completedChildCount: 0, inProgressChildCount: 2,
+    },
+    // Feature in In Progress — with more children
+    {
+      id: 'mock-f4', identifier: 'F27973', title: 'Direct Development: Ciccio Restaurant Group POS Migration',
+      status: 'In Progress', priority: 1, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', derivedStatus: 'in_progress',
+      totalChildCount: 8, completedChildCount: 3, inProgressChildCount: 3,
+    },
+    // Feature in Done
+    {
+      id: 'mock-f5', identifier: 'F28100', title: 'Automated Tip Reconciliation Report Generation',
+      status: 'Done', priority: 3, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Done', derivedStatus: 'closed',
+      totalChildCount: 4, completedChildCount: 4, inProgressChildCount: 0,
+    },
+  ];
+
+  const stories: Issue[] = [
+    // Children of F29390 (In Progress)
+    {
+      id: 'mock-us1', identifier: 'US218080', title: 'LPSLI – Step 1.2: API Integration for Small Biz Validation',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F29390', rawTrackerState: 'In-Progress',
+    },
+    {
+      id: 'mock-us2', identifier: 'US214008', title: 'LPSLI – Step 2: Assign Default Tax Templates',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F29390', rawTrackerState: 'In-Progress',
+    },
+    // Children of F27973 (In Progress)
+    {
+      id: 'mock-us3', identifier: 'US217395', title: 'Add a warning/alert if menu item prices differ >10% from market avg',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F27973', rawTrackerState: 'In-Progress',
+    },
+    {
+      id: 'mock-us4', identifier: 'US204193', title: 'Ensure Adjustment items sync correctly to accounting export',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F27973', rawTrackerState: 'In-Progress',
+    },
+    {
+      id: 'mock-us5', identifier: 'US215578', title: 'QA Automation plan for Ciccio migration regression suite',
+      status: 'In Progress', priority: 3, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F27973', rawTrackerState: 'Defined',
+    },
+    // A story in To Do under F28993
+    {
+      id: 'mock-us6', identifier: 'US220001', title: 'Define PII field inventory for payroll data exports',
+      status: 'To Do', priority: 2, labels: [], url: '#', createdAt: '2025-03-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F28993', rawTrackerState: 'Defined',
+    },
+    // Done stories under F28100
+    {
+      id: 'mock-us7', identifier: 'US210500', title: 'Generate nightly tip reconciliation CSV per location',
+      status: 'Done', priority: 2, labels: [], url: '#', createdAt: '2025-01-15', updatedAt: '2025-03-20',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F28100', rawTrackerState: 'Accepted',
+    },
+    {
+      id: 'mock-us8', identifier: 'US210501', title: 'Email distribution list for tip reports with PDF attachment',
+      status: 'Done', priority: 2, labels: [], url: '#', createdAt: '2025-01-15', updatedAt: '2025-03-22',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F28100', rawTrackerState: 'Accepted',
+    },
+  ];
+
+  return [...features, ...stories];
+}
+
+/**
  * Organize issues in a column into hierarchical groups.
  * Features (PortfolioItem) become parent groups; Stories/Defects with
  * a matching parentRef nest underneath. Orphans display normally.
@@ -393,16 +500,19 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
 }
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
+// Children (user stories) render INSIDE the card
 function FeatureCard({
   feature,
   childCount,
   isExpanded,
   onToggle,
+  children,
 }: {
   feature: Issue;
   childCount: number;
   isExpanded: boolean;
   onToggle: () => void;
+  children?: React.ReactNode;
 }) {
   const completed = feature.completedChildCount ?? 0;
   const inProgress = feature.inProgressChildCount ?? 0;
@@ -420,11 +530,18 @@ function FeatureCard({
         onClick={onToggle}
         className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
       >
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-primary/70 shrink-0 mt-0.5" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-primary/70 shrink-0 mt-0.5" />
-        )}
+        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-primary/70" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-primary/70" />
+          )}
+          {childCount > 0 && (
+            <span className="text-[10px] font-medium text-primary/60 min-w-[1rem] text-center">
+              {childCount}
+            </span>
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {feature.project && (
@@ -450,7 +567,7 @@ function FeatureCard({
             )}
             <TrackerShadowBadges issue={feature} />
           </div>
-          <p className="text-sm text-content-body mt-1 line-clamp-1">{feature.title}</p>
+          <p className="text-sm text-content-body mt-1 line-clamp-2">{feature.title}</p>
 
           {/* Progress bar and summary */}
           {total > 0 && (
@@ -461,18 +578,19 @@ function FeatureCard({
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-content-muted">
-                  {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
-                </span>
-                <span className="text-xs text-primary/70">
-                  {childCount} in column
-                </span>
-              </div>
+              <span className="text-[11px] text-content-muted mt-0.5 block">
+                {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
+              </span>
             </div>
           )}
         </div>
       </div>
+      {/* Child stories rendered inside the card */}
+      {isExpanded && children && (
+        <div className="border-t border-border/50 bg-surface-raised/50">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -718,6 +836,21 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
+
+  // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
+  const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
+
+  const toggleFeature = useCallback((featureId: string) => {
+    setCollapsedFeatures(prev => {
+      const next = new Set(prev);
+      if (next.has(featureId)) {
+        next.delete(featureId);
+      } else {
+        next.add(featureId);
+      }
+      return next;
+    });
+  }, []);
 
   // DnD state
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
@@ -992,11 +1125,46 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [issues, registeredProjects]);
 
   // Filter issues by selected projects
-  const filteredIssues = useMemo(() => {
+  const filteredIssuesBase = useMemo(() => {
     if (!issues) return [];
     if (selectedProjects.size === 0) return issues; // Show all if none selected
     return issues.filter(issue => issue.project && selectedProjects.has(issue.project.id));
   }, [issues, selectedProjects]);
+
+  // Inject mock Rally data for visual testing (?mockRally=true)
+  const mockRallyEnabled = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mockRally') === 'true';
+  }, []);
+
+  const filteredIssues = useMemo(() => {
+    if (!mockRallyEnabled) return filteredIssuesBase;
+    return [...filteredIssuesBase, ...generateMockRallyData()];
+  }, [filteredIssuesBase, mockRallyEnabled]);
+
+  // Detect if any filtered issues use Rally hierarchy (for expand/collapse all button)
+  const hasAnyRallyHierarchy = useMemo(() =>
+    filteredIssues.some(i => i.artifactType?.includes('PortfolioItem')),
+    [filteredIssues]
+  );
+
+  // Collect all feature identifiers for expand/collapse all
+  const allFeatureIds = useMemo(() =>
+    filteredIssues
+      .filter(i => i.artifactType?.includes('PortfolioItem'))
+      .map(i => i.identifier),
+    [filteredIssues]
+  );
+
+  const expandAllFeatures = useCallback(() => {
+    setCollapsedFeatures(new Set());
+  }, []);
+
+  const collapseAllFeatures = useCallback(() => {
+    setCollapsedFeatures(new Set(allFeatureIds));
+  }, [allFeatureIds]);
+
+  const allExpanded = collapsedFeatures.size === 0;
 
   // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
   const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
@@ -1072,6 +1240,24 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           <span className="text-sm text-muted-foreground">
             {issues?.length || 0} issues
           </span>
+
+          {/* Expand/Collapse all Rally features — only visible when Rally hierarchy exists */}
+          {hasAnyRallyHierarchy && cycleFilter === 'current' && (
+            <div className="flex items-center gap-1 ml-auto">
+              <button
+                onClick={allExpanded ? collapseAllFeatures : expandAllFeatures}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-background border border-border hover:bg-accent rounded-lg transition-colors"
+                title={allExpanded ? 'Collapse all features' : 'Expand all features'}
+              >
+                {allExpanded ? (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+                <span>{allExpanded ? 'Collapse' : 'Expand'} all</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Row 2: Project filter */}
@@ -1245,6 +1431,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onPlan={setPlanDialogIssue}
                     onViewBeads={setBeadsDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
+                    collapsedFeatures={collapsedFeatures}
+                    onToggleFeature={toggleFeature}
                   />
                 </div>
               </DroppableColumn>
@@ -1325,6 +1513,8 @@ function ColumnContent({
   onPlan,
   onViewBeads,
   onViewVBrief,
+  collapsedFeatures,
+  onToggleFeature,
 }: {
   issues: Issue[];
   agents: Agent[];
@@ -1336,21 +1526,9 @@ function ColumnContent({
   onPlan: (issue: Issue) => void;
   onViewBeads: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
+  collapsedFeatures: Set<string>;
+  onToggleFeature: (featureId: string) => void;
 }) {
-  const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
-
-  const toggleFeature = useCallback((featureId: string) => {
-    setCollapsedFeatures(prev => {
-      const next = new Set(prev);
-      if (next.has(featureId)) {
-        next.delete(featureId);
-      } else {
-        next.add(featureId);
-      }
-      return next;
-    });
-  }, []);
-
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
   const hierarchy = hasRallyHierarchy ? buildHierarchy(issues) : null;
@@ -1420,30 +1598,21 @@ function ColumnContent({
         const isExpanded = !collapsedFeatures.has(feature.identifier);
 
         return (
-          <div key={`feature-${feature.id}`} className="space-y-1">
-            <FeatureCard
-              feature={feature}
-              childCount={group.children.length}
-              isExpanded={isExpanded}
-              onToggle={() => toggleFeature(feature.identifier)}
-            />
-            {isExpanded && (
-              <div className="ml-3 border-l-2 border-primary/20 pl-1">
-                {group.children.map(child => (
-                  <CompactChildCard
-                    key={child.id}
-                    issue={child}
-                    agents={agents}
-                  />
-                ))}
-                {group.children.length === 0 && (
-                  <div className="text-xs text-content-muted py-2 pl-2">
-                    No stories in this column
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <FeatureCard
+            key={`feature-${feature.id}`}
+            feature={feature}
+            childCount={group.children.length}
+            isExpanded={isExpanded}
+            onToggle={() => onToggleFeature(feature.identifier)}
+          >
+            {group.children.map(child => (
+              <CompactChildCard
+                key={child.id}
+                issue={child}
+                agents={agents}
+              />
+            ))}
+          </FeatureCard>
         );
       })}
     </div>
