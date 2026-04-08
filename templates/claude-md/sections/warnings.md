@@ -1,3 +1,16 @@
+## Investigation First — NEVER Fix Inline
+
+**Your default mode is INVESTIGATION, not implementation.** When you encounter a bug, unexpected behavior, or something that needs changing outside your current issue scope:
+
+1. **Investigate** — understand the root cause fully
+2. **Document** — write up the problem, root cause, and proposed solution
+3. **File an issue** — use `bd create` or the issue tracker with your findings so the fix is ready to implement
+4. **Do NOT fix it yourself** — unless it directly blocks your current issue
+
+This prevents scope creep, keeps changes traceable, and ensures every fix goes through the proper workspace/review pipeline. A well-investigated issue with a clear solution is more valuable than a drive-by fix buried in an unrelated PR.
+
+**Exception:** If the bug directly blocks your assigned issue, fix it — but document it as a separate commit with a clear message.
+
 ## Warnings
 
 - **DO NOT** modify files outside this workspace without explicit permission

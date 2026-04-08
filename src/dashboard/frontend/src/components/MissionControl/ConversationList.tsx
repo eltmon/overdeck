@@ -1,6 +1,5 @@
-import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Plus, Circle, Archive } from 'lucide-react';
+import { Circle, Archive } from 'lucide-react';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,13 +50,11 @@ async function archiveConversation(name: string): Promise<void> {
 interface ConversationListProps {
   selectedConversation: string | null;
   onSelectConversation: (name: string | null) => void;
-  onDraftCreated: (draft: DraftSession) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationList({ selectedConversation, onSelectConversation, onDraftCreated }: ConversationListProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
   const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -65,8 +62,6 @@ export function ConversationList({ selectedConversation, onSelectConversation, o
     queryFn: fetchConversations,
     refetchInterval: 10000,
   });
-
-  // No mutation needed — draft mode is just local state
 
   const archiveMutation = useMutation({
     mutationFn: archiveConversation,
@@ -78,85 +73,55 @@ export function ConversationList({ selectedConversation, onSelectConversation, o
     },
   });
 
-  const handleAddClick = useCallback(() => {
-    onDraftCreated(true);
-  }, [onDraftCreated]);
+  if (isLoading) {
+    return (
+      <div className={styles.skeletonList}>
+        <div className={styles.skeletonItem} />
+        <div className={styles.skeletonItem} />
+      </div>
+    );
+  }
+
+  if (conversations.length === 0) {
+    return <div className={styles.conversationEmpty}>No conversations yet</div>;
+  }
 
   return (
-    <div className={styles.conversationSection}>
-      {/* Section header */}
-      <div className={styles.conversationHeader}>
+    <div className={styles.conversationList}>
+      {conversations.map(conv => (
         <button
-          className={styles.conversationToggle}
-          onClick={() => setIsExpanded(prev => !prev)}
-          aria-expanded={isExpanded}
+          key={conv.id}
+          className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''}`}
+          onClick={() => onSelectConversation(conv.name)}
+          title={conv.name}
         >
-          <ChevronRight
-            size={12}
-            className={`${styles.chevron} ${isExpanded ? styles.chevronOpen : ''}`}
+          <Circle
+            size={7}
+            className={styles.conversationDot}
+            style={{
+              fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+              color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+            }}
           />
-          <span className={styles.conversationTitle}>Conversations</span>
-          <span className={styles.featureCount}>{conversations.length}</span>
-        </button>
-        <button
-          className={styles.conversationAddBtn}
-          onClick={handleAddClick}
-          title="New conversation"
-          aria-label="New conversation"
-        >
-          <Plus size={13} />
-        </button>
-      </div>
-
-      {/* Collapsed or expanded content */}
-      {isExpanded && (
-        <div className={styles.conversationList}>
-          {/* Session list */}
-          {isLoading ? (
-            <div className={styles.skeletonList}>
-              <div className={styles.skeletonItem} />
-              <div className={styles.skeletonItem} />
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className={styles.conversationEmpty}>No conversations yet</div>
-          ) : (
-            conversations.map(conv => (
-              <button
-                key={conv.id}
-                className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''}`}
-                onClick={() => onSelectConversation(conv.name)}
-                title={conv.name}
-              >
-                <Circle
-                  size={7}
-                  className={styles.conversationDot}
-                  style={{
-                    fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-                    color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-                  }}
-                />
-                <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
-                {conv.totalCost !== undefined && conv.totalCost > 0 && (
-                  <span className={styles.featureCost}>
-                    {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
-                  </span>
-                )}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={styles.conversationArchiveBtn}
-                  onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
-                  title="Archive conversation"
-                  aria-label={`Archive ${conv.name}`}
-                >
-                  <Archive size={11} />
-                </span>
-              </button>
-            ))
+          <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+          {conv.totalCost !== undefined && conv.totalCost > 0 && (
+            <span className={styles.featureCost}>
+              {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
+            </span>
           )}
-        </div>
-      )}
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationArchiveBtn}
+            onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
+            title="Archive conversation"
+            aria-label={`Archive ${conv.name}`}
+          >
+            <Archive size={11} />
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

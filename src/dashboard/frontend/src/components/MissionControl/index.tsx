@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass } from 'lucide-react';
+import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { ActivityView } from './ActivityView';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
@@ -52,11 +52,14 @@ interface MissionControlProps {
   issues?: Issue[];
 }
 
+type SidebarTab = 'conversations' | 'projects';
+
 export function MissionControl({ issues = [] }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
     return saved ? Number(saved) : 600;
@@ -124,6 +127,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
+    setSidebarTab('conversations');
   }, []);
 
   const queryClient = useQueryClient();
@@ -197,19 +201,49 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
         {/* Sidebar: Project Tree */}
         <div className={styles.sidebar} style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>Command Deck</h2>
-            <p className={styles.sidebarSubtitle}>Active features across projects</p>
+            <div className={styles.sidebarHeaderRow}>
+              <h2 className={styles.sidebarTitle}>Command Deck</h2>
+              {sidebarTab === 'conversations' && (
+                <button
+                  className={styles.conversationAddBtn}
+                  onClick={handleDraftCreated}
+                  title="New conversation"
+                  aria-label="New conversation"
+                >
+                  <Plus size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Segmented control */}
+            <div className={styles.segmentControl}>
+              <button
+                className={`${styles.segmentButton} ${sidebarTab === 'conversations' ? styles.segmentButtonActive : ''}`}
+                onClick={() => setSidebarTab('conversations')}
+              >
+                Conversations
+                <span className={styles.segmentCount}>{conversations.length}</span>
+              </button>
+              <button
+                className={`${styles.segmentButton} ${sidebarTab === 'projects' ? styles.segmentButtonActive : ''}`}
+                onClick={() => setSidebarTab('projects')}
+              >
+                Projects
+                <span className={styles.segmentCount}>
+                  {projects.reduce((sum, p) => sum + p.features.length, 0)}
+                </span>
+              </button>
+            </div>
           </div>
 
-          {/* Conversations section — above project tree */}
-          <ConversationList
-            selectedConversation={selectedConversation}
-            onSelectConversation={handleSelectConversation}
-            onDraftCreated={handleDraftCreated}
-          />
-
+          {/* Tab content — each gets full height */}
           <div className={styles.projectTree}>
-            {isLoading && projects.length === 0 ? (
+            {sidebarTab === 'conversations' ? (
+              <ConversationList
+                selectedConversation={selectedConversation}
+                onSelectConversation={handleSelectConversation}
+              />
+            ) : isLoading && projects.length === 0 ? (
               <div className={styles.skeletonList}>
                 <div className={styles.skeletonItem} style={{ width: '60%' }} />
                 <div className={styles.skeletonItem} style={{ width: '80%' }} />
