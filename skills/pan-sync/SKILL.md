@@ -18,13 +18,13 @@ allowed-tools:
 
 This skill guides you through syncing Panopticon skills to AI coding assistants. The sync process creates symlinks from `~/.panopticon/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
 
-## When to Use
+## Auto-Sync
 
-- After installing or updating Panopticon
-- After adding new skills to `~/.panopticon/skills/`
-- When skills aren't appearing in your AI tool
-- When workspace CLAUDE.md files aren't available in opencode
-- To check what would be synced (dry run)
+`pan up` runs a full sync automatically on every startup. You rarely need to run `pan sync` manually. Manual sync is useful when:
+
+- You added new skills and want to sync without restarting the dashboard
+- You want to preview changes with `--dry-run`
+- You need to force-overwrite with `--force`
 
 ## How Sync Works
 

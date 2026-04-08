@@ -143,8 +143,7 @@ export async function initCommand(): Promise<void> {
 
     console.log('');
     console.log('Next steps:');
-    console.log(chalk.dim('  1. Run: pan sync'));
-    console.log(chalk.dim('  2. Start dashboard: pan up'));
+    console.log(chalk.dim('  1. Start dashboard: pan up (auto-syncs skills)'));
 
   } catch (error: any) {
     spinner.fail('Failed to initialize');

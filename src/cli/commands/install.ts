@@ -652,14 +652,13 @@ async function installCommand(options: InstallOptions): Promise<void> {
   console.log(chalk.green.bold('Installation complete!'));
   console.log('');
   console.log(chalk.bold('Next steps:'));
-  console.log(`  1. Run ${chalk.cyan('pan sync')} to sync skills to ~/.claude/`);
 
   if (!options.minimal) {
-    console.log(`  2. Run ${chalk.cyan('pan up')} to start Traefik and dashboard`);
-    console.log(`  3. Access dashboard at ${chalk.cyan(`https://${config.traefik?.domain || 'pan.localhost'}`)}`);
+    console.log(`  1. Run ${chalk.cyan('pan up')} to start Traefik and dashboard (auto-syncs skills)`);
+    console.log(`  2. Access dashboard at ${chalk.cyan(`https://${config.traefik?.domain || 'pan.localhost'}`)}`);
   } else {
-    console.log(`  2. Run ${chalk.cyan('pan up')} to start the dashboard`);
-    console.log(`  3. Access dashboard at ${chalk.cyan(`http://localhost:${config.dashboard.port}`)}`);
+    console.log(`  1. Run ${chalk.cyan('pan up')} to start the dashboard (auto-syncs skills)`);
+    console.log(`  2. Access dashboard at ${chalk.cyan(`http://localhost:${config.dashboard.port}`)}`);
   }
 
   console.log(`  4. In each project root, initialize beads task tracking:`);
