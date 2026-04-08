@@ -17,3 +17,10 @@ All beads completed, ready for review
 
 ## Specialist Feedback
 - None yet
+- **[2026-04-08T04:33Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-08T04:34Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-08T04:35Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-04-08T04:37Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
+- **[2026-04-08T04:39Z] verification-gate → FAILED** — `.planning/feedback/005-verification-gate-failed.md`
+- **[2026-04-08T04:45Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`
+- **[2026-04-08T05:00Z] verification-gate → FAILED** — `.planning/feedback/007-verification-gate-failed.md`
