@@ -105,6 +105,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // MiniMax ($0.30/M input, $1.20/M output)
   { provider: 'custom', model: 'minimax-m2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'minimax-m2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  { provider: 'custom', model: 'MiniMax-M2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  { provider: 'custom', model: 'MiniMax-M2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
 ];
 
 // ============== Cost Calculation ==============
