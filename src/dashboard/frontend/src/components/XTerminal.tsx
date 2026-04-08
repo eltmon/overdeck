@@ -218,7 +218,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
-        scrollback: 5000,  // Local scroll buffer; the real status-bar fix is dimension-sync (Attempt 14)
+        scrollback: 200,  // Keep small to avoid flash on open with large scrollback; users can switch to conversation mode for history
         convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
