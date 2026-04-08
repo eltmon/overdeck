@@ -151,7 +151,7 @@ export function ActionsSection({
           data-testid="review-test-btn"
           onClick={onReview}
           disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-primary badge-bg-primary hover:bg-primary/20"
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-muted-foreground hover:text-foreground hover:bg-accent"
         >
           {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
             <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -173,7 +173,7 @@ export function ActionsSection({
         <button
           onClick={onClose}
           disabled={closeMutation.isPending}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-warning rounded badge-bg-warning hover:bg-warning/20 disabled:opacity-50"
+          className="flex items-center gap-1 px-2 py-1 text-xs text-destructive-foreground rounded hover:bg-accent disabled:opacity-50"
         >
           {closeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
           Close
@@ -185,7 +185,7 @@ export function ActionsSection({
             data-testid="reopen-btn"
             onClick={onReopen}
             disabled={reopenMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs badge-bg-secondary text-signal-review rounded hover:bg-signal-review/20 disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
           >
             {reopenMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
@@ -197,7 +197,7 @@ export function ActionsSection({
           <button
             onClick={onResetReview}
             disabled={resetReviewMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-900/30 text-amber-400 rounded hover:bg-amber-900/50 disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
           >
             {resetReviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
             {resetReviewMutation.isPending ? 'Resetting...' : 'Reset Pipeline'}
@@ -216,7 +216,7 @@ export function ActionsSection({
                 }
               }}
               disabled={startAgentMutation.isPending || startAgentMutation.isSuccess || showResumeInput}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded hover:bg-primary/90 disabled:opacity-50 font-medium bg-primary"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 font-medium bg-primary"
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : startAgentMutation.isSuccess ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               {startAgentMutation.isPending ? (isResume ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (isResume ? 'Resumed!' : 'Started!') : (isResume ? 'Resume Session' : 'Start Agent')}
