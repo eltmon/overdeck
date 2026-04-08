@@ -74,6 +74,9 @@ export interface PanopticonBridge {
    */
   openTerminalWindow(sessionName: string, title: string): void;
 
+  /** Sets the always-on-top state of the focused window */
+  setAlwaysOnTop(value: boolean): void;
+
   /**
    * Registers a listener for menu actions dispatched from the main process.
    * Returns an unsubscribe function.
@@ -121,6 +124,10 @@ const bridge: PanopticonBridge = {
 
   openTerminalWindow: (sessionName: string, title: string) => {
     ipcRenderer.send(IPC.OPEN_TERMINAL_WINDOW, sessionName, title);
+  },
+
+  setAlwaysOnTop: (value: boolean) => {
+    ipcRenderer.send(IPC.SET_ALWAYS_ON_TOP, value);
   },
 
   onMenuAction: (listener: (action: string) => void) => {

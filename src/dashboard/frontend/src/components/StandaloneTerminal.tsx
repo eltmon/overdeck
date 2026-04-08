@@ -20,9 +20,7 @@ export function StandaloneTerminal({ sessionName }: StandaloneTerminalProps) {
     if (bridge?.isDesktopApp()) {
       const newValue = !isAlwaysOnTop;
       setIsAlwaysOnTop(newValue);
-      // IPC for always-on-top will be handled via the bridge
-      // The bridge.notify or dedicated method would be used here
-      // For now, we track state; the electron side will handle the actual window control
+      bridge.setAlwaysOnTop(newValue);
     } else {
       // Browser popup: just focus the window
       window.focus();
