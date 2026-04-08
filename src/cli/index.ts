@@ -607,16 +607,30 @@ program
 program
   .command('serve')
   .description('Start the dashboard server and open it in the default browser (npx launcher)')
-  .option('--port <port>', 'Port to listen on', '7825')
+  .option('--port <port>', 'Port to listen on', '3011')
   .action(async (options: { port: string }) => {
-    const { spawn } = await import('child_process');
+    const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { existsSync } = await import('fs');
 
+    // Check Node.js version — dashboard requires Node 22+ (node-pty, Effect.js)
+    const nodeVersion = process.versions.node;
+    const major = parseInt(nodeVersion.split('.')[0]!, 10);
+    if (major < 22) {
+      console.error(chalk.red(`Error: Panopticon dashboard requires Node.js 22 or later.`));
+      console.error(chalk.dim(`You are running Node.js ${nodeVersion}.`));
+      console.error('');
+      console.error('Install Node 22:');
+      console.error(chalk.dim('  nvm install 22 && nvm use 22'));
+      console.error(chalk.dim('  # or: brew install node@22'));
+      console.error(chalk.dim('  # or: https://nodejs.org/en/download'));
+      process.exit(1);
+    }
+
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
-    const port = parseInt(options.port, 10) || 7825;
+    const port = parseInt(options.port, 10) || 3011;
     const url = `http://localhost:${port}`;
 
     if (!existsSync(bundledServer)) {
@@ -625,15 +639,12 @@ program
       process.exit(1);
     }
 
-    const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
-    const node22 = existsSync(nvmNode) ? nvmNode : 'node';
-
     console.log(chalk.bold('Panopticon Dashboard'));
-    console.log(chalk.dim(`Starting server on port ${port}...`));
+    console.log(chalk.dim(`Starting server on port ${port} (Node ${nodeVersion})...`));
 
-    const server = spawn(node22, [bundledServer], {
+    const server = spawn(process.execPath, [bundledServer], {
       stdio: 'inherit',
-      env: { ...process.env, PANOPTICON_PORT: String(port) },
+      env: { ...process.env, PORT: String(port) },
     });
 
     server.on('error', (err) => {
