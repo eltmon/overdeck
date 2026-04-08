@@ -12,6 +12,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
+import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { getAgentRuntimeState, getAgentDir } from './agents.js'
@@ -37,8 +38,7 @@ export interface AgentEnrichment {
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
 
 export function getClaudeProjectDir(workspacePath: string): string {
-  const dirName = workspacePath.replace(/^\//, '').replace(/\//g, '-')
-  return join(homedir(), '.claude', 'projects', `-${dirName}`)
+  return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
 }
 
 export function getActiveSessionPath(projectDir: string): string | null {

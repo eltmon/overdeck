@@ -1,5 +1,6 @@
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 /**
  * Specialists route module — Effect HttpRouter.Layer (PAN-428 B9)
  *
@@ -868,7 +869,7 @@ const getSpecialistCostRoute = HttpRouter.add(
     const homeDir = process.env.HOME || homedir();
     const claudeProjectsDir = join(homeDir, '.claude', 'projects');
 
-    const projectDirName = `-${homeDir.replace(/^\//, '').replace(/\//g, '-')}`;
+    const projectDirName = encodeClaudeProjectDir(homeDir);
     const projectDir = join(claudeProjectsDir, projectDirName);
     const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 

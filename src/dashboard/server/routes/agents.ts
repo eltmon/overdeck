@@ -1,5 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -1030,7 +1031,7 @@ const getAgentCostRoute = HttpRouter.add(
     const workspacePath = agentState.workspace;
 
     if (workspacePath) {
-      const projectDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
+      const projectDirName = encodeClaudeProjectDir(workspacePath);
       const projectDir = join(claudeProjectsDir, projectDirName);
       const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
