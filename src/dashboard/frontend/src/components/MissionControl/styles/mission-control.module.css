@@ -1317,6 +1317,23 @@
   gap: var(--mc-space-1);
 }
 
+.copyLinkButton {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.copyLinkButton:hover {
+  color: var(--mc-text-primary);
+  background: var(--mc-bg-hover);
+}
+
 .conversationTerminalBody {
   flex: 1;
   overflow: hidden;
