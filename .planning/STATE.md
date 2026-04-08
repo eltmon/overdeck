@@ -28,3 +28,4 @@ Implementing beads one at a time - auto-updater service complete, moving to IPC 
 
 ## Specialist Feedback
 - None yet
+- **[2026-04-08T11:26Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
