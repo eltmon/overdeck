@@ -134,7 +134,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
   return {
     models: {
       providers: {
-        anthropic: true, // Always enabled
+        anthropic: config.enabledProviders.has('anthropic'),
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
         zai: config.enabledProviders.has('zai'),
@@ -377,6 +377,53 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
     },
     api_keys: {},
     tracker_keys: {},
+  };
+}
+
+/**
+ * MiniMax-optimized defaults: use MiniMax M2.7 for all work, Anthropic disabled
+ */
+export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
+  return {
+    models: {
+      providers: {
+        anthropic: false,
+        openai: false,
+        google: false,
+        zai: false,
+        kimi: false,
+        minimax: true,
+        openrouter: false,
+      },
+      overrides: getMiniMaxModelDefaults(),
+      gemini_thinking_level: 3,
+    },
+    api_keys: {},
+    tracker_keys: {},
+  };
+}
+
+function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
+  return {
+    'issue-agent:exploration': 'minimax-m2.7',
+    'issue-agent:implementation': 'minimax-m2.7-highspeed',
+    'issue-agent:testing': 'minimax-m2.7-highspeed',
+    'issue-agent:documentation': 'minimax-m2.7-highspeed',
+    'issue-agent:review-response': 'minimax-m2.7-highspeed',
+    'specialist-review-agent': 'minimax-m2.7',
+    'specialist-test-agent': 'minimax-m2.7-highspeed',
+    'specialist-merge-agent': 'minimax-m2.7-highspeed',
+    'convoy:security-reviewer': 'minimax-m2.7',
+    'convoy:performance-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:correctness-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:requirements-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:synthesis-agent': 'minimax-m2.7-highspeed',
+    'subagent:explore': 'minimax-m2.7-highspeed',
+    'subagent:plan': 'minimax-m2.7-highspeed',
+    'subagent:bash': 'minimax-m2.7-highspeed',
+    'subagent:general-purpose': 'minimax-m2.7-highspeed',
+    'cli:interactive': 'minimax-m2.7',
+    'cli:quick-command': 'minimax-m2.7-highspeed',
   };
 }
 

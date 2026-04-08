@@ -372,8 +372,11 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       const providers = config.models.providers;
       const legacyKeys = config.api_keys || {};
 
-      // Anthropic (always enabled)
-      result.enabledProviders.add('anthropic');
+      // Anthropic
+      const anthropic = normalizeProviderConfig(providers.anthropic);
+      if (anthropic.enabled) {
+        result.enabledProviders.add('anthropic');
+      }
 
       // OpenAI
       const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);

@@ -84,6 +84,12 @@ async function fetchOptimalDefaults(): Promise<SettingsConfig> {
   return res.json();
 }
 
+async function fetchMiniMaxDefaults(): Promise<SettingsConfig> {
+  const res = await fetch('/api/settings/minimax-defaults');
+  if (!res.ok) throw new Error('Failed to fetch MiniMax defaults');
+  return res.json();
+}
+
 interface TestApiKeyResult {
   success: boolean;
   error: string | null;
@@ -386,6 +392,25 @@ export function SettingsPage() {
     }
   };
 
+  const handleRestoreMiniMaxDefaults = async () => {
+    try {
+      const miniMaxDefaults = await fetchMiniMaxDefaults();
+      const newFormData: SettingsConfig = {
+        models: {
+          providers: { ...miniMaxDefaults.models.providers },
+          overrides: { ...miniMaxDefaults.models.overrides },
+          gemini_thinking_level: formData?.models.gemini_thinking_level,
+        },
+        api_keys: { ...(formData?.api_keys || {}) },
+        tracker_keys: { ...(formData?.tracker_keys || {}) },
+      };
+      setFormData(newFormData);
+    } catch (error) {
+      console.error('Failed to fetch MiniMax defaults:', error);
+      showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });
+    }
+  };
+
   const handleTestApiKey = async (provider: Provider) => {
     const apiKey = formData?.api_keys[provider as keyof typeof formData.api_keys];
     if (!apiKey) return;
@@ -452,10 +477,18 @@ export function SettingsPage() {
             <button
               onClick={handleRestoreOptimalDefaults}
               className="px-3 py-1.5 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
-              title="Set all model assignments to research-based optimal defaults"
+              title="Set all model assignments to research-based optimal defaults (Anthropic + Kimi)"
             >
               <Zap className="w-4 h-4" />
               Optimal Defaults
+            </button>
+            <button
+              onClick={handleRestoreMiniMaxDefaults}
+              className="px-3 py-1.5 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              title="Set all model assignments to MiniMax M2.7 (lowest cost)"
+            >
+              <Zap className="w-4 h-4" />
+              MiniMax Defaults
             </button>
             <button
               onClick={handleReset}
