@@ -292,6 +292,7 @@ export interface AvailableModelsResult {
   google: ProviderModelEntry[];
   zai: ProviderModelEntry[];
   kimi: ProviderModelEntry[];
+  minimax: ProviderModelEntry[];
   openrouter: ProviderModelEntry[];
   /**
    * Per-provider usability: true = provider is enabled and has credentials
@@ -303,6 +304,7 @@ export interface AvailableModelsResult {
     google: boolean;
     zai: boolean;
     kimi: boolean;
+    minimax: boolean;
     openrouter: boolean;
   };
 }
@@ -326,6 +328,7 @@ export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsR
     google: [],
     zai: [],
     kimi: [],
+    minimax: [],
     openrouter: [],
     usable: {
       anthropic: anthropicAuthed,
@@ -333,6 +336,7 @@ export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsR
       google: config.enabledProviders.has('google') && !!config.apiKeys.google,
       zai: config.enabledProviders.has('zai') && !!config.apiKeys.zai,
       kimi: config.enabledProviders.has('kimi') && !!config.apiKeys.kimi,
+      minimax: config.enabledProviders.has('minimax') && !!config.apiKeys.minimax,
       openrouter: config.enabledProviders.has('openrouter') && !!config.apiKeys.openrouter,
     },
   };
@@ -345,6 +349,7 @@ export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsR
       case 'google': result.google.push(entry); break;
       case 'zai': result.zai.push(entry); break;
       case 'kimi': result.kimi.push(entry); break;
+      case 'minimax': result.minimax.push(entry); break;
       case 'openrouter': result.openrouter.push(entry); break;
     }
   }
