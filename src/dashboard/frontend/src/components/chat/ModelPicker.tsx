@@ -293,24 +293,19 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
       {open && (
         <div className={styles.pickerDropdown}>
-          {groups.map((group) => (
-            <div key={group.provider} className={!group.usable ? styles.pickerGroupDisabled : undefined}>
-              {groups.length > 1 && (
+          {groups.filter(g => g.usable).map((group) => (
+            <div key={group.provider}>
+              {groups.filter(g => g.usable).length > 1 && (
                 <div className={styles.pickerGroupHeader}>
                   {group.label}
-                  {!group.usable && (
-                    <span className={styles.pickerGroupNoKey}>no key</span>
-                  )}
                 </div>
               )}
               {group.models.map((model) => (
                 <button
                   key={model.id}
                   className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                  onClick={() => group.usable ? handleSelect(model) : undefined}
-                  disabled={!group.usable}
+                  onClick={() => handleSelect(model)}
                   type="button"
-                  title={!group.usable ? 'Configure an API key in Settings to use this provider' : undefined}
                 >
                   <span className={styles.pickerOptionLabel}>{model.label}</span>
                   {model.authBadge && group.usable && (
