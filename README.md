@@ -23,6 +23,16 @@ Panopticon is an open-source control plane for multi-agent software development.
 
 </div>
 
+## Quick Start
+
+```bash
+npm install -g panopticon-cli && pan install && pan sync && pan up
+```
+
+Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
+
+See the [full documentation](https://panopticon-cli.com) for detailed setup, configuration, and usage guides.
+
 ---
 
 ## Why Panopticon?
@@ -110,18 +120,6 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 | **Cursor** | Skills sync |
 | **Gemini CLI** | Skills sync |
 | **Google Antigravity** | Skills sync |
-
----
-
-## Quick Start
-
-```bash
-npm install -g panopticon-cli && pan install && pan sync && pan up
-```
-
-Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
-
-See the [full documentation](https://panopticon-cli.com) for detailed setup, configuration, and usage guides.
 
 ---
 
