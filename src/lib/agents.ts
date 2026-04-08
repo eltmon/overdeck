@@ -686,6 +686,25 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     preTrustDirectory(options.workspace);
   } catch { /* non-fatal */ }
 
+  // Configure workspace for GitHub App bot identity (PAN-536)
+  // Agents push as panopticon-agent[bot] with short-lived installation tokens
+  try {
+    const { isGitHubAppConfigured, generateInstallationToken, configureWorkspaceForBot } = await import('./github-app.js');
+    if (isGitHubAppConfigured()) {
+      const { findProjectByPath } = await import('./projects.js');
+      const project = findProjectByPath(resolve(options.workspace, '..', '..'));
+      const ghRepo = project?.github_repo;
+      if (ghRepo) {
+        const [owner, repo] = ghRepo.split('/');
+        const { token } = await generateInstallationToken();
+        await configureWorkspaceForBot(options.workspace, owner, repo, token);
+        console.log(`[${agentId}] Configured workspace for bot push (panopticon-agent[bot])`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[${agentId}] GitHub App config failed (falling back to SSH): ${err.message}`);
+  }
+
   // Build SageOx environment variables for session linking (only if project is SageOx-initialized)
   // Derive project root from workspace path: <project-root>/workspaces/<branch>
   const projectRoot = resolve(options.workspace, '..', '..');
