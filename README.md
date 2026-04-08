@@ -26,7 +26,7 @@ Panopticon is an open-source control plane for multi-agent software development.
 ## Quick Start
 
 ```bash
-npm install -g panopticon-cli && pan install && pan sync && pan up
+npx panopticon-cli@latest install && pan sync && pan up
 ```
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
