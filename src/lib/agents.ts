@@ -36,7 +36,7 @@ function normalizeAgentId(agentId: string): string {
  * Reads the current API key from settings so resumed/recovered agents
  * always use the latest key.
  */
-function getProviderEnvForModel(model: string): Record<string, string> {
+export function getProviderEnvForModel(model: string): Record<string, string> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
 
@@ -56,6 +56,31 @@ function getProviderEnvForModel(model: string): Record<string, string> {
     return getProviderEnv(provider, apiKey);
   }
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
+}
+
+/**
+ * Get bash export lines for provider env vars (for use in launcher scripts).
+ * Returns empty string for Anthropic models.
+ */
+export function getProviderExportsForModel(model: string): string {
+  const envVars = getProviderEnvForModel(model);
+  if (Object.keys(envVars).length === 0) return '';
+  return Object.entries(envVars)
+    .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
+    .join('\n') + '\n';
+}
+
+/**
+ * Get tmux -e flags for provider env vars (for use in tmux new-session).
+ * Returns empty string for Anthropic models.
+ */
+export function getProviderTmuxFlags(model: string): string {
+  const envVars = getProviderEnvForModel(model);
+  let flags = '';
+  for (const [key, value] of Object.entries(envVars)) {
+    flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
+  }
+  return flags;
 }
 
 // ============================================================================
@@ -644,8 +669,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let claudeCmd: string;
   if (prompt) {
     const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
+    const providerExports = getProviderExportsForModel(state.model);
     const launcherContent = `#!/bin/bash
-prompt=$(cat "${promptFile}")
+${providerExports}prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });

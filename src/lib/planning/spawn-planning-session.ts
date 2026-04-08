@@ -625,7 +625,7 @@ while true; do sleep 60; done
       id: sessionName,
       issueId: issue.identifier,
       workspace: workspacePath,
-      runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
+      runtime: 'claude',
       model: planningModel,
       status: 'running',
       startedAt: new Date().toISOString(),
