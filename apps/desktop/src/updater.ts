@@ -12,6 +12,7 @@ import { BrowserWindow, app } from "electron";
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 
 let checkIntervalId: ReturnType<typeof setInterval> | null = null;
+let initialized = false;
 
 // Update state for IPC bridge
 export interface UpdateStatus {
@@ -66,6 +67,12 @@ function broadcastToRenderers(channel: string, ...args: unknown[]): void {
  * Sets up event handlers and starts periodic update checks.
  */
 export function initializeAutoUpdater(): void {
+  if (initialized) {
+    console.log("[updater] Already initialized, skipping...");
+    return;
+  }
+  initialized = true;
+
   // Configure to use GitHub Releases
   autoUpdater.setFeedURL({
     provider: "github",

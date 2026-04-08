@@ -344,6 +344,7 @@ function stopServer() {
 */
 const FOUR_HOURS_MS = 14400 * 1e3;
 let checkIntervalId = null;
+let initialized = false;
 let currentStatus = {
 	checking: false,
 	available: false,
@@ -375,6 +376,11 @@ function broadcastToRenderers(channel, ...args) {
 * Sets up event handlers and starts periodic update checks.
 */
 function initializeAutoUpdater() {
+	if (initialized) {
+		console.log("[updater] Already initialized, skipping...");
+		return;
+	}
+	initialized = true;
 	electron_updater.autoUpdater.setFeedURL({
 		provider: "github",
 		owner: "eltmon",
@@ -930,11 +936,19 @@ function registerIpcHandlers() {
 	});
 	electron.ipcMain.handle(IPC.GET_UPDATE_STATUS, () => getUpdateStatus());
 	electron.ipcMain.handle(IPC.CHECK_FOR_UPDATES, async () => {
-		await checkForUpdates();
+		try {
+			await checkForUpdates();
+		} catch (err) {
+			console.error("[main] checkForUpdates failed:", err);
+		}
 		return getUpdateStatus();
 	});
 	electron.ipcMain.handle(IPC.DOWNLOAD_UPDATE, async () => {
-		await downloadUpdate();
+		try {
+			await downloadUpdate();
+		} catch (err) {
+			console.error("[main] downloadUpdate failed:", err);
+		}
 		return getUpdateStatus();
 	});
 	electron.ipcMain.on(IPC.QUIT_AND_INSTALL, () => {

@@ -137,12 +137,20 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.GET_UPDATE_STATUS, () => getUpdateStatus());
 
   ipcMain.handle(IPC.CHECK_FOR_UPDATES, async () => {
-    await checkForUpdates();
+    try {
+      await checkForUpdates();
+    } catch (err) {
+      console.error("[main] checkForUpdates failed:", err);
+    }
     return getUpdateStatus();
   });
 
   ipcMain.handle(IPC.DOWNLOAD_UPDATE, async () => {
-    await downloadUpdate();
+    try {
+      await downloadUpdate();
+    } catch (err) {
+      console.error("[main] downloadUpdate failed:", err);
+    }
     return getUpdateStatus();
   });
 
