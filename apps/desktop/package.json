@@ -33,6 +33,11 @@
   "build": {
     "appId": "com.panopticon.app",
     "productName": "Panopticon",
+    "publish": {
+      "provider": "github",
+      "owner": "eltmon",
+      "repo": "panopticon-cli"
+    },
     "files": [
       "dist-electron/**/*",
       "!dist-electron/**/*.map"
