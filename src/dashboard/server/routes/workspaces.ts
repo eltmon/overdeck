@@ -3652,6 +3652,29 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/workspaces/:issueId/refresh-token ───────────────────────
+
+const postWorkspaceRefreshTokenRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/refresh-token',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issueLower = issueId.toLowerCase();
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+    const { refreshWorkspaceToken, isGitHubAppConfigured } = yield* Effect.promise(() => import('../../../lib/github-app.js'));
+    if (!isGitHubAppConfigured()) {
+      return jsonResponse({ success: false, error: 'GitHub App not configured' }, { status: 400 });
+    }
+
+    yield* Effect.promise(() => refreshWorkspaceToken(workspacePath));
+    return jsonResponse({ success: true, message: `Token refreshed for ${issueId}` });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const workspacesRouteLayer = Layer.mergeAll(
@@ -3674,6 +3697,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceApproveRoute,
   deleteWorkspacePendingRoute,
   getWorkspaceTldrRoute,
+  postWorkspaceRefreshTokenRoute,
 );
 
 export default workspacesRouteLayer;

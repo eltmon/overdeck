@@ -68,5 +68,20 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(`    - Poke on warning: ${status.config.auto_actions.poke_on_warning ? 'enabled' : 'disabled'}`);
   console.log(`    - Kill on stuck:   ${status.config.auto_actions.kill_on_stuck ? chalk.red('enabled') : 'disabled'}`);
 
+  // GitHub App status (PAN-536)
+  try {
+    const { getAppStatus } = await import('../../../lib/github-app.js');
+    const appStatus = getAppStatus();
+    console.log('');
+    console.log(chalk.bold('GitHub App:'));
+    if (appStatus.configured) {
+      console.log(`  ${chalk.green('✓')} panopticon-agent (App ID: ${appStatus.appId})`);
+      console.log(`  Mode: ${chalk.green('App')} — agents push as panopticon-agent[bot]`);
+    } else {
+      console.log(`  ${chalk.yellow('⚠')} Not configured — agents push as your SSH identity`);
+      console.log(`  ${chalk.dim('  Run: node scripts/create-github-app.mjs')}`);
+    }
+  } catch { /* non-fatal */ }
+
   console.log('');
 }
