@@ -345,9 +345,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-
   // Migrate .panopticon/ → .pan/ and run multi-tool sync in all registered projects
-  const projects = listProjects();
   for (const { config } of projects) {
     if (!existsSync(config.path)) continue;
 
