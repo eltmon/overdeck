@@ -384,9 +384,6 @@ export default function App() {
 
       {/* Collapsible sidebar navigation */}
       <Sidebar
-
-      {/* Collapsible sidebar navigation */}
-      <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSearchOpen={() => setIsSearchOpen(true)}
