@@ -190,6 +190,11 @@ export const IssueLifecycleLive = Layer.effect(
             }
             if (state === 'closed') {
               yield* github.closeIssue(ghInfo.owner, ghInfo.repo, ghInfo.number);
+            } else {
+              // Reopen the issue if it's currently closed (e.g. reopening after incorrect merge)
+              yield* github.reopenIssue(ghInfo.owner, ghInfo.repo, ghInfo.number).pipe(
+                Effect.catch(() => Effect.void) // Non-fatal if already open
+              );
             }
           } else if (trackerType === 'rally') {
             const normalizedState =

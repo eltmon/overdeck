@@ -1913,8 +1913,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     resumeSessionMutation.mutate();
   };
 
-  // In Review card with stopped agent = "session lost" / needs recovery
-  const isSessionLost = !isRunning && !isResuming && activeAgent?.status === 'stopped' && canonical === 'in_review';
+  // In Review card with stopped agent = "session lost" / needs recovery.
+  // Exclude agents that completed normally (runtimeState === 'completed') — those transitioned
+  // to in_review intentionally and don't need recovery.
+  const isSessionLost = !isRunning && !isResuming && activeAgent?.status === 'stopped'
+    && canonical === 'in_review'
+    && activeAgent?.runtimeState !== 'completed';
 
   const [confirmingStart, setConfirmingStart] = useState(false);
   const confirmingStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
