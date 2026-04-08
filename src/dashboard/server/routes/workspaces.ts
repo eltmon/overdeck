@@ -3002,6 +3002,31 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     };
   }
 
+  // Ensure commit statuses are reported before merge (branch protection requires them).
+  // This is a fallback for issues that became readyForMerge before the status reporting was added.
+  if (reviewStatus.prUrl) {
+    try {
+      const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
+      if (isGitHubAppConfigured()) {
+        const prMatch = reviewStatus.prUrl.match(/\/pull\/(\d+)/);
+        if (prMatch) {
+          const { stdout } = await execAsync(
+            `gh pr view ${prMatch[1]} --json headRefOid --jq .headRefOid`,
+            { encoding: 'utf-8', timeout: 10000 }
+          );
+          const sha = stdout.trim();
+          if (sha) {
+            await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/review', 'Review passed');
+            await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/test', 'Tests passed');
+            console.log(`[merge] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[merge] Failed to report commit statuses: ${err.message}`);
+    }
+  }
+
   if (reviewStatus?.mergeStatus === 'merging') {
     const pendingOp = getPendingOperation(issueId);
     const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
