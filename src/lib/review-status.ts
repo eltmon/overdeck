@@ -136,6 +136,35 @@ export function setReviewStatus(
     history,
   };
 
+  // Report commit statuses to GitHub when readyForMerge transitions to true (PAN-536)
+  if (readyForMerge && !existing.readyForMerge && updated.prUrl) {
+    (async () => {
+      try {
+        const { isGitHubAppConfigured, reportCommitStatus } = await import('./github-app.js');
+        if (!isGitHubAppConfigured()) return;
+        const prMatch = updated.prUrl!.match(/github\.com\/([^/]+)\/([^/]+)\/pull/);
+        if (!prMatch) return;
+        const [, owner, repo] = prMatch;
+        // Get HEAD SHA of the PR branch
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        const { stdout } = await execAsync(
+          `gh pr view ${updated.prUrl!.match(/\/pull\/(\d+)/)?.[1]} --json headRefOid --jq .headRefOid`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        const sha = stdout.trim();
+        if (sha) {
+          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/review', 'Review passed');
+          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/test', 'Tests passed');
+          console.log(`[review-status] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
+        }
+      } catch (err: any) {
+        console.warn(`[review-status] Failed to report commit status: ${err.message}`);
+      }
+    })();
+  }
+
   // SQLite first — it is the authoritative store (reads prefer SQLite)
   if (filePath === DEFAULT_STATUS_FILE) {
     try {
