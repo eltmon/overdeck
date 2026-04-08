@@ -2259,10 +2259,12 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    // Reset review status
+    // Reset review status — keep 'pending' until dispatch succeeds (PAN-511 atomicity fix).
+    // reviewStatus is set to 'reviewing' only after the specialist is successfully dispatched
+    // or queued, not before. This prevents stuck 'reviewing' state if Cloister crashes mid-dispatch.
     setPendingOperation(issueId, 'review');
     const reviewReset: Record<string, unknown> = {
-      reviewStatus: 'reviewing',
+      reviewStatus: 'pending',
       testStatus: 'pending',
       autoRequeueCount: 0,
       verificationCycleCount: 0,
@@ -2398,6 +2400,8 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 isRemote: workspaceInfo.isRemote,
                 vmName: workspaceInfo.vmName,
               });
+              // PAN-511: set 'reviewing' only after task is committed to queue
+              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               completePendingOperation(issueId, null);
               return;
             }
@@ -2491,6 +2495,8 @@ ${workspaceAccessInstructions}
             }
 
             console.log(`[review] Review pipeline started for ${issueId}`);
+            // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
@@ -2676,8 +2682,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
+    // PAN-511: set metadata fields but keep reviewStatus='pending' until dispatch succeeds.
+    // reviewStatus is set to 'reviewing' only after specialist is dispatched or queued.
     setReviewStatus(issueId, {
-      reviewStatus: 'reviewing',
+      reviewStatus: 'pending',
       testStatus: 'pending',
       autoRequeueCount: newCount,
       reviewNotes,
@@ -2713,6 +2721,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (result.success) {
         console.log(`[request-review] Spawned review specialist for ${issueId}`);
+        // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
           timestamp: new Date().toISOString(),
@@ -2737,6 +2747,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           workspace: workspacePath,
           branch: branchName,
         });
+        // PAN-511: set 'reviewing' after task is committed to queue
         setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         return jsonResponse(
           {

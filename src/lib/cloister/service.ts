@@ -67,6 +67,30 @@ import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
 
 /**
+ * Pure helper: from a map of review statuses, return the issue IDs that are
+ * orphaned in 'reviewing' state — i.e. reviewStatus='reviewing', no passed
+ * review in history, and not currently being handled by a running specialist.
+ *
+ * Extracted for unit-testability; called by startup recovery in Cloister.start().
+ */
+export function identifyOrphanedReviewingIssues(
+  statuses: Record<string, { reviewStatus: string; history?: Array<{ type: string; status: string }> }>,
+  activeReviewIssues: Set<string>,
+): string[] {
+  const orphaned: string[] = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (status.reviewStatus !== 'reviewing') continue;
+    const hasPassedReview = status.history?.some(
+      (h) => h.type === 'review' && h.status === 'passed',
+    );
+    if (hasPassedReview) continue;
+    if (activeReviewIssues.has(issueId.toUpperCase())) continue;
+    orphaned.push(issueId);
+  }
+  return orphaned;
+}
+
+/**
  * Write Cloister running state to file for cross-process visibility
  */
 function writeStateFile(running: boolean, pid?: number): void {
@@ -235,28 +259,116 @@ export class CloisterService {
       console.error('  ✗ Failed to reset orphaned verification states:', error);
     }
 
-    // PAN-511: Clear stale currentIssue from idle project-specialist agents.
-    // If Cloister dies while a specialist is between tasks, the specialist's runtime.json
-    // may retain currentIssue pointing to a completed review. wakeSpecialistOrQueue checks
-    // currentIssue to decide whether to queue or dispatch — a stale value permanently blocks
-    // new dispatches until manually cleared. On startup, clear currentIssue from any
-    // specialist agent whose runtime state is 'idle' (safe: idle means no active task).
+    // PAN-511: Clear stale currentIssue from specialist agents that are not actually running.
+    // If Cloister dies while a specialist is between tasks or mid-run, the specialist's
+    // runtime.json may retain currentIssue and state='active' even though the process is dead.
+    // wakeSpecialistOrQueue and spawnEphemeralSpecialist check these fields to decide whether
+    // to queue or dispatch — a stale 'active' state permanently blocks new dispatches.
+    // On startup, clear currentIssue and reset state from any specialist agent that is:
+    //   (a) idle — safe: idle means no active task, currentIssue is leftover
+    //   (b) active but tmux session no longer running — state is stale from a crash
     try {
       if (existsSync(AGENTS_DIR)) {
-        const specialistPattern = /^specialist-.+-(review-agent|test-agent|merge-agent)$/;
+        const { isRunning: isSpecialistRunning } = await import('./specialists.js');
+        const specialistPattern = /^specialist-(.+)-(review-agent|test-agent|merge-agent)$/;
         const entries = readdirSync(AGENTS_DIR, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
-          if (!specialistPattern.test(entry.name)) continue;
+          const match = specialistPattern.exec(entry.name);
+          if (!match) continue;
+          const projectKey = match[1];
+          const specialistType = match[2] as 'review-agent' | 'test-agent' | 'merge-agent';
           const runtimeState = getAgentRuntimeState(entry.name);
-          if (runtimeState?.currentIssue && runtimeState.state === 'idle') {
+          if (!runtimeState?.currentIssue) continue;
+
+          if (runtimeState.state === 'idle') {
             saveAgentRuntimeState(entry.name, { currentIssue: undefined });
             console.log(`  ✓ Cleared stale currentIssue '${runtimeState.currentIssue}' from idle ${entry.name}`);
+          } else if (runtimeState.state === 'active') {
+            // Check if the process is actually alive — if not, the state is stale from a crash
+            const stillRunning = await isSpecialistRunning(specialistType, projectKey);
+            if (!stillRunning) {
+              saveAgentRuntimeState(entry.name, {
+                state: 'idle',
+                lastActivity: new Date().toISOString(),
+                currentIssue: undefined,
+              });
+              console.log(`  ✓ Cleared stale active state for crashed specialist ${entry.name} (was working on '${runtimeState.currentIssue}')`);
+            }
           }
         }
       }
     } catch (error) {
-      console.error('  ✗ Failed to clear stale specialist currentIssue states:', error);
+      console.error('  ✗ Failed to clear stale specialist states:', error);
+    }
+
+    // PAN-511: Startup recovery for orphaned reviewStatus='reviewing' issues.
+    // If Cloister crashes after reviewStatus was set to 'reviewing' but before the specialist
+    // completes (or if Fix 1 wasn't in place and status was set pre-dispatch), the issue is
+    // stuck. On startup, find such issues and re-queue the review dispatch so work continues.
+    try {
+      const reviewStatuses = loadReviewStatuses();
+      const { resolveProjectFromIssue } = await import('../projects.js');
+      const { submitToSpecialistQueue, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+
+      // Build set of issue IDs actively being reviewed by a running specialist
+      const activeReviewIssues = new Set<string>();
+      try {
+        const projSpecs = await getAllProjectSpecialistStatuses();
+        for (const ps of projSpecs) {
+          if (ps.specialistType !== 'review-agent' || !ps.isRunning) continue;
+          const rs = getAgentRuntimeState(ps.tmuxSession);
+          if (rs?.state === 'active' && rs.currentIssue) {
+            activeReviewIssues.add(rs.currentIssue.toUpperCase());
+          }
+        }
+        // Also check global review-agent session
+        const globalSession = getTmuxSessionName('review-agent');
+        const globalRs = getAgentRuntimeState(globalSession);
+        if (globalRs?.state === 'active' && globalRs.currentIssue) {
+          activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
+        }
+      } catch {
+        // Non-fatal: if we can't check active sessions, re-queue all
+      }
+
+      const orphanedReviewing = identifyOrphanedReviewingIssues(reviewStatuses, activeReviewIssues);
+
+      if (orphanedReviewing.length > 0) {
+        console.log(`  ⚠ Found ${orphanedReviewing.length} issue(s) with orphaned reviewStatus='reviewing'`);
+
+        for (const issueId of orphanedReviewing) {
+
+          const agentId = `agent-${issueId.toLowerCase()}`;
+          const agentState = getAgentState(agentId);
+          const workspace = agentState?.workspace;
+
+          if (!workspace) {
+            console.log(`  ⚠ ${issueId}: orphaned reviewing but no workspace found — resetting to pending`);
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+            continue;
+          }
+
+          const resolved = resolveProjectFromIssue(issueId);
+          if (!resolved) {
+            console.log(`  ⚠ ${issueId}: orphaned reviewing but no project configured — resetting to pending`);
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+            continue;
+          }
+
+          const branch = `feature/${issueId.toLowerCase()}`;
+          submitToSpecialistQueue('review-agent', {
+            priority: 'high',
+            source: 'startup-recovery',
+            issueId,
+            workspace,
+            branch,
+          });
+          console.log(`  ✓ Queued recovery review dispatch for ${issueId} (project: ${resolved.projectKey})`);
+        }
+      }
+    } catch (error) {
+      console.error('  ✗ Failed to recover orphaned reviewing issues:', error);
     }
 
     // PAN-378: Global specialists removed — per-project ephemeral specialists handle all work.
