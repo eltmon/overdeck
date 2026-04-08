@@ -49,7 +49,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { loadSettings, getAgentCommand } from '../../../lib/settings.js';
+import { getAgentCommand } from '../../../lib/settings.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import {
   getReviewStatus,
@@ -609,10 +609,13 @@ const postSpecialistWakeRoute = HttpRouter.add(
 
     const useSessionId = sessionId || existingSessionId;
 
-    // Get specialist model from settings
-    const specSettings = loadSettings();
-    const specModelKey = `${name}_agent` as keyof typeof specSettings.models.specialists;
-    const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-6';
+    // Get specialist model from work-type router (config.yaml)
+    let specModel = 'claude-sonnet-4-6';
+    try {
+      const { getModelId } = await import('../../../lib/work-type-router.js');
+      const workTypeId = `specialist-${name}` as any;
+      specModel = getModelId(workTypeId);
+    } catch { /* fall back to default */ }
     const specCmd = getAgentCommand(specModel);
     const specCmdWithArgs =
       specCmd.args.length > 0

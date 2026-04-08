@@ -1218,12 +1218,12 @@ Continue the PLANNING session. Do NOT implement anything.
           await rename(outputFile, backupPath);
         }
 
-        const { loadSettings: loadSettingsFn, getAgentCommand } = await import('../../../lib/settings.js');
-        const msgSettings = loadSettingsFn();
-        const msgPlanningModel =
-          (msgSettings.models as any).planning_agent ||
-          msgSettings.models.complexity?.expert ||
-          'claude-opus-4-6';
+        const { getAgentCommand } = await import('../../../lib/settings.js');
+        let msgPlanningModel = 'claude-sonnet-4-6';
+        try {
+          const { getModelId } = await import('../../../lib/work-type-router.js');
+          msgPlanningModel = getModelId('planning-agent');
+        } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0

@@ -248,11 +248,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   // Validate providers
   if (!settings.models?.providers) {
     errors.push('Missing providers configuration');
-  } else {
-    // Anthropic must always be enabled
-    if (settings.models.providers.anthropic !== true) {
-      errors.push('Anthropic provider must be enabled');
-    }
   }
 
   // Validate overrides - check that model IDs are valid (including deprecated ones)
@@ -405,15 +400,15 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
 
 function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   return {
-    'issue-agent:exploration': 'minimax-m2.7',
+    'issue-agent:exploration': 'minimax-m2.7-highspeed',
     'issue-agent:implementation': 'minimax-m2.7-highspeed',
     'issue-agent:testing': 'minimax-m2.7-highspeed',
     'issue-agent:documentation': 'minimax-m2.7-highspeed',
     'issue-agent:review-response': 'minimax-m2.7-highspeed',
-    'specialist-review-agent': 'minimax-m2.7',
+    'specialist-review-agent': 'minimax-m2.7-highspeed',
     'specialist-test-agent': 'minimax-m2.7-highspeed',
     'specialist-merge-agent': 'minimax-m2.7-highspeed',
-    'convoy:security-reviewer': 'minimax-m2.7',
+    'convoy:security-reviewer': 'minimax-m2.7-highspeed',
     'convoy:performance-reviewer': 'minimax-m2.7-highspeed',
     'convoy:correctness-reviewer': 'minimax-m2.7-highspeed',
     'convoy:requirements-reviewer': 'minimax-m2.7-highspeed',
@@ -422,7 +417,8 @@ function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
     'subagent:plan': 'minimax-m2.7-highspeed',
     'subagent:bash': 'minimax-m2.7-highspeed',
     'subagent:general-purpose': 'minimax-m2.7-highspeed',
-    'cli:interactive': 'minimax-m2.7',
+    'planning-agent': 'minimax-m2.7-highspeed',
+    'cli:interactive': 'minimax-m2.7-highspeed',
     'cli:quick-command': 'minimax-m2.7-highspeed',
   };
 }
