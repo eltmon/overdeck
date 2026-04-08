@@ -86,6 +86,19 @@ describe('conversations-db', () => {
     expect(getConversationByName('nonexistent')).toBeNull();
   });
 
+  it('getConversationById returns the matching row by id', async () => {
+    const { createConversation, getConversationById } = await import('../conversations-db.js');
+    const created = createConversation({ name: 'lookup-by-id', tmuxSession: 'conv-lookup-by-id', cwd: '/cwd' });
+    const conv = getConversationById(created.id);
+    expect(conv).not.toBeNull();
+    expect(conv!.name).toBe('lookup-by-id');
+  });
+
+  it('getConversationById returns null for unknown id', async () => {
+    const { getConversationById } = await import('../conversations-db.js');
+    expect(getConversationById(99999)).toBeNull();
+  });
+
   it('markConversationEnded updates status and ended_at', async () => {
     const { createConversation, markConversationEnded, getConversationByName } = await import('../conversations-db.js');
     createConversation({ name: 'end-me', tmuxSession: 'conv-end-me', cwd: '/cwd' });
