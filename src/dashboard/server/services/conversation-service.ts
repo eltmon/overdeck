@@ -11,7 +11,15 @@ import { readdir, stat, readFile, watch } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
-import { calculateCost, getPricing } from '../../../lib/cost.js';
+import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
+
+/** Detect AI provider from model name */
+function providerFromModel(model: string): AIProvider {
+  if (model.includes('gpt')) return 'openai';
+  if (model.includes('gemini')) return 'google';
+  if (model.includes('kimi') || model.toLowerCase().startsWith('minimax')) return 'custom';
+  return 'anthropic';
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -237,7 +245,7 @@ export async function parseConversationMessages(
 
       // Accumulate cost from usage data
       if (msg.usage && msg.model) {
-        const pricing = getPricing('anthropic', msg.model);
+        const pricing = getPricing(providerFromModel(msg.model), msg.model);
         if (pricing) {
           totalCost += calculateCost({
             inputTokens: msg.usage.input_tokens ?? 0,
