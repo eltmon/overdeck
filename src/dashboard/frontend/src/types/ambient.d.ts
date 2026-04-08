@@ -30,6 +30,7 @@ interface PanopticonBridge {
   getWsUrl(): string | null;
   pickFolder(): Promise<string | null>;
   openExternal(url: string): Promise<void>;
+  openTerminalWindow(sessionName: string, title: string): void;
   onMenuAction(listener: (action: string) => void): () => void;
   getDesktopSettings(): Promise<PanopticonBridgeDesktopSettings>;
   updateDesktopSetting(key: string, value: unknown): Promise<void>;

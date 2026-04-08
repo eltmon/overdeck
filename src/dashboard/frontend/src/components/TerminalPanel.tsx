@@ -10,6 +10,12 @@ interface TerminalPanelProps {
 }
 
 function popoutTerminal(sessionName: string, title: string): void {
+  const bridge = window.panopticonBridge;
+  if (bridge?.isDesktopApp()) {
+    bridge.openTerminalWindow(sessionName, title);
+    return;
+  }
+  // Browser: use window.open with named popup to re-focus existing window
   const name = `terminal-${sessionName}`;
   const features = 'width=900,height=650,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
   const popup = window.open(`/terminal/${sessionName}`, name, features);
