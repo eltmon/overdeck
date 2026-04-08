@@ -92,6 +92,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   zai: 'Z.AI',
   kimi: 'Kimi',
+  minimax: 'MiniMax',
   openrouter: 'OpenRouter',
 };
 
