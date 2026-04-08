@@ -200,6 +200,25 @@ program
 
     console.log(chalk.bold('Starting Panopticon...\n'));
 
+    // Auto-sync skills, hooks, and MCP config on every startup
+    {
+      const origWrite = process.stdout.write;
+      const origErrWrite = process.stderr.write;
+      try {
+        const { syncCommand } = await import('./commands/sync.js');
+        process.stdout.write = () => true;  // suppress all output during sync
+        process.stderr.write = () => true;
+        await syncCommand({});
+        process.stdout.write = origWrite;
+        process.stderr.write = origErrWrite;
+        console.log(chalk.dim('  Auto-synced skills, hooks, and MCP config'));
+      } catch {
+        process.stdout.write = origWrite;
+        process.stderr.write = origErrWrite;
+        console.log(chalk.yellow('⚠ Auto-sync failed (non-fatal, continuing startup)'));
+      }
+    }
+
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
