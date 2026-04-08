@@ -21,3 +21,4 @@ None
 - **[2026-04-07T06:02Z] review-agent → CHANGES-REQUESTED** — addressed: sessionExists→async, duplicate listProjects, unused projectKey, PAN-XXX placeholder, added tests for copy-live-config and buildTestAgentPromptContent
 - **[2026-04-07T06:13Z] review-agent → CHANGES-REQUESTED** — addressed: wired onDisconnect→setTerminalFailed(true) in AgentOutputPanel, removed unused readdirSync import
 - **[2026-04-07T~20:55Z] merge → REBASE-CONFLICT** — rebased onto origin/main (PAN-442), resolved conflicts in KanbanBoard.tsx, AgentOutputPanel.tsx, PlanDialog.tsx, issues.ts, spawn-planning-session.ts, sync.ts; force-pushed
+- **[2026-04-08T01:02Z] verification-gate → FAILED** — `.planning/feedback/011-verification-gate-failed.md`
