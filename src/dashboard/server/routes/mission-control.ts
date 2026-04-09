@@ -40,6 +40,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
@@ -129,7 +130,7 @@ const getMissionControlActivityRoute = HttpRouter.add(
 
 async function fetchActivityData(issueId: string): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const sections: Array<{
     type: string;
@@ -374,7 +375,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
 
 async function fetchPlanningData(issueId: string): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -476,7 +477,7 @@ async function generateStatusReview(issueId: string): Promise<
   | { type: 'err'; response: unknown; status: number }
 > {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -709,7 +710,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
 
     const { type, filename, content } = body as { type?: string; filename?: string; content?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     if (!type || !filename || !content) {
       return jsonResponse({ error: 'type, filename, and content are required' }, { status: 400 });
@@ -758,7 +759,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     const { tracker } = body as { tracker?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     if (!tracker || !['github', 'linear', 'rally'].includes(tracker)) {
       return jsonResponse({ error: 'tracker must be github, linear, or rally' }, { status: 400 });
@@ -889,7 +890,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     const { shadow } = body as { shadow?: boolean };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);

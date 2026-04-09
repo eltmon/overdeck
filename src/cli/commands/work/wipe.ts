@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { getIssuePrefix } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, rmSync, readFileSync, readdirSync } from 'fs';
@@ -139,7 +140,11 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
   // 4. Find project path
   let projectPath: string | undefined;
-  const prefix = issueId.split('-')[0].toUpperCase();
+  const prefix = extractPrefix(issueId);
+  if (!prefix) {
+    console.log(chalk.red('  ✗ Could not extract prefix from issue ID'));
+    return;
+  }
   const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
 
   if (existsSync(projectsYamlPath)) {

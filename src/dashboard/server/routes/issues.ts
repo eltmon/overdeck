@@ -35,6 +35,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -257,7 +258,7 @@ const postIssuePlanRoute = HttpRouter.add(
       return jsonResponse({ error: 'Issue not found' }, { status: 404 });
     }
 
-    const issuePrefix = issue.identifier.split('-')[0];
+    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const { findPRDFiles, analyzeComplexity, executePlan } = yield* Effect.promise(() =>
@@ -328,7 +329,7 @@ const postIssueCloseRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const { reason } = body as any;
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const { close: closeWorkflow } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
@@ -525,7 +526,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       );
     }
 
-    const issuePrefix = issue.identifier.split('-')[0];
+    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -715,7 +716,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
           }
           if (!projectPath) {
-            const prefix = issueIdentifier!.split('-')[0].toUpperCase();
+            const prefix = extractPrefix(issueIdentifier!) ?? issueIdentifier!.split('-')[0].toUpperCase();
             const projConfig = findProjectByTeam(prefix);
             if (projConfig) projectPath = projConfig.path;
           }
@@ -1614,7 +1615,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
       projectName = githubCheck.repo || '';
     }
     if (!projectPath) {
-      const prefix = id.split('-')[0].toUpperCase();
+      const prefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
       projectConfig = findProjectByTeam(prefix);
       if (projectConfig) {
         projectPath = projectConfig.path;
@@ -1728,7 +1729,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     }
     if (!projectPath) {
-      const issuePrefix = id.split('-')[0].toUpperCase();
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
       projectPath = getProjectPath(undefined, issuePrefix);
     }
     if (!projectPath) {
@@ -1802,7 +1803,7 @@ const getIssueBeadsRoute = HttpRouter.add(
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     }
     if (!projectPath) {
-      const issuePrefix = id.split('-')[0];
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
       try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
     }
 

@@ -12,6 +12,7 @@ import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
 import { getLinearApiKey } from '../../../lib/shadow-utils.js';
+import { extractNumber } from '../../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -90,7 +91,8 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
     const ghConfig = getGitHubConfig();
     if (!ghConfig) return false;
 
-    const number = parseInt(issueId.split('-')[1], 10);
+    const number = extractNumber(issueId);
+    if (number === null) return false;
     const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
     const { owner, repo } = repoConfig;
     const token = ghConfig.token;

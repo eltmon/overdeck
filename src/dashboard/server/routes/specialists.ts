@@ -70,6 +70,7 @@ import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -115,7 +116,7 @@ function firePostMergeLifecycle(issueId: string): void {
     return;
   }
 
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPathForIssue(issuePrefix);
 
   _postMergeInFlight.add(issueId);
