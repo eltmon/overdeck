@@ -68,8 +68,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-4.7' as ModelId, name: 'GLM 4.7', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Top open-source for agentic coding, 73.8% SWE-bench, 200K context' },
-      { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
+      { id: 'glm-5' as ModelId, name: 'GLM 5', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '754B params, agentic engineering focus, 200K context' },
+      { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Zap, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Latest flagship (Apr 2026), all GLM-5 improvements plus further enhancements' },
     ],
   },
   minimax: {
