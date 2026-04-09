@@ -21,6 +21,7 @@ import {
   removeWorkspace as removeWorkspaceFromConfig,
   addReposToWorkspace,
 } from '../../lib/workspace-manager.js';
+import type { ProjectConfig, RepoConfig } from '../../lib/workspace-config.js';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
@@ -1481,7 +1482,7 @@ async function addRepoCommand(workspaceId: string, repoNames: string[], options:
     const folderName = `feature-${normalizedId}`;
 
     // Resolve project
-    let projectConfig: any = null;
+    let projectConfig: ProjectConfig | null = null;
     if (options.project) {
       // Find project by key in listProjects
       const allProjects = listProjects();
@@ -1537,7 +1538,7 @@ async function addRepoCommand(workspaceId: string, repoNames: string[], options:
       const groups = loadRepoGroups(groupsFilePath);
 
       if (options.group === 'all' || groups.groups[options.group] === '*') {
-        targetRepoNames = workspaceConfig.repos!.map((r: any) => r.name);
+        targetRepoNames = workspaceConfig.repos!.map((r: RepoConfig) => r.name);
       } else if (Array.isArray(groups.groups[options.group])) {
         targetRepoNames = groups.groups[options.group] as string[];
       } else {
