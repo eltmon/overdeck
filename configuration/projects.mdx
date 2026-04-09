@@ -58,11 +58,16 @@ projects:
 |-------|----------|-------------|
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
-| `issue_prefix` | Yes | Linear team prefix (e.g., "MIN", "PAN") |
+| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN") |
+| `tracker` | No | Tracker type: `linear`, `github`, `gitlab`, `rally` |
+| `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
+| `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
 | `issue_routing` | No | Label-based routing rules |
 | `workspace_command` | No | Custom workspace creation script |
 | `workspace_remove_command` | No | Custom workspace cleanup script |
-| `workspace` | No | Polyrepo configuration (see [Polyrepo Configuration](/configuration/polyrepo)) |
+| `workspace` | No | Polyrepo/progressive workspace configuration |
+
+*Not required if `issue_prefixes` or `issue_pattern` is specified.
 
 ## Label-Based Routing
 
@@ -163,8 +168,46 @@ When registering a new project with Panopticon (`pan project add`), the system w
 
 This ensures every Panopticon-managed project has a well-defined canonical PRD that agents can reference.
 
+## Progressive Workspaces
+
+For large projects with 10+ repositories, progressive workspaces provide on-demand repo checkout. Enable in `workspace` config:
+
+```yaml
+projects:
+  enterprise:
+    name: "Enterprise Integration"
+    path: /home/user/projects/enterprise
+    tracker: rally
+    issue_prefixes: [F, US, DE, TA]
+    workspace:
+      type: polyrepo
+      progressive: true
+      always_include: [meta]
+      groups_file: team-meta/panopticon/repo-groups.yaml
+      pr_target: qa
+      repos:
+        - name: meta
+          path: team-meta
+          link_type: symlink
+          readonly: true
+```
+
+Key progressive fields:
+
+| Field | Description |
+|-------|-------------|
+| `progressive` | When `true`, only `always_include` repos created on workspace init |
+| `always_include` | Repo names to always include (typically meta/docs repos) |
+| `groups_file` | Path to `repo-groups.yaml` for named repo groups |
+| `pr_target` | Default PR target branch (e.g., `'qa'`) |
+
+See [Progressive Polyrepo](/configuration/progressive-polyrepo) for full documentation.
+
 ## Related Guides
 
 - [Polyrepo Configuration](/configuration/polyrepo) - Multi-repository workspace setup
-- [Issue Tracker Integration](/configuration/issue-trackers) - Connecting to Linear, GitHub, etc.
+- [Progressive Polyrepo](/configuration/progressive-polyrepo) - Large-scale polyrepo with on-demand checkout
+- [Setup Wizard](/configuration/setup-wizard) - Interactive project configuration
+- [Meta Repos](/configuration/meta-repos) - Team conventions and onboarding kits
+- [Issue Tracker Integration](/configuration/issue-trackers) - Connecting to Linear, GitHub, Rally, etc.
 - [Workspaces](/features/workspaces) - Workspace management
