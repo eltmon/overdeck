@@ -23,6 +23,24 @@ import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
+async function switchModel(
+  conversationName: string,
+  model: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/conversations/${encodeURIComponent(conversationName)}/switch-model`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to switch model (${res.status})${body ? `: ${body}` : ''}`);
+  }
+}
+
 async function sendConversationMessage(
   conversationName: string,
   message: string,
@@ -95,6 +113,14 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
 
     setSending(true);
     try {
+      // If the selected model differs from the conversation's current model,
+      // kill the session and restart with the new model before sending.
+      if (model !== conversation.model && conversation.sessionAlive) {
+        await switchModel(conversation.name, model);
+        // Wait for the new session to spawn before sending the message
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
       await sendConversationMessage(conversation.name, messageText);
 
       // Clear editor after successful send
@@ -110,7 +136,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       // Refocus editor
       editor.focus();
     }
-  }, [conversation.name, conversation.sessionAlive, sending, isDisabled, onSend]);
+  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
