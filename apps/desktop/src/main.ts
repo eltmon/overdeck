@@ -17,6 +17,7 @@ import { configureApplicationMenu } from "./menu.js";
 import { initializeNotifications, registerNotificationHandlers } from "./notifications.js";
 import { handleAutoStartNag } from "./autostart.js";
 import { registerDesktopProtocol } from "./protocol.js";
+import { initializeAutoUpdater, checkForUpdates, downloadUpdate, quitAndInstall, getUpdateStatus, onUpdateStatusChange } from "./updater.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -37,6 +38,10 @@ export const IPC = {
   GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
   UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
   NOTIFY: "pan:notify",
+  GET_UPDATE_STATUS: "pan:get-update-status",
+  CHECK_FOR_UPDATES: "pan:check-for-updates",
+  DOWNLOAD_UPDATE: "pan:download-update",
+  QUIT_AND_INSTALL: "pan:quit-and-install",
 } as const;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -126,6 +131,31 @@ function registerIpcHandlers(): void {
     if (updated && key === "autoStart.enabled") {
       app.setLoginItemSettings({ openAtLogin: value === true });
     }
+  });
+
+  // Update IPC handlers
+  ipcMain.handle(IPC.GET_UPDATE_STATUS, () => getUpdateStatus());
+
+  ipcMain.handle(IPC.CHECK_FOR_UPDATES, async () => {
+    try {
+      await checkForUpdates();
+    } catch (err) {
+      console.error("[main] checkForUpdates failed:", err);
+    }
+    return getUpdateStatus();
+  });
+
+  ipcMain.handle(IPC.DOWNLOAD_UPDATE, async () => {
+    try {
+      await downloadUpdate();
+    } catch (err) {
+      console.error("[main] downloadUpdate failed:", err);
+    }
+    return getUpdateStatus();
+  });
+
+  ipcMain.on(IPC.QUIT_AND_INSTALL, () => {
+    quitAndInstall();
   });
 }
 
@@ -227,6 +257,7 @@ app.on("ready", () => {
   initializeNotifications();
   configureApplicationMenu();
   registerDesktopProtocol();
+  initializeAutoUpdater();
 
   if (process.platform === "win32") {
     app.setAppUserModelId(APP_ID);

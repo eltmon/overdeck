@@ -12,6 +12,7 @@ import { app, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 
 import { callServerApi, showOrCreateWindow, dispatchMenuAction, serverUrl } from "./main.js";
+import { checkForUpdates, quitAndInstall, onUpdateStatusChange } from "./updater.js";
 
 // ─── Workspace submenu (refreshed on open) ────────────────────────────────────
 
@@ -29,6 +30,32 @@ async function fetchActiveWorkspaces(): Promise<WorkspaceSummary[]> {
     return data.workspaces?.slice(0, 10) ?? [];
   } catch {
     return [];
+  }
+}
+
+// ─── Update menu state ─────────────────────────────────────────────────────────
+
+let updateDownloaded = false;
+
+function rebuildMenu(): void {
+  const menu = Menu.buildFromTemplate(buildMenuTemplate());
+  Menu.setApplicationMenu(menu);
+
+  // Re-attach workspace submenu refresh listener
+  const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+  if (panopticonMenu?.submenu) {
+    panopticonMenu.submenu.on("menu-will-show", () => {
+      void fetchActiveWorkspaces().then((workspaces) => {
+        const wsItem = panopticonMenu.submenu?.items.find(
+          (i) => i.id === "open-workspace-submenu",
+        );
+        if (wsItem) {
+          wsItem.label = workspaces.length
+            ? `Open Workspace (${workspaces.length})`
+            : "Open Workspace";
+        }
+      });
+    });
   }
 }
 
@@ -159,6 +186,13 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
     role: "help" as const,
     submenu: [
       {
+        label: "Check for Updates...",
+        click: () => {
+          void checkForUpdates();
+        },
+      },
+      { type: "separator" },
+      {
         label: "Panopticon on GitHub",
         click: () =>
           void shell.openExternal("https://github.com/eltmon/panopticon-cli"),
@@ -170,6 +204,22 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
       },
     ],
   });
+
+  // Add "Install Update and Restart" item if update is downloaded
+  if (updateDownloaded) {
+    const helpMenu = template[template.length - 1];
+    if (helpMenu && helpMenu.submenu && Array.isArray(helpMenu.submenu)) {
+      helpMenu.submenu.push(
+        { type: "separator" },
+        {
+          label: "Install Update and Restart",
+          click: () => {
+            quitAndInstall();
+          },
+        },
+      );
+    }
+  }
 
   return template;
 }
@@ -198,4 +248,12 @@ export function configureApplicationMenu(): void {
       });
     });
   }
+
+  // Listen for update status changes to rebuild menu when update is downloaded
+  onUpdateStatusChange((status) => {
+    if (status.downloaded && !updateDownloaded) {
+      updateDownloaded = true;
+      rebuildMenu();
+    }
+  });
 }

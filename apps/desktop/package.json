@@ -17,8 +17,9 @@
     "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3"
   },
   "dependencies": {
+    "conf": "^13.0.0",
     "electron": "40.6.0",
-    "conf": "^13.0.0"
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@panopticon/contracts": "workspace:*",
@@ -32,6 +33,11 @@
   "build": {
     "appId": "com.panopticon.app",
     "productName": "Panopticon",
+    "publish": {
+      "provider": "github",
+      "owner": "eltmon",
+      "repo": "panopticon-cli"
+    },
     "files": [
       "dist-electron/**/*",
       "!dist-electron/**/*.map"
