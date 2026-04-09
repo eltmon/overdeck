@@ -418,6 +418,28 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Fast and affordable. Good for quick iterations and exploration.',
   },
 
+  'glm-5.1': {
+    model: 'glm-5.1',
+    provider: 'zai',
+    displayName: 'GLM 5.1',
+    costPer1MTokens: 8.0,
+    contextWindow: 256000,
+    skills: {
+      'code-generation': 95,
+      'code-review': 92,
+      debugging: 90,
+      planning: 88,
+      documentation: 88,
+      testing: 88,
+      security: 80,
+      performance: 85,
+      synthesis: 90,
+      speed: 78,
+      'context-length': 98,
+    },
+    notes: 'Flagship Z.AI model. 256K context, top-tier reasoning.',
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // KIMI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
