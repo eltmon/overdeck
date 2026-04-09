@@ -300,11 +300,12 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
       {open && (
         <div className={styles.pickerDropdown} style={{ left: dropdownPos.x, top: dropdownPos.y }}>
-          {groups.filter(g => g.usable).map((group) => (
-            <div key={group.provider}>
-              {groups.filter(g => g.usable).length > 1 && (
+          {groups.map((group) => (
+            <div key={group.provider} className={!group.usable ? styles.pickerGroupDisabled : undefined}>
+              {groups.length > 1 && (
                 <div className={styles.pickerGroupHeader}>
                   {group.label}
+                  {!group.usable && <span className={styles.pickerGroupNoKey}>No Key</span>}
                 </div>
               )}
               {group.models.map((model) => (
@@ -319,6 +320,9 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
                     <span className={styles.pickerAuthBadge}>{model.authBadge}</span>
                   )}
                   {model.costDisplay && group.usable && !model.authBadge && (
+                    <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
+                  )}
+                  {model.costDisplay && !group.usable && (
                     <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
                   )}
                 </button>
