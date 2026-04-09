@@ -35,6 +35,12 @@
 | [CONFIGURATION.md](./CONFIGURATION.md) | Multi-model routing, API keys, presets, and provider configuration |
 | [WORK-TYPES.md](./WORK-TYPES.md) | 23 work type definitions for smart model selection |
 | [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md) | Optimal model assignments for different tasks |
+| [projects.mdx](../configuration/projects.mdx) | Project registry and configuration fields (tracker, issue_prefixes, progressive) |
+| [polyrepo.mdx](../configuration/polyrepo.mdx) | Multi-repository workspace management (links to progressive for 10+ repos) |
+| [progressive-polyrepo.mdx](../configuration/progressive-polyrepo.mdx) | Large-scale polyrepo with on-demand repo checkout |
+| [setup-wizard.mdx](../configuration/setup-wizard.mdx) | Interactive project setup with AI-assisted configuration |
+| [meta-repos.mdx](../configuration/meta-repos.mdx) | Team conventions, shared skills, and onboarding via meta repos |
+| [issue-trackers.mdx](../configuration/issue-trackers.mdx) | Connecting to Linear, GitHub, GitLab, and Rally |
 
 ---
 
