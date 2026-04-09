@@ -29,6 +29,38 @@ GITLAB_TOKEN=glpat-xxxxx  # For GitLab-tracked projects
 RALLY_API_KEY=_xxxxx       # For Rally-tracked projects
 ```
 
+## Unified Issue ID Parser
+
+Panopticon uses a unified issue ID parser that handles multiple formats through configurable project patterns. This eliminates the hardcoded `PREFIX-NUMBER` assumption that doesn't work for Rally-style IDs.
+
+### Supported Formats
+
+| Format | Example | Parser Behavior |
+|--------|---------|----------------|
+| **Standard** | `MIN-123`, `PAN-456` | Prefix and number separated by dash |
+| **Rally** | `F29698`, `US12345` | Type prefix directly concatenated with number |
+| **Custom** | `PROJ12345` | Per-project regex pattern via `issue_pattern` |
+
+### Configuration Fields
+
+| Field | Description |
+|-------|-------------|
+| `tracker` | Tracker type: `linear`, `github`, `gitlab`, `rally` |
+| `issue_prefix` | Single prefix (e.g., `"MIN"`) |
+| `issue_prefixes` | Array of prefixes mapping to one project (e.g., `[F, US, DE, TA]`) |
+| `issue_pattern` | Custom regex with two capture groups: `^(PREFIX)-(\d+)$` |
+
+### Custom ID Patterns
+
+For non-standard trackers, define a custom regex pattern:
+
+```yaml
+projects:
+  myproject:
+    tracker: custom
+    issue_pattern: "^(PROJ)-(\\d+)$"  # Matches PROJ-123
+```
+
 ## GitHub Issues
 
 GitHub Issues provides full integration with PRs, status updates, and automated merging.
@@ -146,9 +178,52 @@ projects:
   enterprise-app:
     name: "Enterprise Application"
     path: /home/user/projects/enterprise
+    tracker: rally
+    issue_prefixes: [F, US, DE, TA, TC]  # All Rally artifact types → this project
     rally_workspace: YOUR_WORKSPACE_OID
     rally_project: YOUR_PROJECT_OID
 ```
+
+### Rally ID Formats
+
+Rally uses a different ID format than most trackers. Instead of `PREFIX-NUMBER`, Rally uses **type prefixes concatenated with numbers**:
+
+| Prefix | Artifact Type | Example |
+|--------|--------------|---------|
+| `F` | Feature | `F29698` |
+| `US` | User Story | `US12345` |
+| `DE` | Defect | `DE118304` |
+| `TA` | Task | `TA4567` |
+| `TC` | Test Case | `TC78901` |
+
+Panopticon's unified issue ID parser handles these formats automatically. Configure `issue_prefixes` to map all Rally artifact types to your project:
+
+```yaml
+issue_prefixes: [F, US, DE, TA, TC]
+```
+
+With this configuration:
+- `pan workspace create F29698` → resolves to your project
+- `pan workspace create US12345` → resolves to your project
+- `pan workspace create DE118304` → resolves to your project
+
+### Shadow Mode
+
+Rally integration supports **shadow mode** — tracking Rally issues locally without modifying the tracker. This is useful for teams transitioning to Panopticon or evaluating the workflow.
+
+```yaml
+projects:
+  enterprise-app:
+    shadow:
+      enabled: true
+      trackers:
+        rally: true
+```
+
+In shadow mode:
+- Issue states are tracked locally in Panopticon
+- No updates are sent to Rally
+- Agents can read Rally data but changes stay local
 
 ### Rally Troubleshooting
 
