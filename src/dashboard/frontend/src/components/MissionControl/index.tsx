@@ -61,10 +61,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
-  const [sidebarModel, setSidebarModel] = useState<string>(() => {
-    // Default to stored model, fall back to MiniMax which is cheaper for drafts
-    return localStorage.getItem('mc-sidebar-model') || 'minimax-4o-mini';
-  });
+  const [sidebarModel, setSidebarModel] = useState<string>('claude-sonnet-4-6');
   // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
   const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -228,8 +225,6 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
                     value={sidebarModel}
                     onChange={(modelId) => {
                       setSidebarModel(modelId);
-                      localStorage.setItem('mc-sidebar-model', modelId);
-                      localStorage.setItem('conv-composer-model', modelId);
                     }}
                   />
                   <button
