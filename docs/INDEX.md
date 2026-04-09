@@ -35,6 +35,12 @@
 | [CONFIGURATION.md](./CONFIGURATION.md) | Multi-model routing, API keys, presets, and provider configuration |
 | [WORK-TYPES.md](./WORK-TYPES.md) | 23 work type definitions for smart model selection |
 | [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md) | Optimal model assignments for different tasks |
+| [projects.md](./projects.md) | Complete projects.yaml reference with all configuration fields |
+| [issue-trackers.md](./issue-trackers.md) | Tracker configuration including Rally ID format support |
+| [polyrepo.md](./polyrepo.md) | Polyrepo workspace configuration for 2-10 repo projects |
+| [progressive-polyrepo.md](./progressive-polyrepo.md) | Progressive polyrepo for 10+ repo projects with on-demand checkout |
+| [setup-wizard.md](./setup-wizard.md) | Interactive project setup with templates and Setup Agent |
+| [meta-repos.md](./meta-repos.md) | Meta repo pattern for shared skills and team conventions |
 
 ---
 
@@ -108,6 +114,21 @@
 - **"work types"** → WORK-TYPES.md
 - **"presets"** / **"overrides"** → CONFIGURATION.md
 - **"model recommendations"** → MODEL_RECOMMENDATIONS.md
+
+### Projects & Workspaces
+- **"project"** / **"projects.yaml"** / **"project config"** → projects.md
+- **"polyrepo"** / **"polyrepo workspace"** → polyrepo.md, progressive-polyrepo.md
+- **"progressive"** / **"progressive polyrepo"** / **"10+ repos"** → progressive-polyrepo.md
+- **"meta repo"** / **"meta-repo"** → meta-repos.md
+- **"setup wizard"** / **"setup agent"** → setup-wizard.md
+- **"issue tracker"** / **"Rally"** / **"tracker config"** → issue-trackers.md
+- **"issue prefix"** / **"issue_prefixes"** → issue-trackers.md, projects.md
+- **"shadow mode"** → issue-trackers.md (Rally shadow mode)
+- **"repo groups"** / **"repo-groups.yaml"** → progressive-polyrepo.md, meta-repos.md
+- **"always_include"** / **"pr_target"** → progressive-polyrepo.md
+- **"symlink"** / **"readonly repo"** → progressive-polyrepo.md, meta-repos.md
+- **"onboarding"** / **"onboarding kit"** → setup-wizard.md, meta-repos.md
+- **"template"** / **"project template"** → setup-wizard.md
 
 ### Agent System
 - **"agent"** / **"agents"** → AGENTS.md, SPECIALIST_WORKFLOW.md, CLAUDE.md
