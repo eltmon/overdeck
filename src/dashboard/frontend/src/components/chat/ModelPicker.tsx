@@ -110,20 +110,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
   },
 ];
 
-const MODEL_STORAGE_KEY = 'conv-composer-model';
-const DEFAULT_MODEL = 'claude-opus-4-6';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-export function loadStoredModel(): string {
-  try {
-    const stored = localStorage.getItem(MODEL_STORAGE_KEY);
-    if (stored) return stored;
-  } catch {
-    // Ignore
-  }
-  return DEFAULT_MODEL;
-}
+export const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 function formatCost(costPer1M: number): string {
   if (costPer1M === 0) return 'FREE';
@@ -220,11 +207,9 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
           });
         }
 
+        // Auto-select: switch away from unusable provider models
         if (newGroups.length > 0) {
           setGroups(newGroups);
-
-          // Auto-select: if the currently stored model belongs to an unusable provider,
-          // switch to the first model from the first usable provider.
           const currentProvider = newGroups.flatMap(g => g.models).find(m => m.id === value)?.provider;
           const currentGroupUsable = newGroups.find(g => g.provider === currentProvider)?.usable ?? true;
           if (!currentGroupUsable) {
@@ -232,7 +217,6 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
             if (firstUsableGroup) {
               const firstModel = firstUsableGroup.models[0]!;
               onChange(firstModel.id, firstModel.effortLevels);
-              localStorage.setItem(MODEL_STORAGE_KEY, firstModel.id);
             }
           }
         }
@@ -262,7 +246,6 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
   function handleSelect(model: PickerModel) {
     onChange(model.id, model.effortLevels);
-    localStorage.setItem(MODEL_STORAGE_KEY, model.id);
     setOpen(false);
   }
 
@@ -279,11 +262,23 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         onClick={(e) => {
           if (!open) {
             const rect = e.currentTarget.getBoundingClientRect();
-            const dropdownHeight = 300; // approximate max height
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+            const dropdownHeight = 400; // approximate max height with scroll
+            const dropdownWidth = 280; // min-width from CSS
+
             // Open upward if there's room above; otherwise open downward
             const openUpward = rect.top >= dropdownHeight;
-            const y = openUpward ? rect.top - 4 : rect.bottom + 4;
-            setDropdownPos({ x: rect.left, y });
+            let y = openUpward ? rect.top - 4 : rect.bottom + 4;
+
+            // Constrain y to stay within viewport
+            y = Math.max(8, Math.min(y, viewportHeight - dropdownHeight - 8));
+
+            // Constrain x to stay within viewport width
+            let x = rect.left;
+            x = Math.max(8, Math.min(x, viewportWidth - dropdownWidth - 8));
+
+            setDropdownPos({ x, y });
           }
           setOpen((o) => !o);
         }}
