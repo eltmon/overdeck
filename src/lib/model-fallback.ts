@@ -38,6 +38,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Z.AI models
   'glm-4.7': 'zai',
   'glm-4.7-flash': 'zai',
+  'glm-5.1': 'zai',
 
   // Kimi models
   'kimi-k2': 'kimi',
@@ -74,6 +75,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // Z.AI → Anthropic
   'glm-4.7': 'claude-haiku-4-5', // Standard model → Haiku
   'glm-4.7-flash': 'claude-haiku-4-5', // Fast model → Haiku
+  'glm-5.1': 'claude-sonnet-4-6', // Flagship model → Sonnet
 
   // Kimi → Anthropic
   'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet
