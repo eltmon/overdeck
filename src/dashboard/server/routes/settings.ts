@@ -70,12 +70,8 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
   'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' },
   // Z.AI models
-  'glm-4.7': { apiModel: 'glm-4' },
-  'glm-4.7-flash': { apiModel: 'glm-4-flash' },
-  'glm-4-plus': { apiModel: 'glm-4' },
-  'glm-4-air': { apiModel: 'glm-4-air' },
-  'glm-4-flash': { apiModel: 'glm-4-flash' },
-  'glm-4-long': { apiModel: 'glm-4-long' },
+  'glm-5': { apiModel: 'glm-5' },
+  'glm-5.1': { apiModel: 'glm-5' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -382,7 +378,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['glm-4.7', 'glm-4.7-flash'];
+              models = data.data?.map(m => m.id) || ['glm-5', 'glm-5.1'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
