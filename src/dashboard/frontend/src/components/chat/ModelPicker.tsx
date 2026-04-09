@@ -270,11 +270,19 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
   const triggerBadge = selectedModel?.authBadge ?? null;
   const selectedProvider = selectedModel?.provider ?? '';
 
+  const [dropdownPos, setDropdownPos] = useState({ x: 0, y: 0 });
+
   return (
     <div ref={ref} className={styles.pickerContainer}>
       <button
         className={styles.pickerBtn}
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => {
+          if (!open) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setDropdownPos({ x: rect.left, y: rect.bottom + 4 });
+          }
+          setOpen((o) => !o);
+        }}
         disabled={disabled}
         type="button"
       >
@@ -292,7 +300,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
       </button>
 
       {open && (
-        <div className={styles.pickerDropdown}>
+        <div className={styles.pickerDropdown} style={{ left: dropdownPos.x, top: dropdownPos.y }}>
           {groups.filter(g => g.usable).map((group) => (
             <div key={group.provider}>
               {groups.filter(g => g.usable).length > 1 && (

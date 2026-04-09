@@ -102,6 +102,13 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--mc-space-2);
+  gap: var(--mc-space-2);
+}
+
+.sidebarHeaderGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
 }
 
 .sidebarTitle {
@@ -1243,6 +1250,22 @@
   color: var(--mc-text-primary);
 }
 
+/* Model picker bar in sidebar — shown above conversation list */
+.conversationModelBar {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-2) var(--mc-space-3);
+  border-bottom: 1px solid var(--mc-border);
+  background: var(--mc-bg-secondary);
+}
+
+.conversationModelLabel {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
+}
+
 /* Conversation Terminal Panel */
 .conversationTerminal {
   flex: 1;
@@ -1912,9 +1935,8 @@
 }
 
 .pickerDropdown {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0;
+  position: fixed;
+  z-index: 9999;
   background: var(--mc-bg-main);
   border: 1px solid var(--mc-border);
   border-radius: var(--mc-radius);
