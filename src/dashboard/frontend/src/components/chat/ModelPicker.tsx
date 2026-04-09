@@ -279,7 +279,11 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         onClick={(e) => {
           if (!open) {
             const rect = e.currentTarget.getBoundingClientRect();
-            setDropdownPos({ x: rect.left, y: rect.top - 4 });
+            const dropdownHeight = 300; // approximate max height
+            // Open upward if there's room above; otherwise open downward
+            const openUpward = rect.top >= dropdownHeight;
+            const y = openUpward ? rect.top - 4 : rect.bottom + 4;
+            setDropdownPos({ x: rect.left, y });
           }
           setOpen((o) => !o);
         }}
