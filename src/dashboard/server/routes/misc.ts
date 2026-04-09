@@ -67,6 +67,7 @@ import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
@@ -999,7 +1000,7 @@ const getPlanningStatusRoute = HttpRouter.add(
     const issueId = parts[3] || '';
     const sessionName = `planning-${issueId.toLowerCase()}`;
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -1589,7 +1590,7 @@ const postShadowMonitorRoute = HttpRouter.add(
     // /api/shadow/:issueId/monitor → parts[3] = issueId
     const issueId = parts[3] || '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -1635,7 +1636,7 @@ const postShadowObserveRoute = HttpRouter.add(
     // /api/shadow/:issueId/observe → parts[3] = issueId
     const issueId = parts[3] || '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     const body = yield* readJsonBody;
     const { mode } = body as { mode?: string };

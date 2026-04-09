@@ -23,6 +23,7 @@ import {
 import { sessionExists } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
+import { extractNumber, extractPrefix, normalizeIssueId } from './issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -319,7 +320,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     if (workspacePath && existsSync(workspacePath)) {
       try {
         const { stopWorkspaceDocker } = await import('./workspace-manager.js');
-        const projectName = ctx.issueId.split('-')[0].toLowerCase();
+        const projectName = extractPrefix(ctx.issueId)?.toLowerCase() ?? ctx.issueId.toLowerCase();
         await stopWorkspaceDocker(workspacePath, projectName, issueLower);
         cleaned = true;
       } catch { /* Docker may not be running */ }
@@ -402,8 +403,12 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
 
       // Find the issue by identifier using issues filter (searchIssues returns
       // IssueSearchResult which lacks .update(); client.issue() needs the UUID)
-      const issueNumber = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-      const issuePrefix = ctx.issueId.split('-')[0].toUpperCase();
+      const issueNumber = extractNumber(ctx.issueId);
+      const issuePrefix = extractPrefix(ctx.issueId);
+      if (issueNumber === null || issuePrefix === null) {
+        steps.push({ name: 'Close issue on tracker', status: 'failed', message: `Could not parse issue ID: ${ctx.issueId}` });
+        return { success: false, issueId: ctx.issueId, steps, error: `Could not parse issue ID: ${ctx.issueId}` };
+      }
       const results = await client.issues({
         filter: {
           number: { eq: issueNumber },
@@ -466,33 +471,35 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
         if (linearApiKey) {
           const { LinearClient } = await import('@linear/sdk');
           const client = new LinearClient({ apiKey: linearApiKey });
-          const issueNum = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-          const teamKey = ctx.issueId.split('-')[0].toUpperCase();
-          const results = await client.issues({
-            filter: {
-              number: { eq: issueNum },
-              team: { key: { eq: teamKey } },
-            },
-            first: 1,
-          });
-          if (results.nodes.length > 0) {
-            const issue = results.nodes[0];
-            // Find or create the closed-out label
-            const labels = await client.issueLabels({ filter: { name: { eq: CLOSED_OUT_LABEL } } });
-            let labelId: string;
-            if (labels.nodes.length > 0) {
-              labelId = labels.nodes[0].id;
-            } else {
-              const created = await client.createIssueLabel({ name: CLOSED_OUT_LABEL, color: `#${CLOSED_OUT_COLOR}` });
-              const createdLabel = await created.issueLabel;
-              labelId = createdLabel ? createdLabel.id : '';
-            }
-            if (labelId) {
-              const existingLabels = await issue.labels();
-              const labelIds = existingLabels.nodes.map(l => l.id);
-              if (!labelIds.includes(labelId)) {
-                labelIds.push(labelId);
-                await issue.update({ labelIds });
+          const issueNum = extractNumber(ctx.issueId);
+          const teamKey = extractPrefix(ctx.issueId);
+          if (issueNum !== null && teamKey !== null) {
+            const results = await client.issues({
+              filter: {
+                number: { eq: issueNum },
+                team: { key: { eq: teamKey } },
+              },
+              first: 1,
+            });
+            if (results.nodes.length > 0) {
+              const issue = results.nodes[0];
+              // Find or create the closed-out label
+              const labels = await client.issueLabels({ filter: { name: { eq: CLOSED_OUT_LABEL } } });
+              let labelId: string;
+              if (labels.nodes.length > 0) {
+                labelId = labels.nodes[0].id;
+              } else {
+                const created = await client.createIssueLabel({ name: CLOSED_OUT_LABEL, color: `#${CLOSED_OUT_COLOR}` });
+                const createdLabel = await created.issueLabel;
+                labelId = createdLabel ? createdLabel.id : '';
+              }
+              if (labelId) {
+                const existingLabels = await issue.labels();
+                const labelIds = existingLabels.nodes.map(l => l.id);
+                if (!labelIds.includes(labelId)) {
+                  labelIds.push(labelId);
+                  await issue.update({ labelIds });
+                }
               }
             }
           }

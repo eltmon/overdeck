@@ -9,6 +9,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { loadProjectsConfig, getIssuePrefix } from './projects.js';
+import { extractPrefix, extractNumber, parseIssueId } from './issue-id.js';
 
 export interface GitHubRepoConfig {
   owner: string;
@@ -73,10 +74,12 @@ export function parseGitHubRepos(): GitHubRepoConfig[] {
 }
 
 /**
- * Extract the prefix from an issue ID (e.g., "CLI" from "CLI-1", "PAN" from "PAN-42").
+ * Extract the prefix from an issue ID (e.g., "CLI" from "CLI-1", "PAN" from "PAN-42", "F" from "F29698").
+ * Uses unified parser to support standard, Rally, and custom formats.
+ * @deprecated Use extractPrefix from issue-id.ts for unified parsing
  */
 export function extractIssuePrefix(issueId: string): string {
-  return issueId.split('-')[0].toUpperCase();
+  return extractPrefix(issueId) ?? issueId.split('-')[0].toUpperCase();
 }
 
 /**
@@ -91,8 +94,8 @@ export function resolveGitHubIssue(issueId: string): IssueResolution {
 
   for (const repoConfig of repos) {
     if (repoConfig.prefix === prefix) {
-      const number = parseInt(issueId.split('-')[1], 10);
-      if (!isNaN(number)) {
+      const number = extractNumber(issueId);
+      if (number !== null) {
         return { isGitHub: true, ...repoConfig, number };
       }
     }
@@ -108,14 +111,14 @@ export function isGitHubIssue(issueId: string): boolean {
   return resolveGitHubIssue(issueId).isGitHub;
 }
 
-export type TrackerTypeResolution = 'github' | 'rally' | 'linear';
+export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab';
 
 /**
  * Resolve the tracker type for an issue ID by checking projects.yaml configuration.
  *
  * Resolution order:
  * 1. GitHub — prefix matches a configured github_repo project
- * 2. Rally — prefix matches a project with rally_project but no linear_team / github_repo
+ * 2. Rally — prefix matches a project with rally_project or tracker: 'rally'
  * 3. Linear — fallback (matches linear_team or unknown prefix)
  */
 export function resolveTrackerType(issueId: string): TrackerTypeResolution {
@@ -124,17 +127,40 @@ export function resolveTrackerType(issueId: string): TrackerTypeResolution {
     return 'github';
   }
 
-  // Check if the issue prefix matches a Rally-only project
-  const prefix = extractIssuePrefix(issueId);
+  // Check if the issue prefix matches a project with explicit tracker type
+  const parsed = parseIssueId(issueId);
+  if (!parsed) {
+    return 'linear'; // default for unparseable IDs
+  }
+
   try {
     const { projects } = loadProjectsConfig();
     for (const [key, project] of Object.entries(projects)) {
-      const projectPrefix = getIssuePrefix(project) || key.toUpperCase().replace(/-/g, '');
-      if (projectPrefix?.toUpperCase() === prefix) {
-        // Prefix matches — determine tracker by what's configured
+      // Check single issue_prefix
+      const singlePrefix = getIssuePrefix(project);
+      if (singlePrefix?.toUpperCase() === parsed.prefix) {
+        if (project.tracker) return project.tracker;
         if (project.github_repo) return 'github';
         if (project.rally_project) return 'rally';
         return 'linear';
+      }
+
+      // Check issue_prefixes array (multiple prefixes per project)
+      if (project.issue_prefixes?.some(p => p.toUpperCase() === parsed.prefix)) {
+        if (project.tracker) return project.tracker;
+        if (project.rally_project) return 'rally';
+        return 'linear';
+      }
+
+      // Derive prefix from project key for projects without explicit prefixes
+      if (!singlePrefix && !project.issue_prefixes) {
+        const derivedPrefix = key.toUpperCase().replace(/-/g, '');
+        if (derivedPrefix === parsed.prefix) {
+          if (project.tracker) return project.tracker;
+          if (project.github_repo) return 'github';
+          if (project.rally_project) return 'rally';
+          return 'linear';
+        }
       }
     }
   } catch { /* ignore config errors */ }

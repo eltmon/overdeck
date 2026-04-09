@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { PANOPTICON_HOME } from './paths.js';
+import { extractPrefix, parseIssueId } from './issue-id.js';
 import type { QualityGateConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, 'projects.yaml');
@@ -82,6 +83,19 @@ export interface ProjectConfig {
   issue_prefix?: string;
   github_repo?: string;  // e.g. "owner/repo"
   gitlab_repo?: string;  // e.g. "group/repo"
+  /** Tracker type for this project. Affects ID parsing and state management. */
+  tracker?: 'linear' | 'github' | 'gitlab' | 'rally';
+  /**
+   * Custom regex pattern for issue ID parsing. Must have two capture groups:
+   * group 1 = prefix, group 2 = number. Example: "^(PROJ)-(\\d+)$"
+   */
+  issue_pattern?: string;
+  /**
+   * Multiple prefixes that map to this project.
+   * For Rally: ['F', 'US', 'DE', 'TA'] — all artifact types route here.
+   * For standard trackers: usually just one prefix via issue_prefix.
+   */
+  issue_prefixes?: string[];
   issue_routing?: IssueRoutingRule[];
   /** Workspace configuration */
   workspace?: WorkspaceConfig;
@@ -201,12 +215,12 @@ export function unregisterProject(key: string): boolean {
 }
 
 /**
- * Extract Linear team prefix from an issue ID
- * E.g., "MIN-123" -> "MIN", "PAN-456" -> "PAN"
+ * Extract Linear team prefix from an issue ID.
+ * Supports standard (MIN-123), Rally (F29698), and custom formats.
+ * @deprecated Use extractPrefix from issue-id.ts for unified parsing
  */
 export function extractTeamPrefix(issueId: string): string | null {
-  const match = issueId.match(/^([A-Z]+)-\d+$/i);
-  return match ? match[1].toUpperCase() : null;
+  return extractPrefix(issueId);
 }
 
 /**
@@ -284,7 +298,7 @@ export function resolveProjectPath(project: ProjectConfig, labels: string[] = []
 /**
  * Resolve project from an issue ID (and optional labels)
  *
- * @param issueId - Linear issue ID (e.g., "MIN-123")
+ * @param issueId - Issue ID in any supported format (e.g., "MIN-123", "F29698")
  * @param labels - Optional array of label names
  * @returns Resolved project info or null if not found
  */
@@ -292,28 +306,41 @@ export function resolveProjectFromIssue(
   issueId: string,
   labels: string[] = []
 ): ResolvedProject | null {
-  const teamPrefix = extractTeamPrefix(issueId);
-  if (!teamPrefix) {
+  const parsed = parseIssueId(issueId);
+  if (!parsed) {
     return null;
   }
 
   const config = loadProjectsConfig();
 
-  // Find project by team prefix (check linear_team first, then derive from project key)
   for (const [key, projectConfig] of Object.entries(config.projects)) {
-    if (getIssuePrefix(projectConfig)?.toUpperCase() === teamPrefix) {
+    // Check single issue_prefix (existing behavior)
+    const singlePrefix = getIssuePrefix(projectConfig);
+    if (singlePrefix?.toUpperCase() === parsed.prefix) {
       const resolvedPath = resolveProjectPath(projectConfig, labels);
       return {
         projectKey: key,
         projectName: projectConfig.name,
         projectPath: resolvedPath,
-        linearTeam: getIssuePrefix(projectConfig),
+        linearTeam: singlePrefix,
       };
     }
-    // For projects without linear_team (GitHub-only or Rally-only), derive prefix from project key
-    if (!getIssuePrefix(projectConfig) && (projectConfig.github_repo || projectConfig.rally_project)) {
+
+    // Check issue_prefixes array (new: multiple prefixes per project)
+    if (projectConfig.issue_prefixes?.some(p => p.toUpperCase() === parsed.prefix)) {
+      const resolvedPath = resolveProjectPath(projectConfig, labels);
+      return {
+        projectKey: key,
+        projectName: projectConfig.name,
+        projectPath: resolvedPath,
+        linearTeam: projectConfig.issue_prefixes?.find(p => p.toUpperCase() === parsed.prefix),
+      };
+    }
+
+    // Fallback: derive prefix from project key for projects without explicit prefixes
+    if (!singlePrefix && !projectConfig.issue_prefixes) {
       const derivedPrefix = key.toUpperCase().replace(/-/g, '');
-      if (derivedPrefix === teamPrefix) {
+      if (derivedPrefix === parsed.prefix) {
         const resolvedPath = resolveProjectPath(projectConfig, labels);
         return {
           projectKey: key,
