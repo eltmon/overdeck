@@ -72,12 +72,12 @@ npm test  # or: mvn test, cargo test, etc.
 git add -A
 git commit -m "feat: description (ISSUE-XXX)
 
-Co-Authored-By: Claude <your-exact-model-id-here> <noreply@anthropic.com>"
+Co-Authored-By: <your-exact-model-id-here> <noreply@anthropic.com>"
 
 # Example for claude-sonnet-4-5-20250929:
 # git commit -m "feat: add specialist completion API
 #
-# Co-Authored-By: Claude claude-sonnet-4-5-20250929 <noreply@anthropic.com>"
+# Co-Authored-By: claude-sonnet-4-5-20250929 <noreply@anthropic.com>"
 
 # 3. Push to remote
 git push -u origin $(git branch --show-current)
