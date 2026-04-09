@@ -1,0 +1,243 @@
+---
+title: Progressive Polyrepo Workspaces
+description: Large-scale polyrepo management with on-demand repository checkout
+---
+
+# Progressive Polyrepo Workspaces
+
+For projects with 10+ repositories, creating all worktrees upfront wastes time and disk space — most issues only touch 1-3 repos. Progressive polyrepo workspaces solve this by starting with only essential repos (like a meta repo) and adding more on demand during work.
+
+## When to Use Progressive Mode
+
+| Project Size | Recommended Mode | Behavior |
+|--------------|-----------------|----------|
+| 1-9 repos | Standard polyrepo | All repos checked out on workspace creation |
+| 10+ repos | Progressive | Only essential repos initially; agents add more as needed |
+| Any project with a meta repo | Progressive | Meta repos symlinked as read-only references |
+
+## Overview
+
+Progressive workspaces are opt-in per-project via the `progressive: true` flag. When enabled:
+
+1. **Workspace creation is fast** — only `always_include` repos get worktrees/symlinks
+2. **Agents add repos on demand** — using the `/workspace-add-repo` skill or CLI command
+3. **Meta repos stay clean** — they symlink to `main` with no feature branches
+4. **Repo groups simplify addition** — agents can add a named group (`simphony`, `aloha`) instead of individual repos
+
+## Configuration
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  enterprise-integration:
+    name: "Enterprise Integration"
+    path: /home/user/Projects/EnterpriseIntegration
+    tracker: rally
+    issue_prefixes: [F, US, DE, TA]    # All Rally artifact types → this project
+    workspace:
+      type: polyrepo
+      progressive: true                  # Opt-in to progressive mode
+      always_include: [meta]           # These repos always exist in workspace
+      groups_file: team-meta/panopticon/repo-groups.yaml  # Repo group definitions
+      pr_target: qa                     # Default PR target for all repos
+
+      repos:
+        - name: meta
+          path: team-meta
+          link_type: symlink            # Symlink, not worktree
+          readonly: true                 # Agents read but never commit
+
+        - name: api-service
+          path: HS/api-service
+          default_branch: master
+
+        - name: int-provider-a
+          path: HS/int-provider-a
+          default_branch: master
+
+        # ... 28 more repos
+```
+
+## New Configuration Fields
+
+### WorkspaceConfig Additions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `progressive` | `boolean` | When `true`, only `always_include` repos are created on workspace init |
+| `always_include` | `string[]` | Repo names to always include (typically meta/docs repos) |
+| `groups_file` | `string` | Path (relative to project root) to `repo-groups.yaml` |
+| `pr_target` | `string` | Default PR target branch for all repos (e.g., `'qa'`) |
+
+### RepoConfig Additions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pr_target` | `string` | Per-repo PR target branch override |
+| `readonly` | `boolean` | If `true`, agent should not commit to this repo |
+| `link_type` | `'worktree' \| 'symlink'` | How to include repo in workspace (default: `'worktree'`) |
+
+## Repo Groups
+
+Repo groups let agents add multiple related repos at once. Groups are defined in a `repo-groups.yaml` file within your meta repo:
+
+```yaml
+# team-meta/panopticon/repo-groups.yaml
+groups:
+  simphony:
+    - int-micros-simphony
+    - int-micros-simphony-api
+    - micros-symphony-canonical-transform
+    - micros-symphony-job-importschedule
+    - micros-symphony-raw-job
+
+  aloha:
+    - int-aloha
+    - int-aloha-hrbridge
+    - aloha-agent-canonical-transfer
+    - aloha-agent-nrt-canonical-transfer
+
+  agent-infra:
+    - agent-service
+    - agent-cli
+    - agent-installer
+
+  shared-lib:
+    - int-aws-hs-service
+    - int-aws-store-config-labels
+
+  canonical:
+    - int-canonical-to-hs
+    - int-canonical-to-fourth
+
+  toast: [int-toast]
+  brink: [int-brink]
+  square: [int-square]
+
+  all: "*"   # Special: includes every repo
+```
+
+## Adding Repos Mid-Work
+
+### CLI Command
+
+```bash
+# Add specific repos
+pan workspace add-repo <workspace-id> <repo-name> [repo-name...]
+
+# Add a named group
+pan workspace add-repo <workspace-id> --group <group-name>
+
+# Add all repos
+pan workspace add-repo <workspace-id> --group all
+```
+
+**Examples:**
+
+```bash
+# Add specific repos
+pan workspace add-repo int-123 int-provider-a int-canonical-to-hs
+
+# Add a named group
+pan workspace add-repo int-123 --group simphony
+
+# Add all repos
+pan workspace add-repo int-123 --group all
+```
+
+### Skill: `/workspace-add-repo`
+
+Agents invoke this skill during work when they need repos not yet in the workspace:
+
+```
+/workspace-add-repo
+```
+
+The skill:
+1. Reads `repo-map.md` in the meta repo for architecture context
+2. Reads `repo-groups.yaml` for available group names
+3. Adds only the repos needed — agents can always add more later
+
+## Meta Repos (Symlink Behavior)
+
+Meta repos (shared skills, architecture docs, team conventions) use `link_type: symlink`:
+
+```yaml
+- name: meta
+  path: team-meta
+  link_type: symlink   # No worktree, no feature branch
+  readonly: true       # Agent reads but never commits
+```
+
+**What happens:**
+- A symlink is created: `workspaces/feature-int-123/meta → /project/team-meta`
+- The symlink always reflects the latest state of the actual repo
+- `readonly: true` tells the agent not to commit changes there
+- No git worktree is created — the meta repo stays on `main`
+
+**Generated CLAUDE.md includes:**
+```
+## Readonly Repos
+The following repos are symlinked for reference only — do NOT commit changes to them:
+- meta/ — shared skills and architecture docs
+```
+
+## PR Target Branch
+
+The `pr_target` field surfaces in agent context so PRs get created against the right branch:
+
+1. **CLAUDE.md injection** — workspace CLAUDE.md includes:
+   ```
+   ## PR Conventions
+   All PRs in this project target the `qa` branch, NOT main/master.
+   ```
+
+2. **Polyrepo context** — `buildPolyrepoContext()` lists repos with their `pr_target` values
+
+### Per-Repo Override
+
+```yaml
+repos:
+  - name: api-service
+    path: HS/api-service
+    default_branch: master
+    pr_target: qa                    # Override workspace default
+
+  - name: legacy-service
+    path: HS/legacy-service
+    default_branch: main
+    pr_target: main                  # Uses workspace default
+```
+
+## Migration from Standard Polyrepo
+
+Existing polyrepo projects (no `progressive` field) work identically to before:
+
+```yaml
+# Old config — still works, all repos checked out
+projects:
+  myn:
+    workspace:
+      type: polyrepo
+      repos:
+        - name: frontend
+          path: packages/frontend
+        - name: backend
+          path: packages/backend
+        # 4 more repos...
+```
+
+To migrate to progressive mode:
+
+1. Add `progressive: true`
+2. Identify `always_include` repos (typically just the meta repo)
+3. Optionally add `groups_file` for team-defined repo groups
+4. Optionally add `pr_target` if your project uses a non-standard PR target branch
+5. Update meta repo `readonly` repos with `link_type: symlink`
+
+## Related Guides
+
+- [Polyrepo Configuration](/configuration/polyrepo) — Standard polyrepo setup
+- [Meta Repos](/configuration/meta-repos) — Meta repo pattern and team onboarding
+- [Setup Wizard](/configuration/setup-wizard) — Interactive project setup
+- [Issue Tracker Integration](/configuration/issue-trackers) — Rally and other tracker configuration
