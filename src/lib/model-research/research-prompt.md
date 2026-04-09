@@ -22,8 +22,8 @@ Research these models across all skill dimensions:
 - Gemini 3 Flash (`gemini-3-flash-preview`)
 
 ### Z.AI
-- GLM 5 (`glm-5`)
-- GLM 5.1 (`glm-5.1`)
+- GLM 4.7 (`glm-4.7`)
+- GLM 4.7 Flash (`glm-4.7-flash`)
 
 ### Kimi/Moonshot
 - Kimi K2 (`kimi-k2`)

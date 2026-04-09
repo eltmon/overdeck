@@ -36,8 +36,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gemini-2.5-flash': 'google',
 
   // Z.AI models
-  'glm-5': 'zai',
-  'glm-5.1': 'zai',
+  'glm-4.7': 'zai',
+  'glm-4.7-flash': 'zai',
 
   // Kimi models
   'kimi-k2': 'kimi',
@@ -53,9 +53,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  *
  * Mapping strategy:
  * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 4.6 (good balance)
- * - Economy models (GPT-4o-mini, Gemini Flash) → Haiku 4.5
+ * - Economy models (GPT-4o-mini, Gemini Flash, GLM Flash) → Haiku 4.5
  * - GPT-4o → Sonnet 4.6 (similar tier)
- * - GLM-5/GLM-5.1 → Sonnet 4.6 (premium tier)
+ * - GLM-4.7 → Haiku 4.5 (economy tier)
  *
  * Note: We intentionally avoid Opus 4.6 as default fallback to keep costs reasonable.
  * Users who want Opus can explicitly set it in their config.
@@ -72,8 +72,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
 
   // Z.AI → Anthropic
-  'glm-5': 'claude-sonnet-4-6', // Premium model → Sonnet
-  'glm-5.1': 'claude-sonnet-4-6', // Latest flagship → Sonnet
+  'glm-4.7': 'claude-haiku-4-5', // Standard model → Haiku
+  'glm-4.7-flash': 'claude-haiku-4-5', // Fast model → Haiku
 
   // Kimi → Anthropic
   'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet

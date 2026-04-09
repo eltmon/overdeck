@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { type LucideIcon, Gem, Sparkles, Zap, Code2, Brain, FlaskConical, Layers, Coins, Network, Globe, X, CheckCircle2 } from 'lucide-react';
+import { type LucideIcon, Gem, Sparkles, Zap, Code2, Brain, FlaskConical, Layers, Coins, Globe, X, CheckCircle2 } from 'lucide-react';
 import { WorkTypeId, ModelId } from '../types';
 
 // Model capabilities that can be matched to work types
@@ -68,8 +68,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-5' as ModelId, name: 'GLM 5', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '754B params, agentic engineering focus, 200K context' },
-      { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Zap, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Latest flagship (Apr 2026), all GLM-5 improvements plus further enhancements' },
+      { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
     ],
   },
   minimax: {

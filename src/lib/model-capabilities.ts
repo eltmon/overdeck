@@ -374,48 +374,48 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   // Z.AI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'glm-5': {
-    model: 'glm-5',
+  'glm-4.7': {
+    model: 'glm-4.7',
     provider: 'zai',
-    displayName: 'GLM 5',
-    costPer1MTokens: 6.0, // ~$6/M blended
-    contextWindow: 200000, // 200K context
+    displayName: 'GLM 4.7',
+    costPer1MTokens: 5.0,
+    contextWindow: 200000, // 200K context, 128K output
     skills: {
-      'code-generation': 90, // 74.8% SWE-bench (improvement over 4.7)
-      'code-review': 88,
-      debugging: 88,
-      planning: 85, // Strong agentic planning
-      documentation: 82,
-      testing: 86,
-      security: 75,
-      performance: 82,
-      synthesis: 88,
-      speed: 78,
-      'context-length': 95,
+      'code-generation': 88, // 73.8% SWE-bench, 84.9 LiveCodeBench v6 (open-source SOTA)
+      'code-review': 85,
+      debugging: 85, // Strong debugging with Interleaved Thinking
+      planning: 82, // 95.7% AIME 2025 (beats Gemini 3 & GPT-5.1)
+      documentation: 80,
+      testing: 82, // 87.4 τ²-Bench (SOTA for tool use)
+      security: 72,
+      performance: 78,
+      synthesis: 85, // Preserved Thinking retains context across turns
+      speed: 80,
+      'context-length': 95, // 200K context
     },
-    notes: '754B params, agentic engineering focus. GLM-5 paper: "from Vibe Coding to Agentic Engineering".',
+    notes: 'Top open-source for agentic coding. 73.8% SWE-bench, best tool use. 400B params with Interleaved Thinking.',
   },
 
-  'glm-5.1': {
-    model: 'glm-5.1',
+  'glm-4.7-flash': {
+    model: 'glm-4.7-flash',
     provider: 'zai',
-    displayName: 'GLM 5.1',
-    costPer1MTokens: 6.0, // Same pricing as GLM-5
-    contextWindow: 200000, // 200K context
+    displayName: 'GLM 4.7 Flash',
+    costPer1MTokens: 1.5,
+    contextWindow: 128000,
     skills: {
-      'code-generation': 92, // Latest flagship, further improvements
-      'code-review': 90,
-      debugging: 90,
-      planning: 88, // Latest improvements to reasoning
-      documentation: 85,
-      testing: 88,
-      security: 78,
-      performance: 85,
-      synthesis: 90,
-      speed: 80,
-      'context-length': 95,
+      'code-generation': 72,
+      'code-review': 68,
+      debugging: 65,
+      planning: 62,
+      documentation: 70,
+      testing: 65,
+      security: 55,
+      performance: 62,
+      synthesis: 65,
+      speed: 92, // Fast inference
+      'context-length': 75,
     },
-    notes: 'Latest flagship (Apr 2026). 754B params, all improvements from GLM-5 plus further agentic enhancements.',
+    notes: 'Fast and affordable. Good for quick iterations and exploration.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
