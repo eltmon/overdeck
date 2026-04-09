@@ -62,6 +62,81 @@ export async function runVerificationForIssue(
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
 
   try {
+    // Step 0: Sync main into workspace before running quality gates.
+    // If main advanced while the work agent was implementing, the branch
+    // may be behind. Syncing first ensures quality gates run against
+    // up-to-date code and prevents "no merge button" on the PR.
+    try {
+      console.log(`[${logPrefix}] Syncing main into workspace for ${issueId}...`);
+      await execAsync('git fetch origin main', { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
+      const mergeResult = await execAsync('git merge origin/main --no-edit', {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: 60000,
+      });
+      const mergeOut = (mergeResult.stdout || '') + (mergeResult.stderr || '');
+      if (mergeOut.includes('Already up to date') || mergeOut.includes('Already up-to-date')) {
+        console.log(`[${logPrefix}] Already up to date with main`);
+      } else {
+        console.log(`[${logPrefix}] Merged latest main into workspace`);
+      }
+    } catch (mergeErr: any) {
+      const mergeOut = (mergeErr.stdout || '') + (mergeErr.stderr || '');
+      const hasConflicts = mergeOut.includes('CONFLICT') || mergeOut.includes('Merge conflict');
+
+      if (hasConflicts) {
+        // Abort the merge so the workspace is in a clean state for the agent
+        try { await execAsync('git merge --abort', { cwd: workspacePath, encoding: 'utf-8' }); } catch {}
+
+        // Extract conflicting file names from git output
+        const conflictLines = mergeOut
+          .split('\n')
+          .filter((line: string) => line.startsWith('CONFLICT'))
+          .map((line: string) => line.replace(/^CONFLICT \([^)]+\): /, '').replace(/Merge conflict in /, ''))
+          .join('\n  - ');
+
+        const newCycleCount = currentCycles + 1;
+        const failedCheck = 'sync-main';
+        const summary = `Sync with main FAILED — merge conflicts detected:\n  - ${conflictLines}`;
+
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: summary,
+          verificationCycleCount: newCycleCount,
+          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+        });
+
+        const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Resolve merge conflicts with main BEFORE resubmitting\n\nThe main branch has advanced since you started working. Your branch has merge conflicts that must be resolved.\n\n1. Run: git fetch origin main && git merge origin/main\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT resubmit until all conflicts are resolved and tests pass.`;
+
+        try {
+          const fileResult = await writeFeedbackFile({
+            issueId,
+            workspacePath,
+            specialist: 'verification-gate',
+            outcome: 'failed',
+            summary: `Sync with main FAILED — merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+            markdownBody: feedbackBody,
+          });
+          if (fileResult.success) {
+            const agentId = `agent-${issueId.toLowerCase()}`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — merge conflicts with main\nRead and address: ${fileResult.relativePath}`;
+            await messageAgent(agentId, msg);
+            console.log(`[${logPrefix}] Sync-main failed for ${issueId} — sent conflict feedback to ${agentId}`);
+          }
+        } catch (feedbackErr: any) {
+          console.error(`[${logPrefix}] Failed to write sync-main feedback for ${issueId}:`, feedbackErr);
+        }
+
+        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      }
+
+      // Non-conflict merge failure (network, permissions, etc.) — log and continue
+      // Don't block verification for transient git issues
+      console.warn(`[${logPrefix}] Sync-main warning for ${issueId}: ${mergeErr.message} (continuing)`);
+    }
+
     // Load project-specific gates or fall back to defaults
     const projectConfig = findProjectByPath(workspacePath);
     const gates =

@@ -68,6 +68,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { buildResumePrompt } from '../../../lib/cloister/resume-prompt.js';
@@ -1138,7 +1139,7 @@ const postAgentsRoute = HttpRouter.add(
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
 
     const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));

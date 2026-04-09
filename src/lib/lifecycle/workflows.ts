@@ -25,6 +25,7 @@ import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
 import { compactBeads } from './compact-beads.js';
+import { extractNumber, extractPrefix } from '../issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -394,8 +395,11 @@ async function resetIssueToTodo(ctx: LifecycleContext): Promise<StepResult> {
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });
-      const issueNum = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-      const teamKey = ctx.issueId.split('-')[0].toUpperCase();
+      const issueNum = extractNumber(ctx.issueId);
+      const teamKey = extractPrefix(ctx.issueId);
+      if (issueNum === null || teamKey === null) {
+        return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
+      }
       const results = await client.issues({
         filter: {
           number: { eq: issueNum },

@@ -20,6 +20,7 @@ import { sessionExists } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findWorkspacePath } from './archive-planning.js';
+import { extractPrefix } from '../issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -444,7 +445,7 @@ export async function teardownWorkspace(
   opts: TeardownOptions = {},
 ): Promise<StepResult[]> {
   const issueLower = ctx.issueId.toLowerCase();
-  const projName = opts.projectName || ctx.projectName || ctx.issueId.split('-')[0].toLowerCase();
+  const projName = opts.projectName || ctx.projectName || (extractPrefix(ctx.issueId)?.toLowerCase() ?? ctx.issueId);
   const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
   const shouldDeleteWorkspace = opts.deleteWorkspace !== false; // default true
   const results: StepResult[] = [];

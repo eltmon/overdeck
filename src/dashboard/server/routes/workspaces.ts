@@ -70,6 +70,7 @@ import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
+import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -206,7 +207,7 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
     }
   } catch { /* non-fatal */ }
 
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
@@ -364,7 +365,7 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${issueId.split('-')[1] || issueId}`);
+  lines.push(`Closes #${extractNumber(issueId) ?? issueId}`);
   lines.push('');
 
   // Acceptance criteria checklist from vBRIEF plan items
@@ -667,7 +668,7 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -851,7 +852,7 @@ const postWorkspacesRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'create', issueId],
@@ -875,7 +876,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -903,7 +904,7 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -1078,7 +1079,7 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const { createBackup } = body as { createBackup?: boolean };
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -1144,7 +1145,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -1278,7 +1279,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2063,7 +2064,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           payload: { issueId, passed: true },
         })));
         const issueLower = issueId.toLowerCase();
-        const issuePrefix = issueId.split('-')[0];
+        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const testWorkspace =
           body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2195,7 +2196,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as any)?.force === true;
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
@@ -2619,7 +2620,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
@@ -2914,7 +2915,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -3048,7 +3049,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     return { success: false, statusCode: 400, error: 'Already merged', mergeStatus: 'merged' };
   }
 
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
 
@@ -3367,7 +3368,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-        const issuePrefix = issueId.split('-')[0];
+        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const issueLower = issueId.toLowerCase();
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -3686,7 +3687,7 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 

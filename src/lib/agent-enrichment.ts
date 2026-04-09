@@ -18,6 +18,7 @@ import { exec } from 'child_process'
 import { getAgentRuntimeState, getAgentDir } from './agents.js'
 import { resolveProjectFromIssue } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
+import { extractPrefix } from './issue-id.js'
 
 const execAsync = promisify(exec)
 
@@ -98,7 +99,8 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
     if (trimmed && existsSync(trimmed)) return trimmed
   } catch {}
   const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase()
-  const prefix = issueId.split('-')[0]
+  const prefix = extractPrefix(issueId)
+  if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
