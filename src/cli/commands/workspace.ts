@@ -1461,16 +1461,12 @@ interface AddRepoOptions {
   project?: string;
 }
 
-interface RepoGroups {
-  groups: Record<string, string[] | '*'>;
-}
-
 /**
  * Load repo groups from the groups_file
  */
-function loadRepoGroups(groupsFilePath: string): RepoGroups {
+function loadRepoGroups(groupsFilePath: string): RepoGroupsYaml {
   const content = readFileSync(groupsFilePath, 'utf8');
-  return YAML.parse(content) as RepoGroups;
+  return YAML.parse(content);
 }
 
 /**
@@ -1587,9 +1583,13 @@ async function addRepoCommand(workspaceId: string, repoNames: string[], options:
 }
 
 // YAML parser - using simple regex-based parsing for repo-groups.yaml
+interface RepoGroupsYaml {
+  groups: Record<string, string[] | '*'>;
+}
+
 const YAML = {
-  parse(content: string): any {
-    const result: any = { groups: {} };
+  parse(content: string): RepoGroupsYaml {
+    const result: RepoGroupsYaml = { groups: {} };
 
     for (const line of content.split('\n')) {
       // Skip empty lines and comments
