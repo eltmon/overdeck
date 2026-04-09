@@ -30,6 +30,7 @@ let node_child_process = require("node:child_process");
 node_child_process = __toESM(node_child_process);
 let node_crypto = require("node:crypto");
 node_crypto = __toESM(node_crypto);
+let electron_updater = require("electron-updater");
 //#region src/settings.ts
 /**
 * Desktop-specific settings, persisted to userData/desktop-settings.json.
@@ -334,6 +335,196 @@ function stopServer() {
 	}, SIGTERM_GRACE_MS).unref();
 }
 //#endregion
+//#region src/updater.ts
+/**
+* Auto-updater service using electron-updater.
+*
+* Handles automatic background checks for updates, downloads, and installation.
+* Uses GitHub Releases as the update server.
+*/
+const FOUR_HOURS_MS = 14400 * 1e3;
+let checkIntervalId = null;
+let initialized = false;
+let currentStatus = {
+	checking: false,
+	available: false,
+	downloaded: false,
+	version: null,
+	error: null
+};
+let statusCallbacks = [];
+/**
+* Register a callback to receive update status changes.
+*/
+function onUpdateStatusChange(callback) {
+	statusCallbacks.push(callback);
+}
+/**
+* Notify all listeners of status change
+*/
+function notifyStatusChange() {
+	for (const cb of statusCallbacks) cb(currentStatus);
+}
+/**
+* Send update event to all browser windows
+*/
+function broadcastToRenderers(channel, ...args) {
+	for (const win of electron.BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send(channel, ...args);
+}
+/**
+* Initialize the auto-updater service.
+* Sets up event handlers and starts periodic update checks.
+*/
+function initializeAutoUpdater() {
+	if (initialized) {
+		console.log("[updater] Already initialized, skipping...");
+		return;
+	}
+	initialized = true;
+	electron_updater.autoUpdater.setFeedURL({
+		provider: "github",
+		owner: "eltmon",
+		repo: "panopticon-cli"
+	});
+	electron_updater.autoUpdater.autoDownload = false;
+	electron_updater.autoUpdater.autoInstallOnAppQuit = true;
+	electron_updater.autoUpdater.on("checking-for-update", () => {
+		currentStatus = {
+			...currentStatus,
+			checking: true,
+			error: null
+		};
+		notifyStatusChange();
+		broadcastToRenderers("update-status", currentStatus);
+		console.log("[updater] Checking for update...");
+	});
+	electron_updater.autoUpdater.on("update-available", (info) => {
+		currentStatus = {
+			checking: false,
+			available: true,
+			downloaded: false,
+			version: info.version,
+			error: null
+		};
+		notifyStatusChange();
+		broadcastToRenderers("update-status", currentStatus);
+		console.log(`[updater] Update available: ${info.version}`);
+	});
+	electron_updater.autoUpdater.on("update-not-available", (info) => {
+		currentStatus = {
+			checking: false,
+			available: false,
+			downloaded: false,
+			version: info.version,
+			error: null
+		};
+		notifyStatusChange();
+		broadcastToRenderers("update-status", currentStatus);
+		console.log(`[updater] Update not available. Current version: ${info.version}`);
+	});
+	electron_updater.autoUpdater.on("download-progress", (progressObj) => {
+		const percent = progressObj.percent.toFixed(1);
+		currentStatus = {
+			...currentStatus,
+			checking: false
+		};
+		notifyStatusChange();
+		broadcastToRenderers("update-download-progress", {
+			percent,
+			transferred: progressObj.transferred,
+			total: progressObj.total
+		});
+		console.log(`[updater] Download progress: ${percent}%`);
+	});
+	electron_updater.autoUpdater.on("update-downloaded", (info) => {
+		currentStatus = {
+			checking: false,
+			available: true,
+			downloaded: true,
+			version: info.version,
+			error: null
+		};
+		notifyStatusChange();
+		broadcastToRenderers("update-status", currentStatus);
+		broadcastToRenderers("update-downloaded", { version: info.version });
+		console.log(`[updater] Update downloaded: ${info.version}`);
+	});
+	electron_updater.autoUpdater.on("error", (err) => {
+		currentStatus = {
+			checking: false,
+			available: false,
+			downloaded: false,
+			version: null,
+			error: err.message
+		};
+		notifyStatusChange();
+		broadcastToRenderers("update-status", currentStatus);
+		console.error("[updater] Error:", err.message);
+	});
+	setTimeout(() => {
+		checkForUpdates();
+	}, 3e3);
+	startPeriodicChecks();
+}
+/**
+* Start periodic update checks every 4 hours.
+*/
+function startPeriodicChecks() {
+	if (checkIntervalId !== null) return;
+	checkIntervalId = setInterval(() => {
+		checkForUpdates();
+	}, FOUR_HOURS_MS);
+	console.log("[updater] Started periodic update checks (every 4 hours)");
+}
+/**
+* Check for updates manually.
+* Returns a promise that resolves when the check completes.
+*/
+async function checkForUpdates() {
+	if (currentStatus.checking) {
+		console.log("[updater] Already checking for update, skipping...");
+		return;
+	}
+	try {
+		console.log("[updater] Starting update check...");
+		await electron_updater.autoUpdater.checkForUpdates();
+	} catch (err) {
+		console.error("[updater] Check for updates failed:", err);
+	}
+}
+/**
+* Download the available update.
+*/
+async function downloadUpdate() {
+	if (!currentStatus.available) {
+		console.log("[updater] No update available to download");
+		return;
+	}
+	try {
+		console.log("[updater] Starting update download...");
+		await electron_updater.autoUpdater.downloadUpdate();
+	} catch (err) {
+		console.error("[updater] Download update failed:", err);
+	}
+}
+/**
+* Quit and install the downloaded update.
+*/
+function quitAndInstall() {
+	if (!currentStatus.downloaded) {
+		console.log("[updater] No update downloaded to install");
+		return;
+	}
+	console.log("[updater] Quitting and installing update...");
+	electron_updater.autoUpdater.quitAndInstall();
+}
+/**
+* Get current update status.
+*/
+function getUpdateStatus() {
+	return currentStatus;
+}
+//#endregion
 //#region src/menu.ts
 /**
 * Application menu bar for the Panopticon desktop app.
@@ -353,6 +544,18 @@ async function fetchActiveWorkspaces() {
 	} catch {
 		return [];
 	}
+}
+let updateDownloaded = false;
+function rebuildMenu() {
+	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
+	electron.Menu.setApplicationMenu(menu);
+	const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+	if (panopticonMenu?.submenu) panopticonMenu.submenu.on("menu-will-show", () => {
+		fetchActiveWorkspaces().then((workspaces) => {
+			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
+			if (wsItem) wsItem.label = workspaces.length ? `Open Workspace (${workspaces.length})` : "Open Workspace";
+		});
+	});
 }
 function buildMenuTemplate() {
 	const template = [];
@@ -446,14 +649,33 @@ function buildMenuTemplate() {
 	});
 	template.push({
 		role: "help",
-		submenu: [{
-			label: "Panopticon on GitHub",
-			click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli")
-		}, {
-			label: "Report an Issue",
-			click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli/issues")
-		}]
+		submenu: [
+			{
+				label: "Check for Updates...",
+				click: () => {
+					checkForUpdates();
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Panopticon on GitHub",
+				click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli")
+			},
+			{
+				label: "Report an Issue",
+				click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli/issues")
+			}
+		]
 	});
+	if (updateDownloaded) {
+		const helpMenu = template[template.length - 1];
+		if (helpMenu && helpMenu.submenu && Array.isArray(helpMenu.submenu)) helpMenu.submenu.push({ type: "separator" }, {
+			label: "Install Update and Restart",
+			click: () => {
+				quitAndInstall();
+			}
+		});
+	}
 	return template;
 }
 function configureApplicationMenu() {
@@ -465,6 +687,12 @@ function configureApplicationMenu() {
 			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
 			if (wsItem) wsItem.label = workspaces.length ? `Open Workspace (${workspaces.length})` : "Open Workspace";
 		});
+	});
+	onUpdateStatusChange((status) => {
+		if (status.downloaded && !updateDownloaded) {
+			updateDownloaded = true;
+			rebuildMenu();
+		}
 	});
 }
 //#endregion
@@ -645,7 +873,11 @@ const IPC = {
 	MENU_ACTION: "pan:menu-action",
 	GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
 	UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
-	NOTIFY: "pan:notify"
+	NOTIFY: "pan:notify",
+	GET_UPDATE_STATUS: "pan:get-update-status",
+	CHECK_FOR_UPDATES: "pan:check-for-updates",
+	DOWNLOAD_UPDATE: "pan:download-update",
+	QUIT_AND_INSTALL: "pan:quit-and-install"
 };
 let mainWindow = null;
 let serverPort = 0;
@@ -701,6 +933,26 @@ function registerIpcHandlers() {
 	electron.ipcMain.handle(IPC.UPDATE_DESKTOP_SETTING, (_event, key, value) => {
 		if (typeof key !== "string") return;
 		if (updateDesktopSetting(key, value) && key === "autoStart.enabled") electron.app.setLoginItemSettings({ openAtLogin: value === true });
+	});
+	electron.ipcMain.handle(IPC.GET_UPDATE_STATUS, () => getUpdateStatus());
+	electron.ipcMain.handle(IPC.CHECK_FOR_UPDATES, async () => {
+		try {
+			await checkForUpdates();
+		} catch (err) {
+			console.error("[main] checkForUpdates failed:", err);
+		}
+		return getUpdateStatus();
+	});
+	electron.ipcMain.handle(IPC.DOWNLOAD_UPDATE, async () => {
+		try {
+			await downloadUpdate();
+		} catch (err) {
+			console.error("[main] downloadUpdate failed:", err);
+		}
+		return getUpdateStatus();
+	});
+	electron.ipcMain.on(IPC.QUIT_AND_INSTALL, () => {
+		quitAndInstall();
 	});
 }
 function createWindow() {
@@ -776,6 +1028,7 @@ electron.app.on("ready", () => {
 	initializeNotifications();
 	configureApplicationMenu();
 	registerDesktopProtocol();
+	initializeAutoUpdater();
 	if (process.platform === "win32") electron.app.setAppUserModelId(APP_ID);
 	if (process.platform === "darwin" && electron.app.dock) {
 		const iconPath = resolveResourcePath("icon.png");
