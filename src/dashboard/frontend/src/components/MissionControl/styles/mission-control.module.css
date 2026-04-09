@@ -1941,8 +1941,8 @@
   border: 1px solid var(--mc-border);
   border-radius: var(--mc-radius);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  z-index: 100;
   min-width: 260px;
+  max-width: calc(100vw - 16px);
   display: flex;
   flex-direction: column;
   padding: 4px;
