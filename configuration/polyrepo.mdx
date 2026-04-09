@@ -414,6 +414,23 @@ projects:
 > **Important:** The `path` value in a quality gate must exactly match the `path` value of the
 > corresponding repo in the `workspace.repos` list (both relative to the project root).
 
+## Large-Scale Projects: Progressive Polyrepo
+
+For projects with **10 or more repositories**, consider using progressive polyrepo mode instead of the standard all-at-once approach.
+
+| Approach | Use When | Workspace Creation | Repo Addition |
+|----------|----------|-------------------|---------------|
+| Standard polyrepo | 2-9 repos | All repos at once | N/A (all included) |
+| Progressive polyrepo | 10+ repos | Only essential repos | On demand via CLI or skill |
+
+**Benefits of progressive mode:**
+- **Faster workspace creation** — only meta/docs repos initially
+- **Less disk usage** — agents only check out repos they need
+- **Flexible scope** — agents add repos as they discover what's needed
+- **Cleaner meta repos** — symlinked as read-only, no feature branches
+
+See [Progressive Polyrepo Workspaces](/configuration/progressive-polyrepo) for full documentation.
+
 ## Related Guides
 
 - [Project Registry](/configuration/projects) - Project configuration
