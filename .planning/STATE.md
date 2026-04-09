@@ -1,4 +1,4 @@
-# PAN-573: Flexible Tracker ID Resolution
+# PAN-572: Progressive Polyrepo Workspaces
 
 ## Status: Implementation Complete
 
@@ -6,45 +6,40 @@
 All implementation complete - feature branch pushed and ready for PR creation.
 
 ## Completed Work
-- [x] Created unified issue ID parser `src/lib/issue-id.ts` with:
-  - `parseIssueId()` - parses standard (MIN-123), Rally (F29698), and custom formats
-  - `extractPrefix()` - extracts prefix from any format
-  - `extractNumber()` - extracts number from any format
-  - `normalizeIssueId()` - returns filesystem-safe lowercase form
-- [x] Added `tracker`, `issue_pattern`, `issue_prefixes` fields to `ProjectConfig`
-- [x] Updated `resolveProjectFromIssue()` to support `issue_prefixes` array
-- [x] Updated `resolveTrackerType()` to use new parser and support explicit `tracker` field
-- [x] Migrated 54 `split('-')` callsites across 15 files to use unified parser
-- [x] Created comprehensive tests in `tests/lib/issue-id.test.ts` (37 tests)
+- [x] Added `progressive`, `always_include`, `groups_file`, `pr_target` fields to `WorkspaceConfig`
+- [x] Added `pr_target`, `readonly`, `link_type` fields to `RepoConfig`
+- [x] Updated `WorkspaceConfig` in `projects.ts` to match (inline type definition)
+- [x] Updated `createWorkspace()` in workspace-manager.ts to:
+  - Filter repos based on `progressive` mode
+  - Handle `link_type: symlink` for meta repos (create symlink instead of worktree)
+- [x] Updated `removeWorkspace()` in workspace-manager.ts to:
+  - Check if entry is symlink before removing worktree
+  - Use `unlinkSync` for symlinks, `removeWorktree` for actual worktrees
+- [x] Added `addReposToWorkspace()` function in workspace-manager.ts
+- [x] Added `add-repo` subcommand to CLI workspace.ts
+- [x] Updated `buildPolyrepoContext()` in work-agent-prompt.ts to:
+  - Show only visible repos in progressive mode
+  - Include add-repo instructions for progressive workspaces
+  - Show PR target branch info
+  - List available repos not yet in workspace
+  - Mark readonly/symlink repos
+- [x] Created `skills/workspace-add-repo/skill.md` skill file
 
 ## Remaining Work
 - [ ] Create GitHub PR via `pan work done`
 
 ## Key Decisions
-- [D1] Used `extractPrefix` with fallback to `split('-')[0]` at each callsite to maintain backward compatibility while gradually migrating. This approach avoids breaking changes in dashboard routes that may receive mixed format IDs.
-- [D2] `extractTeamPrefix()` is now a thin wrapper around `extractPrefix()` - this maintains API compatibility for external consumers while using the unified parser internally.
-- [D3] `issue_prefixes` array in ProjectConfig supersedes single `issue_prefix` when both are specified (array takes precedence for matching).
+- [D1] Used inline type definition in `projects.ts` for `WorkspaceConfig` since it was already duplicating the type there rather than importing from workspace-config.ts
+- [D2] Progressive mode is opt-in via `progressive: true` config flag - existing polyrepo projects continue to work unchanged
+- [D3] Symlink repos are detected at removal time using `lstatSync().isSymbolicLink()` rather than storing link_type at creation time
 
 ## Files Modified
-- `src/lib/issue-id.ts` (NEW)
-- `src/lib/projects.ts`
-- `src/lib/tracker-utils.ts`
-- `src/lib/lifecycle/close-issue.ts`
-- `src/lib/lifecycle/label-cleanup.ts`
-- `src/lib/lifecycle/workflows.ts`
-- `src/lib/lifecycle/teardown-workspace.ts`
-- `src/lib/close-out.ts`
-- `src/lib/agent-enrichment.ts`
-- `src/lib/costs/wal.ts`
-- `src/cli/commands/work/done.ts`
-- `src/cli/commands/work/wipe.ts`
-- `src/dashboard/server/routes/issues.ts`
-- `src/dashboard/server/routes/workspaces.ts`
-- `src/dashboard/server/routes/misc.ts`
-- `src/dashboard/server/routes/agents.ts`
-- `src/dashboard/server/routes/specialists.ts`
-- `src/dashboard/server/routes/mission-control.ts`
-- `tests/lib/issue-id.test.ts` (NEW)
+- `src/lib/workspace-config.ts` - Added new config fields
+- `src/lib/projects.ts` - Updated inline WorkspaceConfig type
+- `src/lib/workspace-manager.ts` - Progressive mode handling and symlink support
+- `src/cli/commands/workspace.ts` - Added add-repo subcommand
+- `src/lib/cloister/work-agent-prompt.ts` - Progressive workspace context
+- `skills/workspace-add-repo/skill.md` (NEW)
 
 ## Specialist Feedback
 None yet.
