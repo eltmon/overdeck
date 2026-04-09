@@ -136,14 +136,12 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   }, []);
 
   const handleDraftCreated = useCallback(() => {
-    localStorage.setItem('mc-sidebar-model', sidebarModel);
-    localStorage.setItem('conv-composer-model', sidebarModel);
     setDraftKey(k => k + 1);
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
     setSidebarTab('conversations');
-  }, [sidebarModel]);
+  }, []);
 
   const queryClient = useQueryClient();
 

@@ -13,7 +13,7 @@ import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, loadStoredModel, MODEL_EFFORT_SUPPORT } from './ModelPicker';
+import { ModelPicker, DEFAULT_MODEL, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -47,9 +47,9 @@ interface DraftConversationPanelProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function DraftConversationPanel({ onPromoted }: DraftConversationPanelProps) {
-  const [model, setModel] = useState<string>(loadStoredModel);
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [effortLevels, setEffortLevels] = useState<readonly string[]>(
-    () => MODEL_EFFORT_SUPPORT[loadStoredModel() as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
+    () => MODEL_EFFORT_SUPPORT[DEFAULT_MODEL as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
   );
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
