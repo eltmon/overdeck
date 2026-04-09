@@ -279,7 +279,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         onClick={(e) => {
           if (!open) {
             const rect = e.currentTarget.getBoundingClientRect();
-            setDropdownPos({ x: rect.left, y: rect.bottom + 4 });
+            setDropdownPos({ x: rect.left, y: rect.top - 4 });
           }
           setOpen((o) => !o);
         }}
