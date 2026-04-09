@@ -8,6 +8,7 @@ import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { ModelPicker } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
 import type { Issue } from '../../types';
@@ -60,6 +61,12 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
+  const [sidebarModel, setSidebarModel] = useState<string>(() => {
+    // Default to stored model, fall back to MiniMax which is cheaper for drafts
+    return localStorage.getItem('mc-sidebar-model') || 'minimax-4o-mini';
+  });
+  // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
+  const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
     return saved ? Number(saved) : 600;
@@ -109,6 +116,13 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     refetchInterval: 10000,
   });
 
+  // Auto-select the first conversation when the list loads
+  useEffect(() => {
+    if (conversations.length > 0 && selectedConversation === null) {
+      setSelectedConversation(conversations[0].name);
+    }
+  }, [conversations, selectedConversation]);
+
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
     setSelectedConversation(null);
@@ -116,6 +130,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   }, []);
 
   const handleSelectConversation = useCallback((name: string | null) => {
+    setDraftKey(0);
     setSelectedConversation(name);
     setIsDraft(false);
     if (name !== null) {
@@ -124,15 +139,19 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   }, []);
 
   const handleDraftCreated = useCallback(() => {
+    localStorage.setItem('mc-sidebar-model', sidebarModel);
+    localStorage.setItem('conv-composer-model', sidebarModel);
+    setDraftKey(k => k + 1);
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
     setSidebarTab('conversations');
-  }, []);
+  }, [sidebarModel]);
 
   const queryClient = useQueryClient();
 
   const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
+    setDraftKey(0);
     setIsDraft(false);
     setSelectedConversation(conv.name);
     // Seed optimistic first message so it appears immediately before polling returns data
@@ -204,14 +223,24 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
             <div className={styles.sidebarHeaderRow}>
               <h2 className={styles.sidebarTitle}>Command Deck</h2>
               {sidebarTab === 'conversations' && (
-                <button
-                  className={styles.conversationAddBtn}
-                  onClick={handleDraftCreated}
-                  title="New conversation"
-                  aria-label="New conversation"
-                >
-                  <Plus size={13} />
-                </button>
+                <div className={styles.sidebarHeaderGroup}>
+                  <ModelPicker
+                    value={sidebarModel}
+                    onChange={(modelId) => {
+                      setSidebarModel(modelId);
+                      localStorage.setItem('mc-sidebar-model', modelId);
+                      localStorage.setItem('conv-composer-model', modelId);
+                    }}
+                  />
+                  <button
+                    className={styles.conversationAddBtn}
+                    onClick={handleDraftCreated}
+                    title="New conversation"
+                    aria-label="New conversation"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
               )}
             </div>
 
@@ -285,6 +314,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
         <div className={styles.content}>
           {isDraft ? (
             <DraftConversationPanel
+              key={draftKey}
               onPromoted={handleDraftPromoted}
             />
           ) : selectedConversation ? (

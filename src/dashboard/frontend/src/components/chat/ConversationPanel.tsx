@@ -5,6 +5,7 @@ import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
+import { ModelPicker } from './ModelPicker';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
@@ -21,9 +22,11 @@ interface ConversationPanelProps {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function resumeConversation(name: string): Promise<Conversation> {
+async function resumeConversation(name: string, model?: string, effort?: string): Promise<Conversation> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/resume`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, effort }),
   });
   if (!res.ok) throw new Error('Failed to resume conversation');
   return res.json();
@@ -36,6 +39,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   // since new conversations should always start in conversation view
   const [viewMode, setViewMode] = useState<ViewMode>('conversation');
   const [resumed, setResumed] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || 'claude-opus-4-6');
   const queryClient = useQueryClient();
 
   // Query messages at this level so we can access streaming status in the header
@@ -47,7 +51,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   const isStreaming = messagesData?.streaming ?? false;
 
   const resumeMutation = useMutation({
-    mutationFn: () => resumeConversation(conversation.name),
+    mutationFn: () => resumeConversation(conversation.name, selectedModel),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       setResumed(true);
@@ -133,6 +137,14 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
             onResume={!showTerminal ? handleResume : undefined}
             onArchive={handleArchive}
             resumePending={resumeMutation.isPending}
+            modelPicker={
+              !showTerminal ? (
+                <ModelPicker
+                  value={selectedModel}
+                  onChange={(modelId) => setSelectedModel(modelId)}
+                />
+              ) : undefined
+            }
           />
         )}
       </div>
@@ -161,9 +173,11 @@ interface ConversationViewProps {
   onResume?: () => void;
   onArchive?: () => void;
   resumePending?: boolean;
+  /** ModelPicker component to render next to the Resume button */
+  modelPicker?: React.ReactNode;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker }: ConversationViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   // Track count so we know when the server caught up
   const prevServerCountRef = useRef(0);
@@ -227,11 +241,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
           <p className={styles.conversationEmptyStateSubtitle}>
             This conversation has no saved history. The session may have ended before any messages were exchanged.
           </p>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
             {onResume && (
-              <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
-                {resumePending ? 'Resuming…' : 'Resume Session'}
-              </button>
+              <>
+                {modelPicker}
+                <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
+                  {resumePending ? 'Resuming…' : 'Resume Session'}
+                </button>
+              </>
             )}
             <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
               Archive
@@ -254,6 +271,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
       )}
       {onResume ? (
         <div className={styles.conversationResumeBar}>
+          {modelPicker}
           <button
             className={styles.conversationResumeBtn}
             onClick={onResume}

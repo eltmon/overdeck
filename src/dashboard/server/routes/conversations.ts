@@ -442,12 +442,21 @@ const postConversationResumeRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
     try {
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
+
+        // Allow model/effort override from request body; fall back to stored values
+        const model = typeof body['model'] === 'string' && body['model'].trim()
+          ? body['model'].trim()
+          : (conv.model ?? undefined);
+        const effort = typeof body['effort'] === 'string' && body['effort'].trim()
+          ? body['effort'].trim()
+          : (conv.effort ?? undefined);
 
         const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
 
@@ -463,7 +472,7 @@ const postConversationResumeRoute = HttpRouter.add(
         const oldSessionId = conv.sessionFile
           ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
           : undefined;
-        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId).catch(
           (err: unknown) => {
             console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
           },
@@ -475,6 +484,58 @@ const postConversationResumeRoute = HttpRouter.add(
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
         }})
+  }),
+);
+
+// ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
+//
+// Kill the current session (if alive), update the model in the DB, and resume.
+// Used by the model picker in the sidebar to switch models without going through
+// the full resume flow.
+
+const postConversationSwitchModelRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/switch-model',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const model = typeof body['model'] === 'string' && body['model'].trim()
+          ? body['model'].trim()
+          : (conv.model ?? undefined);
+
+        // Always kill the existing session first (if alive) so the model change takes effect
+        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+        // Persist the new model
+        if (model) updateConversationModel(name, model);
+
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.sessionFile
+          ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
+          : undefined;
+
+        // Spawn with the new model
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, conv.effort ?? undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
+          (err: unknown) => {
+            console.error(`[conversations] Failed to respawn session after model switch ${conv.tmuxSession}:`, err);
+          },
+        );
+
+        markConversationActive(name);
+        return jsonResponse({ ...conv, status: 'active', model, reattached: false });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to switch model: ' + msg }, { status: 500 });
+      }
+    });
   }),
 );
 
@@ -720,6 +781,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  postConversationSwitchModelRoute,
   postConversationRestartAllRoute,
   postConversationArchiveRoute,
   getConversationMessagesRoute,

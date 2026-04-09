@@ -25,6 +25,10 @@ export interface Conversation {
   titleSeed?: string | null;
   /** Cached total cost in USD. */
   totalCost?: number;
+  /** Model used for this conversation. Null until backfilled from session file. */
+  model?: string | null;
+  /** Effort level used when spawning this conversation. */
+  effort?: string | null;
 }
 
 /** Marker that we're in draft mode — no session spawned yet. */
