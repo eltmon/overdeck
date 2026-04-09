@@ -71,7 +71,7 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' },
   // Z.AI models
   'glm-5': { apiModel: 'glm-5' },
-  'glm-5.1': { apiModel: 'glm-5' },
+  'glm-5.1': { apiModel: 'glm-5.1' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
