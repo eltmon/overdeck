@@ -504,7 +504,22 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     return '';
   }
 
-  const repos = projectConfig.workspace.repos;
+  const wsConfig = projectConfig.workspace;
+  const repos = wsConfig.repos;
+
+  // In progressive mode, only show repos that exist in the workspace
+  const isProgressive = wsConfig.progressive && wsConfig.always_include;
+  let visibleRepos = repos;
+
+  if (isProgressive) {
+    // Check which repos actually exist in the workspace
+    const existingRepos = readdirSync(workspacePath).filter(f => {
+      const fullPath = join(workspacePath, f);
+      return f !== '.planning' && f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+    });
+    visibleRepos = repos.filter(r => existingRepos.includes(r.name));
+  }
+
   const lines: string[] = [
     '## Project Structure (Polyrepo)',
     '',
@@ -515,8 +530,12 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     '|-----------|---------|',
   ];
 
-  for (const repo of repos) {
-    lines.push(`| \`${repo.name}/\` | Git worktree for ${repo.path} |`);
+  for (const repo of visibleRepos) {
+    const notes: string[] = [];
+    if (repo.readonly) notes.push('readonly');
+    if (repo.link_type === 'symlink') notes.push('symlink');
+    const noteStr = notes.length > 0 ? ` (${notes.join(', ')})` : '';
+    lines.push(`| \`${repo.name}/\` | ${repo.path}${noteStr} |`);
   }
 
   lines.push('');
@@ -530,6 +549,56 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
   lines.push(
     `- Each subdirectory has its own branch: \`${repos[0]?.branch_prefix || 'feature/'}${issueId.toLowerCase()}\``
   );
+
+  // Add PR target info if specified
+  const prTargets = new Set<string>();
+  for (const repo of visibleRepos) {
+    const prTarget = repo.pr_target || wsConfig.pr_target;
+    if (prTarget) prTargets.add(prTarget);
+  }
+  if (prTargets.size > 0) {
+    lines.push('');
+    lines.push(`**PR target branch:** \`${[...prTargets].join('` or `')}\` (NOT main/master)`);
+  }
+
+  // Progressive workspace: add instructions for adding repos
+  if (isProgressive) {
+    lines.push('');
+    lines.push('## Adding Repositories');
+    lines.push('');
+    lines.push('This is a **progressive** workspace. Only essential repos are included.');
+    lines.push('Use the `/workspace-add-repo` skill to add more repos when needed:');
+    lines.push('');
+    lines.push('```bash');
+    lines.push(`pan workspace add-repo ${issueId.toLowerCase()} <repo-name> [repo-name...]`);
+    lines.push('# Or add all repos in a group:');
+    lines.push(`pan workspace add-repo ${issueId.toLowerCase()} --group <group-name>`);
+    lines.push('```');
+    lines.push('');
+    lines.push('Available repos not yet in workspace:');
+
+    const existingRepoNames = visibleRepos.map(r => r.name);
+    const missingRepos = repos.filter(r => !existingRepoNames.includes(r.name));
+
+    for (const repo of missingRepos) {
+      const notes: string[] = [];
+      if (repo.readonly) notes.push('readonly');
+      if (repo.link_type === 'symlink') notes.push('symlink');
+      const noteStr = notes.length > 0 ? ` (${notes.join(', ')})` : '';
+      lines.push(`- \`${repo.name}\`${noteStr} — ${repo.path}`);
+    }
+
+    // List readonly/symlink repos
+    const readonlyRepos = visibleRepos.filter(r => r.readonly || r.link_type === 'symlink');
+    if (readonlyRepos.length > 0) {
+      lines.push('');
+      lines.push('**Readonly repos** (do NOT commit changes):');
+      for (const repo of readonlyRepos) {
+        lines.push(`- \`${repo.name}/\` — ${repo.path}`);
+      }
+    }
+  }
+
   lines.push('');
 
   return lines.join('\n');

@@ -21,6 +21,8 @@ export interface EventStoreServiceShape {
   readonly append: (event: Record<string, unknown>) => Effect.Effect<number>;
   /** Return all stored events with sequence > fromSequence. */
   readonly readFrom: (fromSequence: number) => Effect.Effect<StoredEvent[]>;
+  /** Return events of a given type, most recent first, capped at limit. */
+  readonly queryByType: (type: string, limit?: number) => Effect.Effect<StoredEvent[]>;
   /** Return the latest sequence number (0 if empty). */
   readonly getLatestSequence: Effect.Effect<number>;
   /** Subscribe to live events as an Effect Stream. */
@@ -61,6 +63,7 @@ export const EventStoreServiceLive = Layer.effect(
     return {
       append: (event) => Effect.sync(() => store.append(event as never)),
       readFrom: (fromSequence) => Effect.sync(() => store.readFrom(fromSequence)),
+      queryByType: (type, limit) => Effect.sync(() => store.queryByType(type, limit)),
       getLatestSequence: Effect.sync(() => store.getLatestSequence()),
       streamEvents,
     };

@@ -29,21 +29,6 @@ import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';
 
-// ─── Activity store ───────────────────────────────────────────────────────────
-// Mirror of the in-memory activity store from index.ts. The Effect HTTP server
-// runs in the same process as the Express server during migration, so this
-// module maintains its own independent store for routes it owns.
-
-interface ActivityEntry {
-  id: string;
-  timestamp: string;
-  command: string;
-  status: 'running' | 'completed' | 'failed';
-  output: string[];
-}
-
-const activities: ActivityEntry[] = [];
-
 // ─── Route: GET /api/metrics/summary ─────────────────────────────────────────
 
 const getMetricsSummaryRoute = HttpRouter.add(
@@ -137,7 +122,20 @@ const getMetricsStuckRoute = HttpRouter.add(
 const getActivityRoute = HttpRouter.add(
   'GET',
   '/api/activity',
-  Effect.succeed(jsonResponse(activities)),
+  httpHandler(Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
+    // Query last 100 activity.entry events, most recent first
+    const events = yield* eventStore.queryByType('activity.entry', 100);
+    return jsonResponse(events.map((e) => ({
+      id: (e.payload as Record<string, unknown>)['id'] as string,
+      timestamp: e.timestamp,
+      source: (e.payload as Record<string, unknown>)['source'] as string,
+      level: (e.payload as Record<string, unknown>)['level'] as string,
+      message: (e.payload as Record<string, unknown>)['message'] as string,
+      details: (e.payload as Record<string, unknown>)['details'] as string | null,
+      issueId: (e.payload as Record<string, unknown>)['issueId'] as string | null,
+    })));
+  })),
 );
 
 // ─── Route: GET /api/activity/:id ────────────────────────────────────────────
@@ -145,15 +143,25 @@ const getActivityRoute = HttpRouter.add(
 const getActivityByIdRoute = HttpRouter.add(
   'GET',
   '/api/activity/:id',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const eventStore = yield* EventStoreService;
     const id = params['id'] ?? '';
-    const activity = activities.find(a => a.id === id);
+    const events = yield* eventStore.queryByType('activity.entry', 1000);
+    const activity = events.find((e) => (e.payload as Record<string, unknown>)['id'] === id);
     if (!activity) {
       return jsonResponse({ error: 'Activity not found' }, { status: 404 });
     }
-    return jsonResponse(activity);
-  }),
+    return jsonResponse({
+      id: (activity.payload as Record<string, unknown>)['id'],
+      timestamp: activity.timestamp,
+      source: (activity.payload as Record<string, unknown>)['source'],
+      level: (activity.payload as Record<string, unknown>)['level'],
+      message: (activity.payload as Record<string, unknown>)['message'],
+      details: (activity.payload as Record<string, unknown>)['details'],
+      issueId: (activity.payload as Record<string, unknown>)['issueId'],
+    });
+  })),
 );
 
 // ─── Route: GET /api/convoys ──────────────────────────────────────────────────

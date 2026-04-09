@@ -103,6 +103,8 @@ export const selectAgentOutput =
 
 export const selectIsBootstrapped = (s: DashboardState): boolean => s.bootstrapComplete
 
+export const selectDashboardLifecycle = (s: DashboardState) => s.dashboardLifecycle
+
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 
 export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw

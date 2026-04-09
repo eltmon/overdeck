@@ -183,6 +183,44 @@ export function setReviewStatus(
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 
+  // Queue test-agent when review transitions to 'passed'.
+  // This fires regardless of how setReviewStatus() is called (API or direct import),
+  // ensuring test-agent is queued even when review-agent bypasses the specialist
+  // dispatch endpoint. Idempotent — if test-agent is already queued, pushToHook
+  // deduplicates by issueId.
+  if (
+    update.reviewStatus === 'passed' &&
+    existing.reviewStatus !== 'passed' &&
+    existing.testStatus === 'pending'
+  ) {
+    (async () => {
+      try {
+        const { submitToSpecialistQueue } = await import('./cloister/specialists.js');
+        const workAgentId = `agent-${issueId.toLowerCase()}`;
+        const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
+        let workspace: string | undefined;
+        let branch: string | undefined;
+        if (existsSync(workStateFile)) {
+          try {
+            const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
+            workspace = workState.workspace;
+            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+          } catch {}
+        }
+        submitToSpecialistQueue('test-agent', {
+          priority: 'high',
+          source: 'review-agent-auto',
+          issueId,
+          workspace,
+          branch,
+        });
+        console.log(`[review-status] Queued test-agent for ${issueId} after review passed`);
+      } catch (err: any) {
+        console.warn(`[review-status] Failed to queue test-agent for ${issueId}: ${err.message}`);
+      }
+    })();
+  }
+
   // Auto-deliver feedback to work agent when review blocks or tests fail.
   // This ensures feedback reaches the agent regardless of whether status was
   // set via the dashboard API or directly (e.g., bun -e import). See PAN-586.

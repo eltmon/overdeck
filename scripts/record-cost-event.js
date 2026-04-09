@@ -7140,12 +7140,7 @@ var require_public_api = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringify = stringify;
 }));
 //#endregion
-//#region ../src/lib/projects.ts
-/**
-* Project Registry - Multi-project support for Panopticon
-*
-* Maps Linear team prefixes and labels to project paths for workspace creation.
-*/
+//#region ../src/lib/issue-id.ts
 var import_dist = (/* @__PURE__ */ __commonJSMin(((exports) => {
 	var composer = require_composer();
 	var Document = require_Document();
@@ -7192,6 +7187,61 @@ var import_dist = (/* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.visit = visit.visit;
 	exports.visitAsync = visit.visitAsync;
 })))();
+/**
+* Parse an issue ID into its components.
+*
+* Supports:
+* - Standard:  PREFIX-NUMBER  (e.g., MIN-123, PAN-456)
+* - Rally:     TYPENUMBER     (e.g., F29698, US12345, DE118304, TA4567)
+* - Custom:    Per-project regex patterns
+*
+* @param issueId - The raw issue ID string
+* @param projectConfig - Optional project config for custom patterns
+* @returns ParsedIssueId or null if no format matches
+*/
+function parseIssueId(issueId, projectConfig) {
+	const standardMatch = issueId.match(/^([A-Za-z]+)-(\d+)$/);
+	if (standardMatch) return {
+		raw: issueId,
+		prefix: standardMatch[1].toUpperCase(),
+		number: parseInt(standardMatch[2], 10),
+		normalized: issueId.toLowerCase(),
+		format: "standard"
+	};
+	const rallyMatch = issueId.match(/^(F|US|DE|TA|TC)(\d+)$/i);
+	if (rallyMatch) return {
+		raw: issueId,
+		prefix: rallyMatch[1].toUpperCase(),
+		number: parseInt(rallyMatch[2], 10),
+		normalized: issueId.toLowerCase(),
+		format: "rally"
+	};
+	if (projectConfig?.issue_pattern) {
+		const customMatch = issueId.match(new RegExp(projectConfig.issue_pattern, "i"));
+		if (customMatch && customMatch[1] && customMatch[2]) return {
+			raw: issueId,
+			prefix: customMatch[1].toUpperCase(),
+			number: parseInt(customMatch[2], 10),
+			normalized: issueId.toLowerCase(),
+			format: "custom"
+		};
+	}
+	return null;
+}
+/**
+* Extract just the team/project prefix from an issue ID.
+* Handles standard (MIN-123), Rally (F29698), and custom formats.
+*/
+function extractPrefix(issueId) {
+	return parseIssueId(issueId)?.prefix ?? null;
+}
+//#endregion
+//#region ../src/lib/projects.ts
+/**
+* Project Registry - Multi-project support for Panopticon
+*
+* Maps Linear team prefixes and labels to project paths for workspace creation.
+*/
 const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, "projects.yaml");
 /**
 * Load projects configuration from ~/.panopticon/projects.yaml
@@ -7232,7 +7282,7 @@ const DEFAULT_EVENTS_SUBDIR = ".pan/events";
 */
 function resolveWalDir(issueId) {
 	const projects = listProjects();
-	const issuePrefix = issueId.split("-")[0]?.toUpperCase();
+	const issuePrefix = extractPrefix(issueId);
 	if (!issuePrefix) return null;
 	for (const { key, config } of projects) {
 		const projectKey = key.toUpperCase();

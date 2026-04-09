@@ -27,9 +27,9 @@ import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgentList, selectIssues } from './lib/store';
+import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
 
 interface TrackerStatusItem {
   type: string;
@@ -129,6 +129,9 @@ export default function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
+  // Dashboard lifecycle state from event store (restart events)
+  const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
+
   // Backend health check — poll every 5s so we catch outages quickly
   const { isError: backendDown, failureCount: backendFailureCount } = useQuery({
     queryKey: ['backend-health'],
@@ -141,6 +144,8 @@ export default function App() {
   });
   // Only show banner after 2 consecutive failures to avoid flicker on transient errors
   const showBackendBanner = backendDown && backendFailureCount >= 2;
+  // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
+  const showRestartBanner = dashboardLifecycle.active;
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -341,8 +346,25 @@ export default function App() {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Backend Offline Banner — shown when /api/version fails repeatedly */}
-        {showBackendBanner && (
+        {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
+        {showRestartBanner && (
+          <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0">
+            <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />
+            <p className="text-primary text-sm font-semibold flex-1">
+              Dashboard is restarting
+              {dashboardLifecycle.issueId && (
+                <> — <span className="font-mono">{dashboardLifecycle.issueId}</span></>
+              )}
+              {dashboardLifecycle.reason && (
+                <span className="font-normal ml-1 text-primary/70">({dashboardLifecycle.reason})</span>
+              )}
+            </p>
+            <span className="text-primary/60 text-xs shrink-0 animate-pulse">● Restarting…</span>
+          </div>
+        )}
+
+        {/* Backend Offline Banner — shown when /api/version fails repeatedly AND not in a planned restart */}
+        {showBackendBanner && !showRestartBanner && (
           <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0">
             <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
             <p className="text-destructive text-sm font-semibold flex-1">

@@ -19,6 +19,7 @@ import {
 import {
   createWorkspace as createWorkspaceFromConfig,
   removeWorkspace as removeWorkspaceFromConfig,
+  addReposToWorkspace,
 } from '../../lib/workspace-manager.js';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
@@ -207,6 +208,14 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('Update skills/agents/rules in an existing workspace')
     .option('--force', 'Overwrite user-modified files')
     .action(updateCommand);
+
+  workspace
+    .command('add-repo <workspaceId> <repoNames...>')
+    .description('Add repositories to a progressive polyrepo workspace')
+    .option('--dry-run', 'Show what would be added')
+    .option('--group <groupName>', 'Add all repos from a named group (from groups_file)')
+    .option('--project <path>', 'Explicit project path (overrides registry)')
+    .action(addRepoCommand);
 }
 
 interface CreateOptions {
@@ -1445,3 +1454,169 @@ async function updateCommand(issueId: string, options: UpdateOptions): Promise<v
     process.exit(1);
   }
 }
+
+interface AddRepoOptions {
+  dryRun?: boolean;
+  group?: string;
+  project?: string;
+}
+
+interface RepoGroups {
+  groups: Record<string, string[] | '*'>;
+}
+
+/**
+ * Load repo groups from the groups_file
+ */
+function loadRepoGroups(groupsFilePath: string): RepoGroups {
+  const content = readFileSync(groupsFilePath, 'utf8');
+  return YAML.parse(content) as RepoGroups;
+}
+
+/**
+ * Add repositories to a progressive polyrepo workspace
+ */
+async function addRepoCommand(workspaceId: string, repoNames: string[], options: AddRepoOptions): Promise<void> {
+  const spinner = ora('Adding repositories...').start();
+
+  try {
+    // Normalize workspace ID
+    const normalizedId = workspaceId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const folderName = `feature-${normalizedId}`;
+
+    // Resolve project
+    let projectConfig: ReturnType<typeof findProjectByTeam> = null;
+    if (options.project) {
+      const config = loadConfig();
+      projectConfig = config.projects?.projects[options.project] || null;
+    }
+
+    if (!projectConfig) {
+      // Try to find project from workspace path
+      const allProjects = listProjects();
+      for (const p of Object.values(allProjects)) {
+        if (p.workspace?.workspaces_dir) {
+          const workspacesDir = join(p.path, p.workspace.workspaces_dir);
+          const workspacePath = join(workspacesDir, folderName);
+          if (existsSync(workspacePath)) {
+            projectConfig = p;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!projectConfig) {
+      spinner.fail(`No project found for workspace ${workspaceId}`);
+      process.exit(1);
+    }
+
+    const workspaceConfig = projectConfig.workspace;
+    if (!workspaceConfig || workspaceConfig.type !== 'polyrepo') {
+      spinner.fail(`Project ${projectConfig.name} does not use polyrepo workspace`);
+      process.exit(1);
+    }
+
+    if (!workspaceConfig.progressive) {
+      spinner.warn('This workspace was not created with progressive mode — all repos already exist');
+    }
+
+    // Resolve repo names (expand groups if --group specified)
+    let targetRepoNames = repoNames;
+
+    if (options.group) {
+      if (!workspaceConfig.groups_file) {
+        spinner.fail('--group requires groups_file to be set in workspace config');
+        process.exit(1);
+      }
+
+      const groupsFilePath = join(projectConfig.path, workspaceConfig.groups_file);
+      if (!existsSync(groupsFilePath)) {
+        spinner.fail(`Groups file not found: ${groupsFilePath}`);
+        process.exit(1);
+      }
+
+      const groups = loadRepoGroups(groupsFilePath);
+
+      if (options.group === 'all' || groups.groups[options.group] === '*') {
+        targetRepoNames = workspaceConfig.repos!.map(r => r.name);
+      } else if (Array.isArray(groups.groups[options.group])) {
+        targetRepoNames = groups.groups[options.group] as string[];
+      } else {
+        spinner.fail(`Unknown group: ${options.group}`);
+        process.exit(1);
+      }
+    }
+
+    if (targetRepoNames.length === 0) {
+      spinner.fail('No repos to add');
+      process.exit(1);
+    }
+
+    // Add repos to workspace
+    const result = await addReposToWorkspace({
+      projectConfig,
+      featureName: normalizedId,
+      repoNames: targetRepoNames,
+      dryRun: options.dryRun,
+    });
+
+    if (!result.success) {
+      spinner.fail(`Failed to add repos: ${result.errors.join(', ')}`);
+      for (const step of result.steps) {
+        console.log(chalk.dim(`  ${step}`));
+      }
+      process.exit(1);
+    }
+
+    spinner.succeed(`Added ${targetRepoNames.length} repository(s) to workspace`);
+    for (const step of result.steps) {
+      if (!step.includes('Skipped')) {
+        console.log(chalk.green(`  ${step}`));
+      } else {
+        console.log(chalk.dim(`  ${step}`));
+      }
+    }
+
+  } catch (error: any) {
+    spinner.fail(`Failed to add repos: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+// YAML parser - using simple regex-based parsing for repo-groups.yaml
+const YAML = {
+  parse(content: string): any {
+    const result: any = { groups: {} };
+    let currentSection = null;
+    let currentIndent = 0;
+
+    for (const line of content.split('\n')) {
+      // Skip empty lines and comments
+      if (!line.trim() || line.trim().startsWith('#')) continue;
+
+      const indent = line.search(/\S/);
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('groups:')) {
+        currentSection = 'groups';
+        continue;
+      }
+
+      if (currentSection === 'groups') {
+        const match = trimmed.match(/^(\w+):\s*(.*)$/);
+        if (match) {
+          const [, key, value] = match;
+          if (value.trim() === '' || value.trim() === '*') {
+            result.groups[key] = value.trim() === '*' ? '*' : [];
+          } else {
+            // Inline array
+            result.groups[key] = value.replace(/[\[\]]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+};

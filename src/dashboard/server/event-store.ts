@@ -37,6 +37,8 @@ export interface EventStore {
   append(event: Omit<DomainEvent, 'sequence'>): number;
   /** Return all events with sequence > fromSequence (exclusive lower bound). */
   readFrom(fromSequence: number): StoredEvent[];
+  /** Return events of a given type, most recent first, capped at limit. */
+  queryByType(type: string, limit?: number): StoredEvent[];
   /** Subscribe to live events. Returns an unsubscribe function. */
   subscribe(fn: EventSubscriber): Unsubscribe;
   /** Run 7-day retention compaction. Called at startup. */
@@ -159,6 +161,9 @@ export function createEventStore(db: DbAdapter): EventStore {
   const lastRowIdStmt = db.prepare<{ sequence: number }>(
     `SELECT last_insert_rowid() AS sequence`,
   );
+  const queryByTypeStmt = db.prepare<EventRow>(
+    `SELECT sequence, type, timestamp, payload FROM events WHERE type = ? ORDER BY sequence DESC LIMIT ?`,
+  );
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
     const timestamp =
@@ -204,7 +209,13 @@ export function createEventStore(db: DbAdapter): EventStore {
     return row?.seq ?? 0;
   }
 
-  return { append, readFrom, subscribe, compact, getLatestSequence };
+  function queryByType(type: string, limit = 100): StoredEvent[] {
+    const rows = queryByTypeStmt.all([type, limit]);
+    // Return most-recent-first (ORDER BY sequence DESC)
+    return rows.map(rowToStored).reverse();
+  }
+
+  return { append, readFrom, queryByType, subscribe, compact, getLatestSequence };
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
