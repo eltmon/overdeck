@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle, ScrollText } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -28,7 +28,6 @@ import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { DeepWipeDialog } from './DeepWipeDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 
 
@@ -62,20 +61,17 @@ const AGENT_ICONS: Record<string, string> = {
 // Agent attribution badge component
 function AgentBadge({
   type,
-  name,
   isConflict
 }: {
   type: 'work' | 'review' | 'test' | 'merge';
-  name: string;
   isConflict: boolean;
 }) {
   const icon = AGENT_ICONS[type];
   const conflictClass = isConflict ? 'animate-[pulse_2s_ease-in-out_infinite]' : '';
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs text-primary ${conflictClass}`}>
+    <span className={`inline-flex items-center text-xs text-primary ${conflictClass}`}>
       <span>{icon}</span>
-      <span>{name}</span>
     </span>
   );
 }
@@ -1275,8 +1271,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     isExplicitlySelected
                       ? 'bg-accent text-foreground border-foreground/20'
                       : selectedProjects.size === 0
-                        ? 'bg-card text-foreground/70 border-foreground/15 hover:bg-accent hover:text-foreground hover:border-foreground/25'
-                        : 'bg-card text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground opacity-50'
+                        ? 'bg-surface-raised text-foreground/70 border-foreground/15 hover:bg-accent hover:text-foreground hover:border-foreground/25'
+                        : 'bg-surface-raised text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground opacity-50'
                   }`}
                   title={isExplicitlySelected ? `Remove ${project.name} filter` : `Filter to ${project.name}`}
                 >
@@ -1411,7 +1407,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-hidden pb-4">
             {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
               <DroppableColumn key={status} status={status}>
                 <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
@@ -1629,7 +1625,7 @@ function DroppableColumn({ status, children }: { status: CanonicalState; childre
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[200px] transition-all ${isOver ? 'scale-[1.02]' : ''}`}
+      className={`flex-1 min-w-0 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
     >
       {children}
     </div>
@@ -2186,7 +2182,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   <Github className="w-3 h-3 text-content-subtle" />
                 </span>
               )}
-              <span className="text-content-subtle">{issue.identifier}</span>
+              <span className="text-content font-medium">{issue.identifier}</span>
               <ExternalLink className="w-3 h-3 opacity-50" />
             </a>
             {/* Agent attribution badges */}
@@ -2208,7 +2204,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               }
 
               return badges.map((b, i) => (
-                <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
+                <AgentBadge key={i} type={b.type} isConflict={hasConflict} />
               ));
             })()}
             {/* Plan Failed badge - shown when planning agent spawn failed */}
@@ -2233,22 +2229,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Planning
               </button>
             )}
-            {/* Model badge - shows which model the active agent is using */}
-            {activeAgent && activeAgent.model && (
-              <span
-                className="px-1.5 py-0.5 rounded text-xs font-medium bg-surface-emphasis text-content-body"
-                title={`Model: ${activeAgent.model}`}
-              >
-                {getFriendlyModelName(activeAgent.model)}
-              </span>
-            )}
             {/* Workspace location badge - shows for any agent with a workspace */}
             {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
               <span
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                   (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
                     ? 'badge-bg-signal-cost text-signal-cost-foreground'
-                    : 'bg-card text-muted-foreground border border-border'
+                    : 'bg-surface-raised text-muted-foreground border border-border'
                 }`}
                 title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
@@ -2336,7 +2323,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 title="Review and tests passed — ready for human merge approval"
               >
                 <GitMerge className="w-3 h-3" />
-                Ready to Merge
+                Ready
               </span>
             )}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
@@ -2400,52 +2387,56 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong">
           <button
             onClick={handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
               isSelected ? 'text-primary' : 'text-content-subtle hover:text-content'
             }`}
+            title="Watch"
           >
             <Eye className="w-3.5 h-3.5" />
-            Watch
           </button>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="View tasks for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
-            Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="View vBRIEF plan for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
-            vBRIEF
           </button>
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
               showMessageInput ? 'text-primary' : 'text-content-subtle hover:text-content'
             }`}
+            title="Tell"
           >
             <MessageCircle className="w-3.5 h-3.5" />
-            Tell
           </button>
+          {/* Model badge - centered between Tell and Kill */}
+          {activeAgent && activeAgent.model && (
+            <span className="flex-1 text-center text-[10px] text-content-body font-medium">
+              {getFriendlyModelName(activeAgent.model)}
+            </span>
+          )}
           <button
             onClick={handleKill}
             disabled={killMutation.isPending}
-            className="flex items-center gap-1 text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors ml-auto"
+            className="flex items-center text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors"
+            title="Kill"
           >
             {killMutation.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <X className="w-3.5 h-3.5" />
             )}
-            Kill
           </button>
         </div>
       )}
@@ -2475,108 +2466,101 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           {isPlanningActive ? (
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
+              title="Watch Planning"
             >
               <Eye className="w-3.5 h-3.5" />
-              Watch Planning
             </button>
           ) : (
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             >
               <FileText className="w-3.5 h-3.5" />
-              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             </button>
           )}
           {issue.labels?.some(l => l.toLowerCase() === 'planned') && (
             <>
               <button
                 onClick={() => onViewBeads && onViewBeads(issue)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                title="View tasks for this issue"
+                className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="Tasks"
               >
                 <List className="w-3.5 h-3.5" />
-                Tasks
               </button>
               <button
                 onClick={() => onViewVBrief && onViewVBrief(issue)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                title="View vBRIEF plan for this issue"
+                className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="vBRIEF"
               >
                 <ScrollText className="w-3.5 h-3.5" />
-                vBRIEF
               </button>
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending}
                 className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
-                title="Start implementation agent"
+                title={startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
               >
                 {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
               </button>
             </>
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
-          <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           {isPlanningActive ? (
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
+              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
+              title="Watch Planning"
             >
               <Eye className="w-3.5 h-3.5" />
-              Watch Planning
             </button>
           ) : (
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             >
               <FileText className="w-3.5 h-3.5" />
-              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             </button>
           )}
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="View tasks for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
-            Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="View vBRIEF plan for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
-            vBRIEF
           </button>
           <button
             onClick={handleResumeSession}
             disabled={resumeSessionMutation.isPending}
             className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+            title="Resume Session"
           >
             {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}
           </button>
           <button
             onClick={async (e) => {
@@ -2592,59 +2576,51 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 }).catch(err => console.error('Reset failed:', err));
               }
             }}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Reset to To Do - kills agents, resets Linear status"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Reset"
           >
             <Undo className="w-3.5 h-3.5" />
-            Reset
           </button>
-          <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
-      {/* In Review items - Resume Session (if lost) + Reset Pipeline + Reopen + Deep Wipe */}
+      {/* In Review items - Resume Session (if lost) + Reset Pipeline + Reopen */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           {(isSessionLost || isResuming) && (
             <button
               onClick={handleResumeSession}
               disabled={resumeSessionMutation.isPending || isResuming}
               className="flex items-center gap-1 text-xs font-medium text-warning-foreground hover:opacity-80 transition-colors disabled:opacity-50"
+              title="Resume Session"
             >
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              {(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}
             </button>
           )}
           <ResetPipelineButton issue={issue} />
           <ReopenSection issue={issue} inline />
-          <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
-      {/* Done items - Reopen + Close Out + Deep Wipe */}
+      {/* Done items - Reopen + Close Out */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="View tasks for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
-            Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="View vBRIEF plan for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
-            vBRIEF
           </button>
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
@@ -2699,80 +2675,6 @@ function ResetPipelineButton({ issue }: { issue: Issue }) {
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
       {isPending ? 'Resetting...' : 'Reset Pipeline'}
-    </button>
-  );
-}
-
-// Deep wipe button - opens progress dialog
-function DeepWipeButton({ issue }: { issue: Issue }) {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(true);
-        }}
-        className="flex items-center gap-1 text-xs text-destructive-foreground/60 hover:text-destructive-foreground transition-colors ml-auto"
-        title="Deep wipe: delete workspace, branches, agent state — start completely fresh"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-        Wipe
-      </button>
-      <DeepWipeDialog issue={issue} isOpen={isOpen} onClose={() => setIsOpen(false)} />
-    </>
-  );
-}
-
-// Cancel button - stop agents, move to Canceled, optionally wipe workspace
-function CancelButton({ issue }: { issue: Issue }) {
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const [isPending, setIsPending] = useState(false);
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        // First confirm the cancel
-        if (!await confirm({
-          title: 'Cancel Issue',
-          message: `Cancel ${issue.identifier}?\n\nThis will:\n• Stop any running agents\n• Clean up agent & review state\n• Move issue to Canceled on tracker`,
-          variant: 'destructive',
-          confirmLabel: 'Cancel Issue',
-        })) return;
-
-        // Then ask about workspace cleanup
-        const wipeWorkspace = await confirm({
-          title: 'Delete Workspace?',
-          message: `Also delete the workspace and branches for ${issue.identifier}?\n\nThis removes the git worktree, local & remote feature branches, and all workspace files.\n\nChoose "Keep" to preserve the code for reference.`,
-          confirmLabel: 'Delete Workspace',
-          cancelLabel: 'Keep Workspace',
-          variant: 'destructive',
-        });
-
-        setIsPending(true);
-        try {
-          const res = await fetch(`/api/issues/${issue.identifier}/cancel`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wipeWorkspace }),
-          });
-          if (!res.ok) throw new Error('Cancel failed');
-          await queryClient.refetchQueries({ queryKey: ['issues'] });
-          await queryClient.refetchQueries({ queryKey: ['agents'] });
-        } catch (err) {
-          console.error('Cancel failed:', err);
-        } finally {
-          setIsPending(false);
-        }
-      }}
-      disabled={isPending}
-      className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors disabled:opacity-50"
-      title="Cancel issue — stop agents, move to Canceled on tracker"
-    >
-      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-      {isPending ? 'Canceling...' : 'Cancel'}
     </button>
   );
 }

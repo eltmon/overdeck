@@ -393,9 +393,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
         let result = await reviewReq();
 
-        // Self-healing: if issue was previously merged, auto-reset and retry
-        if (!result.success && result.alreadyMerged) {
-          console.log(chalk.yellow(`  ⚠ Issue was previously merged. Resetting specialist states for re-review...`));
+        // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
+        // This is the normal flow when a work agent fixes review issues and re-signals done.
+        if (!result.success && (result.alreadyMerged || result.alreadyReviewed)) {
+          const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
+          console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
 
           const resetReq = () => new Promise<any>((resolve, reject) => {
             const postData = JSON.stringify({});
