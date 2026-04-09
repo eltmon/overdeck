@@ -74,9 +74,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Z.AI (GLM)',
     compatibility: 'direct',
     baseUrl: 'https://api.z.ai/api/anthropic',
-    models: ['glm-4.7', 'glm-4.7-flash'],
+    models: ['glm-5', 'glm-5.1'],
     tested: true,
-    description: 'Anthropic-compatible API, tested 2026-01-28',
+    description: 'Anthropic-compatible API, GLM-5.1 flagship (Apr 2026)',
   },
 
   openai: {
@@ -143,7 +143,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Z.AI models
-  if (['glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
+  if (['glm-5', 'glm-5.1'].includes(modelId)) {
     return PROVIDERS.zai;
   }
 
