@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { sendKeysAsync, sessionExists } from '../tmux.js';
+import { emitActivityEntry, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -255,11 +256,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
         projectPath,
         sourceBranch: sourceBranch ?? '',
         timestamp: Date.now(),
+        reason: 'post-merge',
+        trigger: 'merge-agent',
       });
       await writeFile(pendingFile, pendingData, 'utf-8');
       console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
 
-      const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? ''], {
+      // Pass 'post-merge' as the reason to the deploy script so it writes the
+      // restart marker. We spawn detached and return immediately — the deploy script
+      // kills this server. The new server reads the pending file on boot,
+      // emits lifecycle_started, and after processing emits lifecycle_complete/failed.
+      const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? '', 'post-merge'], {
         detached: true,
         stdio: 'ignore',
       });
@@ -654,21 +661,15 @@ function logMergeHistory(context: MergeConflictContext, result: MergeResult, ses
 }
 
 /**
- * Log activity to the dashboard activity log
+ * Log activity to the dashboard activity log (event-sourced via emitActivityEntry)
  */
-function logActivity(action: string, details: string): void {
-  const ACTIVITY_LOG = '/tmp/panopticon-activity.log';
-  try {
-    const entry = {
-      timestamp: new Date().toISOString(),
-      source: 'merge-agent',
-      action,
-      details,
-    };
-    appendFileSync(ACTIVITY_LOG, JSON.stringify(entry) + '\n');
-  } catch {
-    // Non-fatal
-  }
+function logActivity(action: string, details: string, issueId?: string): void {
+  emitActivityEntry({
+    source: 'merge-agent',
+    level: action.includes('fail') || action.includes('error') ? 'error' : action.includes('warn') ? 'warn' : 'success',
+    message: `[merge-agent] ${action}: ${details}`,
+    issueId,
+  });
 }
 
 /**

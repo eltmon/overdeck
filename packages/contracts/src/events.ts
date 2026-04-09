@@ -301,6 +301,63 @@ export const ActivityUpdatedEvent = Schema.Struct({
 })
 export type ActivityUpdatedEvent = typeof ActivityUpdatedEvent.Type
 
+/** Individual activity log entry — emitted by merge-agent, cloister, specialists (PAN-520) */
+export const ActivityEntryEvent = Schema.Struct({
+  type: Schema.Literal("activity.entry"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    id: Schema.String,
+    source: Schema.String,
+    level: Schema.String,
+    message: Schema.String,
+    details: Schema.optional(Schema.String),
+    issueId: Schema.optional(IssueId),
+  }),
+})
+export type ActivityEntryEvent = typeof ActivityEntryEvent.Type
+
+// ─── Dashboard Lifecycle Events ─────────────────────────────────────────────────
+
+/** Dashboard is restarting (post-merge deploy, pan restart, etc.) (PAN-520) */
+export const DashboardLifecycleStartedEvent = Schema.Struct({
+  type: Schema.Literal("dashboard.lifecycle_started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    reason: Schema.String,
+    issueId: Schema.optional(IssueId),
+    trigger: Schema.String,
+  }),
+})
+export type DashboardLifecycleStartedEvent = typeof DashboardLifecycleStartedEvent.Type
+
+/** Dashboard restarted successfully after a lifecycle event (PAN-520) */
+export const DashboardLifecycleCompletedEvent = Schema.Struct({
+  type: Schema.Literal("dashboard.lifecycle_completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    reason: Schema.String,
+    issueId: Schema.optional(IssueId),
+    durationMs: Schema.Number,
+  }),
+})
+export type DashboardLifecycleCompletedEvent = typeof DashboardLifecycleCompletedEvent.Type
+
+/** Dashboard restart failed (PAN-520) */
+export const DashboardLifecycleFailedEvent = Schema.Struct({
+  type: Schema.Literal("dashboard.lifecycle_failed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    reason: Schema.String,
+    issueId: Schema.optional(IssueId),
+    error: Schema.String,
+  }),
+})
+export type DashboardLifecycleFailedEvent = typeof DashboardLifecycleFailedEvent.Type
+
 /** Replaces socket.io `shadow:inference-update` */
 export const ShadowInferenceUpdateEvent = Schema.Struct({
   type: Schema.Literal("shadow.inference_update"),
@@ -405,6 +462,7 @@ export const DomainEvent = Schema.Union([
   IssuesUpdatedEvent,
   IssueStatusChangedEvent,
   ActivityUpdatedEvent,
+  ActivityEntryEvent,
   ShadowInferenceUpdateEvent,
   CostEventRecordedEvent,
   WorkspaceCreatedEvent,
@@ -412,5 +470,8 @@ export const DomainEvent = Schema.Union([
   WorkspaceDestroyedEvent,
   WorkspaceDeletedEvent,
   WorkspaceAbortedEvent,
+  DashboardLifecycleStartedEvent,
+  DashboardLifecycleCompletedEvent,
+  DashboardLifecycleFailedEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

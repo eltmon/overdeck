@@ -30,6 +30,18 @@ export interface ReadModelState {
   issuesRaw: unknown[]
   recentActivity: unknown[]
   shadowInferenceByIssueId: Record<string, string>
+  dashboardLifecycle: DashboardLifecycleState
+}
+
+export interface DashboardLifecycleState {
+  active: boolean
+  reason: string | null
+  issueId: string | null
+  trigger: string | null
+  startedAt: string | null
+  completedAt: string | null
+  failedAt: string | null
+  error: string | null
 }
 
 export const INITIAL_READ_MODEL_STATE: ReadModelState = {
@@ -42,6 +54,16 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   issuesRaw: [],
   recentActivity: [],
   shadowInferenceByIssueId: {},
+  dashboardLifecycle: {
+    active: false,
+    reason: null,
+    issueId: null,
+    trigger: null,
+    startedAt: null,
+    completedAt: null,
+    failedAt: null,
+    error: null,
+  },
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -333,6 +355,62 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.items_unblocked':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'activity.entry': {
+      const entry = event.payload as Record<string, unknown>;
+      const newEntry = { id: entry.id, timestamp: event.timestamp, ...entry };
+      const updated = [newEntry, ...(state.recentActivity as Array<Record<string, unknown>>)].slice(0, MAX_ACTIVITY_ENTRIES);
+      return { ...state, sequence: Math.max(state.sequence, event.sequence), recentActivity: updated };
+    }
+
+    case 'dashboard.lifecycle_started': {
+      const { reason, issueId, trigger } = event.payload as { reason: string; issueId: string | null; trigger: string };
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        dashboardLifecycle: {
+          active: true,
+          reason,
+          issueId,
+          trigger,
+          startedAt: event.timestamp,
+          completedAt: null,
+          failedAt: null,
+          error: null,
+        },
+      };
+    }
+
+    case 'dashboard.lifecycle_completed': {
+      const { reason, issueId } = event.payload as { reason: string; issueId: string | null; durationMs: number };
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        dashboardLifecycle: {
+          ...state.dashboardLifecycle,
+          active: false,
+          reason: reason ?? state.dashboardLifecycle.reason,
+          issueId: issueId ?? state.dashboardLifecycle.issueId,
+          completedAt: event.timestamp,
+        },
+      };
+    }
+
+    case 'dashboard.lifecycle_failed': {
+      const { reason, issueId, error } = event.payload as { reason: string; issueId: string | null; error: string };
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        dashboardLifecycle: {
+          ...state.dashboardLifecycle,
+          active: false,
+          reason: reason ?? state.dashboardLifecycle.reason,
+          issueId: issueId ?? state.dashboardLifecycle.issueId,
+          failedAt: event.timestamp,
+          error,
+        },
+      };
+    }
 
     default: {
       void (event as never)
