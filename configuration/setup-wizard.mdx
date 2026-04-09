@@ -1,0 +1,251 @@
+---
+title: Project Setup Wizard
+description: Interactive project configuration with AI-assisted setup
+---
+
+# Project Setup Wizard
+
+The setup wizard (`pan setup`) interactively guides you through complete project configuration, replacing the minimal `pan project add` with a comprehensive setup flow.
+
+## Running the Wizard
+
+```bash
+pan setup
+```
+
+The wizard asks questions, detects project structure, applies templates, and optionally spawns a Setup Agent for AI-assisted configuration.
+
+## Setup Flow
+
+### Step 1: Project Location
+
+```
+$ pan setup
+
+Welcome to Panopticon Project Setup!
+
+Step 1: Project Location
+  Where is your project? [/home/user/Projects/MyProject]: _
+  Scanning directory structure...
+```
+
+### Step 2: Project Type Detection
+
+The wizard scans your project directory and detects the structure:
+
+```
+Step 2: Project Type Detection
+  Found: 31 git repositories in subdirectories
+  Detected: Polyrepo (multiple independent git repos)
+
+  Is this correct? [Y/n]: _
+```
+
+### Step 3: Template Selection
+
+Based on your project structure, the wizard recommends a template:
+
+```
+Step 3: Template Selection
+  Based on your project structure, recommended template:
+  → progressive-polyrepo (30+ repos, team meta repo, progressive workspaces)
+
+  Available templates:
+    1. simple-app        — Single repo, standard branching
+    2. monorepo          — One repo, multiple packages/services
+    3. polyrepo          — 2-10 repos, all checked out per workspace
+    4. progressive-polyrepo — 10+ repos, on-demand checkout
+    5. custom            — Start from scratch
+
+  Select template [4]: _
+```
+
+### Step 4: Repository Configuration
+
+```
+Step 4: Repository Configuration
+  Scanning 31 repos for branch information...
+
+  Default branch detected:
+    - 17 repos use 'master'
+    - 14 repos use 'main'
+
+  PR target branch:
+    What branch should PRs target? [main]: qa
+
+  Would you like to organize repos into groups? [Y/n]: _
+```
+
+### Step 5: Issue Tracker
+
+```
+Step 5: Issue Tracker
+  Which issue tracker does this project use?
+    1. Linear
+    2. GitHub Issues
+    3. Rally
+    4. GitLab Issues
+    5. None / Manual
+
+  Select [3]: _
+
+  Rally artifact types to track [F,US,DE,TA]: _
+  Rally project name: _
+```
+
+### Step 6: Meta Repo
+
+```
+Step 6: Meta Repo
+  Progressive polyrepo projects use a meta repo for shared skills,
+  architecture docs, and team conventions.
+
+  Create a new meta repo? [Y/n]: _
+  Meta repo name [team-meta]: _
+
+  Would you like the Setup Agent to analyze your codebase and
+  generate initial docs? [Y/n]: _
+
+  [Spawning Setup Agent...]
+```
+
+### Step 7: Review & Save
+
+```
+Step 7: Review & Save
+  Here's your configuration:
+  [YAML preview]
+
+  Save to ~/.panopticon/projects.yaml? [Y/n]: _
+
+  Done! Next steps:
+  - Run 'pan workspace create F29698' to test workspace creation
+  - Review generated docs in team-meta/
+  - Share team-meta/ with your team for onboarding
+```
+
+## Project Templates
+
+Templates are pre-built configurations for common project archetypes. They live in Panopticon's source and are applied during setup.
+
+### Template Structure
+
+```
+templates/project-types/
+├── simple-app/
+│   ├── template.yaml          # Template metadata + defaults
+│   └── agent-template/        # .claude/ skeleton
+│       └── .claude/
+│           ├── CLAUDE.md
+│           └── skills/
+├── monorepo/
+├── polyrepo/
+└── progressive-polyrepo/
+    ├── template.yaml
+    ├── agent-template/
+    └── meta-repo-scaffold/    # Skeleton for the meta repo
+```
+
+### Template Format
+
+```yaml
+# template.yaml
+name: progressive-polyrepo
+description: Large-scale polyrepo with 10+ repos and progressive workspace creation
+recommended_when:
+  min_repos: 10
+  has_meta_repo: true
+
+defaults:
+  workspace:
+    type: polyrepo
+    progressive: true
+    workspaces_dir: workspaces
+  specialists:
+    merge: false
+
+prompts:
+  - key: pr_target
+    question: "What branch should PRs target?"
+    default: main
+    type: string
+  - key: create_meta
+    question: "Create a meta repo for shared skills and docs?"
+    default: true
+    type: boolean
+  - key: meta_name
+    question: "Meta repo name?"
+    default: "team-meta"
+    type: string
+    condition: create_meta == true
+```
+
+## Setup Agent
+
+The Setup Agent is an AI agent that explores your codebase to detect conventions and generate configuration files. It's spawned optionally by the wizard for AI-assisted setup.
+
+### What the Setup Agent Does
+
+1. **Explores the codebase** — Reads READMEs, package.json files, CI configs, Terraform files
+2. **Detects conventions** — Branch naming patterns, PR conventions, code style, test frameworks
+3. **Generates CLAUDE.md** — Writes project-specific AI instructions for only non-obvious conventions
+4. **Generates repo-map.md** — Documents each repo's purpose, dependencies, and relationships
+5. **Generates repo-groups.yaml** — Suggests logical groupings based on naming patterns
+6. **Generates onboarding checklist** — Lists prerequisites, API keys, access requirements
+
+### Generated Meta Repo Structure
+
+```
+team-meta/
+├── .agent-template/              # Copied into every workspace
+│   └── .claude/
+│       ├── CLAUDE.md             # Project conventions for agents
+│       └── skills/
+├── panopticon/                   # Panopticon-specific config
+│   └── repo-groups.yaml          # Repo group definitions
+├── docs/
+│   ├── repo-map.md               # What each repo does
+│   ├── architecture.md           # System architecture
+│   └── onboarding/
+│       ├── checklist.md          # Prerequisites checklist
+│       ├── machine-setup.sh      # Automated setup script
+│       └── README.md
+└── README.md
+```
+
+### Spawning the Setup Agent
+
+The Setup Agent runs in a tmux session, similar to planning agents:
+
+```bash
+# Setup Agent prompt includes:
+- Project context (name, path, type, repo count, tracker)
+- Detected repositories table
+- Tasks: Generate CLAUDE.md, repo-map.md, repo-groups.yaml, onboarding checklist
+- Output location: {{META_REPO_PATH}}/
+```
+
+## Template Selection Guide
+
+| Template | When to Use | Min Repos |
+|----------|-------------|-----------|
+| `simple-app` | Single repo, standard branching | 1 |
+| `monorepo` | One repo, multiple packages/services | 1 |
+| `polyrepo` | 2-9 repos, all checked out per workspace | 2 |
+| `progressive-polyrepo` | 10+ repos, on-demand checkout | 10 |
+
+## Deprecating `pan project add`
+
+The old `pan project add` command is deprecated in favor of `pan setup`. It only did basic detection (monorepo vs polyrepo, Linear team prefix) and wrote minimal config. `pan setup` provides:
+
+- Comprehensive configuration (workspaces, services, quality gates)
+- Template-based defaults
+- AI-assisted convention detection
+- Meta repo scaffolding
+
+## Related Guides
+
+- [Progressive Polyrepo](/configuration/progressive-polyrepo) — Progressive workspace configuration
+- [Meta Repos](/configuration/meta-repos) — Meta repo pattern and team onboarding
+- [Issue Tracker Integration](/configuration/issue-trackers) — Tracker setup including Rally
+- [Projects](/configuration/projects) — Project registry and configuration fields
