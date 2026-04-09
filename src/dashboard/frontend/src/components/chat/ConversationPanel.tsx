@@ -58,6 +58,19 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
     },
   });
 
+  const switchModelMutation = useMutation({
+    mutationFn: (model: string) =>
+      fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
+    },
+  });
+
   const handleResume = useCallback(() => {
     resumeMutation.mutate();
   }, [resumeMutation]);
@@ -138,12 +151,13 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
             onArchive={handleArchive}
             resumePending={resumeMutation.isPending}
             modelPicker={
-              !showTerminal ? (
-                <ModelPicker
-                  value={selectedModel}
-                  onChange={(modelId) => setSelectedModel(modelId)}
-                />
-              ) : undefined
+              <ModelPicker
+                value={selectedModel}
+                onChange={(modelId) => {
+                  setSelectedModel(modelId);
+                  switchModelMutation.mutate(modelId);
+                }}
+              />
             }
           />
         )}
