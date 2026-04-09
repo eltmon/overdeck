@@ -8,7 +8,7 @@
  * No terminal toggle in draft mode (nothing running yet).
  */
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
@@ -58,6 +58,15 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   const editorRef = useRef<LexicalEditor | null>(null);
   // Unique key per draft instance so Lexical doesn't reuse stale state
   const draftKey = useMemo(() => `draft-${Date.now()}`, []);
+
+  // Auto-focus the editor when the draft panel mounts (e.g. after clicking "+")
+  useEffect(() => {
+    // Small delay to let Lexical mount and register the editor instance
+    const timer = setTimeout(() => {
+      editorRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const isEmpty = text.trim() === '';
 

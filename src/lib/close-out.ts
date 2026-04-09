@@ -29,8 +29,8 @@ const execAsync = promisify(exec);
 /**
  * Check if a feature branch has been merged into main.
  *
- * Uses `git merge-base --is-ancestor` which correctly handles both
- * regular merges and squash merges (where commit SHAs differ).
+ * Uses `git merge-base --is-ancestor` for regular merges, plus a
+ * code-diff fallback to detect squash merges where the branch still exists.
  * Also checks review-status.json as authoritative — the merge specialist
  * validates the merge before setting mergeStatus to 'merged'.
  */
@@ -65,7 +65,21 @@ async function isBranchMerged(
       );
       return { status: 'merged', message: 'All commits merged to main' };
     } catch {
-      // Not an ancestor — branch has unmerged work
+      // --is-ancestor fails for squash merges where the branch still exists.
+      // Check if the code diff (excluding planning artifacts) is empty — if so,
+      // the code was squash-merged and only planning files remain on the branch.
+      try {
+        const { stdout: codeDiff } = await execAsync(
+          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' },
+        );
+        if (!codeDiff.trim()) {
+          return { status: 'merged', message: 'Code changes squash-merged to main (only planning artifacts remain on branch)' };
+        }
+      } catch {
+        // diff failed — fall through to unmerged report
+      }
+
       const { stdout: unmerged } = await execAsync(
         `git log main..${branchName} --oneline 2>/dev/null || true`,
         { cwd: projectPath, encoding: 'utf-8' },
@@ -93,6 +107,19 @@ async function isBranchMerged(
       );
       return { status: 'merged', message: 'Remote branch fully merged' };
     } catch {
+      // Squash-merge detection for remote branch
+      try {
+        const { stdout: codeDiff } = await execAsync(
+          `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' },
+        );
+        if (!codeDiff.trim()) {
+          return { status: 'merged', message: 'Remote code changes squash-merged to main (only planning artifacts remain on branch)' };
+        }
+      } catch {
+        // diff failed — fall through
+      }
+
       const { stdout: remoteUnmerged } = await execAsync(
         `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
         { cwd: projectPath, encoding: 'utf-8' },
