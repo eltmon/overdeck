@@ -212,8 +212,9 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     if (!term) {
       term = new Terminal({
-        cursorBlink: true,
-        cursorStyle: 'block',
+        cursorBlink: false,
+        cursorStyle: 'bar',
+        cursorInactiveStyle: 'none',
         fontSize: 14,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
