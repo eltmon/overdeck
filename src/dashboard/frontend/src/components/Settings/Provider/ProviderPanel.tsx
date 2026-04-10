@@ -18,7 +18,6 @@ const PROVIDER_INFO: Record<
   anthropic: { displayName: 'Anthropic', icon: 'auto_awesome', iconColor: '#D97757', compatibility: 'direct' },
   openai: { displayName: 'OpenAI', icon: 'bolt', iconColor: '#10a37f', compatibility: 'router' },
   google: { displayName: 'Google Vertex AI', icon: 'google', iconColor: '#4285F4', compatibility: 'router' },
-  zai: { displayName: 'Z.AI (GLM)', icon: 'api', iconColor: '#94a3b8', compatibility: 'direct' },
   kimi: { displayName: 'Kimi (Moonshot)', icon: 'rocket_launch', iconColor: '#6366f1', compatibility: 'direct' },
   minimax: { displayName: 'MiniMax', icon: 'speed', iconColor: '#f59e0b', compatibility: 'direct' },
   openrouter: { displayName: 'OpenRouter', icon: 'hub', iconColor: '#6B7F8E', compatibility: 'direct' },
@@ -33,7 +32,7 @@ export function ProviderPanel({
   onThinkingLevelChange,
   onTestConnection,
 }: ProviderPanelProps) {
-  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'zai', 'kimi', 'openrouter'];
+  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'kimi', 'openrouter'];
 
   const getApiKey = (provider: Provider): string | undefined => {
     if (provider === 'anthropic') {

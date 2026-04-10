@@ -26,7 +26,6 @@ const MODEL_COLORS: Record<string, { bg: string; text: string; border: string }>
   'claude': { bg: 'badge-bg-warning', text: 'text-warning-foreground', border: 'badge-border-warning' },
   'gpt': { bg: 'badge-bg-primary', text: 'text-primary', border: 'badge-border-primary' },
   'gemini': { bg: 'badge-bg-signal-review', text: 'text-signal-review-foreground', border: 'badge-border-signal-review' },
-  'glm': { bg: 'badge-bg-destructive', text: 'text-destructive-foreground', border: 'badge-border-destructive' },
 };
 
 function getModelStyle(model: ModelId) {
@@ -35,7 +34,6 @@ function getModelStyle(model: ModelId) {
   if (provider.includes('claude') || provider.includes('sonnet') || provider.includes('opus')) return MODEL_COLORS['claude'];
   if (provider.includes('gpt') || provider.includes('o1') || provider.includes('o3')) return MODEL_COLORS['gpt'];
   if (provider.includes('gemini')) return MODEL_COLORS['gemini'];
-  if (provider.includes('glm')) return MODEL_COLORS['glm'];
   return { bg: 'bg-surface-raised', text: 'text-content-body', border: 'border-divider' };
 }
 

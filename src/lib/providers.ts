@@ -73,7 +73,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openai',
     displayName: 'OpenAI',
     compatibility: 'router',
-    models: ['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'],
+    models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
     tested: false,
     description: 'Requires claude-code-router for API translation',
   },
@@ -82,7 +82,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'router',
-    models: ['gemini-3-pro-preview', 'gemini-3-flash-preview'],
+    models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
     tested: false,
     description: 'Requires claude-code-router for API translation',
   },
@@ -123,17 +123,17 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check OpenAI models
-  if (['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+  if (['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 
   // Check Google models
-  if (['gemini-3-pro-preview', 'gemini-3-flash-preview'].includes(modelId)) {
+  if (['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
   // Check Kimi models
-  if (['kimi-k2', 'kimi-k2.5'].includes(modelId)) {
+  if (['kimi-k2.5'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 
@@ -171,7 +171,7 @@ export function getDirectProviders(): ProviderConfig[] {
  * Check if any configured providers require router
  * Used to determine if router installation is needed
  */
-export function needsRouter(apiKeys: { openai?: string; google?: string; zai?: string }): boolean {
+export function needsRouter(apiKeys: { openai?: string; google?: string }): boolean {
   return !!(apiKeys.openai || apiKeys.google);
 }
 
