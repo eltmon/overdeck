@@ -2372,7 +2372,25 @@ function recoverOrphanedAgents(context?: string): string[] {
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       if (state.status !== 'running' && state.status !== 'starting') continue;
-      if (sessionExists(dir)) continue; // truly still running
+      if (sessionExists(dir)) {
+        // Planning sessions use remain-on-exit, so the tmux session persists after
+        // Claude exits. Check if the pane's process is actually dead.
+        if (dir.startsWith('planning-')) {
+          try {
+            const result = execSync(
+              `tmux list-panes -t "${dir}" -F "#{pane_dead}" 2>/dev/null`,
+              { encoding: 'utf-8', timeout: 3000 }
+            ).trim();
+            if (result !== '1') continue; // pane is alive — truly still running
+            // Pane is dead — kill the zombie tmux session and fall through to recovery
+            try { execSync(`tmux kill-session -t "${dir}" 2>/dev/null`); } catch { /* ignore */ }
+          } catch {
+            continue; // can't check — assume alive
+          }
+        } else {
+          continue; // truly still running
+        }
+      }
       // Orphaned — crashed agent with no tmux session
       const oldStatus = state.status;
       state.status = 'stopped';
