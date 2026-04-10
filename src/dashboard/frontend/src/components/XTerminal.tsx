@@ -449,8 +449,12 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
             // settles. Without this, stale spinner/braille characters from the
             // scrollback history remain visually rendered as dots even though the
             // logical content has been overwritten by new data.
+            // Do multiple refreshes at staggered intervals — the scrollback dump
+            // can take varying amounts of time depending on history size.
             if (term) {
               term.refresh(0, term.rows - 1);
+              setTimeout(() => { if (term) term.refresh(0, term.rows - 1); }, 500);
+              setTimeout(() => { if (term) term.refresh(0, term.rows - 1); }, 1500);
             }
           }, 350);
         }
