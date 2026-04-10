@@ -15,9 +15,9 @@ export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax
 /**
  * Provider compatibility types
  * - direct: Anthropic-compatible API, use ANTHROPIC_BASE_URL directly
- * - router: Incompatible API, requires claude-code-router for translation
+ * - claudish: Route via claudish (provider@model syntax, supports OAuth subscriptions)
  */
-export type ProviderCompatibility = 'direct' | 'router';
+export type ProviderCompatibility = 'direct' | 'claudish';
 
 /**
  * Provider configuration
@@ -72,19 +72,19 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   openai: {
     name: 'openai',
     displayName: 'OpenAI',
-    compatibility: 'router',
-    models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
-    tested: false,
-    description: 'Requires claude-code-router for API translation',
+    compatibility: 'claudish',
+    models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'],
+    tested: true,
+    description: 'Route via claudish: oai@model (API key) or cx@model (ChatGPT OAuth subscription)',
   },
 
   google: {
     name: 'google',
     displayName: 'Google (Gemini)',
-    compatibility: 'router',
+    compatibility: 'claudish',
     models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
-    tested: false,
-    description: 'Requires claude-code-router for API translation',
+    tested: true,
+    description: 'Route via claudish: go@model (Google CodeAssist OAuth) or API key',
   },
 
   minimax: {
@@ -147,17 +147,17 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
 }
 
 /**
- * Check if a provider requires claude-code-router
+ * Check if a provider requires claudish routing
  */
-export function requiresRouter(provider: ProviderName): boolean {
-  return PROVIDERS[provider].compatibility === 'router';
+export function requiresClaudish(provider: ProviderName): boolean {
+  return PROVIDERS[provider].compatibility === 'claudish';
 }
 
 /**
- * Get all providers that require router (have router compatibility)
+ * Get all providers that require claudish routing
  */
-export function getRouterProviders(): ProviderConfig[] {
-  return Object.values(PROVIDERS).filter(p => p.compatibility === 'router');
+export function getClaudishProviders(): ProviderConfig[] {
+  return Object.values(PROVIDERS).filter(p => p.compatibility === 'claudish');
 }
 
 /**
@@ -168,10 +168,10 @@ export function getDirectProviders(): ProviderConfig[] {
 }
 
 /**
- * Check if any configured providers require router
- * Used to determine if router installation is needed
+ * Check if any configured providers need claudish installed
+ * Used to determine if claudish installation is needed
  */
-export function needsRouter(apiKeys: { openai?: string; google?: string }): boolean {
+export function needsClaudish(apiKeys: { openai?: string; google?: string }): boolean {
   return !!(apiKeys.openai || apiKeys.google);
 }
 
