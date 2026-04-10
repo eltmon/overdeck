@@ -1,7 +1,9 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { Loader2, ChevronRight, ChevronDown, GripHorizontal, Terminal, FileText } from 'lucide-react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { Loader2, ChevronRight, ChevronDown, GripHorizontal, Terminal, FileText, MessageSquare } from 'lucide-react';
 import styles from '../styles/mission-control.module.css';
 import { XTerminal } from '../../XTerminal';
+import { ConversationPanel } from '../../chat/ConversationPanel';
+import type { Conversation } from '../ConversationList';
 
 interface ActivitySection {
   type: string;
@@ -84,10 +86,35 @@ function getPreviewLine(transcript: string): string {
   return last.length > 120 ? last.slice(0, 120) + '...' : last;
 }
 
+type ViewMode = 'transcript' | 'terminal' | 'conversation';
+
 export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded = false }: AgentSectionProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [viewMode, setViewMode] = useState<'transcript' | 'terminal'>('transcript');
+  // Default to conversation view when specialist is stopped (has a session to render)
+  const isSpecialist = section.sessionId?.startsWith('specialist-');
+  const isStopped = section.status !== 'running';
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    isSpecialist && isStopped ? 'conversation' : 'transcript'
+  );
+
+  // Build a Conversation object for stopped specialists so ConversationPanel can fetch the JSONL
+  const specialistConversation = useMemo<Conversation | null>(() => {
+    if (!isSpecialist) return null;
+    return {
+      id: 0,
+      name: section.sessionId,
+      tmuxSession: section.sessionId,
+      status: isStopped ? 'ended' : 'active',
+      cwd: '',
+      issueId: null,
+      createdAt: section.startedAt || new Date().toISOString(),
+      endedAt: isStopped ? new Date().toISOString() : null,
+      lastAttachedAt: null,
+      sessionAlive: !isStopped,
+      sessionFile: null, // Backend resolves from specialist .session file
+    };
+  }, [isSpecialist, section.sessionId, section.startedAt, isStopped]);
   // null = natural height (no constraint), number = user-set max-height
   const [customHeight, setCustomHeight] = useState<number | null>(null);
   const isDragging = useRef(false);
@@ -214,6 +241,24 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
           <span className={styles.sectionCost}>{formatCost(cost)}</span>
         )}
         {isUnread && <div className={styles.unreadDot} />}
+
+        {/* View toggle — only shown when specialist session is live */}
+        {section.tmuxSession && (
+          <div className={styles.viewToggle} onClick={e => e.stopPropagation()}>
+            <button
+              className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
+              onClick={() => setViewMode('transcript')}
+            >
+              Transcript
+            </button>
+            <button
+              className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+              onClick={() => setViewMode('terminal')}
+            >
+              Terminal
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Preview line when collapsed */}
@@ -226,9 +271,18 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
       {/* Full content when expanded */}
       {expanded && (
         <>
-          {/* Transcript / Terminal toggle — only when a live session exists */}
-          {section.tmuxSession && (
+          {/* View toggle — Conversation/Transcript/Terminal */}
+          {(section.tmuxSession || (isSpecialist && specialistConversation)) && (
             <div className={styles.viewToggle} onClick={e => e.stopPropagation()}>
+              {isSpecialist && specialistConversation && (
+                <button
+                  className={`${styles.viewToggleBtn} ${viewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
+                  onClick={() => setViewMode('conversation')}
+                >
+                  <MessageSquare size={11} />
+                  Conversation
+                </button>
+              )}
               <button
                 className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
                 onClick={() => setViewMode('transcript')}
@@ -236,20 +290,26 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
                 <FileText size={11} />
                 Transcript
               </button>
-              <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
-                onClick={() => setViewMode('terminal')}
-              >
-                <Terminal size={11} />
-                Terminal
-              </button>
+              {section.tmuxSession && (
+                <button
+                  className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+                  onClick={() => setViewMode('terminal')}
+                >
+                  <Terminal size={11} />
+                  Terminal
+                </button>
+              )}
             </div>
           )}
 
-          {/* Terminal view — only render when selected (xterm.js crashes with visibility:hidden) */}
-          {section.tmuxSession && viewMode === 'terminal' ? (
+          {/* Content view — conditional rendering (xterm.js crashes with visibility:hidden) */}
+          {viewMode === 'terminal' && section.tmuxSession ? (
             <div ref={contentRef} className={contentClass} style={{ ...contentStyle, padding: 0, overflow: 'hidden' }}>
               <XTerminal sessionName={section.tmuxSession} />
+            </div>
+          ) : viewMode === 'conversation' && specialistConversation ? (
+            <div ref={contentRef} className={contentClass} style={{ ...contentStyle, padding: 0, overflow: 'hidden' }}>
+              <ConversationPanel conversation={specialistConversation} />
             </div>
           ) : (
             <div
