@@ -1,0 +1,75 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-09T00:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-594: Fix stale session_file paths with incorrect CWD encoding in conversations DB"
+  },
+  "plan": {
+    "id": "pan-594",
+    "title": "bug: stale session_file paths with incorrect CWD encoding break conversation messages",
+    "status": "approved",
+    "uid": "ec32951a-3411-43ba-83c6-bb619bf7f70b",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-09T00:00:00Z",
+    "updated": "2026-04-09T00:00:00Z",
+    "references": [
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/594", "label": "PAN-594", "type": "issue" }
+    ],
+    "tags": ["bug", "data-migration", "conversations", "paths"],
+    "narratives": {
+      "Problem": "Conversations created by older Panopticon versions have session_file paths in SQLite with dots preserved in usernames (e.g., edward.becker) instead of being encoded as hyphens. encodeClaudeProjectDir() was fixed to use /[^a-zA-Z0-9-]/g → -, but existing DB records are never migrated. This causes GET /api/conversations/:name/messages to return empty messages even though the JSONL files exist at the correctly-encoded paths.",
+      "Proposal": "Add a one-time schema migration (v13 → v14) in runMigrations() in schema.ts. The migration reads all conversations with a non-null session_file, extracts and re-encodes the CWD segment using encodeClaudeProjectDir(), verifies the correctly-encoded file exists, and updates the DB record. Runs exactly once on first startup after this fix is deployed."
+    },
+    "items": [
+      {
+        "id": "schema-migration",
+        "title": "Add v13→v14 schema migration to fix stale session_file paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-09T00:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-594"
+        },
+        "narrative": {
+          "Action": "In schema.ts: (1) import encodeClaudeProjectDir from paths.js; (2) bump SCHEMA_VERSION from 13 to 14; (3) add if (currentVersion < 14) block in runMigrations() that: selects all conversations with non-null session_file, extracts the encoded-CWD segment from each path, re-encodes the raw cwd via encodeClaudeProjectDir(), builds the correct path, verifies it exists via existsSync(), updates the DB record if the path differs and file exists, logs the count of updated records."
+        },
+        "subItems": [
+          {
+            "id": "schema-migration.ac1",
+            "title": "SCHEMA_VERSION bumped from 13 to 14",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "schema-migration.ac2",
+            "title": "Migration runs exactly once when currentVersion < 14 (first startup after deploy)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "schema-migration.ac3",
+            "title": "Migration verifies existsSync(correctPath) before updating DB record",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "schema-migration.ac4",
+            "title": "Migration logs: 'Fixed session_file paths for N conversation(s) via PAN-594 migration'",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "schema-migration.ac5",
+            "title": "npm run typecheck && npm run lint pass with no errors",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}
