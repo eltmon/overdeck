@@ -29,6 +29,6 @@ Implementing beads one at a time — just completed config schema (pan-598-z2g)
 - D5: Dashboard shows full prefix + backing (e.g. `oai@gpt-5.4`) via tmux pane parser update
 
 ## Specialist Feedback
-- None yet
 - **[2026-04-10T06:28Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 - **[2026-04-10T06:38Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-10 addressed]** Fixed activity-logger.ts: removed null coercions, refactored emitDashboardLifecycle to avoid Record<string,unknown> type (commit: 2d3fe325)
