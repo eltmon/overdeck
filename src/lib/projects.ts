@@ -9,7 +9,7 @@ import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { PANOPTICON_HOME } from './paths.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
-import type { QualityGateConfig } from './workspace-config.js';
+import type { QualityGateConfig, WorkspaceConfig, RepoConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, 'projects.yaml');
 
@@ -20,22 +20,6 @@ export interface IssueRoutingRule {
   labels?: string[];
   default?: boolean;
   path: string;
-}
-
-/**
- * Workspace configuration (imported from workspace-config.ts for full details)
- */
-export interface WorkspaceConfig {
-  type?: 'polyrepo' | 'monorepo';
-  workspaces_dir?: string;
-  repos?: Array<{ name: string; path: string; branch_prefix?: string }>;
-  dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
-  ports?: Record<string, { range: [number, number] }>;
-  docker?: { traefik?: string; compose_template?: string };
-  database?: { seed_file?: string; container_name?: string; [key: string]: any };
-  agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
-  env?: { template?: string; secrets_file?: string };
-  services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;
 }
 
 /**

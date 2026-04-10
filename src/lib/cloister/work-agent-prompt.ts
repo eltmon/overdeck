@@ -9,6 +9,7 @@ import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
+import type { RepoConfig } from '../workspace-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -505,13 +506,13 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
   }
 
   const wsConfig = projectConfig.workspace;
-  const repos = wsConfig.repos;
+  const repos = wsConfig.repos!;
 
   // In progressive mode, only show repos that exist in the workspace
   const isProgressive = wsConfig.progressive && wsConfig.always_include;
-  let visibleRepos = repos;
+  let visibleRepos: RepoConfig[] = repos;
 
-  if (isProgressive) {
+  if (isProgressive && wsConfig.always_include) {
     // Check which repos actually exist in the workspace
     const existingRepos = readdirSync(workspacePath).filter(f => {
       const fullPath = join(workspacePath, f);
