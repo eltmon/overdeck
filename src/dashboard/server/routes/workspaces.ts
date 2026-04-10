@@ -2543,9 +2543,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     }
 
     if (existingStatus?.reviewStatus === 'passed') {
-      if (existingStatus.testStatus === 'failed') {
+      if (existingStatus.testStatus === 'failed' || existingStatus.testStatus === 'pending' || existingStatus.testStatus === 'dispatch_failed') {
         console.log(
-          `[request-review] ${issueId}: review passed but tests failed — re-queuing test specialist`
+          `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test specialist`
         );
         setReviewStatus(issueId, { testStatus: 'pending' });
 
