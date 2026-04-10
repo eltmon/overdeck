@@ -218,7 +218,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
-        scrollback: 200,  // Keep small to avoid flash on open with large scrollback; users can switch to conversation mode for history
+        scrollback: 5000,  // Local scroll buffer; server-side blackout prevents flash on reconnect
         convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
@@ -281,12 +281,11 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Note: wheel events are now handled natively by xterm.js v6's SmoothScrollableElement.
-      // Previously we intercepted and called scrollLines() manually, but this caused issues
-      // where scrollLines() didn't properly update the viewport. With hasScrollback=true,
-      // xterm.js's wheel handler returns early without sending mouse sequences, allowing
-      // the SmoothScrollableElement to handle scrolling locally.
-      // If tmux mouse mode causes issues, consider setting TMUX_MOUSE=off in the environment.
+      // Do NOT intercept wheel events — let them pass through to xterm.js and tmux.
+      // With tmux mouse mode enabled, wheel events trigger tmux copy-mode scrollback,
+      // which is the only way to scroll history while Claude Code's TUI (alternate
+      // screen buffer) is active. xterm.js's scrollLines() does nothing in alternate
+      // buffer mode.
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
@@ -408,13 +407,21 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         }
       }
 
-      // Session is alive — clear only on the FIRST mount (initial connect).
-      // On reconnects within the same session, DO NOT clear — that would wipe
-      // the scrollback buffer. The hadFirstData ref persists across reconnects
-      // within the same React component lifecycle, so reconnects skip this block.
+      // Session is alive — on first data, hide terminal briefly while the initial
+      // tmux scrollback dump and SIGWINCH repaint settle. After 350ms, reveal the
+      // terminal with the correct viewport. This prevents the visible flash of
+      // old-size content without suppressing scrollback data (which xterm.js needs
+      // for mousewheel scrolling).
       if (!hadFirstData.current) {
         hadFirstData.current = true;
-        term!.clear();
+        if (terminalRef.current) {
+          terminalRef.current.style.opacity = '0';
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.style.opacity = '1';
+            }
+          }, 350);
+        }
       }
       reconnectAttempts.current = 0;
 
