@@ -445,16 +445,16 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
             if (terminalRef.current) {
               terminalRef.current.style.opacity = '1';
             }
-            // Force xterm.js to repaint all visible rows after the scrollback dump
-            // settles. Without this, stale spinner/braille characters from the
-            // scrollback history remain visually rendered as dots even though the
-            // logical content has been overwritten by new data.
-            // Do multiple refreshes at staggered intervals — the scrollback dump
-            // can take varying amounts of time depending on history size.
-            if (term) {
-              term.refresh(0, term.rows - 1);
-              setTimeout(() => { if (term) term.refresh(0, term.rows - 1); }, 500);
-              setTimeout(() => { if (term) term.refresh(0, term.rows - 1); }, 1500);
+            // Force a full repaint after the scrollback dump settles.
+            // term.refresh() is NOT enough — it doesn't clear stale rendered cells.
+            // fit.fit() calls term.resize() which triggers a complete DOM re-render,
+            // clearing stale spinner/braille artifacts from the scrollback history.
+            // This is the same thing that happens when the user drags the panel divider.
+            if (fit) {
+              fit.fit();
+              // Staggered fits for large scrollback dumps that take longer to settle
+              setTimeout(() => { if (fit) fit.fit(); }, 500);
+              setTimeout(() => { if (fit) fit.fit(); }, 1500);
             }
           }, 350);
         }
