@@ -702,7 +702,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Determine auth mode for OpenAI from config (subscription vs api-key)
   const yamlConfig = loadYamlConfig();
-  const openaiAuthMode = yamlConfig.config.providerAuth['openai'];
+  const openaiAuthMode = yamlConfig.config?.providerAuth?.['openai'];
   const effectiveAuthMode = openaiAuthMode ?? 'api-key';
 
   // Get claudish-prefixed model if needed (e.g. oai@gpt-5.4 or cx@o3)

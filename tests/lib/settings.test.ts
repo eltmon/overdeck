@@ -423,10 +423,12 @@ describe('settings', () => {
       const available = getAvailableModels(settings);
 
       expect(available.openai).toEqual([
-        'gpt-5.2-codex',
-        'o3-deep-research',
-        'gpt-4o',
-        'gpt-4o-mini',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.4-nano',
+        'gpt-5.4-pro',
+        'o3',
+        'o4-mini',
       ]);
     });
 
@@ -439,8 +441,9 @@ describe('settings', () => {
       const available = getAvailableModels(settings);
 
       expect(available.google).toEqual([
-        'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
+        'gemini-3.1-pro-preview',
+        'gemini-3-flash',
+        'gemini-3.1-flash-lite-preview',
       ]);
     });
 
@@ -452,7 +455,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.kimi).toEqual(['kimi-k2', 'kimi-k2.5']);
+      expect(available.kimi).toEqual(['kimi-k2.5']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {

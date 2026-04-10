@@ -154,8 +154,8 @@ describe('settings-api', () => {
       const models = getAvailableModelsApi();
 
       const openaiIds = models.openai.map(m => m.id);
-      expect(openaiIds).toContain('gpt-5.2-codex');
-      expect(openaiIds).toContain('gpt-4o');
+      expect(openaiIds).toContain('gpt-5.4');
+      expect(openaiIds).toContain('o4-mini');
     });
   });
 

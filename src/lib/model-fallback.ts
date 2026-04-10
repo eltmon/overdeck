@@ -24,7 +24,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models
+  // OpenAI models (current)
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
   'gpt-5.4-nano': 'openai',
@@ -32,10 +32,22 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'o3': 'openai',
   'o4-mini': 'openai',
 
-  // Google models
+  // OpenAI legacy (for backward compat with existing configs/tests)
+  'gpt-5.2-codex': 'openai',
+  'o3-deep-research': 'openai',
+  'gpt-4o': 'openai',
+  'gpt-4o-mini': 'openai',
+
+  // Google models (current)
   'gemini-3.1-pro-preview': 'google',
   'gemini-3-flash': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
+
+  // Google legacy
+  'gemini-3-pro-preview': 'google',
+  'gemini-3-flash-preview': 'google',
+  'gemini-2.5-pro': 'google',
+  'gemini-2.5-flash': 'google',
 
   // Kimi models
   'kimi-k2.5': 'kimi',
@@ -43,7 +55,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // MiniMax models
   'minimax-m2.7': 'minimax',
   'minimax-m2.7-highspeed': 'minimax',
-};
+} as Record<ModelId | string, ModelProvider>;
 
 /**
  * Fallback mapping: non-Anthropic model → Anthropic equivalent
@@ -65,10 +77,22 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
   'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
 
+  // OpenAI legacy
+  'gpt-5.2-codex': 'claude-sonnet-4-6', // Legacy flagship → Sonnet
+  'o3-deep-research': 'claude-sonnet-4-6', // Legacy deep research → Sonnet
+  'gpt-4o': 'claude-sonnet-4-6', // Legacy flagship → Sonnet
+  'gpt-4o-mini': 'claude-haiku-4-5', // Legacy economy → Haiku
+
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
   'gemini-3-flash': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
+
+  // Google legacy
+  'gemini-3-pro-preview': 'claude-sonnet-4-6', // Legacy flagship → Sonnet
+  'gemini-3-flash-preview': 'claude-haiku-4-5', // Legacy fast → Haiku
+  'gemini-2.5-pro': 'claude-sonnet-4-6', // Legacy flagship → Sonnet
+  'gemini-2.5-flash': 'claude-haiku-4-5', // Legacy fast → Haiku
 
   // Kimi → Anthropic
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
@@ -121,7 +145,15 @@ export function isOpenRouterModel(modelId: string): boolean {
  */
 export function getModelProvider(modelId: ModelId | string): ModelProvider {
   if (isOpenRouterModel(modelId)) return 'openrouter';
-  return (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId] ?? 'anthropic';
+  const direct = (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId];
+  if (direct) return direct;
+  // Handle deprecated/legacy model IDs for backward compatibility
+  if (modelId.startsWith('gpt-')) return 'openai';
+  if (modelId.startsWith('o1') || modelId.startsWith('o2') || modelId.startsWith('o3') || modelId.startsWith('o4')) return 'openai';
+  if (modelId.startsWith('gemini-')) return 'google';
+  if (modelId.startsWith('kimi-')) return 'kimi';
+  if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
+  return 'anthropic';
 }
 
 /**

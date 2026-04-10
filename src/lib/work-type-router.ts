@@ -79,8 +79,8 @@ export class WorkTypeRouter {
 
     // Determine effective user tier for OpenAI (undefined = API key auth)
     const userTier =
-      this.config.providerAuth['openai'] === 'subscription'
-        ? this.config.providerPlan['openai']
+      this.config.providerAuth?.['openai'] === 'subscription'
+        ? this.config.providerPlan?.['openai']
         : undefined;
 
     let model: ModelId;
