@@ -93,7 +93,12 @@ export class WorkTypeRouter {
     } else {
       // Use smart (capability-based) selection
       const availableModels = this.getAvailableModels();
-      const result = selectModel(workTypeId, availableModels);
+      // Determine effective user tier from config (for OAuth subscription users)
+      const userTier =
+        this.config.providerAuth['openai'] === 'subscription'
+          ? this.config.providerPlan['openai']
+          : undefined;
+      const result = selectModel(workTypeId, availableModels, { userTier });
       model = result.model;
       source = 'smart';
       selection = {

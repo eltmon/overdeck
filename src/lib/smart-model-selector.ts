@@ -17,6 +17,17 @@ import {
   ModelCapability,
   getModelCapability,
 } from './model-capabilities.js';
+import type { SubscriptionPlan } from './subscription-types.js';
+
+/**
+ * Tier rank for comparison: undefined = accessible to all, then free < plus < pro
+ */
+const TIER_RANK: Record<SubscriptionPlan | 'none', number> = {
+  none: -1, // minTier undefined: accessible to all authenticated users
+  free: 0,
+  plus: 1,
+  pro: 2,
+};
 
 /**
  * Skill requirements for a work type
@@ -210,6 +221,13 @@ export interface SelectionOptions {
    * Force a specific model (bypass selection)
    */
   forceModel?: ModelId;
+
+  /**
+   * User's subscription tier (for OAuth-authenticated providers).
+   * Models with minTier > userTier are excluded from selection.
+   * Undefined means API key auth (only minTier: undefined models accessible).
+   */
+  userTier?: SubscriptionPlan;
 }
 
 /**
@@ -247,6 +265,26 @@ function calculateSelectionScore(
 }
 
 /**
+ * Check if a model is accessible at the given user tier.
+ * - Models with minTier: undefined are accessible to all authenticated users
+ * - Models with minTier: 'free' are accessible to free/plus/pro tiers
+ * - Models with minTier: 'plus' are accessible to plus/pro tiers only
+ * - Models with minTier: 'pro' are accessible to pro tier only
+ */
+function isAccessibleAtTier(
+  modelTier: SubscriptionPlan | undefined,
+  userTier: SubscriptionPlan | undefined
+): boolean {
+  const modelRank = modelTier !== undefined ? TIER_RANK[modelTier] : TIER_RANK.none;
+  // undefined userTier = API key auth: only models with no tier restriction (rank -1)
+  // defined userTier: only models where modelRank <= userRank
+  if (userTier === undefined) {
+    return modelRank === TIER_RANK.none;
+  }
+  return modelRank <= TIER_RANK[userTier];
+}
+
+/**
  * Select the best model for a work type from available models
  */
 export function selectModel(
@@ -254,7 +292,7 @@ export function selectModel(
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): ModelSelectionResult {
-  const { minCapability = 50, forceModel } = options;
+  const { minCapability = 50, forceModel, userTier } = options;
 
   // Force model if specified and available
   if (forceModel) {
@@ -287,10 +325,13 @@ export function selectModel(
     };
   });
 
-  // Filter to available models with minimum capability
-  const eligible = candidates.filter(
-    (c) => c.available && c.skillScore >= minCapability
-  );
+  // Filter to available models with minimum capability and tier access
+  const eligible = candidates.filter((c) => {
+    if (!c.available || c.skillScore < minCapability) return false;
+    if (userTier === undefined) return true; // caller responsible for tier filtering
+    const cap = getModelCapability(c.model);
+    return isAccessibleAtTier(cap.minTier, userTier);
+  });
 
   // Sort by selection score (descending)
   eligible.sort((a, b) => b.score - a.score);
