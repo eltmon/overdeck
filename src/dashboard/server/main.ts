@@ -17,6 +17,8 @@ import { clearStuckMergeStatuses } from '../../lib/review-status.js';
 import { getEventStore } from './event-store.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
+import { setAgentStoppedNotifier } from '../../lib/cloister/deacon.js';
+import { getAgentState } from '../../lib/agents.js';
 
 declare const Bun: unknown;
 
@@ -49,6 +51,21 @@ setPipelineHandler((event) => {
   }
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');
+
+// Wire up deacon → domain events for orphaned agent recovery.
+// When deacon detects a running agent with no tmux session, it resets to stopped.
+// This notifier emits agent.stopped so the read model and frontend update immediately.
+setAgentStoppedNotifier((agentId) => {
+  try {
+    const es = getEventStore();
+    es.append({
+      type: 'agent.stopped',
+      timestamp: new Date().toISOString(),
+      payload: { agentId },
+    } as any);
+  } catch { /* non-fatal — event store may not be ready during early boot */ }
+});
+console.log('[panopticon] Agent stopped notifier → domain events wired');
 
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
