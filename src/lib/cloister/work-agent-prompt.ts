@@ -505,11 +505,11 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
   }
 
   const wsConfig = projectConfig.workspace;
-  const repos = wsConfig.repos;
+  const repos = wsConfig!.repos!;
 
   // In progressive mode, only show repos that exist in the workspace
   const isProgressive = wsConfig.progressive && wsConfig.always_include;
-  let visibleRepos = repos;
+  let visibleRepos: typeof repos = repos;
 
   if (isProgressive) {
     // Check which repos actually exist in the workspace

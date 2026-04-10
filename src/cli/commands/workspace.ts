@@ -15,6 +15,7 @@ import {
   extractTeamPrefix,
   listProjects,
   getIssuePrefix,
+  type ProjectConfig,
 } from '../../lib/projects.js';
 import {
   createWorkspace as createWorkspaceFromConfig,
@@ -1485,21 +1486,21 @@ async function addRepoCommand(workspaceId: string, repoNames: string[], options:
     const folderName = `feature-${normalizedId}`;
 
     // Resolve project
-    let projectConfig: ReturnType<typeof findProjectByTeam> = null;
+    let projectConfig: ProjectConfig | null = null;
     if (options.project) {
-      const config = loadConfig();
-      projectConfig = config.projects?.projects[options.project] || null;
+      const allProjects = listProjects();
+      projectConfig = allProjects.find(p => p.key === options.project)?.config || null;
     }
 
     if (!projectConfig) {
       // Try to find project from workspace path
       const allProjects = listProjects();
-      for (const p of Object.values(allProjects)) {
-        if (p.workspace?.workspaces_dir) {
-          const workspacesDir = join(p.path, p.workspace.workspaces_dir);
+      for (const p of allProjects) {
+        if (p.config.workspace?.workspaces_dir) {
+          const workspacesDir = join(p.config.path, p.config.workspace.workspaces_dir);
           const workspacePath = join(workspacesDir, folderName);
           if (existsSync(workspacePath)) {
-            projectConfig = p;
+            projectConfig = p.config;
             break;
           }
         }
