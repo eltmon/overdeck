@@ -32,3 +32,4 @@ Implementing beads one at a time — just completed config schema (pan-598-z2g)
 - **[2026-04-10T06:28Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 - **[2026-04-10T06:38Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
 - **[2026-04-10 addressed]** Fixed activity-logger.ts: removed null coercions, refactored emitDashboardLifecycle to avoid Record<string,unknown> type (commit: 2d3fe325)
+- **[2026-04-10 addressed]** Fixed event-store.ts: added @ts-ignore on bun:sqlite dynamic import — root tsconfig follows import chain from activity-logger.ts into dashboard server, but @types/bun is only in dashboard server node_modules (commit: e7505bae)
