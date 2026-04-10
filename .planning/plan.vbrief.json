@@ -4,7 +4,7 @@
     "created": "2026-04-10T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-598: Support latest ChatGPT/OpenAI models with subscription tier awareness",
-    "updated": "2026-04-10T06:27:46.483Z"
+    "updated": "2026-04-10T06:28:03.959Z"
   },
   "plan": {
     "id": "pan-598",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "28a73744-aef7-48e9-b372-e4f30ad21d4d",
     "author": "agent:claude-opus-4-6",
-    "sequence": 71,
+    "sequence": 83,
     "created": "2026-04-10T00:00:00.000Z",
-    "updated": "2026-04-10T06:27:46.483Z",
+    "updated": "2026-04-10T06:28:03.959Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/598",
@@ -76,7 +76,7 @@
             "completed": "2026-04-10T06:26:45.786Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.483Z"
+        "completed": "2026-04-10T06:28:03.959Z"
       },
       {
         "id": "pan-598.model-registry",
@@ -120,7 +120,7 @@
             "completed": "2026-04-10T06:26:45.786Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.483Z"
+        "completed": "2026-04-10T06:28:03.959Z"
       },
       {
         "id": "pan-598.provider-prefix-mapping",
@@ -155,7 +155,7 @@
             "completed": "2026-04-10T06:26:45.783Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.480Z"
+        "completed": "2026-04-10T06:28:03.956Z"
       },
       {
         "id": "pan-598.tier-aware-selector",
@@ -190,7 +190,7 @@
             "completed": "2026-04-10T06:26:45.782Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.479Z"
+        "completed": "2026-04-10T06:28:03.954Z"
       },
       {
         "id": "pan-598.tier-aware-fallback",
@@ -216,7 +216,7 @@
             "completed": "2026-04-10T06:26:45.785Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.482Z"
+        "completed": "2026-04-10T06:28:03.958Z"
       },
       {
         "id": "pan-598.claudish-install",
@@ -251,7 +251,7 @@
             "completed": "2026-04-10T06:26:45.785Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.482Z"
+        "completed": "2026-04-10T06:28:03.958Z"
       },
       {
         "id": "pan-598.claudish-sync",
@@ -277,7 +277,7 @@
             "completed": "2026-04-10T06:26:45.784Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.481Z"
+        "completed": "2026-04-10T06:28:03.957Z"
       },
       {
         "id": "pan-598.ccr-removal",
@@ -303,7 +303,7 @@
             "completed": "2026-04-10T06:26:45.785Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.482Z"
+        "completed": "2026-04-10T06:28:03.957Z"
       },
       {
         "id": "pan-598.agent-spawn-with-prefix",
@@ -347,7 +347,7 @@
             "completed": "2026-04-10T06:26:45.783Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.480Z"
+        "completed": "2026-04-10T06:28:03.955Z"
       },
       {
         "id": "pan-598.dashboard-display",
@@ -382,7 +382,7 @@
             "completed": "2026-04-10T06:26:45.784Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.481Z"
+        "completed": "2026-04-10T06:28:03.957Z"
       },
       {
         "id": "pan-598.cost-tracking",
@@ -408,7 +408,7 @@
             "completed": "2026-04-10T06:26:45.784Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.481Z"
+        "completed": "2026-04-10T06:28:03.956Z"
       },
       {
         "id": "pan-598.research-oauth",
@@ -434,7 +434,7 @@
             "completed": "2026-04-10T06:26:45.783Z"
           }
         ],
-        "completed": "2026-04-10T06:27:46.480Z"
+        "completed": "2026-04-10T06:28:03.956Z"
       }
     ],
     "edges": [

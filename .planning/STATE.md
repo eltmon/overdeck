@@ -30,3 +30,5 @@ Implementing beads one at a time — just completed config schema (pan-598-z2g)
 
 ## Specialist Feedback
 - None yet
+- **[2026-04-10T06:28Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-10T06:38Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
