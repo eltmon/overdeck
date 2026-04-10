@@ -10,6 +10,7 @@ import {
   readIssueSpecialistHandoffs,
   getSpecialistHandoffStats,
   getTodaySpecialistHandoffs,
+  updateSpecialistHandoffStatus,
 } from '../../../src/lib/cloister/specialist-handoff-logger.js';
 import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -262,8 +263,8 @@ describe('specialist-handoff-logger', () => {
   });
 
   describe('getSpecialistHandoffStats', () => {
-    it('should return zero stats for empty log', () => {
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+    it('should return zero stats for empty log', async () => {
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.totalHandoffs).toBe(0);
       expect(stats.todayCount).toBe(0);
@@ -273,17 +274,17 @@ describe('specialist-handoff-logger', () => {
       expect(Object.keys(stats.byStatus)).toHaveLength(0);
     });
 
-    it('should count total handoffs', () => {
+    it('should count total handoffs', async () => {
       for (let i = 1; i <= 5; i++) {
         const handoff = createSpecialistHandoff('review-agent', 'test-agent', `PAN-${i}`, 'normal');
         logSpecialistHandoff(handoff);
       }
 
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(stats.totalHandoffs).toBe(5);
     });
 
-    it('should count handoffs by specialist (sent and received)', () => {
+    it('should count handoffs by specialist (sent and received)', async () => {
       const handoffs = [
         createSpecialistHandoff('issue-agent', 'review-agent', 'PAN-1', 'normal'),
         createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'high'),
@@ -293,7 +294,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // review-agent: sent 2, received 1
       expect(stats.bySpecialist['review-agent'].sent).toBe(2);
@@ -312,7 +313,7 @@ describe('specialist-handoff-logger', () => {
       expect(stats.bySpecialist['issue-agent'].received).toBe(0);
     });
 
-    it('should count handoffs by status', () => {
+    it('should count handoffs by status', async () => {
       const handoffs = [
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), status: 'queued' as const },
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'normal'), status: 'processing' as const },
@@ -323,7 +324,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.byStatus['queued']).toBe(1);
       expect(stats.byStatus['processing']).toBe(1);
@@ -331,7 +332,7 @@ describe('specialist-handoff-logger', () => {
       expect(stats.byStatus['failed']).toBe(1);
     });
 
-    it('should calculate success rate correctly', () => {
+    it('should calculate success rate correctly', async () => {
       const handoffs = [
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), status: 'completed' as const, result: 'success' as const },
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'normal'), status: 'completed' as const, result: 'success' as const },
@@ -341,13 +342,13 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // 3 successes out of 4 completed
       expect(stats.successRate).toBe(0.75);
     });
 
-    it('should not count queued/processing items in success rate', () => {
+    it('should not count queued/processing items in success rate', async () => {
       const handoffs = [
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), status: 'queued' as const },
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'normal'), status: 'processing' as const },
@@ -356,13 +357,13 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // Only 1 completed, 1 success = 100%
       expect(stats.successRate).toBe(1.0);
     });
 
-    it('should calculate queue depth from live hook files, not JSONL status', () => {
+    it('should calculate queue depth from live hook files, not JSONL status', async () => {
       // Log handoffs with queued/processing status — these should NOT affect queueDepth
       // because the JSONL is append-only and statuses are stale.
       const handoffs = [
@@ -373,7 +374,7 @@ describe('specialist-handoff-logger', () => {
       handoffs.forEach(h => logSpecialistHandoff(h));
 
       // Without hook files: queueDepth = 0 (live hooks are authoritative)
-      const statsNoHooks = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const statsNoHooks = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(statsNoHooks.queueDepth).toBe(0);
 
       // Write a hook.json for test-agent with 2 pending items
@@ -384,11 +385,11 @@ describe('specialist-handoff-logger', () => {
         JSON.stringify({ agentId: 'test-agent', items: [{ id: 'a' }, { id: 'b' }] }),
       );
 
-      const statsWithHooks = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const statsWithHooks = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(statsWithHooks.queueDepth).toBe(2);
     });
 
-    it('should count today\'s handoffs correctly', () => {
+    it('should count today\'s handoffs correctly', async () => {
       // Create handoffs with today's timestamp
       const todayHandoff1 = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       const todayHandoff2 = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'normal');
@@ -405,7 +406,7 @@ describe('specialist-handoff-logger', () => {
       };
       logSpecialistHandoff(yesterdayHandoff);
 
-      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.totalHandoffs).toBe(3);
       expect(stats.todayCount).toBe(2);
@@ -470,6 +471,125 @@ describe('specialist-handoff-logger', () => {
       const handoffs = getTodaySpecialistHandoffs();
       expect(handoffs).toHaveLength(1);
       expect(handoffs[0].timestamp).toBe(midnightTimestamp);
+    });
+  });
+
+  describe('updateSpecialistHandoffStatus', () => {
+    it('should return false when log file does not exist', async () => {
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      expect(result).toBe(false);
+    });
+
+    it('should update the most recent matching queued record', async () => {
+      const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
+      logSpecialistHandoff(handoff);
+
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      expect(result).toBe(true);
+
+      const handoffs = readSpecialistHandoffs();
+      expect(handoffs).toHaveLength(1);
+      expect(handoffs[0].status).toBe('completed');
+      expect(handoffs[0].result).toBe('success');
+    });
+
+    it('should set completedAt timestamp when completing or failing', async () => {
+      const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
+      logSpecialistHandoff(handoff);
+
+      const before = Date.now();
+      await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      const after = Date.now();
+
+      const handoffs = readSpecialistHandoffs();
+      expect(handoffs[0].completedAt).toBeDefined();
+      const completedAt = new Date(handoffs[0].completedAt!).getTime();
+      expect(completedAt).toBeGreaterThanOrEqual(before);
+      expect(completedAt).toBeLessThanOrEqual(after);
+    });
+
+    it('should not set completedAt when setting processing status', async () => {
+      const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
+      logSpecialistHandoff(handoff);
+
+      await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'processing');
+
+      const handoffs = readSpecialistHandoffs();
+      expect(handoffs[0].status).toBe('processing');
+      expect(handoffs[0].completedAt).toBeUndefined();
+    });
+
+    it('should return false when no matching active record exists', async () => {
+      // Log a completed record — should not match (only queued/processing are updated)
+      const handoff = {
+        ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'),
+        status: 'completed' as const,
+        result: 'success' as const,
+      };
+      logSpecialistHandoff(handoff);
+
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      expect(result).toBe(false);
+    });
+
+    it('should return false when issueId does not match', async () => {
+      const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
+      logSpecialistHandoff(handoff);
+
+      const result = await updateSpecialistHandoffStatus('PAN-999', 'test-agent', 'completed', 'success');
+      expect(result).toBe(false);
+
+      // Original record unchanged
+      const handoffs = readSpecialistHandoffs();
+      expect(handoffs[0].status).toBe('queued');
+    });
+
+    it('should update most recent record when multiple exist for same issue', async () => {
+      // Log two queued records for the same issue
+      const first = { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), timestamp: '2026-01-01T10:00:00.000Z' };
+      const second = { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), timestamp: '2026-01-01T11:00:00.000Z' };
+      logSpecialistHandoff(first);
+      logSpecialistHandoff(second);
+
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      expect(result).toBe(true);
+
+      // Only the most recent (second) should be updated
+      const handoffs = readSpecialistHandoffs();
+      expect(handoffs).toHaveLength(2);
+      const firstRecord = handoffs.find(h => h.timestamp === '2026-01-01T10:00:00.000Z')!;
+      const secondRecord = handoffs.find(h => h.timestamp === '2026-01-01T11:00:00.000Z')!;
+      expect(firstRecord.status).toBe('queued');
+      expect(secondRecord.status).toBe('completed');
+    });
+
+    it('should handle corrupted JSON lines gracefully', async () => {
+      // Write a corrupted log file
+      const logDir = join(PANOPTICON_HOME, 'logs');
+      mkdirSync(logDir, { recursive: true });
+      const logFile = join(logDir, 'specialist-handoffs.jsonl');
+      const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
+      writeFileSync(logFile, `{corrupted json}\n${JSON.stringify(handoff)}\n`, 'utf-8');
+
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      expect(result).toBe(true);
+
+      const content = readFileSync(logFile, 'utf-8');
+      const lines = content.trim().split('\n').filter(l => l.trim());
+      // The valid line should be updated; corrupted line stays as-is
+      expect(lines).toHaveLength(2);
+      const updatedHandoff = JSON.parse(lines[1]);
+      expect(updatedHandoff.status).toBe('completed');
+    });
+
+    it('should handle empty log file', async () => {
+      const logDir = join(PANOPTICON_HOME, 'logs');
+      mkdirSync(logDir, { recursive: true });
+      const logFile = join(logDir, 'specialist-handoffs.jsonl');
+      writeFileSync(logFile, '', 'utf-8');
+
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      expect(result).toBe(false);
     });
   });
 });

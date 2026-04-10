@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
+import { getProviderForModel } from './providers.js';
 
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
@@ -214,7 +215,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
-    ? ['gemini-3-pro-preview', 'gemini-3-flash-preview']
+    ? ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
     : [];
 
   const zaiModels: ZAIModel[] = settings.api_keys.zai
@@ -257,8 +258,11 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
 }
 
 /**
- * Get the command to run an agent with a specific model
- * Returns 'claude' for Anthropic models, 'claude-code-router' for others
+ * Get the command to run an agent with a specific model.
+ * - Anthropic models: 'claude --model <flag>'
+ * - Direct-compatible providers (Z.AI, Kimi, Google): 'claude --model <id>'
+ *   (caller sets ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN env vars)
+ * - Router-only providers (OpenAI, OpenRouter): 'claude-code-router'
  */
 export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
   if (isAnthropicModel(modelId)) {
@@ -267,7 +271,15 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
       args: ['--model', getClaudeModelFlag(modelId)],
     };
   }
-  // Non-Anthropic models require the router
+  const provider = getProviderForModel(modelId);
+  if (provider.compatibility === 'direct') {
+    // Direct providers use claude CLI via ANTHROPIC_BASE_URL
+    return {
+      command: 'claude',
+      args: ['--model', modelId],
+    };
+  }
+  // Router-only providers (OpenAI, OpenRouter)
   return {
     command: 'claude-code-router',
     args: [],

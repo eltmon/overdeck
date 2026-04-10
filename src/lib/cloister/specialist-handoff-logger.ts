@@ -5,7 +5,7 @@
  * to JSONL file for tracking and analysis in the dashboard.
  */
 
-import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
@@ -31,13 +31,14 @@ const KNOWN_SPECIALISTS = [
  *
  * @param agentsDir - Directory containing per-agent subdirectories (defaults to AGENTS_DIR)
  */
-function getLiveQueueDepth(agentsDir: string = AGENTS_DIR): number {
+async function getLiveQueueDepth(agentsDir: string = AGENTS_DIR): Promise<number> {
   let depth = 0;
   for (const specialistId of KNOWN_SPECIALISTS) {
     const hookFile = join(agentsDir, specialistId, 'hook.json');
     if (!existsSync(hookFile)) continue;
     try {
-      const hook = JSON.parse(readFileSync(hookFile, 'utf-8')) as { items: unknown[] };
+      const content = await readFile(hookFile, 'utf-8');
+      const hook = JSON.parse(content) as { items: unknown[] };
       depth += hook.items?.length ?? 0;
     } catch {
       // Corrupt hook file — skip
@@ -172,14 +173,14 @@ export function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[
  *
  * @returns Specialist handoff statistics
  */
-export function getSpecialistHandoffStats(options?: { agentsDir?: string }): {
+export async function getSpecialistHandoffStats(options?: { agentsDir?: string }): Promise<{
   totalHandoffs: number;
   todayCount: number;
   bySpecialist: Record<string, { sent: number; received: number }>;
   byStatus: Record<string, number>;
   successRate: number;
   queueDepth: number; // Current items with 'queued' or 'processing' status
-} {
+}> {
   const events = readSpecialistHandoffs();
   const today = new Date().toISOString().split('T')[0];
 
@@ -230,7 +231,7 @@ export function getSpecialistHandoffStats(options?: { agentsDir?: string }): {
   stats.successRate = completedCount > 0 ? successCount / completedCount : 0;
 
   // Compute live queue depth from actual hook files (not stale JSONL status)
-  stats.queueDepth = getLiveQueueDepth(options?.agentsDir);
+  stats.queueDepth = await getLiveQueueDepth(options?.agentsDir);
 
   return stats;
 }
