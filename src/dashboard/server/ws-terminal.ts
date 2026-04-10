@@ -114,10 +114,15 @@ export function setupTerminalWebSocket(server: http.Server): void {
         existingHub.clients.add(ws);
         // Most recently connected client takes over as input client
         existingHub.inputClient = ws;
+        // Brief blackout for rejoining clients — suppresses the scrollback burst
+        // that tmux dumps when the SIGWINCH repaint fires. The repaint fires after
+        // the blackout so the client receives only the clean current viewport.
+        const BLACKOUT_MS = 200;
+        existingHub.clientBlackout.set(ws, Date.now() + BLACKOUT_MS);
 
         // Force a SIGWINCH repaint so the new tab gets the current terminal state.
         // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
-        // No server-side blackout — the client handles flash via opacity hide.
+        // Fires after blackout so the clean repaint reaches the client.
         const { cols, rows } = existingHub;
         setTimeout(() => {
           if (existingHub.clients.has(ws) && ws.readyState === WebSocket.OPEN) {
@@ -136,7 +141,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
               // PTY may have exited — ignore
             }
           }
-        }, 100);
+        }, BLACKOUT_MS + 50);
 
         const handleJoinMessage = (message: string) => {
           if (message.startsWith('{')) {
