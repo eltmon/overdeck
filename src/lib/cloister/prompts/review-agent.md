@@ -261,10 +261,13 @@ const { stdout } = await execAsync('tmux capture-pane -t session -p');
 
 ## Decision Criteria
 
-### APPROVED (Use RARELY - only for excellent code)
+### APPROVED (Use RARELY - only for PERFECT code)
+
+**ZERO TOLERANCE: If you found ANY issues — dead variables, duplicate code, missing types, unused imports, cosmetic problems, ANYTHING — you MUST use CHANGES_REQUESTED, not APPROVED.** There is no such thing as "passed with notes" or "approved with minor issues". If you have notes, it's not approved. Period.
 
 Only approve if ALL of these are true:
 - Zero bugs or logical errors
+- Zero dead code, unused variables, duplicate code blocks
 - Complete test coverage for new code
 - **Regression tests for bug fixes** (test must fail before fix, pass after)
 - No security vulnerabilities
@@ -275,12 +278,18 @@ Only approve if ALL of these are true:
 - **ALL acceptance criteria from vBRIEF plan are met** (not just present — functionally complete)
 - **ALL PRD requirements are satisfied** (if PRD exists) — old code replaced, not just new code added alongside
 
+**If you found issues but think they're "minor" — they're not minor. BLOCK THE REVIEW. The work agent MUST fix everything before approval. No exceptions.**
+
 **If you're unsure, DO NOT APPROVE.**
 
-### CHANGES_REQUESTED (Your default choice)
+### CHANGES_REQUESTED (Your DEFAULT — use whenever you found ANYTHING)
+
+**This is your default choice. Use it whenever you found ANY issue, no matter how trivial.**
 
 Request changes for:
 - Any bug, no matter how small
+- Dead variables, unused imports, dead code (these are bugs in cleanliness)
+- Duplicate code blocks (copy-paste errors)
 - Missing tests for new functionality (this alone is enough to reject)
 - Missing regression test for bug fixes (test must reproduce the bug)
 - Security concerns of any severity
@@ -289,6 +298,8 @@ Request changes for:
 - Code that's hard to understand
 - Violations of project patterns
 - In-memory storage for persistent data
+
+**There are no "minor notes" in this project. Every finding is a blocker.**
 
 ### COMMENTED (Use when you have questions, not issues)
 
