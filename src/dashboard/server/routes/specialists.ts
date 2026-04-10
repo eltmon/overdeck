@@ -1238,10 +1238,18 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
               `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.testStatus})`,
             );
           } else {
+            const testPassed = status === 'passed';
             setReviewStatusBase(issueId, {
-              testStatus: status === 'passed' ? 'passed' : 'failed',
+              testStatus: testPassed ? 'passed' : 'failed',
               testNotes: `Auto-detected: ${status}`,
+              // Set readyForMerge when test passes — same as specialists/done handler.
+              // Without this, issues that go through per-project specialists never
+              // transition to readyForMerge (PAN-615).
+              ...(testPassed ? { readyForMerge: true } : {}),
             });
+            if (testPassed) {
+              console.log(`[specialists] ${issueId} marked ready for merge after auto-detected test pass`);
+            }
           }
         }
 
