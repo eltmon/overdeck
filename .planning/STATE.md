@@ -27,3 +27,4 @@ All beads complete — running quality gates and finalizing
 (none yet)
 - **[2026-04-07T19:01Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/009-review-agent-changes-requested.md`
 - **[2026-04-10T19:38Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/010-review-agent-changes-requested.md`
+- **[2026-04-10T19:44Z] verification-gate → FAILED** — `.planning/feedback/011-verification-gate-failed.md`
