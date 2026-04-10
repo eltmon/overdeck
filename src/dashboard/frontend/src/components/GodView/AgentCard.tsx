@@ -123,6 +123,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
       {agent.git?.branch && (
         <div className="flex items-center gap-1 pl-2">
           <GitBranch className="w-3 h-3 shrink-0" style={{ color: 'var(--gv-text-dim)' }} />
+          <span className="text-[10px] gv-mono text-content-subtle">Plan</span>
           <span className="text-[10px] gv-mono truncate" style={{ color: 'var(--gv-text-secondary)' }}>
             {agent.git.branch}
           </span>

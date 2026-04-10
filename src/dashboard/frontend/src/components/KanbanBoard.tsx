@@ -2396,20 +2396,23 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             title="Watch"
           >
             <Eye className="w-3.5 h-3.5" />
+            Watch
           </button>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
+            Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
+            vBRIEF
           </button>
           <button
             onClick={handleTell}
@@ -2419,6 +2422,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             title="Tell"
           >
             <MessageCircle className="w-3.5 h-3.5" />
+            Tell
           </button>
           {/* Model badge - centered between Tell and Kill */}
           {activeAgent && activeAgent.model && (
@@ -2480,27 +2484,30 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             >
               <FileText className="w-3.5 h-3.5" />
+              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             </button>
           )}
           {issue.labels?.some(l => l.toLowerCase() === 'planned') && (
             <>
               <button
                 onClick={() => onViewBeads && onViewBeads(issue)}
-                className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 title="Tasks"
               >
                 <List className="w-3.5 h-3.5" />
+                Tasks
               </button>
               <button
                 onClick={() => onViewVBrief && onViewVBrief(issue)}
-                className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 title="vBRIEF"
               >
                 <ScrollText className="w-3.5 h-3.5" />
+                vBRIEF
               </button>
               <button
                 ref={startButtonRef}
@@ -2534,25 +2541,28 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             >
               <FileText className="w-3.5 h-3.5" />
+              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             </button>
           )}
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
+            Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
+            vBRIEF
           </button>
           <button
             onClick={handleResumeSession}
