@@ -60,7 +60,6 @@ describe('Model Deprecation System', () => {
             anthropic: true,
             openai: false,
             google: false,
-            zai: false,
             kimi: false,
           },
           overrides: {
@@ -85,7 +84,6 @@ describe('Model Deprecation System', () => {
             anthropic: true,
             openai: false,
             google: false,
-            zai: false,
             kimi: false,
           },
           overrides: {
@@ -108,7 +106,6 @@ describe('Model Deprecation System', () => {
             anthropic: true,
             openai: false,
             google: false,
-            zai: false,
             kimi: false,
           },
           overrides: {
@@ -131,7 +128,6 @@ describe('Model Deprecation System', () => {
             anthropic: true,
             openai: false,
             google: false,
-            zai: false,
             kimi: false,
           },
           overrides: {

@@ -5,10 +5,9 @@ import { SETTINGS_FILE } from './paths.js';
 export type AnthropicModel = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel = 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
-export type ZAIModel = 'glm-4.7' | 'glm-4.7-flash' | 'glm-5.1';
 export type KimiModel = 'kimi-k2' | 'kimi-k2.5';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | ZAIModel | KimiModel | MiniMaxModel;
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -36,7 +35,6 @@ export interface ModelsConfig {
 export interface ApiKeysConfig {
   openai?: string;
   google?: string;
-  zai?: string;
   kimi?: string;
 }
 
@@ -126,7 +124,6 @@ export function loadSettings(): SettingsConfig {
   const envApiKeys: ApiKeysConfig = {};
   if (process.env.OPENAI_API_KEY) envApiKeys.openai = process.env.OPENAI_API_KEY;
   if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
-  if (process.env.ZAI_API_KEY) envApiKeys.zai = process.env.ZAI_API_KEY;
   if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
@@ -201,7 +198,6 @@ export function getAvailableModels(settings: SettingsConfig): {
   anthropic: AnthropicModel[];
   openai: OpenAIModel[];
   google: GoogleModel[];
-  zai: ZAIModel[];
   kimi: KimiModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
@@ -218,10 +214,6 @@ export function getAvailableModels(settings: SettingsConfig): {
     ? ['gemini-3-pro-preview', 'gemini-3-flash-preview']
     : [];
 
-  const zaiModels: ZAIModel[] = settings.api_keys.zai
-    ? ['glm-4.7', 'glm-4.7-flash', 'glm-5.1']
-    : [];
-
   const kimiModels: KimiModel[] = settings.api_keys.kimi
     ? ['kimi-k2', 'kimi-k2.5']
     : [];
@@ -230,7 +222,6 @@ export function getAvailableModels(settings: SettingsConfig): {
     anthropic: anthropicModels,
     openai: openaiModels,
     google: googleModels,
-    zai: zaiModels,
     kimi: kimiModels,
   };
 }

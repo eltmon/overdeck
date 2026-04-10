@@ -8,9 +8,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel, MiniMaxModel } from './settings.js';
+import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, MiniMaxModel } from './settings.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai' | 'minimax' | 'openrouter';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'openrouter';
 
 /**
  * Provider compatibility types
@@ -67,16 +67,6 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     models: [], // Kimi uses same model names as Anthropic
     tested: true,
     description: 'Anthropic-compatible API via Kimi Code Plan (OAuth token refresh)',
-  },
-
-  zai: {
-    name: 'zai',
-    displayName: 'Z.AI (GLM)',
-    compatibility: 'direct',
-    baseUrl: 'https://api.z.ai/api/anthropic',
-    models: ['glm-4.7-flash'],
-    tested: true,
-    description: 'Anthropic-compatible API, GLM-4.7 Flash (31B, fast and affordable)',
   },
 
   openai: {
@@ -140,11 +130,6 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // Check Google models
   if (['gemini-3-pro-preview', 'gemini-3-flash-preview'].includes(modelId)) {
     return PROVIDERS.google;
-  }
-
-  // Check Z.AI models
-  if (['glm-4.7-flash'].includes(modelId)) {
-    return PROVIDERS.zai;
   }
 
   // Check Kimi models
@@ -217,11 +202,6 @@ export function getProviderEnv(
         // Static providers use a long-lived API key
         env.ANTHROPIC_AUTH_TOKEN = apiKey;
       }
-    }
-
-    // Z.AI recommends longer timeout
-    if (provider.name === 'zai') {
-      env.API_TIMEOUT_MS = '300000';
     }
 
     return env;

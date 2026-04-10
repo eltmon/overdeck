@@ -45,14 +45,12 @@ function detectEnabledProviders(settings: SettingsConfig): {
   anthropic: boolean;
   openai: boolean;
   google: boolean;
-  zai: boolean;
   kimi: boolean;
 } {
   return {
     anthropic: true, // Always enabled
     openai: !!settings.api_keys.openai,
     google: !!settings.api_keys.google,
-    zai: !!settings.api_keys.zai,
     kimi: false, // Legacy settings don't have Kimi
   };
 }

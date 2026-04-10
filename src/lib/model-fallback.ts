@@ -6,12 +6,12 @@
  * Panopticon always works even without configuring external providers.
  */
 
-import { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './settings.js';
+import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
 
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'openrouter';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter';
 
 /**
  * Map of model ID to provider
@@ -35,11 +35,6 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gemini-2.5-pro': 'google',
   'gemini-2.5-flash': 'google',
 
-  // Z.AI models
-  'glm-4.7': 'zai',
-  'glm-4.7-flash': 'zai',
-  'glm-5.1': 'zai',
-
   // Kimi models
   'kimi-k2': 'kimi',
   'kimi-k2.5': 'kimi',
@@ -54,9 +49,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  *
  * Mapping strategy:
  * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 4.6 (good balance)
- * - Economy models (GPT-4o-mini, Gemini Flash, GLM Flash) → Haiku 4.5
+ * - Economy models (GPT-4o-mini, Gemini Flash) → Haiku 4.5
  * - GPT-4o → Sonnet 4.6 (similar tier)
- * - GLM-4.7 → Haiku 4.5 (economy tier)
  *
  * Note: We intentionally avoid Opus 4.6 as default fallback to keep costs reasonable.
  * Users who want Opus can explicitly set it in their config.
@@ -71,11 +65,6 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // Google → Anthropic
   'gemini-3-pro-preview': 'claude-sonnet-4-6', // Premium model → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
-
-  // Z.AI → Anthropic
-  'glm-4.7': 'claude-haiku-4-5', // Standard model → Haiku
-  'glm-4.7-flash': 'claude-haiku-4-5', // Fast model → Haiku
-  'glm-5.1': 'claude-sonnet-4-6', // Flagship model → Sonnet
 
   // Kimi → Anthropic
   'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet
@@ -193,7 +182,6 @@ export function getFallbackModel(modelId: ModelId): AnthropicModel {
 export function detectEnabledProviders(apiKeys: {
   openai?: string;
   google?: string;
-  zai?: string;
   kimi?: string;
 }): Set<ModelProvider> {
   const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
@@ -204,9 +192,6 @@ export function detectEnabledProviders(apiKeys: {
   }
   if (apiKeys.google && apiKeys.google.trim()) {
     enabled.add('google');
-  }
-  if (apiKeys.zai && apiKeys.zai.trim()) {
-    enabled.add('zai');
   }
   if (apiKeys.kimi && apiKeys.kimi.trim()) {
     enabled.add('kimi');

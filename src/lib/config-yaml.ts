@@ -54,7 +54,6 @@ export interface YamlConfig {
       anthropic?: ProviderConfig | boolean;
       openai?: ProviderConfig | boolean;
       google?: ProviderConfig | boolean;
-      zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
       minimax?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
@@ -77,7 +76,6 @@ export interface YamlConfig {
   api_keys?: {
     openai?: string;
     google?: string;
-    zai?: string;
     kimi?: string;
     minimax?: string;
     openrouter?: string;
@@ -396,15 +394,6 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         }
       }
 
-      // Z.AI
-      const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
-      if (zai.enabled) {
-        result.enabledProviders.add('zai');
-        if (zai.api_key) {
-          result.apiKeys.zai = resolveEnvVar(zai.api_key);
-        }
-      }
-
       // Kimi
       const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
       if (kimi.enabled) {
@@ -450,10 +439,6 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
         if (!hasProvidersConfig) result.enabledProviders.add('google');
-      }
-      if (config.api_keys.zai) {
-        result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
-        if (!hasProvidersConfig) result.enabledProviders.add('zai');
       }
       if (config.api_keys.kimi) {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
@@ -629,10 +614,6 @@ export function loadConfig(): ConfigLoadResult {
   if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;
     config.enabledProviders.add('google');
-  }
-  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
-    config.apiKeys.zai = process.env.ZAI_API_KEY;
-    config.enabledProviders.add('zai');
   }
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;
