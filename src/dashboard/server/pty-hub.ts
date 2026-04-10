@@ -25,7 +25,11 @@ export interface PtyHub {
    * tabs have the same terminal open.
    */
   inputClient: WebSocket | null;
-  /** @deprecated Kept for interface compat — blackout logic removed, flash handled client-side. */
+  /**
+   * Per-client blackout map: rejoining clients receive no data during their
+   * blackout period while the SIGWINCH repaint settles. Only used for hub joins
+   * (not new hubs — those use client-side opacity hide instead).
+   */
   clientBlackout: Map<WebSocket, number>;
 }
 
@@ -33,13 +37,16 @@ export interface PtyHub {
 export const activePtyHubs = new Map<string, PtyHub>();
 
 /**
- * Broadcast data to all open clients in the hub.
+ * Broadcast data to all open clients in the hub, respecting per-client blackout periods.
+ * Rejoining clients get a brief blackout while the SIGWINCH repaint settles.
  */
 export function broadcastToHub(hub: PtyHub, data: string): void {
+  const now = Date.now();
   for (const client of hub.clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(data);
-    }
+    if (client.readyState !== WebSocket.OPEN) continue;
+    const blackoutUntil = hub.clientBlackout.get(client);
+    if (blackoutUntil && now < blackoutUntil) continue;
+    client.send(data);
   }
 }
 
