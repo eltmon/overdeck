@@ -130,7 +130,6 @@ export interface NormalizedConfig {
   apiKeys: {
     openai?: string;
     google?: string;
-    zai?: string;
     kimi?: string;
     minimax?: string;
     openrouter?: string;

@@ -42,35 +42,27 @@ const readJsonBody = Effect.gen(function* () {
 });
 
 /** Determine provider from model ID */
-function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'zai' {
+function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' {
   if (modelId.startsWith('claude-')) return 'anthropic';
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o3-') || modelId.startsWith('o1')) return 'openai';
+  if (modelId.startsWith('gpt-') || modelId === 'o3') return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
-  if (modelId.startsWith('glm-')) return 'zai';
-  return 'kimi'; // default
+  return 'anthropic'; // default
 }
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models
-  'gpt-5.2-codex': { apiModel: 'gpt-4o' },
-  'o3-deep-research': { apiModel: 'gpt-4o' },
-  'gpt-4o': { apiModel: 'gpt-4o' },
-  'gpt-4o-mini': { apiModel: 'gpt-4o-mini' },
-  'o1': { apiModel: 'gpt-4o' },
-  'o3-mini': { apiModel: 'gpt-4o-mini' },
+  'gpt-5.4': { apiModel: 'gpt-5.4' },
+  'gpt-5.4-mini': { apiModel: 'gpt-5.4-mini' },
+  'gpt-5.4-nano': { apiModel: 'gpt-5.4-nano' },
+  'o3': { apiModel: 'o3' },
   // Google models
-  'gemini-3-pro-preview': { apiModel: 'gemini-1.5-pro' },
-  'gemini-3-flash-preview': { apiModel: 'gemini-1.5-flash' },
-  'gemini-2.5-pro': { apiModel: 'gemini-1.5-pro' },
-  'gemini-2.5-flash': { apiModel: 'gemini-1.5-flash' },
+  'gemini-3.1-pro-preview': { apiModel: 'gemini-3.1-pro-preview' },
+  'gemini-3-flash': { apiModel: 'gemini-3-flash' },
+  'gemini-3.1-flash-lite-preview': { apiModel: 'gemini-3.1-flash-lite-preview' },
   // Kimi models
-  'kimi-k2': { apiModel: 'moonshot-v1-8k' },
-  'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
-  'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' },
-  // Z.AI models
-  'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
+  'kimi-k2.5': { apiModel: 'kimi-k2.5' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -146,7 +138,7 @@ const postTestApiKeyRoute = HttpRouter.add(
 
       switch (provider) {
         case 'openai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-4o-mini') : 'gpt-4o-mini';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-5.4-mini') : 'gpt-5.4-mini';
           try {
             const resp = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
@@ -203,33 +195,6 @@ const postTestApiKeyRoute = HttpRouter.add(
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'moonshot-v1-8k') : 'moonshot-v1-8k';
           try {
             const resp = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
-            });
-            latencyMs = Date.now() - startTime;
-            if (resp.ok) {
-              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-              response = data.choices?.[0]?.message?.content?.trim() || '';
-              success = response.includes(expectedAnswer);
-              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-            } else if (resp.status === 401) {
-              error = 'Invalid API key';
-            } else if (resp.status === 404) {
-              error = `Model not found: ${apiModel}`;
-            } else {
-              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
-            }
-          } catch (err) {
-            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
-          }
-          break;
-        }
-
-        case 'zai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4.7-flash') : 'glm-4.7-flash';
-          try {
-            const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
@@ -311,7 +276,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
-    if (!['openai', 'google', 'zai'].includes(provider)) {
+    if (!['openai', 'google'].includes(provider)) {
       return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -348,14 +313,14 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'google': {
           try {
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }] }),
             });
             if (resp.ok || resp.status === 400) {
               valid = true;
-              models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
+              models = ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'];
             } else if (resp.status === 401 || resp.status === 403) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
@@ -369,27 +334,6 @@ const postValidateApiKeyRoute = HttpRouter.add(
           break;
         }
 
-        case 'zai': {
-          try {
-            const resp = await fetch('https://api.zai.chat/v1/models', {
-              headers: { 'Authorization': `Bearer ${apiKey}` },
-            });
-            if (resp.ok) {
-              const data = await resp.json() as { data?: Array<{ id: string }> };
-              valid = true;
-              models = data.data?.map(m => m.id) || ['glm-4.7-flash'];
-            } else if (resp.status === 401) {
-              error = 'Invalid API key';
-            } else if (resp.status === 429) {
-              error = 'Rate limit exceeded';
-            } else {
-              error = `HTTP error: ${resp.status}`;
-            }
-          } catch (err) {
-            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
-          }
-          break;
-        }
       }
 
       return jsonResponse({ valid, provider, models: valid ? models : undefined, error: error || undefined });

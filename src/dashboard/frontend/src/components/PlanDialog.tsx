@@ -783,7 +783,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             </optgroup>
                             <optgroup label="Kimi">
                               <option value="kimi-k2.5">Kimi K2.5</option>
-                              <option value="kimi-k2">Kimi K2</option>
                             </optgroup>
                           </select>
                         </div>

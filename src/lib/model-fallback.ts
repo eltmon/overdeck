@@ -24,19 +24,17 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-haiku-4-5': 'anthropic',
 
   // OpenAI models
-  'gpt-5.2-codex': 'openai',
-  'o3-deep-research': 'openai',
-  'gpt-4o': 'openai',
-  'gpt-4o-mini': 'openai',
+  'gpt-5.4': 'openai',
+  'gpt-5.4-mini': 'openai',
+  'gpt-5.4-nano': 'openai',
+  'o3': 'openai',
 
   // Google models
-  'gemini-3-pro-preview': 'google',
-  'gemini-3-flash-preview': 'google',
-  'gemini-2.5-pro': 'google',
-  'gemini-2.5-flash': 'google',
+  'gemini-3.1-pro-preview': 'google',
+  'gemini-3-flash': 'google',
+  'gemini-3.1-flash-lite-preview': 'google',
 
   // Kimi models
-  'kimi-k2': 'kimi',
   'kimi-k2.5': 'kimi',
 
   // MiniMax models
@@ -57,17 +55,17 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
-  'gpt-5.2-codex': 'claude-sonnet-4-6', // Premium code model → Sonnet
-  'o3-deep-research': 'claude-sonnet-4-6', // Premium research model → Sonnet
-  'gpt-4o': 'claude-sonnet-4-6', // Flagship model → Sonnet
-  'gpt-4o-mini': 'claude-haiku-4-5', // Economy model → Haiku
+  'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
+  'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
+  'gpt-5.4-nano': 'claude-haiku-4-5', // Economy model → Haiku
+  'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
 
   // Google → Anthropic
-  'gemini-3-pro-preview': 'claude-sonnet-4-6', // Premium model → Sonnet
-  'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
+  'gemini-3-flash': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
 
   // Kimi → Anthropic
-  'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
 
   // MiniMax → Anthropic

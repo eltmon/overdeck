@@ -114,7 +114,6 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
   { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
   { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
   { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
 ];
 
@@ -208,10 +207,9 @@ function getModelDisplay(modelId?: string): string {
   if (model) return model.name;
   // Fallback for unknown models
   if (modelId.includes('claude')) return modelId.includes('opus') ? 'Opus 4.6' : modelId.includes('haiku') ? 'Haiku' : 'Sonnet 4.5';
-  if (modelId.includes('gpt')) return 'GPT-4o';
-  if (modelId.includes('gemini')) return modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
-  if (modelId.includes('kimi')) return modelId.includes('k2.5') || modelId.includes('2.5') ? 'Kimi K2.5' : 'Kimi K2';
-  if (modelId.includes('glm')) return 'GLM-4';
+  if (modelId.includes('gpt')) return modelId.includes('nano') ? 'GPT-5.4 Nano' : modelId.includes('mini') ? 'GPT-5.4 Mini' : 'GPT-5.4';
+  if (modelId.includes('gemini')) return modelId.includes('lite') ? 'Flash Lite' : modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
+  if (modelId.includes('kimi')) return 'Kimi K2.5';
   if (modelId.includes('minimax')) return modelId.includes('highspeed') ? 'M2.7 HS' : 'M2.7';
   return modelId;
 }
