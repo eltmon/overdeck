@@ -338,7 +338,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../lib/cloister/specialist-handoff-logger.js');
-        const updated = updateSpecialistHandoffStatus(
+        const updated = await updateSpecialistHandoffStatus(
           normalizedIssueId,
           `${specialist}-agent`,
           status === 'passed' ? 'completed' : 'failed',

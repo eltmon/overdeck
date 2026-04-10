@@ -13,10 +13,14 @@ import {
 } from '../../../src/lib/cloister/specialist-handoff-logger.js';
 import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { PANOPTICON_HOME, AGENTS_DIR } from '../../../src/lib/paths.js';
+import { tmpdir } from 'os';
+import { PANOPTICON_HOME } from '../../../src/lib/paths.js';
 
 const TEST_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'specialist-handoffs.jsonl');
 const TEST_LOG_DIR = join(PANOPTICON_HOME, 'logs');
+
+// Isolated temp directory for hook files — prevents tests from reading real AGENTS_DIR
+let TEST_AGENTS_DIR: string;
 
 describe('specialist-handoff-logger', () => {
   beforeEach(() => {
@@ -24,6 +28,9 @@ describe('specialist-handoff-logger', () => {
     if (existsSync(TEST_LOG_FILE)) {
       unlinkSync(TEST_LOG_FILE);
     }
+    // Create a fresh temp agents dir for each test
+    TEST_AGENTS_DIR = join(tmpdir(), `pan-test-agents-${Date.now()}`);
+    mkdirSync(TEST_AGENTS_DIR, { recursive: true });
   });
 
   afterEach(() => {
@@ -31,6 +38,8 @@ describe('specialist-handoff-logger', () => {
     if (existsSync(TEST_LOG_FILE)) {
       unlinkSync(TEST_LOG_FILE);
     }
+    // Remove temp agents dir
+    rmSync(TEST_AGENTS_DIR, { recursive: true, force: true });
   });
 
   describe('createSpecialistHandoff', () => {
@@ -254,7 +263,7 @@ describe('specialist-handoff-logger', () => {
 
   describe('getSpecialistHandoffStats', () => {
     it('should return zero stats for empty log', () => {
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.totalHandoffs).toBe(0);
       expect(stats.todayCount).toBe(0);
@@ -270,7 +279,7 @@ describe('specialist-handoff-logger', () => {
         logSpecialistHandoff(handoff);
       }
 
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(stats.totalHandoffs).toBe(5);
     });
 
@@ -284,7 +293,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // review-agent: sent 2, received 1
       expect(stats.bySpecialist['review-agent'].sent).toBe(2);
@@ -314,7 +323,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.byStatus['queued']).toBe(1);
       expect(stats.byStatus['processing']).toBe(1);
@@ -332,7 +341,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // 3 successes out of 4 completed
       expect(stats.successRate).toBe(0.75);
@@ -347,7 +356,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // Only 1 completed, 1 success = 100%
       expect(stats.successRate).toBe(1.0);
@@ -364,24 +373,19 @@ describe('specialist-handoff-logger', () => {
       handoffs.forEach(h => logSpecialistHandoff(h));
 
       // Without hook files: queueDepth = 0 (live hooks are authoritative)
-      const statsNoHooks = getSpecialistHandoffStats();
+      const statsNoHooks = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(statsNoHooks.queueDepth).toBe(0);
 
       // Write a hook.json for test-agent with 2 pending items
-      const testAgentDir = join(AGENTS_DIR, 'test-agent');
+      const testAgentDir = join(TEST_AGENTS_DIR, 'test-agent');
       mkdirSync(testAgentDir, { recursive: true });
       writeFileSync(
         join(testAgentDir, 'hook.json'),
         JSON.stringify({ agentId: 'test-agent', items: [{ id: 'a' }, { id: 'b' }] }),
       );
 
-      try {
-        const statsWithHooks = getSpecialistHandoffStats();
-        expect(statsWithHooks.queueDepth).toBe(2);
-      } finally {
-        // Clean up hook file
-        rmSync(testAgentDir, { recursive: true, force: true });
-      }
+      const statsWithHooks = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      expect(statsWithHooks.queueDepth).toBe(2);
     });
 
     it('should count today\'s handoffs correctly', () => {
@@ -401,7 +405,7 @@ describe('specialist-handoff-logger', () => {
       };
       logSpecialistHandoff(yesterdayHandoff);
 
-      const stats = getSpecialistHandoffStats();
+      const stats = getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.totalHandoffs).toBe(3);
       expect(stats.todayCount).toBe(2);

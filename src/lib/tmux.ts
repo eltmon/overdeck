@@ -1,5 +1,7 @@
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { PANOPTICON_HOME } from './paths.js';
