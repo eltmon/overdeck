@@ -46,7 +46,7 @@ function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google'
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
   if (modelId.startsWith('glm-')) return 'zai';
-  return 'kimi'; // default
+  return 'anthropic'; // default
 }
 
 /** Model ID to API model ID mapping */
@@ -217,17 +217,17 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'zai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4-flash') : 'glm-4-flash';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4.7-flash') : 'glm-4.7-flash';
           try {
-            const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+            const resp = await fetch('https://api.z.ai/api/anthropic/v1/messages', {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
             });
             latencyMs = Date.now() - startTime;
             if (resp.ok) {
-              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-              response = data.choices?.[0]?.message?.content?.trim() || '';
+              const data = await resp.json() as { content?: Array<{ text?: string }> };
+              response = data.content?.[0]?.text?.trim() || '';
               success = response.includes(expectedAnswer);
               if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
             } else if (resp.status === 401) {
@@ -325,8 +325,8 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'zai': {
           try {
-            const resp = await fetch('https://api.zai.chat/v1/models', {
-              headers: { 'Authorization': `Bearer ${apiKey}` },
+            const resp = await fetch('https://api.z.ai/api/anthropic/v1/models', {
+              headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
             });
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
