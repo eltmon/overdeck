@@ -170,14 +170,12 @@ describe('router-config', () => {
             expert: 'claude-opus-4-6',
           },
         },
-        api_keys: {
-          zai: 'zai-test-key',
-        },
+        api_keys: {},
       };
 
       const config = generateRouterConfig(settings);
 
-      // Z.AI is intentionally excluded - it uses direct API, not the router
+      // Only Anthropic provider
       expect(config.providers).toHaveLength(1);
       expect(config.providers[0].name).toBe('anthropic');
     });
@@ -203,14 +201,12 @@ describe('router-config', () => {
         api_keys: {
           openai: 'sk-test-key',
           google: 'AIza-test-key',
-          zai: 'zai-test-key', // Z.AI uses direct API, not router
         },
       };
 
       const config = generateRouterConfig(settings);
 
       // 3 providers: anthropic (always) + openai + google
-      // Z.AI is intentionally excluded (uses direct API, not router)
       expect(config.providers).toHaveLength(3);
       expect(config.providers.map((p) => p.name)).toEqual(
         expect.arrayContaining(['anthropic', 'openai', 'google'])

@@ -40,7 +40,6 @@ describe('settings-api', () => {
       expect(settings.models.providers.anthropic).toBe(true);
       expect(settings.models.providers.openai).toBe(true);
       expect(settings.models.providers.google).toBe(false);
-      expect(settings.models.providers.zai).toBe(false);
       expect(settings.models.providers.kimi).toBe(false);
       expect(settings.models.gemini_thinking_level).toBe(3);
     });
@@ -58,7 +57,6 @@ describe('settings-api', () => {
           anthropic: true,
           openai: true,
           google: false,
-          zai: false,
           kimi: false,
         },
         overrides: {},
@@ -134,7 +132,6 @@ describe('settings-api', () => {
       expect(models.anthropic).toBeDefined();
       expect(models.openai).toBeDefined();
       expect(models.google).toBeDefined();
-      expect(models.zai).toBeDefined();
       expect(models.kimi).toBeDefined();
 
       // Each model should have id and name properties
@@ -171,7 +168,6 @@ describe('settings-api', () => {
             anthropic: true,
             openai: true,
             google: false,
-            zai: false,
             kimi: false,
           },
           overrides: {},

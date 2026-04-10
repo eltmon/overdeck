@@ -83,7 +83,6 @@ export interface ApiSettingsConfig {
       anthropic: boolean;
       openai: boolean;
       google: boolean;
-      zai: boolean;
       kimi: boolean;
       minimax: boolean;
       openrouter: boolean;
@@ -94,7 +93,6 @@ export interface ApiSettingsConfig {
   api_keys: {
     openai?: string;
     google?: string;
-    zai?: string;
     kimi?: string;
     minimax?: string;
     openrouter?: string;
@@ -137,7 +135,6 @@ export function loadSettingsApi(): ApiSettingsConfig {
         anthropic: config.enabledProviders.has('anthropic'),
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
-        zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
         minimax: config.enabledProviders.has('minimax'),
         openrouter: config.enabledProviders.has('openrouter'),
@@ -165,7 +162,6 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
         anthropic: settings.models.providers.anthropic,
         openai: settings.models.providers.openai,
         google: settings.models.providers.google,
-        zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
         minimax: settings.models.providers.minimax,
         openrouter: settings.models.providers.openrouter,
@@ -290,7 +286,6 @@ export interface AvailableModelsResult {
   anthropic: ProviderModelEntry[];
   openai: ProviderModelEntry[];
   google: ProviderModelEntry[];
-  zai: ProviderModelEntry[];
   kimi: ProviderModelEntry[];
   minimax: ProviderModelEntry[];
   openrouter: ProviderModelEntry[];
@@ -302,7 +297,6 @@ export interface AvailableModelsResult {
     anthropic: boolean;
     openai: boolean;
     google: boolean;
-    zai: boolean;
     kimi: boolean;
     minimax: boolean;
     openrouter: boolean;
@@ -326,7 +320,6 @@ export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsR
     anthropic: [],
     openai: [],
     google: [],
-    zai: [],
     kimi: [],
     minimax: [],
     openrouter: [],
@@ -334,7 +327,6 @@ export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsR
       anthropic: anthropicAuthed,
       openai: config.enabledProviders.has('openai') && !!config.apiKeys.openai,
       google: config.enabledProviders.has('google') && !!config.apiKeys.google,
-      zai: config.enabledProviders.has('zai') && !!config.apiKeys.zai,
       kimi: config.enabledProviders.has('kimi') && !!config.apiKeys.kimi,
       minimax: config.enabledProviders.has('minimax') && !!config.apiKeys.minimax,
       openrouter: config.enabledProviders.has('openrouter') && !!config.apiKeys.openrouter,
@@ -347,7 +339,6 @@ export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsR
       case 'anthropic': result.anthropic.push(entry); break;
       case 'openai': result.openai.push(entry); break;
       case 'google': result.google.push(entry); break;
-      case 'zai': result.zai.push(entry); break;
       case 'kimi': result.kimi.push(entry); break;
       case 'minimax': result.minimax.push(entry); break;
       case 'openrouter': result.openrouter.push(entry); break;
@@ -367,7 +358,6 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         anthropic: true,
         openai: false,
         google: false,
-        zai: false,
         kimi: true, // Kimi K2.5 used for implementation work agent
         minimax: false,
         openrouter: false,
@@ -390,7 +380,6 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         anthropic: false,
         openai: false,
         google: false,
-        zai: false,
         kimi: false,
         minimax: true,
         openrouter: false,

@@ -206,7 +206,6 @@ describe('work-type-router', () => {
         expect(providers.has('anthropic')).toBe(true);
         expect(providers.has('openai')).toBe(true);
         expect(providers.has('google')).toBe(true);
-        expect(providers.has('zai')).toBe(false);
       });
     });
 
@@ -421,11 +420,10 @@ describe('work-type-router', () => {
   describe('multi-provider scenarios', () => {
     it('should work with all providers enabled', () => {
       const config: NormalizedConfig = {
-        enabledProviders: new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai']),
+        enabledProviders: new Set<ModelProvider>(['anthropic', 'openai', 'google']),
         apiKeys: {
           openai: 'sk-test',
           google: 'test',
-          zai: 'test',
         },
         overrides: {},
         geminiThinkingLevel: 3,

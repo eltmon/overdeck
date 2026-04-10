@@ -69,8 +69,6 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'Zhipu (GLM)',
     models: [
       { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship model, 256K context, top-tier reasoning' },
-      { id: 'glm-4.7' as ModelId, name: 'GLM 4.7', icon: Layers, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic'], description: '73.8% SWE-bench, 200K context, 400B params' },
-      { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
     ],
   },
   minimax: {

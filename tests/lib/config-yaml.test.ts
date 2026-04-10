@@ -42,7 +42,6 @@ models:
     anthropic: true
     openai: true
     google: false
-    zai: false
 `;
       writeFileSync(testGlobalConfig, yamlContent, 'utf-8');
 
