@@ -762,10 +762,12 @@ ${basePrompt}`;
     const innerScript = join(agentDir, 'run-claude.sh');
 
     // Inner script: the actual Claude invocation.
-    // test-agent NEVER resumes — each test run is stateless and must start fresh to avoid
-    // reporting cached analysis from prior runs (accumulated history caused repeated false-FAILs
-    // even after the underlying bug was fixed). All other specialists accumulate context.
-    const useResume = specialistType !== 'test-agent';
+    // ALL specialists start fresh sessions — no --resume. Reasons:
+    // 1. Context compaction corrupts thinking block signatures, making resumed sessions
+    //    permanently fail with "Invalid signature in thinking block" (PAN-612)
+    // 2. Specialists are task-based: each dispatch is a new task with a full prompt
+    // 3. Accumulated context caused false-FAILs in test-agent (stale analysis)
+    // Session ID is still deterministic per generation, so JSONL files are predictable.
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
@@ -774,16 +776,8 @@ export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
 prompt=$(cat "${promptFile}")
 
-${useResume ? `# Resume existing session (accumulates context over time)
-claude ${permissionFlags} --resume "${sessionId}" --model ${model} "$prompt"
-exit_code=$?
-
-# First cold start: session doesn't exist yet in Claude's storage
-if [ $exit_code -ne 0 ]; then
-  echo "[launcher] First run — creating session"
-  claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
-fi` : `# test-agent: always fresh session — no --resume to prevent stale result reporting
-claude ${permissionFlags} --model ${model} "$prompt"`}
+# Fresh session every dispatch — no --resume (PAN-612: thinking signature corruption)
+claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
 
 # Signal completion
 echo ""
@@ -2028,14 +2022,11 @@ export async function wakeSpecialist(
         : '--dangerously-skip-permissions';
 
       // Start with --resume if we have a session, otherwise generate a new session ID
-      let claudeCmd: string;
-      if (sessionId) {
-        claudeCmd = `claude --resume "${sessionId}" ${modelFlag} ${permissionFlags}`;
-      } else {
-        const newSessionId = randomUUID();
-        claudeCmd = `claude --session-id "${newSessionId}" ${modelFlag} ${permissionFlags}`;
-        setSessionId(name, newSessionId);
-      }
+      // Always start fresh — no --resume. Context compaction corrupts thinking block
+      // signatures, making resumed sessions permanently fail (PAN-612).
+      const effectiveSessionId = sessionId || randomUUID();
+      if (!sessionId) setSessionId(name, effectiveSessionId);
+      const claudeCmd = `claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
