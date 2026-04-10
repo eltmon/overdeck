@@ -271,6 +271,14 @@ export function setupTerminalWebSocket(server: http.Server): void {
         // Do NOT force SIGWINCH via dimension toggle — the async resize/repaint
         // races with the client's opacity reveal and causes text bleeding/corruption.
         // (Original fix: 2282e695, Feb 3 2026. Regression: April 2026 dimension toggles.)
+        //
+        // After a short delay, force a clean repaint via tmux refresh-client.
+        // This clears stale cursor artifacts in empty rows without changing dimensions.
+        setTimeout(() => {
+          if (ptyProcess && hub.clients.size > 0) {
+            execAsync(`tmux refresh-client -t ${sessionName} 2>/dev/null || true`).catch(() => {});
+          }
+        }, 300);
 
         // Handle PTY exit — close all client connections
         ptyProcess.onExit(({ exitCode }) => {
