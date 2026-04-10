@@ -101,6 +101,9 @@ export async function openEventDb(): Promise<DbAdapter> {
   const dbPath = join(home, 'panopticon.db');
 
   if (typeof Bun !== 'undefined') {
+    // @ts-ignore — bun:sqlite is a Bun-native module; @types/bun is only in the dashboard
+    // workspace node_modules, but this import is already guarded by the Bun runtime check.
+    // The DbAdapter interface enforces type safety for all returned database operations.
     const { Database } = await import('bun:sqlite');
     const db = new Database(dbPath, { create: true });
     db.exec('PRAGMA journal_mode = WAL');
