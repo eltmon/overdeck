@@ -10,7 +10,7 @@
 
 import { WorkTypeId, isValidWorkType, validateWorkType, getAllWorkTypes } from './work-types.js';
 import { ModelId } from './settings.js';
-import { applyFallback, ModelProvider, getModelsByProvider } from './model-fallback.js';
+import { applyTierAwareFallback, ModelProvider, getModelsByProvider } from './model-fallback.js';
 import { loadConfig, NormalizedConfig } from './config-yaml.js';
 import { selectModel, ModelSelectionResult } from './smart-model-selector.js';
 
@@ -77,6 +77,12 @@ export class WorkTypeRouter {
   getModel(workTypeId: WorkTypeId): ModelResolutionResult {
     validateWorkType(workTypeId);
 
+    // Determine effective user tier for OpenAI (undefined = API key auth)
+    const userTier =
+      this.config.providerAuth['openai'] === 'subscription'
+        ? this.config.providerPlan['openai']
+        : undefined;
+
     let model: ModelId;
     let source: 'override' | 'smart';
     let originalModel: ModelId | undefined;
@@ -91,13 +97,8 @@ export class WorkTypeRouter {
         reason: `Explicit override: ${model}`,
       };
     } else {
-      // Use smart (capability-based) selection
+      // Use smart (capability-based) selection with tier awareness
       const availableModels = this.getAvailableModels();
-      // Determine effective user tier from config (for OAuth subscription users)
-      const userTier =
-        this.config.providerAuth['openai'] === 'subscription'
-          ? this.config.providerPlan['openai']
-          : undefined;
       const result = selectModel(workTypeId, availableModels, { userTier });
       model = result.model;
       source = 'smart';
@@ -107,9 +108,9 @@ export class WorkTypeRouter {
       };
     }
 
-    // Apply fallback if provider is disabled
+    // Apply tier-aware fallback (downgrades within provider or switches to Anthropic)
     originalModel = model;
-    model = applyFallback(model, this.config.enabledProviders);
+    model = applyTierAwareFallback(model, this.config.enabledProviders, userTier);
 
     return {
       model,
