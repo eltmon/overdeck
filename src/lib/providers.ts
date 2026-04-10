@@ -92,7 +92,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'router',
-    models: ['gemini-3-pro-preview', 'gemini-3-flash-preview'],
+    models: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     tested: false,
     description: 'Requires claude-code-router for API translation',
   },

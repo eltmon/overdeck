@@ -66,6 +66,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // Google → Anthropic
   'gemini-3-pro-preview': 'claude-sonnet-4-6', // Premium model → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-2.5-pro': 'claude-sonnet-4-6', // Premium model → Sonnet
+  'gemini-2.5-flash': 'claude-haiku-4-5', // Fast model → Haiku
 
   // Z.AI → Anthropic
   'glm-4.7': 'claude-haiku-4-5', // Standard model → Haiku
