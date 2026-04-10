@@ -39,3 +39,4 @@ today's count with "(today)" label text instead of lifetime total.
 - **[2026-04-10] All issues resolved** — fixed test isolation (temp AGENTS_DIR), async violations (sessionExistsAsync, updateSpecialistHandoffStatus async), placeholder, dead code (onDisconnect wired)
 - **[2026-04-10T19:53Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
 - **[2026-04-10T20:44Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/005-review-agent-changes-requested.md`
+- **[2026-04-10T20:56Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`
