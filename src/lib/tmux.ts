@@ -83,6 +83,15 @@ export function sessionExists(name: string): boolean {
   }
 }
 
+export async function sessionExistsAsync(name: string): Promise<boolean> {
+  try {
+    await execAsync(`tmux has-session -t ${name} 2>/dev/null`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function createSession(
   name: string,
   cwd: string,

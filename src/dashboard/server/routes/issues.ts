@@ -48,7 +48,7 @@ import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js'
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
-import { sessionExists } from '../../../lib/tmux.js';
+import { sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -952,7 +952,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // planning finishes, but the user may have already clicked "Start Agent". Resetting the
     // issue to Planned would undo that and flash the card back to To Do.
     const workAgentSession = `agent-${issueLower}`;
-    const workAgentAlreadyRunning = sessionExists(workAgentSession);
+    const workAgentAlreadyRunning = yield* Effect.promise(() => sessionExistsAsync(workAgentSession));
     if (workAgentAlreadyRunning) {
       console.log(`[complete-planning] Work agent ${workAgentSession} is already running — skipping status reset to Planned`);
     }
