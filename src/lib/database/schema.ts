@@ -6,9 +6,11 @@
  */
 
 import type Database from 'better-sqlite3';
+import { encodeClaudeProjectDir } from '../paths.js';
+import { existsSync } from 'fs';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /**
  * Initialize the complete database schema.
@@ -371,6 +373,51 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN effort TEXT`);
     } catch { /* already exists */ }
+  }
+
+  // v13 → v14: fix stale session_file paths (PAN-594)
+  // Old code preserved dots in CWD (e.g. edward.becker), but Claude Code encodes
+  // them as hyphens (e.g. edward-becker). This migration updates existing records.
+  if (currentVersion < 14) {
+    const conversations = db
+      .prepare(
+        `SELECT id, name, cwd, session_file FROM conversations WHERE session_file IS NOT NULL`
+      )
+      .all() as Array<{ id: number; name: string; cwd: string; session_file: string }>;
+
+    let fixedCount = 0;
+    for (const conv of conversations) {
+      // Extract the CWD segment from the stale session_file path
+      // Path format: ~/.claude/projects/<encoded-cwd>/sessions/<session-id>.jsonl
+      const match = conv.session_file.match(
+        /^(.*[/\\]\.claude[/\\]projects[/\\])([^/\\]+)([/\\]sessions[/\\][^/\\]+\.jsonl)$/
+      );
+      if (!match) continue;
+
+      const [, prefix, encodedCwdSegment, suffix] = match;
+      const expectedEncodedCwd = encodeClaudeProjectDir(conv.cwd);
+
+      if (encodedCwdSegment === expectedEncodedCwd) {
+        // Already correct — skip
+        continue;
+      }
+
+      const correctPath = `${prefix}${expectedEncodedCwd}${suffix}`;
+      if (!existsSync(correctPath)) {
+        // File doesn't exist at the correctly-encoded path — skip (can't fix)
+        continue;
+      }
+
+      db.prepare(`UPDATE conversations SET session_file = ? WHERE id = ?`).run(
+        correctPath,
+        conv.id
+      );
+      fixedCount++;
+    }
+
+    if (fixedCount > 0) {
+      console.log(`Fixed session_file paths for ${fixedCount} conversation(s) via PAN-594 migration`);
+    }
   }
 
   // After all migrations, set the version
