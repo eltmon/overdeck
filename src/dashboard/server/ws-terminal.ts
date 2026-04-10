@@ -148,13 +148,19 @@ export function setupTerminalWebSocket(server: http.Server): void {
             try {
               const parsed = JSON.parse(message);
               if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-                existingHub.cols = parsed.cols;
-                existingHub.rows = parsed.rows;
-                try {
-                  existingHub.pty.resize(parsed.cols, parsed.rows);
-                } catch { /* ignore */ }
-                execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
-                  .catch(() => {});
+                // Only the input client (most recently connected) can resize the PTY.
+                // Other clients must fit to the PTY's current size — otherwise multiple
+                // browser windows/tabs at different sizes would fight over the PTY dimensions,
+                // causing text cutoff for one viewer.
+                if (existingHub.inputClient === ws) {
+                  existingHub.cols = parsed.cols;
+                  existingHub.rows = parsed.rows;
+                  try {
+                    existingHub.pty.resize(parsed.cols, parsed.rows);
+                  } catch { /* ignore */ }
+                  execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+                    .catch(() => {});
+                }
                 return;
               }
             } catch {

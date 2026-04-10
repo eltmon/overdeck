@@ -325,8 +325,27 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // The server waits for this resize message before starting the SSH session
       // This ensures tmux is created with the correct dimensions from the start
       fit?.fit();
-      console.log('XTerminal: Sending initial dimensions:', term!.cols, 'x', term!.rows);
-      ws.send(JSON.stringify({ type: 'resize', cols: term!.cols, rows: term!.rows }));
+
+      // Validate fit result — if cols are unreasonably small, the char measure element
+      // returned a wrong width (happens when the container isn't fully laid out yet).
+      // Retry fit after a short delay to let CSS settle.
+      const sendDimensions = () => {
+        console.log('XTerminal: Sending initial dimensions:', term!.cols, 'x', term!.rows);
+        ws.send(JSON.stringify({ type: 'resize', cols: term!.cols, rows: term!.rows }));
+      };
+
+      if (term!.cols < 40) {
+        console.warn(`XTerminal: fit() returned ${term!.cols} cols — too narrow, retrying in 200ms`);
+        setTimeout(() => {
+          fit?.fit();
+          if (term!.cols < 40) {
+            console.warn(`XTerminal: Still ${term!.cols} cols after retry — sending anyway`);
+          }
+          sendDimensions();
+        }, 200);
+      } else {
+        sendDimensions();
+      }
     };
 
     // DEBUG: Enable detailed logging to diagnose terminal corruption
