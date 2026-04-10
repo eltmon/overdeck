@@ -33,3 +33,7 @@ today's count with "(today)" label text instead of lifetime total.
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-07T04:52Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-07T18:59Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+- **[2026-04-10T19:45Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-04-10] All issues resolved** — fixed test isolation (temp AGENTS_DIR), async violations (sessionExistsAsync, updateSpecialistHandoffStatus async), placeholder, dead code (onDisconnect wired)
