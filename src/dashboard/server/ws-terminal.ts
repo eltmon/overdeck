@@ -252,23 +252,18 @@ export function setupTerminalWebSocket(server: http.Server): void {
         hub.pty = ptyProcess;
         activePtyHubs.set(sessionName, hub);
 
-        // Suppress initial PTY output — the first data burst contains the tmux screen
-        // rendered at the OLD size (80x24 default). We drop it, wait for Claude to
-        // process SIGWINCH (from our PTY attachment resizing the window), then force
-        // a second SIGWINCH via dimension toggle to trigger a clean full repaint.
-        let forwarding = false;
-
-        // Broadcast PTY data to ALL connected clients
+        // Forward ALL PTY data to clients immediately — no server-side suppression.
+        // The initial tmux dump populates xterm.js's scrollback buffer, which is needed
+        // for mousewheel scrolling. The client handles visual flash by hiding the terminal
+        // element briefly (opacity: 0) until the repaint settles.
         ptyProcess.onData((data) => {
-          if (!forwarding) return;
           broadcastToHub(hub, data);
         });
 
-        // After 200ms: start forwarding, then force full repaint via dimension toggle.
+        // After 200ms: force full repaint via dimension toggle.
         // The toggle (cols -> cols-1 -> cols) guarantees two SIGWINCHs, the last at the
-        // correct size. Claude repaints its entire TUI and we forward the clean result.
+        // correct size. Claude repaints its entire TUI at the correct dimensions.
         setTimeout(() => {
-          forwarding = true;
           if (ptyProcess && hub.clients.size > 0) {
             // Toggle dimensions to force SIGWINCH + full repaint
             ptyProcess.resize(cols - 1, rows);

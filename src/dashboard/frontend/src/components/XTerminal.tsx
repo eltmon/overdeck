@@ -412,13 +412,21 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         }
       }
 
-      // Session is alive — clear only on the FIRST mount (initial connect).
-      // On reconnects within the same session, DO NOT clear — that would wipe
-      // the scrollback buffer. The hadFirstData ref persists across reconnects
-      // within the same React component lifecycle, so reconnects skip this block.
+      // Session is alive — on first data, hide terminal briefly while the initial
+      // tmux scrollback dump and SIGWINCH repaint settle. After 350ms, reveal the
+      // terminal with the correct viewport. This prevents the visible flash of
+      // old-size content without suppressing scrollback data (which xterm.js needs
+      // for mousewheel scrolling).
       if (!hadFirstData.current) {
         hadFirstData.current = true;
-        term!.clear();
+        if (terminalRef.current) {
+          terminalRef.current.style.opacity = '0';
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.style.opacity = '1';
+            }
+          }, 350);
+        }
       }
       reconnectAttempts.current = 0;
 
