@@ -5,8 +5,10 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { useDashboardStore, selectAgentList } from '../lib/store';
 
 interface CloisterStatus {
   running: boolean;
@@ -21,39 +23,10 @@ interface CloisterStatus {
   agentsNeedingAttention: string[];
 }
 
-interface CloisterConfig {
-  startup: {
-    auto_start: boolean;
-  };
-  thresholds: {
-    stale_minutes: number;
-    warning_minutes: number;
-    stuck_minutes: number;
-  };
-  specialists: {
-    enabled: string[];
-  };
-}
-
 async function fetchCloisterStatus(): Promise<CloisterStatus> {
   const res = await fetch('/api/cloister/status');
   if (!res.ok) throw new Error('Failed to fetch Cloister status');
   return res.json();
-}
-
-async function fetchCloisterConfig(): Promise<CloisterConfig> {
-  const res = await fetch('/api/cloister/config');
-  if (!res.ok) throw new Error('Failed to fetch Cloister config');
-  return res.json();
-}
-
-async function updateCloisterConfig(config: Partial<CloisterConfig>): Promise<void> {
-  const res = await fetch('/api/cloister/config', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
-  });
-  if (!res.ok) throw new Error('Failed to update Cloister config');
 }
 
 async function startCloister(): Promise<void> {
@@ -72,21 +45,27 @@ async function emergencyStop(): Promise<{ killedAgents: string[] }> {
   return res.json();
 }
 
-export function CloisterStatusBar() {
+async function fetchConversations(): Promise<{ sessionAlive: boolean }[]> {
+  const res = await fetch('/api/conversations');
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showRestartPopover, setShowRestartPopover] = useState(false);
+  const [restartConversations, setRestartConversations] = useState(true);
+  const [restartAgents, setRestartAgents] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
   const queryClient = useQueryClient();
 
   const { data: status, refetch } = useQuery({
     queryKey: ['cloister-status'],
     queryFn: fetchCloisterStatus,
-    refetchInterval: 10000, // Refresh every 10 seconds
-  });
-
-  const { data: config } = useQuery({
-    queryKey: ['cloister-config'],
-    queryFn: fetchCloisterConfig,
+    refetchInterval: 10000,
   });
 
   const { data: specialistsData } = useQuery({
@@ -99,13 +78,56 @@ export function CloisterStatusBar() {
     refetchInterval: 30000,
   });
 
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    refetchInterval: 10000,
+  });
+
+  const agents = useDashboardStore(selectAgentList);
+  const runningAgentCount = agents.filter(a => a.status === 'running').length;
+  const aliveConversationCount = conversations.filter(c => c.sessionAlive).length;
+
   const runningEphemeral: Array<{ projectKey: string; specialistType: string }> =
     (specialistsData?.projects ?? []).filter((p: { isRunning: boolean }) => p.isRunning);
 
-  const configMutation = useMutation({
-    mutationFn: updateCloisterConfig,
+  const openPopover = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPopoverPos({ left: rect.left, bottom: window.innerHeight - rect.top + 8 });
+    }
+    setShowRestartPopover(true);
+  }, []);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showRestartPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target as Node) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as Node)
+      ) {
+        setShowRestartPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showRestartPopover]);
+
+  const restartMutation = useMutation({
+    mutationFn: async ({ convs, doAgents }: { convs: boolean; doAgents: boolean }) => {
+      const promises: Promise<Response>[] = [];
+      if (convs) promises.push(fetch('/api/conversations/restart-all', { method: 'POST' }));
+      if (doAgents) promises.push(fetch('/api/agents/restart-all', { method: 'POST' }));
+      const results = await Promise.all(promises);
+      for (const r of results) {
+        if (!r.ok) throw new Error(`Restart failed: ${r.statusText}`);
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cloister-config'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      refetch();
+      setShowRestartPopover(false);
     },
   });
 
@@ -129,11 +151,9 @@ export function CloisterStatusBar() {
     refetch();
   };
 
-  const handleAutoStartToggle = () => {
-    if (!config) return;
-    configMutation.mutate({
-      startup: { auto_start: !config.startup.auto_start },
-    });
+  const handleRestart = () => {
+    if (!restartConversations && !restartAgents) return;
+    restartMutation.mutate({ convs: restartConversations, doAgents: restartAgents });
   };
 
   if (!status) {
@@ -148,7 +168,7 @@ export function CloisterStatusBar() {
       {/* Cloister Status Indicator */}
       <div className="flex items-center gap-1" title={status.running ? 'Cloister: Running' : 'Cloister: Stopped'}>
         {status.running ? (
-          <Bell className="w-3.5 h-3.5 text-green-400" />
+          <Bell className="w-3.5 h-3.5 text-success" />
         ) : (
           <BellOff className="w-3.5 h-3.5 text-content-muted" />
         )}
@@ -158,13 +178,13 @@ export function CloisterStatusBar() {
       {status.running && status.summary.total > 0 && (
         <div className="flex items-center gap-1 text-xs">
           {status.summary.active > 0 && (
-            <span className="text-green-400">{status.summary.active}</span>
+            <span className="text-success">{status.summary.active}</span>
           )}
           {status.summary.warning > 0 && (
-            <span className="text-orange-400">{status.summary.warning}</span>
+            <span className="text-warning">{status.summary.warning}</span>
           )}
           {status.summary.stuck > 0 && (
-            <span className="text-red-400">{status.summary.stuck}</span>
+            <span className="text-destructive">{status.summary.stuck}</span>
           )}
         </div>
       )}
@@ -172,7 +192,7 @@ export function CloisterStatusBar() {
       {/* Running Ephemeral Specialists Indicator */}
       {runningEphemeral.length > 0 && (
         <span
-          className="flex items-center gap-0.5 text-xs text-green-400"
+          className="flex items-center gap-0.5 text-xs text-success"
           title={`Ephemeral: ${runningEphemeral.map(p => `${p.projectKey.toUpperCase()} ${p.specialistType}`).join(', ')}`}
         >
           <Zap className="w-3 h-3" />
@@ -183,7 +203,7 @@ export function CloisterStatusBar() {
       {/* Warning Indicator */}
       {hasWarnings && (
         <span title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`}>
-          <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+          <AlertTriangle className="w-3.5 h-3.5 text-warning" />
         </span>
       )}
 
@@ -198,7 +218,7 @@ export function CloisterStatusBar() {
               ? 'bg-surface-emphasis text-content-subtle cursor-wait'
               : status.running
               ? 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
-              : 'bg-blue-600 text-content hover:bg-blue-700'
+              : 'bg-primary text-white hover:bg-primary/90'
           }`}
         >
           {isToggling
@@ -206,21 +226,84 @@ export function CloisterStatusBar() {
             : (status.running ? 'Pause' : 'Start')}
         </button>
 
+        {/* Restart Sessions */}
+        <button
+          ref={buttonRef}
+          onClick={() => showRestartPopover ? setShowRestartPopover(false) : openPopover()}
+          className="p-1 rounded text-xs bg-surface-overlay text-content-body border border-border hover:bg-surface-emphasis transition-colors"
+          title="Restart sessions"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${restartMutation.isPending ? 'animate-spin' : ''}`} />
+        </button>
+        {showRestartPopover && popoverPos && createPortal(
+          <div
+            ref={popoverRef}
+            style={{ position: 'fixed', zIndex: 9999, left: popoverPos.left, bottom: popoverPos.bottom, width: 256, borderRadius: 6, border: '1px solid var(--border, #333)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', backgroundColor: 'var(--card, #0c1018)' }}
+          >
+              <div className="px-3 py-2 text-xs font-semibold text-foreground border-b border-border">
+                Restart Sessions
+              </div>
+              <div className="p-2 space-y-1">
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-foreground hover:bg-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={restartConversations}
+                    onChange={e => setRestartConversations(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Conversations</span>
+                  <span className="ml-auto text-muted-foreground">({aliveConversationCount} active)</span>
+                </label>
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-foreground hover:bg-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={restartAgents}
+                    onChange={e => setRestartAgents(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Workspace Agents</span>
+                  <span className="ml-auto text-muted-foreground">({runningAgentCount} active)</span>
+                </label>
+              </div>
+              <div className="flex justify-end gap-1.5 px-3 py-2 border-t border-border">
+                <button
+                  onClick={() => setShowRestartPopover(false)}
+                  className="px-2 py-1 rounded text-xs text-foreground bg-muted hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRestart}
+                  disabled={restartMutation.isPending || (!restartConversations && !restartAgents)}
+                  className="px-2 py-1 rounded text-xs text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restartMutation.isPending ? 'Restarting...' : 'Restart'}
+                </button>
+              </div>
+              {restartMutation.isError && (
+                <div className="px-3 py-1.5 text-xs text-destructive border-t border-border">
+                  {(restartMutation.error as Error).message}
+                </div>
+              )}
+          </div>,
+          document.body,
+        )}
+
         {/* Emergency Stop */}
         {!showEmergencyConfirm ? (
           <button
             onClick={() => setShowEmergencyConfirm(true)}
-            className="p-1 rounded text-xs bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors"
+            className="p-1 rounded text-xs badge-bg-destructive text-destructive border badge-border-destructive hover:bg-destructive/20 transition-colors"
             title="Emergency stop - kill all agents"
           >
             <StopCircle className="w-3.5 h-3.5" />
           </button>
         ) : (
-          <div className="flex items-center gap-1 px-2 py-0.5 bg-red-600/20 rounded border border-red-600/30">
-            <span className="text-xs text-red-300">Kill all?</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 badge-bg-destructive rounded border badge-border-destructive">
+            <span className="text-xs text-destructive">Kill all?</span>
             <button
               onClick={handleEmergencyStop}
-              className="px-1.5 py-0.5 rounded text-xs bg-red-600 text-content hover:bg-red-700"
+              className="px-1.5 py-0.5 rounded text-xs bg-destructive text-white hover:bg-destructive/90"
             >
               Yes
             </button>
@@ -233,43 +316,14 @@ export function CloisterStatusBar() {
           </div>
         )}
 
-        {/* Settings */}
-        <div className="relative">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-1 rounded text-xs transition-colors ${
-              showSettings
-                ? 'bg-surface-emphasis text-content'
-                : 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
-            }`}
-            title="Cloister settings"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Settings Dropdown */}
-          {showSettings && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-surface-raised border border-divider rounded-lg shadow-lg z-50">
-              <div className="p-3">
-                <div className="text-xs text-content-subtle font-medium mb-2">Settings</div>
-
-                {/* Auto-start checkbox */}
-                <label className="flex items-center gap-2 cursor-pointer hover:bg-surface-overlay/50 rounded px-2 py-1.5 -mx-2">
-                  <input
-                    type="checkbox"
-                    checked={config?.startup.auto_start ?? true}
-                    onChange={handleAutoStartToggle}
-                    disabled={configMutation.isPending}
-                    className="w-4 h-4 rounded border-divider-strong bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
-                  />
-                  <span className="text-sm text-content-body">
-                    Auto-start on dashboard launch
-                  </span>
-                </label>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Settings — navigates to Settings page */}
+        <button
+          onClick={onOpenSettings}
+          className="p-1 rounded text-xs bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
+          title="Open Settings"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

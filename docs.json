@@ -2,6 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "Panopticon",
   "theme": "maple",
+  "layout": "topnav",
   "colors": {
     "primary": "#D4A27F",
     "light": "#E5C4A8",
@@ -25,7 +26,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Getting Started",
         "groups": [
           {
             "group": "Getting Started",
@@ -34,7 +35,12 @@
               "quickstart",
               "concepts"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
           {
             "group": "CLI Reference",
             "pages": [
@@ -44,7 +50,12 @@
               "cli/workspace-commands",
               "cli/convoy-commands"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Features",
+        "groups": [
           {
             "group": "Features",
             "pages": [
@@ -55,7 +66,12 @@
               "features/workspaces",
               "features/convoys"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Configuration",
+        "groups": [
           {
             "group": "Configuration",
             "pages": [
@@ -63,7 +79,12 @@
               "configuration/issue-trackers",
               "configuration/polyrepo"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
           {
             "group": "Guides",
             "pages": [
@@ -71,7 +92,12 @@
               "guides/stitch-integration",
               "guides/docker-setup"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
           {
             "group": "Reference",
             "pages": [

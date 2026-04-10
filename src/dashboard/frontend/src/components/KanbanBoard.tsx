@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle, ScrollText } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -28,16 +28,16 @@ import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { DeepWipeDialog } from './DeepWipeDialog';
+import { useUIPreferences } from '../hooks/useUIPreferences';
 
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
-  trivial: 'bg-green-900/50 text-green-400',
-  simple: 'bg-green-900/50 text-green-400',
-  medium: 'bg-yellow-900/50 text-yellow-400',
-  complex: 'bg-orange-900/50 text-orange-400',
-  expert: 'bg-red-900/50 text-red-400',
+  trivial: 'badge-bg-success text-success-foreground',
+  simple: 'badge-bg-success text-success-foreground',
+  medium: 'badge-bg-warning text-warning-foreground',
+  complex: 'badge-bg-warning text-warning-foreground',
+  expert: 'badge-bg-destructive text-destructive-foreground',
 };
 
 // Difficulty badge component
@@ -61,20 +61,17 @@ const AGENT_ICONS: Record<string, string> = {
 // Agent attribution badge component
 function AgentBadge({
   type,
-  name,
   isConflict
 }: {
   type: 'work' | 'review' | 'test' | 'merge';
-  name: string;
   isConflict: boolean;
 }) {
   const icon = AGENT_ICONS[type];
   const conflictClass = isConflict ? 'animate-[pulse_2s_ease-in-out_infinite]' : '';
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs text-blue-400 ${conflictClass}`}>
+    <span className={`inline-flex items-center text-xs text-primary ${conflictClass}`}>
       <span>{icon}</span>
-      <span>{name}</span>
     </span>
   );
 }
@@ -120,16 +117,8 @@ function formatCost(cost: number): string {
 }
 
 // Get cost badge color based on amount
-function getLabelStyle(label: string): string {
-  const l = label.toLowerCase();
-  if (l === 'bug') return 'bg-red-900/40 text-red-400 border border-red-500/30';
-  if (l === 'security') return 'bg-red-900/40 text-red-300 border border-red-500/30';
-  if (l === 'enhancement') return 'bg-blue-900/40 text-blue-400 border border-blue-500/30';
-  if (l === 'improvement') return 'bg-cyan-900/40 text-cyan-400 border border-cyan-500/30';
-  if (l === 'planning' || l === 'in-planning') return 'bg-purple-900/40 text-purple-400 border border-purple-500/30';
-  if (l === 'in-progress') return 'bg-blue-900/40 text-blue-400 border border-blue-500/30';
-  if (l === 'in-review') return 'bg-amber-900/40 text-amber-400 border border-amber-500/30';
-  return 'bg-gray-800/60 text-gray-400 border border-gray-600/30';
+function getLabelStyle(_label: string): string {
+  return 'bg-muted text-muted-foreground border border-border';
 }
 
 function getCostColor(_cost: number): string {
@@ -292,6 +281,113 @@ export function groupByCanceledType(issues: Issue[]): { name: string; issues: Is
 }
 
 /**
+ * Generate mock Rally data for visual testing when no Rally connection exists.
+ * Enable via URL param: ?mockRally=true
+ */
+function generateMockRallyData(): Issue[] {
+  const rallyProject: LinearProject = { id: 'mock-rally-project', name: 'HS POS Integrations', color: '#3b82f6' };
+  const rallyProject2: LinearProject = { id: 'mock-rally-project-2', name: 'HSv3', color: '#10b981' };
+
+  const features: Issue[] = [
+    // Feature in To Do — no children in this column
+    {
+      id: 'mock-f1', identifier: 'F28993', title: 'Delete/Anonymize PII for Ex-Employees in Payroll Integration',
+      status: 'To Do', priority: 2, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', totalChildCount: 3, completedChildCount: 0, inProgressChildCount: 0,
+    },
+    // Feature in To Do — no children
+    {
+      id: 'mock-f2', identifier: 'F29398', title: 'Implement Event-Driven Architecture for Real-Time Sync',
+      status: 'To Do', priority: 2, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', totalChildCount: 5, completedChildCount: 0, inProgressChildCount: 2,
+    },
+    // Feature in In Progress — derived status, with children in column
+    {
+      id: 'mock-f3', identifier: 'F29390', title: 'Dir Dev – Small Business Onboarding Flow Redesign',
+      status: 'In Progress', priority: 1, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', derivedStatus: 'in_progress',
+      totalChildCount: 4, completedChildCount: 0, inProgressChildCount: 2,
+    },
+    // Feature in In Progress — with more children
+    {
+      id: 'mock-f4', identifier: 'F27973', title: 'Direct Development: Ciccio Restaurant Group POS Migration',
+      status: 'In Progress', priority: 1, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Discovering', derivedStatus: 'in_progress',
+      totalChildCount: 8, completedChildCount: 3, inProgressChildCount: 3,
+    },
+    // Feature in Done
+    {
+      id: 'mock-f5', identifier: 'F28100', title: 'Automated Tip Reconciliation Report Generation',
+      status: 'Done', priority: 3, labels: [], url: '#', createdAt: '2025-01-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'PortfolioItem/Feature',
+      rawTrackerState: 'Done', derivedStatus: 'closed',
+      totalChildCount: 4, completedChildCount: 4, inProgressChildCount: 0,
+    },
+  ];
+
+  const stories: Issue[] = [
+    // Children of F29390 (In Progress)
+    {
+      id: 'mock-us1', identifier: 'US218080', title: 'LPSLI – Step 1.2: API Integration for Small Biz Validation',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F29390', rawTrackerState: 'In-Progress',
+    },
+    {
+      id: 'mock-us2', identifier: 'US214008', title: 'LPSLI – Step 2: Assign Default Tax Templates',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F29390', rawTrackerState: 'In-Progress',
+    },
+    // Children of F27973 (In Progress)
+    {
+      id: 'mock-us3', identifier: 'US217395', title: 'Add a warning/alert if menu item prices differ >10% from market avg',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F27973', rawTrackerState: 'In-Progress',
+    },
+    {
+      id: 'mock-us4', identifier: 'US204193', title: 'Ensure Adjustment items sync correctly to accounting export',
+      status: 'In Progress', priority: 2, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F27973', rawTrackerState: 'In-Progress',
+    },
+    {
+      id: 'mock-us5', identifier: 'US215578', title: 'QA Automation plan for Ciccio migration regression suite',
+      status: 'In Progress', priority: 3, labels: [], url: '#', createdAt: '2025-02-01', updatedAt: '2025-04-01',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F27973', rawTrackerState: 'Defined',
+    },
+    // A story in To Do under F28993
+    {
+      id: 'mock-us6', identifier: 'US220001', title: 'Define PII field inventory for payroll data exports',
+      status: 'To Do', priority: 2, labels: [], url: '#', createdAt: '2025-03-01', updatedAt: '2025-04-01',
+      project: rallyProject, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F28993', rawTrackerState: 'Defined',
+    },
+    // Done stories under F28100
+    {
+      id: 'mock-us7', identifier: 'US210500', title: 'Generate nightly tip reconciliation CSV per location',
+      status: 'Done', priority: 2, labels: [], url: '#', createdAt: '2025-01-15', updatedAt: '2025-03-20',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F28100', rawTrackerState: 'Accepted',
+    },
+    {
+      id: 'mock-us8', identifier: 'US210501', title: 'Email distribution list for tip reports with PDF attachment',
+      status: 'Done', priority: 2, labels: [], url: '#', createdAt: '2025-01-15', updatedAt: '2025-03-22',
+      project: rallyProject2, source: 'rally', artifactType: 'HierarchicalRequirement',
+      parentRef: 'F28100', rawTrackerState: 'Accepted',
+    },
+  ];
+
+  return [...features, ...stories];
+}
+
+/**
  * Organize issues in a column into hierarchical groups.
  * Features (PortfolioItem) become parent groups; Stories/Defects with
  * a matching parentRef nest underneath. Orphans display normally.
@@ -378,7 +474,7 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
   if (compact) {
     return (
       <span
-        className="w-2 h-2 rounded-full bg-purple-500 shrink-0"
+        className="w-2 h-2 rounded-full badge-bg-signal-review shrink-0"
         title={`Rally: ${trackerState} → Pan: ${shadowLabel}`}
       />
     );
@@ -386,12 +482,12 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
 
   return (
     <div className="flex items-center gap-1 text-xs">
-      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-700/50 text-gray-300">
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-foreground">
         <ExternalLink className="w-2.5 h-2.5" />
         {trackerState}
       </span>
       <span className="text-content-muted">→</span>
-      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded badge-bg-signal-review text-signal-review-foreground">
         <Eye className="w-2.5 h-2.5" />
         {shadowLabel}
       </span>
@@ -400,16 +496,19 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
 }
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
+// Children (user stories) render INSIDE the card
 function FeatureCard({
   feature,
   childCount,
   isExpanded,
   onToggle,
+  children,
 }: {
   feature: Issue;
   childCount: number;
   isExpanded: boolean;
   onToggle: () => void;
+  children?: React.ReactNode;
 }) {
   const completed = feature.completedChildCount ?? 0;
   const inProgress = feature.inProgressChildCount ?? 0;
@@ -422,16 +521,23 @@ function FeatureCard({
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
   return (
-    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-indigo-500 overflow-hidden">
+    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-primary overflow-hidden">
       <div
         onClick={onToggle}
-        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-indigo-900/20 transition-colors"
+        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
       >
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-        )}
+        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-primary/70" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-primary/70" />
+          )}
+          {childCount > 0 && (
+            <span className="text-[10px] font-medium text-primary/60 min-w-[1rem] text-center">
+              {childCount}
+            </span>
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {feature.project && (
@@ -445,41 +551,42 @@ function FeatureCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-xs font-medium text-indigo-300 hover:text-indigo-200 flex items-center gap-1"
+              className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1"
             >
               <span>{feature.identifier}</span>
               <ExternalLink className="w-2.5 h-2.5 opacity-50" />
             </a>
             {hasDerivedDiff && (
-              <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/50 text-amber-400">
+              <span className="px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground">
                 derived
               </span>
             )}
             <TrackerShadowBadges issue={feature} />
           </div>
-          <p className="text-sm text-content-body mt-1 line-clamp-1">{feature.title}</p>
+          <p className="text-sm text-content-body mt-1 line-clamp-2">{feature.title}</p>
 
           {/* Progress bar and summary */}
           {total > 0 && (
             <div className="mt-2">
-              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all"
+                  className="h-full bg-success rounded-full transition-all"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-content-muted">
-                  {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
-                </span>
-                <span className="text-xs text-indigo-400">
-                  {childCount} in column
-                </span>
-              </div>
+              <span className="text-[11px] text-content-muted mt-0.5 block">
+                {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
+              </span>
             </div>
           )}
         </div>
       </div>
+      {/* Child stories rendered inside the card */}
+      {isExpanded && children && (
+        <div className="border-t border-border/50 bg-surface-raised/50">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -493,10 +600,10 @@ function CompactChildCard({
   agents: Agent[];
 }) {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
-  const dotColor = canonical === 'done' ? 'bg-green-400' :
-                   canonical === 'in_progress' ? 'bg-yellow-400' :
-                   canonical === 'in_review' ? 'bg-pink-400' :
-                   'bg-gray-500';
+  const dotColor = canonical === 'done' ? 'bg-success' :
+                   canonical === 'in_progress' ? 'bg-warning' :
+                   canonical === 'in_review' ? 'bg-signal-review' :
+                   'bg-muted-foreground';
 
   const issueIdLower = issue.identifier.toLowerCase();
   const hasAgent = agents.some(
@@ -504,20 +611,21 @@ function CompactChildCard({
   );
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-overlay/50 transition-colors group">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-overlay/50 transition-colors group">
       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
       <a
         href={issue.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs text-content-subtle hover:text-blue-400 shrink-0"
+        onClick={(e) => e.stopPropagation()}
+        className="text-xs font-medium text-primary/70 hover:text-primary shrink-0"
       >
         {issue.identifier}
       </a>
       <span className="text-xs text-content-body truncate flex-1">{issue.title}</span>
       <TrackerShadowBadges issue={issue} compact />
       {hasAgent && (
-        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
+        <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
       )}
     </div>
   );
@@ -555,11 +663,11 @@ export function ListIssueRow({
   }, [isSelected]);
 
   // Status indicator color
-  const statusColor = canonical === 'done' ? 'bg-green-400' :
-                      canonical === 'in_review' ? 'bg-pink-400' :
-                      canonical === 'in_progress' ? 'bg-yellow-400' :
-                      canonical === 'todo' ? 'bg-blue-400' :
-                      'bg-gray-500';
+  const statusColor = canonical === 'done' ? 'bg-success' :
+                      canonical === 'in_review' ? 'bg-signal-review' :
+                      canonical === 'in_progress' ? 'bg-warning' :
+                      canonical === 'todo' ? 'bg-primary' :
+                      'bg-muted-foreground';
 
   // Get cost for this issue
   const cost = issueCosts[issue.identifier.toLowerCase()];
@@ -590,16 +698,10 @@ export function ListIssueRow({
       {/* Status indicator */}
       <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
 
-      {/* Issue identifier */}
-      <a
-        href={issue.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="text-xs text-content-subtle hover:text-blue-400 shrink-0 font-mono"
-      >
+      {/* Issue identifier — clicking selects the card, use ExternalLink icon to open in tracker */}
+      <span className="text-xs text-content-subtle shrink-0 font-mono">
         {issue.identifier}
-      </a>
+      </span>
 
       {/* Title - dimmed/strikethrough for canceled issues */}
       <span className={`text-sm truncate flex-1 min-w-0 ${
@@ -609,8 +711,8 @@ export function ListIssueRow({
       }`}>{issue.title}</span>
 
       {/* Priority indicator */}
-      {issue.priority === 1 && <span className="text-xs text-red-400 font-medium shrink-0">Urgent</span>}
-      {issue.priority === 2 && <span className="text-xs text-orange-400 font-medium shrink-0">High</span>}
+      {issue.priority === 1 && <span className="text-xs text-destructive-foreground font-medium shrink-0">Urgent</span>}
+      {issue.priority === 2 && <span className="text-xs text-warning-foreground font-medium shrink-0">High</span>}
 
       {/* Difficulty badge */}
       {difficulty && (
@@ -637,12 +739,12 @@ export function ListIssueRow({
 
       {/* Running agent indicator */}
       {isRunning && (
-        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
+        <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
       )}
 
       {/* Specialist indicators */}
       {issueSpecialists.map(s => (
-        <span key={s.name} className="text-xs text-blue-400 shrink-0" title={`${s.displayName} specialist`}>
+        <span key={s.name} className="text-xs text-primary shrink-0" title={`${s.displayName} specialist`}>
           {s.name === 'review-agent' ? '👁️' : s.name === 'test-agent' ? '🧪' : s.name === 'merge-agent' ? '🔀' : '🤖'}
         </span>
       ))}
@@ -656,7 +758,7 @@ export function ListIssueRow({
               e.stopPropagation();
               onPlan(issue);
             }}
-            className="p-1 text-content-subtle hover:text-blue-400 transition-colors"
+            className="p-1 text-content-subtle hover:text-primary transition-colors"
             title="Plan issue"
           >
             <Play className="w-3.5 h-3.5" />
@@ -693,10 +795,10 @@ export function ListIssueRow({
 
 const COLUMN_COLORS: Record<string, string> = {
   backlog: 'border-divider-strong',
-  todo: 'border-blue-600',
-  in_progress: 'border-yellow-500',
-  in_review: 'border-pink-500',
-  done: 'border-green-500',
+  todo: 'border-divider-strong',
+  in_progress: 'border-primary',
+  in_review: 'border-warning',
+  done: 'border-success',
 };
 
 const COLUMN_TITLES: Record<string, string> = {
@@ -731,6 +833,21 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
+
+  // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
+  const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
+
+  const toggleFeature = useCallback((featureId: string) => {
+    setCollapsedFeatures(prev => {
+      const next = new Set(prev);
+      if (next.has(featureId)) {
+        next.delete(featureId);
+      } else {
+        next.add(featureId);
+      }
+      return next;
+    });
+  }, []);
 
   // DnD state
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
@@ -1005,11 +1122,46 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [issues, registeredProjects]);
 
   // Filter issues by selected projects
-  const filteredIssues = useMemo(() => {
+  const filteredIssuesBase = useMemo(() => {
     if (!issues) return [];
     if (selectedProjects.size === 0) return issues; // Show all if none selected
     return issues.filter(issue => issue.project && selectedProjects.has(issue.project.id));
   }, [issues, selectedProjects]);
+
+  // Inject mock Rally data for visual testing (?mockRally=true)
+  const mockRallyEnabled = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mockRally') === 'true';
+  }, []);
+
+  const filteredIssues = useMemo(() => {
+    if (!mockRallyEnabled) return filteredIssuesBase;
+    return [...filteredIssuesBase, ...generateMockRallyData()];
+  }, [filteredIssuesBase, mockRallyEnabled]);
+
+  // Detect if any filtered issues use Rally hierarchy (for expand/collapse all button)
+  const hasAnyRallyHierarchy = useMemo(() =>
+    filteredIssues.some(i => i.artifactType?.includes('PortfolioItem')),
+    [filteredIssues]
+  );
+
+  // Collect all feature identifiers for expand/collapse all
+  const allFeatureIds = useMemo(() =>
+    filteredIssues
+      .filter(i => i.artifactType?.includes('PortfolioItem'))
+      .map(i => i.identifier),
+    [filteredIssues]
+  );
+
+  const expandAllFeatures = useCallback(() => {
+    setCollapsedFeatures(new Set());
+  }, []);
+
+  const collapseAllFeatures = useCallback(() => {
+    setCollapsedFeatures(new Set(allFeatureIds));
+  }, [allFeatureIds]);
+
+  const allExpanded = collapsedFeatures.size === 0;
 
   // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
   const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
@@ -1034,91 +1186,113 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   return (
     <div className="space-y-4">
       {/* Filter bar */}
-      <div className="flex items-center gap-4 flex-wrap">
-        {/* Cycle filter */}
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-content-subtle" />
-          <span className="text-sm text-content-subtle">Cycle:</span>
-          <div className="flex rounded-lg overflow-hidden border border-divider-strong">
-            {(['current', 'all', 'backlog', 'canceled'] as CycleFilter[]).map((cycle) => (
-              <button
-                key={cycle}
-                onClick={() => setCycleFilter(cycle)}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  cycleFilter === cycle
-                    ? 'bg-blue-600 text-content'
-                    : 'bg-surface-raised text-content-subtle hover:text-content hover:bg-surface-overlay'
-                }`}
-              >
-                {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Canceled'}
-              </button>
-            ))}
+      <div className="flex flex-col gap-2">
+        {/* Row 1: Cycle + controls */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Cycle:</span>
+            <div className="flex rounded-lg overflow-hidden border border-border">
+              {(['current', 'all', 'backlog', 'canceled'] as CycleFilter[]).map((cycle) => (
+                <button
+                  key={cycle}
+                  onClick={() => setCycleFilter(cycle)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    cycleFilter === cycle
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-foreground/70 hover:text-foreground hover:bg-accent'
+                  }`}
+                >
+                  {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Canceled'}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeCompleted}
+              onChange={(e) => setIncludeCompleted(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-ring focus:ring-offset-surface"
+            />
+            <span className="text-sm font-medium text-muted-foreground">Include closed-out</span>
+          </label>
+
+          <button
+            onClick={async () => {
+              try {
+                await fetch('/api/trackers/refresh', { method: 'POST' });
+                queryClient.invalidateQueries({ queryKey: ['issues'] });
+              } catch (e) {
+                console.error('Refresh failed:', e);
+              }
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-background border border-border hover:bg-accent rounded-lg transition-colors"
+            title="Force refresh all trackers"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+
+          <span className="text-sm text-muted-foreground">
+            {issues?.length || 0} issues
+          </span>
+
+          {/* Expand/Collapse all Rally features — only visible when Rally hierarchy exists */}
+          {hasAnyRallyHierarchy && cycleFilter === 'current' && (
+            <div className="flex items-center gap-1 ml-auto">
+              <button
+                onClick={allExpanded ? collapseAllFeatures : expandAllFeatures}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-background border border-border hover:bg-accent rounded-lg transition-colors"
+                title={allExpanded ? 'Collapse all features' : 'Expand all features'}
+              >
+                {allExpanded ? (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+                <span>{allExpanded ? 'Collapse' : 'Expand'} all</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Include completed toggle */}
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={includeCompleted}
-            onChange={(e) => setIncludeCompleted(e.target.checked)}
-            className="w-4 h-4 rounded border-divider-strong bg-surface-raised text-blue-600 focus:ring-blue-500 focus:ring-offset-surface"
-          />
-          <span className="text-sm text-content-subtle">Include closed-out</span>
-        </label>
-
-        {/* Refresh button */}
-        <button
-          onClick={async () => {
-            try {
-              await fetch('/api/trackers/refresh', { method: 'POST' });
-              queryClient.invalidateQueries({ queryKey: ['issues'] });
-            } catch (e) {
-              console.error('Refresh failed:', e);
-            }
-          }}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-content-subtle hover:text-content bg-surface-raised hover:bg-surface-overlay rounded transition-colors"
-          title="Force refresh all trackers"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Issue count */}
-        <span className="text-sm text-content-muted">
-          {issues?.length || 0} issues
-        </span>
-
-        {/* Project filter */}
+        {/* Row 2: Project filter */}
         {projects.length > 1 && (
-          <>
-            <div className="w-px h-6 bg-surface-overlay" />
-            <span className="text-sm text-content-subtle">Projects:</span>
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => toggleProject(project.id)}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
-                  selectedProjects.size === 0 || selectedProjects.has(project.id)
-                    ? 'bg-surface-overlay text-content'
-                    : 'bg-surface-raised text-content-muted hover:text-content-body'
-                }`}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: project.color || '#6b7280' }}
-                />
-                {project.name}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-muted-foreground">Projects:</span>
+            {projects.map((project) => {
+              const isExplicitlySelected = selectedProjects.has(project.id);
+              return (
+                <button
+                  key={project.id}
+                  onClick={() => toggleProject(project.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                    isExplicitlySelected
+                      ? 'bg-accent text-foreground border-foreground/20'
+                      : selectedProjects.size === 0
+                        ? 'bg-surface-raised text-foreground/70 border-foreground/15 hover:bg-accent hover:text-foreground hover:border-foreground/25'
+                        : 'bg-surface-raised text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground opacity-50'
+                  }`}
+                  title={isExplicitlySelected ? `Remove ${project.name} filter` : `Filter to ${project.name}`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: project.color || '#6b7280' }}
+                  />
+                  {project.name}
+                </button>
+              );
+            })}
             {selectedProjects.size > 0 && (
               <button
                 onClick={() => setSelectedProjects(new Set())}
-                className="text-xs text-content-subtle hover:text-content"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Clear
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
 
@@ -1129,7 +1303,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             <div key={label} className="bg-surface-raised rounded-lg">
               <div className="px-4 py-3 border-b border-divider">
                 <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-blue-400" />
+                  <Tag className="w-4 h-4 text-primary" />
                   <h3 className="font-semibold text-content">{label}</h3>
                   <span className="text-sm text-content-subtle">({labelIssues.length})</span>
                 </div>
@@ -1197,7 +1371,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             <div key={group.name} className="bg-surface-raised rounded-lg">
               <div className="px-4 py-3 border-b border-divider">
                 <div className="flex items-center gap-2">
-                  <X className="w-4 h-4 text-red-400" />
+                  <X className="w-4 h-4 text-destructive-foreground" />
                   <h3 className="font-semibold text-content">{group.name}</h3>
                   <span className="text-sm text-content-subtle">({group.issues.length})</span>
                 </div>
@@ -1233,11 +1407,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-hidden pb-4">
             {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
               <DroppableColumn key={status} status={status}>
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-pan-panel-left rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-pan-panel-left/80' : ''}`}>
-                  <div className="px-4 py-3 border-b border-pan-border bg-pan-panel-left">
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                  <div className="px-4 py-3 border-b border-divider bg-surface-raised">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
                       <span className="text-sm text-content-subtle">{grouped[status].length}</span>
@@ -1254,6 +1428,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onPlan={setPlanDialogIssue}
                     onViewBeads={setBeadsDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
+                    collapsedFeatures={collapsedFeatures}
+                    onToggleFeature={toggleFeature}
                   />
                 </div>
               </DroppableColumn>
@@ -1334,6 +1510,8 @@ function ColumnContent({
   onPlan,
   onViewBeads,
   onViewVBrief,
+  collapsedFeatures,
+  onToggleFeature,
 }: {
   issues: Issue[];
   agents: Agent[];
@@ -1345,21 +1523,9 @@ function ColumnContent({
   onPlan: (issue: Issue) => void;
   onViewBeads: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
+  collapsedFeatures: Set<string>;
+  onToggleFeature: (featureId: string) => void;
 }) {
-  const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
-
-  const toggleFeature = useCallback((featureId: string) => {
-    setCollapsedFeatures(prev => {
-      const next = new Set(prev);
-      if (next.has(featureId)) {
-        next.delete(featureId);
-      } else {
-        next.add(featureId);
-      }
-      return next;
-    });
-  }, []);
-
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
   const hierarchy = hasRallyHierarchy ? buildHierarchy(issues) : null;
@@ -1367,10 +1533,10 @@ function ColumnContent({
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
     const workAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'agent' && a.agentPhase !== 'planning'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase !== 'planning'
     );
     const planningAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase === 'planning' && a.status !== 'stopped'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase === 'planning'
     );
     const issueSpecialists = specialists.filter(
       (s) => s.currentIssue?.toLowerCase() === issueIdLower
@@ -1429,30 +1595,21 @@ function ColumnContent({
         const isExpanded = !collapsedFeatures.has(feature.identifier);
 
         return (
-          <div key={`feature-${feature.id}`} className="space-y-1">
-            <FeatureCard
-              feature={feature}
-              childCount={group.children.length}
-              isExpanded={isExpanded}
-              onToggle={() => toggleFeature(feature.identifier)}
-            />
-            {isExpanded && (
-              <div className="ml-3 border-l-2 border-indigo-700/30 pl-1">
-                {group.children.map(child => (
-                  <CompactChildCard
-                    key={child.id}
-                    issue={child}
-                    agents={agents}
-                  />
-                ))}
-                {group.children.length === 0 && (
-                  <div className="text-xs text-content-muted py-2 pl-2">
-                    No stories in this column
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <FeatureCard
+            key={`feature-${feature.id}`}
+            feature={feature}
+            childCount={group.children.length}
+            isExpanded={isExpanded}
+            onToggle={() => onToggleFeature(feature.identifier)}
+          >
+            {group.children.map(child => (
+              <CompactChildCard
+                key={child.id}
+                issue={child}
+                agents={agents}
+              />
+            ))}
+          </FeatureCard>
         );
       })}
     </div>
@@ -1468,7 +1625,7 @@ function DroppableColumn({ status, children }: { status: CanonicalState; childre
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[200px] transition-all ${isOver ? 'scale-[1.02]' : ''}`}
+      className={`flex-1 min-w-0 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
     >
       {children}
     </div>
@@ -1538,8 +1695,8 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
-          <div className="p-2 bg-amber-900/50 rounded-lg">
-            <AlertTriangle className="w-6 h-6 text-amber-400" />
+          <div className="p-2 badge-bg-warning rounded-lg">
+            <AlertTriangle className="w-6 h-6 text-warning-foreground" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-content mb-2">
@@ -1561,7 +1718,7 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
               </button>
               <button
                 onClick={onConfirm}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-content rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-warning hover:bg-warning/90 text-foreground rounded-lg transition-colors text-sm"
               >
                 Move Anyway
               </button>
@@ -1595,8 +1752,8 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
-          <div className="p-2 bg-green-900/50 rounded-lg">
-            <Check className="w-6 h-6 text-green-400" />
+          <div className="p-2 badge-bg-success rounded-lg">
+            <Check className="w-6 h-6 text-success-foreground" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-content mb-2">
@@ -1613,7 +1770,7 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
                   type="checkbox"
                   checked={cleanupWorkspace}
                   onChange={(e) => setCleanupWorkspace(e.target.checked)}
-                  className="rounded border-divider-strong bg-surface-overlay text-green-500 focus:ring-green-500"
+                  className="rounded border-divider-strong bg-surface-overlay text-success focus:ring-ring"
                 />
                 Clean up workspace
               </label>
@@ -1622,7 +1779,7 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
                   type="checkbox"
                   checked={stopAgents}
                   onChange={(e) => setStopAgents(e.target.checked)}
-                  className="rounded border-divider-strong bg-surface-overlay text-green-500 focus:ring-green-500"
+                  className="rounded border-divider-strong bg-surface-overlay text-success focus:ring-ring"
                 />
                 Stop running agents
               </label>
@@ -1640,7 +1797,7 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
               </button>
               <button
                 onClick={() => onSync(true, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-content rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-success hover:bg-success/90 text-foreground rounded-lg transition-colors text-sm"
               >
                 Sync to {trackerName}
               </button>
@@ -1668,7 +1825,7 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
         <span className="text-sm text-content-body">Issue moved</span>
         <button
           onClick={onUndo}
-          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
         >
           <Undo className="w-4 h-4" />
           Undo
@@ -1693,7 +1850,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
-            <List className="w-5 h-5 text-green-400" />
+            <List className="w-5 h-5 text-success-foreground" />
             <h2 className="font-semibold text-content">Tasks: {issue.identifier}</h2>
           </div>
           <button
@@ -1733,6 +1890,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const { prefs } = useUIPreferences();
 
   // Auto-scroll into view when selected via search
   useEffect(() => {
@@ -1749,10 +1907,20 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
   const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
-  const isPlanningActive = planningAgent && planningAgent.status !== 'stopped';
+  // Only show "Watch Planning" when there's an actual live tmux session — 'starting'/'failed'/'stopped'/'dead' all mean no session to attach to
+  const isPlanningActive = planningAgent != null && (planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
 
   // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
   const agent = activeAgent || planningAgent;
+
+  // Compute agent idle duration for "inactive" badge
+  const agentIdleMinutes = (() => {
+    if (!agent?.lastActivity || !isRunning) return 0;
+    const ms = Date.now() - new Date(agent.lastActivity).getTime();
+    return Math.floor(ms / 60000);
+  })();
+  // Show inactive badge when agent hasn't acted in > 30 min (stuck threshold)
+  const isAgentIdle = agentIdleMinutes >= 30;
 
   // Check if issue has "Review Ready" label (agent completed work)
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled
@@ -1763,11 +1931,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   ) ?? false);
 
   const priorityColors: Record<number, string> = {
-    0: 'border-l-gray-500',
-    1: 'border-l-red-500',
-    2: 'border-l-orange-500',
-    3: 'border-l-yellow-500',
-    4: 'border-l-blue-500',
+    0: 'border-l-border',         // no priority — neutral
+    1: 'border-l-destructive',    // urgent — red
+    2: 'border-l-warning',        // high — amber
+    3: 'border-l-muted-foreground', // medium — subtle gray
+    4: 'border-l-border',         // low — barely visible
   };
 
   // Kill agent mutation
@@ -1857,20 +2025,97 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     },
   });
 
+  const [isResuming, setIsResuming] = useState(false);
+  const resumingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear "resuming" state once the agent is actually running, or after 60s safety valve
+  useEffect(() => {
+    if (isResuming && isRunning) {
+      setIsResuming(false);
+      if (resumingTimeoutRef.current) clearTimeout(resumingTimeoutRef.current);
+    }
+  }, [isResuming, isRunning]);
+
+  const resumeSessionMutation = useMutation({
+    mutationFn: async () => {
+      const agentId = activeAgent?.id;
+      if (!agentId) throw new Error('No agent to resume');
+      const res = await fetch(`/api/agents/${agentId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let message = `Failed to resume session (${res.status})`;
+        try {
+          const data = JSON.parse(text);
+          message = data.error || message;
+        } catch {
+          message = text.length < 200 ? text : message;
+        }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setIsResuming(true);
+      resumingTimeoutRef.current = setTimeout(() => setIsResuming(false), 60000);
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+    onError: (err: Error) => {
+      // If the agent is already running, the store snapshot is just stale — refresh it silently
+      if (err.message.includes('runtime=active') || err.message.includes('status=running')) {
+        setIsResuming(false);
+        queryClient.invalidateQueries({ queryKey: ['agents'] });
+        return;
+      }
+      showAlert({ message: `Failed to resume session: ${err.message}`, variant: 'error' });
+    },
+  });
+
+  const handleResumeSession = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resumeSessionMutation.mutate();
+  };
+
+  // In Review card with stopped agent = "session lost" / needs recovery.
+  // Exclude agents that completed normally (runtimeState === 'completed') — those transitioned
+  // to in_review intentionally and don't need recovery.
+  const isSessionLost = !isRunning && !isResuming && activeAgent?.status === 'stopped'
+    && canonical === 'in_review'
+    && activeAgent?.runtimeState !== 'completed';
+
   const [confirmingStart, setConfirmingStart] = useState(false);
-  const confirmingStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!confirmingStart) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (startButtonRef.current && !startButtonRef.current.contains(e.target as Node)) {
+        setConfirmingStart(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmingStart(false);
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [confirmingStart]);
 
   const handleStartAgent = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirmingStart) {
       // Second click — confirmed
       setConfirmingStart(false);
-      if (confirmingStartTimer.current) clearTimeout(confirmingStartTimer.current);
       startAgentMutation.mutate();
     } else {
-      // First click — show inline confirm, auto-reset after 6s
+      // First click — show inline confirm, stays until clicked outside or Escape
       setConfirmingStart(true);
-      confirmingStartTimer.current = setTimeout(() => setConfirmingStart(false), 6000);
     }
   };
 
@@ -1886,11 +2131,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       ref={cardRef}
       data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
-      className={`rounded-lg p-3 border border-pan-border border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
+      className={`rounded-lg p-3 border border-divider border-l-4 cursor-pointer transition-all ${isSessionLost ? 'border-l-warning' : (priorityColors[issue.priority] || 'border-l-content-muted')} ${
         isSelected
           ? 'ring-2 ring-blue-500'
-          : 'hover:border-pan-border/80'
-      } ${isRunning ? 'bg-blue-900/20' : 'bg-pan-panel-right'}`}
+          : 'hover:border-divider'
+      } ${isRunning ? 'badge-bg-primary' : 'bg-surface'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -1905,24 +2150,39 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {isRunning && (
               <div className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
+            )}
+            {isResuming && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-primary text-primary-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Resuming…
+              </span>
+            )}
+            {isSessionLost && (
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-warning text-warning-foreground"
+                title="Session lost — agent was running when the system stopped. Resume session to continue."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-warning-foreground animate-pulse" />
+                Session lost
+              </span>
             )}
             <a
               href={issue.url}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-sm font-medium text-content hover:text-blue-400 flex items-center gap-1"
+              className="text-sm font-medium text-content hover:text-primary flex items-center gap-1"
             >
               {issue.source === 'github' && (
                 <span title="GitHub Issue">
                   <Github className="w-3 h-3 text-content-subtle" />
                 </span>
               )}
-              <span className="text-content-subtle">{issue.identifier}</span>
+              <span className="text-content font-medium">{issue.identifier}</span>
               <ExternalLink className="w-3 h-3 opacity-50" />
             </a>
             {/* Agent attribution badges */}
@@ -1944,14 +2204,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               }
 
               return badges.map((b, i) => (
-                <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
+                <AgentBadge key={i} type={b.type} isConflict={hasConflict} />
               ));
             })()}
             {/* Plan Failed badge - shown when planning agent spawn failed */}
             {planningAgent?.status === 'failed' && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPlan(); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/50 text-red-300 animate-pulse hover:bg-red-800/60 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-destructive text-destructive-foreground animate-pulse hover:bg-destructive/30 transition-colors cursor-pointer"
                 title={planningAgent.error ? `Planning failed: ${planningAgent.error}` : 'Planning agent failed to start — click to retry'}
               >
                 <XCircle className="w-3 h-3" />
@@ -1962,29 +2222,20 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {planningAgent && planningAgent.status !== 'stopped' && planningAgent.status !== 'failed' && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPlan(); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-900/50 text-purple-300 animate-pulse hover:bg-purple-800/60 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-signal-review text-signal-review-foreground animate-pulse hover:bg-signal-review/30 transition-colors cursor-pointer"
                 title="Click to watch planning session"
               >
                 <Sparkles className="w-3 h-3" />
                 Planning
               </button>
             )}
-            {/* Model badge - shows which model the active agent is using */}
-            {activeAgent && activeAgent.model && (
-              <span
-                className="px-1.5 py-0.5 rounded text-xs font-medium bg-surface-emphasis text-content-body"
-                title={`Model: ${activeAgent.model}`}
-              >
-                {getFriendlyModelName(activeAgent.model)}
-              </span>
-            )}
             {/* Workspace location badge - shows for any agent with a workspace */}
             {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
               <span
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                   (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
-                    ? 'bg-cyan-900/50 text-cyan-400'
-                    : 'bg-gray-800/60 text-gray-400 border border-gray-600/30'
+                    ? 'badge-bg-signal-cost text-signal-cost-foreground'
+                    : 'bg-surface-raised text-muted-foreground border border-border'
                 }`}
                 title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
@@ -1999,7 +2250,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Review Ready badge - prominent indicator that agent completed work */}
             {isReviewReady && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-600 text-content animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground animate-pulse"
                 title="Agent completed work - ready for human review"
               >
                 <CheckCheck className="w-3 h-3" />
@@ -2013,7 +2264,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   e.stopPropagation();
                   onPlan();
                 }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-content animate-pulse cursor-pointer hover:bg-amber-500"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse cursor-pointer hover:bg-warning/90"
                 title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
               >
                 <HelpCircle className="w-3 h-3" />
@@ -2023,7 +2274,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Lifecycle resolution badges (PAN-309) */}
             {!isTerminal && agent?.resolution === 'done' && !agent?.hasPendingQuestion && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-700 text-content"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
                 title="Agent evidence shows work is complete — waiting for agent to call pan work done"
               >
                 <CheckCircle className="w-3 h-3" />
@@ -2032,7 +2283,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {!isTerminal && agent?.resolution === 'stuck' && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-700 text-content animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground animate-pulse"
                 title={`Agent appears stuck — no clear progress signal after ${agent.resolutionCount || 0} check(s). Consider sending a message.`}
               >
                 <XCircle className="w-3 h-3" />
@@ -2041,11 +2292,21 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {!isTerminal && agent?.resolution === 'needs_input' && !agent?.hasPendingQuestion && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-700 text-content animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse"
                 title="Agent stopped because it needs human input or hit a blocker"
               >
                 <AlertCircle className="w-3 h-3" />
                 Blocked
+              </span>
+            )}
+            {/* Idle badge — time-based health indicator. Shows when agent hasn't been active for 30+ min */}
+            {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
+                title={`Agent has not been active for ${agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h ${agentIdleMinutes % 60}m` : `${agentIdleMinutes}m`} — Deacon will poke it`}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h idle` : `${agentIdleMinutes}m idle`}
               </span>
             )}
             {/* Tracker vs Shadow state badges */}
@@ -2055,20 +2316,20 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               const difficulty = parseDifficultyLabel(issue.labels || []);
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
-            {/* Ready to merge badge — yellow indicator when review+tests passed */}
+            {/* Ready to merge badge — shimmer draws attention to human-action-required state */}
             {isReadyToMerge && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-yellow-900/60 text-yellow-300 border border-yellow-500/40 uppercase tracking-wide"
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-success-foreground uppercase tracking-wide ${prefs.readyToMergeShimmer ? 'badge-shimmer-rtm' : 'badge-bg-success'}`}
                 title="Review and tests passed — ready for human merge approval"
               >
                 <GitMerge className="w-3 h-3" />
-                Ready to Merge
+                Ready
               </span>
             )}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
             {isMerged && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-green-900/60 text-green-300 border border-green-500/40 uppercase tracking-wide"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-success text-success-foreground uppercase tracking-wide"
                 title="Branch verified merged into main"
               >
                 <GitMerge className="w-3 h-3" />
@@ -2078,7 +2339,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             {/* Needs close-out badge - amber indicator for reopened issues needing review */}
             {issue.labels?.some(l => l.toLowerCase() === 'needs-close-out') && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/60 text-amber-400 border border-amber-600/40"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
                 title="Reopened for close-out review — verify this work is complete, then click Close Out"
               >
                 <AlertTriangle className="w-3 h-3" />
@@ -2126,28 +2387,29 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong">
           <button
             onClick={handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              isSelected ? 'text-blue-400' : 'text-content-subtle hover:text-content'
+              isSelected ? 'text-primary' : 'text-content-subtle hover:text-content'
             }`}
+            title="Watch"
           >
             <Eye className="w-3.5 h-3.5" />
             Watch
           </button>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
-            title="View tasks for this issue"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
             Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-            title="View vBRIEF plan for this issue"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
             vBRIEF
@@ -2155,23 +2417,30 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              showMessageInput ? 'text-blue-400' : 'text-content-subtle hover:text-content'
+              showMessageInput ? 'text-primary' : 'text-content-subtle hover:text-content'
             }`}
+            title="Tell"
           >
             <MessageCircle className="w-3.5 h-3.5" />
             Tell
           </button>
+          {/* Model badge - centered between Tell and Kill */}
+          {activeAgent && activeAgent.model && (
+            <span className="flex-1 text-center text-[10px] text-content-body font-medium">
+              {getFriendlyModelName(activeAgent.model)}
+            </span>
+          )}
           <button
             onClick={handleKill}
             disabled={killMutation.isPending}
-            className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
+            className="flex items-center text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors"
+            title="Kill"
           >
             {killMutation.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <X className="w-3.5 h-3.5" />
             )}
-            Kill
           </button>
         </div>
       )}
@@ -2185,13 +2454,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 bg-surface-raised text-content text-sm px-3 py-1.5 rounded border border-divider-strong focus:border-blue-500 focus:outline-none"
+              className="flex-1 bg-surface-raised text-content text-sm px-3 py-1.5 rounded border border-divider-strong focus:border-primary focus:outline-none"
               autoFocus
             />
             <button
               type="submit"
               disabled={!messageInput.trim() || sendMessageMutation.isPending}
-              className="px-3 py-1.5 bg-blue-600 text-content text-sm rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 bg-primary text-foreground text-sm rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sendMessageMutation.isPending ? '...' : 'Send'}
             </button>
@@ -2201,21 +2470,22 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           {isPlanningActive ? (
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
+              title="Watch Planning"
             >
               <Eye className="w-3.5 h-3.5" />
-              Watch Planning
             </button>
           ) : (
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             >
               <FileText className="w-3.5 h-3.5" />
               {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
@@ -2225,55 +2495,54 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <>
               <button
                 onClick={() => onViewBeads && onViewBeads(issue)}
-                className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
-                title="View tasks for this issue"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="Tasks"
               >
                 <List className="w-3.5 h-3.5" />
                 Tasks
               </button>
               <button
                 onClick={() => onViewVBrief && onViewVBrief(issue)}
-                className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                title="View vBRIEF plan for this issue"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="vBRIEF"
               >
                 <ScrollText className="w-3.5 h-3.5" />
                 vBRIEF
               </button>
               <button
+                ref={startButtonRef}
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending}
-                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
-                title="Start implementation agent"
+                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
+                title={startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
               >
                 {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
               </button>
             </>
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
-          <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           {isPlanningActive ? (
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
+              title="Watch Planning"
             >
               <Eye className="w-3.5 h-3.5" />
-              Watch Planning
             </button>
           ) : (
             <button
               data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
-              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             >
               <FileText className="w-3.5 h-3.5" />
               {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
@@ -2281,27 +2550,27 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
-            title="View tasks for this issue"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
             Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-            title="View vBRIEF plan for this issue"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
             vBRIEF
           </button>
           <button
-            onClick={handleStartAgent}
-            disabled={startAgentMutation.isPending}
-            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
+            onClick={handleResumeSession}
+            disabled={resumeSessionMutation.isPending}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+            title="Resume Session"
           >
-            {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Resume Agent'}
+            {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={async (e) => {
@@ -2317,49 +2586,51 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 }).catch(err => console.error('Reset failed:', err));
               }
             }}
-            className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors"
-            title="Reset to To Do - kills agents, resets Linear status"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Reset"
           >
             <Undo className="w-3.5 h-3.5" />
-            Reset
           </button>
-          <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
-      {/* In Review items - Reset Pipeline + Reopen + Deep Wipe */}
+      {/* In Review items - Resume Session (if lost) + Reset Pipeline + Reopen */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
+          {(isSessionLost || isResuming) && (
+            <button
+              onClick={handleResumeSession}
+              disabled={resumeSessionMutation.isPending || isResuming}
+              className="flex items-center gap-1 text-xs font-medium text-warning-foreground hover:opacity-80 transition-colors disabled:opacity-50"
+              title="Resume Session"
+            >
+              {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            </button>
+          )}
           <ResetPipelineButton issue={issue} />
           <ReopenSection issue={issue} inline />
-          <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
-      {/* Done items - Reopen + Close Out + Deep Wipe */}
+      {/* Done items - Reopen + Close Out */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30 flex-wrap">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
-            title="View tasks for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tasks"
           >
             <List className="w-3.5 h-3.5" />
-            Tasks
           </button>
           <button
             onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-            title="View vBRIEF plan for this issue"
+            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="vBRIEF"
           >
             <ScrollText className="w-3.5 h-3.5" />
-            vBRIEF
           </button>
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
-          <DeepWipeButton issue={issue} />
         </div>
       )}
 
@@ -2409,85 +2680,11 @@ function ResetPipelineButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       title="Reset pipeline state and re-run review & test"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
       {isPending ? 'Resetting...' : 'Reset Pipeline'}
-    </button>
-  );
-}
-
-// Deep wipe button - opens progress dialog
-function DeepWipeButton({ issue }: { issue: Issue }) {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(true);
-        }}
-        className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors ml-auto"
-        title="Deep wipe: delete workspace, branches, agent state — start completely fresh"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-        Wipe
-      </button>
-      <DeepWipeDialog issue={issue} isOpen={isOpen} onClose={() => setIsOpen(false)} />
-    </>
-  );
-}
-
-// Cancel button - stop agents, move to Canceled, optionally wipe workspace
-function CancelButton({ issue }: { issue: Issue }) {
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const [isPending, setIsPending] = useState(false);
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        // First confirm the cancel
-        if (!await confirm({
-          title: 'Cancel Issue',
-          message: `Cancel ${issue.identifier}?\n\nThis will:\n• Stop any running agents\n• Clean up agent & review state\n• Move issue to Canceled on tracker`,
-          variant: 'destructive',
-          confirmLabel: 'Cancel Issue',
-        })) return;
-
-        // Then ask about workspace cleanup
-        const wipeWorkspace = await confirm({
-          title: 'Delete Workspace?',
-          message: `Also delete the workspace and branches for ${issue.identifier}?\n\nThis removes the git worktree, local & remote feature branches, and all workspace files.\n\nChoose "Keep" to preserve the code for reference.`,
-          confirmLabel: 'Delete Workspace',
-          cancelLabel: 'Keep Workspace',
-          variant: 'destructive',
-        });
-
-        setIsPending(true);
-        try {
-          const res = await fetch(`/api/issues/${issue.identifier}/cancel`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wipeWorkspace }),
-          });
-          if (!res.ok) throw new Error('Cancel failed');
-          await queryClient.refetchQueries({ queryKey: ['issues'] });
-          await queryClient.refetchQueries({ queryKey: ['agents'] });
-        } catch (err) {
-          console.error('Cancel failed:', err);
-        } finally {
-          setIsPending(false);
-        }
-      }}
-      disabled={isPending}
-      className="flex items-center gap-1 text-xs text-orange-400/70 hover:text-orange-400 transition-colors disabled:opacity-50"
-      title="Cancel issue — stop agents, move to Canceled on tracker"
-    >
-      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-      {isPending ? 'Canceling...' : 'Cancel'}
     </button>
   );
 }
@@ -2592,7 +2789,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
       <button
         onClick={handleReopen}
         disabled={reopenMutation.isPending}
-        className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
         {reopenMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2602,7 +2799,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
         {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
       </button>
       {reopenMutation.isError && (
-        <span className="text-xs text-red-400">{(reopenMutation.error as Error).message}</span>
+        <span className="text-xs text-destructive-foreground">{(reopenMutation.error as Error).message}</span>
       )}
     </>
   );
@@ -2610,7 +2807,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   if (inline) return content;
 
   return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong">
       {content}
     </div>
   );
@@ -2650,7 +2847,7 @@ function CloseOutSection({ issue }: { issue: Issue }) {
       <button
         onClick={handleCloseOut}
         disabled={closeOutMutation.isPending}
-        className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
         {closeOutMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2660,7 +2857,7 @@ function CloseOutSection({ issue }: { issue: Issue }) {
         {closeOutMutation.isPending ? 'Closing out...' : 'Close Out'}
       </button>
       {closeOutMutation.isError && (
-        <span className="text-xs text-red-400">{(closeOutMutation.error as Error).message}</span>
+        <span className="text-xs text-destructive-foreground">{(closeOutMutation.error as Error).message}</span>
       )}
     </>
   );

@@ -80,7 +80,7 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 | Command | Description | Example |
 |---------|-------------|---------|
 | `pan skills` | List available skills | `pan skills` |
-| `pan sync` | Sync skills to AI tools (Claude Code, Cursor, etc.) | `pan sync` |
+| `pan sync` | Sync skills to AI tools (auto-runs on `pan up`) | `pan sync` |
 | `pan sync --dry-run` | Preview skill sync without applying | `pan sync --dry-run` |
 
 ### Maintenance

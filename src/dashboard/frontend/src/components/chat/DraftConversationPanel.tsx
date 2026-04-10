@@ -8,12 +8,12 @@
  * No terminal toggle in draft mode (nothing running yet).
  */
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, loadStoredModel, MODEL_EFFORT_SUPPORT } from './ModelPicker';
+import { ModelPicker, DEFAULT_MODEL, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -41,15 +41,15 @@ async function spawnAndCreate(
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface DraftConversationPanelProps {
-  onPromoted: (conv: Conversation) => void;
+  onPromoted: (conv: Conversation, firstMessage: string) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function DraftConversationPanel({ onPromoted }: DraftConversationPanelProps) {
-  const [model, setModel] = useState<string>(loadStoredModel);
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [effortLevels, setEffortLevels] = useState<readonly string[]>(
-    () => MODEL_EFFORT_SUPPORT[loadStoredModel() as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
+    () => MODEL_EFFORT_SUPPORT[DEFAULT_MODEL as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
   );
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
@@ -58,6 +58,15 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   const editorRef = useRef<LexicalEditor | null>(null);
   // Unique key per draft instance so Lexical doesn't reuse stale state
   const draftKey = useMemo(() => `draft-${Date.now()}`, []);
+
+  // Auto-focus the editor when the draft panel mounts (e.g. after clicking "+")
+  useEffect(() => {
+    // Small delay to let Lexical mount and register the editor instance
+    const timer = setTimeout(() => {
+      editorRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const isEmpty = text.trim() === '';
 
@@ -68,8 +77,9 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
 
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
-    if (!editor || isEmpty || sending) return;
+    if (!editor || sending) return;
 
+    // Read directly from Lexical — React state may be stale if onChange hasn't fired yet
     let messageText = '';
     editor.read(() => {
       messageText = $getRoot().getTextContent().trim();
@@ -80,13 +90,13 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
     setError(null);
     try {
       const conv = await spawnAndCreate(messageText, model, effort);
-      onPromoted(conv);
+      onPromoted(conv, messageText);
     } catch (err) {
       console.error('[DraftConversationPanel] Failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to create conversation');
       setSending(false);
     }
-  }, [model, effort, onPromoted, isEmpty, sending]);
+  }, [model, effort, onPromoted, sending]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {

@@ -32,6 +32,18 @@ import { ModelId } from './settings.js';
 export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'claude-opus-4-5': 'claude-opus-4-6',
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
+  // OpenAI retired models (Feb 2026)
+  'gpt-5.2-codex': 'gpt-5.4',
+  'o3-deep-research': 'o3',
+  'gpt-4o': 'gpt-5.4-mini',
+  'gpt-4o-mini': 'gpt-5.4-nano',
+  // Google deprecated models
+  'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
+  'gemini-3-flash-preview': 'gemini-3-flash',
+  'gemini-2.5-pro': 'gemini-3.1-pro-preview',
+  'gemini-2.5-flash': 'gemini-3-flash',
+  // Kimi deprecated
+  'kimi-k2': 'kimi-k2.5',
 };
 
 /**
@@ -70,7 +82,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -190,78 +202,148 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   // OPENAI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'gpt-5.2-codex': {
-    model: 'gpt-5.2-codex',
+  'gpt-5.4': {
+    model: 'gpt-5.4',
     provider: 'openai',
-    displayName: 'GPT-5.2 Codex',
-    costPer1MTokens: 75.0, // Premium tier ~$75/M
-    contextWindow: 128000,
+    displayName: 'GPT-5.4',
+    costPer1MTokens: 8.75, // $2.50 in / $15 out
+    contextWindow: 1000000, // 1M context
     skills: {
-      'code-generation': 95, // 80% SWE-bench Verified, 55.6% SWE-bench Pro
-      'code-review': 90,
-      debugging: 92, // 92.4% GPQA Diamond
-      planning: 88,
-      documentation: 85,
-      testing: 90,
-      security: 85,
-      performance: 88, // 52.9% ARC-AGI-2 (best reasoning)
-      synthesis: 88, // 100% AIME 2025 without tools
-      speed: 55,
-      'context-length': 75,
+      'code-generation': 96,
+      'code-review': 92,
+      debugging: 94,
+      planning: 92,
+      documentation: 90,
+      testing: 92,
+      security: 88,
+      performance: 90,
+      synthesis: 92,
+      speed: 60,
+      'context-length': 100, // 1M context
     },
-    notes: 'Premium coding: 80% SWE-bench. Best raw reasoning (52.9% ARC-AGI-2). Expensive.',
+    notes: 'OpenAI flagship (March 2026). 1M context, 128K max output. Strong coding and reasoning.',
   },
 
-  'o3-deep-research': {
-    model: 'o3-deep-research',
+  'gpt-5.4-mini': {
+    model: 'gpt-5.4-mini',
     provider: 'openai',
-    displayName: 'O3 Deep Research',
-    costPer1MTokens: 100.0, // Expensive reasoning model
+    displayName: 'GPT-5.4 Mini',
+    costPer1MTokens: 1.0, // ~$0.40 in / $1.60 out
+    contextWindow: 400000,
+    skills: {
+      'code-generation': 82,
+      'code-review': 78,
+      debugging: 76,
+      planning: 72,
+      documentation: 80,
+      testing: 76,
+      security: 68,
+      performance: 72,
+      synthesis: 75,
+      speed: 90, // 2x faster than predecessor
+      'context-length': 90, // 400K context
+    },
+    notes: 'Fast and efficient. 400K context. Available in ChatGPT Free/Go tiers.',
+  },
+
+  'gpt-5.4-nano': {
+    model: 'gpt-5.4-nano',
+    provider: 'openai',
+    displayName: 'GPT-5.4 Nano',
+    costPer1MTokens: 0.7, // $0.20 in / $1.25 out
+    contextWindow: 128000,
+    skills: {
+      'code-generation': 70,
+      'code-review': 65,
+      debugging: 62,
+      planning: 58,
+      documentation: 68,
+      testing: 62,
+      security: 52,
+      performance: 58,
+      synthesis: 60,
+      speed: 96, // Fastest OpenAI model
+      'context-length': 75,
+    },
+    notes: 'API-only. Best for classification, extraction, ranking, sub-agents.',
+  },
+
+  'o3': {
+    model: 'o3',
+    provider: 'openai',
+    displayName: 'O3',
+    costPer1MTokens: 5.0, // $2 in / $8 out
     contextWindow: 200000,
     skills: {
-      'code-generation': 85,
+      'code-generation': 90,
       'code-review': 95,
       debugging: 98, // Best for debugging
       planning: 95,
       documentation: 88,
-      testing: 85,
+      testing: 88,
       security: 92,
       performance: 92,
       synthesis: 95,
-      speed: 20, // Very slow (reasoning chains)
+      speed: 25, // Slow (reasoning chains)
       'context-length': 95,
     },
-    notes: 'Deep reasoning model, excellent for complex debugging and analysis',
+    notes: 'Deep reasoning model. Excels at complex debugging, math, scientific reasoning.',
   },
 
-  'gpt-4o': {
-    model: 'gpt-4o',
-    provider: 'openai',
-    displayName: 'GPT-4o',
-    costPer1MTokens: 15.0, // $5 in / $15 out
-    contextWindow: 128000,
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'gemini-3.1-pro-preview': {
+    model: 'gemini-3.1-pro-preview',
+    provider: 'google',
+    displayName: 'Gemini 3.1 Pro',
+    costPer1MTokens: 7.0, // $2 in / $12 out (≤200K), $4/$18 above
+    contextWindow: 1000000,
     skills: {
-      'code-generation': 88,
-      'code-review': 85,
-      debugging: 85,
-      planning: 82,
-      documentation: 88,
-      testing: 82,
-      security: 78,
-      performance: 80,
-      synthesis: 85,
+      'code-generation': 93,
+      'code-review': 90,
+      debugging: 88,
+      planning: 88,
+      documentation: 90,
+      testing: 88,
+      security: 82,
+      performance: 88,
+      synthesis: 92,
       speed: 75,
-      'context-length': 75,
+      'context-length': 100, // 1M context
     },
-    notes: 'Good all-rounder, competitive with Sonnet',
+    notes: 'Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities.',
   },
 
-  'gpt-4o-mini': {
-    model: 'gpt-4o-mini',
-    provider: 'openai',
-    displayName: 'GPT-4o Mini',
-    costPer1MTokens: 1.0, // Very cheap
-    contextWindow: 128000,
+  'gemini-3-flash': {
+    model: 'gemini-3-flash',
+    provider: 'google',
+    displayName: 'Gemini 3 Flash',
+    costPer1MTokens: 0.4, // ~$0.15 in / $0.60 out
+    contextWindow: 1000000,
+    skills: {
+      'code-generation': 80,
+      'code-review': 75,
+      debugging: 72,
+      planning: 68,
+      documentation: 76,
+      testing: 72,
+      security: 60,
+      performance: 70,
+      synthesis: 75,
+      speed: 96, // Very fast
+      'context-length': 100,
+    },
+    notes: 'Fast and cheap with 1M context. Strong reasoning and agentic capabilities.',
+  },
+
+  'gemini-3.1-flash-lite-preview': {
+    model: 'gemini-3.1-flash-lite-preview',
+    provider: 'google',
+    displayName: 'Gemini 3.1 Flash Lite',
+    costPer1MTokens: 0.9, // $0.25 in / $1.50 out
+    contextWindow: 1000000,
     skills: {
       'code-generation': 72,
       'code-review': 68,
@@ -269,186 +351,24 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       planning: 60,
       documentation: 70,
       testing: 65,
-      security: 55,
-      performance: 60,
-      synthesis: 62,
-      speed: 92,
-      'context-length': 75,
-    },
-    notes: 'Budget option, good for simple tasks',
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GOOGLE MODELS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  'gemini-3-pro-preview': {
-    model: 'gemini-3-pro-preview',
-    provider: 'google',
-    displayName: 'Gemini 3 Pro',
-    costPer1MTokens: 12.0, // $4.2 in / $18.9 out
-    contextWindow: 1000000, // 1M context!
-    skills: {
-      'code-generation': 90, // 2439 Elo LiveCodeBench Pro (first >1500 on LMArena)
-      'code-review': 88,
-      debugging: 85,
-      planning: 85,
-      documentation: 88,
-      testing: 85, // ~95% AIME 2025
-      security: 78,
-      performance: 85, // Strong multimodal
-      synthesis: 90, // Best for combining large codebases
-      speed: 80,
-      'context-length': 100, // Best context - 1M tokens
-    },
-    notes: 'First to exceed 1500 Elo on LMArena. Best for large codebase analysis with 1M context.',
-  },
-
-  'gemini-3-flash-preview': {
-    model: 'gemini-3-flash-preview',
-    provider: 'google',
-    displayName: 'Gemini 3 Flash',
-    costPer1MTokens: 0.5, // Very cheap
-    contextWindow: 1000000,
-    skills: {
-      'code-generation': 75,
-      'code-review': 70,
-      debugging: 68,
-      planning: 62,
-      documentation: 72,
-      testing: 68,
-      security: 55,
-      performance: 65,
-      synthesis: 70,
-      speed: 98, // Fastest overall
-      'context-length': 100,
-    },
-    notes: 'Extremely fast and cheap, huge context, great for exploration',
-  },
-
-  'gemini-2.5-pro': {
-    model: 'gemini-2.5-pro',
-    provider: 'google',
-    displayName: 'Gemini 2.5 Pro',
-    costPer1MTokens: 12.0,
-    contextWindow: 1000000,
-    skills: {
-      'code-generation': 92,
-      'code-review': 90,
-      debugging: 88,
-      planning: 88,
-      documentation: 90,
-      testing: 87,
-      security: 82,
-      performance: 88,
-      synthesis: 92,
-      speed: 75,
-      'context-length': 100,
-    },
-    notes: 'Advanced reasoning and code capabilities with 1M context',
-  },
-
-  'gemini-2.5-flash': {
-    model: 'gemini-2.5-flash',
-    provider: 'google',
-    displayName: 'Gemini 2.5 Flash',
-    costPer1MTokens: 0.6,
-    contextWindow: 1000000,
-    skills: {
-      'code-generation': 78,
-      'code-review': 73,
-      debugging: 70,
-      planning: 65,
-      documentation: 75,
-      testing: 70,
-      security: 58,
-      performance: 68,
-      synthesis: 73,
-      speed: 95,
-      'context-length': 100,
-    },
-    notes: 'Fast and efficient with large context support',
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Z.AI MODELS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  'glm-4.7': {
-    model: 'glm-4.7',
-    provider: 'zai',
-    displayName: 'GLM 4.7',
-    costPer1MTokens: 5.0,
-    contextWindow: 200000, // 200K context, 128K output
-    skills: {
-      'code-generation': 88, // 73.8% SWE-bench, 84.9 LiveCodeBench v6 (open-source SOTA)
-      'code-review': 85,
-      debugging: 85, // Strong debugging with Interleaved Thinking
-      planning: 82, // 95.7% AIME 2025 (beats Gemini 3 & GPT-5.1)
-      documentation: 80,
-      testing: 82, // 87.4 τ²-Bench (SOTA for tool use)
-      security: 72,
-      performance: 78,
-      synthesis: 85, // Preserved Thinking retains context across turns
-      speed: 80,
-      'context-length': 95, // 200K context
-    },
-    notes: 'Top open-source for agentic coding. 73.8% SWE-bench, best tool use. 400B params with Interleaved Thinking.',
-  },
-
-  'glm-4.7-flash': {
-    model: 'glm-4.7-flash',
-    provider: 'zai',
-    displayName: 'GLM 4.7 Flash',
-    costPer1MTokens: 1.5,
-    contextWindow: 128000,
-    skills: {
-      'code-generation': 72,
-      'code-review': 68,
-      debugging: 65,
-      planning: 62,
-      documentation: 70,
-      testing: 65,
-      security: 55,
+      security: 52,
       performance: 62,
-      synthesis: 65,
-      speed: 92, // Fast inference
-      'context-length': 75,
+      synthesis: 68,
+      speed: 98, // Most cost-efficient
+      'context-length': 100,
     },
-    notes: 'Fast and affordable. Good for quick iterations and exploration.',
+    notes: 'Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // KIMI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'kimi-k2': {
-    model: 'kimi-k2',
-    provider: 'kimi',
-    displayName: 'Kimi K2',
-    costPer1MTokens: 1.4, // $0.16 in / $2.63 out → very cheap
-    contextWindow: 131000,
-    skills: {
-      'code-generation': 82, // 65.8% SWE-bench (beats GPT-4.1 at 54.6%)
-      'code-review': 80,
-      debugging: 78,
-      planning: 75,
-      documentation: 80,
-      testing: 75,
-      security: 70,
-      performance: 72,
-      synthesis: 78,
-      speed: 80,
-      'context-length': 75,
-    },
-    notes: 'Strong value: 65.8% SWE-bench at very low cost. Good for routine tasks.',
-  },
-
   'kimi-k2.5': {
     model: 'kimi-k2.5',
     provider: 'kimi',
     displayName: 'Kimi K2.5',
-    costPer1MTokens: 8.0, // ~5.1x cheaper than GPT-5.2
+    costPer1MTokens: 1.6, // $0.60 in / $2.50 out
     contextWindow: 256000,
     skills: {
       'code-generation': 92, // 76.8% SWE-bench, 85 LiveCodeBench v6
@@ -464,6 +384,54 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 98, // 256K context
     },
     notes: 'Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MINIMAX MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'minimax-m2.7': {
+    model: 'minimax-m2.7',
+    provider: 'minimax',
+    displayName: 'MiniMax M2.7',
+    costPer1MTokens: 1.5, // $0.30/M in + $1.20/M out, blended ~$0.06/M with auto-cache
+    contextWindow: 204800,
+    skills: {
+      'code-generation': 90, // 56.22% SWE-Pro (Opus ~57-58%), 55.6% VIBE-Pro
+      'code-review': 88,
+      debugging: 88, // 57.0% Terminal Bench 2
+      planning: 85,
+      documentation: 85,
+      testing: 86,
+      security: 80,
+      performance: 82,
+      synthesis: 90, // Self-evolving agent, 97% skill adherence on complex tasks
+      speed: 80, // 10B active params (MoE)
+      'context-length': 92, // 204K context
+    },
+    notes: '10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache.',
+  },
+
+  'minimax-m2.7-highspeed': {
+    model: 'minimax-m2.7-highspeed',
+    provider: 'minimax',
+    displayName: 'MiniMax M2.7 Highspeed',
+    costPer1MTokens: 1.5, // Same pricing as M2.7
+    contextWindow: 204800,
+    skills: {
+      'code-generation': 90,
+      'code-review': 88,
+      debugging: 88,
+      planning: 85,
+      documentation: 85,
+      testing: 86,
+      security: 80,
+      performance: 82,
+      synthesis: 90,
+      speed: 92, // 100 tps, 3x faster than Opus
+      'context-length': 92,
+    },
+    notes: 'Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work.',
   },
 };
 

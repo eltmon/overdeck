@@ -12,11 +12,13 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
+import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { getAgentRuntimeState, getAgentDir } from './agents.js'
 import { resolveProjectFromIssue } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
+import { extractPrefix } from './issue-id.js'
 
 const execAsync = promisify(exec)
 
@@ -37,8 +39,7 @@ export interface AgentEnrichment {
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
 
 export function getClaudeProjectDir(workspacePath: string): string {
-  const dirName = workspacePath.replace(/^\//, '').replace(/\//g, '-')
-  return join(homedir(), '.claude', 'projects', `-${dirName}`)
+  return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
 }
 
 export function getActiveSessionPath(projectDir: string): string | null {
@@ -98,7 +99,8 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
     if (trimmed && existsSync(trimmed)) return trimmed
   } catch {}
   const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase()
-  const prefix = issueId.split('-')[0]
+  const prefix = extractPrefix(issueId)
+  if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)

@@ -70,6 +70,7 @@ import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
+import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -206,7 +207,7 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
     }
   } catch { /* non-fatal */ }
 
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
@@ -364,7 +365,7 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${issueId.split('-')[1] || issueId}`);
+  lines.push(`Closes #${extractNumber(issueId) ?? issueId}`);
   lines.push('');
 
   // Acceptance criteria checklist from vBRIEF plan items
@@ -667,7 +668,7 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -851,7 +852,7 @@ const postWorkspacesRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'create', issueId],
@@ -875,7 +876,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -903,7 +904,7 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -1078,7 +1079,7 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const { createBackup } = body as { createBackup?: boolean };
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -1144,7 +1145,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -1278,7 +1279,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2063,7 +2064,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           payload: { issueId, passed: true },
         })));
         const issueLower = issueId.toLowerCase();
-        const issuePrefix = issueId.split('-')[0];
+        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const testWorkspace =
           body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2195,7 +2196,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as any)?.force === true;
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
@@ -2259,10 +2260,12 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    // Reset review status
+    // Reset review status — keep 'pending' until dispatch succeeds (PAN-511 atomicity fix).
+    // reviewStatus is set to 'reviewing' only after the specialist is successfully dispatched
+    // or queued, not before. This prevents stuck 'reviewing' state if Cloister crashes mid-dispatch.
     setPendingOperation(issueId, 'review');
     const reviewReset: Record<string, unknown> = {
-      reviewStatus: 'reviewing',
+      reviewStatus: 'pending',
       testStatus: 'pending',
       autoRequeueCount: 0,
       verificationCycleCount: 0,
@@ -2398,6 +2401,8 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 isRemote: workspaceInfo.isRemote,
                 vmName: workspaceInfo.vmName,
               });
+              // PAN-511: set 'reviewing' only after task is committed to queue
+              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               completePendingOperation(issueId, null);
               return;
             }
@@ -2491,6 +2496,8 @@ ${workspaceAccessInstructions}
             }
 
             console.log(`[review] Review pipeline started for ${issueId}`);
+            // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
@@ -2613,7 +2620,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
@@ -2676,8 +2683,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
+    // PAN-511: set metadata fields but keep reviewStatus='pending' until dispatch succeeds.
+    // reviewStatus is set to 'reviewing' only after specialist is dispatched or queued.
     setReviewStatus(issueId, {
-      reviewStatus: 'reviewing',
+      reviewStatus: 'pending',
       testStatus: 'pending',
       autoRequeueCount: newCount,
       reviewNotes,
@@ -2713,6 +2722,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (result.success) {
         console.log(`[request-review] Spawned review specialist for ${issueId}`);
+        // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
           timestamp: new Date().toISOString(),
@@ -2737,6 +2748,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           workspace: workspacePath,
           branch: branchName,
         });
+        // PAN-511: set 'reviewing' after task is committed to queue
         setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         return jsonResponse(
           {
@@ -2903,7 +2915,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -2991,6 +3003,31 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     };
   }
 
+  // Ensure commit statuses are reported before merge (branch protection requires them).
+  // This is a fallback for issues that became readyForMerge before the status reporting was added.
+  if (reviewStatus.prUrl) {
+    try {
+      const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
+      if (isGitHubAppConfigured()) {
+        const prMatch = reviewStatus.prUrl.match(/\/pull\/(\d+)/);
+        if (prMatch) {
+          const { stdout } = await execAsync(
+            `gh pr view ${prMatch[1]} --json headRefOid --jq .headRefOid`,
+            { encoding: 'utf-8', timeout: 10000 }
+          );
+          const sha = stdout.trim();
+          if (sha) {
+            await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/review', 'Review passed');
+            await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/test', 'Tests passed');
+            console.log(`[merge] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[merge] Failed to report commit statuses: ${err.message}`);
+    }
+  }
+
   if (reviewStatus?.mergeStatus === 'merging') {
     const pendingOp = getPendingOperation(issueId);
     const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
@@ -3012,7 +3049,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     return { success: false, statusCode: 400, error: 'Already merged', mergeStatus: 'merged' };
   }
 
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
 
@@ -3331,7 +3368,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-        const issuePrefix = issueId.split('-')[0];
+        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const issueLower = issueId.toLowerCase();
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -3641,6 +3678,29 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/workspaces/:issueId/refresh-token ───────────────────────
+
+const postWorkspaceRefreshTokenRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/refresh-token',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issueLower = issueId.toLowerCase();
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+    const { refreshWorkspaceToken, isGitHubAppConfigured } = yield* Effect.promise(() => import('../../../lib/github-app.js'));
+    if (!isGitHubAppConfigured()) {
+      return jsonResponse({ success: false, error: 'GitHub App not configured' }, { status: 400 });
+    }
+
+    yield* Effect.promise(() => refreshWorkspaceToken(workspacePath));
+    return jsonResponse({ success: true, message: `Token refreshed for ${issueId}` });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const workspacesRouteLayer = Layer.mergeAll(
@@ -3663,6 +3723,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceApproveRoute,
   deleteWorkspacePendingRoute,
   getWorkspaceTldrRoute,
+  postWorkspaceRefreshTokenRoute,
 );
 
 export default workspacesRouteLayer;

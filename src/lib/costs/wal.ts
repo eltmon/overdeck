@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { listProjects } from '../projects.js';
+import { extractPrefix } from '../issue-id.js';
 import type { CostEvent } from './events.js';
 
 const DEFAULT_EVENTS_SUBDIR = '.pan/events';
@@ -23,7 +24,7 @@ export function resolveWalDir(issueId: string): string | null {
 
   // Find which project this issueId belongs to.
   // Match by issue prefix (e.g. "PAN" in "PAN-335") against project key or name.
-  const issuePrefix = issueId.split('-')[0]?.toUpperCase();
+  const issuePrefix = extractPrefix(issueId);
   if (!issuePrefix) return null;
 
   for (const { key, config } of projects) {

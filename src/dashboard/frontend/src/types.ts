@@ -70,6 +70,7 @@ export interface Agent {
   pendingQuestionCount?: number;
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
+  runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
 }
 
 export interface AgentHealth {

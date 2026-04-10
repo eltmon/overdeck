@@ -12,6 +12,7 @@ import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
 import { getLinearApiKey } from '../../../lib/shadow-utils.js';
+import { extractNumber } from '../../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -90,7 +91,8 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
     const ghConfig = getGitHubConfig();
     if (!ghConfig) return false;
 
-    const number = parseInt(issueId.split('-')[1], 10);
+    const number = extractNumber(issueId);
+    if (number === null) return false;
     const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
     const { owner, repo } = repoConfig;
     const token = ghConfig.token;
@@ -206,6 +208,29 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       }
 
+      // Sync closed beads to vBRIEF AC status before running the AC check.
+      // The work agent closes beads via bd close, but nothing syncs that to
+      // the plan's AC subItems until now.
+      try {
+        const { stdout } = await execAsync(
+          `bd list --status closed -l "${issueId.toLowerCase()}" --json --limit 0`,
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        const closedBeads = JSON.parse(stdout || '[]');
+        let synced = 0;
+        for (const bead of closedBeads) {
+          if (bead.id) {
+            const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
+            if (itemId) synced++;
+          }
+        }
+        if (synced > 0) {
+          console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
+        }
+      } catch {
+        // Non-fatal — sync failure shouldn't block completion check
+      }
+
       // Check 3: vBRIEF acceptance criteria completion
       try {
         const acStatus = getVBriefACStatus(workspacePath);
@@ -235,37 +260,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.error(chalk.dim('  Use --force to skip checks.'));
         console.error('');
         process.exit(1);
-      }
-    }
-  }
-
-  // Sync closed beads to vBRIEF AC status before signaling completion.
-  // The work agent closes beads via bd close, but nothing syncs that to
-  // the plan's AC subItems. Do it here so the verification gate sees
-  // completed AC when it checks.
-  {
-    const { getAgentState } = await import('../../../lib/agents.js');
-    const agentState = getAgentState(`agent-${issueId.toLowerCase()}`);
-    const workspacePath = agentState?.workspace;
-    if (workspacePath && existsSync(workspacePath)) {
-      try {
-        const { stdout } = await execAsync(
-          `bd list --status closed -l "${issueId.toLowerCase()}" --json --limit 0`,
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        const closedBeads = JSON.parse(stdout || '[]');
-        let synced = 0;
-        for (const bead of closedBeads) {
-          if (bead.id) {
-            const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed');
-            if (itemId) synced++;
-          }
-        }
-        if (synced > 0) {
-          console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
-        }
-      } catch {
-        // Non-fatal — sync failure shouldn't block completion
       }
     }
   }
@@ -399,9 +393,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
         let result = await reviewReq();
 
-        // Self-healing: if issue was previously merged, auto-reset and retry
-        if (!result.success && result.alreadyMerged) {
-          console.log(chalk.yellow(`  ⚠ Issue was previously merged. Resetting specialist states for re-review...`));
+        // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
+        // This is the normal flow when a work agent fixes review issues and re-signals done.
+        if (!result.success && (result.alreadyMerged || result.alreadyReviewed)) {
+          const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
+          console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
 
           const resetReq = () => new Promise<any>((resolve, reject) => {
             const postData = JSON.stringify({});

@@ -13,6 +13,12 @@ export interface RepoConfig {
   branch_prefix?: string;
   /** Default branch to create feature branches from (default: 'main') */
   default_branch?: string;
+  /** PR target branch for this repo (overrides workspace pr_target) */
+  pr_target?: string;
+  /** If true, agent should not commit to this repo */
+  readonly?: boolean;
+  /** How to include this repo in workspace: 'worktree' (default) or 'symlink' */
+  link_type?: 'worktree' | 'symlink';
 }
 
 export interface DnsConfig {
@@ -209,6 +215,14 @@ export interface WorkspaceConfig {
   hume?: HumeConfig;
   /** PRD directory path (relative to project path, default: 'docs/prds') */
   prdDir?: string;
+  /** When true, only always_include repos are created on workspace init (progressive mode) */
+  progressive?: boolean;
+  /** Repo names to always include in progressive workspaces (typically meta/docs repos) */
+  always_include?: string[];
+  /** Path (relative to project root) to repo-groups.yaml for named repo groups */
+  groups_file?: string;
+  /** Default PR target branch for all repos (e.g., 'qa') */
+  pr_target?: string;
 }
 
 export interface TestsConfig {

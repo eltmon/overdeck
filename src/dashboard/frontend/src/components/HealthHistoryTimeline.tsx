@@ -17,10 +17,10 @@ interface HealthHistoryTimelineProps {
 }
 
 const STATE_COLORS = {
-  active: 'bg-green-500',
-  stale: 'bg-yellow-500',
-  warning: 'bg-orange-500',
-  stuck: 'bg-red-500',
+  active: 'bg-success',
+  stale: 'bg-warning',
+  warning: 'bg-warning',
+  stuck: 'bg-destructive',
 };
 
 const STATE_LABELS = {
@@ -140,7 +140,7 @@ export function HealthHistoryTimeline({
           return (
             <div
               key={event.id}
-              className="flex items-center justify-between text-sm py-2 px-3 bg-surface-raised rounded hover:bg-gray-750 transition-colors"
+              className="flex items-center justify-between text-sm py-2 px-3 bg-surface-raised rounded hover:bg-surface-emphasis transition-colors"
             >
               <div className="flex items-center gap-3">
                 <span className="text-lg">{STATE_EMOJI[event.state]}</span>
@@ -152,7 +152,7 @@ export function HealthHistoryTimeline({
                     </div>
                   )}
                   {event.source && (
-                    <div className="text-xs text-gray-600 font-mono">{event.source}</div>
+                    <div className="text-xs text-content-muted font-mono">{event.source}</div>
                   )}
                 </div>
               </div>
@@ -160,7 +160,7 @@ export function HealthHistoryTimeline({
               <div className="text-right">
                 <div className="text-content-subtle">{formatTime(event.timestamp)}</div>
                 {duration !== null && (
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-content-muted">
                     Duration: {formatDuration(duration)}
                   </div>
                 )}

@@ -30,7 +30,7 @@ interface ActivityViewProps {
 }
 
 async function fetchActivity(issueId: string): Promise<{ issueId: string; sections: ActivitySection[]; costByStage?: CostByStage; totalCost?: number }> {
-  const res = await fetch(`/api/mission-control/activity/${issueId}`);
+  const res = await fetch(`/api/command-deck/activity/${issueId}`);
   if (!res.ok) throw new Error('Failed to fetch activity');
   return res.json();
 }
@@ -232,7 +232,7 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['mission-control-activity', issueId],
+    queryKey: ['command-deck-activity', issueId],
     queryFn: () => fetchActivity(issueId),
     refetchInterval: 5000,
   });

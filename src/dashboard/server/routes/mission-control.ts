@@ -1,15 +1,15 @@
 import { jsonResponse } from "../http-helpers.js";
 /**
- * Mission Control route module — Effect HttpRouter.Layer (PAN-428 B13)
+ * Command Deck route module — Effect HttpRouter.Layer (PAN-428 B13)
  *
- * Implements all /api/mission-control/* endpoints from the Express server:
- *   GET  /api/mission-control/activity/:issueId
- *   GET  /api/mission-control/planning/:issueId
- *   POST /api/mission-control/planning/:issueId/status-review
- *   POST /api/mission-control/planning/:issueId/upload
- *   POST /api/mission-control/planning/:issueId/sync-discussions
- *   POST /api/mission-control/planning/:issueId/init
- *   GET  /api/mission-control/projects
+ * Implements all /api/command-deck/* endpoints from the Express server:
+ *   GET  /api/command-deck/activity/:issueId
+ *   GET  /api/command-deck/planning/:issueId
+ *   POST /api/command-deck/planning/:issueId/status-review
+ *   POST /api/command-deck/planning/:issueId/upload
+ *   POST /api/command-deck/planning/:issueId/sync-discussions
+ *   POST /api/command-deck/planning/:issueId/init
+ *   GET  /api/command-deck/projects
  */
 
 import { exec } from 'node:child_process';
@@ -40,8 +40,8 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
-import { loadSettings } from '../../../lib/settings.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
 import { getReviewStatus } from '../review-status.js';
@@ -111,11 +111,11 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-// ─── Route: GET /api/mission-control/activity/:issueId ───────────────────────
+// ─── Route: GET /api/command-deck/activity/:issueId ───────────────────────
 
 const getMissionControlActivityRoute = HttpRouter.add(
   'GET',
-  '/api/mission-control/activity/:issueId',
+  '/api/command-deck/activity/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -130,7 +130,7 @@ const getMissionControlActivityRoute = HttpRouter.add(
 
 async function fetchActivityData(issueId: string): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const sections: Array<{
     type: string;
@@ -356,11 +356,11 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
   return { issueId, sections, costByStage, totalCost };
 }
 
-// ─── Route: GET /api/mission-control/planning/:issueId ───────────────────────
+// ─── Route: GET /api/command-deck/planning/:issueId ───────────────────────
 
 const getMissionControlPlanningRoute = HttpRouter.add(
   'GET',
-  '/api/mission-control/planning/:issueId',
+  '/api/command-deck/planning/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -375,7 +375,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
 
 async function fetchPlanningData(issueId: string): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -449,11 +449,11 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
   return result;
 }
 
-// ─── Route: POST /api/mission-control/planning/:issueId/status-review ────────
+// ─── Route: POST /api/command-deck/planning/:issueId/status-review ────────
 
 const postMissionControlStatusReviewRoute = HttpRouter.add(
   'POST',
-  '/api/mission-control/planning/:issueId/status-review',
+  '/api/command-deck/planning/:issueId/status-review',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -477,7 +477,7 @@ async function generateStatusReview(issueId: string): Promise<
   | { type: 'err'; response: unknown; status: number }
 > {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -620,21 +620,34 @@ Be specific: reference actual file names, function names, requirement text, disc
 
   const apiSettings = loadSettingsApi();
   const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
-    || loadSettings().models.status_review
     || 'claude-sonnet-4-6';
   const { command: cliCmd, args: cliArgs } = getAgentCommand(statusModelId);
   const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
   const promptFile = join(planningDir, '.status-review-prompt.tmp');
 
+  // Build provider env vars for non-Anthropic models
+  const { getProviderForModel, getProviderEnv } = await import('../../../lib/providers.js');
+  const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+  let providerEnvStr = '';
+  const statusProvider = getProviderForModel(statusModelId);
+  if (statusProvider.name !== 'anthropic') {
+    const { config } = loadYamlConfig();
+    const apiKey = config.apiKeys[statusProvider.name as keyof typeof config.apiKeys];
+    if (apiKey) {
+      const envVars = getProviderEnv(statusProvider, apiKey);
+      providerEnvStr = Object.entries(envVars).map(([k, v]) => `${k}="${v}"`).join(' ') + ' ';
+    }
+  }
+
   await writeFile(promptFile, analysisPrompt, 'utf-8');
-  console.log(`[status-review] ${issueId}: generating with ${cliCmd}${modelFlag}`);
+  console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
     const { stdout: aiReview } = await execAsync(
-      `cat "${promptFile}" | ${cliCmd} -p${modelFlag} --no-session-persistence`,
+      `${providerEnvStr}cat "${promptFile}" | ${cliCmd} -p${modelFlag} --no-session-persistence`,
       { encoding: 'utf-8', timeout: 120000, maxBuffer: 1024 * 1024 }
     );
-    review = `# Status Review - ${issueId}\n\n*AI-Generated: ${now}*\n\n${aiReview.trim()}\n\n---\n*Generated by Panopticon Mission Control AI*`;
+    review = `# Status Review - ${issueId}\n\n*AI-Generated: ${now}*\n\n${aiReview.trim()}\n\n---\n*Generated by Panopticon Command Deck AI*`;
   } catch (llmError: unknown) {
     const msg = llmError instanceof Error ? llmError.message : String(llmError);
     console.warn(`AI status review failed for ${issueId}, using static template:`, msg);
@@ -671,7 +684,7 @@ ${transcriptsContent || '(No transcripts uploaded)'}
 ${notesContent || '(No notes uploaded)'}
 
 ${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}---
-*Review by Panopticon Mission Control (static fallback)*
+*Review by Panopticon Command Deck (static fallback)*
 `;
   } finally {
     await unlink(promptFile).catch(() => { /* ignore */ });
@@ -685,11 +698,11 @@ ${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}---
   return { type: 'ok', review, reviewedAt: now };
 }
 
-// ─── Route: POST /api/mission-control/planning/:issueId/upload ────────────────
+// ─── Route: POST /api/command-deck/planning/:issueId/upload ────────────────
 
 const postMissionControlUploadRoute = HttpRouter.add(
   'POST',
-  '/api/mission-control/planning/:issueId/upload',
+  '/api/command-deck/planning/:issueId/upload',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -697,7 +710,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
 
     const { type, filename, content } = body as { type?: string; filename?: string; content?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     if (!type || !filename || !content) {
       return jsonResponse({ error: 'type, filename, and content are required' }, { status: 400 });
@@ -733,11 +746,11 @@ const postMissionControlUploadRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/mission-control/planning/:issueId/sync-discussions ─────
+// ─── Route: POST /api/command-deck/planning/:issueId/sync-discussions ─────
 
 const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
   'POST',
-  '/api/mission-control/planning/:issueId/sync-discussions',
+  '/api/command-deck/planning/:issueId/sync-discussions',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -746,7 +759,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     const { tracker } = body as { tracker?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     if (!tracker || !['github', 'linear', 'rally'].includes(tracker)) {
       return jsonResponse({ error: 'tracker must be github, linear, or rally' }, { status: 400 });
@@ -864,11 +877,11 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/mission-control/planning/:issueId/init ─────────────────
+// ─── Route: POST /api/command-deck/planning/:issueId/init ─────────────────
 
 const postMissionControlPlanningInitRoute = HttpRouter.add(
   'POST',
-  '/api/mission-control/planning/:issueId/init',
+  '/api/command-deck/planning/:issueId/init',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -877,7 +890,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     const { shadow } = body as { shadow?: boolean };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -905,11 +918,11 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/mission-control/projects ────────────────────────────────
+// ─── Route: GET /api/command-deck/projects ────────────────────────────────
 
 const getMissionControlProjectsRoute = HttpRouter.add(
   'GET',
-  '/api/mission-control/projects',
+  '/api/command-deck/projects',
   httpHandler(Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
       try: () => fetchProjectTree(),
@@ -1093,7 +1106,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
-export const missionControlRouteLayer = Layer.mergeAll(
+export const commandDeckRouteLayer = Layer.mergeAll(
   getMissionControlActivityRoute,
   getMissionControlPlanningRoute,
   postMissionControlStatusReviewRoute,
@@ -1103,4 +1116,4 @@ export const missionControlRouteLayer = Layer.mergeAll(
   getMissionControlProjectsRoute,
 );
 
-export default missionControlRouteLayer;
+export default commandDeckRouteLayer;

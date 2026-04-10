@@ -112,7 +112,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         ) : (
           <div
             className="h-10 rounded flex items-center justify-center text-[10px]"
-            style={{ background: 'rgba(10, 14, 26, 0.6)', color: 'var(--gv-text-dim)' }}
+            style={{ background: 'var(--gv-surface)', color: 'var(--gv-text-dim)' }}
           >
             no output
           </div>
@@ -123,6 +123,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
       {agent.git?.branch && (
         <div className="flex items-center gap-1 pl-2">
           <GitBranch className="w-3 h-3 shrink-0" style={{ color: 'var(--gv-text-dim)' }} />
+          <span className="text-[10px] gv-mono text-content-subtle">Plan</span>
           <span className="text-[10px] gv-mono truncate" style={{ color: 'var(--gv-text-secondary)' }}>
             {agent.git.branch}
           </span>

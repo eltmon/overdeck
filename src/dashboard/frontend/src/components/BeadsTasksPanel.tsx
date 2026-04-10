@@ -84,11 +84,11 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
       <div className="flex items-center justify-between text-xs text-content-subtle">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <Circle className="w-3 h-3 text-blue-400" />
+            <Circle className="w-3 h-3 text-primary" />
             {openTasks.length} open
           </span>
           <span className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-400" />
+            <CheckCircle2 className="w-3 h-3 text-success" />
             {closedTasks.length} closed
           </span>
         </div>
@@ -218,9 +218,9 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
     >
       <div className="flex items-start gap-2 p-2">
         {task.status === 'open' ? (
-          <Circle className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+          <Circle className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
         ) : (
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+          <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
         )}
         <div className="flex-1 min-w-0">
           <div className="text-content break-words leading-tight">
@@ -232,9 +232,9 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
                 key={label}
                 className={`text-[9px] px-1 py-0.5 rounded ${
                   label.startsWith('difficulty:')
-                    ? label.includes('easy') ? 'bg-green-900/50 text-green-400' :
-                      label.includes('medium') ? 'bg-yellow-900/50 text-yellow-400' :
-                      label.includes('hard') ? 'bg-red-900/50 text-red-400' :
+                    ? label.includes('easy') ? 'badge-bg-success text-success' :
+                      label.includes('medium') ? 'badge-bg-warning text-warning' :
+                      label.includes('hard') ? 'badge-bg-destructive text-destructive' :
                       'bg-surface-overlay text-content-body'
                     : 'bg-surface-overlay text-content-body'
                 }`}
@@ -244,13 +244,13 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
             ))}
             {/* AC count badge */}
             {hasACs && (
-              <span className="text-[9px] px-1 py-0.5 rounded border border-blue-800 bg-blue-950/50 text-blue-400 font-semibold">
+              <span className="text-[9px] px-1 py-0.5 rounded border border-primary/30 badge-bg-primary text-primary font-semibold">
                 {completedAcs}/{acs.length} AC
               </span>
             )}
           </div>
           {task.blockedBy.length > 0 && (
-            <div className="flex items-center gap-1 mt-1 text-[9px] text-orange-400">
+            <div className="flex items-center gap-1 mt-1 text-[9px] text-warning">
               <Clock className="w-2.5 h-2.5" />
               Blocked by: {task.blockedBy.join(', ')}
             </div>
@@ -336,8 +336,8 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
       {matchedBead && (
         <div className="flex items-center gap-1 text-[10px]">
           {matchedBead.status === 'closed'
-            ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
-            : <Circle className="w-3 h-3 text-blue-400 shrink-0" />}
+            ? <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
+            : <Circle className="w-3 h-3 text-primary shrink-0" />}
           <span className="text-content-subtle">
             Bead: {matchedBead.status === 'closed' ? 'completed' : 'open'} ({matchedBead.id})
           </span>
@@ -361,7 +361,7 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
           {acs.map(s => (
             <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
               {s.status === 'completed'
-                ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0 mt-0.5" />
+                ? <CheckCircle2 className="w-3 h-3 text-success shrink-0 mt-0.5" />
                 : <Circle className="w-3 h-3 text-content-muted shrink-0 mt-0.5" />}
               {s.title}
             </div>
@@ -377,7 +377,7 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
             const source = itemById(e.from);
             return source ? (
               <div key={`in-${i}`} className="text-[10px] text-content-subtle">
-                <span className="text-blue-400/80">← {e.type}</span>
+                <span className="text-primary/80">← {e.type}</span>
                 {' '}{source.title}
               </div>
             ) : null;
@@ -386,7 +386,7 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
             const target = itemById(e.to);
             return target ? (
               <div key={`out-${i}`} className="text-[10px] text-content-subtle">
-                <span className="text-orange-400/80">→ {e.type}</span>
+                <span className="text-warning/80">→ {e.type}</span>
                 {' '}{target.title}
               </div>
             ) : null;

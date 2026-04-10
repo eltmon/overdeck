@@ -41,7 +41,7 @@ export function ConfirmationDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-orange-400" />
+            <AlertTriangle className="w-5 h-5 text-warning" />
             <h3 className="text-lg font-semibold text-content">Confirmation Required</h3>
           </div>
           <button
@@ -73,8 +73,8 @@ export function ConfirmationDialog({
             </div>
           )}
 
-          <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded">
-            <p className="text-sm text-orange-200">
+          <div className="mt-4 p-3 badge-bg-warning border badge-border-warning rounded">
+            <p className="text-sm text-warning-foreground">
               ⚠️ This action cannot be undone. Please confirm that you want to proceed.
             </p>
           </div>
@@ -90,7 +90,7 @@ export function ConfirmationDialog({
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded text-sm bg-orange-600 text-content hover:bg-orange-700 transition-colors font-medium"
+            className="px-4 py-2 rounded text-sm bg-warning text-white hover:bg-warning/90 transition-colors font-medium"
           >
             Confirm
           </button>

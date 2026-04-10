@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Users, AlertTriangle, GitBranch, TrendingUp, Layers } from 'lucide-react';
+import { DollarSign, Users, AlertTriangle, ArrowRightLeft, TrendingUp, Layers } from 'lucide-react';
 
 interface MetricsSummaryData {
   today: {
@@ -51,26 +51,29 @@ interface MetricTileProps {
   label: string;
   value: string | number;
   subtext?: string;
-  color?: string;
+  valueClass?: string;
+  pulse?: boolean;
 }
 
-function MetricTile({ icon, label, value, subtext, color = '#92a4c9' }: MetricTileProps) {
+function MetricTile({ icon, label, value, subtext, valueClass = 'text-foreground', pulse }: MetricTileProps) {
   return (
-    <div
-      className="flex items-center gap-3 px-4 py-2.5 rounded-lg border min-w-0"
-      style={{ backgroundColor: '#161b26', borderColor: '#232f48' }}
-    >
-      <div className="shrink-0" style={{ color }}>
+    <div className="flex flex-1 items-center justify-center gap-2 px-2 py-2 whitespace-nowrap border-r border-border last:border-r-0">
+      <div className={`shrink-0 ${valueClass} opacity-40`}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="text-xs" style={{ color: '#92a4c9' }}>{label}</div>
-        <div className="text-sm font-semibold text-white leading-tight" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-          {value}
+      <div className="flex flex-col">
+        <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
+          {label}
+        </span>
+        <div className="flex items-baseline gap-1">
+          {pulse && <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" style={{ color: 'var(--primary)' }} />}
+          <span className={`text-base font-semibold tabular-nums leading-none font-display ${valueClass}`}>
+            {value}
+          </span>
+          {subtext && (
+            <span className="text-[10px] text-muted-foreground">{subtext}</span>
+          )}
         </div>
-        {subtext && (
-          <div className="text-[10px] truncate" style={{ color: '#92a4c9' }}>{subtext}</div>
-        )}
       </div>
     </div>
   );
@@ -101,46 +104,51 @@ export function MetricsSummaryRow() {
     ? Object.values(handoffStats.byTrigger).reduce((sum, count) => sum + count, 0)
     : 0;
 
+  const stuckColor = metrics.today.stuckCount > 0 ? 'text-destructive' : 'text-muted-foreground';
+  const escalationColor = costEscalations > 0 ? 'text-signal-review' : 'text-muted-foreground';
+  const queueColor = (specialistStats?.queueDepth ?? 0) > 10 ? 'text-warning' : 'text-muted-foreground';
+
   return (
-    <div className="flex gap-3 mb-4 overflow-x-auto scrollbar-hide pb-1">
+    <div className="flex items-stretch mb-4 rounded-xl border border-border bg-card">
       <MetricTile
         icon={<DollarSign className="w-4 h-4" />}
         label="Cost Today"
         value={`$${metrics.today.totalCost.toFixed(2)}`}
-        color="#4ade80"
+        valueClass="text-success"
       />
       <MetricTile
         icon={<Users className="w-4 h-4" />}
         label="Agents"
         value={`${metrics.today.activeCount} / ${metrics.today.agentCount}`}
-        subtext={`${metrics.today.activeCount} active`}
-        color="#60a5fa"
+        subtext="active"
+        valueClass="text-primary"
+        pulse={metrics.today.activeCount > 0}
       />
       <MetricTile
         icon={<AlertTriangle className="w-4 h-4" />}
         label="Stuck"
         value={metrics.today.stuckCount}
-        subtext={`${metrics.today.warningCount} warnings`}
-        color={metrics.today.stuckCount > 0 ? '#f87171' : '#92a4c9'}
+        subtext={metrics.today.warningCount > 0 ? `${metrics.today.warningCount} warn` : undefined}
+        valueClass={stuckColor}
       />
       <MetricTile
-        icon={<GitBranch className="w-4 h-4" />}
+        icon={<ArrowRightLeft className="w-4 h-4" />}
         label="Handoffs"
         value={specialistStats?.todayCount ?? 0}
-        subtext={specialistStats ? `${(specialistStats.successRate * 100).toFixed(0)}% success` : undefined}
-        color="#22d3ee"
+        subtext={specialistStats ? `${(specialistStats.successRate * 100).toFixed(0)}%` : undefined}
+        valueClass="text-signal-cost"
       />
       <MetricTile
         icon={<TrendingUp className="w-4 h-4" />}
         label="Escalations"
         value={costEscalations}
-        color="#c084fc"
+        valueClass={escalationColor}
       />
       <MetricTile
         icon={<Layers className="w-4 h-4" />}
-        label="Queue Depth"
+        label="Queue"
         value={specialistStats?.queueDepth ?? 0}
-        color="#fb923c"
+        valueClass={queueColor}
       />
     </div>
   );

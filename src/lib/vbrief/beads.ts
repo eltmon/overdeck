@@ -61,6 +61,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
       // No main .beads/ and no local .beads/ — fall back to bd init
       try {
         await execAsync('bd init', { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] Initialized beads database in ${workspacePath}`);
       } catch (initErr: any) {
         return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
@@ -78,25 +79,47 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 
   // Verify db connectivity — the Dolt database for this project may not exist yet
   // on fresh installs (bd was installed but bd init was never run at the project root).
-  // If connectivity fails with "database not found", auto-initialize with the right prefix.
+  // If connectivity fails for any reason and a redirect exists, auto-initialize with
+  // the right prefix so beads creation can proceed without manual intervention.
   const issueLabel = plan.id.toLowerCase();
+  const redirectExists = existsSync(redirectPath);
   try {
     await execAsync('bd list --json --limit 0', {
       encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
     });
   } catch (connectErr: any) {
-    const msg = String(connectErr?.message ?? connectErr?.stderr ?? '');
-    if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-      // Derive prefix from issue label (pan-475 → prefix "pan-475")
+    // When redirect exists but DB is unreachable (not found, connection refused, timeout,
+    // or any other error), always attempt bd init --prefix to initialize the database.
+    // This covers fresh installs, corrupted DBs, and cases where the redirect was created
+    // but bd init was never run for this prefix.
+    if (redirectExists) {
       const prefix = issueLabel;
-      console.log(`[beads] Database unreachable — auto-running bd init --prefix ${prefix}`);
+      const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
+
+      // Categorize the connectivity error for diagnostic clarity
+      let connectCategory: string;
+      if (connectErrMsg.toLowerCase().includes('connect') || connectErrMsg.toLowerCase().includes('refused') || connectErrMsg.toLowerCase().includes('econnrefused')) {
+        connectCategory = 'Dolt server not running';
+      } else if (connectErrMsg.toLowerCase().includes('not found') || connectErrMsg.toLowerCase().includes('not exist') || connectErrMsg.toLowerCase().includes('no such')) {
+        connectCategory = 'database not found';
+      } else {
+        connectCategory = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
+      }
+
+      console.log(`[beads] Database unreachable (${connectCategory}) — auto-running bd init --prefix ${prefix}`);
       try {
         await execAsync(`bd init --prefix ${prefix}`, {
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
         });
+        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] bd init succeeded for prefix ${prefix}`);
       } catch (initErr: any) {
-        console.warn(`[beads] bd init failed: ${initErr.message} — will attempt bead creation anyway`);
+        // Init failed — return early with a specific error so callers know exactly what happened
+        // rather than proceeding with bead creation against a broken database.
+        const initErrMsg = String(initErr?.message ?? initErr?.stderr ?? '');
+        const detail = `database init failed: ${initErrMsg.split('\n')[0]} (connectivity: ${connectCategory})`;
+        console.warn(`[beads] ${detail}`);
+        return { success: false, created: [], errors: [detail], beadIds };
       }
     }
   }
@@ -259,27 +282,32 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 export function syncBeadStatusToVBrief(
   beadId: string,
   workspacePath: string,
-  status: VBriefItemStatus = 'completed'
+  status: VBriefItemStatus = 'completed',
+  /** Optional: bead title from caller (e.g. bd list --json output). Falls back to .beads/issues.jsonl lookup. */
+  knownTitle?: string
 ): string | null {
   try {
     const doc = readWorkspacePlan(workspacePath);
     if (!doc) return null;
 
-    // Read bead title from .beads/issues.jsonl
-    const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(beadsFile)) return null;
+    let beadTitle: string | null = knownTitle ?? null;
 
-    const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
-    let beadTitle: string | null = null;
-    for (const line of lines) {
-      try {
-        const bead = JSON.parse(line);
-        if (bead.id === beadId && bead.title) {
-          beadTitle = bead.title as string;
-          break;
+    // Fallback: read bead title from .beads/issues.jsonl (legacy flat-file beads)
+    if (!beadTitle) {
+      const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
+      if (existsSync(beadsFile)) {
+        const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const bead = JSON.parse(line);
+            if (bead.id === beadId && bead.title) {
+              beadTitle = bead.title as string;
+              break;
+            }
+          } catch {
+            // skip malformed lines
+          }
         }
-      } catch {
-        // skip malformed lines
       }
     }
 

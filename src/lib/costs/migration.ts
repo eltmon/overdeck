@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { encodeClaudeProjectDir } from '../paths.js';
 import { appendCostEvent, CostEvent, eventsFileExists, getLastEventMetadata } from './events.js';
 import { getPricing, calculateCost, TokenUsage } from '../cost.js';
 
@@ -247,7 +248,7 @@ function usageToCostEvents(
 function getSessionDir(workspacePath: string): string | null {
   // Claude Code session directory name format: path with leading / removed and / replaced by -
   // e.g., /home/user/projects/foo -> -home-user-projects-foo
-  const sessionDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
+  const sessionDirName = encodeClaudeProjectDir(workspacePath);
   const sessionDir = join(getClaudeProjectsDir(), sessionDirName);
 
   if (existsSync(sessionDir)) {

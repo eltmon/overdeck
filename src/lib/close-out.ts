@@ -23,14 +23,15 @@ import {
 import { sessionExists } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
+import { extractNumber, extractPrefix, normalizeIssueId } from './issue-id.js';
 
 const execAsync = promisify(exec);
 
 /**
  * Check if a feature branch has been merged into main.
  *
- * Uses `git merge-base --is-ancestor` which correctly handles both
- * regular merges and squash merges (where commit SHAs differ).
+ * Uses `git merge-base --is-ancestor` for regular merges, plus a
+ * code-diff fallback to detect squash merges where the branch still exists.
  * Also checks review-status.json as authoritative — the merge specialist
  * validates the merge before setting mergeStatus to 'merged'.
  */
@@ -65,7 +66,21 @@ async function isBranchMerged(
       );
       return { status: 'merged', message: 'All commits merged to main' };
     } catch {
-      // Not an ancestor — branch has unmerged work
+      // --is-ancestor fails for squash merges where the branch still exists.
+      // Check if the code diff (excluding planning artifacts) is empty — if so,
+      // the code was squash-merged and only planning files remain on the branch.
+      try {
+        const { stdout: codeDiff } = await execAsync(
+          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' },
+        );
+        if (!codeDiff.trim()) {
+          return { status: 'merged', message: 'Code changes squash-merged to main (only planning artifacts remain on branch)' };
+        }
+      } catch {
+        // diff failed — fall through to unmerged report
+      }
+
       const { stdout: unmerged } = await execAsync(
         `git log main..${branchName} --oneline 2>/dev/null || true`,
         { cwd: projectPath, encoding: 'utf-8' },
@@ -93,6 +108,19 @@ async function isBranchMerged(
       );
       return { status: 'merged', message: 'Remote branch fully merged' };
     } catch {
+      // Squash-merge detection for remote branch
+      try {
+        const { stdout: codeDiff } = await execAsync(
+          `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' },
+        );
+        if (!codeDiff.trim()) {
+          return { status: 'merged', message: 'Remote code changes squash-merged to main (only planning artifacts remain on branch)' };
+        }
+      } catch {
+        // diff failed — fall through
+      }
+
       const { stdout: remoteUnmerged } = await execAsync(
         `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
         { cwd: projectPath, encoding: 'utf-8' },
@@ -292,7 +320,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     if (workspacePath && existsSync(workspacePath)) {
       try {
         const { stopWorkspaceDocker } = await import('./workspace-manager.js');
-        const projectName = ctx.issueId.split('-')[0].toLowerCase();
+        const projectName = extractPrefix(ctx.issueId)?.toLowerCase() ?? ctx.issueId.toLowerCase();
         await stopWorkspaceDocker(workspacePath, projectName, issueLower);
         cleaned = true;
       } catch { /* Docker may not be running */ }
@@ -375,8 +403,12 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
 
       // Find the issue by identifier using issues filter (searchIssues returns
       // IssueSearchResult which lacks .update(); client.issue() needs the UUID)
-      const issueNumber = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-      const issuePrefix = ctx.issueId.split('-')[0].toUpperCase();
+      const issueNumber = extractNumber(ctx.issueId);
+      const issuePrefix = extractPrefix(ctx.issueId);
+      if (issueNumber === null || issuePrefix === null) {
+        steps.push({ name: 'Close issue on tracker', status: 'failed', message: `Could not parse issue ID: ${ctx.issueId}` });
+        return { success: false, issueId: ctx.issueId, steps, error: `Could not parse issue ID: ${ctx.issueId}` };
+      }
       const results = await client.issues({
         filter: {
           number: { eq: issueNumber },
@@ -439,33 +471,35 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
         if (linearApiKey) {
           const { LinearClient } = await import('@linear/sdk');
           const client = new LinearClient({ apiKey: linearApiKey });
-          const issueNum = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-          const teamKey = ctx.issueId.split('-')[0].toUpperCase();
-          const results = await client.issues({
-            filter: {
-              number: { eq: issueNum },
-              team: { key: { eq: teamKey } },
-            },
-            first: 1,
-          });
-          if (results.nodes.length > 0) {
-            const issue = results.nodes[0];
-            // Find or create the closed-out label
-            const labels = await client.issueLabels({ filter: { name: { eq: CLOSED_OUT_LABEL } } });
-            let labelId: string;
-            if (labels.nodes.length > 0) {
-              labelId = labels.nodes[0].id;
-            } else {
-              const created = await client.createIssueLabel({ name: CLOSED_OUT_LABEL, color: `#${CLOSED_OUT_COLOR}` });
-              const createdLabel = await created.issueLabel;
-              labelId = createdLabel ? createdLabel.id : '';
-            }
-            if (labelId) {
-              const existingLabels = await issue.labels();
-              const labelIds = existingLabels.nodes.map(l => l.id);
-              if (!labelIds.includes(labelId)) {
-                labelIds.push(labelId);
-                await issue.update({ labelIds });
+          const issueNum = extractNumber(ctx.issueId);
+          const teamKey = extractPrefix(ctx.issueId);
+          if (issueNum !== null && teamKey !== null) {
+            const results = await client.issues({
+              filter: {
+                number: { eq: issueNum },
+                team: { key: { eq: teamKey } },
+              },
+              first: 1,
+            });
+            if (results.nodes.length > 0) {
+              const issue = results.nodes[0];
+              // Find or create the closed-out label
+              const labels = await client.issueLabels({ filter: { name: { eq: CLOSED_OUT_LABEL } } });
+              let labelId: string;
+              if (labels.nodes.length > 0) {
+                labelId = labels.nodes[0].id;
+              } else {
+                const created = await client.createIssueLabel({ name: CLOSED_OUT_LABEL, color: `#${CLOSED_OUT_COLOR}` });
+                const createdLabel = await created.issueLabel;
+                labelId = createdLabel ? createdLabel.id : '';
+              }
+              if (labelId) {
+                const existingLabels = await issue.labels();
+                const labelIds = existingLabels.nodes.map(l => l.id);
+                if (!labelIds.includes(labelId)) {
+                  labelIds.push(labelId);
+                  await issue.update({ labelIds });
+                }
               }
             }
           }

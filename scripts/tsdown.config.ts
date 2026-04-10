@@ -8,4 +8,7 @@ export default defineConfig({
   outDir: '.',
   clean: false,
   outExtensions: () => ({ js: '.js' }),
+  // Bundle all dependencies inline — this script runs standalone at ~/.panopticon/bin/
+  // with no node_modules, so imports like 'yaml' must be embedded.
+  noExternal: [/.*/],
 });

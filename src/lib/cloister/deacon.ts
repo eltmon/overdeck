@@ -21,7 +21,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
-import { setReviewStatus } from '../review-status.js';
+import { setReviewStatus, loadReviewStatuses } from '../review-status.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -1147,7 +1147,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     }
 
     const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
+    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
 
     // Build a set of all active specialist sessions (global + per-project)
     // so we can check if ANY specialist is working on review/test tasks.
@@ -1205,6 +1205,92 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         status.reviewStatus = 'pending';
         modified = true;
         actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
+      }
+
+      // Re-dispatch pending reviews that should be in the pipeline.
+      // This covers the gap where checkOrphanedReviewStatuses resets reviewing → pending
+      // but nothing re-enqueues the issue. Conditions: reviewStatus=pending AND the issue
+      // has completed (completed.processed exists) AND has a PR (prUrl exists) AND no
+      // review agent is currently working on it.
+      const reviewQueuedOrActive = activeReviewSessions.has(issueId.toUpperCase());
+      if (
+        status.reviewStatus === 'pending' &&
+        !reviewQueuedOrActive &&
+        !hasPassedReview &&
+        status.prUrl
+      ) {
+        // Check completed.processed marker
+        const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
+        const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
+        if (existsSync(completedProcessedFile)) {
+          // Check review queue — maybe it's already enqueued
+          const reviewQueue = checkSpecialistQueue('review-agent');
+          const alreadyQueued = reviewQueue.items.some(
+            (item) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase(),
+          );
+
+          if (alreadyQueued) {
+            actions.push(`Review for ${issueId} already in queue — deacon will dispatch when idle`);
+            console.log(`[deacon] Review for ${issueId} is already queued — skipping re-dispatch`);
+          } else {
+            const agentState = getAgentState(agentIdForCheck);
+            const workspace = agentState?.workspace;
+
+            if (workspace) {
+              const branch = `feature/${issueId.toLowerCase()}`;
+              const { resolveProjectFromIssue } = await import('../projects.js');
+              const resolved = resolveProjectFromIssue(issueId);
+
+              if (resolved) {
+                const { spawnEphemeralSpecialist } = await import('./specialists.js');
+                const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+                  issueId,
+                  workspace,
+                  branch,
+                });
+                if (result.success) {
+                  setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+                  status.reviewStatus = 'reviewing';
+                  modified = true;
+                  actions.push(
+                    `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
+                  );
+                  console.log(
+                    `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection (project: ${resolved.projectKey})`,
+                  );
+                } else if (result.error === 'specialist_busy') {
+                  const { submitToSpecialistQueue } = await import('./specialists.js');
+                  submitToSpecialistQueue('review-agent', {
+                    priority: 'high',
+                    source: 'deacon-orphan-recovery',
+                    issueId,
+                    workspace,
+                    branch,
+                  });
+                  setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+                  status.reviewStatus = 'reviewing'; // queued, will be picked up
+                  modified = true;
+                  actions.push(
+                    `Queued pending review for ${issueId} (specialist busy) — deacon will dispatch when idle`,
+                  );
+                  console.log(`[deacon] Review specialist busy for ${issueId} — queued for later dispatch`);
+                } else {
+                  actions.push(
+                    `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+                  );
+                  console.log(
+                    `[deacon] Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+                  );
+                }
+              } else {
+                actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
+              }
+            } else {
+              actions.push(`Skipped pending review re-dispatch for ${issueId}: agent state unavailable`);
+              console.log(`[deacon] Skipped review re-dispatch for ${issueId} — agent state unavailable`);
+            }
+          }
+        }
       }
 
       // Check for orphaned testing status (includes dispatch_failed from PAN-369)
@@ -1325,6 +1411,83 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 }
 
 // ============================================================================
+// Post-review commit detection
+// ============================================================================
+
+/**
+ * Detect issues where the agent pushed new commits AFTER review passed.
+ *
+ * When review passes, specialists.ts snapshots the HEAD commit SHA into
+ * `reviewedAtCommit`. On each patrol, we check all passed/readyForMerge
+ * issues: if the workspace HEAD has moved past that snapshot, the review
+ * is stale and must be re-run.
+ *
+ * Guards:
+ *   - Only fires when reviewedAtCommit is populated (set since the review passed)
+ *   - Skips issues already merged (mergeStatus === 'merged')
+ *   - Skips issues whose workspace directory doesn't exist
+ */
+export async function checkPostReviewCommits(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const statuses = loadReviewStatuses();
+    const { resolveProjectFromIssue } = await import('../projects.js');
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      // Only check passed reviews not yet merged
+      if (status.mergeStatus === 'merged') continue;
+      if (!status.reviewedAtCommit) continue;
+      if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+
+      // Resolve workspace path
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
+      const workspacePath = join(
+        project.projectPath,
+        'workspaces',
+        `feature-${issueId.toLowerCase()}`,
+      );
+      if (!existsSync(workspacePath)) continue;
+
+      // Get current HEAD
+      let currentHead: string;
+      try {
+        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+        currentHead = stdout.trim();
+      } catch {
+        continue; // not a git repo or git unavailable
+      }
+
+      if (currentHead === status.reviewedAtCommit) continue;
+
+      // HEAD moved — new commits since review. Reset review pipeline.
+      console.log(
+        `[deacon] Post-review commit detected for ${issueId}: ` +
+        `was ${status.reviewedAtCommit.substring(0, 8)}, now ${currentHead.substring(0, 8)} — resetting review`,
+      );
+      setReviewStatus(issueId, {
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+        reviewedAtCommit: undefined,
+        reviewNotes: undefined,
+        testNotes: undefined,
+      });
+      actions.push(
+        `Reset review for ${issueId}: new commits after review passed ` +
+        `(${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`,
+      );
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error in checkPostReviewCommits:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // Ready-for-merge stuck detection (PAN-344)
 // ============================================================================
 
@@ -1339,6 +1502,19 @@ const MERGE_STUCK_MAX_ATTEMPTS = 3;
 // In-memory cooldowns for stuck-merge detection (reset on server restart is acceptable —
 // cooldowns are a performance optimisation, not critical state)
 const mergeStuckCooldowns = new Map<string, number>();
+
+// Callback set by the server layer to emit domain events when agents are stopped.
+// Deacon is a library module and does not own the event store directly.
+let agentStoppedNotifier: ((agentId: string) => void) | null = null;
+
+/**
+ * Register a callback that deacon will call when it detects an orphaned agent
+ * and resets it to stopped. The server layer uses this to emit an agent.stopped
+ * domain event so the read model and frontend update in real-time.
+ */
+export function setAgentStoppedNotifier(fn: (agentId: string) => void): void {
+  agentStoppedNotifier = fn;
+}
 
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
 // Deacon is a library module and does not own the Socket.io instance directly.
@@ -1950,6 +2126,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   // per-project ephemeral specialists via spawnEphemeralSpecialist().
   // Per-project ephemeral specialist patrol is below (dead session + stuck detection).
 
+  // Recover orphaned agents: status=running but tmux session gone (failed resume, crash, etc.)
+  const orphanedAgentActions = recoverOrphanedAgents();
+  actions.push(...orphanedAgentActions);
+  for (const a of orphanedAgentActions) addLog('action', a, state.patrolCycle);
+
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
@@ -1959,6 +2140,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
+
+  // Detect new commits pushed after review passed — invalidate stale reviews
+  const postReviewActions = await checkPostReviewCommits();
+  actions.push(...postReviewActions);
+  for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
 
   // PAN-384: Check specialist queues and dispatch pending work.
   // This is the safety net for task_queued events that were missed (e.g., dashboard restart,
@@ -2168,6 +2354,45 @@ export function getLastPatrolResult(): PatrolResult | null {
 /**
  * Start the deacon patrol loop
  */
+/**
+ * On startup, detect agents whose state.json claims 'running' or 'starting' but have
+ * no live tmux session — this happens after a system crash where tmux was killed but
+ * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
+ */
+function recoverOrphanedAgents(context?: string): string[] {
+  if (!existsSync(AGENTS_DIR)) return [];
+  let dirs: string[];
+  try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
+  catch { return []; }
+
+  const actions: string[] = [];
+  for (const dir of dirs) {
+    const stateFile = join(AGENTS_DIR, dir, 'state.json');
+    if (!existsSync(stateFile)) continue;
+    try {
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      if (state.status !== 'running' && state.status !== 'starting') continue;
+      if (sessionExists(dir)) continue; // truly still running
+      // Orphaned — crashed agent with no tmux session
+      const oldStatus = state.status;
+      state.status = 'stopped';
+      state.stoppedAt = new Date().toISOString();
+      writeFileSync(stateFile, JSON.stringify(state, null, 2));
+      const msg = `Recovered orphaned agent ${dir} (${oldStatus}→stopped)`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
+      // Notify server layer so the read model and frontend update
+      if (agentStoppedNotifier) {
+        try { agentStoppedNotifier(dir); } catch { /* non-fatal */ }
+      }
+    } catch { /* non-fatal */ }
+  }
+  if (actions.length > 0 && context) {
+    console.log(`[deacon] ${context}: ${actions.length} orphaned agent(s) reset to stopped`);
+  }
+  return actions;
+}
+
 export function startDeacon(): void {
   if (deaconInterval) {
     console.log('[deacon] Already running');
@@ -2176,6 +2401,9 @@ export function startDeacon(): void {
 
   config = loadConfig();
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
+
+  // Recover agents whose tmux sessions were killed by a system crash
+  recoverOrphanedAgents('Startup recovery');
 
   // Run initial patrol
   runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));

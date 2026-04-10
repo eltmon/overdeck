@@ -74,9 +74,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   streaming,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   // Track whether user has manually scrolled up
   const isPinnedToBottomRef = useRef(true);
+  // Visible state for scroll-to-bottom button
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const timelineEntries = deriveTimelineEntries(messages, workLog);
   const rows = deriveMessagesTimelineRows(timelineEntries, streaming);
@@ -108,29 +111,55 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     return () => ro.disconnect();
   }, []);
 
-  // Auto-scroll to bottom during streaming if user hasn't scrolled up
+  // Auto-scroll when inner content grows (e.g. AI streaming text into existing row)
+  // This fires on every height change, complementing the row-count-based effect below.
+  useLayoutEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
+    const ro = new ResizeObserver(() => {
+      if (isPinnedToBottomRef.current && scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      }
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
+  // Auto-scroll to bottom when row count changes (new message added)
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el || !isPinnedToBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [rows.length, streaming]);
 
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    isPinnedToBottomRef.current = true;
+    setShowScrollToBottom(false);
+  }, []);
+
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
-    isPinnedToBottomRef.current = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
+    const atBottom = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
+    isPinnedToBottomRef.current = atBottom;
+    setShowScrollToBottom(!atBottom);
   }, []);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className={styles.messagesTimeline}
-      onScroll={handleScroll}
-    >
-      <div className={styles.messagesTimelineInner}>
+    <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div
+        ref={scrollContainerRef}
+        className={styles.messagesTimeline}
+        onScroll={handleScroll}
+        style={{ flex: 1 }}
+      >
+      <div ref={innerRef} className={styles.messagesTimelineInner}>
         {/* Virtual section — absolutely positioned rows */}
         {virtualRows.length > 0 && (
           <div
@@ -165,6 +194,37 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           <TimelineRowRenderer key={row.id} row={row} isStreaming={streaming} />
         ))}
       </div>
+    </div>
+
+    {/* Scroll-to-bottom button — appears when user has scrolled up */}
+    {showScrollToBottom && (
+      <button
+        onClick={scrollToBottom}
+        style={{
+          position: 'absolute',
+          bottom: 12,
+          right: 16,
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '6px 12px',
+          background: 'var(--color-primary)',
+          color: 'var(--color-primary-foreground)',
+          border: 'none',
+          borderRadius: 20,
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+          opacity: 0.95,
+        }}
+        title="Scroll to bottom"
+      >
+        <ChevronDown size={14} />
+        Bottom
+      </button>
+    )}
     </div>
   );
 });
@@ -273,6 +333,7 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
 const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 
 function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
+  const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--mc-text-secondary)',
     tool: 'var(--mc-accent)',
@@ -281,33 +342,57 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
   };
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
+  const hasResult = !!entry.result;
 
   return (
-    <div className={styles.workLogEntry}>
-      {isTerminal ? (
-        <span
-          className={styles.workLogTerminalIcon}
-          style={{ color: toneColor[entry.tone] }}
-        >
-          {'>_'}
-        </span>
-      ) : (
-        <Circle
-          size={6}
-          style={{
-            fill: toneColor[entry.tone],
-            color: toneColor[entry.tone],
-            flexShrink: 0,
-            marginTop: 2,
-          }}
-        />
-      )}
-      <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
-      {entry.detail && (
-        <span className={styles.workLogDetail} title={entry.detail}>
-          {entry.detail.slice(0, 80)}
-          {entry.detail.length > 80 ? '…' : ''}
-        </span>
+    <div>
+      <div
+        className={styles.workLogEntry}
+        style={hasResult ? { cursor: 'pointer' } : undefined}
+        onClick={hasResult ? () => setShowResult(prev => !prev) : undefined}
+      >
+        {isTerminal ? (
+          <span
+            className={styles.workLogTerminalIcon}
+            style={{ color: toneColor[entry.tone] }}
+          >
+            {'>_'}
+          </span>
+        ) : (
+          <Circle
+            size={6}
+            style={{
+              fill: toneColor[entry.tone],
+              color: toneColor[entry.tone],
+              flexShrink: 0,
+              marginTop: 2,
+            }}
+          />
+        )}
+        <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
+        {entry.detail && (
+          <span className={styles.workLogDetail} title={entry.detail}>
+            {entry.detail.slice(0, 80)}
+            {entry.detail.length > 80 ? '…' : ''}
+          </span>
+        )}
+        {hasResult && (
+          <ChevronRight
+            size={10}
+            style={{
+              flexShrink: 0,
+              marginLeft: 'auto',
+              transition: 'transform 0.15s',
+              transform: showResult ? 'rotate(90deg)' : 'none',
+              color: 'var(--mc-text-muted)',
+            }}
+          />
+        )}
+      </div>
+      {showResult && entry.result && (
+        <pre className={styles.workLogResult}>
+          {entry.result}
+        </pre>
       )}
     </div>
   );

@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
-import { loadSettings, getAgentCommand, isAnthropicModel } from '../settings.js';
+import { getAgentCommand, isAnthropicModel } from '../settings.js';
+import { loadConfig as loadYamlConfig } from '../config-yaml.js';
+import { getProviderForModel, getProviderEnv } from '../providers.js';
 import { createWorkspace } from '../workspace-manager.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -91,6 +93,10 @@ export interface SpawnPlanningOptions {
   workspaceLocation: 'local' | 'remote';
   startDocker?: boolean;
   shadowMode?: boolean;
+  /** Optional model override — if omitted, the planning-agent setting is used. */
+  model?: string;
+  /** Optional effort level — controls how thorough the planning agent is. */
+  effort?: 'low' | 'medium' | 'high';
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -121,7 +127,7 @@ async function ensureTmuxRunning(): Promise<void> {
   const varsToStrip = [
     'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
     'OPENAI_API_KEY', 'LINEAR_API_KEY', 'GITHUB_TOKEN',
-    'ZAI_API_KEY', 'HUME_API_KEY', 'KIMI_API_KEY', 'GOOGLE_API_KEY',
+    'HUME_API_KEY', 'KIMI_API_KEY', 'GOOGLE_API_KEY',
   ];
   for (const envVar of varsToStrip) {
     try {
@@ -134,7 +140,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string): string {
+export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high'): string {
   const issueLower = issue.identifier.toLowerCase();
   const version = getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -209,6 +215,25 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
 `;
   }
 
+  const effortSection = effort && effort !== 'medium' ? `
+## Planning Effort: ${effort === 'high' ? 'High (Deep Analysis)' : 'Low (Quick Planning)'}
+
+${effort === 'high'
+    ? `**The user has requested HIGH effort planning.** Be exceptionally thorough:
+- Explore more of the codebase before concluding — check adjacent files, not just the obvious ones
+- Identify edge cases, potential failure modes, and risks
+- Consider multiple implementation approaches and explain tradeoffs
+- Ask more clarifying questions when scope is ambiguous
+- Break down tasks into finer-grained subtasks`
+    : `**The user has requested LOW effort planning.** Be concise and fast:
+- Focus on the most critical decisions only
+- Keep the task list tight — 3–5 items max unless truly necessary
+- Skip deep exploration; read only the directly relevant files
+- Ask only essential clarifying questions`
+  }
+
+` : '';
+
   return `<!-- panopticon:orchestration-context-start -->
 <!-- This is Panopticon orchestration context injected automatically.
      It contains planning session setup instructions, not agent reasoning.
@@ -237,7 +262,7 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
 When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
 
 ---
-
+${effortSection}
 ## Issue Details
 - **ID:** ${issue.identifier}
 - **Title:** ${issue.title}
@@ -380,7 +405,7 @@ Start by exploring the codebase to understand the context, then begin the discov
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -492,11 +517,13 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 3: Load specs & PRDs ────────────────────────────────────────
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
 
-    // Determine planning model (before prompt so it's injected)
-    const agentSettings = loadSettings();
-    const planningModel = (agentSettings.models as any).planning_agent
-      || agentSettings.models.complexity?.expert
-      || 'claude-opus-4-6';
+    // Determine planning model — explicit override takes precedence over work-type router
+    let settingsModel = 'claude-opus-4-6';
+    try {
+      const { getModelId } = await import('../work-type-router.js');
+      settingsModel = getModelId('planning-agent');
+    } catch { /* fall back to default */ }
+    const planningModel = modelOverride || settingsModel;
 
     // Discover and copy PRD files to workspace
     const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
@@ -520,12 +547,26 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(4, 'Configuring agent', planningModel);
 
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-    const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel);
+    const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     writeFileSync(planningPromptPath, planningPrompt);
     const agentCmd = getAgentCommand(planningModel);
     const cmdWithArgs = agentCmd.args.length > 0
       ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
       : `${agentCmd.command} --dangerously-skip-permissions`;
+
+    // Get provider env vars for non-Anthropic models
+    let providerExports = '';
+    const provider = getProviderForModel(planningModel);
+    if (provider.name !== 'anthropic') {
+      const { config } = loadYamlConfig();
+      const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+      if (apiKey) {
+        const envVars = getProviderEnv(provider, apiKey);
+        providerExports = Object.entries(envVars)
+          .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
+          .join('\n');
+      }
+    }
 
     // ── Write launcher script ──────────────────────────────────────────────
     const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
@@ -541,6 +582,7 @@ export LC_ALL=C.UTF-8
 export PANOPTICON_AGENT_ID="${sessionName}"
 export PANOPTICON_ISSUE_ID="${issue.identifier}"
 export PANOPTICON_SESSION_TYPE="planning"
+${providerExports}
 cd "${workspacePath}"
 prompt=$(cat "${promptFile}")
 trap '' HUP
@@ -583,7 +625,7 @@ while true; do sleep 60; done
       id: sessionName,
       issueId: issue.identifier,
       workspace: workspacePath,
-      runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
+      runtime: 'claude',
       model: planningModel,
       status: 'running',
       startedAt: new Date().toISOString(),

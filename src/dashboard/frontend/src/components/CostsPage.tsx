@@ -13,13 +13,14 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  LineController,
   Filler,
   Tooltip,
   type ChartData,
   type ChartOptions,
 } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Filler, Tooltip);
 
 // ============== Types ==============
 
@@ -196,7 +197,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
       >
         <div className="flex items-center justify-between p-6 border-b border-divider">
           <div className="flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
+            <BarChart3 className="w-5 h-5 text-primary" />
             <h2 className="text-xl font-bold text-content font-mono">{issueId}</h2>
           </div>
           <button onClick={onClose} className="text-content-subtle hover:text-content transition-colors">
@@ -211,7 +212,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
             <>
               {/* Summary */}
               <div>
-                <div className="text-3xl font-bold text-green-400 mb-1">${detail.totalCost.toFixed(4)}</div>
+                <div className="text-3xl font-bold text-success mb-1">${detail.totalCost.toFixed(4)}</div>
                 <div className="text-sm text-content-subtle">
                   {(detail.inputTokens + detail.outputTokens + detail.cacheReadTokens + detail.cacheWriteTokens).toLocaleString()} total tokens
                 </div>
@@ -246,7 +247,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
                         <div key={model} className="bg-surface/50 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-content font-mono truncate mr-2">{model}</span>
-                            <span className="text-sm text-green-400 font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
+                            <span className="text-sm text-success font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
                           </div>
                           <div className="flex gap-4 text-xs text-content-subtle">
                             <span>{stats.calls} calls</span>
@@ -269,7 +270,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
                         <div key={stage} className="bg-surface/50 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-content capitalize">{stage}</span>
-                            <span className="text-sm text-green-400 font-semibold">${stats.cost.toFixed(4)}</span>
+                            <span className="text-sm text-success font-semibold">${stats.cost.toFixed(4)}</span>
                           </div>
                           <div className="flex gap-4 text-xs text-content-subtle">
                             <span>{stats.calls} calls</span>
@@ -331,7 +332,7 @@ export function CostsPage() {
   if (!costs) {
     return (
       <div className="p-6 h-full flex items-center justify-center">
-        <div className="text-red-400">Failed to load costs</div>
+        <div className="text-destructive">Failed to load costs</div>
       </div>
     );
   }
@@ -348,9 +349,9 @@ export function CostsPage() {
         <h1 className="text-3xl font-bold text-content">Cost Tracking</h1>
         <div className="flex items-center gap-3">
           <div className={`px-3 py-1 rounded text-sm ${
-            costs.status === 'live' ? 'bg-green-900/30 text-green-400' :
-            costs.status === 'migrating' ? 'bg-yellow-900/30 text-yellow-400' :
-            'bg-red-900/30 text-red-400'
+            costs.status === 'live' ? 'badge-bg-success text-success' :
+            costs.status === 'migrating' ? 'badge-bg-warning text-warning' :
+            'badge-bg-destructive text-destructive'
           }`}>
             {costs.status === 'live' ? '● Live' :
              costs.status === 'migrating' ? '⟳ Migrating' : '⚠ Stale'}
@@ -362,7 +363,7 @@ export function CostsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-surface-raised border border-divider rounded-lg p-6">
           <div className="flex items-center gap-3 mb-3">
-            <DollarSign className="w-6 h-6 text-green-400" />
+            <DollarSign className="w-6 h-6 text-success" />
             <h3 className="text-lg font-semibold text-content">Total Cost</h3>
           </div>
           <div className="text-3xl font-bold text-content mb-2">${totalCost.toFixed(2)}</div>
@@ -371,7 +372,7 @@ export function CostsPage() {
 
         <div className="bg-surface-raised border border-divider rounded-lg p-6">
           <div className="flex items-center gap-3 mb-3">
-            <TrendingUp className="w-6 h-6 text-blue-400" />
+            <TrendingUp className="w-6 h-6 text-primary" />
             <h3 className="text-lg font-semibold text-content">Event Count</h3>
           </div>
           <div className="text-3xl font-bold text-content mb-2">{costs.eventCount.toLocaleString()}</div>
@@ -380,7 +381,7 @@ export function CostsPage() {
 
         <div className="bg-surface-raised border border-divider rounded-lg p-6">
           <div className="flex items-center gap-3 mb-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-400" />
+            <AlertTriangle className="w-6 h-6 text-warning" />
             <h3 className="text-lg font-semibold text-content">Budget Warnings</h3>
           </div>
           <div className="text-3xl font-bold text-content mb-2">
@@ -391,7 +392,7 @@ export function CostsPage() {
 
         <div className="bg-surface-raised border border-divider rounded-lg p-6">
           <div className="flex items-center gap-3 mb-3">
-            <Zap className="w-6 h-6 text-purple-400" />
+            <Zap className="w-6 h-6 text-signal-review" />
             <h3 className="text-lg font-semibold text-content">Over Budget</h3>
           </div>
           <div className="text-3xl font-bold text-content mb-2">{overBudget.length}</div>
@@ -424,20 +425,20 @@ export function CostsPage() {
                   onClick={() => setSelectedIssue(issue.issueId)}
                   className={`p-4 rounded-lg cursor-pointer transition-colors ${
                     selectedIssue === issue.issueId
-                      ? 'bg-blue-900/30 border border-blue-500'
+                      ? 'badge-bg-primary border border-primary'
                       : 'bg-surface/50 hover:bg-surface'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-content font-mono font-semibold">{issue.issueId}</span>
-                      {issue.budgetWarning && <AlertTriangle className="w-4 h-4 text-yellow-400" />}
+                      {issue.budgetWarning && <AlertTriangle className="w-4 h-4 text-warning" />}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-green-400 font-bold">${issue.totalCost.toFixed(2)}</span>
+                      <span className="text-success font-bold">${issue.totalCost.toFixed(2)}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); setModalIssue(issue.issueId); }}
-                        className="p-1 rounded text-content-subtle hover:text-blue-400 hover:bg-blue-900/20 transition-colors"
+                        className="p-1 rounded text-content-subtle hover:text-primary hover:bg-primary/10 transition-colors"
                         title="View details"
                       >
                         <BarChart3 className="w-4 h-4" />
@@ -454,8 +455,8 @@ export function CostsPage() {
                       <div className="w-full bg-surface-overlay rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all ${
-                            budgetPercent >= 100 ? 'bg-red-500' :
-                            budgetPercent >= 80 ? 'bg-yellow-500' : 'bg-green-500'
+                            budgetPercent >= 100 ? 'bg-destructive' :
+                            budgetPercent >= 80 ? 'bg-warning' : 'bg-success'
                           }`}
                           style={{ width: `${Math.min(budgetPercent, 100)}%` }}
                         />
@@ -481,7 +482,7 @@ export function CostsPage() {
                 <h3 className="text-xl font-semibold text-content">{selectedIssueData.issueId} Details</h3>
                 <button
                   onClick={() => setModalIssue(selectedIssueData.issueId)}
-                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
                 >
                   <BarChart3 className="w-3 h-3" />
                   Full detail
@@ -516,7 +517,7 @@ export function CostsPage() {
                       <div key={model} className="bg-surface/50 rounded p-3">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-content font-mono truncate mr-2">{model}</span>
-                          <span className="text-sm text-green-400 font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
+                          <span className="text-sm text-success font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
                         </div>
                         <div className="flex gap-4 text-xs text-content-subtle">
                           <span>{stats.calls} calls</span>
@@ -538,7 +539,7 @@ export function CostsPage() {
                         <div key={stage} className="bg-surface/50 rounded p-3">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-content capitalize">{stage}</span>
-                            <span className="text-sm text-green-400 font-semibold">${stats.cost.toFixed(4)}</span>
+                            <span className="text-sm text-success font-semibold">${stats.cost.toFixed(4)}</span>
                           </div>
                           <div className="text-xs text-content-subtle">{stats.tokens.toLocaleString()} tokens</div>
                         </div>

@@ -9,6 +9,10 @@ description: 'Multi-agent orchestration for AI coding assistants'
 >
 > — Classic Doctor Who. The Panopticon was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
 
+```bash
+npx panopticon-cli@latest install && pan sync && pan up
+```
+
 Panopticon is an open-source control plane for multi-agent software development. It connects to your issue tracker — GitHub Issues, Linear, GitLab, or Rally — and manages the full agent lifecycle from planning through merge.
 
 Assign an issue to Panopticon and an Opus-class model reads the ticket and writes a detailed PRD, then hands off to a cost-effective implementation model (configurable per project — Kimi, Sonnet, GPT, Gemini, or others) that writes code in an isolated git worktree. Once the implementation agent signals completion, five specialist agents take over: an **inspect specialist** verifies each implementation step against the spec, a **review specialist** diffs the changes against the PRD, a **test specialist** runs your CI pipeline, a **UAT specialist** performs browser-based requirement verification, and a **merge specialist** opens the PR. The only human step is clicking **Merge**.

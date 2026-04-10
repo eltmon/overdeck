@@ -11,9 +11,12 @@ import { jsonResponse } from "../http-helpers.js";
 
 import { exec } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
+import { createReadStream } from 'node:fs';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -29,6 +32,7 @@ import {
   updateSessionFile,
   updateConversationTitle,
   updateConversationCost,
+  updateConversationModel,
   archiveConversation,
   canReplaceTitle,
 } from '../../../lib/database/conversations-db.js';
@@ -37,7 +41,9 @@ import { getProviderForModel, getProviderEnv } from '../../../lib/providers.js';
 import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import {
   parseConversationMessages,
+  parseFromLastCompactBoundary,
 } from '../services/conversation-service.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
 const execAsync = promisify(exec);
 
@@ -68,7 +74,7 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
 
 /** Compute the deterministic JSONL session file path from cwd + session UUID. */
 function sessionFilePath(cwd: string, sessionId: string): string {
-  const encodedCwd = cwd.replace(/\//g, '-');
+  const encodedCwd = encodeClaudeProjectDir(cwd);
   return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
 }
 
@@ -84,10 +90,10 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-/** Generate a default conversation name, e.g. conv-20260404-1 */
+/** Generate a default conversation name, e.g. 20260404-1234 */
 function generateConversationName(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `conv-${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
+  return `${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
 }
 
 /** Sanitize a user-provided name to be safe for tmux session names */
@@ -104,6 +110,59 @@ async function tmuxSessionExists(sessionName: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Extract the model from a Claude Code JSONL session file by reading
+ * until the first assistant message with a model field.
+ * Reads line-by-line to avoid loading the entire file into memory.
+ */
+async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
+  try {
+    if (!existsSync(sessionFile)) return null;
+    const stream = createReadStream(sessionFile, { encoding: 'utf-8' });
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    try {
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        const entry = JSON.parse(line);
+        if (entry.type === 'assistant' && entry.message?.model) {
+          return entry.message.model as string;
+        }
+      }
+    } finally {
+      rl.close();
+      stream.destroy();
+    }
+  } catch {
+    // Corrupt or unreadable file — skip
+  }
+  return null;
+}
+
+/**
+ * Backfill model column for existing conversations that have a session file
+ * but no model stored. Runs once on server startup (async, non-blocking).
+ */
+async function backfillConversationModels(): Promise<void> {
+  const convs = listConversations();
+  let backfilled = 0;
+  for (const conv of convs) {
+    if (conv.model || !conv.sessionFile) continue;
+    const model = await extractModelFromSessionFile(conv.sessionFile);
+    if (model) {
+      updateConversationModel(conv.name, model);
+      backfilled++;
+    }
+  }
+  if (backfilled > 0) {
+    console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
+  }
+}
+
+// Fire-and-forget backfill on module load
+void backfillConversationModels().catch((err: unknown) => {
+  console.error('[conversations] Model backfill failed:', err);
+});
 
 /**
  * Spawn a new tmux session running claude.
@@ -128,18 +187,16 @@ async function spawnConversationSession(
   const providerEnvExports: string[] = [];
   if (model) {
     const provider = getProviderForModel(model);
-    if (provider.name === 'openrouter') {
+    if (provider.name !== 'anthropic') {
       const { config } = loadYamlConfig();
-      const apiKey = config.apiKeys.openrouter;
+      const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
       if (apiKey) {
         const providerEnv = getProviderEnv(provider, apiKey);
         for (const [key, val] of Object.entries(providerEnv)) {
           providerEnvExports.push(`export ${key}="${val}"`);
         }
-        // Suppress the native Anthropic key so OpenRouter is used exclusively
-        providerEnvExports.push(`export ANTHROPIC_API_KEY=""`);
       } else {
-        console.warn('[conversations] OpenRouter model selected but no API key configured');
+        throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
       }
     }
   }
@@ -321,6 +378,8 @@ const postConversationRoute = HttpRouter.add(
           title,
           titleSource: 'auto',
           titleSeed: title,
+          model,
+          effort,
         });
 
         // Wait for Claude Code to be ready, send message, and generate title — all async.
@@ -383,12 +442,21 @@ const postConversationResumeRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
     try {
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
+
+        // Allow model/effort override from request body; fall back to stored values
+        const model = typeof body['model'] === 'string' && body['model'].trim()
+          ? body['model'].trim()
+          : (conv.model ?? undefined);
+        const effort = typeof body['effort'] === 'string' && body['effort'].trim()
+          ? body['effort'].trim()
+          : (conv.effort ?? undefined);
 
         const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
 
@@ -404,7 +472,7 @@ const postConversationResumeRoute = HttpRouter.add(
         const oldSessionId = conv.sessionFile
           ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
           : undefined;
-        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), undefined, undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId).catch(
           (err: unknown) => {
             console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
           },
@@ -419,6 +487,58 @@ const postConversationResumeRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
+//
+// Kill the current session (if alive), update the model in the DB, and resume.
+// Used by the model picker in the sidebar to switch models without going through
+// the full resume flow.
+
+const postConversationSwitchModelRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/switch-model',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const model = typeof body['model'] === 'string' && body['model'].trim()
+          ? body['model'].trim()
+          : (conv.model ?? undefined);
+
+        // Always kill the existing session first (if alive) so the model change takes effect
+        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+        // Persist the new model
+        if (model) updateConversationModel(name, model);
+
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.sessionFile
+          ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
+          : undefined;
+
+        // Spawn with the new model
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, conv.effort ?? undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
+          (err: unknown) => {
+            console.error(`[conversations] Failed to respawn session after model switch ${conv.tmuxSession}:`, err);
+          },
+        );
+
+        markConversationActive(name);
+        return jsonResponse({ ...conv, status: 'active', model, reattached: false });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to switch model: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: GET /api/conversations/:name/messages ────────────────────────────
 
 const getConversationMessagesRoute = HttpRouter.add(
@@ -430,21 +550,53 @@ const getConversationMessagesRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       try {
         const conv = getConversationByName(name);
+
+        // Fall back to specialist session file when name is a specialist tmux session
+        // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
+        let sessionFile: string | null | undefined = conv?.sessionFile;
         if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+          const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+          if (specialistMatch) {
+            const [, project, type] = specialistMatch;
+            const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
+            const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
+            try {
+              const { readFile, readdir } = await import('node:fs/promises');
+              const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
+              if (sessionId) {
+                const claudeProjects = join(homedir(), '.claude', 'projects');
+                const dirs = await readdir(claudeProjects);
+                for (const dir of dirs) {
+                  const candidate = join(claudeProjects, dir, `${sessionId}.jsonl`);
+                  if (existsSync(candidate)) {
+                    sessionFile = candidate;
+                    break;
+                  }
+                }
+              }
+            } catch { /* session file not found */ }
+          }
+          if (!sessionFile) {
+            return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+          }
         }
 
-        if (!conv.sessionFile) {
+        if (!sessionFile) {
           // Session file should always be set (deterministic from --session-id).
           // If missing, it's a legacy conversation — return empty.
           return jsonResponse({ messages: [], workLog: [], streaming: false });
         }
 
         try {
-          const result = await parseConversationMessages(conv.sessionFile, 0);
+          // Specialists: parse only from the last compact_boundary so the display
+          // shows only the current context window, not the full 30-day history.
+          const isSpecialist = !conv && /^specialist-/.test(name);
+          const result = isSpecialist
+            ? await parseFromLastCompactBoundary(sessionFile)
+            : await parseConversationMessages(sessionFile, 0);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
-          if (result.totalCost > 0) {
+          if (result.totalCost > 0 && conv) {
             updateConversationCost(name, result.totalCost);
           }
 
@@ -564,6 +716,63 @@ const postConversationArchiveRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/restart-all ─────────────────────────────
+//
+// Kill all active conversation tmux sessions and re-spawn them with
+// their stored model/effort. Useful when model persistence was fixed
+// and existing sessions need to pick up the correct model.
+
+const postConversationRestartAllRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/restart-all',
+  Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      try {
+        const allConvs = listConversations();
+        // Filter to conversations with a live tmux session
+        const convs: typeof allConvs = [];
+        for (const c of allConvs) {
+          if (await tmuxSessionExists(c.tmuxSession)) convs.push(c);
+        }
+        const results: { name: string; model: string | null; status: string }[] = [];
+
+        for (const conv of convs) {
+          try {
+            // Kill existing tmux session
+            await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+            // Re-spawn with stored model
+            const oldSessionId = conv.sessionFile
+              ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
+              : undefined;
+            await spawnConversationSession(
+              conv.tmuxSession,
+              conv.cwd,
+              oldSessionId ?? randomUUID(),
+              conv.model ?? undefined,
+              conv.effort ?? undefined,
+              conv.issueId ?? undefined,
+              !!oldSessionId,
+            );
+            markConversationActive(conv.name);
+            results.push({ name: conv.name, model: conv.model, status: 'restarted' });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
+            results.push({ name: conv.name, model: conv.model, status: `failed: ${msg}` });
+          }
+        }
+
+        console.log(`[conversations] Restarted ${results.filter(r => r.status === 'restarted').length}/${convs.length} conversations`);
+        return jsonResponse({ restarted: results.length, results });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to restart conversations: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -572,6 +781,8 @@ export const conversationsRouteLayer = Layer.mergeAll(
   patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  postConversationSwitchModelRoute,
+  postConversationRestartAllRoute,
   postConversationArchiveRoute,
   getConversationMessagesRoute,
   postConversationMessageRoute,

@@ -38,6 +38,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   const fitAddon = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
+  const hadFirstData = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxReconnectAttempts = 5;
   const [shouldReconnect, setShouldReconnect] = useState(true);
@@ -217,7 +218,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
-        scrollback: 5000,  // Local scroll buffer; the real status-bar fix is dimension-sync (Attempt 14)
+        scrollback: 5000,  // Local scroll buffer; server-side blackout prevents flash on reconnect
         convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
@@ -280,16 +281,27 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Intercept wheel events: scroll xterm.js locally instead of forwarding to tmux.
-      // Without this, xterm.js sends mouse escape sequences to tmux, which passes them
-      // to Claude Code's TUI input area instead of entering copy-mode.
-      const handleWheel = (event: WheelEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const scrollLines = Math.round(event.deltaY / 20);
-        term!.scrollLines(scrollLines);
-      };
-      terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
+      // Do NOT intercept wheel events — let them pass through to xterm.js and tmux.
+      // With tmux mouse mode enabled, wheel events trigger tmux copy-mode scrollback,
+      // which is the only way to scroll history while Claude Code's TUI (alternate
+      // screen buffer) is active. xterm.js's scrollLines() does nothing in alternate
+      // buffer mode.
+
+      // Register input/resize handlers once per terminal instance.
+      // Using wsRef.current ensures they always send to the current WebSocket,
+      // even after reconnects — this avoids accumulating duplicate handlers
+      // that would send each keystroke multiple times.
+      term.onData((data: string) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(data);
+        }
+      });
+
+      term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
     }
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
@@ -304,8 +316,10 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     ws.onopen = () => {
       console.log('XTerminal: WebSocket opened');
-      reconnectAttempts.current = 0;
-      term!.clear();
+      // Do NOT reset reconnectAttempts or clear the terminal here — the server
+      // may close immediately if the tmux session doesn't exist yet. Clearing
+      // here causes the screen to flash on every failed reconnect attempt.
+      // Both reset and clear happen only when we receive data (session alive).
 
       // CRITICAL: Send dimensions IMMEDIATELY on connection, before any data flows
       // The server waits for this resize message before starting the SSH session
@@ -393,6 +407,24 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         }
       }
 
+      // Session is alive — on first data, hide terminal briefly while the initial
+      // tmux scrollback dump and SIGWINCH repaint settle. After 350ms, reveal the
+      // terminal with the correct viewport. This prevents the visible flash of
+      // old-size content without suppressing scrollback data (which xterm.js needs
+      // for mousewheel scrolling).
+      if (!hadFirstData.current) {
+        hadFirstData.current = true;
+        if (terminalRef.current) {
+          terminalRef.current.style.opacity = '0';
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.style.opacity = '1';
+            }
+          }, 350);
+        }
+      }
+      reconnectAttempts.current = 0;
+
       // Add to queue and trigger processing
       writeQueue.push(dataStr);
       processWriteQueue();
@@ -430,18 +462,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
     };
-
-    term.onData((data: string) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
-
-    term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-      }
-    });
 
     const handleResize = debounce(() => {
       if (ws.readyState === WebSocket.OPEN) {
@@ -508,7 +528,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       <div className="absolute top-2 right-2 z-10 flex gap-2">
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="p-1.5 rounded bg-slate-700/80 hover:bg-slate-600/80 text-slate-300 transition-colors"
+          className="p-1.5 rounded bg-surface-raised/80 hover:bg-surface-active/80 text-text-secondary transition-colors"
           title="Terminal settings"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -520,18 +540,18 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
       {/* Settings panel */}
       {showSettings && (
-        <div className="absolute top-10 right-2 z-20 w-64 p-3 rounded-lg bg-slate-800 border border-slate-700 shadow-xl">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Terminal Settings</h3>
+        <div className="absolute top-10 right-2 z-20 w-64 p-3 rounded-lg bg-card border border-border shadow-xl">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Terminal Settings</h3>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={autoCopyOnSelect}
               onChange={(e) => setAutoCopyOnSelect(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500"
+              className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary"
             />
-            <span className="text-sm text-slate-300">Auto-copy on selection</span>
+            <span className="text-sm text-text-secondary">Auto-copy on selection</span>
           </label>
-          <p className="text-xs text-slate-500 mt-2">
+          <p className="text-xs text-text-muted mt-2">
             Automatically copy selected text to clipboard
           </p>
         </div>
@@ -554,7 +574,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       {/* Context menu */}
       {contextMenu.visible && (
         <div
-          className="fixed z-50 min-w-[120px] py-1 rounded-lg bg-slate-800 border border-slate-700 shadow-xl"
+          className="fixed z-50 min-w-[120px] py-1 rounded-lg bg-card border border-border shadow-xl"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
@@ -564,26 +584,26 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
           {contextMenu.canCopy && (
             <button
               onClick={handleContextCopy}
-              className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               Copy
-              <span className="ml-auto text-xs text-slate-500">
+              <span className="ml-auto text-xs text-text-muted">
                 {isMac ? '⌘C' : 'Ctrl+C'}
               </span>
             </button>
           )}
           <button
             onClick={handleContextPaste}
-            className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             Paste
-            <span className="ml-auto text-xs text-slate-500">
+            <span className="ml-auto text-xs text-text-muted">
               {isMac ? '⌘V' : 'Ctrl+V'}
             </span>
           </button>

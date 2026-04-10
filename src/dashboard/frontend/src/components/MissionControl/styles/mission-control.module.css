@@ -1,9 +1,10 @@
-/* Codex-inspired design tokens for Mission Control */
-/* Isolated to Mission Control only - does not affect existing components */
+/* Codex-inspired design tokens for Command Deck */
+/* Isolated to Command Deck only - does not affect existing components */
 
 .missionControl {
   --mc-bg-main: #FFFFFF;
   --mc-bg-sidebar: #FAF9F7;
+  --mc-bg-secondary: #F7F6F3;
   --mc-bg-hover: #F3F2EF;
   --mc-bg-selected: #EDE9E3;
   --mc-text-primary: #1A1A1A;
@@ -45,9 +46,19 @@
   height: 100%;
 }
 
-/* Mission Control always uses its own Codex light theme — no dark mode overrides.
-   This is intentional: the Codex design language uses warm cream/white regardless
-   of the surrounding dashboard theme. */
+/* Dark mode overrides — mirrors the dashboard's .dark token values */
+:global(.dark) .missionControl {
+  --mc-bg-main:     #0c1018;
+  --mc-bg-sidebar:  #111520;
+  --mc-bg-secondary:#0e1320;
+  --mc-bg-hover:    #161d2b;
+  --mc-bg-selected: #1a2438;
+  --mc-text-primary:   #f3f4f6;
+  --mc-text-secondary: #9ca3af;
+  --mc-text-muted:     #6b7280;
+  --mc-border:         #1e2a3a;
+  --mc-border-strong:  #2a3a50;
+}
 
 /* Layout */
 .layout {
@@ -81,20 +92,83 @@
 }
 
 .sidebarHeader {
-  padding: var(--mc-space-4) var(--mc-space-4) var(--mc-space-3);
+  padding: var(--mc-space-3) var(--mc-space-4) var(--mc-space-3);
   border-bottom: 1px solid var(--mc-border);
+  flex-shrink: 0;
+}
+
+.sidebarHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mc-space-2);
+  gap: var(--mc-space-2);
+}
+
+.sidebarHeaderGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
 }
 
 .sidebarTitle {
   font-size: var(--mc-font-size-md);
   font-weight: 600;
-  margin: 0 0 var(--mc-space-1);
+  margin: 0;
 }
 
 .sidebarSubtitle {
   font-size: var(--mc-font-size-sm);
   color: var(--mc-text-secondary);
   margin: 0;
+}
+
+/* Segmented control */
+.segmentControl {
+  display: flex;
+  background: var(--mc-bg-main);
+  border-radius: var(--mc-radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmentButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mc-space-1);
+  padding: var(--mc-space-1) var(--mc-space-2);
+  border: none;
+  background: transparent;
+  border-radius: calc(var(--mc-radius) - 2px);
+  font-size: var(--mc-font-size-xs);
+  font-weight: 500;
+  font-family: var(--mc-font-family);
+  color: var(--mc-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.segmentButton:hover {
+  color: var(--mc-text-primary);
+}
+
+.segmentButtonActive {
+  background: var(--mc-bg-sidebar);
+  color: var(--mc-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.segmentCount {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mc-text-muted);
+  background: var(--mc-bg-hover);
+  padding: 0 5px;
+  border-radius: 8px;
+  line-height: 16px;
 }
 
 .projectTree {
@@ -980,7 +1054,6 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 .conversationSection {
-  border-bottom: 1px solid var(--mc-border);
   flex-shrink: 0;
 }
 
@@ -1175,6 +1248,22 @@
 .conversationArchiveBtnLarge:hover {
   background: var(--mc-bg-selected);
   color: var(--mc-text-primary);
+}
+
+/* Model picker bar in sidebar — shown above conversation list */
+.conversationModelBar {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-2) var(--mc-space-3);
+  border-bottom: 1px solid var(--mc-border);
+  background: var(--mc-bg-secondary);
+}
+
+.conversationModelLabel {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
 }
 
 /* Conversation Terminal Panel */
@@ -1464,6 +1553,21 @@
   flex: 1;
 }
 
+.workLogResult {
+  margin: 2px 0 4px 18px;
+  padding: 6px 8px;
+  background: var(--mc-bg-secondary, rgba(0,0,0,0.2));
+  border-radius: 4px;
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+
 .workLogExpandBtn {
   background: none;
   border: none;
@@ -1691,16 +1795,71 @@
   user-select: none;
 }
 
+/* Slash command menu */
+.slashMenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 320px;
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: var(--mc-space-1);
+  overflow: hidden;
+}
+
+.slashMenuItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: var(--mc-space-2) var(--mc-space-3);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--mc-radius-sm);
+  text-align: left;
+  gap: 2px;
+}
+
+.slashMenuItem:hover,
+.slashMenuItemSelected {
+  background: var(--mc-bg-hover);
+}
+
+.slashMenuLabel {
+  font-size: var(--mc-font-size-base);
+  font-family: var(--mc-font-mono);
+  color: var(--mc-text-primary);
+  font-weight: 500;
+}
+
+.slashMenuDescription {
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-secondary);
+}
+
 /* Toolbar row: inside the box, below the textarea */
 .composerToolbar {
   display: flex;
   align-items: center;
-  gap: var(--mc-space-2);
-  padding: 0 var(--mc-space-3) var(--mc-space-3);
+  gap: 0;
+  padding: 0 var(--mc-space-2) var(--mc-space-3);
 }
 
 .composerToolbarSpacer {
   flex: 1;
+}
+
+/* Pipe divider between toolbar items (matches t3code style) */
+.composerToolbarDivider {
+  width: 1px;
+  height: 16px;
+  background: var(--mc-border-strong);
+  opacity: 0.5;
+  flex-shrink: 0;
+  margin: 0 var(--mc-space-1);
 }
 
 /* Send button — rounded, inside the box */
@@ -1736,24 +1895,24 @@
 .pickerBtn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px var(--mc-space-2);
-  font-size: var(--mc-font-size-xs);
-  border: 1px solid var(--mc-border);
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: var(--mc-font-size-sm);
+  border: none;
   border-radius: var(--mc-radius-sm);
-  background: var(--mc-bg-main);
-  color: var(--mc-text-secondary);
+  background: transparent;
+  color: var(--mc-text-muted);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .pickerBtn:hover:not(:disabled) {
-  border-color: var(--mc-border-strong);
+  background: var(--mc-bg-hover);
   color: var(--mc-text-primary);
 }
 
 .pickerBtn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -1765,19 +1924,25 @@
 }
 
 .pickerLabel {
-  font-size: var(--mc-font-size-xs);
+  font-size: var(--mc-font-size-sm);
+}
+
+/* Provider icon inside picker trigger button */
+.pickerProviderIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .pickerDropdown {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0;
+  position: fixed;
+  z-index: 9999;
   background: var(--mc-bg-main);
   border: 1px solid var(--mc-border);
   border-radius: var(--mc-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  min-width: 160px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  min-width: 260px;
+  max-width: calc(100vw - 16px);
   display: flex;
   flex-direction: column;
   padding: 4px;
@@ -1814,11 +1979,34 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--mc-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* "no key" badge in group header */
+.pickerGroupNoKey {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent);
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 22%, transparent);
+}
+
+/* Entire group dimmed when provider has no credentials */
+.pickerGroupDisabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .pickerOptionLabel {
   flex: 1;
   text-align: left;
+  white-space: nowrap;
 }
 
 .pickerCostBadge {
@@ -1826,4 +2014,136 @@
   color: var(--mc-text-muted);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* Subscription plan badge (e.g. "MAX", "Pro") */
+.pickerAuthBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-primary, #6366f1) 18%, transparent);
+  color: var(--color-primary, #6366f1);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #6366f1) 30%, transparent);
+}
+
+.pickerAuthBadgeWarn {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 25%, transparent);
+}
+
+/* ─── Restart Popover ────────────────────────────────────────────────────── */
+
+.restartPopover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  width: 240px;
+  background: var(--mc-bg-primary);
+  border: 1px solid var(--mc-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: var(--mc-space-2);
+  margin-top: 4px;
+}
+
+.restartPopoverTitle {
+  font-size: var(--mc-font-size-sm);
+  font-weight: 600;
+  color: var(--mc-text-primary);
+  padding: 2px 4px;
+}
+
+.restartPopoverDivider {
+  height: 1px;
+  background: var(--mc-border);
+  margin: var(--mc-space-1) 0;
+}
+
+.restartPopoverLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-primary);
+  transition: background 0.1s;
+}
+
+.restartPopoverLabel:hover {
+  background: var(--mc-bg-hover);
+}
+
+.restartPopoverLabel input[type="checkbox"] {
+  accent-color: var(--mc-accent);
+  margin: 0;
+}
+
+.restartPopoverCount {
+  color: var(--mc-text-muted);
+  font-size: var(--mc-font-size-xs);
+  margin-left: auto;
+}
+
+.restartPopoverActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.restartPopoverCancel {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-secondary);
+  background: transparent;
+  border: 1px solid var(--mc-border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.restartPopoverCancel:hover {
+  background: var(--mc-bg-hover);
+}
+
+.restartPopoverConfirm {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: var(--mc-font-size-xs);
+  color: white;
+  background: var(--mc-accent);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.restartPopoverConfirm:hover {
+  opacity: 0.9;
+}
+
+.restartPopoverConfirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.restartPopoverError {
+  color: var(--mc-error);
+  font-size: var(--mc-font-size-xs);
+  padding: 4px;
+  margin-top: 2px;
 }

@@ -37,6 +37,8 @@ export interface ReviewStatus {
   autoRequeueCount?: number;
   prUrl?: string;
   history?: StatusHistoryEntry[];
+  /** HEAD commit SHA at the time review passed — used to detect new commits after review */
+  reviewedAtCommit?: string;
 }
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -116,11 +118,14 @@ export function setReviewStatus(
 
   // readyForMerge is true when all required gates pass.
   // If uatStatus exists (UAT specialist has been involved), it must also be 'passed'.
+  // verificationStatus must not be 'failed' — verification catches pre-existing test breakage
+  // that scoped test runs (e2e/dashboard) may miss.
   const readyForMerge = update.readyForMerge !== undefined
     ? update.readyForMerge
     : (
         merged.reviewStatus === 'passed' &&
         merged.testStatus === 'passed' &&
+        merged.verificationStatus !== 'failed' &&
         merged.mergeStatus !== 'merged' &&
         // If UAT has been initiated, it must pass too
         (merged.uatStatus === undefined || merged.uatStatus === 'passed')
@@ -133,6 +138,35 @@ export function setReviewStatus(
     readyForMerge,
     history,
   };
+
+  // Report commit statuses to GitHub when readyForMerge transitions to true (PAN-536)
+  if (readyForMerge && !existing.readyForMerge && updated.prUrl) {
+    (async () => {
+      try {
+        const { isGitHubAppConfigured, reportCommitStatus } = await import('./github-app.js');
+        if (!isGitHubAppConfigured()) return;
+        const prMatch = updated.prUrl!.match(/github\.com\/([^/]+)\/([^/]+)\/pull/);
+        if (!prMatch) return;
+        const [, owner, repo] = prMatch;
+        // Get HEAD SHA of the PR branch
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        const { stdout } = await execAsync(
+          `gh pr view ${updated.prUrl!.match(/\/pull\/(\d+)/)?.[1]} --json headRefOid --jq .headRefOid`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        const sha = stdout.trim();
+        if (sha) {
+          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/review', 'Review passed');
+          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/test', 'Tests passed');
+          console.log(`[review-status] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
+        }
+      } catch (err: any) {
+        console.warn(`[review-status] Failed to report commit status: ${err.message}`);
+      }
+    })();
+  }
 
   // SQLite first — it is the authoritative store (reads prefer SQLite)
   if (filePath === DEFAULT_STATUS_FILE) {
@@ -148,6 +182,70 @@ export function setReviewStatus(
   saveReviewStatuses(statuses, filePath);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
+
+  // Queue test-agent when review transitions to 'passed'.
+  // This fires regardless of how setReviewStatus() is called (API or direct import),
+  // ensuring test-agent is queued even when review-agent bypasses the specialist
+  // dispatch endpoint. Idempotent — if test-agent is already queued, pushToHook
+  // deduplicates by issueId.
+  if (
+    update.reviewStatus === 'passed' &&
+    existing.reviewStatus !== 'passed' &&
+    existing.testStatus === 'pending'
+  ) {
+    (async () => {
+      try {
+        const { submitToSpecialistQueue } = await import('./cloister/specialists.js');
+        const workAgentId = `agent-${issueId.toLowerCase()}`;
+        const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
+        let workspace: string | undefined;
+        let branch: string | undefined;
+        if (existsSync(workStateFile)) {
+          try {
+            const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
+            workspace = workState.workspace;
+            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+          } catch {}
+        }
+        submitToSpecialistQueue('test-agent', {
+          priority: 'high',
+          source: 'review-agent-auto',
+          issueId,
+          workspace,
+          branch,
+        });
+        console.log(`[review-status] Queued test-agent for ${issueId} after review passed`);
+      } catch (err: any) {
+        console.warn(`[review-status] Failed to queue test-agent for ${issueId}: ${err.message}`);
+      }
+    })();
+  }
+
+  // Auto-deliver feedback to work agent when review blocks or tests fail.
+  // This ensures feedback reaches the agent regardless of whether status was
+  // set via the dashboard API or directly (e.g., bun -e import). See PAN-586.
+  if (
+    (update.reviewStatus === 'blocked' || update.testStatus === 'failed') &&
+    (update.reviewStatus !== existing.reviewStatus || update.testStatus !== existing.testStatus)
+  ) {
+    const agentSession = `agent-${issueId.toLowerCase()}`;
+    (async () => {
+      try {
+        const { sessionExists } = await import('./tmux.js');
+        if (!sessionExists(agentSession)) return;
+
+        const statusType = update.reviewStatus === 'blocked' ? 'REVIEW BLOCKED' : 'TESTS FAILED';
+        const notes = update.reviewNotes || update.testNotes || 'No details provided.';
+        const msg = `SPECIALIST FEEDBACK: ${statusType} for ${issueId}.\n\n${notes}\n\nFix the issues, then run: pan work done ${issueId}`;
+
+        const { messageAgent } = await import('./agents.js');
+        await messageAgent(agentSession, msg);
+        console.log(`[review-status] Auto-delivered ${statusType} feedback to ${agentSession}`);
+      } catch (err: any) {
+        console.warn(`[review-status] Failed to auto-deliver feedback to ${agentSession}: ${err.message}`);
+      }
+    })();
+  }
 
   return updated;
 }

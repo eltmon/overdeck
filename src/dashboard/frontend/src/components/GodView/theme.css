@@ -1,39 +1,43 @@
 /* God View Design System — PAN-341 */
-/* Scoped under .god-view to avoid polluting global styles */
+/* All tokens scoped under .god-view — zero global pollution */
 
 @import '@fontsource/space-grotesk/400.css';
 @import '@fontsource/space-grotesk/600.css';
 @import '@fontsource/space-grotesk/700.css';
 @import '@fontsource/jetbrains-mono/400.css';
 
-:root {
+.god-view {
+  /* ── Surfaces ─────────────────────────────────────────────────── */
   --gv-bg: #0a0e1a;
   --gv-surface: rgba(21, 27, 43, 0.7);
   --gv-surface-solid: #151b2b;
   --gv-border: rgba(30, 38, 56, 0.8);
   --gv-border-bright: rgba(0, 212, 255, 0.3);
 
+  /* ── Signal colors ────────────────────────────────────────────── */
   --gv-blue: #00d4ff;
   --gv-pink: #ff2d7c;
   --gv-green: #39ff14;
   --gv-amber: #ffb800;
   --gv-purple: #9d4edd;
 
+  /* ── Text ─────────────────────────────────────────────────────── */
   --gv-text-primary: #e8edf8;
   --gv-text-secondary: #7a8aaa;
   --gv-text-dim: #4a5a7a;
 
+  /* ── Typography ───────────────────────────────────────────────── */
   --gv-font-display: 'Space Grotesk', system-ui, sans-serif;
   --gv-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
+  /* ── Effects ──────────────────────────────────────────────────── */
   --gv-blur: blur(12px);
   --gv-glow-blue: 0 0 20px rgba(0, 212, 255, 0.3);
   --gv-glow-pink: 0 0 20px rgba(255, 45, 124, 0.3);
   --gv-glow-green: 0 0 20px rgba(57, 255, 20, 0.3);
   --gv-glow-amber: 0 0 20px rgba(255, 184, 0, 0.3);
-}
 
-.god-view {
+  /* ── Layout ───────────────────────────────────────────────────── */
   background: var(--gv-bg);
   color: var(--gv-text-primary);
   font-family: var(--gv-font-display);
@@ -59,6 +63,8 @@
 .gv-status-stopped { color: var(--gv-text-dim); }
 
 /* Breathing glow animation for borders */
+/* Note: @keyframes cannot reference CSS custom properties at parse time,
+   so these use the raw color values matching --gv-blue/green/amber/pink */
 @keyframes gv-breathe-blue {
   0%, 100% { box-shadow: 0 0 8px rgba(0, 212, 255, 0.15); }
   50%       { box-shadow: 0 0 20px rgba(0, 212, 255, 0.45); }

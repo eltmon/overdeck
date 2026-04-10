@@ -35,6 +35,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -257,7 +258,7 @@ const postIssuePlanRoute = HttpRouter.add(
       return jsonResponse({ error: 'Issue not found' }, { status: 404 });
     }
 
-    const issuePrefix = issue.identifier.split('-')[0];
+    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const { findPRDFiles, analyzeComplexity, executePlan } = yield* Effect.promise(() =>
@@ -328,7 +329,7 @@ const postIssueCloseRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const { reason } = body as any;
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const { close: closeWorkflow } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
@@ -410,6 +411,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       startDocker = false,
       workspaceLocation = 'local',
       shadowMode = false,
+      model: modelOverride,
+      effort,
     } = body as any;
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
@@ -523,7 +526,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       );
     }
 
-    const issuePrefix = issue.identifier.split('-')[0];
+    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -603,6 +606,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             workspaceLocation: workspaceLocation as 'local' | 'remote',
             startDocker: body.startDocker,
             shadowMode,
+            model: modelOverride || undefined,
+            effort: effort || undefined,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });
@@ -711,7 +716,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
           }
           if (!projectPath) {
-            const prefix = issueIdentifier!.split('-')[0].toUpperCase();
+            const prefix = extractPrefix(issueIdentifier!) ?? issueIdentifier!.split('-')[0].toUpperCase();
             const projConfig = findProjectByTeam(prefix);
             if (projConfig) projectPath = projConfig.path;
           }
@@ -850,8 +855,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     }
 
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
-    const gitPushed = yield* Effect.promise(async (): Promise<boolean> => {
-      if (!projectPath) return false;
+    const { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
+      if (!projectPath) return { pushed: false, beadsWarning: null };
 
       const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
@@ -860,7 +865,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       if (existsSync(workspacePlanningDir)) planningDir = workspacePlanningDir;
       else if (existsSync(legacyPlanningDir)) planningDir = legacyPlanningDir;
 
-      if (!planningDir) return false;
+      if (!planningDir) return { pushed: false, beadsWarning: null };
 
       try {
         const gitRoot = planningDir.includes('/workspaces/')
@@ -868,6 +873,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           : projectPath;
 
         // Create beads from vBRIEF plan if available
+        let beadsWarning: string | null = null;
         const { findPlan } = await import('../../../lib/vbrief/io.js');
         const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
         if (findPlan(gitRoot)) {
@@ -876,7 +882,15 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
             if (beadsResult.created.length > 0) {
               console.log(`[complete-planning] Created ${beadsResult.created.length} beads from vBRIEF plan`);
             }
+            if (!beadsResult.success || beadsResult.errors.length > 0) {
+              const detail = beadsResult.errors.length > 0
+                ? beadsResult.errors[0]
+                : 'Beads creation did not complete successfully';
+              beadsWarning = `Beads tasks were not created: ${detail}. Start Agent will attempt recovery, or re-run planning to regenerate.`;
+              console.warn(`[complete-planning] createBeadsFromVBrief warning: ${beadsWarning}`);
+            }
           } catch (vbriefErr: any) {
+            beadsWarning = `Beads tasks were not created: ${vbriefErr.message}. Start Agent will attempt recovery, or re-run planning to regenerate.`;
             console.warn(`[complete-planning] createBeadsFromVBrief failed: ${vbriefErr.message}`);
           }
         }
@@ -934,15 +948,15 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           if (remotes.trim()) {
             const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
             pushChild.unref();
-            return true;
+            return { pushed: true, beadsWarning };
           } else {
-            return true;
+            return { pushed: true, beadsWarning };
           }
         } catch { /* Non-fatal */ }
       } catch (gitErr) {
         console.error('Git commit/push failed:', gitErr);
       }
-      return false;
+      return { pushed: false, beadsWarning: null };
     });
 
     // Update Linear/GitHub issue state
@@ -1012,6 +1026,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       issueId: id,
       newState,
       gitPushed,
+      ...(beadsWarning ? { beadsWarning } : {}),
       message: gitPushed
         ? 'Planning complete and pushed to git - ready for execution'
         : 'Planning complete - ready for execution',
@@ -1281,9 +1296,29 @@ const postIssueReopenRoute = HttpRouter.add(
       newState = 'Open';
 
     } else if (githubCheck.isGitHub) {
-      // Also clean up done/needs-close-out labels and ensure in-progress is set
+      // Also clean up done/needs-close-out/merged labels and ensure in-progress is set
       yield* lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void));
       yield* lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void));
+      yield* lifecycle.removeLabel(id, 'merged').pipe(Effect.catch(() => Effect.void));
+
+      // Reopen closed (not merged) PR for the feature branch if one exists
+      yield* Effect.promise(async () => {
+        try {
+          const branchName = `feature/${id.toLowerCase()}`;
+          const { stdout } = await execAsync(
+            `gh pr list --head ${branchName} --state closed --json number,mergedAt --limit 1`,
+            { encoding: 'utf-8', timeout: 15000 }
+          );
+          const prs = JSON.parse(stdout.trim() || '[]');
+          if (prs.length > 0 && !prs[0].mergedAt) {
+            await execAsync(`gh pr reopen ${prs[0].number}`, { encoding: 'utf-8', timeout: 15000 });
+            console.log(`[reopen] Reopened PR #${prs[0].number} for ${id}`);
+          }
+        } catch (err: any) {
+          console.warn(`[reopen] Could not reopen PR for ${id}: ${err.message}`);
+        }
+      });
+
       issueDataService.invalidateTracker('github').catch(() => {});
       newState = 'In Progress';
 
@@ -1367,6 +1402,20 @@ const postIssueReopenRoute = HttpRouter.add(
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
       payload: { issueId: issueIdentifier, status: newState, canonicalStatus: 'in_progress' },
+    });
+    // Emit pipeline reset so frontend read model clears the stale readyForMerge badge
+    yield* eventStore.append({
+      type: 'pipeline.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        issueId: issueIdentifier,
+        status: {
+          issueId: issueIdentifier,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+        },
+      },
     });
     try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
@@ -1566,7 +1615,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
       projectName = githubCheck.repo || '';
     }
     if (!projectPath) {
-      const prefix = id.split('-')[0].toUpperCase();
+      const prefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
       projectConfig = findProjectByTeam(prefix);
       if (projectConfig) {
         projectPath = projectConfig.path;
@@ -1680,7 +1729,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     }
     if (!projectPath) {
-      const issuePrefix = id.split('-')[0].toUpperCase();
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
       projectPath = getProjectPath(undefined, issuePrefix);
     }
     if (!projectPath) {
@@ -1754,7 +1803,7 @@ const getIssueBeadsRoute = HttpRouter.add(
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     }
     if (!projectPath) {
-      const issuePrefix = id.split('-')[0];
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
       try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
     }
 

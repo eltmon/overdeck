@@ -39,7 +39,9 @@ import {
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { OpenRouterPage } from './OpenRouterPage';
+import { DesktopSettingsSection } from './DesktopSettingsSection';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -82,6 +84,12 @@ async function fetchOptimalDefaults(): Promise<SettingsConfig> {
   return res.json();
 }
 
+async function fetchMiniMaxDefaults(): Promise<SettingsConfig> {
+  const res = await fetch('/api/settings/minimax-defaults');
+  if (!res.ok) throw new Error('Failed to fetch MiniMax defaults');
+  return res.json();
+}
+
 interface TestApiKeyResult {
   success: boolean;
   error: string | null;
@@ -106,7 +114,7 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
   { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
   { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
 ];
 
 // Tracker definitions
@@ -146,12 +154,13 @@ const AGENT_CATEGORIES: AgentCategory[] = [
     ],
   },
   {
-    name: 'Convoy Reviewers',
+    name: 'Review Panel',
     icon: SplitSquareVertical,
     agents: [
       { id: 'convoy:security-reviewer' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
       { id: 'convoy:performance-reviewer' as WorkTypeId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
       { id: 'convoy:correctness-reviewer' as WorkTypeId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
+      { id: 'convoy:requirements-reviewer' as WorkTypeId, name: 'Requirements', icon: ClipboardList, description: 'Requirements coverage vs issue + vBRIEF', implemented: true },
       { id: 'convoy:synthesis-agent' as WorkTypeId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
     ],
   },
@@ -198,16 +207,17 @@ function getModelDisplay(modelId?: string): string {
   if (model) return model.name;
   // Fallback for unknown models
   if (modelId.includes('claude')) return modelId.includes('opus') ? 'Opus 4.6' : modelId.includes('haiku') ? 'Haiku' : 'Sonnet 4.5';
-  if (modelId.includes('gpt')) return 'GPT-4o';
-  if (modelId.includes('gemini')) return modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
-  if (modelId.includes('kimi')) return modelId.includes('k2.5') || modelId.includes('2.5') ? 'Kimi K2.5' : 'Kimi K2';
-  if (modelId.includes('glm')) return 'GLM-4';
+  if (modelId.includes('gpt')) return modelId.includes('nano') ? 'GPT-5.4 Nano' : modelId.includes('mini') ? 'GPT-5.4 Mini' : 'GPT-5.4';
+  if (modelId.includes('gemini')) return modelId.includes('lite') ? 'Flash Lite' : modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
+  if (modelId.includes('kimi')) return 'Kimi K2.5';
+  if (modelId.includes('minimax')) return modelId.includes('highspeed') ? 'M2.7 HS' : 'M2.7';
   return modelId;
 }
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
+  const { prefs: uiPrefs, update: updateUIPrefs } = useUIPreferences();
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -223,6 +233,27 @@ export function SettingsPage() {
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [clearingCache, setClearingCache] = useState(false);
+  const [claudeAuth, setClaudeAuth] = useState<{
+    installed: boolean;
+    loggedIn: boolean;
+    expired: boolean;
+    subscriptionType: string | null;
+    rateLimitTier: string | null;
+    expiresAt: number | null;
+    hasAnthropicApiKey: boolean;
+  } | null>(null);
+  const [refreshingAuth, setRefreshingAuth] = useState(false);
+
+  const fetchClaudeAuth = async () => {
+    setRefreshingAuth(true);
+    try {
+      const res = await fetch('/api/settings/claude-auth');
+      if (res.ok) setClaudeAuth(await res.json());
+    } catch { /* ignore */ }
+    finally { setRefreshingAuth(false); }
+  };
+
+  useEffect(() => { void fetchClaudeAuth(); }, []);
 
   useEffect(() => {
     if (settings && !formData) {
@@ -262,7 +293,7 @@ export function SettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -270,7 +301,7 @@ export function SettingsPage() {
   if (error || !formData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-400">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
+        <div className="text-destructive">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
       </div>
     );
   }
@@ -278,7 +309,6 @@ export function SettingsPage() {
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
 
   const handleProviderToggle = (provider: Provider) => {
-    if (provider === 'anthropic') return;
     setFormData({
       ...formData,
       models: {
@@ -359,6 +389,25 @@ export function SettingsPage() {
     }
   };
 
+  const handleRestoreMiniMaxDefaults = async () => {
+    try {
+      const miniMaxDefaults = await fetchMiniMaxDefaults();
+      const newFormData: SettingsConfig = {
+        models: {
+          providers: { ...miniMaxDefaults.models.providers },
+          overrides: { ...miniMaxDefaults.models.overrides },
+          gemini_thinking_level: formData?.models.gemini_thinking_level,
+        },
+        api_keys: { ...(formData?.api_keys || {}) },
+        tracker_keys: { ...(formData?.tracker_keys || {}) },
+      };
+      setFormData(newFormData);
+    } catch (error) {
+      console.error('Failed to fetch MiniMax defaults:', error);
+      showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });
+    }
+  };
+
   const handleTestApiKey = async (provider: Provider) => {
     const apiKey = formData?.api_keys[provider as keyof typeof formData.api_keys];
     if (!apiKey) return;
@@ -401,49 +450,104 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8 pb-32">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Settings className="w-8 h-8 text-blue-400" />
-            <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
+    <div>
+      {/* Sticky action bar */}
+      <div className="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm border-b border-divider shadow-sm">
+        <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex items-center justify-between py-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-primary" />
+            <h1 className="text-content text-lg font-black tracking-tight">Settings</h1>
           </div>
-          <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
+          <div className="flex items-center gap-3">
+            {saveMutation.isSuccess && (
+              <span className="flex items-center gap-1.5 text-success text-sm">
+                <CheckCircle className="w-4 h-4" />
+                Saved!
+              </span>
+            )}
+            {saveMutation.isError && (
+              <span className="flex items-center gap-1.5 text-destructive text-sm">
+                <AlertTriangle className="w-4 h-4" />
+                Save failed
+              </span>
+            )}
+            <button
+              onClick={handleRestoreOptimalDefaults}
+              className="px-3 py-1.5 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              title="Set all model assignments to research-based optimal defaults (Anthropic + Kimi)"
+            >
+              <Zap className="w-4 h-4" />
+              Optimal Defaults
+            </button>
+            <button
+              onClick={handleRestoreMiniMaxDefaults}
+              className="px-3 py-1.5 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              title="Set all model assignments to MiniMax M2.7 (lowest cost)"
+            >
+              <Zap className="w-4 h-4" />
+              MiniMax Defaults
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={!hasChanges}
+              className="px-3 py-1.5 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-40"
+            >
+              Undo
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saveMutation.isPending}
+              className="px-5 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-md shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Changes
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
+      {/* Page Header */}
+      <div className="flex flex-col gap-1 mb-8">
+        <div className="flex items-center gap-2 mb-1">
+          <Settings className="w-8 h-8 text-primary" />
+          <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
+        </div>
+        <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
       </div>
 
       {/* Deprecation Warning Banner */}
       {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-6">
+        <div className="badge-bg-warning border badge-border-warning rounded-xl px-4 py-3 mb-6">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <AlertTriangle className="w-6 h-6 text-warning shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-amber-400 font-semibold mb-2">
+              <p className="text-warning font-semibold mb-2">
                 Deprecated Model IDs Detected
               </p>
               <div className="space-y-1">
                 {formData.deprecation_warnings.map((warning, idx) => (
-                  <p key={idx} className="text-amber-400/90 text-sm">
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">{warning.workType}</span>
+                  <p key={idx} className="text-warning/90 text-sm">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded">{warning.workType}</span>
                     {': '}
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded line-through">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded line-through">
                       {warning.from}
                     </span>
                     {' → '}
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded">
                       {warning.to}
                     </span>
                   </p>
                 ))}
               </div>
-              <p className="text-amber-400/80 text-xs mt-3">
+              <p className="text-warning/80 text-xs mt-3">
                 Click <span className="font-semibold">Save</span> to automatically migrate to current model IDs. A backup will be created before migration.
               </p>
             </div>
           </div>
         </div>
       )}
+
 
       {/* Smart Model Selection Hero */}
       <section className="mb-10">
@@ -457,12 +561,12 @@ export function SettingsPage() {
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
                     <Terminal className="w-5 h-5 text-content-subtle" />
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-blue-500 to-divider-strong mx-2" />
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-primary to-divider-strong mx-2" />
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <User className="w-5 h-5 text-blue-400" />
+                    <User className="w-5 h-5 text-primary" />
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-blue-500 to-divider mx-2" />
-                  <div className="size-12 rounded-lg bg-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-primary to-divider mx-2" />
+                  <div className="size-12 rounded-lg bg-primary flex items-center justify-center shadow-lg">
                     <Zap className="w-5 h-5 text-content" />
                   </div>
                 </div>
@@ -476,7 +580,7 @@ export function SettingsPage() {
             {/* Content */}
             <div className="lg:w-3/5 p-8">
               <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider rounded border border-blue-500/20">Active</span>
+                <span className="px-2 py-0.5 badge-bg-primary text-primary text-[10px] font-bold uppercase tracking-wider rounded border badge-border-primary">Active</span>
                 <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
               </div>
               <p className="text-content-muted mb-6 leading-relaxed">
@@ -484,14 +588,14 @@ export function SettingsPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
+                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Capability Matching</p>
                     <p className="text-xs text-content-muted">Best model for each task type</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
+                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Cost Optimization</p>
                     <p className="text-xs text-content-muted">Balance performance vs spend</p>
@@ -499,6 +603,90 @@ export function SettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Claude Code Authentication */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          Claude Code
+          <div className="h-px flex-1 bg-divider-strong" />
+        </h2>
+        <div className="bg-surface-raised border border-divider rounded-xl p-6 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              {/* Status dot */}
+              <div className={`mt-1 w-3 h-3 rounded-full shrink-0 ${
+                claudeAuth?.loggedIn ? 'bg-success' :
+                claudeAuth?.expired ? 'bg-warning' :
+                claudeAuth?.installed ? 'bg-destructive' :
+                'bg-muted-foreground'
+              }`} />
+              <div>
+                {claudeAuth === null ? (
+                  <p className="text-content-body text-sm">Checking authentication status…</p>
+                ) : !claudeAuth.installed ? (
+                  <>
+                    <p className="text-content font-semibold">Claude Code not detected</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      Install Claude Code to use subscription-based authentication.
+                    </p>
+                  </>
+                ) : claudeAuth.loggedIn ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <p className="text-content font-semibold">Logged in</p>
+                      {claudeAuth.subscriptionType && (
+                        <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+                          {claudeAuth.subscriptionType.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    {claudeAuth.rateLimitTier && (
+                      <p className="text-content-muted text-xs mt-1">
+                        Rate tier: <code className="font-mono text-content-subtle">{claudeAuth.rateLimitTier}</code>
+                      </p>
+                    )}
+                    {claudeAuth.hasAnthropicApiKey && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                        <p className="text-warning text-xs">
+                          <code className="font-mono">ANTHROPIC_API_KEY</code> is set — this overrides subscription auth for direct API calls
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : claudeAuth.expired ? (
+                  <>
+                    <p className="text-content font-semibold text-warning">Session expired</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      Your Claude Code session has expired. Run <code className="font-mono bg-surface-overlay px-1 rounded">claude</code> in the terminal and use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code> to re-authenticate.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-content font-semibold">Not logged in</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      No active subscription session. To log in, type <code className="font-mono bg-surface-overlay px-1 rounded">! claude</code> in the command bar, then use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code>.
+                    </p>
+                    {claudeAuth.hasAnthropicApiKey && (
+                      <p className="text-content-subtle text-xs mt-2">
+                        Falling back to <code className="font-mono">ANTHROPIC_API_KEY</code> for Anthropic models.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => void fetchClaudeAuth()}
+              disabled={refreshingAuth}
+              className="shrink-0 p-2 rounded-lg border border-divider hover:border-divider-strong text-content-muted hover:text-content transition-colors disabled:opacity-50"
+              title="Refresh auth status"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshingAuth ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
       </section>
@@ -512,7 +700,7 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PROVIDERS.map((provider) => {
             const isDefault = provider.id === 'anthropic';
-            const isEnabled = isDefault || formData.models.providers[provider.id];
+            const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
 
             return (
@@ -520,13 +708,13 @@ export function SettingsPage() {
                 key={provider.id}
                 className={`bg-surface-raised border rounded-xl p-5 relative transition-colors shadow-sm ${
                   isDefault
-                    ? 'border-blue-500/50 shadow-lg shadow-blue-500/5'
+                    ? 'border-primary/50 shadow-lg shadow-primary/5'
                     : 'border-divider hover:border-divider-strong'
                 }`}
               >
                 {isDefault && (
                   <div className="absolute -top-3 right-4">
-                    <span className="bg-blue-500 text-content text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
+                    <span className="bg-primary text-primary-foreground text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
                       Default
                     </span>
                   </div>
@@ -536,13 +724,18 @@ export function SettingsPage() {
                     <provider.icon className="w-5 h-5 text-content-subtle" />
                   </div>
                   <span className="font-bold text-content">{provider.name}</span>
+                  {/* Subscription badge in the Anthropic card header */}
+                  {isDefault && claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
+                    <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+                      {claudeAuth.subscriptionType.toUpperCase()}
+                    </span>
+                  )}
                   <div className="ml-auto">
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
-                      disabled={isDefault}
                       className={`w-10 h-5 rounded-full relative transition-colors ${
-                        isEnabled ? 'bg-blue-500' : 'bg-surface-emphasis'
-                      } ${isDefault ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        isEnabled ? 'bg-primary' : 'bg-surface-emphasis'
+                      } cursor-pointer`}
                     >
                       <div
                         className={`absolute top-0.5 size-4 bg-white rounded-full transition-all ${
@@ -554,57 +747,97 @@ export function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="relative">
-                    <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
-                    {/* Check if it's an unresolved env var reference */}
-                    {apiKey.startsWith('$') ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
-                        </div>
-                        <p className="text-[10px] text-amber-400/70 mt-1">
-                          Set this environment variable or enter the key directly below
-                        </p>
-                        <input
-                          type="text"
-                          placeholder={provider.placeholder}
-                          onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                          autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
-                        />
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type={showApiKey[provider.id] ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                          disabled={isDefault}
-                          placeholder={provider.placeholder}
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck={false}
-                          data-lpignore="true"
-                          data-1p-ignore="true"
-                          data-form-type="other"
-                          className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                            isDefault ? 'cursor-not-allowed text-content-muted' : 'text-content-body'
-                          }`}
-                        />
-                        {!isDefault && (
-                          <button
-                            onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                            className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
-                          >
-                            {showApiKey[provider.id] ? (
-                              <Eye className="w-4 h-4" />
-                            ) : (
-                              <Eye className="w-4 h-4 opacity-50" />
-                            )}
-                          </button>
+                    {/* Anthropic: show authentication method rather than raw API key field */}
+                    {isDefault ? (
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
+                        {claudeAuth?.loggedIn ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                            <div className="w-2 h-2 rounded-full bg-success shrink-0" />
+                            <span className="text-xs text-success font-medium">
+                              Subscription{claudeAuth.subscriptionType ? ` — ${claudeAuth.subscriptionType.toUpperCase()} plan` : ''}
+                            </span>
+                          </div>
+                        ) : claudeAuth?.hasAnthropicApiKey ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <Key className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="text-xs text-primary font-medium">API Key (via env)</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20">
+                            <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                            <span className="text-xs text-warning">Not authenticated — see Claude Code section above</span>
+                          </div>
+                        )}
+                        {claudeAuth?.hasAnthropicApiKey && claudeAuth.loggedIn && (
+                          <p className="text-[10px] text-warning mt-1.5 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <code className="font-mono">ANTHROPIC_API_KEY</code> overrides subscription for direct API calls
+                          </p>
                         )}
                       </div>
+                    ) : (
+                      <>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
+                        {/* Check if it's an unresolved env var reference */}
+                        {apiKey.startsWith('$') ? (
+                          <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 text-warning text-xs">
+                              <AlertTriangle className="w-4 h-4" />
+                              <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
+                            </div>
+                            <p className="text-[10px] text-warning/70 mt-1">
+                              Set this environment variable or enter the key directly below
+                            </p>
+                            <input
+                              type="text"
+                              placeholder={provider.placeholder}
+                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                              autoComplete="off"
+                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                            />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              type={showApiKey[provider.id] ? 'text' : 'password'}
+                              value={apiKey}
+                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                              placeholder={provider.placeholder}
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="off"
+                              spellCheck={false}
+                              data-lpignore="true"
+                              data-1p-ignore="true"
+                              data-form-type="other"
+                              className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body ${apiKey ? 'pr-16' : 'pr-8'}`}
+                            />
+                            {apiKey && (
+                              <button
+                                onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
+                                className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                                title={showApiKey[provider.id] ? 'Hide key' : 'Show key'}
+                              >
+                                {showApiKey[provider.id] ? (
+                                  <Eye className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4 opacity-50" />
+                                )}
+                              </button>
+                            )}
+                            {apiKey && (
+                              <button
+                                onClick={() => handleApiKeyChange(provider.id, '')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-destructive transition-colors"
+                                title="Delete API key"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   {/* Action Buttons */}
@@ -614,7 +847,7 @@ export function SettingsPage() {
                       {apiKey && !apiKey.startsWith('$') && (
                         <button
                           onClick={() => setModelsModalProvider(provider.id)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-xs text-blue-400 transition-colors w-full"
+                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 badge-bg-primary hover:bg-primary/20 border badge-border-primary rounded-lg text-xs text-primary transition-colors w-full"
                         >
                           <BarChart3 className="w-3.5 h-3.5" />
                           View Models
@@ -636,7 +869,7 @@ export function SettingsPage() {
                             Test 2+3
                           </button>
                           {testResults[provider.id] && (
-                            <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-green-400' : 'text-red-400'}`}>
+                            <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-success' : 'text-destructive'}`}>
                               {testResults[provider.id]?.success ? (
                                 <CheckCircle className="w-3.5 h-3.5" />
                               ) : (
@@ -703,8 +936,8 @@ export function SettingsPage() {
                   <div className="relative">
                     <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key / Token</label>
                     {trackerKey.startsWith('$') ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
+                      <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 text-warning text-xs">
                           <AlertTriangle className="w-4 h-4" />
                           <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{trackerKey}</code></span>
                         </div>
@@ -713,7 +946,7 @@ export function SettingsPage() {
                           placeholder={tracker.placeholder}
                           onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
                           autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                       </div>
                     ) : (
@@ -730,7 +963,7 @@ export function SettingsPage() {
                           data-lpignore="true"
                           data-1p-ignore="true"
                           data-form-type="other"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                         <button
                           onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
@@ -805,36 +1038,36 @@ export function SettingsPage() {
                           ? 'opacity-50 bg-surface-emphasis border-divider cursor-not-allowed'
                           : `cursor-pointer ${
                             isDeprecated
-                              ? 'bg-amber-500/10 border-amber-500/50 hover:border-amber-500/70 hover:bg-amber-500/15'
+                              ? 'badge-bg-warning border-warning/50 hover:border-warning/70 hover:bg-warning/15'
                               : isGoodFit
-                                ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+                                ? 'badge-bg-success border-success/30 hover:border-success/50 hover:bg-success/10'
                                 : isOkFit
-                                  ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
-                                  : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
+                                  ? 'badge-bg-warning border-warning/30 hover:border-warning/50 hover:bg-warning/10'
+                                  : 'badge-bg-destructive border-destructive/30 hover:border-destructive/50 hover:bg-destructive/10'
                             }`
                       }`}
                     >
                       {isDeprecated && (
                         <div className="absolute top-1 right-1">
-                          <span className="bg-amber-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                          <span className="bg-warning text-foreground text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
                             DEPRECATED
                           </span>
                         </div>
                       )}
                       {!agent.implemented && (
                         <div className="absolute top-1 right-1">
-                          <span className="bg-gray-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                          <span className="bg-muted-foreground text-foreground text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
                             NOT YET IMPLEMENTED
                           </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between mb-2">
                         <agent.icon className={`w-4 h-4 ${
-                          isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                          isDeprecated ? 'text-warning' : isGoodFit ? 'text-success' : isOkFit ? 'text-warning' : 'text-destructive'
                         }`} />
                         {agent.implemented && (
                           <span className={`text-[9px] font-bold ${
-                            isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                            isDeprecated ? 'text-warning' : isGoodFit ? 'text-success' : isOkFit ? 'text-warning' : 'text-destructive'
                           }`}>
                             {Math.round(score * 100)}%
                           </span>
@@ -853,8 +1086,8 @@ export function SettingsPage() {
                               title={`${CAPABILITY_INFO[cap].name}: ${hasIt ? 'Model has this' : 'Model missing this'}`}
                               className={`text-[8px] px-1 py-0.5 rounded ${
                                 hasIt
-                                  ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-rose-500/20 text-rose-400'
+                                  ? 'badge-bg-success text-success-foreground'
+                                  : 'badge-bg-destructive text-destructive-foreground'
                               }`}
                             >
                               {CAPABILITY_INFO[cap].name}
@@ -868,6 +1101,37 @@ export function SettingsPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Appearance */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          <Eye className="w-6 h-6 text-primary" />
+          Appearance
+        </h2>
+        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div>
+              <h3 className="text-sm font-bold text-content flex items-center gap-2">
+                <GitMerge className="w-4 h-4 text-success" />
+                Ready to Merge shimmer
+              </h3>
+              <p className="text-xs text-content-muted mt-1">
+                Animate the "READY TO MERGE" badge with a subtle shimmer to draw attention to cards awaiting your merge approval.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={uiPrefs.readyToMergeShimmer}
+              onClick={() => updateUIPrefs({ readyToMergeShimmer: !uiPrefs.readyToMergeShimmer })}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${uiPrefs.readyToMergeShimmer ? 'bg-primary' : 'bg-input'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ${uiPrefs.readyToMergeShimmer ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
         </div>
       </section>
 
@@ -900,7 +1164,7 @@ export function SettingsPage() {
                 }
               }}
               disabled={clearingCache}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-amber-500/50 hover:bg-amber-500/10 text-content-muted hover:text-amber-400 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-warning/50 hover:bg-warning/10 text-content-muted hover:text-warning transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {clearingCache ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
@@ -909,50 +1173,8 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur-md border-t border-divider-strong shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-6 py-4 z-40">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-content-muted text-sm">
-            {saveMutation.isSuccess && (
-              <>
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                <span className="text-green-400">Settings saved!</span>
-              </>
-            )}
-            {saveMutation.isError && (
-              <>
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span className="text-red-400">Error saving settings</span>
-              </>
-            )}
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={handleRestoreOptimalDefaults}
-              className="px-6 py-2 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
-              title="Set all model assignments to research-based optimal defaults"
-            >
-              <Zap className="w-4 h-4" />
-              Optimal Defaults
-            </button>
-            <button
-              onClick={handleReset}
-              disabled={!hasChanges}
-              className="px-6 py-2 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-50"
-            >
-              Undo Changes
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!hasChanges || saveMutation.isPending}
-              className="px-8 py-2 bg-blue-500 hover:bg-blue-400 text-content font-black rounded-lg transition-all shadow-lg shadow-blue-500/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </footer>
+
+      </div>{/* end max-w content */}
 
       {/* Model Override Modal */}
       {modalWorkType && (
@@ -978,7 +1200,7 @@ export function SettingsPage() {
               <div className="flex items-center gap-3">
                 {(() => {
                   const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
-                  return Icon ? <Icon className="w-5 h-5 text-blue-400" /> : null;
+                  return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
                 })()}
                 <h3 className="text-content text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
@@ -1010,8 +1232,8 @@ export function SettingsPage() {
                 if (isEnvVarRef) {
                   return (
                     <div className="text-center py-8">
-                      <AlertTriangle className="w-10 h-10 text-amber-500 mb-2 mx-auto" />
-                      <p className="text-amber-400">API key configured via environment variable</p>
+                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
+                      <p className="text-warning">API key configured via environment variable</p>
                       <p className="text-content-muted text-sm mt-1">
                         <code className="font-mono bg-surface-overlay px-1 rounded">{providerApiKey}</code> is not set
                       </p>
@@ -1042,9 +1264,9 @@ export function SettingsPage() {
                               <h4 className="text-content font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                  model.tier === 'premium' ? 'bg-purple-500/20 text-purple-400' :
-                                  model.tier === 'balanced' ? 'bg-blue-500/20 text-blue-400' :
-                                  'bg-emerald-500/20 text-emerald-400'
+                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
+                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
+                                  'badge-bg-success text-success-foreground'
                                 }`}>
                                   {model.tier}
                                 </span>
@@ -1068,7 +1290,7 @@ export function SettingsPage() {
                             <button
                               onClick={() => handleTestModel(modelsModalProvider, model.id)}
                               disabled={isTesting}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
                             >
                               {isTesting ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -1078,7 +1300,7 @@ export function SettingsPage() {
                               Test 2+3
                             </button>
                             {testResult && (
-                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
                                 {testResult.success ? (
                                   <CheckCircle className="w-3.5 h-3.5" />
                                 ) : (
@@ -1108,6 +1330,9 @@ export function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Desktop App settings — shown only inside Electron */}
+      <DesktopSettingsSection />
     </div>
   );
 }

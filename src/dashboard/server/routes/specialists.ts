@@ -1,5 +1,6 @@
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 /**
  * Specialists route module — Effect HttpRouter.Layer (PAN-428 B9)
  *
@@ -49,7 +50,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { loadSettings, getAgentCommand } from '../../../lib/settings.js';
+import { getAgentCommand } from '../../../lib/settings.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import {
   getReviewStatus,
@@ -69,6 +70,7 @@ import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -114,7 +116,7 @@ function firePostMergeLifecycle(issueId: string): void {
     return;
   }
 
-  const issuePrefix = issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPathForIssue(issuePrefix);
 
   _postMergeInFlight.add(issueId);
@@ -338,6 +340,31 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     });
 
+    // When review passes, snapshot the current HEAD commit so we can detect
+    // if the agent makes new commits before merge (which invalidates the review).
+    if (specialist === 'review' && status === 'passed') {
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssue(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
+              const { HEAD } = await getWorkspaceGitInfo(workspacePath);
+              setReviewStatusBase(normalizedIssueId, { reviewedAtCommit: HEAD });
+              console.log(`[specialists/done] Snapshotted reviewedAtCommit=${HEAD.substring(0, 8)} for ${normalizedIssueId}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Failed to snapshot reviewedAtCommit for ${normalizedIssueId}:`, err);
+        }
+      });
+    }
+
     // When inspect specialist reports success, save checkpoint
     if (specialist === 'inspect' && status === 'passed') {
       yield* Effect.promise(async () => {
@@ -457,6 +484,72 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(`[specialists/done] Could not transition issue back to in_progress:`, errMsg);
       }
+    }
+
+    // When merge fails, post a comment on the GitHub PR so the failure is visible
+    // outside the dashboard, and send feedback to the work agent.
+    if (specialist === 'merge' && status === 'failed') {
+      yield* Effect.promise(async () => {
+        try {
+          // Post comment on the PR
+          const reviewStatus = loadReviewStatuses()[normalizedIssueId];
+          const prUrl = reviewStatus?.prUrl;
+          if (prUrl) {
+            // Extract owner/repo#number from PR URL
+            const prMatch = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+            if (prMatch) {
+              const [, owner, repo, prNumber] = prMatch;
+              const commentBody = `## Merge Failed\n\n${notes || 'Merge could not be completed.'}\n\nThe issue has been moved back to In Progress. The work agent needs to resolve conflicts and resubmit.`;
+              await execAsync(`gh api repos/${owner}/${repo}/issues/${prNumber}/comments -f body=${JSON.stringify(commentBody)}`, { encoding: 'utf-8' });
+              console.log(`[specialists/done] Posted merge failure comment on ${prUrl}`);
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[specialists/done] Failed to post merge failure comment: ${err.message}`);
+        }
+      });
+
+      // If merge failed due to conflicts, send rebase instructions to the work agent.
+      if (notes?.toLowerCase().includes('conflict')) {
+        yield* Effect.promise(async () => {
+          try {
+            const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+            const { sessionExists } = await import('../../../lib/tmux.js');
+            const { messageAgent, spawnAgent, getAgentState } = await import('../../../lib/agents.js');
+
+            if (sessionExists(workAgentId)) {
+              // Agent is running — send rebase instructions directly
+              const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
+              await messageAgent(workAgentId, rebaseMsg);
+              console.log(`[specialists/done] Sent rebase instructions to ${workAgentId}`);
+            } else {
+              // Agent is stopped — start fresh (don't resume, sessions may be corrupted: PAN-612)
+              console.log(`[specialists/done] Work agent ${workAgentId} not running — will need manual restart or next pan work issue dispatch`);
+            }
+          } catch (err: any) {
+            console.warn(`[specialists/done] Failed to send rebase feedback to work agent: ${err.message}`);
+          }
+        });
+      }
+    }
+
+    // When review fails, send feedback to work agent so it can fix the issues
+    if (specialist === 'review' && status === 'failed' && notes) {
+      yield* Effect.promise(async () => {
+        try {
+          const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+          const { sessionExists } = await import('../../../lib/tmux.js');
+          const { messageAgent } = await import('../../../lib/agents.js');
+
+          if (sessionExists(workAgentId)) {
+            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"`;
+            await messageAgent(workAgentId, reviewMsg);
+            console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
+          }
+        } catch (err: any) {
+          console.warn(`[specialists/done] Failed to send review feedback: ${err.message}`);
+        }
+      });
     }
 
     // Emit domain event for specialist completion/failure
@@ -584,10 +677,13 @@ const postSpecialistWakeRoute = HttpRouter.add(
 
     const useSessionId = sessionId || existingSessionId;
 
-    // Get specialist model from settings
-    const specSettings = loadSettings();
-    const specModelKey = `${name}_agent` as keyof typeof specSettings.models.specialists;
-    const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-6';
+    // Get specialist model from work-type router (config.yaml)
+    let specModel = 'claude-sonnet-4-6';
+    try {
+      const { getModelId } = yield* Effect.promise(() => import('../../../lib/work-type-router.js'));
+      const workTypeId = `specialist-${name}` as any;
+      specModel = getModelId(workTypeId);
+    } catch { /* fall back to default */ }
     const specCmd = getAgentCommand(specModel);
     const specCmdWithArgs =
       specCmd.args.length > 0
@@ -787,7 +883,7 @@ const getSpecialistCostRoute = HttpRouter.add(
     const homeDir = process.env.HOME || homedir();
     const claudeProjectsDir = join(homeDir, '.claude', 'projects');
 
-    const projectDirName = `-${homeDir.replace(/^\//, '').replace(/\//g, '-')}`;
+    const projectDirName = encodeClaudeProjectDir(homeDir);
     const projectDir = join(claudeProjectsDir, projectDirName);
     const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
@@ -1770,6 +1866,35 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/specialists/projects/:project/:name/reset-session ───────
+// Bumps the session generation so the next dispatch starts a fresh Claude session.
+// Old JSONL files are preserved.
+
+const postProjectSpecialistResetSessionRoute = HttpRouter.add(
+  'POST',
+  '/api/specialists/projects/:project/:name/reset-session',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const projectKey = params['project'] ?? '';
+    const name = params['name'] ?? '';
+
+    const { bumpSessionGeneration } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const specialistType = name as any;
+    const newGen = bumpSessionGeneration(specialistType, projectKey);
+
+    // Also kill the tmux session so it doesn't linger with old context.
+    // NOTE: try/catch does NOT work with yield* in Effect.gen — use .catch() in the Promise chain.
+    const tmuxSession = `specialist-${projectKey}-${name}`;
+    yield* Effect.promise(() =>
+      execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null`, { encoding: 'utf-8' })
+        .catch(() => { /* no session to kill */ })
+    );
+
+    console.log(`[specialist] Reset session for ${projectKey}/${name} → generation ${newGen}`);
+    return jsonResponse({ success: true, specialist: name, project: projectKey, generation: newGen });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 //
 // ORDERING RULES (important for Effect HttpRouter):
@@ -1817,6 +1942,7 @@ export const specialistsRouteLayer = Layer.mergeAll(
   postProjectSpecialistCompleteRoute,       // /complete
   getProjectSpecialistLatestLogRoute,       // /latest-log
   postProjectSpecialistLogsCleanupRoute,    // /logs/cleanup
+  postProjectSpecialistResetSessionRoute,  // /reset-session
 );
 
 export default specialistsRouteLayer;

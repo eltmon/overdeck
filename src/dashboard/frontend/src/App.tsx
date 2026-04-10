@@ -16,18 +16,20 @@ import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
+import { CommandPalette } from './components/CommandPalette';
 import { MissionControl } from './components/MissionControl';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
-import { Header, Tab } from './components/Header';
+import { Tab } from './components/Header';
+import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
 import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgentList, selectIssues } from './lib/store';
+import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
 
 interface TrackerStatusItem {
   type: string;
@@ -45,7 +47,7 @@ interface TrackerStatus {
 
 const TAB_PATHS: Record<Tab, string> = {
   kanban: '/',
-  'mission-control': '/mission-control',
+  'command-deck': '/command-deck',
   agents: '/agents',
   resources: '/resources',
   convoys: '/convoys',
@@ -66,6 +68,12 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   return PATH_TO_TAB[path] || 'kanban';
+}
+
+async function fetchBackendHealth(): Promise<{ version: string }> {
+  const res = await fetch('/api/version');
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+  return res.json();
 }
 
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
@@ -118,7 +126,26 @@ export default function App() {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
+
+  // Dashboard lifecycle state from event store (restart events)
+  const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
+
+  // Backend health check — poll every 5s so we catch outages quickly
+  const { isError: backendDown, failureCount: backendFailureCount } = useQuery({
+    queryKey: ['backend-health'],
+    queryFn: fetchBackendHealth,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+    retry: 1, // one retry before marking as error
+    retryDelay: 1000,
+    staleTime: 0,
+  });
+  // Only show banner after 2 consecutive failures to avoid flicker on transient errors
+  const showBackendBanner = backendDown && backendFailureCount >= 2;
+  // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
+  const showRestartBanner = dashboardLifecycle.active;
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -235,12 +262,20 @@ export default function App() {
     setCurrentConfirmation(null);
   }, []);
 
-  // Global keyboard shortcut for search
+  // Global keyboard shortcuts: / for search, Cmd+K for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+      const isMac = navigator.platform.includes('Mac');
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+      const target = e.target as HTMLElement;
+      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      if (e.key === '/' && !inInput) {
         e.preventDefault();
         setIsSearchOpen(true);
+      } else if (e.key === 'k' && isCmdOrCtrl && !e.shiftKey) {
+        e.preventDefault();
+        setIsPaletteOpen((prev) => !prev);
       }
     };
 
@@ -248,55 +283,131 @@ export default function App() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Listen for menu actions from desktop app (open-settings, etc.)
+  useEffect(() => {
+    const bridge = window.panopticonBridge;
+    if (!bridge) return;
+    const unsub = bridge.onMenuAction((action: string) => {
+      if (action === 'open-settings') {
+        setActiveTab('settings');
+      } else if (action.startsWith('open-workspace:')) {
+        const issueId = action.slice('open-workspace:'.length);
+        setActiveTab('kanban');
+        if (issueId) setSelectedIssue(issueId);
+      } else if (action.startsWith('auto-start-nag:')) {
+        // Format: auto-start-nag:<count>:<max>
+        setIsPaletteOpen(false);
+        // Let the nag toast be handled below
+        const parts = action.split(':');
+        const count = parseInt(parts[1] ?? '0', 10);
+        const max = parseInt(parts[2] ?? '5', 10);
+        showAutoStartNag(count, max);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Auto-start nag toast for desktop app (launched 2-5 times without enabling)
+  function showAutoStartNag(count: number, max: number): void {
+    const messages = [
+      "Auto-start means never missing an agent asking for help.",
+      "Your agents could be waiting for you right now.",
+      "Panopticon works best when it's always watching.",
+      "One click enables auto-start. You can disable it anytime.",
+    ];
+    const msg = messages[(count - 2) % messages.length] ?? messages[0];
+    toast(`Reminder ${count} of ${max} — ${msg}`, {
+      duration: 8_000,
+      action: {
+        label: 'Enable',
+        onClick: () => {
+          void window.panopticonBridge?.updateDesktopSetting('autoStart.enabled', true);
+        },
+      },
+    });
+  }
+
   const handleSelectIssueFromSearch = useCallback((issueId: string) => {
     setSelectedIssue(issueId);
     setActiveTab('kanban');
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden transition-colors duration-150" style={{ backgroundColor: '#101622' }}>
+    <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
-      <Header
+
+      {/* Collapsible sidebar navigation */}
+      <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSearchOpen={() => setIsSearchOpen(true)}
       />
 
-      {/* Missing Tracker API Key Banner */}
-      {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
-        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center gap-3 shrink-0">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-          <p className="text-amber-400 text-sm flex-1">
-            <span className="font-semibold">Missing API key{missingKeyTrackers.length > 1 ? 's' : ''}:</span>{' '}
-            {missingKeyTrackers.map(t => (
-              <span key={t.type}>
-                {t.name} (<code className="font-mono text-xs bg-amber-500/20 px-1 rounded">{t.envVar}</code>)
-              </span>
-            )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ', ', curr], [] as React.ReactNode[])}.{' '}
-            <button
-              onClick={() => setActiveTab('settings')}
-              className="underline hover:text-amber-300 font-semibold"
-            >
-              Configure in Settings
-            </button>
-          </p>
-          <button
-            onClick={() => setTrackerBannerDismissed(true)}
-            className="text-amber-400/60 hover:text-amber-400 shrink-0"
-            title="Dismiss"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      <main className="flex-1 flex overflow-hidden">
-        {activeTab === 'mission-control' && (
-          <div className="w-full h-full">
-            <MissionControl issues={issues} />
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
+        {showRestartBanner && (
+          <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0">
+            <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />
+            <p className="text-primary text-sm font-semibold flex-1">
+              Dashboard is restarting
+              {dashboardLifecycle.issueId && (
+                <> — <span className="font-mono">{dashboardLifecycle.issueId}</span></>
+              )}
+              {dashboardLifecycle.reason && (
+                <span className="font-normal ml-1 text-primary/70">({dashboardLifecycle.reason})</span>
+              )}
+            </p>
+            <span className="text-primary/60 text-xs shrink-0 animate-pulse">● Restarting…</span>
           </div>
         )}
+
+        {/* Backend Offline Banner — shown when /api/version fails repeatedly AND not in a planned restart */}
+        {showBackendBanner && !showRestartBanner && (
+          <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+            <p className="text-destructive text-sm font-semibold flex-1">
+              Backend is unreachable — dashboard data is stale. Check that <code className="font-mono bg-destructive/20 px-1 rounded">pan up</code> is running.
+            </p>
+            <span className="text-destructive/60 text-xs shrink-0 animate-pulse">● Retrying…</span>
+          </div>
+        )}
+
+        {/* Missing Tracker API Key Banner */}
+        {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
+          <div className="bg-warning/10 border-b border-warning/30 px-4 py-2 flex items-center gap-3 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-warning-foreground shrink-0" />
+            <p className="text-warning-foreground text-sm flex-1">
+              <span className="font-semibold">Missing API key{missingKeyTrackers.length > 1 ? 's' : ''}:</span>{' '}
+              {missingKeyTrackers.map(t => (
+                <span key={t.type}>
+                  {t.name} (<code className="font-mono text-xs bg-warning/20 px-1 rounded">{t.envVar}</code>)
+                </span>
+              )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ', ', curr], [] as React.ReactNode[])}.{' '}
+              <button
+                onClick={() => setActiveTab('settings')}
+                className="underline hover:opacity-80 font-semibold"
+              >
+                Configure in Settings
+              </button>
+            </p>
+            <button
+              onClick={() => setTrackerBannerDismissed(true)}
+              className="text-warning-foreground/60 hover:text-warning-foreground shrink-0"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <main className="flex-1 flex overflow-hidden">
+          {activeTab === 'command-deck' && (
+            <div className="w-full h-full">
+              <MissionControl issues={issues} />
+            </div>
+          )}
         {activeTab === 'kanban' && (
           <BootstrapGate fallback={
             <div className="flex-1 overflow-auto p-6 w-full">
@@ -401,7 +512,8 @@ export default function App() {
             </div>
           </BootstrapGate>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog
@@ -419,6 +531,16 @@ export default function App() {
         onSelectIssue={handleSelectIssueFromSearch}
         cycleFilter="current"
         includeCompletedFilter={false}
+      />
+
+      {/* Command Palette — Cmd+K / Ctrl+K */}
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        onNavigate={(tab, issueId) => {
+          setActiveTab(tab as Tab);
+          if (issueId) setSelectedIssue(issueId);
+        }}
       />
 
       {/* Toast Notifications */}

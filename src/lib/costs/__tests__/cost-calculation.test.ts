@@ -307,7 +307,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should handle models without cache pricing', () => {
-      const pricing = getPricing('openai', 'gpt-4o');
+      const pricing = getPricing('openai', 'gpt-5.4');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
@@ -320,25 +320,25 @@ describe('Cost Calculation Accuracy', () => {
       const cost = calculateCost(usage, pricing!);
 
       // Should only calculate input/output, ignore cache tokens
-      // (1000/1M)*5 + (500/1M)*15 = 0.005 + 0.0075 = 0.0125
-      expect(cost).toBeCloseTo(0.0125, 6);
+      // (1000/1M)*2.5 + (500/1M)*15 = 0.0025 + 0.0075 = 0.01
+      expect(cost).toBeCloseTo(0.01, 6);
     });
   });
 
   describe('Multi-Provider Support', () => {
     it('should have pricing for OpenAI models', () => {
-      expect(getPricing('openai', 'gpt-4o')).toBeDefined();
-      expect(getPricing('openai', 'gpt-4o-mini')).toBeDefined();
-      expect(getPricing('openai', 'gpt-4-turbo')).toBeDefined();
+      expect(getPricing('openai', 'gpt-5.4')).toBeDefined();
+      expect(getPricing('openai', 'gpt-5.4-mini')).toBeDefined();
+      expect(getPricing('openai', 'o3')).toBeDefined();
     });
 
     it('should have pricing for Google models', () => {
-      expect(getPricing('google', 'gemini-1.5-pro')).toBeDefined();
-      expect(getPricing('google', 'gemini-1.5-flash')).toBeDefined();
+      expect(getPricing('google', 'gemini-3.1-pro-preview')).toBeDefined();
+      expect(getPricing('google', 'gemini-3-flash')).toBeDefined();
     });
 
     it('should calculate OpenAI costs correctly', () => {
-      const pricing = getPricing('openai', 'gpt-4o');
+      const pricing = getPricing('openai', 'gpt-5.4');
 
       const usage: TokenUsage = {
         inputTokens: 10000,
@@ -349,13 +349,13 @@ describe('Cost Calculation Accuracy', () => {
 
       const cost = calculateCost(usage, pricing!);
 
-      // GPT-4o: input $5/MTok, output $15/MTok
-      // (10000/1M)*5 + (5000/1M)*15 = 0.05 + 0.075 = 0.125
-      expect(cost).toBeCloseTo(0.125, 6);
+      // GPT-5.4: input $2.50/MTok, output $15/MTok
+      // (10000/1M)*2.5 + (5000/1M)*15 = 0.025 + 0.075 = 0.1
+      expect(cost).toBeCloseTo(0.1, 6);
     });
 
     it('should calculate Google costs correctly', () => {
-      const pricing = getPricing('google', 'gemini-1.5-pro');
+      const pricing = getPricing('google', 'gemini-3.1-pro-preview');
 
       const usage: TokenUsage = {
         inputTokens: 10000,
@@ -366,9 +366,9 @@ describe('Cost Calculation Accuracy', () => {
 
       const cost = calculateCost(usage, pricing!);
 
-      // Gemini 1.5 Pro: input $1.25/MTok, output $5/MTok
-      // (10000/1M)*1.25 + (5000/1M)*5 = 0.0125 + 0.025 = 0.0375
-      expect(cost).toBeCloseTo(0.0375, 6);
+      // Gemini 3.1 Pro: input $2/MTok, output $12/MTok
+      // (10000/1M)*2 + (5000/1M)*12 = 0.02 + 0.06 = 0.08
+      expect(cost).toBeCloseTo(0.08, 6);
     });
   });
 });

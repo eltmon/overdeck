@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Loader2 } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
+import { ModelPicker } from './ModelPicker';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
@@ -21,9 +22,11 @@ interface ConversationPanelProps {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function resumeConversation(name: string): Promise<Conversation> {
+async function resumeConversation(name: string, model?: string, effort?: string): Promise<Conversation> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/resume`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, effort }),
   });
   if (!res.ok) throw new Error('Failed to resume conversation');
   return res.json();
@@ -36,6 +39,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   // since new conversations should always start in conversation view
   const [viewMode, setViewMode] = useState<ViewMode>('conversation');
   const [resumed, setResumed] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || 'claude-opus-4-6');
   const queryClient = useQueryClient();
 
   // Query messages at this level so we can access streaming status in the header
@@ -47,10 +51,23 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   const isStreaming = messagesData?.streaming ?? false;
 
   const resumeMutation = useMutation({
-    mutationFn: () => resumeConversation(conversation.name),
+    mutationFn: () => resumeConversation(conversation.name, selectedModel),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       setResumed(true);
+    },
+  });
+
+  const switchModelMutation = useMutation({
+    mutationFn: (model: string) =>
+      fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
     },
   });
 
@@ -133,6 +150,15 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
             onResume={!showTerminal ? handleResume : undefined}
             onArchive={handleArchive}
             resumePending={resumeMutation.isPending}
+            modelPicker={
+              <ModelPicker
+                value={selectedModel}
+                onChange={(modelId) => {
+                  setSelectedModel(modelId);
+                  switchModelMutation.mutate(modelId);
+                }}
+              />
+            }
           />
         )}
       </div>
@@ -161,9 +187,15 @@ interface ConversationViewProps {
   onResume?: () => void;
   onArchive?: () => void;
   resumePending?: boolean;
+  /** ModelPicker component to render next to the Resume button */
+  modelPicker?: React.ReactNode;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker }: ConversationViewProps) {
+  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
+  // Track count so we know when the server caught up
+  const prevServerCountRef = useRef(0);
+
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
@@ -172,21 +204,44 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
     refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
 
-  const messages = data?.messages ?? [];
+  const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
   const streaming = data?.streaming ?? false;
+
+  // Drop optimistic messages once the server has returned at least as many messages
+  // as we had before plus the optimistic ones (the real message has arrived).
+  const expectedCount = prevServerCountRef.current + optimisticMessages.length;
+  const serverCaughtUp = serverMessages.length >= expectedCount && optimisticMessages.length > 0;
+  const messages = serverCaughtUp ? serverMessages : [...serverMessages, ...optimisticMessages];
+
+  const handleMessageSent = useCallback((text: string) => {
+    prevServerCountRef.current = serverMessages.length;
+    const optimistic: ChatMessage = {
+      id: `optimistic-${Date.now()}`,
+      role: 'user',
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    setOptimisticMessages([optimistic]);
+  }, [serverMessages.length]);
+
+  // Clean up optimistic messages in an effect once the server catches up
+  useEffect(() => {
+    if (serverCaughtUp) setOptimisticMessages([]);
+  }, [serverCaughtUp]);
+
   const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
   const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
 
   // "Working" = session is alive AND either:
-  // - server reports streaming (incomplete assistant message with recent file activity)
+  // - server reports streaming (file modified < 5s ago with no terminal stop_reason)
   // - last message is from the user (waiting for assistant response)
-  // - last assistant message has no completedAt (still generating)
+  // We intentionally omit `!lastMsg.completedAt` — that caused the indicator to
+  // stick forever when completedAt was undefined due to missing/null timestamps.
   const lastMsg = messages[messages.length - 1];
   const isWorking = conversation.sessionAlive && messages.length > 0 && (
     streaming ||
-    lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    lastMsg?.role === 'user'
   );
 
   return (
@@ -200,11 +255,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
           <p className={styles.conversationEmptyStateSubtitle}>
             This conversation has no saved history. The session may have ended before any messages were exchanged.
           </p>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
             {onResume && (
-              <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
-                {resumePending ? 'Resuming…' : 'Resume Session'}
-              </button>
+              <>
+                {modelPicker}
+                <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
+                  {resumePending ? 'Resuming…' : 'Resume Session'}
+                </button>
+              </>
             )}
             <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
               Archive
@@ -227,6 +285,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
       )}
       {onResume ? (
         <div className={styles.conversationResumeBar}>
+          {modelPicker}
           <button
             className={styles.conversationResumeBtn}
             onClick={onResume}
@@ -236,7 +295,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending }: 
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} />
+        <ComposerFooter conversation={conversation} onSend={handleMessageSent} />
       )}
     </div>
   );

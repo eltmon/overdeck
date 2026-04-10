@@ -42,9 +42,9 @@ function getSubStepIcon(label: string) {
 }
 
 function StatusIndicator({ status }: { status: 'active' | 'complete' | 'error' | 'pending' }) {
-  if (status === 'complete') return <CheckCircle2 className="w-4 h-4 text-green-400" />;
-  if (status === 'active') return <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />;
-  if (status === 'error') return <AlertCircle className="w-4 h-4 text-red-400" />;
+  if (status === 'complete') return <CheckCircle2 className="w-4 h-4 text-success" />;
+  if (status === 'active') return <Loader2 className="w-4 h-4 text-signal-review animate-spin" />;
+  if (status === 'error') return <AlertCircle className="w-4 h-4 text-destructive" />;
   return <Circle className="w-4 h-4 text-content-muted" />;
 }
 
@@ -62,25 +62,25 @@ function StepRow({ stepNum, event, subSteps }: { stepNum: number; event?: SetupP
     <div>
       <div className={`flex items-start gap-4 transition-opacity duration-300 ${isPending ? 'opacity-35' : ''}`}>
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 transition-colors duration-300 ${
-          isComplete ? 'bg-green-500/20' :
-          isActive ? 'bg-purple-500/20' :
-          isError ? 'bg-red-500/20' :
+          isComplete ? 'badge-bg-success' :
+          isActive ? 'badge-bg-secondary' :
+          isError ? 'badge-bg-destructive' :
           'border border-divider'
         }`}>
           <StatusIndicator status={isPending ? 'pending' : event!.status} />
         </div>
         <div className="flex-1 py-1">
           <p className={`text-sm font-medium transition-colors duration-300 ${
-            isComplete ? 'text-green-400' :
+            isComplete ? 'text-success' :
             isActive ? 'text-content' :
-            isError ? 'text-red-400' :
+            isError ? 'text-destructive' :
             'text-content-muted'
           }`}>
             {event?.label || defaultLabel}
           </p>
           {event?.detail && !hasSubSteps && (
             <p className={`text-xs mt-0.5 font-mono ${
-              isError ? 'text-red-400/80' : 'text-content-muted'
+              isError ? 'text-destructive/80' : 'text-content-muted'
             }`}>
               {event.detail}
             </p>
@@ -88,9 +88,9 @@ function StepRow({ stepNum, event, subSteps }: { stepNum: number; event?: SetupP
         </div>
         <div className="flex-shrink-0 mt-1.5">
           <Icon className={`w-4 h-4 ${
-            isComplete ? 'text-green-400/50' :
-            isActive ? 'text-purple-400/50' :
-            isError ? 'text-red-400/50' :
+            isComplete ? 'text-success/50' :
+            isActive ? 'text-signal-review/50' :
+            isError ? 'text-destructive/50' :
             'text-content-muted/30'
           }`} />
         </div>
@@ -98,28 +98,37 @@ function StepRow({ stepNum, event, subSteps }: { stepNum: number; event?: SetupP
 
       {/* Sub-steps (indented under main step) */}
       {hasSubSteps && (
-        <div className="ml-12 mt-2 space-y-1.5 border-l border-divider pl-4">
+        <div className="ml-12 mt-2 space-y-2 border-l border-divider pl-4">
           {subSteps.map((sub, i) => {
             const SubIcon = getSubStepIcon(sub.label);
             return (
-              <div key={i} className={`flex items-center gap-3 transition-opacity duration-200 ${sub.status === 'active' ? '' : sub.status === 'complete' ? 'opacity-70' : 'opacity-40'}`}>
-                <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 ${
-                  sub.status === 'complete' ? 'text-green-400/60' :
-                  sub.status === 'active' ? 'text-purple-400' :
+              <div key={i} className={`flex items-start gap-3 transition-opacity duration-200 ${sub.status === 'active' ? '' : sub.status === 'complete' ? 'opacity-70' : 'opacity-40'}`}>
+                <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${
+                  sub.status === 'complete' ? 'text-success/60' :
+                  sub.status === 'active' ? 'text-signal-review' :
                   'text-content-muted/40'
                 }`} />
-                <span className={`text-xs ${
-                  sub.status === 'complete' ? 'text-green-400/80' :
-                  sub.status === 'active' ? 'text-content-body' :
-                  'text-content-muted'
-                }`}>
-                  {sub.label}
-                </span>
-                <span className="text-xs text-content-muted font-mono truncate">
-                  {sub.detail}
-                </span>
-                {sub.status === 'active' && <Loader2 className="w-3 h-3 text-purple-400 animate-spin flex-shrink-0" />}
-                {sub.status === 'complete' && <CheckCircle2 className="w-3 h-3 text-green-400/60 flex-shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <span className={`text-xs ${
+                    sub.status === 'complete' ? 'text-success/80' :
+                    sub.status === 'active' ? 'text-content-body' :
+                    'text-content-muted'
+                  }`}>
+                    {sub.label}
+                  </span>
+                  {sub.detail && (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-xs text-content-muted font-mono leading-tight">
+                        {sub.detail}
+                      </span>
+                      {sub.status === 'active' && <Loader2 className="w-3 h-3 text-signal-review animate-spin flex-shrink-0" />}
+                      {sub.status === 'complete' && <CheckCircle2 className="w-3 h-3 text-success/60 flex-shrink-0" />}
+                    </div>
+                  )}
+                  {!sub.detail && sub.status === 'active' && (
+                    <Loader2 className="w-3 h-3 text-signal-review animate-spin mt-0.5" />
+                  )}
+                </div>
               </div>
             );
           })}
@@ -175,7 +184,7 @@ export function PlanSetupScreen({ issueIdentifier, issueTitle, steps, error }: P
     <div className="flex-1 flex flex-col items-center justify-center p-8">
       {/* Hero area */}
       <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center mb-6">
-        <Terminal className="w-10 h-10 text-purple-400" />
+        <Terminal className="w-10 h-10 text-signal-review" />
       </div>
 
       <h3 className="text-xl font-semibold text-content mb-1">Setting up planning session</h3>
@@ -211,12 +220,12 @@ export function PlanSetupScreen({ issueIdentifier, issueTitle, steps, error }: P
 
       {/* Error display */}
       {error && (
-        <div className="mt-6 w-full max-w-md bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+        <div className="mt-6 w-full max-w-md badge-bg-destructive border border-destructive/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-red-400">Setup failed</p>
-              <p className="text-xs text-red-400/80 mt-1 font-mono">{error}</p>
+              <p className="text-sm font-medium text-destructive">Setup failed</p>
+              <p className="text-xs text-destructive/80 mt-1 font-mono">{error}</p>
             </div>
           </div>
         </div>

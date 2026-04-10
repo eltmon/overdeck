@@ -82,7 +82,7 @@ export function AgentFocusView({ agent, onClose }: FocusViewProps) {
               </div>
               <div className="flex items-center gap-3 mt-1">
                 <InfoRow label="Model" value={agent.model || 'unknown'} />
-                {agent.git?.branch && <InfoRow label="Branch" value={agent.git.branch} />}
+                {agent.git?.branch && <InfoRow label="Plan" value={agent.git.branch} />}
                 {agent.agentPhase && <InfoRow label="Phase" value={agent.agentPhase} />}
               </div>
             </div>

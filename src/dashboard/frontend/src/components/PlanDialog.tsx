@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
@@ -72,10 +73,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
+  const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
+  const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);
   const [showTasksPanel, setShowTasksPanel] = useState(false);
+  const [beadsWarning, setBeadsWarning] = useState<string | null>(null);
   const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
   const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
 
@@ -84,6 +88,18 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const hasConnectedToSession = useRef(false);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+
+  // Fetch settings to know the default planning-agent model
+  const settingsQuery = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error('Failed to load settings');
+      return res.json() as Promise<{ models: { overrides: Record<string, string> } }>;
+    },
+    staleTime: 60000,
+  });
+  const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
 
   // Start planning via SSE stream — replaces the old fire-and-forget mutation.
   // Uses fetch with streaming body parsing since EventSource only supports GET.
@@ -97,7 +113,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, effort }),
       });
 
       if (!res.ok) {
@@ -198,7 +214,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       setError(err.message || 'Connection failed');
       setStep('error');
     }
-  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, watchPlanning, queryClient, onClose]);
+  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, effort, watchPlanning, queryClient, onClose]);
 
   // Legacy mutation wrapper — keeps the same handleStartPlanning interface
   const startPlanningMutation = {
@@ -235,11 +251,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       if (!completeRes.ok) {
         console.warn('Failed to mark planning complete, continuing anyway');
       }
+      const completeData = await completeRes.json().catch(() => ({}));
 
-      return stopData;
+      return { ...stopData, beadsWarning: completeData.beadsWarning ?? null };
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+      if (data?.beadsWarning) {
+        setBeadsWarning(data.beadsWarning);
+        toast.warning(data.beadsWarning, { duration: 10000 });
+      }
       setStep('complete');
     },
     onError: (err: Error) => {
@@ -460,22 +481,22 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         <span className="text-sm text-content font-medium">Plan: {issue.identifier}</span>
         {step === 'setting-up' && (
           <>
-            <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />
-            <span className="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-xs rounded">Setting up</span>
+            <Loader2 className="w-3 h-3 text-signal-review animate-spin" />
+            <span className="px-1.5 py-0.5 badge-bg-signal-review text-signal-review-foreground text-xs rounded">Setting up</span>
           </>
         )}
         {step === 'planning' && (
           <>
-            <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+            <span className="w-2 h-2 bg-signal-review rounded-full animate-pulse" />
             {statusQuery.data?.isRemote ? (
-              <span className="px-1.5 py-0.5 bg-blue-500/30 text-blue-300 text-xs rounded">Remote</span>
+              <span className="px-1.5 py-0.5 badge-bg-primary text-primary text-xs rounded">Remote</span>
             ) : (
-              <span className="px-1.5 py-0.5 bg-gray-500/30 text-content-subtle text-xs rounded">Local</span>
+              <span className="px-1.5 py-0.5 bg-muted text-content-subtle text-xs rounded">Local</span>
             )}
           </>
         )}
         {step === 'complete' && (
-          <span className="px-1.5 py-0.5 bg-green-500/30 text-green-300 text-xs rounded">Done</span>
+          <span className="px-1.5 py-0.5 badge-bg-success text-success-foreground text-xs rounded">Done</span>
         )}
       </div>
     );
@@ -525,23 +546,23 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               <div className="flex items-center gap-2">
                 {step === 'planning' && (
                   <>
-                    <span className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">
-                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+                    <span className="flex items-center gap-1.5 px-2 py-1 badge-bg-signal-review text-signal-review text-xs rounded-full">
+                      <span className="w-2 h-2 bg-signal-review rounded-full animate-pulse" />
                       Planning Active
                     </span>
                     {statusQuery.data?.isRemote ? (
-                      <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full" title={statusQuery.data.vmName ? `VM: ${statusQuery.data.vmName}` : undefined}>
+                      <span className="px-2 py-1 badge-bg-primary text-primary text-xs rounded-full" title={statusQuery.data.vmName ? `VM: ${statusQuery.data.vmName}` : undefined}>
                         Remote
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-500/20 text-content-subtle text-xs rounded-full">
+                      <span className="px-2 py-1 bg-muted text-content-subtle text-xs rounded-full">
                         Local
                       </span>
                     )}
                     <button
                       onClick={handleStopPlanning}
                       disabled={stopPlanningMutation.isPending}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-content text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                       title="Stop the planning agent"
                     >
                       <Square className="w-4 h-4" />
@@ -564,7 +585,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {/* Checking step - loading state while checking for active session */}
               {step === 'checking' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
-                  <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
+                  <Loader2 className="w-12 h-12 text-signal-review animate-spin mb-4" />
                   <p className="text-content-body">
                     {['In Planning', 'Planning', 'Discovery'].includes(issue.status)
                       ? 'Reconnecting to active planning session...'
@@ -581,15 +602,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {/* Ready step - start planning */}
               {step === 'ready' && (
                 <div className="flex-1 flex flex-col items-center p-8 pt-6 overflow-y-auto">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center mb-6">
-                    <Terminal className="w-10 h-10 text-purple-400" />
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-signal-review/20 to-primary/20 border border-signal-review/30 flex items-center justify-center mb-6">
+                    <Terminal className="w-10 h-10 text-signal-review" />
                   </div>
                   {/* Check if already in planning state */}
                   {['In Planning', 'Planning', 'Planned', 'Discovery'].includes(issue.status) ? (
                     <>
                       <h3 className="text-xl font-semibold text-content mb-2">Resume Planning Session</h3>
                       <p className="text-content-subtle text-center max-w-md mb-6">
-                        This issue is in <span className="text-purple-400 font-medium">"In Planning"</span> state.
+                        This issue is in <span className="text-signal-review font-medium">"In Planning"</span> state.
                         You can resume planning or abort to return to Todo.
                       </p>
 
@@ -597,12 +618,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         <h4 className="text-sm font-medium text-content-body mb-2">Options:</h4>
                         <ul className="space-y-2 text-sm text-content-subtle">
                           <li className="flex items-center gap-2">
-                            <Play className="w-4 h-4 text-purple-400" />
-                            <span><strong className="text-purple-400">Resume</strong> - Start a new planning agent session</span>
+                            <Play className="w-4 h-4 text-signal-review" />
+                            <span><strong className="text-signal-review">Resume</strong> - Start a new planning agent session</span>
                           </li>
                           <li className="flex items-center gap-2">
-                            <X className="w-4 h-4 text-orange-400" />
-                            <span><strong className="text-orange-400">Abort</strong> - Return issue to Todo (keeps workspace)</span>
+                            <X className="w-4 h-4 text-warning-foreground" />
+                            <span><strong className="text-warning-foreground">Abort</strong> - Return issue to Todo (keeps workspace)</span>
                           </li>
                         </ul>
                       </div>
@@ -613,7 +634,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             type="checkbox"
                             checked={watchPlanning}
                             onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
-                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                            className="w-4 h-4 rounded border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />
                           <span className="text-sm text-content-body">
                             Stay and watch planning
@@ -626,14 +647,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         <button
                           onClick={handleAbortPlanning}
                           disabled={abortPlanningMutation.isPending}
-                          className="flex items-center gap-2 px-5 py-3 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded-lg transition-colors font-medium disabled:opacity-50"
+                          className="flex items-center gap-2 px-5 py-3 badge-bg-warning hover:bg-warning/20 text-warning-foreground rounded-lg transition-colors font-medium disabled:opacity-50"
                         >
                           <X className="w-5 h-5" />
                           {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort Planning'}
                         </button>
                         <button
                           onClick={handleStartPlanning}
-                          className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors font-medium"
+                          className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-white rounded-lg transition-colors font-medium"
                         >
                           <Play className="w-5 h-5" />
                           Resume Planning
@@ -644,7 +665,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     <>
                       <h3 className="text-xl font-semibold text-content mb-2">Start Planning Session</h3>
                       <p className="text-content-subtle text-center max-w-md mb-6">
-                        This will move the issue to <span className="text-purple-400 font-medium">"In Planning"</span>,
+                        This will move the issue to <span className="text-signal-review font-medium">"In Planning"</span>,
                         create a workspace, and start an AI discovery session to help define the implementation plan.
                       </p>
 
@@ -652,15 +673,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         <h4 className="text-sm font-medium text-content-body mb-2">What happens:</h4>
                         <ul className="space-y-2 text-sm text-content-subtle">
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            <CheckCircle2 className="w-4 h-4 text-success" />
                             Issue moves to "In Planning" in {issue.source === 'github' ? 'GitHub' : 'Linear'}
                           </li>
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            <CheckCircle2 className="w-4 h-4 text-success" />
                             Git worktree created for feature branch
                           </li>
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            <CheckCircle2 className="w-4 h-4 text-success" />
                             Planning agent starts discovery conversation
                           </li>
                         </ul>
@@ -682,7 +703,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                                   setWorkspaceLocation('local');
                                   localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
                                 }}
-                                className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                                className="w-4 h-4 border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
                               />
                               <span className="text-sm text-content-body">Local</span>
                             </label>
@@ -696,7 +717,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                                   setWorkspaceLocation('remote');
                                   localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
                                 }}
-                                className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                                className="w-4 h-4 border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
                               />
                               <span className="text-sm text-content-body">Remote (Fly.io)</span>
                             </label>
@@ -709,7 +730,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             type="checkbox"
                             checked={watchPlanning}
                             onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
-                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                            className="w-4 h-4 rounded border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />
                           <span className="text-sm text-content-body">
                             Stay and watch planning
@@ -722,7 +743,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             type="checkbox"
                             checked={shadowMode}
                             onChange={(e) => setShadowMode(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                            className="w-4 h-4 rounded border-border bg-surface-overlay text-primary focus:ring-primary focus:ring-offset-background"
                           />
                           <span className="text-sm text-content-body">
                             Shadow Engineering
@@ -738,18 +759,64 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                               setStartDocker(e.target.checked);
                               localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
                             }}
-                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                            className="w-4 h-4 rounded border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />
                           <span className="text-sm text-content-body">
                             Start Docker containers
                             <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
                           </span>
                         </label>
+
+                        {/* Model override */}
+                        <div>
+                          <label className="text-sm font-medium text-content-body mb-1.5 block">Model</label>
+                          <select
+                            value={modelOverride}
+                            onChange={(e) => setModelOverride(e.target.value)}
+                            className="w-full px-3 py-2 bg-surface-overlay border border-border rounded-lg text-sm text-content-body focus:outline-none focus:ring-1 focus:ring-signal-review"
+                          >
+                            <option value="">Settings default ({defaultPlanningModel})</option>
+                            <optgroup label="Anthropic">
+                              <option value="claude-opus-4-6">Claude Opus 4.6</option>
+                              <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                              <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                            </optgroup>
+                            <optgroup label="Kimi">
+                              <option value="kimi-k2.5">Kimi K2.5</option>
+                            </optgroup>
+                          </select>
+                        </div>
+
+                        {/* Effort level */}
+                        <div>
+                          <label className="text-sm font-medium text-content-body mb-1.5 block">Effort</label>
+                          <div className="flex gap-2">
+                            {(['low', 'medium', 'high'] as const).map((level) => (
+                              <button
+                                key={level}
+                                type="button"
+                                onClick={() => setEffort(level)}
+                                className={`flex-1 py-1.5 text-sm rounded-lg border transition-colors capitalize ${
+                                  effort === level
+                                    ? 'bg-signal-review/20 border-signal-review text-signal-review font-medium'
+                                    : 'bg-surface-overlay border-border text-content-subtle hover:text-content-body hover:border-border/80'
+                                }`}
+                              >
+                                {level}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-content-muted mt-1">
+                            {effort === 'low' && 'Quick planning — concise tasks, minimal exploration'}
+                            {effort === 'medium' && 'Balanced — standard planning depth (default)'}
+                            {effort === 'high' && 'Deep analysis — thorough exploration, edge cases, tradeoffs'}
+                          </p>
+                        </div>
                       </div>
 
                       <button
                         onClick={handleStartPlanning}
-                        className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors font-medium"
+                        className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-white rounded-lg transition-colors font-medium"
                       >
                         <Play className="w-5 h-5" />
                         Start Planning
@@ -762,7 +829,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {/* Starting step — brief transition before SSE connects */}
               {step === 'starting' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
-                  <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
+                  <Loader2 className="w-12 h-12 text-signal-review animate-spin mb-4" />
                   <p className="text-content-body">Starting planning session...</p>
                   <p className="text-sm text-content-muted mt-2">Moving to In Planning, creating workspace, spawning agent</p>
                 </div>
@@ -806,7 +873,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full gap-2">
-                            <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                            <Loader2 className="w-5 h-5 animate-spin text-signal-review" />
                             <p className="text-sm text-content-body">Attaching to planning session...</p>
                             <p className="text-xs text-content-muted font-mono">planning-{issue.identifier.toLowerCase()}</p>
                           </div>
@@ -826,7 +893,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         onClick={() => setShowTasksPanel(!showTasksPanel)}
                         className={`flex items-center gap-1 px-3 py-1 text-sm rounded transition-colors ${
                           showTasksPanel
-                            ? 'bg-purple-600/30 text-purple-300 hover:bg-purple-600/40'
+                            ? 'badge-bg-signal-review text-signal-review-foreground hover:bg-signal-review/30'
                             : 'bg-surface-overlay hover:bg-surface-emphasis text-content-body'
                         }`}
                         title={showTasksPanel ? 'Back to terminal' : 'View vBRIEF tasks and dependency graph'}
@@ -837,7 +904,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       <button
                         onClick={handleAbortPlanning}
                         disabled={abortPlanningMutation.isPending}
-                        className="flex items-center gap-1 px-3 py-1 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 text-sm rounded transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 px-3 py-1 badge-bg-warning hover:bg-warning/20 text-warning-foreground text-sm rounded transition-colors disabled:opacity-50"
                         title="Stop planning and return to Todo"
                       >
                         <Square className="w-4 h-4" />
@@ -851,7 +918,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             statusQuery.refetch();
                           }}
                           disabled={stopPlanningMutation.isPending}
-                          className="flex items-center gap-1 px-3 py-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm rounded transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 px-3 py-1 badge-bg-success hover:bg-success/20 text-success-foreground text-sm rounded transition-colors disabled:opacity-50"
                           title="Done - mark planning complete"
                         >
                           <CheckCircle2 className="w-4 h-4" />
@@ -868,26 +935,36 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* Scrollable content area */}
                   <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-                      <CheckCircle2 className="w-10 h-10 text-green-400" />
+                    <div className="w-16 h-16 rounded-full badge-bg-success flex items-center justify-center mb-4">
+                      <CheckCircle2 className="w-10 h-10 text-success" />
                     </div>
                     <h3 className="text-xl font-semibold text-content mb-2">Planning Complete</h3>
                     <p className="text-content-subtle text-center max-w-md mb-6">
                       The planning session has ended. Review the plan and start the execution agent.
                     </p>
 
+                    {/* Beads warning — shown when beads creation failed during planning */}
+                    {beadsWarning && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
+                          <p className="text-sm text-yellow-300">{beadsWarning}</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* PRD Link */}
                     {getPrdPath() && (
-                      <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mb-6 max-w-md w-full">
+                      <div className="badge-bg-signal-review border badge-border-signal-review rounded-lg p-4 mb-6 max-w-md w-full">
                         <div className="flex items-center gap-3">
-                          <FileText className="w-8 h-8 text-purple-400" />
+                          <FileText className="w-8 h-8 text-signal-review" />
                           <div className="flex-1">
                             <p className="text-sm text-content-body font-medium">Feature Plan</p>
                             <p className="text-xs text-content-muted font-mono truncate">{getPrdPath()}</p>
                           </div>
                           <a
                             href={`vscode://file${getPrdPath()}`}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-content text-sm rounded-lg transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-signal-review hover:bg-signal-review/90 text-white text-sm rounded-lg transition-colors"
                             title="Open in VS Code"
                           >
                             <ExternalLink className="w-4 h-4" />
@@ -916,7 +993,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     <button
                       onClick={handleComplete}
                       disabled={startAgentMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-content rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
                     >
                       {startAgentMutation.isPending ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -932,11 +1009,11 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {/* Error step */}
               {step === 'error' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
-                  <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
-                    <AlertCircle className="w-10 h-10 text-red-400" />
+                  <div className="w-16 h-16 rounded-full badge-bg-destructive flex items-center justify-center mb-4">
+                    <AlertCircle className="w-10 h-10 text-destructive" />
                   </div>
                   <h3 className="text-xl font-semibold text-content mb-2">Planning Failed</h3>
-                  <p className="text-red-400 text-center max-w-md mb-2">{error}</p>
+                  <p className="text-destructive text-center max-w-md mb-2">{error}</p>
                   <p className="text-sm text-content-muted text-center max-w-md mb-6">
                     The planning agent could not start. You can retry or abort to return the issue to Todo.
                   </p>
@@ -951,7 +1028,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     <button
                       onClick={handleAbortPlanning}
                       disabled={abortPlanningMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 badge-bg-warning hover:bg-warning/20 text-warning-foreground rounded-lg transition-colors disabled:opacity-50"
                     >
                       <X className="w-4 h-4" />
                       {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort'}
@@ -963,7 +1040,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         startPlanningMutation.mutate();
                       }}
                       disabled={startPlanningMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-signal-review hover:bg-signal-review/90 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
                       <RefreshCw className="w-4 h-4" />
                       {startPlanningMutation.isPending ? 'Retrying...' : 'Retry'}

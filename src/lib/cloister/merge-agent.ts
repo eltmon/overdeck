@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { sendKeysAsync, sessionExists } from '../tmux.js';
+import { emitActivityEntry, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -255,11 +256,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
         projectPath,
         sourceBranch: sourceBranch ?? '',
         timestamp: Date.now(),
+        reason: 'post-merge',
+        trigger: 'merge-agent',
       });
       await writeFile(pendingFile, pendingData, 'utf-8');
       console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
 
-      const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? ''], {
+      // Pass 'post-merge' as the reason to the deploy script so it writes the
+      // restart marker. We spawn detached and return immediately — the deploy script
+      // kills this server. The new server reads the pending file on boot,
+      // emits lifecycle_started, and after processing emits lifecycle_complete/failed.
+      const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? '', 'post-merge'], {
         detached: true,
         stdio: 'ignore',
       });
@@ -654,21 +661,15 @@ function logMergeHistory(context: MergeConflictContext, result: MergeResult, ses
 }
 
 /**
- * Log activity to the dashboard activity log
+ * Log activity to the dashboard activity log (event-sourced via emitActivityEntry)
  */
-function logActivity(action: string, details: string): void {
-  const ACTIVITY_LOG = '/tmp/panopticon-activity.log';
-  try {
-    const entry = {
-      timestamp: new Date().toISOString(),
-      source: 'merge-agent',
-      action,
-      details,
-    };
-    appendFileSync(ACTIVITY_LOG, JSON.stringify(entry) + '\n');
-  } catch {
-    // Non-fatal
-  }
+function logActivity(action: string, details: string, issueId?: string): void {
+  emitActivityEntry({
+    source: 'merge-agent',
+    level: action.includes('fail') || action.includes('error') ? 'error' : action.includes('warn') ? 'warn' : 'success',
+    message: `[merge-agent] ${action}: ${details}`,
+    issueId,
+  });
 }
 
 /**
@@ -1520,23 +1521,40 @@ INSTRUCTIONS:
 
 1. cd ${workspacePath}
 2. git fetch origin ${baseBranch}
-3. git rebase origin/${baseBranch}
-4. If rebase has ANY conflicts:
+3. Check if rebase is needed:
+   \`\`\`bash
+   BEHIND=$(git rev-list --count HEAD..origin/${baseBranch})
+   echo "Commits behind origin/${baseBranch}: $BEHIND"
+   \`\`\`
+4. If BEHIND is 0: skip rebase entirely — branch is already up to date. Go to step 7.
+5. If BEHIND > 0: Remove .planning/ first (ephemeral artifacts always conflict), then rebase:
+   \`\`\`bash
+   git rm -rf .planning/ 2>/dev/null && git commit -m "chore: remove planning artifacts before rebase" 2>/dev/null
+   git rebase origin/${baseBranch}
+   \`\`\`
+6. If rebase has conflicts:
    a. Immediately abort: git rebase --abort
    b. Report FAILURE — do NOT attempt to resolve conflicts manually
-   c. The work agent or a human must resolve conflicts before merge can proceed
-5. If rebase succeeds cleanly: git push --force-with-lease origin ${featureBranch}
-6. Report completion by calling the Panopticon API:
+7. git push --force-with-lease origin ${featureBranch}
+8. Merge the PR via GitHub CLI (this is the ACTUAL merge to main):
+   \`\`\`bash
+   gh pr merge ${featureBranch} --squash
+   \`\`\`
+   Do NOT use --auto or --admin flags. Panopticon reports commit statuses via GitHub App,
+   so branch protection checks will pass automatically.
+   If this fails, report FAILURE — do NOT report success without a merged PR.
+9. Report completion by calling the Panopticon API:
    curl -s -X POST ${apiUrl}/api/specialists/done \\
      -H "Content-Type: application/json" \\
-     -d '{"specialist":"merge","issueId":"${issueId}","status":"passed","notes":"Rebase onto ${baseBranch} complete"}'
+     -d '{"specialist":"merge","issueId":"${issueId}","status":"passed","notes":"Rebased and merged PR via gh pr merge --squash"}'
 
 IMPORTANT:
 - Work ONLY in ${workspacePath} — do NOT modify the main repo
-- Do NOT run git merge — this is a rebase, not a merge
+- Do NOT run git merge locally — use gh pr merge --squash to merge via GitHub
 - Do NOT run build or tests — CI handles validation after PR merge
 - Use --force-with-lease (never --force) for the push
-- Report completion immediately after the push
+- The PR MUST be merged via gh pr merge before reporting success
+- Report completion immediately after the PR merge
 
 IF REBASE FAILS (conflicts):
 After aborting, report failure so the work agent can fix it:
@@ -1546,7 +1564,16 @@ curl -s -X POST ${apiUrl}/api/specialists/done \\
   -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"Rebase conflicts with main — work agent must run: git fetch origin main && git rebase origin/main, resolve conflicts, then resubmit"}'
 \`\`\`
 
-CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.`;
+IF gh pr merge FAILS:
+Report failure — do NOT report success:
+\`\`\`bash
+curl -s -X POST ${apiUrl}/api/specialists/done \\
+  -H "Content-Type: application/json" \\
+  -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"Rebase succeeded but gh pr merge --squash failed"}'
+\`\`\`
+
+CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
+CRITICAL: Success means the PR is MERGED on GitHub. Rebase alone is NOT success.`;
 
   // Resolve project for per-project ephemeral specialist
   const resolvedProject = resolveProjectFromIssue(issueId);

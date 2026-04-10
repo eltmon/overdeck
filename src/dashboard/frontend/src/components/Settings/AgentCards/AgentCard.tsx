@@ -22,11 +22,10 @@ export interface AgentCardProps {
 }
 
 const MODEL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  'kimi': { bg: 'bg-emerald-900/40', text: 'text-emerald-300', border: 'border-emerald-700/50' },
-  'claude': { bg: 'bg-orange-900/40', text: 'text-orange-300', border: 'border-orange-700/50' },
-  'gpt': { bg: 'bg-blue-900/40', text: 'text-blue-300', border: 'border-blue-700/50' },
-  'gemini': { bg: 'bg-purple-900/40', text: 'text-purple-300', border: 'border-purple-700/50' },
-  'glm': { bg: 'bg-red-900/40', text: 'text-red-300', border: 'border-red-700/50' },
+  'kimi': { bg: 'badge-bg-success', text: 'text-success-foreground', border: 'badge-border-success' },
+  'claude': { bg: 'badge-bg-warning', text: 'text-warning-foreground', border: 'badge-border-warning' },
+  'gpt': { bg: 'badge-bg-primary', text: 'text-primary', border: 'badge-border-primary' },
+  'gemini': { bg: 'badge-bg-signal-review', text: 'text-signal-review-foreground', border: 'badge-border-signal-review' },
 };
 
 function getModelStyle(model: ModelId) {
@@ -35,7 +34,6 @@ function getModelStyle(model: ModelId) {
   if (provider.includes('claude') || provider.includes('sonnet') || provider.includes('opus')) return MODEL_COLORS['claude'];
   if (provider.includes('gpt') || provider.includes('o1') || provider.includes('o3')) return MODEL_COLORS['gpt'];
   if (provider.includes('gemini')) return MODEL_COLORS['gemini'];
-  if (provider.includes('glm')) return MODEL_COLORS['glm'];
   return { bg: 'bg-surface-raised', text: 'text-content-body', border: 'border-divider' };
 }
 
@@ -137,7 +135,7 @@ export function AgentCard({
                         e.stopPropagation();
                         onRemoveOverride(phase.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-content-muted hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-content-muted hover:text-destructive transition-all"
                       title="Remove override"
                     >
                       <span className="material-symbols-outlined text-sm">close</span>

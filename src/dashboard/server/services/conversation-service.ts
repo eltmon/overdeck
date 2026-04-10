@@ -11,7 +11,16 @@ import { readdir, stat, readFile, watch } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
-import { calculateCost, getPricing } from '../../../lib/cost.js';
+import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+
+/** Detect AI provider from model name */
+function providerFromModel(model: string): AIProvider {
+  if (model.includes('gpt')) return 'openai';
+  if (model.includes('gemini')) return 'google';
+  if (model.includes('kimi') || model.toLowerCase().startsWith('minimax')) return 'custom';
+  return 'anthropic';
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,11 +39,11 @@ export interface ParseResult {
 
 /**
  * Encode a filesystem path to the Claude Code project directory name.
- * Claude encodes the CWD by replacing path separators with hyphens
- * (e.g. /home/user/Projects/foo → -home-user-Projects-foo).
+ * Delegates to the shared encodeClaudeProjectDir() which matches
+ * Claude Code's actual encoding (all non-alphanumeric chars → hyphens).
  */
 function encodeCwdToProjectDir(cwd: string): string {
-  return cwd.replace(/\//g, '-');
+  return encodeClaudeProjectDir(cwd);
 }
 
 /** Returns ~/.claude/projects/<encoded-cwd>/ */
@@ -196,15 +205,26 @@ export async function parseConversationMessages(
       } else if (Array.isArray(rawContent)) {
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
-            // Complete a pending WorkLogEntry
+            // Complete a pending WorkLogEntry with result content
             const pending = pendingToolUse.get(block.tool_use_id);
             if (pending) {
               pendingToolUse.delete(block.tool_use_id);
+              // Extract result text from tool_result content
+              let resultText: string | undefined;
+              if (typeof block.content === 'string') {
+                resultText = block.content;
+              } else if (Array.isArray(block.content)) {
+                resultText = (block.content as Array<{ type?: string; text?: string }>)
+                  .filter(b => b.type === 'text' && b.text)
+                  .map(b => b.text)
+                  .join('\n');
+              }
               workLog.push({
                 ...pending,
                 detail: block.is_error
-                  ? `Error: ${JSON.stringify(block.content)}`
+                  ? `Error: ${resultText ?? JSON.stringify(block.content)}`
                   : pending.detail,
+                result: resultText,
                 tone: block.is_error ? 'error' : pending.tone,
               });
             }
@@ -226,7 +246,7 @@ export async function parseConversationMessages(
 
       // Accumulate cost from usage data
       if (msg.usage && msg.model) {
-        const pricing = getPricing('anthropic', msg.model);
+        const pricing = getPricing(providerFromModel(msg.model), msg.model);
         if (pricing) {
           totalCost += calculateCost({
             inputTokens: msg.usage.input_tokens ?? 0,
@@ -267,7 +287,12 @@ export async function parseConversationMessages(
           // createdAt = when the user sent the request (for duration calculation)
           // completedAt = when this assistant response finished
           createdAt: lastUserTimestamp ?? entry.timestamp ?? new Date().toISOString(),
-          completedAt: msg.stop_reason === 'end_turn' ? (entry.timestamp ?? undefined) : undefined,
+          // Any terminal stop reason (end_turn, max_tokens, stop_sequence) marks the response as done.
+          // tool_use means more exchanges are coming, so leave completedAt unset.
+          // Use || fallback in case entry.timestamp is null (not just undefined).
+          completedAt: (msg.stop_reason && msg.stop_reason !== 'tool_use')
+            ? (entry.timestamp || new Date().toISOString())
+            : undefined,
           streaming: !msg.stop_reason,
         };
       }
@@ -293,6 +318,69 @@ export async function parseConversationMessages(
   }
 
   return { messages, workLog, byteOffset: newByteOffset, streaming, totalCost };
+}
+
+// ─── Compact boundary offset cache ───────────────────────────────────────────
+
+/**
+ * In-memory cache mapping JSONL file path → last compact_boundary byte offset.
+ * Persists across requests so we don't re-scan the entire file each time.
+ */
+const compactOffsetCache = new Map<string, { boundaryOffset: number; fileSize: number }>();
+
+/**
+ * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
+ *
+ * Uses an in-memory cache keyed by file path + size. When the file grows beyond
+ * the cached size, only the new portion is scanned. Returns 0 if no boundary found.
+ */
+export async function findLastCompactBoundary(sessionFile: string): Promise<number> {
+  const buffer = await readFile(sessionFile);
+  const fileSize = buffer.length;
+  const text = buffer.toString('utf-8');
+
+  const cached = compactOffsetCache.get(sessionFile);
+
+  // If file hasn't grown since last scan, return cached offset
+  if (cached && cached.fileSize === fileSize) {
+    return cached.boundaryOffset;
+  }
+
+  // Scan from the cached offset (or start) forward — compact boundaries only append
+  const scanFrom = cached?.boundaryOffset ?? 0;
+  let lastBoundaryOffset = cached?.boundaryOffset ?? 0;
+
+  // Walk through lines, tracking byte position
+  let bytePos = 0;
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (bytePos >= scanFrom && line.trim()) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+          lastBoundaryOffset = bytePos;
+        }
+      } catch { /* skip invalid lines */ }
+    }
+    bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+  }
+
+  compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, fileSize });
+  return lastBoundaryOffset;
+}
+
+/**
+ * Parse a JSONL session file starting from the last compact boundary.
+ *
+ * Returns only messages from the current context window — everything after
+ * the most recent compaction. For sessions that have never been compacted,
+ * returns all messages.
+ */
+export async function parseFromLastCompactBoundary(
+  sessionFile: string,
+): Promise<ParseResult> {
+  const boundaryOffset = await findLastCompactBoundary(sessionFile);
+  return parseConversationMessages(sessionFile, boundaryOffset);
 }
 
 // ─── File watcher ─────────────────────────────────────────────────────────────

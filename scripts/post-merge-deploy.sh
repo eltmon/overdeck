@@ -2,7 +2,7 @@
 # Post-merge deploy script: rebuild + restart dashboard after merge to main.
 # Called as a detached process by postMergeLifecycle() in merge-agent.ts.
 #
-# Usage: post-merge-deploy.sh <REPO_ROOT> <ISSUE_ID> <PROJECT_PATH> <SOURCE_BRANCH>
+# Usage: post-merge-deploy.sh <REPO_ROOT> <ISSUE_ID> <PROJECT_PATH> <SOURCE_BRANCH> [REASON]
 #
 # On success: exits 0 after health check passes.
 # On failure: exits 1 with error in log file.
@@ -13,11 +13,13 @@ REPO_ROOT="${1:?REPO_ROOT required}"
 ISSUE_ID="${2:?ISSUE_ID required}"
 PROJECT_PATH="${3:?PROJECT_PATH required}"
 SOURCE_BRANCH="${4:-}"
+REASON="${5:-post-merge}"
 
 LOG_FILE="/tmp/panopticon-deploy.log"
 LOCK_FILE="/tmp/panopticon-deploy.lock"
 HEALTH_URL="http://localhost:3011/api/health"
 HEALTH_TIMEOUT=30
+RESTART_MARKER="$HOME/.panopticon/dashboard-restarting.json"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*" | tee -a "$LOG_FILE"
@@ -30,7 +32,7 @@ if ! flock -x -n 9; then
   exit 0
 fi
 
-log "Starting post-merge deploy for issue=$ISSUE_ID branch=$SOURCE_BRANCH"
+log "Starting post-merge deploy for issue=$ISSUE_ID branch=$SOURCE_BRANCH reason=$REASON"
 log "Repo root: $REPO_ROOT"
 
 cd "$REPO_ROOT"
@@ -47,7 +49,21 @@ log "Build complete."
 log "Running npm link..."
 npm link >> "$LOG_FILE" 2>&1 || log "WARN: npm link failed (non-fatal)"
 
-# --- Step 3: Kill old server ---
+# --- Step 3: Write restart marker (BEFORE killing server) ---
+# The new server reads this on boot to emit dashboard.lifecycle_started.
+# This is the signal that the restart is planned, not a crash.
+mkdir -p "$(dirname "$RESTART_MARKER")"
+cat > "$RESTART_MARKER" << EOF
+{
+  "reason": "$REASON",
+  "issueId": "$ISSUE_ID",
+  "trigger": "deploy-script",
+  "timestamp": $(date +%s000)
+}
+EOF
+log "Restart marker written: $RESTART_MARKER"
+
+# --- Step 4: Kill old server ---
 log "Stopping old server processes..."
 for port in 3010 3011 3012; do
   fuser -k "${port}/tcp" >> "$LOG_FILE" 2>&1 || true
@@ -77,8 +93,11 @@ log "Waiting for server health check (${HEALTH_TIMEOUT}s timeout)..."
 for i in $(seq 1 "$HEALTH_TIMEOUT"); do
   if curl -s --max-time 2 "$HEALTH_URL" > /dev/null 2>&1; then
     log "Health check passed after ${i}s."
-    rm -f "$HOME/.panopticon/pending-post-merge.json" || true
-    log "Cleared pending post-merge marker."
+    # NOTE: The new server reads the pending file on boot, emits lifecycle_started,
+    # processes the lifecycle (including post-merge cleanup), emits lifecycle_completed,
+    # and then deletes the pending file itself. Do NOT delete it here.
+    rm -f "$RESTART_MARKER" || true
+    log "Cleared restart marker. New server will process pending lifecycle and emit lifecycle_complete."
     log "Post-merge deploy complete for issue=$ISSUE_ID."
     exit 0
   fi
@@ -86,4 +105,5 @@ for i in $(seq 1 "$HEALTH_TIMEOUT"); do
 done
 
 log "ERROR: Health check timed out after ${HEALTH_TIMEOUT}s. Check $LOG_FILE."
+rm -f "$RESTART_MARKER" || true
 exit 1

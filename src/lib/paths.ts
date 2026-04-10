@@ -120,6 +120,24 @@ export function isDevMode(): boolean {
   }
 }
 
+/**
+ * Encode a filesystem path to match Claude Code's project directory naming.
+ *
+ * Claude Code replaces ALL non-alphanumeric characters (except hyphens) with
+ * hyphens when encoding the CWD into the project directory name under
+ * ~/.claude/projects/. For example:
+ *
+ *   /Users/edward.becker/Projects → -Users-edward-becker-Projects
+ *   /home/eltmon/Projects         → -home-eltmon-Projects
+ *   /tmp/test_under.dot+plus@at   → -tmp-test-under-dot-plus-at
+ *
+ * This is critical for session file lookup — a mismatch means JSONL files
+ * are never found and conversation messages appear permanently empty.
+ */
+export function encodeClaudeProjectDir(cwdPath: string): string {
+  return cwdPath.replace(/[^a-zA-Z0-9-]/g, '-');
+}
+
 // All directories to create on init
 export const INIT_DIRS = [
   PANOPTICON_HOME,

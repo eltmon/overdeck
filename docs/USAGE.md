@@ -23,7 +23,7 @@
 ### Quick Install
 
 ```bash
-npm install -g panopticon-cli && pan install && pan sync && pan up
+npm install -g panopticon-cli && pan install && pan up
 ```
 
 **That's it!** Dashboard runs at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
@@ -261,8 +261,11 @@ Configure which local directory each Linear project maps to. Create/edit `~/.pan
 ### Dashboard Commands
 
 ```bash
-# Start dashboard
+# Start dashboard (prefers Electron desktop app if installed)
 pan up
+
+# Start server + open in system browser (no Electron)
+npx panopticon serve
 
 # Stop dashboard
 pan down
@@ -669,6 +672,49 @@ Configure Claude Code hooks for real-time agent monitoring:
 ```
 
 The heartbeat hook updates agent status in real-time on the dashboard.
+
+---
+
+## Desktop App
+
+The Panopticon desktop app wraps the dashboard in a native Electron window with system tray integration, native notifications, and automatic server embedding.
+
+### Installation
+
+- **Linux**: Download the `.AppImage` from the releases page. `pan up` detects it automatically if placed at `~/.local/bin/panopticon` or in `~/Applications/`.
+- **macOS**: Open the `.dmg` and drag `Panopticon.app` to `/Applications/`. `pan up` launches it automatically.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **System Tray** | Color-coded status indicator (green/yellow/red) + context menu |
+| **Native Notifications** | Per-event-type toggles (input needed, stuck agents, merge failures, etc.) |
+| **Auto-start** | Launch at login with a gentle nag flow (up to 5 reminders) |
+| **Cmd+K Palette** | Command palette for quick actions and workspace navigation |
+| **Desktop Settings** | Settings → Desktop App section for tray, notifications, and auto-start config |
+
+### `pan up` Electron Detection
+
+`pan up` checks for the desktop app before starting the server:
+
+1. Linux: `~/.local/bin/panopticon`, then `~/Applications/Panopticon*.AppImage`
+2. macOS: `/Applications/Panopticon.app`
+3. Windows: `%LOCALAPPDATA%\Programs\Panopticon`
+
+If found, it spawns the app detached and exits — the desktop app handles server startup internally. If not found, `pan up` starts the server normally.
+
+### Browser-Only Mode
+
+To skip Electron and use the system browser instead:
+
+```bash
+npx panopticon serve
+```
+
+This starts the server and opens it in your default browser after 1.5 seconds. Useful on headless servers or if you prefer the browser experience.
+
+📖 **[Full desktop app reference →](DESKTOP-APP.md)**
 
 ---
 

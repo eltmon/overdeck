@@ -29,16 +29,16 @@ async function fetchProjectSpecialists(): Promise<ProjectSpecialistStatus[]> {
 }
 
 const STATUS_CONFIG: Record<AgentHealth['status'], { icon: typeof CheckCircle; color: string; bg: string }> = {
-  healthy: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-900/30' },
-  warning: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-900/30' },
-  stuck: { icon: Clock, color: 'text-orange-400', bg: 'bg-orange-900/30' },
-  dead: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-900/30' },
+  healthy: { icon: CheckCircle, color: 'text-success', bg: 'badge-bg-success' },
+  warning: { icon: AlertTriangle, color: 'text-warning', bg: 'badge-bg-warning' },
+  stuck: { icon: Clock, color: 'text-warning', bg: 'badge-bg-warning' },
+  dead: { icon: XCircle, color: 'text-destructive', bg: 'badge-bg-destructive' },
 };
 
 const PROJECT_RUN_STATUS_CONFIG = {
-  passed: { icon: CheckCircle, color: 'text-green-400' },
-  failed: { icon: XCircle, color: 'text-red-400' },
-  blocked: { icon: AlertTriangle, color: 'text-yellow-400' },
+  passed: { icon: CheckCircle, color: 'text-success' },
+  failed: { icon: XCircle, color: 'text-destructive' },
+  blocked: { icon: AlertTriangle, color: 'text-warning' },
 } as const;
 
 export function HealthDashboard() {
@@ -65,7 +65,7 @@ export function HealthDashboard() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-400">Error: {(error as Error).message}</div>
+        <div className="text-destructive">Error: {(error as Error).message}</div>
       </div>
     );
   }
@@ -73,7 +73,7 @@ export function HealthDashboard() {
   if (!health || health.length === 0) {
     return (
       <div className="bg-surface-raised rounded-lg p-8 text-center">
-        <Activity className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+        <Activity className="w-12 h-12 text-content-muted mx-auto mb-4" />
         <h3 className="text-lg font-medium text-content-subtle">No agents to monitor</h3>
         <p className="text-sm text-content-muted mt-2">
           Health data will appear here when agents are running
@@ -122,7 +122,7 @@ export function HealthDashboard() {
       {projectSpecialists && projectSpecialists.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-content-subtle uppercase mb-3 flex items-center gap-2">
-            <Brain className="w-4 h-4 text-purple-400" />
+            <Brain className="w-4 h-4 text-signal-review" />
             Per-Project Specialists
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -135,20 +135,20 @@ export function HealthDashboard() {
                 <div
                   key={`${ps.projectKey}/${ps.specialistType}`}
                   className={`rounded-lg p-4 border border-divider ${
-                    ps.isRunning ? 'bg-green-900/20' : 'bg-surface-raised'
+                    ps.isRunning ? 'badge-bg-success' : 'bg-surface-raised'
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="font-medium text-content flex items-center gap-2">
-                        <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                        <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                           {ps.projectKey.toUpperCase()}
                         </span>
                         {ps.specialistType}
                       </div>
-                      <div className={`flex items-center gap-1 text-sm mt-1 ${ps.isRunning ? 'text-green-400' : 'text-content-muted'}`}>
+                      <div className={`flex items-center gap-1 text-sm mt-1 ${ps.isRunning ? 'text-success' : 'text-content-muted'}`}>
                         {ps.isRunning ? (
-                          <><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> Running</>
+                          <><span className="w-2 h-2 rounded-full bg-success animate-pulse" /> Running</>
                         ) : (
                           <><Clock className="w-3.5 h-3.5" /> Idle</>
                         )}
@@ -205,7 +205,7 @@ export function HealthDashboard() {
                 <div>
                   <div className="font-medium text-content flex items-center gap-2 flex-wrap">
                     {ephemeralMatch && (
-                      <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                      <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                         {ephemeralMatch[1].toUpperCase()}
                       </span>
                     )}
@@ -233,13 +233,13 @@ export function HealthDashboard() {
                 )}
                 <div className="flex justify-between text-content-subtle">
                   <span>Failures:</span>
-                  <span className={agent.consecutiveFailures > 0 ? 'text-orange-400' : ''}>
+                  <span className={agent.consecutiveFailures > 0 ? 'text-warning' : ''}>
                     {agent.consecutiveFailures}
                   </span>
                 </div>
                 <div className="flex justify-between text-content-subtle">
                   <span>Kill count:</span>
-                  <span className={agent.killCount > 0 ? 'text-red-400' : ''}>
+                  <span className={agent.killCount > 0 ? 'text-destructive' : ''}>
                     {agent.killCount}
                   </span>
                 </div>
@@ -250,9 +250,9 @@ export function HealthDashboard() {
                       Context:
                     </span>
                     <span className={
-                      agent.contextPercent >= 80 ? 'text-red-400' :
-                      agent.contextPercent >= 60 ? 'text-yellow-400' :
-                      'text-green-400'
+                      agent.contextPercent >= 80 ? 'text-destructive' :
+                      agent.contextPercent >= 60 ? 'text-warning' :
+                      'text-success'
                     }>
                       {agent.contextPercent}%
                     </span>

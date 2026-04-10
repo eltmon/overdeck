@@ -561,11 +561,20 @@ export async function spawnTestAgent(context: TestContext): Promise<TestResult> 
   // to report old failures from conversation history instead of re-running the tests.
   const launcherScript = join(testAgentDir, 'launcher.sh');
 
+  // Resolve model from work-type router
+  let testModel = 'claude-haiku-4-5';
+  try {
+    const { getModelId } = await import('../work-type-router.js');
+    testModel = getModelId('specialist-test-agent');
+  } catch { /* fall back */ }
+  const { getProviderExportsForModel } = await import('../agents.js');
+  const testProviderExports = getProviderExportsForModel(testModel);
+
   writeFileSync(launcherScript, `#!/bin/bash
 cd "${workingDir}"
 export PANOPTICON_AGENT_ID=test-agent
-prompt=$(cat "${promptFile}")
-exec claude --model haiku --dangerously-skip-permissions "$prompt" 2>&1 | tee "${outputFile}"
+${testProviderExports}prompt=$(cat "${promptFile}")
+exec claude --model ${testModel} --dangerously-skip-permissions "$prompt" 2>&1 | tee "${outputFile}"
 `, { mode: 0o755 });
 
   const tmuxSessionName = 'test-agent';

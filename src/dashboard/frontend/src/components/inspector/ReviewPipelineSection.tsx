@@ -1,4 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from './types';
 import { formatRelativeTime, isStale } from './utils';
 import { StatusHistory } from './StatusHistory';
@@ -11,8 +13,8 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
   return (
     <div className={`mb-2 p-2 rounded text-xs ${
       reviewStatus.updatedAt && isStale(reviewStatus.updatedAt)
-        ? 'bg-amber-900/20 border border-amber-700/30'
-        : 'bg-pan-border/50'
+        ? 'bg-surface-raised border border-warning/40'
+        : 'bg-surface-emphasis/50'
     }`}>
       {reviewStatus.updatedAt && isStale(reviewStatus.updatedAt) && (
         <div className="flex items-center gap-1 mb-1.5 text-amber-400 text-[10px]">
@@ -21,11 +23,11 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
         </div>
       )}
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-pan-text-secondary">Review:</span>
+        <span className="text-content-subtle">Review:</span>
         <span className={
-          reviewStatus.reviewStatus === 'passed' ? 'text-green-400' :
-          reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed' ? 'text-red-400' :
-          reviewStatus.reviewStatus === 'reviewing' ? 'text-yellow-400' : 'text-gray-500'
+          reviewStatus.reviewStatus === 'passed' ? 'text-success' :
+          reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed' ? 'text-destructive' :
+          reviewStatus.reviewStatus === 'reviewing' ? 'text-warning' : 'text-content-muted'
         }>
           {reviewStatus.reviewStatus === 'passed' ? '✓ Passed' :
            reviewStatus.reviewStatus === 'blocked' ? '✗ Blocked' :
@@ -34,12 +36,12 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
         </span>
       </div>
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-pan-text-secondary">Tests:</span>
+        <span className="text-content-subtle">Tests:</span>
         <span className={
-          reviewStatus.testStatus === 'passed' ? 'text-green-400' :
-          reviewStatus.testStatus === 'failed' ? 'text-red-400' :
-          reviewStatus.testStatus === 'dispatch_failed' ? 'text-red-400' :
-          reviewStatus.testStatus === 'testing' ? 'text-yellow-400' : 'text-gray-500'
+          reviewStatus.testStatus === 'passed' ? 'text-success' :
+          reviewStatus.testStatus === 'failed' ? 'text-destructive' :
+          reviewStatus.testStatus === 'dispatch_failed' ? 'text-destructive' :
+          reviewStatus.testStatus === 'testing' ? 'text-warning' : 'text-content-muted'
         }>
           {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
            reviewStatus.testStatus === 'failed' ? '✗ Failed' :
@@ -51,17 +53,17 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
       {reviewStatus.verificationStatus && reviewStatus.verificationStatus !== 'pending' && (
         <div className={`flex items-center gap-2 mb-1 ${
           reviewStatus.verificationStatus === 'failed'
-            ? 'bg-red-900/20 rounded px-1 -mx-1'
+            ? 'badge-bg-destructive rounded px-1 -mx-1'
             : reviewStatus.verificationStatus === 'running'
-            ? 'bg-yellow-900/10 rounded px-1 -mx-1'
+            ? 'badge-bg-warning rounded px-1 -mx-1'
             : ''
         }`}>
-          <span className="text-pan-text-secondary">Verify:</span>
+          <span className="text-content-subtle">Verify:</span>
           <span className={
-            reviewStatus.verificationStatus === 'passed' ? 'text-green-400' :
-            reviewStatus.verificationStatus === 'failed' ? 'text-red-400' :
-            reviewStatus.verificationStatus === 'skipped' ? 'text-gray-500' :
-            'text-yellow-400'
+            reviewStatus.verificationStatus === 'passed' ? 'text-success' :
+            reviewStatus.verificationStatus === 'failed' ? 'text-destructive' :
+            reviewStatus.verificationStatus === 'skipped' ? 'text-content-muted' :
+            'text-warning'
           }>
             {reviewStatus.verificationStatus === 'passed' ? '✓ Passed' :
              reviewStatus.verificationStatus === 'failed' ? '✗ Failed' :
@@ -69,19 +71,19 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
              '⟳ Running...'}
           </span>
           {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
-            <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= (reviewStatus.verificationMaxCycles ?? 3) ? 'text-red-400' : 'text-gray-500'}`}>
+            <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= (reviewStatus.verificationMaxCycles ?? 3) ? 'text-destructive' : 'text-content-muted'}`}>
               Attempt {reviewStatus.verificationCycleCount}/{reviewStatus.verificationMaxCycles ?? 3}
             </span>
           )}
         </div>
       )}
       {reviewStatus.verificationStatus === 'failed' && reviewStatus.verificationNotes && (
-        <div className="text-[10px] text-red-300 mt-0.5 ml-2">{reviewStatus.verificationNotes}</div>
+        <div className="text-[10px] text-destructive/80 mt-0.5 ml-2">{reviewStatus.verificationNotes}</div>
       )}
       {(reviewStatus.autoRequeueCount ?? 0) > 0 && (
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-pan-text-secondary">Cycles:</span>
-          <span className={(reviewStatus.autoRequeueCount ?? 0) >= 3 ? 'text-red-400 font-medium' : 'text-white'}>
+          <span className="text-content-subtle">Cycles:</span>
+          <span className={(reviewStatus.autoRequeueCount ?? 0) >= 3 ? 'text-destructive font-medium' : 'text-content'}>
             {reviewStatus.autoRequeueCount}/3
           </span>
           {(reviewStatus.autoRequeueCount ?? 0) >= 3 && (
@@ -91,8 +93,16 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
           )}
         </div>
       )}
-      {reviewStatus.reviewNotes && <div className="mt-1 text-xs text-pan-text-secondary">{reviewStatus.reviewNotes}</div>}
-      {reviewStatus.testNotes && <div className="mt-1 text-xs text-pan-text-secondary">{reviewStatus.testNotes}</div>}
+      {reviewStatus.reviewNotes && (
+        <div className="mt-2 text-xs text-content prose-notes">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{reviewStatus.reviewNotes}</ReactMarkdown>
+        </div>
+      )}
+      {reviewStatus.testNotes && (
+        <div className="mt-2 text-xs text-content prose-notes">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{reviewStatus.testNotes}</ReactMarkdown>
+        </div>
+      )}
       {reviewStatus.history && reviewStatus.history.length > 0 && <StatusHistory history={reviewStatus.history} />}
     </div>
   );

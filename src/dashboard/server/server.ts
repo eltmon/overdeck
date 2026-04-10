@@ -35,7 +35,7 @@ import { specialistsRouteLayer } from './routes/specialists.js'
 import { costsRouteLayer } from './routes/costs.js'
 import { cloisterRouteLayer } from './routes/cloister.js'
 import { resourcesRouteLayer } from './routes/resources.js'
-import { missionControlRouteLayer } from './routes/mission-control.js'
+import { commandDeckRouteLayer } from './routes/mission-control.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { metricsRouteLayer } from './routes/metrics.js'
@@ -185,7 +185,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   costsRouteLayer,
   cloisterRouteLayer,
   resourcesRouteLayer,
-  missionControlRouteLayer,
+  commandDeckRouteLayer,
   remoteRouteLayer,
   settingsRouteLayer,
   metricsRouteLayer,

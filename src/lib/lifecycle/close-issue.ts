@@ -17,6 +17,7 @@ import { promisify } from 'util';
 import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
+import { extractNumber, extractPrefix } from '../issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -207,8 +208,11 @@ async function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Promise
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNumber = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-    const issuePrefix = ctx.issueId.split('-')[0].toUpperCase();
+    const issueNumber = extractNumber(ctx.issueId);
+    const issuePrefix = extractPrefix(ctx.issueId);
+    if (issueNumber === null || issuePrefix === null) {
+      return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
+    }
     const results = await client.issues({
       filter: {
         number: { eq: issueNumber },
@@ -350,8 +354,11 @@ async function applyLabelLinear(ctx: LifecycleContext, apiKey: string): Promise<
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNum = parseInt(ctx.issueId.split('-').pop() || '0', 10);
-    const teamKey = ctx.issueId.split('-')[0].toUpperCase();
+    const issueNum = extractNumber(ctx.issueId);
+    const teamKey = extractPrefix(ctx.issueId);
+    if (issueNum === null || teamKey === null) {
+      return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
+    }
     const results = await client.issues({
       filter: {
         number: { eq: issueNum },

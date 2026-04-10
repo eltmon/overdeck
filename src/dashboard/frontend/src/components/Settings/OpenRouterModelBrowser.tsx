@@ -52,7 +52,7 @@ function ModelCard({
       className={cn(
         'flex items-start gap-3 p-3 rounded-lg border transition-colors',
         isFavorite
-          ? 'bg-amber-500/10 border-amber-500/30'
+          ? 'badge-bg-warning border-warning/30'
           : 'bg-surface-raised border-divider hover:border-divider-focus'
       )}
     >
@@ -62,7 +62,7 @@ function ModelCard({
         title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         className={cn(
           'mt-0.5 flex-shrink-0 transition-colors',
-          isFavorite ? 'text-amber-400 hover:text-amber-300' : 'text-text-muted hover:text-amber-400'
+          isFavorite ? 'text-warning hover:text-warning/80' : 'text-text-muted hover:text-warning'
         )}
       >
         {isFavorite ? <Star className="size-4 fill-current" /> : <StarOff className="size-4" />}
@@ -73,7 +73,7 @@ function ModelCard({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-sm text-text-primary truncate">{model.name}</span>
           {model.supportsThinking && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-400 border border-purple-500/30 flex-shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider badge-bg-signal-review text-signal-review-foreground border badge-border-signal-review flex-shrink-0">
               Thinking
             </span>
           )}
@@ -83,7 +83,7 @@ function ModelCard({
         {/* Metrics row */}
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
           {isFree ? (
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">
+            <span className="text-xs font-bold text-success-foreground badge-bg-success px-1.5 py-0.5 rounded border badge-border-success">
               FREE
             </span>
           ) : (
@@ -171,7 +171,7 @@ export function OpenRouterModelBrowser({
       {favoriteModels.length > 0 && (
         <div>
           <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Star className="size-3 fill-amber-400 text-amber-400" />
+            <Star className="size-3 fill-warning text-warning" />
             Favorites ({favoriteModels.length})
           </h4>
           <div className="space-y-2">

@@ -269,8 +269,7 @@ function extractCostEvents(
 
       if (entry.type !== 'assistant' || !entry.message?.usage) continue;
 
-      const requestId = entry.requestId;
-      if (!requestId) continue;
+      const requestId: string | undefined = entry.requestId ?? undefined;
 
       const usage = entry.message.usage;
       const model = entry.message.model || 'claude-sonnet-4';
@@ -285,6 +284,7 @@ function extractCostEvents(
       if (model.includes('gpt')) provider = 'openai';
       else if (model.includes('gemini')) provider = 'google';
       else if (model.includes('kimi')) provider = 'custom' as AIProvider;
+      else if (model.toLowerCase().startsWith('minimax')) provider = 'custom' as AIProvider;
 
       const pricing = getPricing(provider, model);
       if (!pricing) continue;

@@ -16,7 +16,8 @@ import { getDevrootPath } from '../config.js';
 import { getProject } from '../projects.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
-import { loadSettings, type ModelId } from '../settings.js';
+import type { ModelId } from '../settings.js';
+import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
@@ -82,13 +83,20 @@ function getProviderEnvForModel(model: string): Record<string, string> {
   const provider = getProviderForModel(model as ModelId);
   if (provider.name === 'anthropic') return {};
 
-  const settings = loadSettings();
-  const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
+  // OpenRouter has its own key path
+  if (provider.name === 'openrouter') {
+    const { config } = loadYamlConfig();
+    const apiKey = config.apiKeys.openrouter;
+    if (apiKey) return getProviderEnv(provider, apiKey);
+    throw new Error(`OpenRouter API key not configured. Add your key in Settings before using model "${model}".`);
+  }
+
+  const { config } = loadYamlConfig();
+  const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }
-  console.warn(`[specialist] No API key for ${provider.displayName}, falling back to Anthropic`);
-  return {};
+  throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
 }
 
 /**
@@ -390,6 +398,33 @@ export function getSessionId(name: SpecialistType, projectKey?: string): string 
  * @param sessionId - Session ID to store
  * @param projectKey - Optional project key (per-project specialists only)
  */
+/**
+ * Get the current session generation (for rotating session IDs).
+ * Returns 0 if no generation file exists.
+ */
+export function getSessionGeneration(name: SpecialistType, projectKey?: string): number {
+  const genFile = getSessionFilePath(name, projectKey) + '.gen';
+  if (!existsSync(genFile)) return 0;
+  try {
+    return parseInt(readFileSync(genFile, 'utf-8').trim(), 10) || 0;
+  } catch { return 0; }
+}
+
+/**
+ * Bump the session generation — next dispatch will use a new session ID.
+ * Old JSONL files are preserved (not deleted).
+ */
+export function bumpSessionGeneration(name: SpecialistType, projectKey?: string): number {
+  const genFile = getSessionFilePath(name, projectKey) + '.gen';
+  const dir = projectKey
+    ? join(SPECIALISTS_DIR, 'projects', projectKey)
+    : SPECIALISTS_DIR;
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const newGen = getSessionGeneration(name, projectKey) + 1;
+  writeFileSync(genFile, String(newGen));
+  return newGen;
+}
+
 export function setSessionId(name: SpecialistType, sessionId: string, projectKey?: string): void {
   const sessionFile = getSessionFilePath(name, projectKey);
   const dir = projectKey
@@ -637,11 +672,25 @@ ${basePrompt}`;
         const { getAgentRuntimeState } = await import('../agents.js');
         const existingState = getAgentRuntimeState(tmuxSession);
         if (existingState?.state === 'active') {
-          return {
-            success: false,
-            message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
-            error: 'specialist_busy',
-          };
+          // PAN-511: verify the session is actually running before treating it as busy.
+          // If state says 'active' but the process isn't alive (e.g. Claude Code crashed),
+          // the runtime.json is stale. Kill the dead session and spawn fresh instead of
+          // returning specialist_busy which would permanently block new dispatches.
+          const actuallyRunning = await isRunning(specialistType, projectKey);
+          if (actuallyRunning) {
+            return {
+              success: false,
+              message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
+              error: 'specialist_busy',
+            };
+          }
+          console.log(`[specialist] ${tmuxSession} state=active but not running — clearing stale state`);
+          const { saveAgentRuntimeState } = await import('../agents.js');
+          saveAgentRuntimeState(tmuxSession, {
+            state: 'idle',
+            lastActivity: new Date().toISOString(),
+            currentIssue: undefined,
+          });
         }
         // Stale session — kill it before spawning fresh
         console.log(`[specialist] Killing stale ${tmuxSession} session before respawn`);
@@ -691,12 +740,12 @@ ${basePrompt}`;
     const promptFile = join(agentDir, 'task-prompt.md');
     writeFileSync(promptFile, taskPrompt);
 
-    // Deterministic session ID: same specialist + project always gets the same UUID.
-    // The UUID is computed from the identity string — no session file needed for dispatch.
-    // --resume is always the default (session exists from prior runs).
-    // On very first cold start, --resume fails and the launcher falls back to --session-id.
-    const sessionName = `specialist-${projectKey}-${specialistType}`;
-    const sessionId = deterministicUUID(sessionName);
+    // Deterministic session ID: same specialist + project + generation gets the same UUID.
+    // Bumping the generation (via API) rotates to a fresh session without deleting old JONLs.
+    // Fresh session every dispatch (PAN-612: thinking signature corruption).
+    // Use randomUUID so each dispatch gets a unique session — deterministic UUIDs
+    // collide with --session-id when a prior session with that ID already exists.
+    const sessionId = randomUUID();
 
     // Write session file for informational purposes (pan specialists list)
     setSessionId(specialistType, sessionId, projectKey);
@@ -712,10 +761,12 @@ ${basePrompt}`;
     const innerScript = join(agentDir, 'run-claude.sh');
 
     // Inner script: the actual Claude invocation.
-    // test-agent NEVER resumes — each test run is stateless and must start fresh to avoid
-    // reporting cached analysis from prior runs (accumulated history caused repeated false-FAILs
-    // even after the underlying bug was fixed). All other specialists accumulate context.
-    const useResume = specialistType !== 'test-agent';
+    // ALL specialists start fresh sessions — no --resume. Reasons:
+    // 1. Context compaction corrupts thinking block signatures, making resumed sessions
+    //    permanently fail with "Invalid signature in thinking block" (PAN-612)
+    // 2. Specialists are task-based: each dispatch is a new task with a full prompt
+    // 3. Accumulated context caused false-FAILs in test-agent (stale analysis)
+    // Session ID is still deterministic per generation, so JSONL files are predictable.
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
@@ -724,16 +775,8 @@ export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
 prompt=$(cat "${promptFile}")
 
-${useResume ? `# Resume existing session (accumulates context over time)
-claude ${permissionFlags} --resume "${sessionId}" --model ${model} "$prompt"
-exit_code=$?
-
-# First cold start: session doesn't exist yet in Claude's storage
-if [ $exit_code -ne 0 ]; then
-  echo "[launcher] First run — creating session"
-  claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
-fi` : `# test-agent: always fresh session — no --resume to prevent stale result reporting
-claude ${permissionFlags} --model ${model} "$prompt"`}
+# Fresh session every dispatch — no --resume (PAN-612: thinking signature corruption)
+claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
 
 # Signal completion
 echo ""
@@ -789,9 +832,9 @@ script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
 /**
  * Shared test-agent prompt builder — used by both buildTaskPrompt (ephemeral spawn)
  * and wakeSpecialistWithTask (queue-based wake). Extracted to avoid the bug where
- * ephemeral test specialists got empty prompts.
+ * ephemeral test specialists got empty prompts (PAN-511).
  */
-async function buildTestAgentPromptContent(task: {
+export async function buildTestAgentPromptContent(task: {
   issueId: string;
   branch?: string;
   workspace?: string;
@@ -1978,14 +2021,13 @@ export async function wakeSpecialist(
         : '--dangerously-skip-permissions';
 
       // Start with --resume if we have a session, otherwise generate a new session ID
-      let claudeCmd: string;
-      if (sessionId) {
-        claudeCmd = `claude --resume "${sessionId}" ${modelFlag} ${permissionFlags}`;
-      } else {
-        const newSessionId = randomUUID();
-        claudeCmd = `claude --session-id "${newSessionId}" ${modelFlag} ${permissionFlags}`;
-        setSessionId(name, newSessionId);
-      }
+      // Always start fresh — no --resume. Context compaction corrupts thinking block
+      // signatures, making resumed sessions permanently fail (PAN-612).
+      // Always use randomUUID — deterministic IDs collide with --session-id when
+      // a prior session with that ID already exists in Claude's storage.
+      const freshSessionId = randomUUID();
+      setSessionId(name, freshSessionId);
+      const claudeCmd = `claude --session-id "${freshSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });

@@ -23,7 +23,7 @@ interface BadgeBarProps {
 }
 
 async function fetchPlanning(issueId: string): Promise<PlanningData> {
-  const res = await fetch(`/api/mission-control/planning/${issueId}`);
+  const res = await fetch(`/api/command-deck/planning/${issueId}`);
   if (!res.ok) throw new Error('Failed to fetch planning');
   return res.json();
 }
@@ -36,7 +36,7 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
   const [generatingStatus, setGeneratingStatus] = useState(false);
 
   const { data: planning, refetch } = useQuery({
-    queryKey: ['mission-control-planning', issueId],
+    queryKey: ['command-deck-planning', issueId],
     queryFn: () => fetchPlanning(issueId),
     refetchInterval: 30000,
   });
@@ -52,7 +52,7 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
 
       for (const tracker of trackers) {
         try {
-          const res = await fetch(`/api/mission-control/planning/${issueId}/sync-discussions`, {
+          const res = await fetch(`/api/command-deck/planning/${issueId}/sync-discussions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tracker }),
@@ -82,7 +82,7 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
       // The backend checks a content hash — if nothing changed, it returns the cached review instantly
       setGeneratingStatus(true);
       try {
-        const statusRes = await fetch(`/api/mission-control/planning/${issueId}/status-review`, { method: 'POST' });
+        const statusRes = await fetch(`/api/command-deck/planning/${issueId}/status-review`, { method: 'POST' });
         if (statusRes.ok) {
           const statusData = await statusRes.json();
           const wasCached = statusData.cached;
@@ -164,7 +164,7 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
               // Generate a new status review
               setGeneratingStatus(true);
               try {
-                const res = await fetch(`/api/mission-control/planning/${issueId}/status-review`, { method: 'POST' });
+                const res = await fetch(`/api/command-deck/planning/${issueId}/status-review`, { method: 'POST' });
                 if (res.ok) {
                   const data = await res.json();
                   setShowModal({ title: 'Status Review', content: data.statusReview });

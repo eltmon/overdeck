@@ -43,7 +43,7 @@ export function TldrServiceStatus() {
   if (error) {
     return (
       <div className="bg-surface-raised rounded-lg p-4 border border-divider">
-        <div className="flex items-center gap-2 text-red-400">
+        <div className="flex items-center gap-2 text-destructive">
           <XCircle className="w-4 h-4" />
           <span className="text-sm">TLDR status unavailable</span>
         </div>
@@ -89,13 +89,13 @@ function DaemonCard({ daemon, label }: { daemon: TldrDaemonStatus; label: string
   const isHealthy = daemon.running && daemon.healthy;
 
   return (
-    <div className={`rounded-lg p-4 border ${isHealthy ? 'bg-green-900/30 border-green-800/30' : 'bg-surface-raised border-divider'}`}>
+    <div className={`rounded-lg p-4 border ${isHealthy ? 'badge-bg-success border-success/30' : 'bg-surface-raised border-divider'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isHealthy ? (
-            <CheckCircle className="w-5 h-5 text-green-400" />
+            <CheckCircle className="w-5 h-5 text-success" />
           ) : (
-            <XCircle className="w-5 h-5 text-gray-400" />
+            <XCircle className="w-5 h-5 text-text-muted" />
           )}
           <div>
             <div className="font-medium text-content">{label}</div>

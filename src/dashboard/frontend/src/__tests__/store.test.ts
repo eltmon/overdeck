@@ -276,7 +276,7 @@ describe('selectIssuesByCycle', () => {
   ]
   const state: DashboardState = { ...emptyState, issuesRaw: issues }
 
-  it('excludes canceled issues but keeps done when includeCompleted=false', () => {
+  it('excludes canceled issues when includeCompleted=false (done issues stay visible)', () => {
     const result = selectIssuesByCycle('current', false)(state) as Array<{ id: string }>
     expect(result.map(i => i.id)).toEqual(['PAN-1', 'PAN-2', 'PAN-3', 'PAN-5'])
   })
@@ -294,6 +294,7 @@ describe('selectIssuesByCycle', () => {
     ]
     const s: DashboardState = { ...emptyState, issuesRaw: mixedIssues }
     const result = selectIssuesByCycle('all', false)(s) as Array<{ id: string }>
+    // Done issues are always visible (PAN-500); only canceled filtered out
     expect(result.map(i => i.id)).toEqual(['A', 'C'])
   })
 

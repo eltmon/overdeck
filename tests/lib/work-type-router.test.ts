@@ -80,7 +80,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']), // OpenAI disabled
           apiKeys: {},
           overrides: {
-            'issue-agent:implementation': 'gpt-4o', // Override with disabled provider
+            'issue-agent:implementation': 'gpt-5.4', // Override with disabled provider
           },
           geminiThinkingLevel: 3,
         };
@@ -92,7 +92,7 @@ describe('work-type-router', () => {
         expect(result.model).toMatch(/^claude-/);
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(true);
-        expect(result.originalModel).toBe('gpt-4o');
+        expect(result.originalModel).toBe('gpt-5.4');
       });
 
       it('should apply fallback to overrides', () => {
@@ -100,7 +100,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']), // OpenAI disabled
           apiKeys: {},
           overrides: {
-            'issue-agent:testing': 'gpt-4o', // Override with disabled provider
+            'issue-agent:testing': 'gpt-5.4', // Override with disabled provider
           },
           geminiThinkingLevel: 3,
         };
@@ -111,7 +111,7 @@ describe('work-type-router', () => {
         expect(result.model).toMatch(/^claude-/); // Fallback to enabled provider
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(true);
-        expect(result.originalModel).toBe('gpt-4o');
+        expect(result.originalModel).toBe('gpt-5.4');
       });
 
       it('should throw on invalid work type', () => {
@@ -206,7 +206,6 @@ describe('work-type-router', () => {
         expect(providers.has('anthropic')).toBe(true);
         expect(providers.has('openai')).toBe(true);
         expect(providers.has('google')).toBe(true);
-        expect(providers.has('zai')).toBe(false);
       });
     });
 
@@ -402,7 +401,7 @@ describe('work-type-router', () => {
         enabledProviders: new Set<ModelProvider>(['anthropic']), // No OpenAI
         apiKeys: {},
         overrides: {
-          'issue-agent:testing': 'gpt-4o', // Override requires OpenAI
+          'issue-agent:testing': 'gpt-5.4', // Override requires OpenAI
         },
         geminiThinkingLevel: 3,
       };
@@ -414,18 +413,17 @@ describe('work-type-router', () => {
       expect(result.source).toBe('override');
       expect(result.model).toMatch(/^claude-/); // Fallback
       expect(result.usedFallback).toBe(true);
-      expect(result.originalModel).toBe('gpt-4o');
+      expect(result.originalModel).toBe('gpt-5.4');
     });
   });
 
   describe('multi-provider scenarios', () => {
     it('should work with all providers enabled', () => {
       const config: NormalizedConfig = {
-        enabledProviders: new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai']),
+        enabledProviders: new Set<ModelProvider>(['anthropic', 'openai', 'google']),
         apiKeys: {
           openai: 'sk-test',
           google: 'test',
-          zai: 'test',
         },
         overrides: {},
         geminiThinkingLevel: 3,
@@ -476,7 +474,7 @@ describe('work-type-router', () => {
 
       // Smart selector picks best model from enabled providers
       const explore = router.getModel('issue-agent:exploration');
-      expect(explore.model).toBe('gemini-3-flash-preview');
+      expect(explore.model).toBe('gemini-3-flash');
       expect(explore.usedFallback).toBe(false);
 
       // Smart selector picks best implementation model from anthropic+google

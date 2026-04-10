@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, rmdirSync, statSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, rmdirSync, statSync, renameSync, unlinkSync, lstatSync } from 'fs';
 import { join, dirname, basename, extname, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -249,7 +249,7 @@ async function createWorktree(
     await execAsync('git restore .', { cwd: targetPath }).catch(() => {});
 
     // Configure beads role so agents don't get "beads.role not configured" warnings
-    await execAsync('git config beads.role agent', { cwd: targetPath }).catch(() => {});
+    await execAsync('git config beads.role contributor', { cwd: targetPath }).catch(() => {});
 
     return { success: true, message: `Created worktree at ${targetPath}` };
   } catch (error) {
@@ -525,24 +525,40 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Handle polyrepo vs monorepo
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
-    // Create worktrees for each repo
-    for (const repo of workspaceConfig.repos) {
-      // Resolve symlinks to get the actual git repository path
-      // (e.g., myn/frontend -> ../frontend needs to resolve to actual path)
+    // Determine which repos to create: in progressive mode, only always_include repos
+    const reposToCreate = workspaceConfig.progressive && workspaceConfig.always_include
+      ? workspaceConfig.repos.filter(r => workspaceConfig.always_include!.includes(r.name))
+      : workspaceConfig.repos;
+
+    // Create worktrees/symlinks for each repo
+    for (const repo of reposToCreate) {
       const rawRepoPath = join(projectConfig.path, repo.path);
       const repoPath = existsSync(rawRepoPath) ? realpathSync(rawRepoPath) : rawRepoPath;
       const targetPath = join(workspacePath, repo.name);
-      const branchPrefix = repo.branch_prefix || 'feature/';
-      const branchName = `${branchPrefix}${featureName}`;
-      // Per-repo default_branch overrides workspace-level, falls back to 'main'
-      const defaultBranch = repo.default_branch || workspaceConfig.default_branch || 'main';
 
-      const worktreeResult = await createWorktree(repoPath, targetPath, branchName, defaultBranch);
-      if (worktreeResult.success) {
-        result.steps.push(`Created worktree for ${repo.name}: ${branchName} (from ${defaultBranch})`);
+      if (repo.link_type === 'symlink') {
+        // Symlink for meta/docs repos - no git worktree, no feature branch
+        try {
+          symlinkSync(repoPath, targetPath);
+          result.steps.push(`Created symlink for ${repo.name} (readonly, no feature branch)`);
+        } catch (symlinkErr: any) {
+          result.errors.push(`${repo.name}: ${symlinkErr.message}`);
+          result.success = false;
+        }
       } else {
-        result.errors.push(`${repo.name}: ${worktreeResult.message}`);
-        result.success = false; // Fail the entire workspace creation if any worktree fails
+        // Worktree for regular repos
+        const branchPrefix = repo.branch_prefix || 'feature/';
+        const branchName = `${branchPrefix}${featureName}`;
+        // Per-repo default_branch overrides workspace-level, falls back to 'main'
+        const defaultBranch = repo.default_branch || workspaceConfig.default_branch || 'main';
+
+        const worktreeResult = await createWorktree(repoPath, targetPath, branchName, defaultBranch);
+        if (worktreeResult.success) {
+          result.steps.push(`Created worktree for ${repo.name}: ${branchName} (from ${defaultBranch})`);
+        } else {
+          result.errors.push(`${repo.name}: ${worktreeResult.message}`);
+          result.success = false; // Fail the entire workspace creation if any worktree fails
+        }
       }
     }
   } else {
@@ -954,6 +970,103 @@ export function preTrustDirectory(dirPath: string): void {
   writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
 }
 
+export interface AddReposToWorkspaceOptions {
+  projectConfig: ProjectConfig;
+  featureName: string;
+  repoNames: string[];
+  dryRun?: boolean;
+}
+
+export interface AddReposToWorkspaceResult {
+  success: boolean;
+  errors: string[];
+  steps: string[];
+}
+
+/**
+ * Add repositories to an existing progressive polyrepo workspace.
+ * Used when an agent needs repos beyond the initial always_include set.
+ */
+export async function addReposToWorkspace(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
+  const { projectConfig, featureName, repoNames, dryRun } = options;
+  const result: AddReposToWorkspaceResult = {
+    success: true,
+    errors: [],
+    steps: [],
+  };
+
+  const workspaceConfig = projectConfig.workspace;
+  if (!workspaceConfig || workspaceConfig.type !== 'polyrepo' || !workspaceConfig.repos) {
+    result.success = false;
+    result.errors.push('Project does not use polyrepo workspace configuration');
+    return result;
+  }
+
+  const workspacesDir = join(projectConfig.path, workspaceConfig.workspaces_dir || 'workspaces');
+  const workspacePath = join(workspacesDir, `feature-${featureName}`);
+
+  if (!existsSync(workspacePath)) {
+    result.success = false;
+    result.errors.push(`Workspace not found at ${workspacePath}`);
+    return result;
+  }
+
+  if (dryRun) {
+    result.steps.push(`[DRY RUN] Would add repos to workspace at: ${workspacePath}`);
+    return result;
+  }
+
+  // Find the repos to add
+  const reposToAdd = workspaceConfig.repos.filter(r => repoNames.includes(r.name));
+  const unknownRepos = repoNames.filter(name => !reposToAdd.some(r => r.name === name));
+
+  if (unknownRepos.length > 0) {
+    result.errors.push(`Unknown repos: ${unknownRepos.join(', ')}`);
+    result.success = false;
+  }
+
+  // Check which repos are already in the workspace
+  const existingEntries = readdirSync(workspacePath).filter(f => {
+    const fullPath = join(workspacePath, f);
+    return f !== '.planning' && f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+  });
+
+  for (const repo of reposToAdd) {
+    if (existingEntries.includes(repo.name)) {
+      result.steps.push(`Skipped ${repo.name}: already exists in workspace`);
+      continue;
+    }
+
+    const rawRepoPath = join(projectConfig.path, repo.path);
+    const repoPath = existsSync(rawRepoPath) ? realpathSync(rawRepoPath) : rawRepoPath;
+    const targetPath = join(workspacePath, repo.name);
+
+    if (repo.link_type === 'symlink') {
+      try {
+        symlinkSync(repoPath, targetPath);
+        result.steps.push(`Added symlink for ${repo.name} (readonly)`);
+      } catch (symlinkErr: any) {
+        result.errors.push(`${repo.name}: ${symlinkErr.message}`);
+        result.success = false;
+      }
+    } else {
+      const branchPrefix = repo.branch_prefix || 'feature/';
+      const branchName = `${branchPrefix}${featureName}`;
+      const defaultBranch = repo.default_branch || workspaceConfig.default_branch || 'main';
+
+      const worktreeResult = await createWorktree(repoPath, targetPath, branchName, defaultBranch);
+      if (worktreeResult.success) {
+        result.steps.push(`Added worktree for ${repo.name}: ${branchName} (from ${defaultBranch})`);
+      } else {
+        result.errors.push(`${repo.name}: ${worktreeResult.message}`);
+        result.success = false;
+      }
+    }
+  }
+
+  return result;
+}
+
 export interface WorkspaceRemoveOptions {
   projectConfig: ProjectConfig;
   featureName: string;
@@ -1130,16 +1243,29 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   // Remove worktrees
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     for (const repo of workspaceConfig.repos) {
-      const repoPath = join(projectConfig.path, repo.path);
       const targetPath = join(workspacePath, repo.name);
-      const branchPrefix = repo.branch_prefix || 'feature/';
-      const branchName = `${branchPrefix}${featureName}`;
 
-      const worktreeResult = await removeWorktree(repoPath, targetPath, branchName);
-      if (worktreeResult.success) {
-        result.steps.push(`Removed worktree for ${repo.name}`);
-      } else {
-        result.errors.push(worktreeResult.message);
+      // Check if this is a symlink (e.g., meta repo symlinked, not a worktree)
+      if (existsSync(targetPath) && lstatSync(targetPath).isSymbolicLink()) {
+        // Symlink - just unlink it
+        try {
+          unlinkSync(targetPath);
+          result.steps.push(`Removed symlink for ${repo.name}`);
+        } catch (unlinkErr: any) {
+          result.errors.push(`${repo.name}: ${unlinkErr.message}`);
+        }
+      } else if (existsSync(targetPath)) {
+        // Worktree - remove via git worktree remove
+        const repoPath = join(projectConfig.path, repo.path);
+        const branchPrefix = repo.branch_prefix || 'feature/';
+        const branchName = `${branchPrefix}${featureName}`;
+
+        const worktreeResult = await removeWorktree(repoPath, targetPath, branchName);
+        if (worktreeResult.success) {
+          result.steps.push(`Removed worktree for ${repo.name}`);
+        } else {
+          result.errors.push(worktreeResult.message);
+        }
       }
     }
   } else {

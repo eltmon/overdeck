@@ -42,6 +42,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'convoy:security-reviewer': 'claude-opus-4-6', // SAFETY CRITICAL
     'convoy:performance-reviewer': 'claude-sonnet-4-6',
     'convoy:correctness-reviewer': 'claude-sonnet-4-6',
+    'convoy:requirements-reviewer': 'claude-sonnet-4-6',
     'convoy:synthesis-agent': 'claude-sonnet-4-6',
 
     // Subagents - speed-optimized (Haiku 2x faster, 1/3 cost)
@@ -82,8 +83,8 @@ export interface ApiSettingsConfig {
       anthropic: boolean;
       openai: boolean;
       google: boolean;
-      zai: boolean;
       kimi: boolean;
+      minimax: boolean;
       openrouter: boolean;
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
@@ -92,8 +93,8 @@ export interface ApiSettingsConfig {
   api_keys: {
     openai?: string;
     google?: string;
-    zai?: string;
     kimi?: string;
+    minimax?: string;
     openrouter?: string;
   };
   openrouter?: {
@@ -131,11 +132,11 @@ export function loadSettingsApi(): ApiSettingsConfig {
   return {
     models: {
       providers: {
-        anthropic: true, // Always enabled
+        anthropic: config.enabledProviders.has('anthropic'),
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
-        zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
+        minimax: config.enabledProviders.has('minimax'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
       overrides: config.overrides,
@@ -161,8 +162,8 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
         anthropic: settings.models.providers.anthropic,
         openai: settings.models.providers.openai,
         google: settings.models.providers.google,
-        zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
+        minimax: settings.models.providers.minimax,
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
@@ -243,11 +244,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   // Validate providers
   if (!settings.models?.providers) {
     errors.push('Missing providers configuration');
-  } else {
-    // Anthropic must always be enabled
-    if (settings.models.providers.anthropic !== true) {
-      errors.push('Anthropic provider must be enabled');
-    }
   }
 
   // Validate overrides - check that model IDs are valid (including deprecated ones)
@@ -284,54 +280,68 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   };
 }
 
+type ProviderModelEntry = { id: ModelId; name: string; costPer1MTokens: number };
+
+export interface AvailableModelsResult {
+  anthropic: ProviderModelEntry[];
+  openai: ProviderModelEntry[];
+  google: ProviderModelEntry[];
+  kimi: ProviderModelEntry[];
+  minimax: ProviderModelEntry[];
+  openrouter: ProviderModelEntry[];
+  /**
+   * Per-provider usability: true = provider is enabled and has credentials
+   * (or subscription), false = missing key or not enabled.
+   */
+  usable: {
+    anthropic: boolean;
+    openai: boolean;
+    google: boolean;
+    kimi: boolean;
+    minimax: boolean;
+    openrouter: boolean;
+  };
+}
+
 /**
- * Get available models by provider (for model selection UI)
+ * Get available models by provider (for model selection UI).
+ *
+ * Always returns the full model list for every provider so the UI can show
+ * what's available. The `usable` map tells the UI which providers actually
+ * have credentials configured so it can highlight or auto-select accordingly.
+ *
+ * @param anthropicAuthed - true if the user has an active Claude Code
+ *   subscription session or ANTHROPIC_API_KEY set.
  */
-export function getAvailableModelsApi(): {
-  anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-} {
-  const result: {
-    anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  } = {
+export function getAvailableModelsApi(anthropicAuthed = false): AvailableModelsResult {
+  const { config } = loadConfig();
+
+  const result: AvailableModelsResult = {
     anthropic: [],
     openai: [],
     google: [],
-    zai: [],
     kimi: [],
+    minimax: [],
     openrouter: [],
+    usable: {
+      anthropic: anthropicAuthed,
+      openai: config.enabledProviders.has('openai') && !!config.apiKeys.openai,
+      google: config.enabledProviders.has('google') && !!config.apiKeys.google,
+      kimi: config.enabledProviders.has('kimi') && !!config.apiKeys.kimi,
+      minimax: config.enabledProviders.has('minimax') && !!config.apiKeys.minimax,
+      openrouter: config.enabledProviders.has('openrouter') && !!config.apiKeys.openrouter,
+    },
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const entry: ProviderModelEntry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
     switch (capability.provider) {
-      case 'anthropic':
-        result.anthropic.push(entry);
-        break;
-      case 'openai':
-        result.openai.push(entry);
-        break;
-      case 'google':
-        result.google.push(entry);
-        break;
-      case 'zai':
-        result.zai.push(entry);
-        break;
-      case 'kimi':
-        result.kimi.push(entry);
-        break;
-      case 'openrouter':
-        result.openrouter.push(entry);
-        break;
+      case 'anthropic': result.anthropic.push(entry); break;
+      case 'openai': result.openai.push(entry); break;
+      case 'google': result.google.push(entry); break;
+      case 'kimi': result.kimi.push(entry); break;
+      case 'minimax': result.minimax.push(entry); break;
+      case 'openrouter': result.openrouter.push(entry); break;
     }
   }
 
@@ -348,8 +358,8 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         anthropic: true,
         openai: false,
         google: false,
-        zai: false,
         kimi: true, // Kimi K2.5 used for implementation work agent
+        minimax: false,
         openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
@@ -357,6 +367,53 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
     },
     api_keys: {},
     tracker_keys: {},
+  };
+}
+
+/**
+ * MiniMax-optimized defaults: use MiniMax M2.7 for all work, Anthropic disabled
+ */
+export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
+  return {
+    models: {
+      providers: {
+        anthropic: false,
+        openai: false,
+        google: false,
+        kimi: false,
+        minimax: true,
+        openrouter: false,
+      },
+      overrides: getMiniMaxModelDefaults(),
+      gemini_thinking_level: 3,
+    },
+    api_keys: {},
+    tracker_keys: {},
+  };
+}
+
+function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
+  return {
+    'issue-agent:exploration': 'minimax-m2.7-highspeed',
+    'issue-agent:implementation': 'minimax-m2.7-highspeed',
+    'issue-agent:testing': 'minimax-m2.7-highspeed',
+    'issue-agent:documentation': 'minimax-m2.7-highspeed',
+    'issue-agent:review-response': 'minimax-m2.7-highspeed',
+    'specialist-review-agent': 'minimax-m2.7-highspeed',
+    'specialist-test-agent': 'minimax-m2.7-highspeed',
+    'specialist-merge-agent': 'minimax-m2.7-highspeed',
+    'convoy:security-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:performance-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:correctness-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:requirements-reviewer': 'minimax-m2.7-highspeed',
+    'convoy:synthesis-agent': 'minimax-m2.7-highspeed',
+    'subagent:explore': 'minimax-m2.7-highspeed',
+    'subagent:plan': 'minimax-m2.7-highspeed',
+    'subagent:bash': 'minimax-m2.7-highspeed',
+    'subagent:general-purpose': 'minimax-m2.7-highspeed',
+    'planning-agent': 'minimax-m2.7-highspeed',
+    'cli:interactive': 'minimax-m2.7-highspeed',
+    'cli:quick-command': 'minimax-m2.7-highspeed',
   };
 }
 

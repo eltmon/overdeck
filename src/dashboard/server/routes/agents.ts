@@ -1,5 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -23,6 +24,7 @@ import { httpHandler } from "./http-handler.js";
  *   POST   /api/agents/:id/handoff
  *   GET    /api/agents/:id/handoffs
  *   GET    /api/agents/:id/cost
+ *   POST   /api/agents/:id/reset-session
  *   POST   /api/agents
  */
 
@@ -55,6 +57,10 @@ import {
   resumeAgent,
   messageAgent,
   stopAgent,
+  getProviderExportsForModel,
+  getProviderTmuxFlags,
+  listRunningAgents,
+  getAgentDir,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import {
@@ -64,6 +70,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { buildResumePrompt } from '../../../lib/cloister/resume-prompt.js';
@@ -855,8 +862,31 @@ const postAgentResumeRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const { message } = body as any;
+    const eventStore = yield* EventStoreService;
     const result = yield* Effect.promise(() => resumeAgent(id, message));
     if (result.success) {
+      // Emit agent.started event so the read model transitions agent status
+      // from 'stopped' → 'running' and the frontend updates immediately.
+      const agentState = getAgentState(id);
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+        type: 'agent.started',
+        timestamp: new Date().toISOString(),
+        payload: {
+          agentId: id,
+          issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
+          agent: {
+            id,
+            issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
+            workspace: agentState?.workspace,
+            runtime: agentState?.runtime,
+            model: agentState?.model,
+            status: 'running',
+            startedAt: agentState?.startedAt,
+            lastActivity: new Date().toISOString(),
+            phase: agentState?.phase,
+          },
+        },
+      })));
       return jsonResponse({ success: true });
     } else {
       return jsonResponse({ error: result.error }, { status: 400 });
@@ -1004,7 +1034,7 @@ const getAgentCostRoute = HttpRouter.add(
     const workspacePath = agentState.workspace;
 
     if (workspacePath) {
-      const projectDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
+      const projectDirName = encodeClaudeProjectDir(workspacePath);
       const projectDir = join(claudeProjectsDir, projectDirName);
       const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
@@ -1111,7 +1141,7 @@ const postAgentsRoute = HttpRouter.add(
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
 
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
 
     const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
@@ -1216,6 +1246,7 @@ const postAgentsRoute = HttpRouter.add(
       hasBeads = bdTasks.length > 0;
     } catch {}
 
+    let recoveryError: string | null = null;
     if (!hasBeads) {
       // Auto-recovery: beads DB may not have been initialized (fresh install, or planning
       // completed before bd init ran). Attempt to create beads from the vBRIEF plan now.
@@ -1227,18 +1258,26 @@ const postAgentsRoute = HttpRouter.add(
         if (hasBeads) {
           console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
         } else if (recovery.errors.length > 0) {
+          recoveryError = recovery.errors[0] ?? 'Unknown error during beads creation';
           console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);
+        } else {
+          recoveryError = 'createBeadsFromVBrief returned no beads and no errors';
         }
       } catch (recoveryErr: any) {
+        recoveryError = recoveryErr.message;
         console.warn(`[agents] Auto-recovery failed: ${recoveryErr.message}`);
       }
     }
 
     if (!hasBeads) {
+      const errorDetail = recoveryError
+        ? ` Recovery failed: ${recoveryError}.`
+        : '';
       return jsonResponse({
-        error: `No beads tasks found for ${issueId}. Planning artifacts exist but beads creation failed — re-run planning to regenerate.`,
+        error: `No beads tasks found for ${issueId}. Planning artifacts exist but beads creation failed —${errorDetail} Re-run planning to regenerate.`,
         hint: 'Click the Plan button to re-run planning, which will recreate beads from the vBRIEF plan.',
         issueId,
+        recoveryError,
       }, { status: 422 });
     }
 
@@ -1336,10 +1375,14 @@ const postAgentsRoute = HttpRouter.add(
     const savedSessionId = getLatestSessionId(agentSessionName);
 
     if (existingAgentState && savedSessionId && (existingAgentState.status === 'stopped' || existingAgentState.status === 'completed')) {
-      // Kill any zombie tmux session before resuming
-      try {
-        yield* Effect.promise(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }));
-      } catch { /* No existing session — good */ }
+      // Kill any zombie tmux session before resuming.
+      // NOTE: try/catch does NOT work with yield* in Effect.gen — Effect errors propagate
+      // through the Effect error channel, not as JS exceptions. Use .catch() in the Promise
+      // chain instead so the Effect never fails when the session doesn't exist.
+      yield* Effect.promise(() =>
+        execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' })
+          .catch(() => { /* No existing session — good */ })
+      );
 
       // Remove completed marker so the agent can work again
       const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
@@ -1356,14 +1399,21 @@ const postAgentsRoute = HttpRouter.add(
       // Fresh session with context prompt (not --resume, which has interactive prompts
       // and loses prompt caching). The resume prompt contains STATE.md, beads, feedback,
       // and optional user message — everything the agent needs to pick up where it left off.
-      const agentModel = existingAgentState.model || 'claude-sonnet-4-6';
-      const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
+      // Use current config model (not the stale model from state.json)
+      let agentModel = existingAgentState.model || 'claude-sonnet-4-6';
+      try {
+        const { getModelId } = yield* Effect.promise(() => import('../../../lib/work-type-router.js'));
+        agentModel = getModelId(`issue-agent:${phase}` as any);
+      } catch { /* fall back to state model */ }
+      const providerExports = getProviderExportsForModel(agentModel);
+      const resumeContent = `#!/bin/bash\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
       yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
 
       // Spawn tmux session with fresh claude session
       const escapedCwd = workspacePath.replace(/"/g, '\\"');
+      const providerFlags = getProviderTmuxFlags(agentModel);
       yield* Effect.promise(() => execAsync(
-        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "bash ${resumeLauncher}"`,
+        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
         { encoding: 'utf-8' }
       ));
 
@@ -1650,6 +1700,121 @@ const getAgentTmuxAliveRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/agents/restart-all ──────────────────────────────────────
+//
+// Stop all running workspace agents, then re-start each by POSTing to
+// the start-agent endpoint internally. Cloister handles model routing,
+// workspace setup, and beads enforcement.
+
+const postAgentsRestartAllRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/restart-all',
+  Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      try {
+        const running = listRunningAgents().filter(a => a.tmuxActive);
+        const results: { id: string; issueId: string; model: string; status: string }[] = [];
+
+        for (const agent of running) {
+          try {
+            // Stop the agent (captures output, kills tmux, marks stopped)
+            stopAgent(agent.id);
+
+            // Re-start via internal API call — reuses all existing start-agent logic
+            const res = await fetch('http://localhost:3011/api/agents', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ issueId: agent.issueId }),
+            });
+
+            if (res.ok) {
+              results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'restarted' });
+            } else {
+              const err = await res.json().catch(() => ({ error: res.statusText }));
+              results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${(err as any).error ?? res.statusText}` });
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[agents] Failed to restart ${agent.id}:`, msg);
+            results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${msg}` });
+          }
+        }
+
+        const succeeded = results.filter(r => r.status === 'restarted').length;
+        console.log(`[agents] Restarted ${succeeded}/${running.length} workspace agents`);
+        return jsonResponse({ restarted: succeeded, total: running.length, results });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to restart agents: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: POST /api/agents/:id/reset-session ─────────────────────────────
+// Clears saved Claude session tracking so the next start creates a fresh session.
+// Workspace, beads, and git state are preserved. JSONL files kept for cost history.
+
+const postAgentResetSessionRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/reset-session',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
+
+    const agentState = getAgentState(id);
+    if (!agentState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    if (agentState.status === 'running') {
+      return jsonResponse({ error: `Agent ${id} is running. Stop it first.` }, { status: 409 });
+    }
+
+    const previousSessionId = getLatestSessionId(id);
+    if (!previousSessionId) {
+      return jsonResponse({ error: `Agent ${id} has no saved session to reset` }, { status: 404 });
+    }
+
+    const agentDir = getAgentDir(id);
+
+    // Clear session.id
+    yield* Effect.promise(() => rm(join(agentDir, 'session.id'), { force: true }));
+
+    // Clear sessions.json
+    yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true }));
+
+    // Clear claudeSessionId from runtime.json (preserve other fields).
+    // Must read/write directly — saveAgentRuntimeState merges with existing file.
+    const runtimeFile = join(agentDir, 'runtime.json');
+    if (existsSync(runtimeFile)) {
+      try {
+        const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'));
+        const runtime = JSON.parse(runtimeContent);
+        delete runtime.claudeSessionId;
+        yield* Effect.promise(() => writeFile(runtimeFile, JSON.stringify(runtime, null, 2)));
+      } catch { /* non-fatal */ }
+    }
+
+    // Kill zombie tmux session if exists
+    yield* Effect.promise(() =>
+      execAsync(`tmux kill-session -t "${id}" 2>/dev/null`, { encoding: 'utf-8' })
+        .catch(() => { /* no session to kill */ })
+    );
+
+    // Emit event so dashboard updates
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.stopped',
+      timestamp: new Date().toISOString(),
+      payload: { agentId: id },
+    })));
+
+    console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
+    return jsonResponse({ success: true, agentId: id, previousSessionId });
+  })),
+);
+
 export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
@@ -1671,7 +1836,9 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentHandoffsRoute,
   getAgentCostRoute,
   postAgentsRoute,
+  postAgentsRestartAllRoute,
   getAgentTmuxAliveRoute,
+  postAgentResetSessionRoute,
 );
 
 export default agentsRouteLayer;

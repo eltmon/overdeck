@@ -112,9 +112,17 @@ export function setupTerminalWebSocket(server: http.Server): void {
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
         existingHub.clients.add(ws);
+        // Most recently connected client takes over as input client
+        existingHub.inputClient = ws;
+        // Brief blackout for rejoining clients — suppresses the scrollback burst
+        // that tmux dumps when the SIGWINCH repaint fires. The repaint fires after
+        // the blackout so the client receives only the clean current viewport.
+        const BLACKOUT_MS = 200;
+        existingHub.clientBlackout.set(ws, Date.now() + BLACKOUT_MS);
 
         // Force a SIGWINCH repaint so the new tab gets the current terminal state.
         // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
+        // Fires after blackout so the clean repaint reaches the client.
         const { cols, rows } = existingHub;
         setTimeout(() => {
           if (existingHub.clients.has(ws) && ws.readyState === WebSocket.OPEN) {
@@ -133,7 +141,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
               // PTY may have exited — ignore
             }
           }
-        }, 100);
+        }, BLACKOUT_MS + 50);
 
         const handleJoinMessage = (message: string) => {
           if (message.startsWith('{')) {
@@ -153,7 +161,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
               // Invalid JSON, treat as terminal input
             }
           }
-          // Forward input to PTY
+          // Only the active input client forwards keystrokes to the PTY.
+          // This prevents double-echo when multiple browser tabs have the same terminal open.
+          if (existingHub.inputClient !== ws) return;
           try {
             existingHub.pty.write(message);
           } catch { /* ignore */ }
@@ -201,10 +211,26 @@ export function setupTerminalWebSocket(server: http.Server): void {
         clients: new Set([ws]),
         cols: 120,
         rows: 29,
+        inputClient: ws, // first client is the initial input client
+        clientBlackout: new Map(), // Unused — flash handled client-side via opacity hide
       };
 
-      const startLocalPty = (cols: number, rows: number) => {
+      const startLocalPty = async (cols: number, rows: number) => {
         if (ptyStarted) return;
+
+        // Check if the tmux session exists before spawning the PTY.
+        // If we spawn without checking, tmux prints "can't find session" to the PTY,
+        // that error text is relayed to the client as a WebSocket message, which
+        // confuses the client's reconnect counter (it looks like real terminal data).
+        // Close cleanly with no data so the client just sees ws.onclose.
+        try {
+          await execAsync(`tmux has-session -t ${JSON.stringify(sessionName)}`);
+        } catch {
+          console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+          ws.close(1000, 'session-not-found');
+          return;
+        }
+
         ptyStarted = true;
         lastResizeCols = cols;
         lastResizeRows = rows;
@@ -226,37 +252,19 @@ export function setupTerminalWebSocket(server: http.Server): void {
         hub.pty = ptyProcess;
         activePtyHubs.set(sessionName, hub);
 
-        // Suppress initial PTY output — the first data burst contains the tmux screen
-        // rendered at the OLD size (80x24 default). We drop it, wait for Claude to
-        // process SIGWINCH (from our PTY attachment resizing the window), then force
-        // a second SIGWINCH via dimension toggle to trigger a clean full repaint.
-        let forwarding = false;
-
-        // Broadcast PTY data to ALL connected clients
+        // Forward ALL PTY data to clients immediately — no server-side suppression.
+        // The initial tmux dump populates xterm.js's scrollback buffer, which is needed
+        // for mousewheel scrolling. The client handles visual flash by hiding the terminal
+        // element briefly (opacity: 0) until the repaint settles.
         ptyProcess.onData((data) => {
-          if (!forwarding) return;
           broadcastToHub(hub, data);
         });
 
-        // After 200ms: start forwarding, then force full repaint via dimension toggle.
-        // The toggle (cols -> cols-1 -> cols) guarantees two SIGWINCHs, the last at the
-        // correct size. Claude repaints its entire TUI and we forward the clean result.
-        setTimeout(() => {
-          forwarding = true;
-          if (ptyProcess && hub.clients.size > 0) {
-            // Toggle dimensions to force SIGWINCH + full repaint
-            ptyProcess.resize(cols - 1, rows);
-            execAsync(`tmux resize-window -t ${sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
-              .then(() => new Promise<void>(r => setTimeout(r, 50)))
-              .then(() => {
-                if (ptyProcess && hub.clients.size > 0) {
-                  ptyProcess.resize(cols, rows);
-                  return execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
-                }
-              })
-              .catch(() => {});
-          }
-        }, 200);
+        // PTY spawns at client's exact dimensions (cols, rows above).
+        // The tmux attach itself triggers a proper resize via window-size=latest.
+        // Do NOT force SIGWINCH via dimension toggle — the async resize/repaint
+        // races with the client's opacity reveal and causes text bleeding/corruption.
+        // (Original fix: 2282e695, Feb 3 2026. Regression: April 2026 dimension toggles.)
 
         // Handle PTY exit — close all client connections
         ptyProcess.onExit(({ exitCode }) => {
@@ -309,7 +317,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
           }
         }
 
-        // Terminal input — buffer if PTY not ready yet
+        // Terminal input — only forward if this client is the active input client.
+        // This prevents double-echo if multiple tabs have the same session open.
+        if (hub.inputClient !== ws) return;
         if (ptyProcess) {
           ptyProcess.write(message);
         } else {

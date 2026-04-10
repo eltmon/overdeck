@@ -16,7 +16,7 @@ import { listRunningAgents } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@panopticon/contracts'
+import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panopticon/contracts'
 import { toAgentStatus, toAgentPhase, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,6 +28,8 @@ interface EnrichmentServiceState {
   lastMtime: Map<string, number | null>
   /** Agent IDs for which we've already emitted agent.created this server lifetime */
   seenAgentIds: Set<string>
+  /** Agent IDs for which we've already emitted a status reconciliation event */
+  reconciledAgentIds: Set<string>
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 workspace: agent.workspace || undefined,
                 runtime: agent.runtime || undefined,
                 model: agent.model || undefined,
-                status: toAgentStatus(agent.status),
+                status: toAgentStatus(agent.tmuxActive && agent.status === 'stopped' ? 'running' : agent.status),
                 startedAt: agent.startedAt || undefined,
                 lastActivity: agent.lastActivity || undefined,
                 branch: agent.branch || undefined,
@@ -94,6 +96,26 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           eventStore.append(createdEvent as never)
         } catch {
           // Non-fatal — event store may not be ready at startup
+        }
+      }
+
+      // Reconcile stale status: if tmux is active but state.json says stopped,
+      // emit a status_changed event so the read model corrects to 'running'.
+      if (agent.tmuxActive && agent.status === 'stopped' && !state.reconciledAgentIds.has(agentId)) {
+        state.reconciledAgentIds.add(agentId)
+        try {
+          const statusEvent: Omit<AgentStatusChangedEvent, 'sequence'> = {
+            type: 'agent.status_changed',
+            timestamp: new Date().toISOString(),
+            payload: {
+              agentId,
+              status: 'running',
+              previousStatus: 'stopped',
+            },
+          }
+          eventStore.append(statusEvent as never)
+        } catch {
+          // Non-fatal
         }
       }
 
@@ -169,6 +191,7 @@ const serviceState: EnrichmentServiceState = {
   lastEnrichment: new Map(),
   lastMtime: new Map(),
   seenAgentIds: new Set(),
+  reconciledAgentIds: new Set(),
 }
 
 export function startAgentEnrichmentService(): void {

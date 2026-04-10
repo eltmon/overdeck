@@ -108,10 +108,10 @@ describe('router-config', () => {
       expect(openaiProvider?.baseURL).toBe('https://api.openai.com/v1');
       expect(openaiProvider?.apiKey).toBe('sk-test-key');
       expect(openaiProvider?.models).toEqual([
-        'gpt-5.2-codex',
-        'o3-deep-research',
-        'gpt-4o',
-        'gpt-4o-mini',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.4-nano',
+        'o3',
       ]);
     });
 
@@ -147,8 +147,9 @@ describe('router-config', () => {
       expect(googleProvider?.baseURL).toBe('https://generativelanguage.googleapis.com/v1beta');
       expect(googleProvider?.apiKey).toBe('AIza-test-key');
       expect(googleProvider?.models).toEqual([
-        'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
+        'gemini-3.1-pro-preview',
+        'gemini-3-flash',
+        'gemini-3.1-flash-lite-preview',
       ]);
     });
 
@@ -170,14 +171,12 @@ describe('router-config', () => {
             expert: 'claude-opus-4-6',
           },
         },
-        api_keys: {
-          zai: 'zai-test-key',
-        },
+        api_keys: {},
       };
 
       const config = generateRouterConfig(settings);
 
-      // Z.AI is intentionally excluded - it uses direct API, not the router
+      // Only Anthropic provider
       expect(config.providers).toHaveLength(1);
       expect(config.providers[0].name).toBe('anthropic');
     });
@@ -203,14 +202,12 @@ describe('router-config', () => {
         api_keys: {
           openai: 'sk-test-key',
           google: 'AIza-test-key',
-          zai: 'zai-test-key', // Z.AI uses direct API, not router
         },
       };
 
       const config = generateRouterConfig(settings);
 
       // 3 providers: anthropic (always) + openai + google
-      // Z.AI is intentionally excluded (uses direct API, not router)
       expect(config.providers).toHaveLength(3);
       expect(config.providers.map((p) => p.name)).toEqual(
         expect.arrayContaining(['anthropic', 'openai', 'google'])
@@ -257,8 +254,8 @@ describe('router-config', () => {
         models: {
           specialists: {
             review_agent: 'claude-sonnet-4-5',
-            test_agent: 'gpt-4o-mini',
-            merge_agent: 'gemini-3-flash-preview',
+            test_agent: 'gpt-5.4-mini',
+            merge_agent: 'gemini-3-flash',
           },
           complexity: {
             trivial: 'claude-haiku-4-5',
@@ -277,8 +274,8 @@ describe('router-config', () => {
       const config = generateRouterConfig(settings);
 
       expect(config.router['specialist-review-agent'].model).toBe('claude-sonnet-4-5');
-      expect(config.router['specialist-test-agent'].model).toBe('gpt-4o-mini');
-      expect(config.router['specialist-merge-agent'].model).toBe('gemini-3-flash-preview');
+      expect(config.router['specialist-test-agent'].model).toBe('gpt-5.4-mini');
+      expect(config.router['specialist-merge-agent'].model).toBe('gemini-3-flash');
     });
 
     it('should map complexity levels to configured models', async () => {
@@ -292,11 +289,11 @@ describe('router-config', () => {
             merge_agent: 'claude-sonnet-4-5',
           },
           complexity: {
-            trivial: 'gpt-4o-mini',
+            trivial: 'gpt-5.4-mini',
             simple: 'claude-haiku-4-5',
-            medium: 'gpt-4o',
+            medium: 'gpt-5.4',
             complex: 'claude-sonnet-4-5',
-            expert: 'gpt-5.2-codex',
+            expert: 'gpt-5.4',
           },
         },
         api_keys: {
@@ -306,11 +303,11 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      expect(config.router['complexity-trivial'].model).toBe('gpt-4o-mini');
+      expect(config.router['complexity-trivial'].model).toBe('gpt-5.4-mini');
       expect(config.router['complexity-simple'].model).toBe('claude-haiku-4-5');
-      expect(config.router['complexity-medium'].model).toBe('gpt-4o');
+      expect(config.router['complexity-medium'].model).toBe('gpt-5.4');
       expect(config.router['complexity-complex'].model).toBe('claude-sonnet-4-5');
-      expect(config.router['complexity-expert'].model).toBe('gpt-5.2-codex');
+      expect(config.router['complexity-expert'].model).toBe('gpt-5.4');
     });
 
     it('should create all router rules', async () => {

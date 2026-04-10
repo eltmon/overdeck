@@ -1,0 +1,90 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-491: bun:sqlite named param binding broken in event-store.ts (NOT NULL on :name params)"
+  },
+  "plan": {
+    "id": "pan-491",
+    "title": "bun:sqlite named param binding broken in event-store.ts (NOT NULL on :name params)",
+    "status": "approved",
+    "uid": "55778d82-0ed3-4869-b334-0f617495119d",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 2,
+    "created": "2026-04-06T12:00:00Z",
+    "updated": "2026-04-07T03:15:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/491",
+        "label": "PAN-491",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bugfix",
+      "sqlite",
+      "bun-compat"
+    ],
+    "narratives": {
+      "Problem": "projection-cache.ts uses :name SQL params with { name: value } bindings, which silently null all params under bun:sqlite. The same bug was already fixed in event-store.ts but projection-cache.ts was missed.",
+      "Proposal": "Convert projection-cache.ts from :name named params to positional ? params with array bindings, matching the pattern established in event-store.ts."
+    },
+    "items": [
+      {
+        "id": "fix-projection-cache",
+        "title": "Convert projection-cache.ts to positional SQL params",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-491"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/projection-cache.ts, change the loadStmt SQL from 'WHERE key = :key' to 'WHERE key = ?' and the upsertStmt SQL from 'VALUES (:key, :data, :sequence, :updated_at)' to 'VALUES (?, ?, ?, ?)'. Update the PreparedStatement interface usage from object bindings ({ key, data, ... }) to array bindings ([key, data, ...]). Also update the PreparedStatement generic type params to accept unknown[] instead of Record<string, unknown> if needed."
+        },
+        "subItems": [
+          {
+            "id": "fix-projection-cache.ac1",
+            "title": "loadStmt uses positional ? param and array binding for key lookup",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-07T03:15:00Z"
+          },
+          {
+            "id": "fix-projection-cache.ac2",
+            "title": "upsertStmt uses positional ? params and array binding for all 4 values",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-07T03:15:00Z"
+          },
+          {
+            "id": "fix-projection-cache.ac3",
+            "title": "npm run typecheck passes with no new errors",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-07T03:15:00Z"
+          },
+          {
+            "id": "fix-projection-cache.ac4",
+            "title": "npm run build succeeds",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-07T03:15:00Z"
+          }
+        ],
+        "completed": "2026-04-07T03:15:00Z"
+      }
+    ],
+    "edges": []
+  }
+}

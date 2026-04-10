@@ -9,7 +9,7 @@ import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
-import { loadSettings, type ModelId } from './settings.js';
+import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
@@ -36,7 +36,7 @@ function normalizeAgentId(agentId: string): string {
  * Reads the current API key from settings so resumed/recovered agents
  * always use the latest key.
  */
-function getProviderEnvForModel(model: string): Record<string, string> {
+export function getProviderEnvForModel(model: string): Record<string, string> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
 
@@ -47,17 +47,40 @@ function getProviderEnvForModel(model: string): Record<string, string> {
     if (apiKey) {
       return getProviderEnv(provider, apiKey);
     }
-    console.warn('Warning: No OpenRouter API key configured');
-    return {};
+    throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
   }
 
-  const settings = loadSettings();
-  const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
+  const { config } = loadYamlConfig();
+  const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }
-  console.warn(`Warning: No API key configured for ${provider.displayName}, falling back to Anthropic`);
-  return {};
+  throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
+}
+
+/**
+ * Get bash export lines for provider env vars (for use in launcher scripts).
+ * Returns empty string for Anthropic models.
+ */
+export function getProviderExportsForModel(model: string): string {
+  const envVars = getProviderEnvForModel(model);
+  if (Object.keys(envVars).length === 0) return '';
+  return Object.entries(envVars)
+    .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
+    .join('\n') + '\n';
+}
+
+/**
+ * Get tmux -e flags for provider env vars (for use in tmux new-session).
+ * Returns empty string for Anthropic models.
+ */
+export function getProviderTmuxFlags(model: string): string {
+  const envVars = getProviderEnvForModel(model);
+  let flags = '';
+  for (const [key, value] of Object.entries(envVars)) {
+    flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
+  }
+  return flags;
 }
 
 // ============================================================================
@@ -433,14 +456,8 @@ function determineModel(options: SpawnOptions): string {
       return getModelId(workType);
     }
 
-    // LEGACY: Complexity-based routing (deprecated but kept for backward compat)
-    if (options.difficulty) {
-      const settings = loadSettings();
-      if (settings.models.complexity[options.difficulty]) {
-        console.warn(`Using legacy complexity-based routing for ${options.difficulty}. Consider migrating to work types.`);
-        return settings.models.complexity[options.difficulty];
-      }
-    }
+    // LEGACY: Complexity-based routing removed — settings.json no longer exists.
+    // All model routing goes through work-type-router via config.yaml.
 
     // Fall back to default model from Cloister config or claude-sonnet-4-6
     try {
@@ -652,8 +669,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let claudeCmd: string;
   if (prompt) {
     const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
+    const providerExports = getProviderExportsForModel(state.model);
     const launcherContent = `#!/bin/bash
-prompt=$(cat "${promptFile}")
+${providerExports}prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
@@ -667,6 +685,25 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     const { preTrustDirectory } = await import('./workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
     preTrustDirectory(options.workspace);
   } catch { /* non-fatal */ }
+
+  // Configure workspace for GitHub App bot identity (PAN-536)
+  // Agents push as panopticon-agent[bot] with short-lived installation tokens
+  try {
+    const { isGitHubAppConfigured, generateInstallationToken, configureWorkspaceForBot } = await import('./github-app.js');
+    if (isGitHubAppConfigured()) {
+      const { findProjectByPath } = await import('./projects.js');
+      const project = findProjectByPath(resolve(options.workspace, '..', '..'));
+      const ghRepo = project?.github_repo;
+      if (ghRepo) {
+        const [owner, repo] = ghRepo.split('/');
+        const { token } = await generateInstallationToken();
+        await configureWorkspaceForBot(options.workspace, owner, repo, token);
+        console.log(`[${agentId}] Configured workspace for bot push (panopticon-agent[bot])`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[${agentId}] GitHub App config failed (falling back to SSH): ${err.message}`);
+  }
 
   // Build SageOx environment variables for session linking (only if project is SageOx-initialized)
   // Derive project root from workspace path: <project-root>/workspaces/<branch>
@@ -942,8 +979,13 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   const allowedRuntimeStates = ['suspended', 'idle'];
   const allowedAgentStatuses = ['stopped', 'completed'];
 
+  // Also allow resuming a "running" agent with no live tmux session — this happens after
+  // a system crash where tmux was killed but state.json was never updated to 'stopped'.
+  const isCrashed = agentState?.status === 'running' && !sessionExists(normalizedId);
+
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
-    || (agentState && allowedAgentStatuses.includes(agentState.status));
+    || (agentState && allowedAgentStatuses.includes(agentState.status))
+    || isCrashed;
 
   if (!canResume) {
     return {

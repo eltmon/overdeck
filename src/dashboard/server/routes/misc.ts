@@ -36,6 +36,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/metrics/tasks
  *   POST /api/shadow/:issueId/monitor
  *   POST /api/shadow/:issueId/observe
+ *   POST /api/dev/rebuild
  */
 
 import { exec } from 'node:child_process';
@@ -66,6 +67,7 @@ import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
@@ -75,17 +77,36 @@ const execAsync = promisify(exec);
 // ─── Package version ──────────────────────────────────────────────────────────
 
 function readPackageVersion(): string {
-  const base = dirname(fileURLToPath(import.meta.url));
-  for (const levels of [['..', '..', '..'], ['..', '..', '..', '..']]) {
-    const candidate = join(base, ...levels, 'package.json');
+  // Walk up from the running script to find the nearest package.json.
+  // Works for both source (src/dashboard/server/routes/) and bundled (dist/dashboard/) layouts.
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    const candidate = join(dir, 'package.json');
     try {
       return JSON.parse(readFileSync(candidate, 'utf-8')).version;
-    } catch { /* try next */ }
+    } catch { /* try parent */ }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
   return '0.0.0';
 }
 
 const panopticonVersion: string = readPackageVersion();
+
+// Dev mode: true when running from the repo checkout (src/ directory exists)
+const panopticonDevMode: boolean = (() => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
+      return true;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return false;
+})();
 
 // ─── IssueDataService singleton (for cache-status) ───────────────────────────
 
@@ -549,8 +570,21 @@ const getTrackerStatusRoute = HttpRouter.add(
         isPrimary: boolean;
       }> = [];
 
+      // Only report trackers that have at least one project using them
+      const projects = listProjects();
+      const cfgs = projects.map(p => p.config as Record<string, unknown>);
+      const trackerHasProjects: Record<string, boolean> = {
+        linear: cfgs.some(c => !!c.linear_project),
+        github: cfgs.some(c => !!c.github_repo),
+        rally: cfgs.some(c => !!c.rally_project),
+        gitlab: cfgs.some(c => !!c.gitlab_repo),
+      };
+
       const trackersToCheck = [primary, secondary].filter(Boolean) as string[];
       for (const trackerType of trackersToCheck) {
+        // Skip trackers that no project uses
+        if (trackerHasProjects[trackerType] === false) continue;
+
         const envVar = trackerEnvVars[trackerType] || `${trackerType.toUpperCase()}_API_KEY`;
         const hasEnvKey = !!process.env[envVar];
         const hasConfigKey = !!((yamlConfig.trackerKeys || {}) as Record<string, string | undefined>)[trackerType];
@@ -721,7 +755,7 @@ const postDeaconPatrolRoute = HttpRouter.add(
 const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
-  Effect.sync(() => jsonResponse({ version: panopticonVersion })),
+  Effect.sync(() => jsonResponse({ version: panopticonVersion, isDev: panopticonDevMode })),
 );
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────
@@ -966,7 +1000,7 @@ const getPlanningStatusRoute = HttpRouter.add(
     const issueId = parts[3] || '';
     const sessionName = `planning-${issueId.toLowerCase()}`;
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -1218,12 +1252,12 @@ Continue the PLANNING session. Do NOT implement anything.
           await rename(outputFile, backupPath);
         }
 
-        const { loadSettings: loadSettingsFn, getAgentCommand } = await import('../../../lib/settings.js');
-        const msgSettings = loadSettingsFn();
-        const msgPlanningModel =
-          (msgSettings.models as any).planning_agent ||
-          msgSettings.models.complexity?.expert ||
-          'claude-opus-4-6';
+        const { getAgentCommand } = await import('../../../lib/settings.js');
+        let msgPlanningModel = 'claude-sonnet-4-6';
+        try {
+          const { getModelId } = await import('../../../lib/work-type-router.js');
+          msgPlanningModel = getModelId('planning-agent');
+        } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
@@ -1556,7 +1590,7 @@ const postShadowMonitorRoute = HttpRouter.add(
     // /api/shadow/:issueId/monitor → parts[3] = issueId
     const issueId = parts[3] || '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -1602,7 +1636,7 @@ const postShadowObserveRoute = HttpRouter.add(
     // /api/shadow/:issueId/observe → parts[3] = issueId
     const issueId = parts[3] || '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     const body = yield* readJsonBody;
     const { mode } = body as { mode?: string };
@@ -1650,6 +1684,49 @@ const postShadowObserveRoute = HttpRouter.add(
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
+// ─── Route: POST /api/dev/rebuild ──────────────────────────────────────────────
+// Dev-only: runs `npm run build` in the project root and returns when done.
+
+// Find the project root (directory with package.json + src/dashboard)
+const panopticonProjectRoot: string | null = (() => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+})();
+
+const postDevRebuildRoute = HttpRouter.add(
+  'POST',
+  '/api/dev/rebuild',
+  Effect.gen(function* () {
+    if (!panopticonDevMode || !panopticonProjectRoot) {
+      return jsonResponse({ error: 'Rebuild only available in dev mode' }, { status: 403 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const { stdout, stderr } = await execAsync('npm run build', {
+          cwd: panopticonProjectRoot,
+          timeout: 120_000,
+        });
+        return jsonResponse({
+          ok: true,
+          stdout: stdout.slice(-2000),
+          stderr: stderr.slice(-2000),
+        });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: `Build failed: ${msg}` }, { status: 500 });
+      }
+    });
+  }),
+);
+
 export const miscRouteLayer = Layer.mergeAll(
   postTrackersRefreshRoute,
   getProjectMappingsRoute,
@@ -1684,6 +1761,7 @@ export const miscRouteLayer = Layer.mergeAll(
   getMetricsTasksRoute,
   postShadowMonitorRoute,
   postShadowObserveRoute,
+  postDevRebuildRoute,
 );
 
 export default miscRouteLayer;

@@ -20,9 +20,11 @@ import {
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
+  getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
 } from '../../../lib/settings-api.js';
+import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 
@@ -40,40 +42,27 @@ const readJsonBody = Effect.gen(function* () {
 });
 
 /** Determine provider from model ID */
-function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'zai' {
+function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' {
   if (modelId.startsWith('claude-')) return 'anthropic';
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o3-') || modelId.startsWith('o1')) return 'openai';
+  if (modelId.startsWith('gpt-') || modelId === 'o3') return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
-  if (modelId.startsWith('glm-')) return 'zai';
-  return 'kimi'; // default
+  return 'anthropic'; // default
 }
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models
-  'gpt-5.2-codex': { apiModel: 'gpt-4o' },
-  'o3-deep-research': { apiModel: 'gpt-4o' },
-  'gpt-4o': { apiModel: 'gpt-4o' },
-  'gpt-4o-mini': { apiModel: 'gpt-4o-mini' },
-  'o1': { apiModel: 'gpt-4o' },
-  'o3-mini': { apiModel: 'gpt-4o-mini' },
+  'gpt-5.4': { apiModel: 'gpt-5.4' },
+  'gpt-5.4-mini': { apiModel: 'gpt-5.4-mini' },
+  'gpt-5.4-nano': { apiModel: 'gpt-5.4-nano' },
+  'o3': { apiModel: 'o3' },
   // Google models
-  'gemini-3-pro-preview': { apiModel: 'gemini-1.5-pro' },
-  'gemini-3-flash-preview': { apiModel: 'gemini-1.5-flash' },
-  'gemini-2.5-pro': { apiModel: 'gemini-1.5-pro' },
-  'gemini-2.5-flash': { apiModel: 'gemini-1.5-flash' },
+  'gemini-3.1-pro-preview': { apiModel: 'gemini-3.1-pro-preview' },
+  'gemini-3-flash': { apiModel: 'gemini-3-flash' },
+  'gemini-3.1-flash-lite-preview': { apiModel: 'gemini-3.1-flash-lite-preview' },
   // Kimi models
-  'kimi-k2': { apiModel: 'moonshot-v1-8k' },
-  'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
-  'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' },
-  // Z.AI models
-  'glm-4.7': { apiModel: 'glm-4' },
-  'glm-4.7-flash': { apiModel: 'glm-4-flash' },
-  'glm-4-plus': { apiModel: 'glm-4' },
-  'glm-4-air': { apiModel: 'glm-4-air' },
-  'glm-4-flash': { apiModel: 'glm-4-flash' },
-  'glm-4-long': { apiModel: 'glm-4-long' },
+  'kimi-k2.5': { apiModel: 'kimi-k2.5' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -92,9 +81,11 @@ const getSettingsRoute = HttpRouter.add(
 const getAvailableModelsRoute = HttpRouter.add(
   'GET',
   '/api/settings/available-models',
-  httpHandler(Effect.try({
-    try: () => jsonResponse(getAvailableModelsApi()),
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  httpHandler(Effect.promise(async () => {
+    // Include auth status so the UI knows which providers are actually usable
+    const auth = await getClaudeAuthStatus();
+    const anthropicAuthed = (auth.loggedIn && !auth.expired) || auth.hasAnthropicApiKey;
+    return jsonResponse(getAvailableModelsApi(anthropicAuthed));
   })),
 );
 
@@ -105,6 +96,17 @@ const getOptimalDefaultsRoute = HttpRouter.add(
   '/api/settings/optimal-defaults',
   httpHandler(Effect.try({
     try: () => jsonResponse(getOptimalDefaultsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+// ─── Route: GET /api/settings/minimax-defaults ───────────────────────────────
+
+const getMiniMaxDefaultsRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/minimax-defaults',
+  httpHandler(Effect.try({
+    try: () => jsonResponse(getMiniMaxDefaultsApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -136,7 +138,7 @@ const postTestApiKeyRoute = HttpRouter.add(
 
       switch (provider) {
         case 'openai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-4o-mini') : 'gpt-4o-mini';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-5.4-mini') : 'gpt-5.4-mini';
           try {
             const resp = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
@@ -216,26 +218,35 @@ const postTestApiKeyRoute = HttpRouter.add(
           break;
         }
 
-        case 'zai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4-flash') : 'glm-4-flash';
+        case 'minimax': {
+          const apiModel = model || 'MiniMax-M2.7';
           try {
-            const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+            const resp = await fetch('https://api.minimax.io/anthropic/v1/messages', {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({ model: apiModel, max_tokens: 256, messages: [{ role: 'user', content: testPrompt }] }),
             });
             latencyMs = Date.now() - startTime;
             if (resp.ok) {
-              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-              response = data.choices?.[0]?.message?.content?.trim() || '';
+              const data = await resp.json() as { content?: Array<{ type?: string; text?: string; thinking?: string }> };
+              // MiniMax returns thinking + text blocks; extract the text block
+              const textBlock = data.content?.find(b => b.type === 'text');
+              response = textBlock?.text?.trim() || data.content?.[0]?.text?.trim() || '';
               success = response.includes(expectedAnswer);
               if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-            } else if (resp.status === 401) {
-              error = 'Invalid API key';
-            } else if (resp.status === 404) {
-              error = `Model not found: ${apiModel}`;
             } else {
-              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+              const body = (await resp.text()).slice(0, 200);
+              if (resp.status === 401) {
+                error = 'Invalid API key';
+              } else if (resp.status === 404) {
+                error = `Model not found: ${apiModel}`;
+              } else {
+                error = `HTTP ${resp.status}: ${body}`;
+              }
             }
           } catch (err) {
             error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
@@ -265,7 +276,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
-    if (!['openai', 'google', 'zai'].includes(provider)) {
+    if (!['openai', 'google'].includes(provider)) {
       return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -302,14 +313,14 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'google': {
           try {
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }] }),
             });
             if (resp.ok || resp.status === 400) {
               valid = true;
-              models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
+              models = ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'];
             } else if (resp.status === 401 || resp.status === 403) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
@@ -323,27 +334,6 @@ const postValidateApiKeyRoute = HttpRouter.add(
           break;
         }
 
-        case 'zai': {
-          try {
-            const resp = await fetch('https://api.zai.chat/v1/models', {
-              headers: { 'Authorization': `Bearer ${apiKey}` },
-            });
-            if (resp.ok) {
-              const data = await resp.json() as { data?: Array<{ id: string }> };
-              valid = true;
-              models = data.data?.map(m => m.id) || ['glm-4.7', 'glm-4.7-flash'];
-            } else if (resp.status === 401) {
-              error = 'Invalid API key';
-            } else if (resp.status === 429) {
-              error = 'Rate limit exceeded';
-            } else {
-              error = `HTTP error: ${resp.status}`;
-            }
-          } catch (err) {
-            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
-          }
-          break;
-        }
       }
 
       return jsonResponse({ valid, provider, models: valid ? models : undefined, error: error || undefined });
@@ -415,6 +405,17 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/settings/claude-auth ────────────────────────────────────
+
+const getClaudeAuthRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/claude-auth',
+  httpHandler(Effect.promise(async () => {
+    const status = await getClaudeAuthStatus();
+    return jsonResponse(status);
+  })),
+);
+
 // ─── Route: POST /api/settings/openrouter/test-key ───────────────────────────
 
 const postOpenRouterTestKeyRoute = HttpRouter.add(
@@ -440,12 +441,14 @@ export const settingsRouteLayer = Layer.mergeAll(
   getSettingsRoute,
   getAvailableModelsRoute,
   getOptimalDefaultsRoute,
+  getMiniMaxDefaultsRoute,
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
   putSettingsRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
   postOpenRouterTestKeyRoute,
+  getClaudeAuthRoute,
 );
 
 export default settingsRouteLayer;

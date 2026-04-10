@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass } from 'lucide-react';
+import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { ActivityView } from './ActivityView';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
@@ -8,7 +8,9 @@ import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { ModelPicker } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
+import type { ChatMessage } from '../chat/chat-types';
 import type { Issue } from '../../types';
 import styles from './styles/mission-control.module.css';
 
@@ -25,7 +27,7 @@ interface ProjectData {
 }
 
 async function fetchProjects(): Promise<ProjectData[]> {
-  const res = await fetch('/api/mission-control/projects');
+  const res = await fetch('/api/command-deck/projects');
   if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
@@ -51,11 +53,17 @@ interface MissionControlProps {
   issues?: Issue[];
 }
 
+type SidebarTab = 'conversations' | 'projects';
+
 export function MissionControl({ issues = [] }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
+  const [sidebarModel, setSidebarModel] = useState<string>('claude-sonnet-4-6');
+  // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
+  const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
     return saved ? Number(saved) : 600;
@@ -66,7 +74,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   const currentWidth = useRef(sidebarWidth);
 
   const { data: projects = [], isLoading } = useQuery({
-    queryKey: ['mission-control-projects'],
+    queryKey: ['command-deck-projects'],
     queryFn: fetchProjects,
     refetchInterval: 10000,
   });
@@ -105,6 +113,13 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     refetchInterval: 10000,
   });
 
+  // Auto-select the first conversation when the list loads
+  useEffect(() => {
+    if (conversations.length > 0 && selectedConversation === null) {
+      setSelectedConversation(conversations[0].name);
+    }
+  }, [conversations, selectedConversation]);
+
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
     setSelectedConversation(null);
@@ -112,6 +127,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   }, []);
 
   const handleSelectConversation = useCallback((name: string | null) => {
+    setDraftKey(0);
     setSelectedConversation(name);
     setIsDraft(false);
     if (name !== null) {
@@ -120,16 +136,31 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
   }, []);
 
   const handleDraftCreated = useCallback(() => {
+    setDraftKey(k => k + 1);
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
+    setSidebarTab('conversations');
   }, []);
 
   const queryClient = useQueryClient();
 
-  const handleDraftPromoted = useCallback((conv: Conversation) => {
+  const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
+    setDraftKey(0);
     setIsDraft(false);
     setSelectedConversation(conv.name);
+    // Seed optimistic first message so it appears immediately before polling returns data
+    const optimistic: ChatMessage = {
+      id: `optimistic-${Date.now()}`,
+      role: 'user',
+      text: firstMessage,
+      createdAt: new Date().toISOString(),
+    };
+    queryClient.setQueryData(['conversation-messages', conv.name], {
+      messages: [optimistic],
+      workLog: [],
+      streaming: true,
+    });
     queryClient.invalidateQueries({ queryKey: ['conversations'] });
   }, [queryClient]);
 
@@ -184,19 +215,57 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
         {/* Sidebar: Project Tree */}
         <div className={styles.sidebar} style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>Mission Control</h2>
-            <p className={styles.sidebarSubtitle}>Active features across projects</p>
+            <div className={styles.sidebarHeaderRow}>
+              <h2 className={styles.sidebarTitle}>Command Deck</h2>
+              {sidebarTab === 'conversations' && (
+                <div className={styles.sidebarHeaderGroup}>
+                  <ModelPicker
+                    value={sidebarModel}
+                    onChange={(modelId) => {
+                      setSidebarModel(modelId);
+                    }}
+                  />
+                  <button
+                    className={styles.conversationAddBtn}
+                    onClick={handleDraftCreated}
+                    title="New conversation"
+                    aria-label="New conversation"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Segmented control */}
+            <div className={styles.segmentControl}>
+              <button
+                className={`${styles.segmentButton} ${sidebarTab === 'conversations' ? styles.segmentButtonActive : ''}`}
+                onClick={() => setSidebarTab('conversations')}
+              >
+                Conversations
+                <span className={styles.segmentCount}>{conversations.length}</span>
+              </button>
+              <button
+                className={`${styles.segmentButton} ${sidebarTab === 'projects' ? styles.segmentButtonActive : ''}`}
+                onClick={() => setSidebarTab('projects')}
+              >
+                Projects
+                <span className={styles.segmentCount}>
+                  {projects.reduce((sum, p) => sum + p.features.length, 0)}
+                </span>
+              </button>
+            </div>
           </div>
 
-          {/* Conversations section — above project tree */}
-          <ConversationList
-            selectedConversation={selectedConversation}
-            onSelectConversation={handleSelectConversation}
-            onDraftCreated={handleDraftCreated}
-          />
-
+          {/* Tab content — each gets full height */}
           <div className={styles.projectTree}>
-            {isLoading && projects.length === 0 ? (
+            {sidebarTab === 'conversations' ? (
+              <ConversationList
+                selectedConversation={selectedConversation}
+                onSelectConversation={handleSelectConversation}
+              />
+            ) : isLoading && projects.length === 0 ? (
               <div className={styles.skeletonList}>
                 <div className={styles.skeletonItem} style={{ width: '60%' }} />
                 <div className={styles.skeletonItem} style={{ width: '80%' }} />
@@ -238,6 +307,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
         <div className={styles.content}>
           {isDraft ? (
             <DraftConversationPanel
+              key={draftKey}
               onPromoted={handleDraftPromoted}
             />
           ) : selectedConversation ? (

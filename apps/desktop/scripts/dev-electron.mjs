@@ -1,0 +1,149 @@
+import { spawn, spawnSync } from "node:child_process";
+import { watch } from "node:fs";
+import { join } from "node:path";
+
+import { desktopDir, resolveElectronPath } from "./electron-launcher.mjs";
+import { waitForResources } from "./wait-for-resources.mjs";
+
+const port = Number(process.env.ELECTRON_RENDERER_PORT ?? 7824);
+const devServerUrl = `http://localhost:${port}`;
+const requiredFiles = [
+  "dist-electron/main.js",
+  "dist-electron/preload.js",
+  "../../dist/dashboard/server.js",
+];
+const watchedDirectories = [
+  { directory: "dist-electron", files: new Set(["main.js", "preload.js"]) },
+];
+const forcedShutdownTimeoutMs = 1_500;
+const restartDebounceMs = 120;
+const childTreeGracePeriodMs = 1_200;
+
+await waitForResources({
+  baseDir: desktopDir,
+  files: requiredFiles,
+  tcpPort: port,
+});
+
+const childEnv = { ...process.env };
+delete childEnv.ELECTRON_RUN_AS_NODE;
+
+let shuttingDown = false;
+let restartTimer = null;
+let currentApp = null;
+let restartQueue = Promise.resolve();
+const expectedExits = new WeakSet();
+const watchers = [];
+
+function killChildTreeByPid(pid, signal) {
+  if (process.platform === "win32" || typeof pid !== "number") return;
+  spawnSync("pkill", [`-${signal}`, "-P", String(pid)], { stdio: "ignore" });
+}
+
+function startApp() {
+  if (shuttingDown || currentApp !== null) return;
+
+  const electronApp = spawn(resolveElectronPath(), ["dist-electron/main.js"], {
+    cwd: desktopDir,
+    env: { ...childEnv, VITE_DEV_SERVER_URL: devServerUrl },
+    stdio: "inherit",
+  });
+
+  currentApp = electronApp;
+
+  electronApp.once("error", () => {
+    if (currentApp === electronApp) currentApp = null;
+    if (!shuttingDown) scheduleRestart();
+  });
+
+  electronApp.once("exit", (code, signal) => {
+    if (currentApp === electronApp) currentApp = null;
+    const exitedAbnormally = signal !== null || code !== 0;
+    if (!shuttingDown && !expectedExits.has(electronApp) && exitedAbnormally) {
+      scheduleRestart();
+    }
+  });
+}
+
+async function stopApp() {
+  const electronApp = currentApp;
+  if (!electronApp) return;
+
+  currentApp = null;
+  expectedExits.add(electronApp);
+
+  await new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(undefined);
+    };
+
+    electronApp.once("exit", finish);
+    electronApp.kill("SIGTERM");
+    killChildTreeByPid(electronApp.pid, "TERM");
+
+    setTimeout(() => {
+      if (settled) return;
+      electronApp.kill("SIGKILL");
+      killChildTreeByPid(electronApp.pid, "KILL");
+      finish();
+    }, forcedShutdownTimeoutMs).unref();
+  });
+}
+
+function scheduleRestart() {
+  if (shuttingDown) return;
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    restartQueue = restartQueue
+      .catch(() => undefined)
+      .then(async () => {
+        await stopApp();
+        if (!shuttingDown) startApp();
+      });
+  }, restartDebounceMs);
+}
+
+function startWatchers() {
+  for (const { directory, files } of watchedDirectories) {
+    const watcher = watch(join(desktopDir, directory), { persistent: true }, (_eventType, filename) => {
+      if (typeof filename !== "string" || !files.has(filename)) return;
+      scheduleRestart();
+    });
+    watchers.push(watcher);
+  }
+}
+
+function killChildTree(signal) {
+  if (process.platform === "win32") return;
+  spawnSync("pkill", [`-${signal}`, "-P", String(process.pid)], { stdio: "ignore" });
+}
+
+async function shutdown(exitCode) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+
+  for (const watcher of watchers) watcher.close();
+
+  await stopApp();
+  killChildTree("TERM");
+  await new Promise((resolve) => setTimeout(resolve, childTreeGracePeriodMs));
+  killChildTree("KILL");
+
+  process.exit(exitCode);
+}
+
+startWatchers();
+startApp();
+
+process.once("SIGINT", () => void shutdown(130));
+process.once("SIGTERM", () => void shutdown(143));
+process.once("SIGHUP", () => void shutdown(129));

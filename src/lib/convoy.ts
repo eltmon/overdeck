@@ -12,6 +12,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { createSession, killSession, sessionExists } from './tmux.js';
+import { getProviderEnvForModel } from './agents.js';
 import { getConvoyTemplate, getExecutionOrder, type ConvoyTemplate, type ConvoyAgent } from './convoy-templates.js';
 import { AGENTS_DIR } from './paths.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
@@ -174,6 +175,7 @@ function mapConvoyRoleToWorkType(role: string): WorkTypeId | null {
     'security': 'convoy:security-reviewer',
     'performance': 'convoy:performance-reviewer',
     'correctness': 'convoy:correctness-reviewer',
+    'requirements': 'convoy:requirements-reviewer',
     'synthesis': 'convoy:synthesis-agent',
   };
 
@@ -247,6 +249,7 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
 
   // Build claude command with resolved model
   const claudeCmd = `claude --dangerously-skip-permissions --model ${model}`;
+  const providerEnv = getProviderEnvForModel(model);
 
   // Create tmux session
   createSession(agentState.tmuxSession, convoy.context.projectPath, claudeCmd, {
@@ -254,6 +257,7 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
       PANOPTICON_CONVOY_ID: convoy.id,
       PANOPTICON_CONVOY_ROLE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+      ...providerEnv,
     },
   });
 

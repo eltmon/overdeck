@@ -6,12 +6,12 @@
  * Panopticon always works even without configuring external providers.
  */
 
-import { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './settings.js';
+import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
 
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter';
 
 /**
  * Map of model ID to provider
@@ -24,24 +24,22 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-haiku-4-5': 'anthropic',
 
   // OpenAI models
-  'gpt-5.2-codex': 'openai',
-  'o3-deep-research': 'openai',
-  'gpt-4o': 'openai',
-  'gpt-4o-mini': 'openai',
+  'gpt-5.4': 'openai',
+  'gpt-5.4-mini': 'openai',
+  'gpt-5.4-nano': 'openai',
+  'o3': 'openai',
 
   // Google models
-  'gemini-3-pro-preview': 'google',
-  'gemini-3-flash-preview': 'google',
-  'gemini-2.5-pro': 'google',
-  'gemini-2.5-flash': 'google',
-
-  // Z.AI models
-  'glm-4.7': 'zai',
-  'glm-4.7-flash': 'zai',
+  'gemini-3.1-pro-preview': 'google',
+  'gemini-3-flash': 'google',
+  'gemini-3.1-flash-lite-preview': 'google',
 
   // Kimi models
-  'kimi-k2': 'kimi',
   'kimi-k2.5': 'kimi',
+
+  // MiniMax models
+  'minimax-m2.7': 'minimax',
+  'minimax-m2.7-highspeed': 'minimax',
 };
 
 /**
@@ -49,31 +47,30 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  *
  * Mapping strategy:
  * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 4.6 (good balance)
- * - Economy models (GPT-4o-mini, Gemini Flash, GLM Flash) → Haiku 4.5
+ * - Economy models (GPT-4o-mini, Gemini Flash) → Haiku 4.5
  * - GPT-4o → Sonnet 4.6 (similar tier)
- * - GLM-4.7 → Haiku 4.5 (economy tier)
  *
  * Note: We intentionally avoid Opus 4.6 as default fallback to keep costs reasonable.
  * Users who want Opus can explicitly set it in their config.
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
-  'gpt-5.2-codex': 'claude-sonnet-4-6', // Premium code model → Sonnet
-  'o3-deep-research': 'claude-sonnet-4-6', // Premium research model → Sonnet
-  'gpt-4o': 'claude-sonnet-4-6', // Flagship model → Sonnet
-  'gpt-4o-mini': 'claude-haiku-4-5', // Economy model → Haiku
+  'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
+  'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
+  'gpt-5.4-nano': 'claude-haiku-4-5', // Economy model → Haiku
+  'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
 
   // Google → Anthropic
-  'gemini-3-pro-preview': 'claude-sonnet-4-6', // Premium model → Sonnet
-  'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
-
-  // Z.AI → Anthropic
-  'glm-4.7': 'claude-haiku-4-5', // Standard model → Haiku
-  'glm-4.7-flash': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
+  'gemini-3-flash': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
 
   // Kimi → Anthropic
-  'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
+
+  // MiniMax → Anthropic
+  'minimax-m2.7': 'claude-sonnet-4-6', // Near-Opus performance → Sonnet
+  'minimax-m2.7-highspeed': 'claude-sonnet-4-6', // Same quality, faster → Sonnet
 };
 
 /**
@@ -153,14 +150,9 @@ export function applyFallback(
     return modelId;
   }
 
-  // Provider disabled - lookup fallback
-  const fallback = FALLBACK_MAP[modelId] || DEFAULT_FALLBACK;
-
-  // Log fallback for visibility
-  console.warn(
-    `Model ${modelId} requires ${provider} API key - falling back to ${fallback}`
-  );
-
+  // Provider disabled — fall back to the equivalent Anthropic model
+  const fallback = getFallbackModel(modelId);
+  console.warn(`Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`);
   return fallback;
 }
 
@@ -188,7 +180,6 @@ export function getFallbackModel(modelId: ModelId): AnthropicModel {
 export function detectEnabledProviders(apiKeys: {
   openai?: string;
   google?: string;
-  zai?: string;
   kimi?: string;
 }): Set<ModelProvider> {
   const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
@@ -199,9 +190,6 @@ export function detectEnabledProviders(apiKeys: {
   }
   if (apiKeys.google && apiKeys.google.trim()) {
     enabled.add('google');
-  }
-  if (apiKeys.zai && apiKeys.zai.trim()) {
-    enabled.add('zai');
   }
   if (apiKeys.kimi && apiKeys.kimi.trim()) {
     enabled.add('kimi');

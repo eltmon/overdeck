@@ -308,7 +308,7 @@ describe('ListIssueRow', () => {
     expect(onSelectIssue).toHaveBeenCalledWith(null);
   });
 
-  it('should have correct link', () => {
+  it('should have correct external link to tracker', () => {
     const issue = createMockIssue({ url: 'https://github.com/test/repo/issues/123' });
     render(
       <ListIssueRow
@@ -322,11 +322,14 @@ describe('ListIssueRow', () => {
       />
     );
 
+    // The identifier is shown as a span; the ExternalLink icon button links to the tracker
+    const identifier = screen.getByText('TEST-123');
+    expect(identifier.tagName).toBe('SPAN');
+
     const links = screen.getAllByRole('link');
-    const issueLink = links.find(l => l.textContent === 'TEST-123');
-    expect(issueLink).toBeDefined();
-    expect(issueLink!.getAttribute('href')).toBe('https://github.com/test/repo/issues/123');
-    expect(issueLink!.getAttribute('target')).toBe('_blank');
+    const trackerLink = links.find(l => l.getAttribute('href') === 'https://github.com/test/repo/issues/123');
+    expect(trackerLink).toBeDefined();
+    expect(trackerLink!.getAttribute('target')).toBe('_blank');
   });
 });
 

@@ -93,15 +93,22 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Anthropic - Legacy
   { provider: 'anthropic', model: 'claude-haiku-3', inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005, currency: 'USD' },
   // OpenAI
-  { provider: 'openai', model: 'gpt-4-turbo', inputPer1k: 0.01, outputPer1k: 0.03, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-4o', inputPer1k: 0.005, outputPer1k: 0.015, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-4o-mini', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.0004, outputPer1k: 0.0016, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4-nano', inputPer1k: 0.0002, outputPer1k: 0.00125, currency: 'USD' },
+  { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
   // Google
-  { provider: 'google', model: 'gemini-1.5-pro', inputPer1k: 0.00125, outputPer1k: 0.005, currency: 'USD' },
-  { provider: 'google', model: 'gemini-1.5-flash', inputPer1k: 0.000075, outputPer1k: 0.0003, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3-flash', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3.1-flash-lite-preview', inputPer1k: 0.00025, outputPer1k: 0.0015, currency: 'USD' },
   // Moonshot AI (Kimi)
   { provider: 'custom', model: 'kimi-for-coding', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
   { provider: 'custom', model: 'kimi-k2.5', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
+  // MiniMax ($0.30/M input, $1.20/M output)
+  { provider: 'custom', model: 'minimax-m2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  { provider: 'custom', model: 'minimax-m2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  { provider: 'custom', model: 'MiniMax-M2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  { provider: 'custom', model: 'MiniMax-M2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
 ];
 
 // ============== Cost Calculation ==============

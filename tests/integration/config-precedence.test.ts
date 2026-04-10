@@ -106,7 +106,7 @@ describe('configuration precedence in router', () => {
       const config = createTestConfig({
         enabledProviders: new Set(['anthropic']), // Only Anthropic enabled
         overrides: {
-          'issue-agent:implementation': 'gpt-5.2-codex', // OpenAI model
+          'issue-agent:implementation': 'gpt-5.4', // OpenAI model
         },
       });
 
@@ -116,14 +116,14 @@ describe('configuration precedence in router', () => {
       // Should fall back to an Anthropic model
       expect(result.usedFallback).toBe(true);
       expect(result.model).toMatch(/claude/i);
-      expect(result.originalModel).toBe('gpt-5.2-codex');
+      expect(result.originalModel).toBe('gpt-5.4');
     });
 
     it('should not apply fallback when provider is enabled', () => {
       const config = createTestConfig({
         enabledProviders: new Set(['anthropic', 'openai']),
         overrides: {
-          'issue-agent:implementation': 'gpt-5.2-codex',
+          'issue-agent:implementation': 'gpt-5.4',
         },
       });
 
@@ -132,7 +132,7 @@ describe('configuration precedence in router', () => {
 
       // Should use the requested model
       expect(result.usedFallback).toBe(false);
-      expect(result.model).toBe('gpt-5.2-codex');
+      expect(result.model).toBe('gpt-5.4');
     });
   });
 
@@ -143,7 +143,7 @@ describe('configuration precedence in router', () => {
         overrides: {
           'issue-agent:exploration': 'claude-haiku-4-5',
           'issue-agent:documentation': 'claude-opus-4-6',
-          'issue-agent:implementation': 'gpt-5.2-codex',
+          'issue-agent:implementation': 'gpt-5.4',
         },
       });
 
@@ -151,7 +151,7 @@ describe('configuration precedence in router', () => {
 
       expect(router.getModelId('issue-agent:exploration' as WorkTypeId)).toBe('claude-haiku-4-5');
       expect(router.getModelId('issue-agent:documentation' as WorkTypeId)).toBe('claude-opus-4-6');
-      expect(router.getModelId('issue-agent:implementation' as WorkTypeId)).toBe('gpt-5.2-codex');
+      expect(router.getModelId('issue-agent:implementation' as WorkTypeId)).toBe('gpt-5.4');
     });
 
     it('should use smart selection for non-overridden work types', () => {
@@ -216,7 +216,6 @@ describe('configuration precedence in router', () => {
       expect(providers.has('anthropic')).toBe(true);
       expect(providers.has('openai')).toBe(true);
       expect(providers.has('google')).toBe(true);
-      expect(providers.has('zai')).toBe(false);
     });
   });
 
