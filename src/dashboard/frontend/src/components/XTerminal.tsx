@@ -281,16 +281,11 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Intercept wheel events: scroll xterm.js locally instead of forwarding to tmux.
-      // Without this, xterm.js sends mouse escape sequences to tmux, which passes them
-      // to Claude Code's TUI input area instead of entering copy-mode.
-      const handleWheel = (event: WheelEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const scrollLines = Math.round(event.deltaY / 20);
-        term!.scrollLines(scrollLines);
-      };
-      terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
+      // Do NOT intercept wheel events — let them pass through to xterm.js and tmux.
+      // With tmux mouse mode enabled, wheel events trigger tmux copy-mode scrollback,
+      // which is the only way to scroll history while Claude Code's TUI (alternate
+      // screen buffer) is active. xterm.js's scrollLines() does nothing in alternate
+      // buffer mode.
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
