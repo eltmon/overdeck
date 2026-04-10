@@ -86,14 +86,12 @@ export function loadPanopticonEnv(): {
 export function getApiKeysFromEnv(): {
   openai?: string;
   google?: string;
-  zai?: string;
   kimi?: string;
   openrouter?: string;
 } {
   return {
     openai: process.env.OPENAI_API_KEY,
     google: process.env.GOOGLE_API_KEY,
-    zai: process.env.ZAI_API_KEY,
     kimi: process.env.KIMI_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
   };

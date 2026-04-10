@@ -197,7 +197,7 @@ describe('Aggregator Cache Management', () => {
           issueId: 'TEST-3',
           sessionType: 'implementation',
           provider: 'openai',
-          model: 'gpt-4o',
+          model: 'gpt-5.4',
           input: 1000,
           output: 500,
           cacheRead: 0,
