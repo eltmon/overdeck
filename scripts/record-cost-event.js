@@ -127,37 +127,51 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
-		model: "gpt-4-turbo",
-		inputPer1k: .01,
-		outputPer1k: .03,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-4o",
-		inputPer1k: .005,
+		model: "gpt-5.4",
+		inputPer1k: .0025,
 		outputPer1k: .015,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
-		model: "gpt-4o-mini",
+		model: "gpt-5.4-mini",
+		inputPer1k: 4e-4,
+		outputPer1k: .0016,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.4-nano",
+		inputPer1k: 2e-4,
+		outputPer1k: .00125,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "o3",
+		inputPer1k: .002,
+		outputPer1k: .008,
+		currency: "USD"
+	},
+	{
+		provider: "google",
+		model: "gemini-3.1-pro-preview",
+		inputPer1k: .002,
+		outputPer1k: .012,
+		currency: "USD"
+	},
+	{
+		provider: "google",
+		model: "gemini-3-flash",
 		inputPer1k: 15e-5,
 		outputPer1k: 6e-4,
 		currency: "USD"
 	},
 	{
 		provider: "google",
-		model: "gemini-1.5-pro",
-		inputPer1k: .00125,
-		outputPer1k: .005,
-		currency: "USD"
-	},
-	{
-		provider: "google",
-		model: "gemini-1.5-flash",
-		inputPer1k: 75e-6,
-		outputPer1k: 3e-4,
+		model: "gemini-3.1-flash-lite-preview",
+		inputPer1k: 25e-5,
+		outputPer1k: .0015,
 		currency: "USD"
 	},
 	{
