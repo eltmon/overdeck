@@ -15,6 +15,7 @@
 
 import { randomUUID } from 'crypto';
 import { getEventStore } from '../dashboard/server/event-store.js';
+import type { DomainEvent } from '@panopticon/contracts';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
 export type ActivitySource = 'merge-agent' | 'cloister' | 'review-specialist' | 'test-specialist' | 'dashboard' | 'deploy-script';
@@ -45,8 +46,8 @@ export function emitActivityEntry(options: EmitActivityOptions): void {
         source: options.source,
         level: options.level,
         message: options.message,
-        details: options.details ?? null,
-        issueId: options.issueId ?? null,
+        details: options.details ?? undefined,
+        issueId: options.issueId ?? undefined,
       },
     };
     store.append(entry);
@@ -71,7 +72,7 @@ export function emitDashboardLifecycle(
 ): void {
   try {
     const store = getEventStore();
-    let event: Record<string, unknown>;
+    let event: Omit<DomainEvent, 'sequence'>;
 
     if (status === 'started') {
       event = {
@@ -79,7 +80,7 @@ export function emitDashboardLifecycle(
         timestamp: new Date().toISOString(),
         payload: {
           reason: options.reason,
-          issueId: options.issueId ?? null,
+          issueId: options.issueId ?? undefined,
           trigger: options.trigger ?? 'unknown',
         },
       };
@@ -89,7 +90,7 @@ export function emitDashboardLifecycle(
         timestamp: new Date().toISOString(),
         payload: {
           reason: options.reason,
-          issueId: options.issueId ?? null,
+          issueId: options.issueId ?? undefined,
           durationMs: options.durationMs ?? 0,
         },
       };
@@ -99,7 +100,7 @@ export function emitDashboardLifecycle(
         timestamp: new Date().toISOString(),
         payload: {
           reason: options.reason,
-          issueId: options.issueId ?? null,
+          issueId: options.issueId ?? undefined,
           error: options.error ?? 'unknown error',
         },
       };
