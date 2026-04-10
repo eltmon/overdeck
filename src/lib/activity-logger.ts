@@ -45,8 +45,8 @@ export function emitActivityEntry(options: EmitActivityOptions): void {
         source: options.source,
         level: options.level,
         message: options.message,
-        details: options.details ?? null,
-        issueId: options.issueId ?? null,
+        details: options.details,
+        issueId: options.issueId,
       },
     };
     store.append(entry);
@@ -71,41 +71,39 @@ export function emitDashboardLifecycle(
 ): void {
   try {
     const store = getEventStore();
-    let event: Record<string, unknown>;
+    const timestamp = new Date().toISOString();
 
     if (status === 'started') {
-      event = {
+      store.append({
         type: 'dashboard.lifecycle_started' as const,
-        timestamp: new Date().toISOString(),
+        timestamp,
         payload: {
           reason: options.reason,
-          issueId: options.issueId ?? null,
+          issueId: options.issueId,
           trigger: options.trigger ?? 'unknown',
         },
-      };
+      });
     } else if (status === 'completed') {
-      event = {
+      store.append({
         type: 'dashboard.lifecycle_completed' as const,
-        timestamp: new Date().toISOString(),
+        timestamp,
         payload: {
           reason: options.reason,
-          issueId: options.issueId ?? null,
+          issueId: options.issueId,
           durationMs: options.durationMs ?? 0,
         },
-      };
+      });
     } else {
-      event = {
+      store.append({
         type: 'dashboard.lifecycle_failed' as const,
-        timestamp: new Date().toISOString(),
+        timestamp,
         payload: {
           reason: options.reason,
-          issueId: options.issueId ?? null,
+          issueId: options.issueId,
           error: options.error ?? 'unknown error',
         },
-      };
+      });
     }
-
-    store.append(event);
   } catch {
     // Non-fatal
   }
