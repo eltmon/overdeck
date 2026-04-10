@@ -317,6 +317,11 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     ws.onopen = () => {
       console.log('XTerminal: WebSocket opened');
+      // Reset first-data flag so the scrollback dump refresh fires on every
+      // new connection (not just the first one). Without this, reconnections
+      // after server restart skip the refresh and leave stale spinner dots.
+      hadFirstData.current = false;
+
       // Do NOT reset reconnectAttempts or clear the terminal here — the server
       // may close immediately if the tmux session doesn't exist yet. Clearing
       // here causes the screen to flash on every failed reconnect attempt.
