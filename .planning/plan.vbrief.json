@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-10T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-598: Support latest ChatGPT/OpenAI models with subscription tier awareness"
+    "description": "Plan for PAN-598: Support latest ChatGPT/OpenAI models with subscription tier awareness",
+    "updated": "2026-04-10T06:27:31.997Z"
   },
   "plan": {
     "id": "pan-598",
@@ -11,13 +12,23 @@
     "status": "approved",
     "uid": "28a73744-aef7-48e9-b372-e4f30ad21d4d",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 47,
     "created": "2026-04-10T00:00:00.000Z",
-    "updated": "2026-04-10T00:00:00.000Z",
+    "updated": "2026-04-10T06:27:31.997Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/598", "label": "PAN-598", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/598",
+        "label": "PAN-598",
+        "type": "issue"
+      }
     ],
-    "tags": ["openai", "claudish", "multi-model", "oauth", "subscription-tiers"],
+    "tags": [
+      "openai",
+      "claudish",
+      "multi-model",
+      "oauth",
+      "subscription-tiers"
+    ],
     "narratives": {
       "Problem": "Panopticon uses claude-code-router for multi-model routing, but CCR lacks OAuth support for ChatGPT Plus/Pro subscriptions. Users must pay per-token via API keys even when they have existing subscriptions. Additionally, the OpenAI model registry is incomplete and lacks subscription tier awareness.",
       "Proposal": "Replace claude-code-router with claudish (v6.12.2) as the multi-model router. claudish supports OAuth-based subscriptions via provider prefixes (e.g., oai@ for API key, go@ for Google OAuth). Add subscription tier configuration to config.yaml, extend the OpenAI model registry with latest models and tier metadata, update the smart model selector to filter by tier, and integrate claudish prefix mapping into agent spawning. Dashboard displays full claudish prefix + backing model."
@@ -26,7 +37,7 @@
       {
         "id": "pan-598.config-schema",
         "title": "Add subscription tier config schema",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -40,27 +51,37 @@
           {
             "id": "pan-598.config-schema.ac1",
             "title": "auth and plan fields added to provider config in config-yaml.ts",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.786Z"
           },
           {
             "id": "pan-598.config-schema.ac2",
             "title": "getProviderAuthMode(model) returns auth mode and plan from config or env",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.786Z"
           },
           {
             "id": "pan-598.config-schema.ac3",
             "title": "Config schema includes auth: subscription|api-key and plan: free|plus|pro",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.786Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.997Z"
       },
       {
         "id": "pan-598.model-registry",
         "title": "Extend OpenAI model registry with new models and tier metadata",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -74,27 +95,37 @@
           {
             "id": "pan-598.model-registry.ac1",
             "title": "All current OpenAI models (gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, o3) have tier metadata",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.786Z"
           },
           {
             "id": "pan-598.model-registry.ac2",
             "title": "ModelCapability interface includes minTier or tierAccess field",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.786Z"
           },
           {
             "id": "pan-598.model-registry.ac3",
             "title": "New confirmed OpenAI models added to MODEL_CAPABILITIES",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.786Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.997Z"
       },
       {
         "id": "pan-598.provider-prefix-mapping",
         "title": "Add claudish provider prefix mapping",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -108,21 +139,28 @@
           {
             "id": "pan-598.provider-prefix-mapping.ac1",
             "title": "getClaudishPrefix(model, authMode) returns correct prefix (e.g., oai@gpt-5.4, cx@o3)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.783Z"
           },
           {
             "id": "pan-598.provider-prefix-mapping.ac2",
             "title": "OpenAI API key auth maps to oai@ prefix, subscription auth maps to OAuth prefix",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.783Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.995Z"
       },
       {
         "id": "pan-598.tier-aware-selector",
         "title": "Add tier-aware filtering to smart model selector",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -136,21 +174,28 @@
           {
             "id": "pan-598.tier-aware-selector.ac1",
             "title": "selectModel() only considers models available at user's configured tier",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.782Z"
           },
           {
             "id": "pan-598.tier-aware-selector.ac2",
             "title": "Smart selector falls back to highest-tier model user has access to",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.782Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.994Z"
       },
       {
         "id": "pan-598.tier-aware-fallback",
         "title": "Add tier-aware model fallback",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -164,15 +209,19 @@
           {
             "id": "pan-598.tier-aware-fallback.ac1",
             "title": "Fallback prefers cheaper OpenAI model before switching providers",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.785Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.996Z"
       },
       {
         "id": "pan-598.claudish-install",
         "title": "Replace CCR install with claudish binary download",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -186,21 +235,28 @@
           {
             "id": "pan-598.claudish-install.ac1",
             "title": "pan install downloads correct claudish binary for Linux x64/arm64",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.785Z"
           },
           {
             "id": "pan-598.claudish-install.ac2",
             "title": "pan install downloads claudish v6.12.2 (latest) from GitHub releases",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.785Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.996Z"
       },
       {
         "id": "pan-598.claudish-sync",
         "title": "Replace CCR sync check with claudish version check",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -214,15 +270,19 @@
           {
             "id": "pan-598.claudish-sync.ac1",
             "title": "pan sync detects claudish installation and version",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.784Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.996Z"
       },
       {
         "id": "pan-598.ccr-removal",
         "title": "Remove CCR command and documentation",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -236,15 +296,19 @@
           {
             "id": "pan-598.ccr-removal.ac1",
             "title": "pan ccr command no longer exists",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.785Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.996Z"
       },
       {
         "id": "pan-598.agent-spawn-with-prefix",
         "title": "Integrate claudish prefix into agent spawning",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -258,27 +322,37 @@
           {
             "id": "pan-598.agent-spawn-with-prefix.ac1",
             "title": "Agents spawned for OpenAI models use claudish prefix (oai@ or cx@)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.782Z"
           },
           {
             "id": "pan-598.agent-spawn-with-prefix.ac2",
             "title": "All agent types (planning, implementation, reviewer, etc.) support OpenAI routing",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.783Z"
           },
           {
             "id": "pan-598.agent-spawn-with-prefix.ac3",
             "title": "Anthropic models continue to work without prefix (no change needed)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.783Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.995Z"
       },
       {
         "id": "pan-598.dashboard-display",
         "title": "Update dashboard to display full claudish prefix + backing model",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -292,21 +366,28 @@
           {
             "id": "pan-598.dashboard-display.ac1",
             "title": "Dashboard inspector shows full claudish prefix for OpenAI-routed agents",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.784Z"
           },
           {
             "id": "pan-598.dashboard-display.ac2",
             "title": "tmux pane parser recognizes OpenAI model names",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.784Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.996Z"
       },
       {
         "id": "pan-598.cost-tracking",
         "title": "Verify token usage tracking for OpenAI models via JSONL",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -320,15 +401,19 @@
           {
             "id": "pan-598.cost-tracking.ac1",
             "title": "Token usage and cost tracking reflects actual OpenAI model usage from JSONL",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.784Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.996Z"
       },
       {
         "id": "pan-598.research-oauth",
         "title": "Research ChatGPT OAuth prefix in claudish",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-10T00:00:00.000Z",
         "metadata": {
@@ -342,21 +427,57 @@
           {
             "id": "pan-598.research-oauth.ac1",
             "title": "ChatGPT OAuth prefix confirmed (cx@ or equivalent)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-10T06:26:45.783Z"
           }
-        ]
+        ],
+        "completed": "2026-04-10T06:27:31.995Z"
       }
     ],
     "edges": [
-      { "from": "pan-598.config-schema", "to": "pan-598.provider-prefix-mapping", "type": "blocks" },
-      { "from": "pan-598.config-schema", "to": "pan-598.tier-aware-selector", "type": "blocks" },
-      { "from": "pan-598.model-registry", "to": "pan-598.tier-aware-selector", "type": "blocks" },
-      { "from": "pan-598.tier-aware-selector", "to": "pan-598.agent-spawn-with-prefix", "type": "blocks" },
-      { "from": "pan-598.provider-prefix-mapping", "to": "pan-598.agent-spawn-with-prefix", "type": "blocks" },
-      { "from": "pan-598.claudish-install", "to": "pan-598.agent-spawn-with-prefix", "type": "informs" },
-      { "from": "pan-598.agent-spawn-with-prefix", "to": "pan-598.dashboard-display", "type": "informs" },
-      { "from": "pan-598.agent-spawn-with-prefix", "to": "pan-598.cost-tracking", "type": "informs" }
+      {
+        "from": "pan-598.config-schema",
+        "to": "pan-598.provider-prefix-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.config-schema",
+        "to": "pan-598.tier-aware-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.model-registry",
+        "to": "pan-598.tier-aware-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.tier-aware-selector",
+        "to": "pan-598.agent-spawn-with-prefix",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.provider-prefix-mapping",
+        "to": "pan-598.agent-spawn-with-prefix",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.claudish-install",
+        "to": "pan-598.agent-spawn-with-prefix",
+        "type": "informs"
+      },
+      {
+        "from": "pan-598.agent-spawn-with-prefix",
+        "to": "pan-598.dashboard-display",
+        "type": "informs"
+      },
+      {
+        "from": "pan-598.agent-spawn-with-prefix",
+        "to": "pan-598.cost-tracking",
+        "type": "informs"
+      }
     ]
   }
 }
