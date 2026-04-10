@@ -260,24 +260,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
           broadcastToHub(hub, data);
         });
 
-        // After 200ms: force full repaint via dimension toggle.
-        // The toggle (cols -> cols-1 -> cols) guarantees two SIGWINCHs, the last at the
-        // correct size. Claude repaints its entire TUI at the correct dimensions.
-        setTimeout(() => {
-          if (ptyProcess && hub.clients.size > 0) {
-            // Toggle dimensions to force SIGWINCH + full repaint
-            ptyProcess.resize(cols - 1, rows);
-            execAsync(`tmux resize-window -t ${sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
-              .then(() => new Promise<void>(r => setTimeout(r, 50)))
-              .then(() => {
-                if (ptyProcess && hub.clients.size > 0) {
-                  ptyProcess.resize(cols, rows);
-                  return execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
-                }
-              })
-              .catch(() => {});
-          }
-        }, 200);
+        // PTY spawns at client's exact dimensions (cols, rows above).
+        // The tmux attach itself triggers a proper resize via window-size=latest.
+        // Do NOT force SIGWINCH via dimension toggle — the async resize/repaint
+        // races with the client's opacity reveal and causes text bleeding/corruption.
+        // (Original fix: 2282e695, Feb 3 2026. Regression: April 2026 dimension toggles.)
 
         // Handle PTY exit — close all client connections
         ptyProcess.onExit(({ exitCode }) => {

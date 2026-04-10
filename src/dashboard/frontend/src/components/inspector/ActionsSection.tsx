@@ -27,12 +27,14 @@ interface ActionsSectionProps {
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
   createWorkspaceMutation: AnyMutation;
   syncMainMutation: SyncMutation;
+  resetSessionMutation: AnyMutation;
   onMerge: () => void;
   onReview: () => void;
   onKill: () => void;
   onClose: () => void;
   onReopen: () => void;
   onResetReview: () => void;
+  onResetSession: () => void;
   onDismissPending: () => void;
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
@@ -52,12 +54,14 @@ export function ActionsSection({
   startAgentMutation,
   createWorkspaceMutation,
   syncMainMutation,
+  resetSessionMutation,
   onMerge,
   onReview,
   onKill,
   onClose,
   onReopen,
   onResetReview,
+  onResetSession,
   onDismissPending,
   onStartAgent,
   onCreateWorkspace,
@@ -221,6 +225,18 @@ export function ActionsSection({
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : startAgentMutation.isSuccess ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               {startAgentMutation.isPending ? (isResume ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (isResume ? 'Resumed!' : 'Started!') : (isResume ? 'Resume Session' : 'Start Agent')}
             </button>
+            {/* Reset Session — only when resuming (has a saved session) */}
+            {isResume && (
+              <button
+                onClick={onResetSession}
+                disabled={resetSessionMutation.isPending || resetSessionMutation.isSuccess}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
+                title="Clear saved session so next start creates a fresh Claude session (preserves workspace)"
+              >
+                {resetSessionMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : resetSessionMutation.isSuccess ? <Check className="w-3 h-3" /> : <RotateCcw className="w-3 h-3" />}
+                {resetSessionMutation.isPending ? 'Resetting...' : resetSessionMutation.isSuccess ? 'Session Reset' : 'Reset Session'}
+              </button>
+            )}
             {!workspace?.exists && (
               <button
                 onClick={onCreateWorkspace}

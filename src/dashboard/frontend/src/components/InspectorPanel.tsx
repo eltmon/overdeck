@@ -191,18 +191,21 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
-      // If there's a stopped agent, resume it instead of starting fresh
+      // If there's a stopped agent, try to resume it
       if (agent && agent.status === 'stopped') {
         const res = await fetch(`/api/agents/${agent.id}/resume`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: message || undefined }),
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
+        if (res.ok) return res.json();
+        const err = await res.json().catch(() => ({}));
+        // If resume fails because session was reset, fall through to fresh start
+        if (err.error?.includes('No saved session ID')) {
+          // Fall through to POST /api/agents below
+        } else {
           throw new Error(err.error || 'Failed to resume session');
         }
-        return res.json();
       }
       const res = await fetch('/api/agents', {
         method: 'POST',
@@ -404,6 +407,25 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+
+  const resetSessionMutation = useMutation({
+    mutationFn: async () => {
+      if (!agent) throw new Error('No agent to reset session for');
+      const res = await fetch(`/api/agents/${agent.id}/reset-session`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to reset session');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      toast.success('Session reset — next start will create a fresh session');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 
@@ -880,12 +902,14 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
           startAgentMutation={startAgentMutation}
           createWorkspaceMutation={createWorkspaceMutation}
           syncMainMutation={syncMainMutation}
+          resetSessionMutation={resetSessionMutation}
           onMerge={handleMerge}
           onReview={handleReview}
           onKill={handleKill}
           onClose={handleClose}
           onReopen={handleReopen}
           onResetReview={handleResetReview}
+          onResetSession={() => resetSessionMutation.mutate()}
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}

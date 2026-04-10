@@ -1503,6 +1503,19 @@ const MERGE_STUCK_MAX_ATTEMPTS = 3;
 // cooldowns are a performance optimisation, not critical state)
 const mergeStuckCooldowns = new Map<string, number>();
 
+// Callback set by the server layer to emit domain events when agents are stopped.
+// Deacon is a library module and does not own the event store directly.
+let agentStoppedNotifier: ((agentId: string) => void) | null = null;
+
+/**
+ * Register a callback that deacon will call when it detects an orphaned agent
+ * and resets it to stopped. The server layer uses this to emit an agent.stopped
+ * domain event so the read model and frontend update in real-time.
+ */
+export function setAgentStoppedNotifier(fn: (agentId: string) => void): void {
+  agentStoppedNotifier = fn;
+}
+
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
 // Deacon is a library module and does not own the Socket.io instance directly.
 let mergeReadyNotifier: ((issueId: string) => void) | null = null;
@@ -2113,6 +2126,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   // per-project ephemeral specialists via spawnEphemeralSpecialist().
   // Per-project ephemeral specialist patrol is below (dead session + stuck detection).
 
+  // Recover orphaned agents: status=running but tmux session gone (failed resume, crash, etc.)
+  const orphanedAgentActions = recoverOrphanedAgents();
+  actions.push(...orphanedAgentActions);
+  for (const a of orphanedAgentActions) addLog('action', a, state.patrolCycle);
+
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
@@ -2341,13 +2359,13 @@ export function getLastPatrolResult(): PatrolResult | null {
  * no live tmux session — this happens after a system crash where tmux was killed but
  * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
  */
-function recoverOrphanedAgents(): void {
-  if (!existsSync(AGENTS_DIR)) return;
+function recoverOrphanedAgents(context?: string): string[] {
+  if (!existsSync(AGENTS_DIR)) return [];
   let dirs: string[];
   try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
-  catch { return; }
+  catch { return []; }
 
-  let recovered = 0;
+  const actions: string[] = [];
   for (const dir of dirs) {
     const stateFile = join(AGENTS_DIR, dir, 'state.json');
     if (!existsSync(stateFile)) continue;
@@ -2360,11 +2378,19 @@ function recoverOrphanedAgents(): void {
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
       writeFileSync(stateFile, JSON.stringify(state, null, 2));
-      recovered++;
-      console.log(`[deacon] Recovered orphaned agent ${dir} (${oldStatus}→stopped)`);
+      const msg = `Recovered orphaned agent ${dir} (${oldStatus}→stopped)`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
+      // Notify server layer so the read model and frontend update
+      if (agentStoppedNotifier) {
+        try { agentStoppedNotifier(dir); } catch { /* non-fatal */ }
+      }
     } catch { /* non-fatal */ }
   }
-  if (recovered > 0) console.log(`[deacon] Startup recovery: ${recovered} orphaned agent(s) reset to stopped`);
+  if (actions.length > 0 && context) {
+    console.log(`[deacon] ${context}: ${actions.length} orphaned agent(s) reset to stopped`);
+  }
+  return actions;
 }
 
 export function startDeacon(): void {
@@ -2377,7 +2403,7 @@ export function startDeacon(): void {
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
   // Recover agents whose tmux sessions were killed by a system crash
-  recoverOrphanedAgents();
+  recoverOrphanedAgents('Startup recovery');
 
   // Run initial patrol
   runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));

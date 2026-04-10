@@ -1869,11 +1869,13 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
     const specialistType = name as any;
     const newGen = bumpSessionGeneration(specialistType, projectKey);
 
-    // Also kill the tmux session so it doesn't linger with old context
+    // Also kill the tmux session so it doesn't linger with old context.
+    // NOTE: try/catch does NOT work with yield* in Effect.gen — use .catch() in the Promise chain.
     const tmuxSession = `specialist-${projectKey}-${name}`;
-    try {
-      yield* Effect.promise(() => execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null`, { encoding: 'utf-8' }));
-    } catch { /* no session to kill */ }
+    yield* Effect.promise(() =>
+      execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null`, { encoding: 'utf-8' })
+        .catch(() => { /* no session to kill */ })
+    );
 
     console.log(`[specialist] Reset session for ${projectKey}/${name} → generation ${newGen}`);
     return jsonResponse({ success: true, specialist: name, project: projectKey, generation: newGen });

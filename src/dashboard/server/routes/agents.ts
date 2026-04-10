@@ -24,6 +24,7 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   POST   /api/agents/:id/handoff
  *   GET    /api/agents/:id/handoffs
  *   GET    /api/agents/:id/cost
+ *   POST   /api/agents/:id/reset-session
  *   POST   /api/agents
  */
 
@@ -59,6 +60,7 @@ import {
   getProviderExportsForModel,
   getProviderTmuxFlags,
   listRunningAgents,
+  getAgentDir,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import {
@@ -1373,10 +1375,14 @@ const postAgentsRoute = HttpRouter.add(
     const savedSessionId = getLatestSessionId(agentSessionName);
 
     if (existingAgentState && savedSessionId && (existingAgentState.status === 'stopped' || existingAgentState.status === 'completed')) {
-      // Kill any zombie tmux session before resuming
-      try {
-        yield* Effect.promise(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }));
-      } catch { /* No existing session — good */ }
+      // Kill any zombie tmux session before resuming.
+      // NOTE: try/catch does NOT work with yield* in Effect.gen — Effect errors propagate
+      // through the Effect error channel, not as JS exceptions. Use .catch() in the Promise
+      // chain instead so the Effect never fails when the session doesn't exist.
+      yield* Effect.promise(() =>
+        execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' })
+          .catch(() => { /* No existing session — good */ })
+      );
 
       // Remove completed marker so the agent can work again
       const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
@@ -1745,6 +1751,70 @@ const postAgentsRestartAllRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/agents/:id/reset-session ─────────────────────────────
+// Clears saved Claude session tracking so the next start creates a fresh session.
+// Workspace, beads, and git state are preserved. JSONL files kept for cost history.
+
+const postAgentResetSessionRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/reset-session',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
+
+    const agentState = getAgentState(id);
+    if (!agentState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    if (agentState.status === 'running') {
+      return jsonResponse({ error: `Agent ${id} is running. Stop it first.` }, { status: 409 });
+    }
+
+    const previousSessionId = getLatestSessionId(id);
+    if (!previousSessionId) {
+      return jsonResponse({ error: `Agent ${id} has no saved session to reset` }, { status: 404 });
+    }
+
+    const agentDir = getAgentDir(id);
+
+    // Clear session.id
+    yield* Effect.promise(() => rm(join(agentDir, 'session.id'), { force: true }));
+
+    // Clear sessions.json
+    yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true }));
+
+    // Clear claudeSessionId from runtime.json (preserve other fields).
+    // Must read/write directly — saveAgentRuntimeState merges with existing file.
+    const runtimeFile = join(agentDir, 'runtime.json');
+    if (existsSync(runtimeFile)) {
+      try {
+        const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'));
+        const runtime = JSON.parse(runtimeContent);
+        delete runtime.claudeSessionId;
+        yield* Effect.promise(() => writeFile(runtimeFile, JSON.stringify(runtime, null, 2)));
+      } catch { /* non-fatal */ }
+    }
+
+    // Kill zombie tmux session if exists
+    yield* Effect.promise(() =>
+      execAsync(`tmux kill-session -t "${id}" 2>/dev/null`, { encoding: 'utf-8' })
+        .catch(() => { /* no session to kill */ })
+    );
+
+    // Emit event so dashboard updates
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.stopped',
+      timestamp: new Date().toISOString(),
+      payload: { agentId: id },
+    })));
+
+    console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
+    return jsonResponse({ success: true, agentId: id, previousSessionId });
+  })),
+);
+
 export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
@@ -1768,6 +1838,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentsRoute,
   postAgentsRestartAllRoute,
   getAgentTmuxAliveRoute,
+  postAgentResetSessionRoute,
 );
 
 export default agentsRouteLayer;
