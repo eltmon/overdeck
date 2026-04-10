@@ -59,7 +59,7 @@ async function readKeychainCredentials(): Promise<string | null> {
   });
 }
 
-function parseOAuthPayload(raw: string): {
+export function parseOAuthPayload(raw: string): {
   loggedIn: boolean;
   expired: boolean;
   subscriptionType: string | null;
@@ -76,6 +76,8 @@ function parseOAuthPayload(raw: string): {
   const expiresAt = typeof oauth.expiresAt === 'number' ? oauth.expiresAt : null;
   const expired = !!(expiresAt && expiresAt < Date.now());
 
+  // Treat as logged in even if expired — Claude Code auto-refreshes tokens
+  // transparently. Only mark as not-logged-in if there's no token at all.
   return {
     loggedIn: true,
     expired,
