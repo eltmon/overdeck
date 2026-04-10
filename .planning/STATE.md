@@ -19,4 +19,7 @@ All beads complete — ready for merge
 - D4: Branch protection enabled immediately via GitHub API (runs live on eltmon/panopticon-cli/main)
 
 ## Specialist Feedback
-(none yet)
+- **[2026-04-07T19:04Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-10T19:41Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+- **[2026-04-10T19:43Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
+- **[2026-04-10] All blocking issues resolved** — sessionExistsAsync (no execSync in route), onDisconnect wired in AgentOutputPanel, PAN-XXX placeholder removed
