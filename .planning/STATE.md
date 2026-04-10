@@ -42,3 +42,4 @@ today's count with "(today)" label text instead of lifetime total.
 - **[2026-04-10T20:56Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`
 - **[2026-04-10T20:59Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/007-review-agent-changes-requested.md`
 - **[2026-04-10T21:02Z] verification-gate → FAILED** — `.planning/feedback/008-verification-gate-failed.md`
+- **[2026-04-10T21:05Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/009-review-agent-changes-requested.md`
