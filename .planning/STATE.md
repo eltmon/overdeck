@@ -22,3 +22,5 @@ All beads implemented and tested. Committing bead 3 (tests) and calling pan work
 ## Specialist Feedback
 (none yet)
 - **[2026-04-07T04:53Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-07T18:57Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+- **[2026-04-07T18:57Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
