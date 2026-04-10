@@ -23,6 +23,20 @@ This means:
 
 **Every workaround is a bug you chose not to fix.** The user has stated this hundreds of times: always pick up the trash, never walk over it, zero intentional technical debt. This applies to EVERYTHING — tools, tests, data, UI, infrastructure. No exceptions.
 
+## CRITICAL: Never Do Agent Work — Fix the System
+
+**When an agent produces bad results (incomplete work, wrong output, passing with known issues), NEVER fix the output yourself. Fix the Panopticon system that allowed the bad result.**
+
+This means:
+- Review agent passes with known issues → Fix the review agent prompt or acceptance criteria so it BLOCKS instead of passing
+- Work agent leaves dead code or uncommitted changes → Fix the verification gate or done flow to catch it
+- Merge agent fails silently → Fix the failure reporting in the pipeline
+- NEVER edit workspace files to fix what an agent should have done
+- NEVER manually run commands that a pipeline flow should handle
+- ALWAYS ask "why did the system allow this?" before touching any code
+
+The goal is autonomous correctness. Every manual intervention is a system bug.
+
 ## CRITICAL: Deliver Complete Features — No Partial Implementations
 
 **Unless explicitly asked to break work into phases, deliver the entire feature in a single issue.** A feature is idempotent — partial delivery provides zero value to the end user.
