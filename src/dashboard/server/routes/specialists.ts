@@ -428,19 +428,26 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
-    // When test specialist reports success, mark as ready for merge.
+    // When test specialist reports success, mark as ready for merge —
+    // but ONLY if verification also passed. If verification failed (pre-existing
+    // or new errors), the issue should not be merge-ready.
     if (specialist === 'test' && status === 'passed') {
       try {
-        const project = resolveProjectFromIssue(normalizedIssueId);
-        if (project) {
-          const workspacePath = join(
-            project.projectPath,
-            'workspaces',
-            `feature-${normalizedIssueId.toLowerCase()}`,
-          );
-          if (existsSync(workspacePath)) {
-            setReviewStatusBase(normalizedIssueId, { readyForMerge: true });
-            console.log(`[specialists/done] ${normalizedIssueId} marked ready for merge after tests passed`);
+        const currentStatus = getReviewStatus(normalizedIssueId);
+        if (currentStatus?.verificationStatus === 'failed') {
+          console.log(`[specialists/done] ${normalizedIssueId} tests passed but verification failed — NOT marking ready for merge`);
+        } else {
+          const project = resolveProjectFromIssue(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              setReviewStatusBase(normalizedIssueId, { readyForMerge: true });
+              console.log(`[specialists/done] ${normalizedIssueId} marked ready for merge after tests passed`);
+            }
           }
         }
       } catch (err) {
@@ -1239,16 +1246,20 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
             );
           } else {
             const testPassed = status === 'passed';
+            // Only set readyForMerge if verification also passed
+            const verificationOk = existingStatus?.verificationStatus !== 'failed';
             setReviewStatusBase(issueId, {
               testStatus: testPassed ? 'passed' : 'failed',
               testNotes: `Auto-detected: ${status}`,
-              // Set readyForMerge when test passes — same as specialists/done handler.
+              // Set readyForMerge when test passes AND verification passed.
               // Without this, issues that go through per-project specialists never
               // transition to readyForMerge (PAN-615).
-              ...(testPassed ? { readyForMerge: true } : {}),
+              ...(testPassed && verificationOk ? { readyForMerge: true } : {}),
             });
-            if (testPassed) {
+            if (testPassed && verificationOk) {
               console.log(`[specialists] ${issueId} marked ready for merge after auto-detected test pass`);
+            } else if (testPassed && !verificationOk) {
+              console.log(`[specialists] ${issueId} tests passed but verification failed — NOT marking ready for merge`);
             }
           }
         }
