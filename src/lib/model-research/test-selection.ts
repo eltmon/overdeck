@@ -66,6 +66,7 @@ const anthropicKimi: ModelId[] = [
   'claude-opus-4-6',
   'claude-sonnet-4-5',
   'claude-haiku-4-5',
+  'kimi-k2',
   'kimi-k2.5',
 ];
 const akResults = selectAllModels(anthropicKimi);
@@ -82,8 +83,8 @@ const anthropicGoogle: ModelId[] = [
   'claude-opus-4-6',
   'claude-sonnet-4-5',
   'claude-haiku-4-5',
-  'gemini-3.1-pro-preview',
-  'gemini-3-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
 ];
 const agResults = selectAllModels(anthropicGoogle);
 

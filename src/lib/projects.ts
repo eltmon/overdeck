@@ -28,7 +28,7 @@ export interface IssueRoutingRule {
 export interface WorkspaceConfig {
   type?: 'polyrepo' | 'monorepo';
   workspaces_dir?: string;
-  repos?: Array<{ name: string; path: string; branch_prefix?: string }>;
+  repos?: Array<{ name: string; path: string; branch_prefix?: string; readonly?: boolean; link_type?: 'worktree' | 'symlink'; pr_target?: string }>;
   dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
   ports?: Record<string, { range: [number, number] }>;
   docker?: { traefik?: string; compose_template?: string };
@@ -36,6 +36,14 @@ export interface WorkspaceConfig {
   agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
   env?: { template?: string; secrets_file?: string };
   services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;
+  /** When true, only always_include repos are created on workspace init (progressive mode) */
+  progressive?: boolean;
+  /** Repo names to always include in progressive workspaces */
+  always_include?: string[];
+  /** Default PR target branch for all repos */
+  pr_target?: string;
+  /** Path (relative to project root) to repo-groups.yaml for named repo groups */
+  groups_file?: string;
 }
 
 /**

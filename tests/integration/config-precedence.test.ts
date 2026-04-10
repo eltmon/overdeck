@@ -216,6 +216,7 @@ describe('configuration precedence in router', () => {
       expect(providers.has('anthropic')).toBe(true);
       expect(providers.has('openai')).toBe(true);
       expect(providers.has('google')).toBe(true);
+      expect(providers.has('zai')).toBe(false);
     });
   });
 

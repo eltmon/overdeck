@@ -43,6 +43,11 @@ describe('model-fallback', () => {
       expect(getModelProvider('gemini-3-pro-preview')).toBe('google');
       expect(getModelProvider('gemini-3-flash-preview')).toBe('google');
     });
+
+    it('should return zai for GLM models', () => {
+      expect(getModelProvider('glm-4.7')).toBe('zai');
+      expect(getModelProvider('glm-4.7-flash')).toBe('zai');
+    });
   });
 
   describe('requiresExternalKey', () => {
@@ -60,6 +65,11 @@ describe('model-fallback', () => {
     it('should return true for Google models', () => {
       expect(requiresExternalKey('gemini-3-pro-preview')).toBe(true);
       expect(requiresExternalKey('gemini-3-flash-preview')).toBe(true);
+    });
+
+    it('should return true for Z.AI models', () => {
+      expect(requiresExternalKey('glm-4.7')).toBe(true);
+      expect(requiresExternalKey('glm-4.7-flash')).toBe(true);
     });
   });
 
@@ -89,6 +99,13 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-2.5-pro');
       expect(models).toContain('gemini-2.5-flash');
       expect(models).toHaveLength(4);
+    });
+
+    it('should return all Z.AI models', () => {
+      const models = getModelsByProvider('zai');
+      expect(models).toContain('glm-4.7');
+      expect(models).toContain('glm-4.7-flash');
+      expect(models).toHaveLength(2);
     });
   });
 
@@ -147,6 +164,16 @@ describe('model-fallback', () => {
       expect(applyFallback('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
     });
 
+    it('should fallback GLM-4.7 to Haiku', () => {
+      const enabled = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallback('glm-4.7', enabled)).toBe('claude-haiku-4-5');
+    });
+
+    it('should fallback GLM-4.7-flash to Haiku', () => {
+      const enabled = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallback('glm-4.7-flash', enabled)).toBe('claude-haiku-4-5');
+    });
+
     it('should log warning when applying fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       applyFallback('gpt-5.2-codex', enabled);
@@ -192,6 +219,11 @@ describe('model-fallback', () => {
       expect(getFallbackModel('gemini-3-pro-preview')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('gemini-3-flash-preview')).toBe('claude-haiku-4-5');
     });
+
+    it('should return fallback for Z.AI models', () => {
+      expect(getFallbackModel('glm-4.7')).toBe('claude-haiku-4-5');
+      expect(getFallbackModel('glm-4.7-flash')).toBe('claude-haiku-4-5');
+    });
   });
 
   describe('detectEnabledProviders', () => {
@@ -210,16 +242,23 @@ describe('model-fallback', () => {
       expect(enabled.has('google')).toBe(true);
     });
 
+    it('should detect Z.AI when key present', () => {
+      const enabled = detectEnabledProviders({ zai: 'test-key' });
+      expect(enabled.has('zai')).toBe(true);
+    });
+
     it('should detect multiple providers', () => {
       const enabled = detectEnabledProviders({
         openai: 'sk-test',
         google: 'test-key',
+        zai: 'test-key',
       });
 
-      expect(enabled.size).toBe(3); // anthropic + 2 others
+      expect(enabled.size).toBe(4); // anthropic + 3 others
       expect(enabled.has('anthropic')).toBe(true);
       expect(enabled.has('openai')).toBe(true);
       expect(enabled.has('google')).toBe(true);
+      expect(enabled.has('zai')).toBe(true);
     });
 
     it('should ignore empty strings', () => {
@@ -261,11 +300,12 @@ describe('model-fallback', () => {
     });
 
     it('should include all models when all providers enabled', () => {
-      const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google']);
+      const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai']);
       const models: ModelId[] = [
         'claude-opus-4-6',
         'gpt-5.2-codex',
         'gemini-3-pro-preview',
+        'glm-4.7',
       ];
 
       const filtered = filterAvailableModels(models, enabled);
@@ -300,10 +340,10 @@ describe('model-fallback', () => {
     });
 
     it('should return all models when all providers enabled', () => {
-      const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
+      const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(14); // 4 Anthropic + 4 OpenAI + 4 Google + 2 Kimi
+      expect(models.length).toBe(16); // 4 Anthropic + 4 OpenAI + 4 Google + 2 Z.AI + 2 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -339,6 +379,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       expect(applyFallback('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
       expect(applyFallback('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
+      expect(applyFallback('glm-4.7-flash', enabled)).toBe('claude-haiku-4-5');
     });
 
     it('should never fallback to Opus by default', () => {
@@ -350,6 +391,8 @@ describe('model-fallback', () => {
         'gpt-4o-mini',
         'gemini-3-pro-preview',
         'gemini-3-flash-preview',
+        'glm-4.7',
+        'glm-4.7-flash',
       ];
 
       allModels.forEach((model) => {

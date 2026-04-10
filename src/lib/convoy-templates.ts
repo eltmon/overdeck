@@ -72,20 +72,15 @@ export const CODE_REVIEW_TEMPLATE: ConvoyTemplate = {
       parallel: true,
     },
     {
-      role: 'requirements',
-      subagent: 'code-review-requirements',
-      parallel: true,
-    },
-    {
       role: 'synthesis',
       subagent: 'code-review-synthesis',
       parallel: false,
-      dependsOn: ['correctness', 'security', 'performance', 'requirements'],
+      dependsOn: ['correctness', 'security', 'performance'],
     },
   ],
   config: {
     outputDir: '.claude/reviews',
-    maxParallel: 4, // 4 parallel reviewers
+    maxParallel: 3, // Limit parallel reviewers
     timeout: 600000, // 10 minutes per agent
   },
 };
