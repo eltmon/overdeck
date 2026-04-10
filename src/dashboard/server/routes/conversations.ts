@@ -90,10 +90,10 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-/** Generate a default conversation name, e.g. conv-20260404-1 */
+/** Generate a default conversation name, e.g. 20260404-1234 */
 function generateConversationName(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `conv-${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
+  return `${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
 }
 
 /** Sanitize a user-provided name to be safe for tmux session names */

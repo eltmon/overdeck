@@ -19,7 +19,7 @@ function sanitizeName(name: string): string {
 
 function generateConversationName(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `conv-${date}-1234`;
+  return `${date}-1234`;
 }
 
 describe('sanitizeName', () => {
@@ -46,8 +46,8 @@ describe('sanitizeName', () => {
 });
 
 describe('generateConversationName', () => {
-  it('starts with conv-', () => {
-    expect(generateConversationName()).toMatch(/^conv-\d{8}-/);
+  it('is YYYYMMDD-NNNN format (no conv- prefix)', () => {
+    expect(generateConversationName()).toMatch(/^\d{8}-/);
   });
 
   it('contains today\'s date in YYYYMMDD format', () => {
