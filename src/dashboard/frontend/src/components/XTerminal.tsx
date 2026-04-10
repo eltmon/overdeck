@@ -281,16 +281,12 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Intercept wheel events: scroll xterm.js locally instead of forwarding to tmux.
-      // Without this, xterm.js sends mouse escape sequences to tmux, which passes them
-      // to Claude Code's TUI input area instead of entering copy-mode.
-      const handleWheel = (event: WheelEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const scrollLines = Math.round(event.deltaY / 20);
-        term!.scrollLines(scrollLines);
-      };
-      terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
+      // Note: wheel events are now handled natively by xterm.js v6's SmoothScrollableElement.
+      // Previously we intercepted and called scrollLines() manually, but this caused issues
+      // where scrollLines() didn't properly update the viewport. With hasScrollback=true,
+      // xterm.js's wheel handler returns early without sending mouse sequences, allowing
+      // the SmoothScrollableElement to handle scrolling locally.
+      // If tmux mouse mode causes issues, consider setting TMUX_MOUSE=off in the environment.
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
@@ -412,13 +408,15 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         }
       }
 
-      // Session is alive — clear reconnect messages and reset counter.
-      // Only do this on first data after (re)connect to avoid clearing mid-session.
-      if (reconnectAttempts.current > 0 || !hadFirstData.current) {
+      // Session is alive — clear only on the FIRST mount (initial connect).
+      // On reconnects within the same session, DO NOT clear — that would wipe
+      // the scrollback buffer. The hadFirstData ref persists across reconnects
+      // within the same React component lifecycle, so reconnects skip this block.
+      if (!hadFirstData.current) {
         hadFirstData.current = true;
         term!.clear();
-        reconnectAttempts.current = 0;
       }
+      reconnectAttempts.current = 0;
 
       // Add to queue and trigger processing
       writeQueue.push(dataStr);
