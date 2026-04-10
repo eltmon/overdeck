@@ -218,7 +218,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
-        scrollback: 200,  // Keep small to avoid flash on open with large scrollback; users can switch to conversation mode for history
+        scrollback: 5000,  // Local scroll buffer; server-side blackout prevents flash on reconnect
         convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
@@ -281,12 +281,16 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Note: wheel events are now handled natively by xterm.js v6's SmoothScrollableElement.
-      // Previously we intercepted and called scrollLines() manually, but this caused issues
-      // where scrollLines() didn't properly update the viewport. With hasScrollback=true,
-      // xterm.js's wheel handler returns early without sending mouse sequences, allowing
-      // the SmoothScrollableElement to handle scrolling locally.
-      // If tmux mouse mode causes issues, consider setting TMUX_MOUSE=off in the environment.
+      // Intercept wheel events: scroll xterm.js locally instead of forwarding to tmux.
+      // Without this, xterm.js sends mouse escape sequences to tmux, which passes them
+      // to Claude Code's TUI input area instead of entering copy-mode.
+      const handleWheel = (event: WheelEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const scrollLines = Math.round(event.deltaY / 20);
+        term!.scrollLines(scrollLines);
+      };
+      terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
