@@ -440,6 +440,13 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
             if (terminalRef.current) {
               terminalRef.current.style.opacity = '1';
             }
+            // Force xterm.js to repaint all visible rows after the scrollback dump
+            // settles. Without this, stale spinner/braille characters from the
+            // scrollback history remain visually rendered as dots even though the
+            // logical content has been overwritten by new data.
+            if (term) {
+              term.refresh(0, term.rows - 1);
+            }
           }, 350);
         }
       }
