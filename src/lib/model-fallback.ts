@@ -27,7 +27,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
   'gpt-5.4-nano': 'openai',
+  'gpt-5.4-pro': 'openai',
   'o3': 'openai',
+  'o4-mini': 'openai',
 
   // Google models
   'gemini-3.1-pro-preview': 'google',
@@ -58,7 +60,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
   'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
   'gpt-5.4-nano': 'claude-haiku-4-5', // Economy model → Haiku
+  'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
+  'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
 
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet

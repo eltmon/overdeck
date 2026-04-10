@@ -16,16 +16,8 @@ import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
-
-/**
- * Subscription plan tiers (for OAuth-authenticated providers)
- */
-export type SubscriptionPlan = 'free' | 'plus' | 'pro';
-
-/**
- * Provider authentication mode
- */
-export type AuthMode = 'api-key' | 'subscription';
+import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
+export type { SubscriptionPlan, AuthMode };
 
 /**
  * Provider configuration (enable/disable + API keys)

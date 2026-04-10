@@ -18,6 +18,7 @@
  */
 
 import { ModelId } from './settings.js';
+import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
  * Model ID deprecation mapping
@@ -91,6 +92,8 @@ export interface ModelCapability {
   skills: Record<SkillDimension, number>;
   /** Context window size in tokens */
   contextWindow: number;
+  /** Minimum subscription plan required to access this model via OAuth (undefined = API key only or no tier restriction) */
+  minTier?: SubscriptionPlan;
   /** Additional notes about this model's strengths */
   notes?: string;
 }
@@ -207,7 +210,8 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     provider: 'openai',
     displayName: 'GPT-5.4',
     costPer1MTokens: 8.75, // $2.50 in / $15 out
-    contextWindow: 1000000, // 1M context
+    contextWindow: 1050000, // 1.05M context
+    minTier: 'plus', // ChatGPT Plus/Pro only
     skills: {
       'code-generation': 96,
       'code-review': 92,
@@ -219,9 +223,9 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       performance: 90,
       synthesis: 92,
       speed: 60,
-      'context-length': 100, // 1M context
+      'context-length': 100, // 1.05M context
     },
-    notes: 'OpenAI flagship (March 2026). 1M context, 128K max output. Strong coding and reasoning.',
+    notes: 'OpenAI flagship (March 2026). 1.05M context, 128K max output. Strong coding and reasoning.',
   },
 
   'gpt-5.4-mini': {
@@ -230,6 +234,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     displayName: 'GPT-5.4 Mini',
     costPer1MTokens: 1.0, // ~$0.40 in / $1.60 out
     contextWindow: 400000,
+    minTier: 'free', // Available in ChatGPT Free tier
     skills: {
       'code-generation': 82,
       'code-review': 78,
@@ -243,7 +248,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       speed: 90, // 2x faster than predecessor
       'context-length': 90, // 400K context
     },
-    notes: 'Fast and efficient. 400K context. Available in ChatGPT Free/Go tiers.',
+    notes: 'Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers.',
   },
 
   'gpt-5.4-nano': {
@@ -274,6 +279,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     displayName: 'O3',
     costPer1MTokens: 5.0, // $2 in / $8 out
     contextWindow: 200000,
+    minTier: 'plus', // ChatGPT Plus/Pro only
     skills: {
       'code-generation': 90,
       'code-review': 95,
@@ -288,6 +294,52 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 95,
     },
     notes: 'Deep reasoning model. Excels at complex debugging, math, scientific reasoning.',
+  },
+
+  'o4-mini': {
+    model: 'o4-mini',
+    provider: 'openai',
+    displayName: 'O4 Mini',
+    costPer1MTokens: 2.75, // $1.10 in / $4.40 out
+    contextWindow: 200000,
+    minTier: 'plus', // ChatGPT Plus/Pro only
+    skills: {
+      'code-generation': 85,
+      'code-review': 90,
+      debugging: 94,
+      planning: 88,
+      documentation: 84,
+      testing: 85,
+      security: 86,
+      performance: 88,
+      synthesis: 88,
+      speed: 70, // Fast for a reasoning model
+      'context-length': 90,
+    },
+    notes: 'Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable.',
+  },
+
+  'gpt-5.4-pro': {
+    model: 'gpt-5.4-pro',
+    provider: 'openai',
+    displayName: 'GPT-5.4 Pro',
+    costPer1MTokens: 105.0, // $15 in / $195 out
+    contextWindow: 1050000,
+    minTier: 'pro', // ChatGPT Pro only
+    skills: {
+      'code-generation': 98,
+      'code-review': 98,
+      debugging: 98,
+      planning: 99,
+      documentation: 96,
+      testing: 96,
+      security: 96,
+      performance: 95,
+      synthesis: 99,
+      speed: 45,
+      'context-length': 100,
+    },
+    notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
