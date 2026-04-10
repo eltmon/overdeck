@@ -486,38 +486,51 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     }
 
-    // When merge fails with conflicts, automatically send rebase instructions to the work agent.
-    // This closes the automation loop: merge conflict → work agent rebases → resubmits → merge retries.
-    if (specialist === 'merge' && status === 'failed' && notes?.toLowerCase().includes('conflict')) {
+    // When merge fails, post a comment on the GitHub PR so the failure is visible
+    // outside the dashboard, and send feedback to the work agent.
+    if (specialist === 'merge' && status === 'failed') {
       yield* Effect.promise(async () => {
         try {
-          const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-          const { sessionExists } = await import('../../../lib/tmux.js');
-          const { messageAgent } = await import('../../../lib/agents.js');
-
-          if (sessionExists(workAgentId)) {
-            // Agent is running — send rebase instructions directly
-            const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
-            await messageAgent(workAgentId, rebaseMsg);
-            console.log(`[specialists/done] Sent rebase instructions to ${workAgentId}`);
-          } else {
-            // Agent is stopped — restart it with rebase instructions
-            try {
-              const { resumeAgent } = await import('../../../lib/agents.js');
-              const result = await resumeAgent(workAgentId, `MERGE CONFLICT: Your branch has conflicts with main. Run: git fetch origin main && git rebase origin/main, resolve conflicts, push with --force-with-lease, then resubmit for review.`);
-              if (result.success) {
-                console.log(`[specialists/done] Resumed ${workAgentId} with rebase instructions`);
-              } else {
-                console.log(`[specialists/done] Could not resume ${workAgentId}: ${result.error}`);
-              }
-            } catch (resumeErr: any) {
-              console.warn(`[specialists/done] Could not restart work agent for rebase: ${resumeErr.message}`);
+          // Post comment on the PR
+          const reviewStatus = loadReviewStatuses()[normalizedIssueId];
+          const prUrl = reviewStatus?.prUrl;
+          if (prUrl) {
+            // Extract owner/repo#number from PR URL
+            const prMatch = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+            if (prMatch) {
+              const [, owner, repo, prNumber] = prMatch;
+              const commentBody = `## Merge Failed\n\n${notes || 'Merge could not be completed.'}\n\nThe issue has been moved back to In Progress. The work agent needs to resolve conflicts and resubmit.`;
+              await execAsync(`gh api repos/${owner}/${repo}/issues/${prNumber}/comments -f body=${JSON.stringify(commentBody)}`, { encoding: 'utf-8' });
+              console.log(`[specialists/done] Posted merge failure comment on ${prUrl}`);
             }
           }
         } catch (err: any) {
-          console.warn(`[specialists/done] Failed to send rebase feedback to work agent: ${err.message}`);
+          console.warn(`[specialists/done] Failed to post merge failure comment: ${err.message}`);
         }
       });
+
+      // If merge failed due to conflicts, send rebase instructions to the work agent.
+      if (notes?.toLowerCase().includes('conflict')) {
+        yield* Effect.promise(async () => {
+          try {
+            const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+            const { sessionExists } = await import('../../../lib/tmux.js');
+            const { messageAgent, spawnAgent, getAgentState } = await import('../../../lib/agents.js');
+
+            if (sessionExists(workAgentId)) {
+              // Agent is running — send rebase instructions directly
+              const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
+              await messageAgent(workAgentId, rebaseMsg);
+              console.log(`[specialists/done] Sent rebase instructions to ${workAgentId}`);
+            } else {
+              // Agent is stopped — start fresh (don't resume, sessions may be corrupted: PAN-612)
+              console.log(`[specialists/done] Work agent ${workAgentId} not running — will need manual restart or next pan work issue dispatch`);
+            }
+          } catch (err: any) {
+            console.warn(`[specialists/done] Failed to send rebase feedback to work agent: ${err.message}`);
+          }
+        });
+      }
     }
 
     // When review fails, send feedback to work agent so it can fix the issues
