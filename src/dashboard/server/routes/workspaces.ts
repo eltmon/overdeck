@@ -2156,6 +2156,10 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       }
 
       if (testStatus === 'passed') {
+        // Mark ready for merge when tests pass (PAN-615 fix: this path was missing readyForMerge)
+        setReviewStatus(issueId, { readyForMerge: true });
+        console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
+
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.test-completed',
           timestamp: new Date().toISOString(),
