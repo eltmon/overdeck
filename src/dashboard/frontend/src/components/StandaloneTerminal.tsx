@@ -17,7 +17,7 @@ export function StandaloneTerminal({ sessionName }: StandaloneTerminalProps) {
 
   const handleAlwaysOnTop = () => {
     const bridge = window.panopticonBridge;
-    if (bridge?.isDesktopApp()) {
+    if (bridge?.isDesktopApp?.()) {
       const newValue = !isAlwaysOnTop;
       setIsAlwaysOnTop(newValue);
       bridge.setAlwaysOnTop(newValue);
