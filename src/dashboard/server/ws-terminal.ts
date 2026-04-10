@@ -114,15 +114,10 @@ export function setupTerminalWebSocket(server: http.Server): void {
         existingHub.clients.add(ws);
         // Most recently connected client takes over as input client
         existingHub.inputClient = ws;
-        // 200ms blackout — suppresses the initial scrollback flood from tmux's buffer.
-        // The SIGWINCH repaint fires AFTER the blackout expires so the client receives
-        // only the clean current-viewport repaint, not the full scrollback dump.
-        const BLACKOUT_MS = 200;
-        existingHub.clientBlackout.set(ws, Date.now() + BLACKOUT_MS);
 
         // Force a SIGWINCH repaint so the new tab gets the current terminal state.
         // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
-        // Delay past the blackout so the repaint data actually reaches the client.
+        // No server-side blackout — the client handles flash via opacity hide.
         const { cols, rows } = existingHub;
         setTimeout(() => {
           if (existingHub.clients.has(ws) && ws.readyState === WebSocket.OPEN) {
@@ -141,7 +136,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
               // PTY may have exited — ignore
             }
           }
-        }, BLACKOUT_MS + 50);
+        }, 100);
 
         const handleJoinMessage = (message: string) => {
           if (message.startsWith('{')) {
@@ -212,7 +207,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         cols: 120,
         rows: 29,
         inputClient: ws, // first client is the initial input client
-        clientBlackout: new Map(), // No client blackout needed for new hubs — the forwarding flag handles suppression
+        clientBlackout: new Map(), // Unused — flash handled client-side via opacity hide
       };
 
       const startLocalPty = async (cols: number, rows: number) => {
