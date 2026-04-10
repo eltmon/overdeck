@@ -69,7 +69,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
 ];
 
 const MODEL_STORAGE_KEY = 'conv-composer-model';
-const DEFAULT_MODEL = 'claude-opus-4-6';
+export const DEFAULT_MODEL = 'claude-opus-4-6';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
