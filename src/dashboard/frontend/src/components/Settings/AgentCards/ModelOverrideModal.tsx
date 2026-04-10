@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { type LucideIcon, Gem, Sparkles, Zap, Code2, Brain, FlaskConical, Layers, Coins, Globe, X, CheckCircle2 } from 'lucide-react';
+import { type LucideIcon, Gem, Sparkles, Zap, Code2, Brain, FlaskConical, Layers, Globe, X, CheckCircle2 } from 'lucide-react';
 import { WorkTypeId, ModelId } from '../types';
 
 // Model capabilities that can be matched to work types
