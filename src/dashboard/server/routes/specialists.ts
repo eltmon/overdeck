@@ -453,9 +453,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             `feature-${normalizedIssueId.toLowerCase()}`,
           );
           if (existsSync(workspacePath)) {
-              setReviewStatusBase(normalizedIssueId, { readyForMerge: true });
-              console.log(`[specialists/done] ${normalizedIssueId} marked ready for merge after tests passed`);
-            }
+            setReviewStatusBase(normalizedIssueId, { readyForMerge: true });
+            console.log(`[specialists/done] ${normalizedIssueId} marked ready for merge after tests passed`);
           }
         }
       } catch (err) {
