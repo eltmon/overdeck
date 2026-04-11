@@ -3126,7 +3126,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           method: 'squash',
         });
 
-        setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
         completePendingOperation(issueId, null);
 
         const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
@@ -3285,7 +3285,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         return { success: false, statusCode: 500, error };
       }
 
-      setReviewStatus(issueId, { mergeStatus: 'verifying' });
+      setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
       for (const repo of activeRepos) {
         const repoConfig = projectConfig.workspace.repos.find(configRepo => configRepo.name === repo.repoKey);
         const repoWorkspacePath = join(workspacePath, repo.repoKey);
@@ -3375,7 +3375,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         updatedAt: new Date().toISOString(),
       };
       upsertMergeSet(mergeSet);
-      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
       completePendingOperation(issueId, null);
 
       const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
@@ -3517,7 +3517,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
-    setReviewStatus(issueId, { mergeStatus: 'verifying' });
+    setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
     console.log(`[merge] Running post-rebase verification for ${issueId}...`);
 
     const { runVerificationForIssue } = await import(
@@ -3605,7 +3605,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle.
     // postMergeLifecycle spawns a deploy script that may kill this server process,
     // so queue processing must happen before that point.
-    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+    setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
     completePendingOperation(issueId, null);
 
     // Dequeue next merge before lifecycle (which may kill the process)
