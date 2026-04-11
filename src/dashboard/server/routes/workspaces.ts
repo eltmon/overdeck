@@ -2814,6 +2814,18 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     });
 
     try {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      const runtimeState = getAgentRuntimeState(agentId);
+      if (runtimeState) {
+        saveAgentRuntimeState(agentId, {
+          resolution: 'working',
+          resolutionCount: 0,
+          resolutionUpdatedAt: new Date().toISOString(),
+        });
+      }
+    } catch {}
+
+    try {
       const { resetPostMergeState } = yield* Effect.promise(() => import(
         '../../../lib/cloister/merge-agent.js'
       ));

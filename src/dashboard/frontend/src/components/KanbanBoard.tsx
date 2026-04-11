@@ -173,6 +173,22 @@ export function shouldShowReviewReadyBadge(
   ) ?? false;
 }
 
+export function shouldShowAgentDoneBadge(options: {
+  issueStatus: string;
+  isTerminal: boolean;
+  isPipelineStuck: boolean;
+  resolution?: Agent['resolution'];
+  hasPendingQuestion: boolean;
+}): boolean {
+  const canonical = STATUS_LABELS[options.issueStatus] || 'backlog';
+
+  return !options.isTerminal
+    && !options.isPipelineStuck
+    && canonical !== 'in_review'
+    && options.resolution === 'done'
+    && !options.hasPendingQuestion;
+}
+
 export function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
   const grouped: Record<string, Issue[]> = {
     backlog: [],
@@ -2334,7 +2350,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               </span>
             )}
             {/* Lifecycle resolution badges (PAN-309) */}
-            {!isTerminal && !isPipelineStuck && agent?.resolution === 'done' && !hasPendingQuestion && (
+            {shouldShowAgentDoneBadge({
+              issueStatus: issue.status,
+              isTerminal,
+              isPipelineStuck,
+              resolution: agent?.resolution,
+              hasPendingQuestion,
+            }) && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
                 title="Agent evidence shows work is complete — waiting for agent to call pan work done"

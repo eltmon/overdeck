@@ -1044,7 +1044,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
 
         let stateLabel = 'Idle';
         if (mergeStatus === 'merged') stateLabel = 'Done';
-        else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'Done';
+        else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'In Review';
         else if (reviewStatus === 'reviewing' || testStatus === 'testing') stateLabel = 'In Review';
         else if (reviewStatus === 'passed' && testStatus === 'pending') stateLabel = 'In Review';
         else if (isAgentTrulyActive) stateLabel = 'In Progress';
