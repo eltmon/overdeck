@@ -132,11 +132,14 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
     }
   }, [convId, conversations]);
 
-  // Auto-select first conversation on initial load if no deep-link
+  // Auto-select first conversation on initial load if no deep-link and no feature selected
+  const hasAutoSelected = useRef(false);
   useEffect(() => {
-    if (conversations.length === 0 || convId || selectedConversation !== null) return;
+    if (hasAutoSelected.current) return;
+    if (conversations.length === 0 || convId || selectedConversation !== null || selectedFeature !== null) return;
     setSelectedConversation(conversations[0].name);
-  }, [conversations, convId, selectedConversation]);
+    hasAutoSelected.current = true;
+  }, [conversations, convId, selectedConversation, selectedFeature]);
 
   // Sync URL when selected conversation changes (user clicks, draft promoted, etc.)
   // Use a ref to track the previous value so we only call onConvIdChange when it actually changes.
