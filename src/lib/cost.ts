@@ -96,7 +96,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.0004, outputPer1k: 0.0016, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-nano', inputPer1k: 0.0002, outputPer1k: 0.00125, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4-pro', inputPer1k: 0.015, outputPer1k: 0.195, currency: 'USD' },
   { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
+  { provider: 'openai', model: 'o4-mini', inputPer1k: 0.0011, outputPer1k: 0.0044, currency: 'USD' },
   // Google
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
   { provider: 'google', model: 'gemini-3-flash', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },

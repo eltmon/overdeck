@@ -820,7 +820,11 @@ const getWorkspaceRoute = HttpRouter.add(
           agentSessionId = agentSession;
 
           const paneOutput = paneResult.stdout;
-          const modelMatch = paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
+          // Match Anthropic models: [Opus], [Sonnet 4.6], [Haiku 4.5]
+          // Also match OpenAI models: [gpt-5.4], [oai@gpt-5.4], [o3], [cx@o3], [o4-mini]
+          const modelMatch = paneOutput.match(
+            /\[((?:oai|cx|go)?@?(?:gpt-[0-9.]+(?:-mini|-nano|-pro)?|o[1-4](?:-mini)?(?:-high)?|gemini-[0-9.]+(?:-pro|-flash|-lite)?))[^\]]*\]/i
+          ) || paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
           agentModel = modelMatch ? modelMatch[1] : undefined;
 
           const fullModel = getActiveSessionModel(workspacePath);

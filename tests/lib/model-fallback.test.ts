@@ -78,8 +78,14 @@ describe('model-fallback', () => {
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('gpt-5.4-mini');
       expect(models).toContain('gpt-5.4-nano');
+      expect(models).toContain('gpt-5.4-pro');
       expect(models).toContain('o3');
-      expect(models).toHaveLength(4);
+      expect(models).toContain('o4-mini');
+      expect(models).toContain('gpt-5.2-codex'); // legacy
+      expect(models).toContain('o3-deep-research'); // legacy
+      expect(models).toContain('gpt-4o'); // legacy
+      expect(models).toContain('gpt-4o-mini'); // legacy
+      expect(models).toHaveLength(10);
     });
 
     it('should return all Google models', () => {
@@ -87,7 +93,11 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
-      expect(models).toHaveLength(3);
+      expect(models).toContain('gemini-3-pro-preview'); // legacy
+      expect(models).toContain('gemini-3-flash-preview'); // legacy
+      expect(models).toContain('gemini-2.5-pro'); // legacy
+      expect(models).toContain('gemini-2.5-flash'); // legacy
+      expect(models).toHaveLength(7);
     });
   });
 
@@ -302,7 +312,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(12); // 4 Anthropic + 4 OpenAI + 3 Google + 1 Kimi
+      expect(models.length).toBe(22); // 4 Anthropic + 10 OpenAI + 7 Google + 1 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -311,7 +321,9 @@ describe('model-fallback', () => {
 
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('o3');
-      expect(models.length).toBe(8); // 4 Anthropic + 4 OpenAI
+      expect(models).toContain('gpt-5.2-codex');
+      expect(models).toContain('gpt-4o');
+      expect(models.length).toBe(14); // 4 Anthropic + 10 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -321,7 +333,9 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
-      expect(models.length).toBe(7); // 4 Anthropic + 3 Google
+      expect(models).toContain('gemini-2.5-pro');
+      expect(models).toContain('gemini-2.5-flash');
+      expect(models.length).toBe(11); // 4 Anthropic + 7 Google
     });
   });
 

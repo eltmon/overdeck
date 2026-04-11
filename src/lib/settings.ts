@@ -3,7 +3,7 @@ import { SETTINGS_FILE } from './paths.js';
 
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
-export type OpenAIModel = 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'o3';
+export type OpenAIModel = 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'gpt-5.4-pro' | 'o3' | 'o4-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-3.1-flash-lite-preview';
 export type KimiModel = 'kimi-k2.5';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
@@ -210,7 +210,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3']
+    ? ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google

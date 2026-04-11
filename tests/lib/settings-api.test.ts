@@ -159,6 +159,7 @@ describe('settings-api', () => {
       const openaiIds = models.openai.map(m => m.id);
       expect(openaiIds).toContain('gpt-5.4');
       expect(openaiIds).toContain('o3');
+      expect(openaiIds).toContain('o4-mini');
     });
   });
 
