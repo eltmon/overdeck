@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow } from './KanbanBoard';
+import { applyReviewStateToIssue, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowReviewReadyBadge } from './KanbanBoard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -150,6 +150,41 @@ describe('applyReviewStateToIssue', () => {
     expect(result.labels).toContain('merged');
     expect(result.labels.map((label) => label.toLowerCase())).not.toContain('in-review');
     expect(result.labels.map((label) => label.toLowerCase())).not.toContain('review ready');
+  });
+});
+
+describe('shouldShowReviewReadyBadge', () => {
+  const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'issue-1',
+    identifier: 'TEST-123',
+    title: 'Test Issue',
+    description: '',
+    status: 'In Review',
+    priority: 3,
+    labels: ['review ready'],
+    url: 'https://test.com/TEST-123',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+    ...overrides,
+  });
+
+  it('uses review status as the source of truth when present', () => {
+    const issue = createMockIssue();
+
+    expect(shouldShowReviewReadyBadge(issue, { readyForMerge: false, mergeStatus: 'failed' })).toBe(false);
+    expect(shouldShowReviewReadyBadge(issue, { readyForMerge: true, mergeStatus: 'failed' })).toBe(true);
+  });
+
+  it('falls back to the review ready label when no review status exists', () => {
+    const issue = createMockIssue();
+    expect(shouldShowReviewReadyBadge(issue)).toBe(true);
   });
 });
 
