@@ -190,6 +190,19 @@ describe('getReviewStatusFromDb', () => {
     expect(result!.mergeNotes).toBeUndefined();
     expect(result!.readyForMerge).toBe(false);
   });
+
+  it('normalizes impossible readyForMerge states when verification failed', () => {
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-G-5',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'failed',
+      readyForMerge: true,
+    }));
+
+    const result = getReviewStatusFromDb('PAN-G-5');
+    expect(result!.readyForMerge).toBe(false);
+  });
 });
 
 // ============== getAllReviewStatusesFromDb ==============

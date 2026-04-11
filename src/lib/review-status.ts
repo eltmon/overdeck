@@ -282,7 +282,11 @@ export function clearStuckMergeStatuses(): void {
   for (const s of stuck) {
     // Reset to pending so MERGE button reappears — the in-memory queue was lost on restart.
     // Preserve readyForMerge if review+test both passed — the merge just needs to be retried.
-    const shouldBeReady = s.reviewStatus === 'passed' && (s.testStatus === 'passed' || s.testStatus === 'skipped');
+    const shouldBeReady =
+      s.reviewStatus === 'passed' &&
+      (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
+      s.verificationStatus !== 'failed' &&
+      (s.uatStatus === undefined || s.uatStatus === 'passed');
     setReviewStatus(s.issueId, {
       mergeStatus: 'pending',
       ...(shouldBeReady ? { readyForMerge: true } : {}),

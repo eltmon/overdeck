@@ -158,6 +158,17 @@ describe('setReviewStatus', () => {
     expect(result.readyForMerge).toBe(false);
     expect(result.mergeNotes).toBeUndefined();
   });
+
+  it('does not keep readyForMerge true when verification has failed', () => {
+    const result = setReviewStatus('PAN-113', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'failed',
+      readyForMerge: true,
+    }, statusFile);
+
+    expect(result.readyForMerge).toBe(false);
+  });
 });
 
 describe('getReviewStatus', () => {
