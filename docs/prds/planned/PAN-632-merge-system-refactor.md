@@ -75,6 +75,24 @@ That means the merge system must understand:
 - per-repo forge metadata
 - mixed GitHub/GitLab merge sets inside one issue
 
+### 7. Repo identity, target branches, and gate applicability come from project configuration
+
+Panopticon must not infer repo identity or merge behavior from guessed directory names.
+
+The source of truth is the configured repo model for the project. For each repo in a merge set, Panopticon must resolve from configuration:
+
+- repo key
+- repo path
+- forge
+- source branch
+- target branch
+- merge order
+- release order hints when relevant
+
+Quality-gate applicability must be keyed from configured repo metadata, not hard-coded assumptions like `frontend` / `backend` path names.
+
+The intended design must not assume every repo merges to `main`.
+
 ## Intended End-to-End Flow
 
 ### Phase 1: Work Completion
@@ -95,6 +113,7 @@ For polyrepo:
 5. Panopticon records merge-set metadata for the issue:
 
 - affected repos
+- repo key and repo path for each repo
 - forge for each repo
 - target branch for each repo
 - artifact URL for each repo
@@ -210,6 +229,7 @@ Minimum required fields:
 
 - issue ID
 - repo key
+- repo path
 - forge
 - target branch
 - source branch
@@ -247,7 +267,24 @@ Required targets:
 
 The SQLite merge queue must survive restart and automatically resume processing from persisted state.
 
-### 7. Release Handoff
+Required behavior:
+
+- reset stale in-flight merges into a resumable queued state
+- rebuild per-project queue state on startup
+- automatically dispatch the next eligible merge for each project with queued work
+- avoid duplicate dispatch on repeated restart
+
+### 7. Repo-Key-Based Gate Resolution
+
+Quality gates, services, and merge ordering must resolve against configured repo keys and repo metadata.
+
+Required behavior:
+
+- no hard-coded repo-name assumptions such as `frontend` / `backend`
+- no gate selection based only on inferred relative paths
+- support projects where repo key and repo path differ, such as `fe` -> `frontend`
+
+### 8. Release Handoff
 
 After merge completion, PAN-632 must emit the merged change-set manifest required by PAN-399.
 
@@ -270,3 +307,6 @@ That manifest must be rich enough for release orchestration to understand:
 8. Polyrepo merge execution does not begin until the entire required merge set is ready.
 9. Queue state survives restart and resumes automatically.
 10. Merge completion emits a change-set manifest suitable for PAN-399 release orchestration.
+11. Queue startup recovery automatically dispatches the next queued merge per project without manual intervention.
+12. Repo identity and gate applicability are resolved from configured repo metadata, not inferred path names.
+13. Per-repo target branch is configurable; the system does not assume every repo targets `main`.
