@@ -3013,6 +3013,18 @@ function getOrCreateMergeQueue(projectKey: string): { current: string | null; qu
   return q;
 }
 
+/** Dequeue the next merge after current completes (success or failure). */
+function dequeueNextMerge(mergeQ: { current: string | null; queue: string[] }): void {
+  mergeQ.current = null;
+  const nextIssueId = mergeQ.queue.shift();
+  if (nextIssueId) {
+    console.log(`[merge] Dequeuing next merge: ${nextIssueId} (${mergeQ.queue.length} remaining)`);
+    triggerMerge(nextIssueId).catch(err =>
+      console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
+    );
+  }
+}
+
 async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatus(issueId);
   if (!reviewStatus?.readyForMerge) {
@@ -3094,6 +3106,11 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     };
   }
   mergeQ.current = issueId.toUpperCase();
+
+  // Wrap in try/finally to ALWAYS dequeue the next merge on any exit path.
+  // Without this, early returns (workspace missing, PR creation fails, etc.)
+  // leave the queue stuck with no dequeue.
+  try {
 
   const workspaceInfo = getWorkspaceInfoForIssue(issueId);
 
@@ -3376,14 +3393,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     _serverManagedMerges.delete(normalizedMergeId);
 
     // Dequeue next merge before lifecycle (which may kill the process)
-    mergeQ.current = null;
-    const nextIssueId = mergeQ.queue.shift();
-    if (nextIssueId) {
-      console.log(`[merge] Dequeuing next merge: ${nextIssueId} (${mergeQ.queue.length} remaining)`);
-      triggerMerge(nextIssueId).catch(err =>
-        console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
-      );
-    }
+    dequeueNextMerge(mergeQ);
 
     // Post-merge lifecycle runs last — may spawn deploy script that kills this server
     await postMergeLifecycle(issueId, projectPath, branchName);
@@ -3398,19 +3408,16 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     console.error(`[merge] Error:`, error);
     setReviewStatus(issueId, { mergeStatus: 'failed' });
     completePendingOperation(issueId, error.message);
-
-    // Dequeue on failure too
-    _serverManagedMerges.delete(normalizedMergeId);
-    mergeQ.current = null;
-    const nextOnFail = mergeQ.queue.shift();
-    if (nextOnFail) {
-      console.log(`[merge] Dequeuing next merge after failure: ${nextOnFail}`);
-      triggerMerge(nextOnFail).catch(err =>
-        console.error(`[merge] Queue error for ${nextOnFail}: ${err}`)
-      );
-    }
-
     return { success: false, statusCode: 500, error: error.message };
+  } finally {
+    _serverManagedMerges.delete(normalizedMergeId);
+  }
+
+  } finally {
+    // ALWAYS dequeue on any exit path — early returns, errors, or success.
+    if (mergeQ.current === issueId.toUpperCase()) {
+      dequeueNextMerge(mergeQ);
+    }
   }
 }
 
