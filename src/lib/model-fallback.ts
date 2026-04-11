@@ -2,8 +2,8 @@
  * Model Fallback Strategy
  *
  * When a non-Anthropic model is selected but its API key is missing,
- * automatically fallback to an equivalent Anthropic model. This ensures
- * Panopticon always works even without configuring external providers.
+ * fail fast with a clear error instead of silently falling back.
+ * This avoids unexpected Anthropic usage/cost when another provider is selected.
  */
 
 import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
@@ -144,14 +144,15 @@ export function isProviderEnabled(
 }
 
 /**
- * Apply fallback strategy for a model
+ * Validate that the requested model can be used with currently enabled providers.
  *
- * If the model's provider is disabled (no API key), return an Anthropic equivalent.
- * Otherwise, return the original model.
+ * If the model's provider is disabled (no API key), throw a clear error instead of
+ * silently switching to another provider.
  *
  * @param modelId Requested model
  * @param enabledProviders Set of enabled provider names
- * @returns Original model if provider enabled, otherwise Anthropic fallback
+ * @returns Original model when provider is enabled
+ * @throws Error when provider API key is missing
  */
 export function applyFallback(
   modelId: ModelId,
@@ -164,10 +165,10 @@ export function applyFallback(
     return modelId;
   }
 
-  // Provider disabled — fall back to the equivalent Anthropic model
-  const fallback = getFallbackModel(modelId);
-  console.warn(`Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`);
-  return fallback;
+  throw new Error(
+    `Model ${modelId} requires ${provider} API key which is not configured. ` +
+    `Configure ${provider} in Settings or choose an Anthropic model.`
+  );
 }
 
 /**

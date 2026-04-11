@@ -116,46 +116,24 @@ describe('model-fallback', () => {
       expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
     });
 
-    it('should fallback GPT-5.2 Codex to Sonnet', () => {
+    it('should throw when OpenAI provider is disabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-6');
-    });
-
-    it('should fallback O3 Deep Research to Sonnet', () => {
-      const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-6');
-    });
-
-    it('should fallback GPT-4o to Sonnet', () => {
-      const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-4o', enabled)).toBe('claude-sonnet-4-6');
-    });
-
-    it('should fallback GPT-4o-mini to Haiku', () => {
-      const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
-    });
-
-    it('should fallback Gemini Pro to Sonnet', () => {
-      const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-6');
-    });
-
-    it('should fallback Gemini Flash to Haiku', () => {
-      const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
-    });
-
-    it('should log warning when applying fallback', () => {
-      const enabled = new Set<ModelProvider>(['anthropic']);
-      applyFallback('gpt-5.2-codex', enabled);
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Model gpt-5.2-codex requires openai API key')
+      expect(() => applyFallback('gpt-5.2-codex', enabled)).toThrow(
+        'Model gpt-5.2-codex requires openai API key which is not configured'
       );
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('falling back to claude-sonnet-4-6')
+    });
+
+    it('should throw when Google provider is disabled', () => {
+      const enabled = new Set<ModelProvider>(['anthropic']);
+      expect(() => applyFallback('gemini-3-pro-preview', enabled)).toThrow(
+        'Model gemini-3-pro-preview requires google API key which is not configured'
       );
+    });
+
+    it('should not log warning when provider is disabled (throws instead)', () => {
+      const enabled = new Set<ModelProvider>(['anthropic']);
+      expect(() => applyFallback('gpt-5.2-codex', enabled)).toThrow();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it('should not log warning when provider is enabled', () => {
@@ -326,34 +304,22 @@ describe('model-fallback', () => {
   });
 
   describe('fallback strategy validation', () => {
-    it('should map premium models to Sonnet', () => {
+    it('should throw for premium models when provider key is missing', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-6');
-      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-6');
-      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-6');
+      expect(() => applyFallback('gpt-5.2-codex', enabled)).toThrow();
+      expect(() => applyFallback('o3-deep-research', enabled)).toThrow();
+      expect(() => applyFallback('gemini-3-pro-preview', enabled)).toThrow();
     });
 
-    it('should map economy models to Haiku', () => {
+    it('should throw for economy models when provider key is missing', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
-      expect(applyFallback('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
+      expect(() => applyFallback('gpt-4o-mini', enabled)).toThrow();
+      expect(() => applyFallback('gemini-3-flash-preview', enabled)).toThrow();
     });
 
-    it('should never fallback to Opus by default', () => {
+    it('should keep Anthropic models usable without external keys', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      const allModels: ModelId[] = [
-        'gpt-5.2-codex',
-        'o3-deep-research',
-        'gpt-4o',
-        'gpt-4o-mini',
-        'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
-      ];
-
-      allModels.forEach((model) => {
-        const fallback = applyFallback(model, enabled);
-        expect(fallback).not.toBe('claude-opus-4-6');
-      });
+      expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
     });
   });
 });
