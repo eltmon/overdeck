@@ -31,11 +31,10 @@ export interface RouterConfig {
 /**
  * Map model IDs to their providers
  */
-function getModelProvider(modelId: ModelId): 'anthropic' | 'openai' | 'google' | 'zai' {
+function getModelProvider(modelId: ModelId): 'anthropic' | 'openai' | 'google' {
   if (modelId.startsWith('claude-')) return 'anthropic';
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o3-')) return 'openai';
+  if (modelId.startsWith('gpt-') || modelId === 'o3') return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
-  if (modelId.startsWith('glm-')) return 'zai';
   // Default to anthropic for unknown models
   return 'anthropic';
 }
@@ -66,7 +65,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
       apiKey: settings.api_keys.openai.startsWith('$')
         ? settings.api_keys.openai
         : settings.api_keys.openai,
-      models: ['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'],
+      models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
     });
   }
 
@@ -78,12 +77,10 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
       apiKey: settings.api_keys.google.startsWith('$')
         ? settings.api_keys.google
         : settings.api_keys.google,
-      models: ['gemini-3-pro-preview', 'gemini-3-flash-preview'],
+      models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
     });
   }
 
-  // Z.AI provider - REMOVED (uses direct API, not router)
-  // GLM models are Anthropic-compatible and don't need translation
   // See src/lib/providers.ts for direct API configuration
 
   // Router rules: Map agent types to configured models
@@ -148,7 +145,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
       name: 'openai',
       baseURL: 'https://api.openai.com/v1',
       apiKey: apiKeys.openai.startsWith('$') ? apiKeys.openai : apiKeys.openai,
-      models: ['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'],
+      models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
     });
   }
 
@@ -158,13 +155,11 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
       name: 'google',
       baseURL: 'https://generativelanguage.googleapis.com/v1beta',
       apiKey: apiKeys.google.startsWith('$') ? apiKeys.google : apiKeys.google,
-      models: ['gemini-3-pro-preview', 'gemini-3-flash-preview'],
+      models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
     });
   }
 
-  // Z.AI provider - REMOVED (uses direct API, not router)
-  // GLM models are Anthropic-compatible and don't need translation
-  // Kimi provider - also REMOVED (uses direct API, not router)
+  // Kimi provider uses direct API, not router
   // See src/lib/providers.ts for direct API configuration
 
   // Generate router rules for all 23 work types

@@ -15,6 +15,7 @@
 
 import { randomUUID } from 'crypto';
 import { getEventStore } from '../dashboard/server/event-store.js';
+import type { DomainEvent } from '@panopticon/contracts';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
 export type ActivitySource = 'merge-agent' | 'cloister' | 'review-specialist' | 'test-specialist' | 'dashboard' | 'deploy-script';
@@ -45,8 +46,8 @@ export function emitActivityEntry(options: EmitActivityOptions): void {
         source: options.source,
         level: options.level,
         message: options.message,
-        details: options.details ?? undefined,
-        issueId: options.issueId ?? undefined,
+        details: options.details,
+        issueId: options.issueId,
       },
     };
     store.append(entry);
@@ -71,39 +72,41 @@ export function emitDashboardLifecycle(
 ): void {
   try {
     const store = getEventStore();
-    const ts = new Date().toISOString();
+    let event: Omit<DomainEvent, 'sequence'>;
 
     if (status === 'started') {
-      store.append({
+      event = {
         type: 'dashboard.lifecycle_started' as const,
-        timestamp: ts,
+        timestamp: new Date().toISOString(),
         payload: {
           reason: options.reason,
           issueId: options.issueId,
           trigger: options.trigger ?? 'unknown',
         },
-      });
+      };
     } else if (status === 'completed') {
-      store.append({
+      event = {
         type: 'dashboard.lifecycle_completed' as const,
-        timestamp: ts,
+        timestamp: new Date().toISOString(),
         payload: {
           reason: options.reason,
           issueId: options.issueId,
           durationMs: options.durationMs ?? 0,
         },
-      });
+      };
     } else {
-      store.append({
+      event = {
         type: 'dashboard.lifecycle_failed' as const,
-        timestamp: ts,
+        timestamp: new Date().toISOString(),
         payload: {
           reason: options.reason,
           issueId: options.issueId,
           error: options.error ?? 'unknown error',
         },
-      });
+      };
     }
+
+    store.append(event);
   } catch {
     // Non-fatal
   }
