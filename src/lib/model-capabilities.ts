@@ -82,7 +82,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -432,6 +432,29 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 92,
     },
     notes: 'Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work.',
+  },
+
+  // Z.AI models
+  'glm-5.1': {
+    model: 'glm-5.1',
+    provider: 'zai',
+    displayName: 'GLM-5.1',
+    costPer1MTokens: 2.0,
+    contextWindow: 128000,
+    skills: {
+      'code-generation': 82,
+      'code-review': 80,
+      debugging: 80,
+      planning: 78,
+      documentation: 78,
+      testing: 78,
+      security: 75,
+      performance: 75,
+      synthesis: 80,
+      speed: 85,
+      'context-length': 75,
+    },
+    notes: 'Z.AI GLM-5.1 model via Anthropic-compatible API.',
   },
 };
 

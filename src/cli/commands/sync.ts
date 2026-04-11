@@ -241,8 +241,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.info('No hooks to sync');
   }
 
-  const projects = listProjects();
-
   // Ensure beads database exists for each registered project (first-time setup guard).
   // bd install puts the binary in PATH, but bd init must be run once per project to
   // create the Dolt database. Without it, workspace beads creation silently fails.
