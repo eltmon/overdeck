@@ -299,7 +299,7 @@ describe('work-types', () => {
       });
     });
 
-    it('should sum to exactly 19 work types', () => {
+    it('should sum to exactly 20 work types', () => {
       const categories: WorkTypeCategory[] = [
         'issue-agent',
         'specialist',
