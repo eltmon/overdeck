@@ -1,12 +1,24 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X, RefreshCw } from 'lucide-react';
+import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { XTerminal } from './XTerminal';
 
 interface TerminalPanelProps {
   agent: Agent;
   onClose: () => void;
+}
+
+function popoutTerminal(sessionName: string, title: string): void {
+  const bridge = window.panopticonBridge;
+  if (bridge?.isDesktopApp?.()) {
+    bridge.openTerminalWindow(sessionName, title);
+    return;
+  }
+
+  const popupName = `terminal-${sessionName}`;
+  const features = 'width=900,height=650,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+  window.open(`/terminal/${sessionName}?title=${encodeURIComponent(title)}`, popupName, features);
 }
 
 async function fetchOutput(agentId: string): Promise<string> {
@@ -84,6 +96,16 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
               title="Refresh"
             >
               <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!isStopped && (
+            <button
+              onClick={() => popoutTerminal(agent.id, `agent-${agent.issueId ?? agent.id} · ${agent.issueId ?? agent.id}`)}
+              className="p-1 rounded transition-colors hover:bg-white/10"
+              style={{ color: textSecondary }}
+              title="Pop out terminal"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
             </button>
           )}
           <button
