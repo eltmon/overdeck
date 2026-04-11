@@ -32,7 +32,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
-    .option('--skip-router', 'Skip claude-code-router installation')
+    .option('--skip-claudish', 'Skip claudish installation')
     .option('--skip-sageox', 'Skip SageOx CLI installation')
     .action(installCommand);
 }
@@ -43,7 +43,7 @@ interface InstallOptions {
   skipMkcert?: boolean;
   skipDocker?: boolean;
   skipBeads?: boolean;
-  skipRouter?: boolean;
+  skipClaudish?: boolean;
   skipSageox?: boolean;
 }
 
@@ -162,13 +162,13 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash',
   });
 
-  // claude-code-router (optional - will be auto-installed)
-  const hasRouter = checkCommand('claude-code-router');
+  // claudish (optional - will be auto-installed)
+  const hasClaudish = checkCommand('claudish');
   results.push({
-    name: 'claude-code-router',
-    passed: hasRouter,
-    message: hasRouter ? 'installed' : 'not found (will auto-install)',
-    fix: 'npm install -g @musistudio/claude-code-router',
+    name: 'claudish',
+    passed: hasClaudish,
+    message: hasClaudish ? 'installed' : 'not found (will auto-install)',
+    fix: 'brew install claudish  # macOS, or download from github.com/eltmon/claudish/releases',
   });
 
   // SageOx CLI (optional - will be auto-installed)
@@ -200,8 +200,8 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
 
   return {
     results,
-    // mkcert, ttyd, beads, and claude-code-router are optional (will be auto-installed or skipped)
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claude-code-router' && r.name !== 'SageOx CLI (ox)').every((r) => r.passed),
+    // mkcert, ttyd, beads, and claudish are optional (will be auto-installed or skipped)
+    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claudish' && r.name !== 'SageOx CLI (ox)').every((r) => r.passed),
   };
 }
 
@@ -442,25 +442,34 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   }
 
-  // Step 5c: Install claude-code-router (multi-model routing)
-  if (options.skipRouter) {
-    spinner.info('Skipping claude-code-router installation (--skip-router)');
+  // Step 5c: Install claudish (multi-model router with OAuth support)
+  if (options.skipClaudish) {
+    spinner.info('Skipping claudish installation (--skip-claudish)');
   } else {
-    const hasRouterNow = checkCommand('claude-code-router');
-    if (!hasRouterNow) {
-      spinner.start('Installing claude-code-router...');
-      try {
-        // Install from npm globally
-        execSync('npm install -g @musistudio/claude-code-router', {
-          stdio: 'pipe',
-          timeout: 120000
-        });
-        spinner.succeed('claude-code-router installed via npm');
-      } catch (error) {
-        spinner.warn('claude-code-router installation failed - install manually: npm install -g @musistudio/claude-code-router');
+    const hasClaudishNow = checkCommand('claudish');
+    if (!hasClaudishNow) {
+      const plat = detectPlatform();
+      if (plat === 'darwin') {
+        spinner.info('Install claudish on macOS via Homebrew: brew install eltmon/claudish/claudish');
+      } else {
+        // Linux: download binary from GitHub releases
+        const arch = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : 'x64';
+        const binDir = join(homedir(), '.local', 'bin');
+        const claudishPath = join(binDir, 'claudish');
+        spinner.start('Installing claudish (Linux binary)...');
+        try {
+          mkdirSync(binDir, { recursive: true });
+          execSync(
+            `curl -sL "https://github.com/eltmon/claudish/releases/latest/download/claudish-linux-${arch}" -o "${claudishPath}" && chmod +x "${claudishPath}"`,
+            { stdio: 'pipe', timeout: 60000 }
+          );
+          spinner.succeed('claudish installed to ~/.local/bin/claudish');
+        } catch {
+          spinner.warn('claudish installation failed - download manually from github.com/eltmon/claudish/releases');
+        }
       }
     } else {
-      spinner.info('claude-code-router already installed');
+      spinner.info('claudish already installed');
     }
   }
 

@@ -165,9 +165,23 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-5.4-pro",
+		inputPer1k: .015,
+		outputPer1k: .195,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "o3",
 		inputPer1k: .002,
 		outputPer1k: .008,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "o4-mini",
+		inputPer1k: .0011,
+		outputPer1k: .0044,
 		currency: "USD"
 	},
 	{

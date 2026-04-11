@@ -11,7 +11,7 @@ import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
 import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
-import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresClaudish } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
@@ -81,6 +81,54 @@ export function getProviderTmuxFlags(model: string): string {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
+}
+
+/**
+ * claudish prefix mapping: auth mode → provider prefix for OpenAI models.
+ *
+ * claudish routes models using the provider@model syntax:
+ *   oai@model  → OpenAI Direct API (API key auth)
+ *   cx@model  → ChatGPT OAuth subscription (PLUS/PRO tiers)
+ *   go@model  → Google OAuth CodeAssist
+ *
+ * cx@ is the ChatGPT subscription prefix (confirmed in claudish v6.12+).
+ * Note: cx@ is for ChatGPT OAuth, distinct from oai@ which uses OpenAI API keys.
+ */
+const CLAUDISH_OPENAI_PREFIX: Record<string, string> = {
+  'api-key': 'oai',
+  subscription: 'cx',
+};
+
+/**
+ * Get the claudish prefix for a model based on auth mode.
+ *
+ * Anthropic models: no prefix (use direct claude CLI).
+ * OpenAI models: prefix depends on auth mode (oai@ or cx@).
+ * Google models (CodeAssist OAuth): go@ prefix.
+ *
+ * @param model   Model ID (e.g. 'gpt-5.4', 'claude-sonnet-4-6')
+ * @param authMode Auth mode: 'api-key' or 'subscription' (undefined = api-key default)
+ * @returns Prefixed model string for claudish, or bare model if not applicable
+ */
+export function getClaudishPrefix(model: string, authMode?: string): string {
+  // Anthropic models — use direct claude CLI, no prefix needed
+  if (model.startsWith('claude-')) {
+    return model;
+  }
+
+  // OpenAI models — prefix depends on auth mode
+  if (model.startsWith('gpt-') || model.startsWith('o') && !model.startsWith('ollama')) {
+    const prefix = CLAUDISH_OPENAI_PREFIX[authMode ?? 'api-key'] ?? 'oai';
+    return `${prefix}@${model}`;
+  }
+
+  // Google CodeAssist OAuth — go@ prefix
+  if (model.startsWith('gemini-') && authMode === 'subscription') {
+    return `go@${model}`;
+  }
+
+  // Other providers — return bare model (fallback to default routing)
+  return model;
 }
 
 // ============================================================================
@@ -652,6 +700,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
   const providerEnv = getProviderEnvForModel(selectedModel);
 
+  // Determine auth mode for OpenAI from config (subscription vs api-key)
+  const yamlConfig = loadYamlConfig();
+  const openaiAuthMode = yamlConfig.config?.providerAuth?.['openai'];
+  const effectiveAuthMode = openaiAuthMode ?? 'api-key';
+
+  // Get claudish-prefixed model if needed (e.g. oai@gpt-5.4 or cx@o3)
+  const claudishModel = getClaudishPrefix(selectedModel, effectiveAuthMode);
+
   // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
   // so Claude Code can refresh short-lived tokens dynamically.
   // For all other providers, CLEAR any stale apiKeyHelper from previous runs
@@ -673,12 +729,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     const launcherContent = `#!/bin/bash
 export CI=1
 ${providerExports}prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
+exec claude --dangerously-skip-permissions --model ${claudishModel} "\$prompt"
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     claudeCmd = `bash "${launcherScript}"`;
   } else {
-    claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
+    claudeCmd = `claude --dangerously-skip-permissions --model ${claudishModel}`;
   }
 
   // Pre-trust workspace directory in Claude Code to avoid the trust prompt

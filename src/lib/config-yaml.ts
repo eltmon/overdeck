@@ -16,6 +16,8 @@ import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
+export type { SubscriptionPlan, AuthMode };
 
 /**
  * Provider configuration (enable/disable + API keys)
@@ -25,6 +27,10 @@ export interface ProviderConfig {
   enabled: boolean;
   /** API key (optional, can use env var) */
   api_key?: string;
+  /** Authentication mode: api-key (default) or subscription (OAuth) */
+  auth?: AuthMode;
+  /** Subscription plan tier (only used when auth is 'subscription') */
+  plan?: SubscriptionPlan;
 }
 
 /**
@@ -134,6 +140,12 @@ export interface NormalizedConfig {
     openrouter?: string;
   };
 
+  /** Provider auth mode (subscription vs api-key) by provider */
+  providerAuth: Partial<Record<ModelProvider, AuthMode>>;
+
+  /** Provider subscription plan by provider */
+  providerPlan: Partial<Record<ModelProvider, SubscriptionPlan>>;
+
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
 
@@ -191,6 +203,8 @@ export interface ConfigLoadResult {
 const DEFAULT_CONFIG: NormalizedConfig = {
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   apiKeys: {},
+  providerAuth: {},
+  providerPlan: {},
   openrouterFavorites: [],
   overrides: {},
   geminiThinkingLevel: 3,
@@ -217,7 +231,7 @@ const GLOBAL_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
 function normalizeProviderConfig(
   providerConfig: ProviderConfig | boolean | undefined,
   fallbackKey?: string
-): { enabled: boolean; api_key?: string } {
+): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan } {
   if (providerConfig === undefined) {
     return { enabled: false };
   }
@@ -229,6 +243,8 @@ function normalizeProviderConfig(
   return {
     enabled: providerConfig.enabled,
     api_key: providerConfig.api_key || fallbackKey,
+    auth: providerConfig.auth,
+    plan: providerConfig.plan,
   };
 }
 
@@ -378,6 +394,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         if (openai.api_key) {
           result.apiKeys.openai = resolveEnvVar(openai.api_key);
         }
+        if (openai.auth) result.providerAuth.openai = openai.auth;
+        if (openai.plan) result.providerPlan.openai = openai.plan;
       }
 
       // Google
@@ -387,6 +405,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         if (google.api_key) {
           result.apiKeys.google = resolveEnvVar(google.api_key);
         }
+        if (google.auth) result.providerAuth.google = google.auth;
+        if (google.plan) result.providerPlan.google = google.plan;
       }
 
       // MiniMax (zai in YAML config, minimax internally)

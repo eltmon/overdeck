@@ -292,19 +292,35 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     statuslineSpinner.info('No statusline script found (scripts/statusline.sh)');
   }
 
-  // Check and install claude-code-router if missing
-  const hasRouter = checkCommand('claude-code-router');
-  if (!hasRouter) {
-    const routerSpinner = ora('Installing claude-code-router...').start();
-    try {
-      execSync('npm install -g @musistudio/claude-code-router', {
-        stdio: 'pipe',
-        timeout: 120000
-      });
-      routerSpinner.succeed('claude-code-router installed');
-    } catch (error) {
-      routerSpinner.warn('Failed to install claude-code-router - run: npm install -g @musistudio/claude-code-router');
+  // Check and install claudish if missing (for multi-model routing with OAuth support)
+  const hasClaudish = checkCommand('claudish');
+  if (!hasClaudish) {
+    const claudishSpinner = ora('Installing claudish...').start();
+    const plat = process.platform === 'darwin' ? 'darwin' : 'linux';
+    if (plat === 'darwin') {
+      claudishSpinner.warn('claudish not found - install via Homebrew: brew install eltmon/claudish/claudish');
+    } else {
+      // Linux: download binary from GitHub releases
+      try {
+        const binDir = join(homedir(), '.local', 'bin');
+        const claudishPath = join(binDir, 'claudish');
+        const arch = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : 'x64';
+        mkdirSync(binDir, { recursive: true });
+        execSync(
+          `curl -sL "https://github.com/eltmon/claudish/releases/latest/download/claudish-linux-${arch}" -o "${claudishPath}" && chmod +x "${claudishPath}"`,
+          { stdio: 'pipe', timeout: 60000 }
+        );
+        claudishSpinner.succeed('claudish installed to ~/.local/bin/claudish');
+      } catch {
+        claudishSpinner.warn('claudish installation failed - download from github.com/eltmon/claudish/releases');
+      }
     }
+  } else {
+    // Log claudish version for diagnostics
+    try {
+      const version = execSync('claudish --version 2>/dev/null || true', { encoding: 'utf8', stdio: 'pipe' }).trim();
+      if (version) console.log(chalk.dim(`  claudish ${version.split('\n')[0]}`));
+    } catch { /* non-fatal */ }
   }
 
   // Check and install mkcert if missing

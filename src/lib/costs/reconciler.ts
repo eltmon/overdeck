@@ -286,7 +286,9 @@ function extractCostEvents(
       else if (model.includes('kimi')) provider = 'custom' as AIProvider;
       else if (model.toLowerCase().startsWith('minimax')) provider = 'custom' as AIProvider;
 
-      const pricing = getPricing(provider, model);
+      // Strip claudish prefix for pricing lookup: "oai@gpt-5.4" → "gpt-5.4"
+      const pricingModel = model.replace(/^(?:oai|cx|go)@/, '');
+      const pricing = getPricing(provider, pricingModel);
       if (!pricing) continue;
 
       const tokenUsage: TokenUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheTTL: '5m' };

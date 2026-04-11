@@ -8,6 +8,7 @@
 
 import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
 import { resolveModelId } from './model-capabilities.js';
+import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
  * AI model provider types
@@ -24,16 +25,30 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models
+  // OpenAI models (current)
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
   'gpt-5.4-nano': 'openai',
+  'gpt-5.4-pro': 'openai',
   'o3': 'openai',
+  'o4-mini': 'openai',
 
-  // Google models
+  // OpenAI legacy (for backward compat with existing configs/tests)
+  'gpt-5.2-codex': 'openai',
+  'o3-deep-research': 'openai',
+  'gpt-4o': 'openai',
+  'gpt-4o-mini': 'openai',
+
+  // Google models (current)
   'gemini-3.1-pro-preview': 'google',
   'gemini-3-flash': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
+
+  // Google legacy
+  'gemini-3-pro-preview': 'google',
+  'gemini-3-flash-preview': 'google',
+  'gemini-2.5-pro': 'google',
+  'gemini-2.5-flash': 'google',
 
   // Kimi models
   'kimi-k2.5': 'kimi',
@@ -44,7 +59,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Z.AI models
   'glm-5.1': 'zai',
-};
+} as Record<ModelId | string, ModelProvider>;
 
 /**
  * Fallback mapping: non-Anthropic model → Anthropic equivalent
@@ -62,7 +77,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
   'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
   'gpt-5.4-nano': 'claude-haiku-4-5', // Economy model → Haiku
+  'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
+  'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
   // Deprecated OpenAI IDs — explicit mappings preserve semantic intent
   // (gpt-4o was flagship-tier, so → Sonnet; gpt-4o-mini was economy → Haiku)
   'gpt-5.2-codex': 'claude-sonnet-4-6',
@@ -94,6 +111,29 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-6';
 
 /**
+ * Tier rank for OpenAI models: higher = more powerful, needs higher subscription
+ * Used for within-provider tier-aware fallback.
+ */
+const MODEL_TIER_RANK: Record<string, number> = {
+  // OpenAI tiers
+  'gpt-5.4-pro': 3,
+  'gpt-5.4': 2,
+  'o3': 2,
+  'o4-mini': 1,
+  'gpt-5.4-mini': 0,
+  'gpt-5.4-nano': -1, // API-only, no OAuth tier
+};
+
+/**
+ * Tier rank for subscription plans
+ */
+const TIER_RANK: Record<SubscriptionPlan, number> = {
+  free: 0,
+  plus: 1,
+  pro: 2,
+};
+
+/**
  * Check if a model ID is an OpenRouter model
  *
  * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
@@ -108,9 +148,18 @@ export function isOpenRouterModel(modelId: string): boolean {
  */
 export function getModelProvider(modelId: ModelId | string): ModelProvider {
   if (isOpenRouterModel(modelId)) return 'openrouter';
-  // Resolve deprecated model IDs to their current replacement before looking up provider
+  const direct = (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId];
+  if (direct) return direct;
   const resolved = resolveModelId(modelId);
-  return (MODEL_PROVIDERS as Record<string, ModelProvider>)[resolved] ?? 'anthropic';
+  const resolvedProvider = (MODEL_PROVIDERS as Record<string, ModelProvider>)[resolved];
+  if (resolvedProvider) return resolvedProvider;
+
+  if (modelId.startsWith('gpt-')) return 'openai';
+  if (modelId.startsWith('o1') || modelId.startsWith('o2') || modelId.startsWith('o3') || modelId.startsWith('o4')) return 'openai';
+  if (modelId.startsWith('gemini-')) return 'google';
+  if (modelId.startsWith('kimi-')) return 'kimi';
+  if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
+  return 'anthropic';
 }
 
 /**
@@ -147,7 +196,99 @@ export function isProviderEnabled(
 }
 
 /**
- * Apply fallback strategy for a model
+ * Get the best Anthropic model available at or below a given tier.
+ * Used when a user cannot access their preferred tier model and we want
+ * to keep them within the Anthropic (claudish) ecosystem before switching.
+ */
+function getBestAnthropicAtTier(
+  targetTier: SubscriptionPlan,
+  originalModelId: ModelId
+): AnthropicModel {
+  const targetRank = TIER_RANK[targetTier];
+  const originalRank = MODEL_TIER_RANK[originalModelId] ?? 0;
+
+  // Determine which tier Anthropic model to use
+  if (targetRank >= 2 || originalRank >= 2) {
+    // User is pro-tier or original was top-tier → use Sonnet 4.6
+    return 'claude-sonnet-4-6';
+  } else if (targetRank >= 0) {
+    // User is free or plus tier → use Haiku 4.5 for economy
+    return 'claude-haiku-4-5';
+  }
+  return DEFAULT_FALLBACK;
+}
+
+/**
+ * Apply tier-aware fallback strategy for a model.
+ *
+ * Resolution order:
+ * 1. If provider disabled → Anthropic equivalent (existing behavior)
+ * 2. If userTier restricts model tier → within-provider downgrade if possible
+ *    (e.g., gpt-5.4-pro → gpt-5.4 for plus user)
+ * 3. If no same-tier model available → Anthropic equivalent
+ *
+ * @param modelId        Requested model
+ * @param enabledProviders Set of enabled provider names
+ * @param userTier       User's subscription tier (for OAuth users)
+ * @returns              Best available model (possibly downgraded)
+ */
+export function applyTierAwareFallback(
+  modelId: ModelId,
+  enabledProviders: Set<ModelProvider>,
+  userTier?: SubscriptionPlan
+): ModelId {
+  const provider = getModelProvider(modelId);
+
+  // Case 1: Provider disabled — use Anthropic equivalent
+  if (!isProviderEnabled(provider, enabledProviders)) {
+    const fallback = getFallbackModel(modelId);
+    console.warn(
+      `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
+    );
+    return fallback;
+  }
+
+  // Case 2: API key auth (userTier undefined) — no tier restriction
+  if (userTier === undefined) {
+    return modelId;
+  }
+
+  // Case 3: Check if model is accessible at user's tier
+  const modelRank = MODEL_TIER_RANK[modelId] ?? 0;
+  const userRank = TIER_RANK[userTier];
+
+  if (modelRank <= userRank) {
+    // Model is accessible at user's tier
+    return modelId;
+  }
+
+  // Case 4: User tier too low — find best available model at user's tier in same provider
+  const providerModels = getModelsByProvider(provider);
+  const candidates = providerModels.filter((m) => {
+    const mRank = MODEL_TIER_RANK[m] ?? 0;
+    return mRank <= userRank;
+  });
+
+  if (candidates.length > 0) {
+    // Find highest-tier candidate (closest to original)
+    candidates.sort((a, b) => (MODEL_TIER_RANK[b] ?? 0) - (MODEL_TIER_RANK[a] ?? 0));
+    const downgraded = candidates[0]!;
+    console.warn(
+      `Model ${modelId} requires higher subscription tier, downgrading to ${downgraded}`
+    );
+    return downgraded;
+  }
+
+  // Case 5: No same-tier model available — fall back to Anthropic equivalent
+  const fallback = getBestAnthropicAtTier(userTier, modelId);
+  console.warn(
+    `No ${provider} model available at tier ${userTier}, falling back to ${fallback}`
+  );
+  return fallback;
+}
+
+/**
+ * Apply fallback strategy for a model (legacy, no tier awareness)
  *
  * If the model's provider is disabled (no API key), return an Anthropic equivalent.
  * Otherwise, return the original model.
@@ -160,17 +301,7 @@ export function applyFallback(
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>
 ): ModelId {
-  const provider = getModelProvider(modelId);
-
-  // If provider is enabled, use the requested model
-  if (isProviderEnabled(provider, enabledProviders)) {
-    return modelId;
-  }
-
-  // Provider disabled — fall back to the equivalent Anthropic model
-  const fallback = getFallbackModel(modelId);
-  console.warn(`Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`);
-  return fallback;
+  return applyTierAwareFallback(modelId, enabledProviders, undefined);
 }
 
 /**
