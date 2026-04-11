@@ -2306,6 +2306,27 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...suspendActions);
   for (const a of suspendActions) addLog('action', a, state.patrolCycle);
 
+  // Clear readyForMerge for issues whose workspace no longer exists.
+  // Prevents MERGE button showing for issues that can't actually merge.
+  try {
+    const { resolveProjectFromIssue } = await import('../projects.js');
+    const allStatuses = loadReviewStatuses();
+    for (const [issueId, status] of Object.entries(allStatuses)) {
+      if (!status.readyForMerge || status.mergeStatus === 'merged') continue;
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
+      const wsPath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+      if (!existsSync(wsPath)) {
+        setReviewStatus(issueId, { readyForMerge: false, mergeStatus: 'failed', mergeNotes: 'Workspace does not exist' });
+        const msg = `Cleared readyForMerge for ${issueId} (workspace deleted)`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Failed to check workspace existence: ${err.message}`);
+  }
+
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
