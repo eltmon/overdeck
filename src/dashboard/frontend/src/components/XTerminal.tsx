@@ -450,11 +450,17 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
             // fit.fit() calls term.resize() which triggers a complete DOM re-render,
             // clearing stale spinner/braille artifacts from the scrollback history.
             // This is the same thing that happens when the user drags the panel divider.
+            // Run fit() repeatedly for the first 3 seconds to catch all scrollback sizes.
             if (fit) {
-              fit.fit();
-              // Staggered fits for large scrollback dumps that take longer to settle
-              setTimeout(() => { if (fit) fit.fit(); }, 500);
-              setTimeout(() => { if (fit) fit.fit(); }, 1500);
+              let fitCount = 0;
+              const fitInterval = setInterval(() => {
+                if (fit && fitCount < 6) {
+                  fit.fit();
+                  fitCount++;
+                } else {
+                  clearInterval(fitInterval);
+                }
+              }, 500);
             }
           }, 350);
         }
