@@ -44,6 +44,17 @@ describe('state-mapping', () => {
       expect(mapGitHubStateToCanonical('CLOSED', [])).toBe('done');
     });
 
+    it('should return canceled for closed issues with cancel labels', () => {
+      expect(mapGitHubStateToCanonical('closed', ['wontfix'])).toBe('canceled');
+      expect(mapGitHubStateToCanonical('closed', ['duplicate'])).toBe('canceled');
+      expect(mapGitHubStateToCanonical('closed', ['Cancelled'])).toBe('canceled');
+    });
+
+    it('should return canceled for open issues with cancel labels', () => {
+      expect(mapGitHubStateToCanonical('open', ['wontfix'])).toBe('canceled');
+      expect(mapGitHubStateToCanonical('open', ['duplicate'])).toBe('canceled');
+    });
+
     it('should return in_review for done label on open issue', () => {
       expect(mapGitHubStateToCanonical('open', ['done'])).toBe('in_review');
       expect(mapGitHubStateToCanonical('open', ['completed'])).toBe('in_review');

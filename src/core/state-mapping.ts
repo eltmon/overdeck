@@ -249,7 +249,12 @@ export const WORKFLOW_LABELS = [
   'review ready',
   'planned',
   'planning',
+  'done',
   'closed-out',
+  'merged',
+  'needs-close-out',
+  'wontfix',
+  'duplicate',
 ];
 
 /**
@@ -280,15 +285,23 @@ export function getStateLabel(state: CanonicalState): string | null {
 export function mapGitHubStateToCanonical(state: string, labels: string[]): CanonicalState {
   // Handle both API lowercase and gh CLI uppercase
   const stateLower = state.toLowerCase();
+  const labelNames = labels.map(l => l.toLowerCase());
+  const hasCanceledLabel = labelNames.some(
+    l => l === 'canceled' || l === 'cancelled' || l === 'duplicate' || l === 'wontfix' || l === "won't do",
+  );
 
-  // Closed issues are always done (regardless of labels)
+  // Closed issues are terminal. Distinguish canceled work from completed work.
   if (stateLower === 'closed') {
-    return 'done';
+    return hasCanceledLabel ? 'canceled' : 'done';
   }
 
-  // For open issues, check labels for workflow state
-  // Order matters: more progressed states take precedence
-  const labelNames = labels.map(l => l.toLowerCase());
+  // Some trackers keep canceled issues open and rely on labels.
+  if (hasCanceledLabel) {
+    return 'canceled';
+  }
+
+  // For open issues, check labels for workflow state.
+  // Order matters: more progressed states take precedence.
 
   // Most progressed states first
   // merged = postMergeLifecycle applied label; issue may still be open if auto-close failed

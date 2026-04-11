@@ -2518,6 +2518,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               {getFriendlyModelName(activeAgent.model)}
             </span>
           )}
+          <CancelIssueButton issue={issue} />
           <button
             onClick={handleKill}
             disabled={killMutation.isPending}
@@ -2610,6 +2611,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
+          <CancelIssueButton issue={issue} />
         </div>
       )}
 
@@ -2659,6 +2661,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             title="Resume Session"
           >
             {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
           </button>
           <button
             onClick={async (e) => {
@@ -2679,6 +2682,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           >
             <Undo className="w-3.5 h-3.5" />
           </button>
+          <CancelIssueButton issue={issue} />
         </div>
       )}
 
@@ -2694,10 +2698,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               title="Resume Session"
             >
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
           )}
           <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           <ReopenSection issue={issue} inline />
+          <CancelIssueButton issue={issue} />
         </div>
       )}
 
@@ -2861,6 +2867,63 @@ function MergeIssueButton({
           : reviewStatus?.mergeStatus === 'merging'
             ? 'Merging'
             : 'Merge'}
+    </button>
+  );
+}
+
+function CancelIssueButton({ issue }: { issue: Issue }) {
+  const confirm = useConfirm();
+  const showAlert = useAlert();
+  const queryClient = useQueryClient();
+  const canonical = STATUS_LABELS[issue.status];
+
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wipeWorkspace: true }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Failed to cancel issue');
+      }
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ['issues'] });
+      await queryClient.refetchQueries({ queryKey: ['agents'] });
+      await queryClient.refetchQueries({ queryKey: ['review-status'] });
+    },
+    onError: (err: Error) => {
+      showAlert({ message: `Failed to cancel: ${err.message}`, variant: 'error' });
+    },
+  });
+
+  if (canonical === 'done' || canonical === 'canceled') {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        if (await confirm({
+          title: 'Cancel Issue',
+          message: `Cancel ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Close any open PR for the issue\n- Remove the workspace\n- Delete the feature branch\n- Remove beads for this issue\n- Move the issue to Canceled`,
+          variant: 'destructive',
+          confirmLabel: 'Cancel Issue',
+        })) {
+          cancelMutation.mutate();
+        }
+      }}
+      disabled={cancelMutation.isPending}
+      className="flex items-center gap-1 text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors disabled:opacity-50"
+      title="Cancel"
+    >
+      {cancelMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+      <span>{cancelMutation.isPending ? 'Canceling...' : 'Cancel'}</span>
     </button>
   );
 }

@@ -60,7 +60,7 @@ const defaultProps = {
   mergeMutation: makeMutation(),
   reviewMutation: makeMutation(),
   killMutation: makeMutation(),
-  closeMutation: makeMutation(),
+  cancelMutation: makeMutation(),
   reopenMutation: makeMutation(),
   resetReviewMutation: makeMutation(),
   startAgentMutation: makeMutation(),
@@ -70,7 +70,7 @@ const defaultProps = {
   onMerge: vi.fn(),
   onReview: vi.fn(),
   onKill: vi.fn(),
-  onClose: vi.fn(),
+  onCancel: vi.fn(),
   onReopen: vi.fn(),
   onResetReview: vi.fn(),
   onResetSession: vi.fn(),
@@ -109,6 +109,11 @@ describe('ActionsSection', () => {
   it('shows Stop button when agent is active', () => {
     render(<ActionsSection {...defaultProps} agent={makeAgent()} />);
     expect(screen.getByText('Stop')).toBeInTheDocument();
+  });
+
+  it('shows Cancel button for non-merged issues', () => {
+    render(<ActionsSection {...defaultProps} reviewStatus={makeReviewStatus()} />);
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
   });
 
   it('calls onKill when Stop clicked', () => {
