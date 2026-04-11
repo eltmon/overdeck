@@ -877,6 +877,7 @@ const COLUMN_TITLES: Record<string, string> = {
 interface KanbanBoardProps {
   selectedIssue?: string | null;
   onSelectIssue?: (issueId: string | null) => void;
+  onPlanDialogChange?: (issueId: string | null) => void;
 }
 
 type CycleFilter = 'current' | 'all' | 'backlog' | 'canceled';
@@ -889,11 +890,16 @@ interface UndoEntry {
   timestamp: number;
 }
 
-export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue }: KanbanBoardProps) {
+export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
+
+  // Notify parent when plan dialog opens/closes so it can suppress the detail panel terminal
+  useEffect(() => {
+    onPlanDialogChange?.(planDialogIssue?.identifier ?? null);
+  }, [planDialogIssue, onPlanDialogChange]);
   const [beadsDialogIssue, setBeadsDialogIssue] = useState<Issue | null>(null); // Beads viewer
   const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
@@ -2569,13 +2575,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           )}
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
+          <AbortIssueButton issue={issue} />
           {/* Model badge - centered between Tell and Kill */}
           {activeAgent && activeAgent.model && (
             <span className="flex-1 text-center text-[10px] text-content-body font-medium">
               {getFriendlyModelName(activeAgent.model)}
             </span>
           )}
-          <CancelIssueButton issue={issue} />
           <button
             onClick={handleKill}
             disabled={killMutation.isPending}
@@ -2668,7 +2674,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
-          <CancelIssueButton issue={issue} />
         </div>
       )}
 
@@ -2738,7 +2743,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           >
             <Undo className="w-3.5 h-3.5" />
           </button>
-          <CancelIssueButton issue={issue} />
+          <AbortIssueButton issue={issue} />
         </div>
       )}
 
@@ -2759,7 +2764,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           <ReopenSection issue={issue} inline />
-          <CancelIssueButton issue={issue} />
+          <AbortIssueButton issue={issue} />
         </div>
       )}
 
@@ -2926,23 +2931,23 @@ function MergeIssueButton({
   );
 }
 
-function CancelIssueButton({ issue }: { issue: Issue }) {
+
+// Abort button — wipe all work (agent, workspace, beads, vBRIEF) and return to Todo
+function AbortIssueButton({ issue }: { issue: Issue }) {
   const confirm = useConfirm();
   const showAlert = useAlert();
   const queryClient = useQueryClient();
   const canonical = STATUS_LABELS[issue.status];
 
-  const cancelMutation = useMutation({
+  const abortMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/cancel`, {
+      const res = await fetch(`/api/issues/${issue.identifier}/abort`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wipeWorkspace: true }),
       });
-
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || data.message || 'Failed to cancel issue');
+        throw new Error(data.error || data.message || 'Failed to abort issue');
       }
       return data;
     },
@@ -2950,11 +2955,11 @@ function CancelIssueButton({ issue }: { issue: Issue }) {
       await refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
-      showAlert({ message: `Failed to cancel: ${err.message}`, variant: 'error' });
+      showAlert({ message: `Failed to abort: ${err.message}`, variant: 'error' });
     },
   });
 
-  if (canonical === 'done' || canonical === 'canceled') {
+  if (canonical === 'done' || canonical === 'canceled' || canonical === 'backlog' || canonical === 'todo') {
     return null;
   }
 
@@ -2963,20 +2968,20 @@ function CancelIssueButton({ issue }: { issue: Issue }) {
       onClick={async (e) => {
         e.stopPropagation();
         if (await confirm({
-          title: 'Cancel Issue',
-          message: `Cancel ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Close any open PR for the issue\n- Remove the workspace\n- Delete the feature branch\n- Remove beads for this issue\n- Move the issue to Canceled`,
+          title: 'Abort Issue',
+          message: `Abort ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and branch\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
           variant: 'destructive',
-          confirmLabel: 'Cancel Issue',
+          confirmLabel: 'Abort',
         })) {
-          cancelMutation.mutate();
+          abortMutation.mutate();
         }
       }}
-      disabled={cancelMutation.isPending}
+      disabled={abortMutation.isPending}
       className="flex items-center gap-1 text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors disabled:opacity-50"
-      title="Cancel"
+      title="Abort — wipe all work and return to Todo"
     >
-      {cancelMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-      <span>{cancelMutation.isPending ? 'Canceling...' : 'Cancel'}</span>
+      {abortMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+      <span>{abortMutation.isPending ? 'Aborting...' : 'Abort'}</span>
     </button>
   );
 }

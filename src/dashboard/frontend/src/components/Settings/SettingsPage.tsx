@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -192,6 +192,16 @@ const AGENT_CATEGORIES: AgentCategory[] = [
 // Default model
 const DEFAULT_MODEL = 'claude-sonnet-4-5';
 
+// Section navigation definitions
+const SETTINGS_SECTIONS = [
+  { id: 'smart-selection', label: 'Smart Selection', icon: Route },
+  { id: 'providers', label: 'Providers', icon: Key },
+  { id: 'openrouter', label: 'OpenRouter', icon: Globe },
+  { id: 'trackers', label: 'Tracker Keys', icon: GitBranch },
+  { id: 'model-assignments', label: 'Model Assignments', icon: Brain },
+  { id: 'maintenance', label: 'Maintenance', icon: Settings },
+] as const;
+
 function getModelDisplay(modelId?: string): string {
   if (!modelId) return 'Default';
   const model = getModelById(modelId as ModelId);
@@ -223,6 +233,47 @@ export function SettingsPage() {
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [clearingCache, setClearingCache] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('smart-selection');
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Track active section based on scroll position
+  // The settings page lives inside an overflow-auto container, not the window
+  useEffect(() => {
+    const scrollContainer = contentRef.current?.closest('.overflow-auto') as HTMLElement | null;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const sectionIds = SETTINGS_SECTIONS.map(s => s.id);
+      let current = sectionIds[0];
+      const containerRect = scrollContainer.getBoundingClientRect();
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          // Section is "active" when its top has scrolled past the top of the container + offset
+          if (rect.top <= containerRect.top + 120) {
+            current = id;
+          }
+        }
+      }
+      setActiveSection(current);
+    };
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = useCallback((sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    const scrollContainer = contentRef.current?.closest('.overflow-auto') as HTMLElement | null;
+    if (el && scrollContainer) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollTop + elRect.top - containerRect.top - 16,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (settings && !formData) {
@@ -401,7 +452,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8 pb-32">
+    <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-8 pb-32">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div className="flex flex-col gap-1">
@@ -412,6 +463,10 @@ export function SettingsPage() {
           <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
         </div>
       </div>
+
+      <div className="flex gap-8">
+      {/* Main content */}
+      <div className="flex-1 min-w-0" ref={contentRef}>
 
       {/* Deprecation Warning Banner */}
       {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
@@ -446,7 +501,7 @@ export function SettingsPage() {
       )}
 
       {/* Smart Model Selection Hero */}
-      <section className="mb-10">
+      <section id="smart-selection" className="mb-10 scroll-mt-4">
         <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
           <div className="flex flex-col lg:flex-row">
             {/* Visualization */}
@@ -504,7 +559,7 @@ export function SettingsPage() {
       </section>
 
       {/* Provider Configuration */}
-      <section className="mb-12">
+      <section id="providers" className="mb-12 scroll-mt-4">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Provider Configuration
           <div className="h-px flex-1 bg-divider-strong" />
@@ -659,7 +714,7 @@ export function SettingsPage() {
       </section>
 
       {/* OpenRouter */}
-      <section className="mb-12">
+      <section id="openrouter" className="mb-12 scroll-mt-4">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           OpenRouter
           <div className="h-px flex-1 bg-divider-strong" />
@@ -673,7 +728,7 @@ export function SettingsPage() {
       </section>
 
       {/* Tracker API Keys */}
-      <section className="mb-12">
+      <section id="trackers" className="mb-12 scroll-mt-4">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Tracker API Keys
           <div className="h-px flex-1 bg-divider-strong" />
@@ -753,7 +808,7 @@ export function SettingsPage() {
       </section>
 
       {/* Agent Configuration by Category */}
-      <section className="mb-12">
+      <section id="model-assignments" className="mb-12 scroll-mt-4">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Model Assignments
           <div className="h-px flex-1 bg-divider-strong" />
@@ -872,7 +927,7 @@ export function SettingsPage() {
       </section>
 
       {/* Maintenance */}
-      <section className="space-y-3 pb-20">
+      <section id="maintenance" className="space-y-3 pb-20 scroll-mt-4">
         <h2 className="text-xl font-black text-content">Maintenance</h2>
         <div className="bg-surface-emphasis rounded-xl border border-divider p-5">
           <div className="flex items-center justify-between">
@@ -908,10 +963,38 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
+      </div>{/* end main content */}
+
+      {/* Section Sub-Navigation */}
+      <nav className="hidden xl:block w-44 shrink-0">
+        <div className="sticky top-8">
+          <p className="text-[10px] uppercase font-bold text-content-muted tracking-widest mb-3 px-2">On this page</p>
+          <div className="space-y-0.5">
+            {SETTINGS_SECTIONS.map((section) => {
+              const isActive = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors ${
+                    isActive
+                      ? 'text-blue-400 bg-blue-500/10 font-semibold'
+                      : 'text-content-muted hover:text-content-body hover:bg-surface-emphasis'
+                  }`}
+                >
+                  <section.icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-400' : 'text-content-subtle'}`} />
+                  <span className="truncate">{section.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
+      </div>{/* end flex container */}
 
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur-md border-t border-divider-strong shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-6 py-4 z-40">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 text-content-muted text-sm">
             {saveMutation.isSuccess && (
               <>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle,
+  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle, ChevronRight,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent } from '../../types';
@@ -179,18 +179,6 @@ export function ActionsSection({
           </button>
         )}
 
-        {/* Cancel Issue */}
-        {reviewStatus?.mergeStatus !== 'merged' && (
-          <button
-            onClick={onCancel}
-            disabled={cancelMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-destructive-foreground rounded hover:bg-accent disabled:opacity-50"
-          >
-            {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-            {cancelMutation.isPending ? 'Canceling...' : 'Cancel'}
-          </button>
-        )}
-
         {/* Reopen button */}
         {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (
           <button
@@ -331,6 +319,32 @@ export function ActionsSection({
         <div className="text-xs text-success badge-bg-success px-2 py-1 rounded mt-2">
           {syncMainMutation.data.alreadyUpToDate ? 'Already up to date with main' : `Synced ${syncMainMutation.data.commitCount ?? 0} commit(s) from main`}
         </div>
+      )}
+
+      {/* Danger Zone — Cancel Issue (collapsed by default) */}
+      {reviewStatus?.mergeStatus !== 'merged' && (
+        <details className="mt-6 rounded border border-destructive/30 group">
+          <summary className="px-3 py-2 bg-destructive/5 rounded cursor-pointer list-none select-none flex items-center gap-1.5 group-open:rounded-b-none group-open:border-b group-open:border-destructive/30">
+            <ChevronRight className="w-3 h-3 text-destructive transition-transform group-open:rotate-90" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-destructive">Danger Zone</span>
+          </summary>
+          <div className="px-3 py-3 space-y-2.5">
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-content">Cancel this issue</div>
+              <div className="text-[11px] text-content-subtle mt-0.5">
+                Permanently stops the agent, deletes the workspace and branch, closes the PR, and moves the issue to Canceled. This cannot be undone.
+              </div>
+            </div>
+            <button
+              onClick={onCancel}
+              disabled={cancelMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
+            >
+              {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+              {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
+            </button>
+          </div>
+        </details>
       )}
     </div>
   );
