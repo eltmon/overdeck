@@ -332,9 +332,6 @@ export function getAvailableModelsApi(): {
       case 'openrouter':
         result.openrouter.push(entry);
         break;
-      case 'zai':
-        result.zai.push(entry);
-        break;
     }
   }
 
