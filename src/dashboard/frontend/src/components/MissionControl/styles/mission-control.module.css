@@ -1936,8 +1936,8 @@
 
 .pickerDropdown {
   position: absolute;
-  bottom: calc(100% + 4px);
   left: 0;
+  top: calc(100% + 4px);
   z-index: 9999;
   background: var(--mc-bg-main);
   border: 1px solid var(--mc-border);
@@ -1948,6 +1948,11 @@
   display: flex;
   flex-direction: column;
   padding: 4px;
+}
+
+.pickerDropdownUp {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .pickerOption {

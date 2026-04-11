@@ -101,6 +101,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [dropdownAlign, setDropdownAlign] = useState<'left' | 'right'>('left');
+  const [openUp, setOpenUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -115,6 +116,13 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
       setDropdownAlign('right');
     } else {
       setDropdownAlign('left');
+    }
+
+    // If dropdown extends past bottom edge of viewport, open upward
+    if (dropdownRect.bottom > window.innerHeight - 8) {
+      setOpenUp(true);
+    } else {
+      setOpenUp(false);
     }
   }, [open]);
 
@@ -227,7 +235,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
       {open && (
         <div
           ref={dropdownRef}
-          className={styles.pickerDropdown}
+          className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
           style={dropdownAlign === 'right' ? { left: 'auto', right: 0 } : {}}
         >
           {groups.map((group) => (

@@ -429,8 +429,22 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
+
+    -- ===== Merge Queue (PAN-632: persistent merge serialization) =====
+    CREATE TABLE IF NOT EXISTS merge_queue (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_key TEXT NOT NULL,
+      issue_id    TEXT NOT NULL UNIQUE,
+      position    INTEGER NOT NULL,
+      queued_at   TEXT NOT NULL,
+      started_at  TEXT,
+      status      TEXT NOT NULL DEFAULT 'queued'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_merge_queue_project
+      ON merge_queue(project_key, status, position);
   `);
-	db.pragma(`user_version = 13`);
+	db.pragma(`user_version = 14`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -438,7 +452,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 13) return;
+	if (currentVersion === 14) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -551,7 +565,20 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN effort TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 13`);
+	if (currentVersion < 14) db.exec(`
+      CREATE TABLE IF NOT EXISTS merge_queue (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_key TEXT NOT NULL,
+        issue_id    TEXT NOT NULL UNIQUE,
+        position    INTEGER NOT NULL,
+        queued_at   TEXT NOT NULL,
+        started_at  TEXT,
+        status      TEXT NOT NULL DEFAULT 'queued'
+      );
+      CREATE INDEX IF NOT EXISTS idx_merge_queue_project
+        ON merge_queue(project_key, status, position);
+    `);
+	db.pragma(`user_version = 14`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

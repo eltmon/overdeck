@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /**
  * Initialize the complete database schema.
@@ -188,6 +188,20 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
+
+    -- ===== Merge Queue (PAN-632: persistent merge serialization) =====
+    CREATE TABLE IF NOT EXISTS merge_queue (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_key TEXT NOT NULL,
+      issue_id    TEXT NOT NULL UNIQUE,
+      position    INTEGER NOT NULL,
+      queued_at   TEXT NOT NULL,
+      started_at  TEXT,
+      status      TEXT NOT NULL DEFAULT 'queued'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_merge_queue_project
+      ON merge_queue(project_key, status, position);
   `);
 
   // Record schema version
@@ -371,6 +385,23 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN effort TEXT`);
     } catch { /* already exists */ }
+  }
+
+  // v13 → v14: add merge_queue table (PAN-632: persistent merge serialization)
+  if (currentVersion < 14) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS merge_queue (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_key TEXT NOT NULL,
+        issue_id    TEXT NOT NULL UNIQUE,
+        position    INTEGER NOT NULL,
+        queued_at   TEXT NOT NULL,
+        started_at  TEXT,
+        status      TEXT NOT NULL DEFAULT 'queued'
+      );
+      CREATE INDEX IF NOT EXISTS idx_merge_queue_project
+        ON merge_queue(project_key, status, position);
+    `);
   }
 
   // After all migrations, set the version

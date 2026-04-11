@@ -57,6 +57,8 @@ interface IssueCostData {
   issueId: string;
   totalCost: number;
   totalTokens: number;
+  inputTokens?: number;
+  outputTokens?: number;
   sessions: SessionCost[];
   byModel: Record<string, ModelCostInfo>;
   byStage?: Record<string, StageCostInfo>;
@@ -751,9 +753,15 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
               <span className="text-success font-medium ml-auto">{formatCost(costData.totalCost)}</span>
             </div>
             {costData.totalTokens > 0 && (
-              <div className="flex justify-between text-[10px]">
-                <span className="text-content-subtle">Tokens</span>
-                <span className="text-content">{formatTokens(costData.totalTokens)}</span>
+              <div className="space-y-0.5">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-content-subtle">Input tokens</span>
+                  <span className="text-content">{formatTokens(costData.inputTokens ?? 0)}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-content-subtle">Output tokens</span>
+                  <span className="text-content">{formatTokens(costData.outputTokens ?? 0)}</span>
+                </div>
               </div>
             )}
             {Object.keys(costData.byModel).length > 0 && (
