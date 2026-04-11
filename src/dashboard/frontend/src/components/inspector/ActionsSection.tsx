@@ -6,6 +6,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
+import { isReviewPipelineStuck } from '../../lib/pipeline-state';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -82,6 +83,7 @@ export function ActionsSection({
     ? now - new Date(reviewStatus.updatedAt).getTime()
     : 0;
   const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
+  const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
 
   if (reviewStatusLoading) {
     return (
@@ -200,15 +202,15 @@ export function ActionsSection({
           </button>
         )}
 
-        {/* Reset Review Cycles */}
-        {reviewStatus && (reviewStatus.reviewStatus !== 'pending' || reviewStatus.testStatus !== 'pending') && (
+        {/* Recover failed review/test/merge pipeline */}
+        {reviewStatus && isPipelineStuck && (
           <button
             onClick={onResetReview}
             disabled={resetReviewMutation.isPending}
             className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
           >
             {resetReviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-            {resetReviewMutation.isPending ? 'Resetting...' : 'Reset Pipeline'}
+            {resetReviewMutation.isPending ? 'Recovering...' : 'Recover'}
           </button>
         )}
 
