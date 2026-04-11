@@ -1233,6 +1233,34 @@
   color: var(--mc-text-primary);
 }
 
+.conversationItem:hover .conversationCopyBtn {
+  opacity: 1;
+}
+
+.conversationCopyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.conversationCopyBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
 /* Archive button in orphaned conversation state */
 .conversationArchiveBtnLarge {
   padding: var(--mc-space-2) var(--mc-space-4);
@@ -1315,6 +1343,23 @@
   display: flex;
   align-items: center;
   gap: var(--mc-space-1);
+}
+
+.copyLinkButton {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.copyLinkButton:hover {
+  color: var(--mc-text-primary);
+  background: var(--mc-bg-hover);
 }
 
 .conversationTerminalBody {

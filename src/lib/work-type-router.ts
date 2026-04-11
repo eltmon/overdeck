@@ -147,7 +147,7 @@ export class WorkTypeRouter {
   /**
    * Get API keys configuration
    */
-  getApiKeys(): { openai?: string; google?: string; zai?: string; kimi?: string } {
+  getApiKeys(): { openai?: string; google?: string; minimax?: string; kimi?: string } {
     return { ...this.config.apiKeys };
   }
 
@@ -176,7 +176,7 @@ export class WorkTypeRouter {
     hasApiKeys: {
       openai: boolean;
       google: boolean;
-      zai: boolean;
+      minimax: boolean;
       kimi: boolean;
     };
   } {
@@ -187,7 +187,7 @@ export class WorkTypeRouter {
       hasApiKeys: {
         openai: !!this.config.apiKeys.openai,
         google: !!this.config.apiKeys.google,
-        zai: !!this.config.apiKeys.zai,
+        minimax: !!this.config.apiKeys.minimax,
         kimi: !!this.config.apiKeys.kimi,
       },
     };

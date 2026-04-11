@@ -129,7 +129,7 @@ export interface NormalizedConfig {
   apiKeys: {
     openai?: string;
     google?: string;
-    zai?: string;
+    minimax?: string;
     kimi?: string;
     openrouter?: string;
   };
@@ -389,12 +389,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         }
       }
 
-      // Z.AI
-      const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
-      if (zai.enabled) {
-        result.enabledProviders.add('zai');
-        if (zai.api_key) {
-          result.apiKeys.zai = resolveEnvVar(zai.api_key);
+      // MiniMax (zai in YAML config, minimax internally)
+      const minimax = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+      if (minimax.enabled) {
+        result.enabledProviders.add('minimax');
+        if (minimax.api_key) {
+          result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
         }
       }
 
@@ -433,8 +433,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         result.enabledProviders.add('google');
       }
       if (config.api_keys.zai) {
-        result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
-        result.enabledProviders.add('zai');
+        result.apiKeys.minimax = resolveEnvVar(config.api_keys.zai);
+        result.enabledProviders.add('minimax');
       }
       if (config.api_keys.kimi) {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
@@ -603,9 +603,9 @@ export function loadConfig(): ConfigLoadResult {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;
     config.enabledProviders.add('google');
   }
-  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
-    config.apiKeys.zai = process.env.ZAI_API_KEY;
-    config.enabledProviders.add('zai');
+  if (process.env.ZAI_API_KEY && !config.apiKeys.minimax) {
+    config.apiKeys.minimax = process.env.ZAI_API_KEY;
+    config.enabledProviders.add('minimax');
   }
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;

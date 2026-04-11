@@ -82,7 +82,7 @@ export interface ApiSettingsConfig {
       anthropic: boolean;
       openai: boolean;
       google: boolean;
-      zai: boolean;
+      minimax: boolean;
       kimi: boolean;
       openrouter: boolean;
     };
@@ -92,7 +92,7 @@ export interface ApiSettingsConfig {
   api_keys: {
     openai?: string;
     google?: string;
-    zai?: string;
+    minimax?: string;
     kimi?: string;
     openrouter?: string;
   };
@@ -134,7 +134,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         anthropic: true, // Always enabled
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
-        zai: config.enabledProviders.has('zai'),
+        minimax: config.enabledProviders.has('minimax'),
         kimi: config.enabledProviders.has('kimi'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
@@ -161,7 +161,7 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
         anthropic: settings.models.providers.anthropic,
         openai: settings.models.providers.openai,
         google: settings.models.providers.google,
-        zai: settings.models.providers.zai,
+        zai: settings.models.providers.minimax,
         kimi: settings.models.providers.kimi,
         openrouter: settings.models.providers.openrouter,
       },
@@ -291,7 +291,7 @@ export function getAvailableModelsApi(): {
   anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
@@ -299,14 +299,14 @@ export function getAvailableModelsApi(): {
     anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
     openai: [],
     google: [],
-    zai: [],
+    minimax: [],
     kimi: [],
     openrouter: [],
   };
@@ -323,11 +323,11 @@ export function getAvailableModelsApi(): {
       case 'google':
         result.google.push(entry);
         break;
-      case 'zai':
-        result.zai.push(entry);
-        break;
       case 'kimi':
         result.kimi.push(entry);
+        break;
+      case 'minimax':
+        result.minimax.push(entry);
         break;
       case 'openrouter':
         result.openrouter.push(entry);
@@ -348,7 +348,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         anthropic: true,
         openai: false,
         google: false,
-        zai: false,
+        minimax: false,
         kimi: true, // Kimi K2.5 used for implementation work agent
         openrouter: false,
       },

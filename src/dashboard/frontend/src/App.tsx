@@ -67,7 +67,15 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
+  if (path.startsWith('/conv/')) return 'command-deck';
   return PATH_TO_TAB[path] || 'kanban';
+}
+
+/** Extract conversation ID from /conv/:id path, or null if not matching. */
+function getConvIdFromPath(): string | null {
+  const path = window.location.pathname;
+  const match = path.match(/^\/conv\/(\d+)$/);
+  return match ? match[1] : null;
 }
 
 async function fetchBackendHealth(): Promise<{ version: string }> {
@@ -123,6 +131,26 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  // Conversation deep-link state (/conv/:id)
+  const [selectedConvId, setSelectedConvIdState] = useState<string | null>(getConvIdFromPath);
+  const setSelectedConvId = useCallback((id: string | null) => {
+    setSelectedConvIdState(id);
+    if (id) {
+      window.history.replaceState(null, '', `/conv/${id}`);
+    } else {
+      window.history.replaceState(null, '', '/command-deck');
+    }
+  }, []);
+  // Sync conversation deep-link on popstate (browser back/forward)
+  useEffect(() => {
+    const onPopState = () => {
+      setSelectedConvId(getConvIdFromPath());
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [setSelectedConvId]);
+
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -405,7 +433,7 @@ export default function App() {
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
-              <MissionControl issues={issues} />
+              <MissionControl issues={issues} convId={selectedConvId} onConvIdChange={setSelectedConvId} />
             </div>
           )}
         {activeTab === 'kanban' && (

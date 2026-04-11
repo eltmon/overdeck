@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Loader2 } from 'lucide-react';
+import { Circle, Copy, Check, Loader2 } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
@@ -39,6 +39,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   // since new conversations should always start in conversation view
   const [viewMode, setViewMode] = useState<ViewMode>('conversation');
   const [resumed, setResumed] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || 'claude-opus-4-6');
   const queryClient = useQueryClient();
 
@@ -89,6 +90,14 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
     setViewMode(mode);
   }, []);
 
+  const handleCopyLink = useCallback(() => {
+    const url = `${window.location.origin}/conv/${conversation.id}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [conversation.id]);
+
   const showTerminal = conversation.sessionAlive || resumed;
 
   const statusColor = conversation.sessionAlive
@@ -117,6 +126,15 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
           />
           {statusLabel}
         </span>
+
+        {/* Copy link button */}
+        <button
+          className={styles.copyLinkButton}
+          onClick={handleCopyLink}
+          title="Copy link to conversation"
+        >
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+        </button>
 
         {/* View toggle — only show when session is live */}
         {showTerminal && (

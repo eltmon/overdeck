@@ -19,7 +19,7 @@ export interface WorkTypeMetadata {
 }
 
 /**
- * Complete registry of all 23 work types with metadata
+ * Complete registry of all 20 work types with metadata
  */
 export const WORK_TYPES = {
   // Issue agent phases (6)
@@ -81,7 +81,7 @@ export const WORK_TYPES = {
     description: 'General-purpose task subagent',
   },
 
-  // Convoy members (4)
+  // Convoy members (5)
   'convoy:security-reviewer': {
     category: 'convoy',
     description: 'Security-focused code reviewer in convoy',
@@ -93,6 +93,10 @@ export const WORK_TYPES = {
   'convoy:correctness-reviewer': {
     category: 'convoy',
     description: 'Correctness-focused code reviewer in convoy',
+  },
+  'convoy:requirements-reviewer': {
+    category: 'convoy',
+    description: 'Requirements and design review in convoy',
   },
   'convoy:synthesis-agent': {
     category: 'convoy',
