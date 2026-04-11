@@ -443,8 +443,48 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_merge_queue_project
       ON merge_queue(project_key, status, position);
+
+    -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
+    CREATE TABLE IF NOT EXISTS merge_sets (
+      issue_id       TEXT PRIMARY KEY,
+      project_key    TEXT NOT NULL,
+      project_path   TEXT NOT NULL,
+      workspace_type TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'draft',
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_merge_sets_project
+      ON merge_sets(project_key, updated_at);
+
+    CREATE TABLE IF NOT EXISTS merge_set_repos (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id            TEXT NOT NULL,
+      repo_key            TEXT NOT NULL,
+      repo_path           TEXT NOT NULL,
+      forge               TEXT NOT NULL,
+      source_branch       TEXT NOT NULL,
+      target_branch       TEXT NOT NULL,
+      artifact_url        TEXT,
+      artifact_id         TEXT,
+      review_status       TEXT NOT NULL DEFAULT 'pending',
+      test_status         TEXT NOT NULL DEFAULT 'pending',
+      rebase_status       TEXT NOT NULL DEFAULT 'pending',
+      verification_status TEXT NOT NULL DEFAULT 'pending',
+      merge_status        TEXT NOT NULL DEFAULT 'pending',
+      merge_order         INTEGER NOT NULL DEFAULT 0,
+      required            INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (issue_id) REFERENCES merge_sets(issue_id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_merge_set_repos_issue_repo
+      ON merge_set_repos(issue_id, repo_key);
+
+    CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
+      ON merge_set_repos(issue_id, merge_order, repo_key);
   `);
-	db.pragma(`user_version = 14`);
+	db.pragma(`user_version = 15`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -452,7 +492,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 14) return;
+	if (currentVersion === 15) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -578,7 +618,43 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_merge_queue_project
         ON merge_queue(project_key, status, position);
     `);
-	db.pragma(`user_version = 14`);
+	if (currentVersion < 15) db.exec(`
+      CREATE TABLE IF NOT EXISTS merge_sets (
+        issue_id       TEXT PRIMARY KEY,
+        project_key    TEXT NOT NULL,
+        project_path   TEXT NOT NULL,
+        workspace_type TEXT NOT NULL,
+        status         TEXT NOT NULL DEFAULT 'draft',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_merge_sets_project
+        ON merge_sets(project_key, updated_at);
+      CREATE TABLE IF NOT EXISTS merge_set_repos (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        issue_id            TEXT NOT NULL,
+        repo_key            TEXT NOT NULL,
+        repo_path           TEXT NOT NULL,
+        forge               TEXT NOT NULL,
+        source_branch       TEXT NOT NULL,
+        target_branch       TEXT NOT NULL,
+        artifact_url        TEXT,
+        artifact_id         TEXT,
+        review_status       TEXT NOT NULL DEFAULT 'pending',
+        test_status         TEXT NOT NULL DEFAULT 'pending',
+        rebase_status       TEXT NOT NULL DEFAULT 'pending',
+        verification_status TEXT NOT NULL DEFAULT 'pending',
+        merge_status        TEXT NOT NULL DEFAULT 'pending',
+        merge_order         INTEGER NOT NULL DEFAULT 0,
+        required            INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (issue_id) REFERENCES merge_sets(issue_id) ON DELETE CASCADE
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_merge_set_repos_issue_repo
+        ON merge_set_repos(issue_id, repo_key);
+      CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
+        ON merge_set_repos(issue_id, merge_order, repo_key);
+    `);
+	db.pragma(`user_version = 15`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
