@@ -83,7 +83,6 @@ export function sessionExists(name: string): boolean {
   }
 }
 
-
 export function createSession(
   name: string,
   cwd: string,
