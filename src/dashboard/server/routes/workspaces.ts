@@ -3129,7 +3129,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const prResult = await ensurePRExists(issueId);
       if (!prResult.prUrl) {
         const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
@@ -3137,7 +3137,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
       if (!prMatch) {
         const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
@@ -3166,7 +3166,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         };
       } catch (remoteErr: any) {
         console.error(`[merge] Remote merge failed for ${issueId}:`, remoteErr);
-        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
         completePendingOperation(issueId, remoteErr.message);
         return {
           success: false,
@@ -3271,7 +3271,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         const error = `Polyrepo merge failed for: ${failedRepos
           .map(r => `${r.repo} (${r.message})`)
           .join(', ')}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error, repos: mergeResults };
       }
@@ -3295,7 +3295,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName });
     if (!prResult.prUrl) {
       const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
-      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 400, error };
     }
@@ -3303,7 +3303,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
     if (!prMatch) {
       const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
-      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 400, error };
     }
@@ -3319,7 +3319,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     if (!rebaseResult.success) {
       const error = rebaseResult.reason || 'Rebase failed';
-      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error });
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
       completePendingOperation(issueId, error);
 
       // Notify work agent about conflicts
@@ -3370,7 +3370,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed: ${verifyResult.reason || 'typecheck/lint/test errors'}`;
       console.log(`[merge] ${error}`);
-      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error });
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
       completePendingOperation(issueId, error);
 
       // Post comment on PR so failure is visible
@@ -3419,7 +3419,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       console.log(`[merge] PR merged: ${mergeOutput.trim()}`);
     } catch (prMergeErr: any) {
       const error = `gh pr merge failed: ${prMergeErr.message}`;
-      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 500, error };
     }
@@ -3445,7 +3445,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     };
   } catch (error: any) {
     console.error(`[merge] Error:`, error);
-    setReviewStatus(issueId, { mergeStatus: 'failed' });
+    setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
     completePendingOperation(issueId, error.message);
     return { success: false, statusCode: 500, error: error.message };
   } finally {
