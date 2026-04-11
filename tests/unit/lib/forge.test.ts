@@ -1,7 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { execMock } = vi.hoisted(() => ({
+const {
+  execMock,
+  getPullRequestStateMock,
+  isGitHubAppConfiguredMock,
+  mergePullRequestWithAppMock,
+  parsePullRequestRefMock,
+} = vi.hoisted(() => ({
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
+  getPullRequestStateMock: vi.fn(),
+  isGitHubAppConfiguredMock: vi.fn(),
+  mergePullRequestWithAppMock: vi.fn(),
+  parsePullRequestRefMock: vi.fn(),
 }));
 
 vi.mock('child_process', () => {
@@ -18,11 +28,21 @@ vi.mock('child_process', () => {
   return { exec };
 });
 
+vi.mock('../../../src/lib/github-app.js', () => ({
+  getPullRequestState: getPullRequestStateMock,
+  isGitHubAppConfigured: isGitHubAppConfiguredMock,
+  mergePullRequestWithApp: mergePullRequestWithAppMock,
+  parsePullRequestRef: parsePullRequestRefMock,
+}));
+
 import { getForgeAdapter } from '../../../src/lib/forge.js';
 
 describe('forge adapters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+    isGitHubAppConfiguredMock.mockReturnValue(false);
+    parsePullRequestRefMock.mockReturnValue({ owner: 'org', repo: 'repo', number: 42 });
   });
 
   it('creates GitHub review artifacts using the configured target branch', async () => {
@@ -75,5 +95,99 @@ describe('forge adapters', () => {
       url: 'https://gitlab.example.com/group/repo/-/merge_requests/7',
       id: '7',
     });
+  });
+
+  it('falls back to gh for GitHub merges when the app is not configured', async () => {
+    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      url: 'https://github.com/org/repo/pull/42',
+      cwd: '/tmp/repo',
+      method: 'squash',
+    });
+
+    expect(execMock).toHaveBeenCalledWith(
+      'gh pr merge https://github.com/org/repo/pull/42 --squash',
+      expect.objectContaining({ cwd: '/tmp/repo' }),
+    );
+    expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
+  });
+
+  it('merges GitHub PRs through the GitHub App once checks settle', async () => {
+    vi.useFakeTimers();
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    getPullRequestStateMock
+      .mockResolvedValueOnce({
+        owner: 'org',
+        repo: 'repo',
+        number: 42,
+        state: 'OPEN',
+        merged: false,
+        mergeable: null,
+        mergeableState: 'unknown',
+        draft: false,
+        headSha: 'abc123',
+        baseBranch: 'main',
+        checksPending: true,
+        checksFailed: false,
+      })
+      .mockResolvedValueOnce({
+        owner: 'org',
+        repo: 'repo',
+        number: 42,
+        state: 'OPEN',
+        merged: false,
+        mergeable: true,
+        mergeableState: 'clean',
+        draft: false,
+        headSha: 'abc123',
+        baseBranch: 'main',
+        checksPending: false,
+        checksFailed: false,
+      });
+    mergePullRequestWithAppMock.mockResolvedValue({ merged: true });
+
+    const mergePromise = getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      url: 'https://github.com/org/repo/pull/42',
+      cwd: '/tmp/repo',
+      method: 'squash',
+    });
+    await vi.runAllTimersAsync();
+    await mergePromise;
+
+    expect(getPullRequestStateMock).toHaveBeenCalledTimes(2);
+    expect(mergePullRequestWithAppMock).toHaveBeenCalledWith('org', 'repo', 42, 'squash', 'abc123');
+    expect(execMock).not.toHaveBeenCalled();
+  });
+
+  it('treats already merged GitHub PRs as success', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    getPullRequestStateMock.mockResolvedValue({
+      owner: 'org',
+      repo: 'repo',
+      number: 42,
+      state: 'CLOSED',
+      merged: true,
+      mergeable: false,
+      mergeableState: 'clean',
+      draft: false,
+      headSha: 'abc123',
+      baseBranch: 'main',
+      checksPending: false,
+      checksFailed: false,
+    });
+
+    await expect(
+      getForgeAdapter('github').mergeReviewArtifact({
+        forge: 'github',
+        url: 'https://github.com/org/repo/pull/42',
+        cwd: '/tmp/repo',
+        method: 'squash',
+      })
+    ).resolves.toBeUndefined();
+
+    expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
   });
 });

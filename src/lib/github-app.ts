@@ -27,6 +27,25 @@ export interface InstallationToken {
   expiresAt: string; // ISO timestamp
 }
 
+export interface GitHubPullRequestRef {
+  owner: string;
+  repo: string;
+  number: number;
+}
+
+export interface GitHubPullRequestState extends GitHubPullRequestRef {
+  url?: string;
+  state: 'OPEN' | 'CLOSED';
+  merged: boolean;
+  mergeable: boolean | null;
+  mergeableState: string | null;
+  draft: boolean;
+  headSha: string;
+  baseBranch: string;
+  checksPending: boolean;
+  checksFailed: boolean;
+}
+
 /**
  * Check if the GitHub App is configured (credentials exist)
  */
@@ -109,6 +128,176 @@ export async function generateInstallationToken(
     token: data.token,
     expiresAt: data.expires_at,
   };
+}
+
+async function getInstallationAccessToken(): Promise<string> {
+  const config = loadGitHubAppConfig();
+  if (!config) {
+    throw new Error('GitHub App not configured. Run: node scripts/create-github-app.mjs');
+  }
+  const { token } = await generateInstallationToken(config);
+  return token;
+}
+
+async function githubApi<T>(
+  path: string,
+  init: RequestInit = {},
+  extraHeaders: Record<string, string> = {}
+): Promise<T> {
+  const token = await getInstallationAccessToken();
+  const response = await fetch(`https://api.github.com${path}`, {
+    ...init,
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'panopticon-cli',
+      ...extraHeaders,
+      ...(init.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return await response.json() as T;
+}
+
+export function parsePullRequestRef(input: {
+  url?: string;
+  id?: string;
+  repository?: string;
+}): GitHubPullRequestRef {
+  if (input.url) {
+    const match = input.url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!match) {
+      throw new Error(`Could not parse GitHub PR from URL: ${input.url}`);
+    }
+    return {
+      owner: match[1],
+      repo: match[2],
+      number: Number.parseInt(match[3], 10),
+    };
+  }
+
+  if (input.repository && input.id) {
+    const [owner, repo] = input.repository.split('/');
+    const number = Number.parseInt(input.id, 10);
+    if (owner && repo && Number.isFinite(number)) {
+      return { owner, repo, number };
+    }
+  }
+
+  throw new Error('GitHub PR reference requires either a PR URL or repository + numeric id');
+}
+
+async function getCommitCheckState(
+  owner: string,
+  repo: string,
+  sha: string,
+): Promise<{ pending: boolean; failed: boolean }> {
+  const [combinedStatus, checkRuns] = await Promise.all([
+    githubApi<{ state?: string }>(`/repos/${owner}/${repo}/commits/${sha}/status`),
+    githubApi<{ check_runs?: Array<{ status?: string; conclusion?: string | null }> }>(
+      `/repos/${owner}/${repo}/commits/${sha}/check-runs`
+    ),
+  ]);
+
+  const statusState = combinedStatus.state || '';
+  const pendingStatus = statusState === 'pending';
+  const failedStatus = statusState === 'failure' || statusState === 'error';
+
+  const runs = checkRuns.check_runs || [];
+  const pendingChecks = runs.some((run) => run.status !== 'completed');
+  const failedChecks = runs.some((run) => {
+    if (run.status !== 'completed') return false;
+    return !['success', 'neutral', 'skipped'].includes(run.conclusion || '');
+  });
+
+  return {
+    pending: pendingStatus || pendingChecks,
+    failed: failedStatus || failedChecks,
+  };
+}
+
+export async function getPullRequestState(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<GitHubPullRequestState> {
+  const pull = await githubApi<{
+    html_url?: string;
+    state: 'open' | 'closed';
+    merged?: boolean;
+    mergeable?: boolean | null;
+    mergeable_state?: string | null;
+    draft?: boolean;
+    head?: { sha?: string };
+    base?: { ref?: string };
+  }>(`/repos/${owner}/${repo}/pulls/${number}`);
+
+  const headSha = pull.head?.sha || '';
+  const checkState = headSha
+    ? await getCommitCheckState(owner, repo, headSha)
+    : { pending: false, failed: false };
+
+  return {
+    owner,
+    repo,
+    number,
+    url: pull.html_url,
+    state: pull.state === 'open' ? 'OPEN' : 'CLOSED',
+    merged: pull.merged === true,
+    mergeable: pull.mergeable ?? null,
+    mergeableState: pull.mergeable_state ?? null,
+    draft: pull.draft === true,
+    headSha,
+    baseBranch: pull.base?.ref || 'main',
+    checksPending: checkState.pending,
+    checksFailed: checkState.failed,
+  };
+}
+
+export async function mergePullRequestWithApp(
+  owner: string,
+  repo: string,
+  number: number,
+  method: 'merge' | 'squash' | 'rebase' = 'squash',
+  sha?: string,
+): Promise<{ merged: boolean; message?: string }> {
+  const token = await getInstallationAccessToken();
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/merge`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'panopticon-cli',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        merge_method: method,
+        ...(sha ? { sha } : {}),
+      }),
+    }
+  );
+
+  if (response.ok) {
+    const data = await response.json() as { merged?: boolean; message?: string };
+    return {
+      merged: data.merged === true,
+      message: data.message,
+    };
+  }
+
+  const text = await response.text();
+  throw new Error(`GitHub merge failed: ${response.status} ${text}`);
 }
 
 /**
