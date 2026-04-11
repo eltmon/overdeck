@@ -168,7 +168,7 @@ export function registerWorkCommands(program: Command): void {
 
   work
     .command('request-review <id>')
-    .description('Request re-review after fixing feedback (max 3 auto-requeues)')
+    .description('Request re-review after fixing feedback (max 7 auto-requeues)')
     .option('-m, --message <text>', 'Message for reviewers describing fixes')
     .action(requestReviewCommand);
 

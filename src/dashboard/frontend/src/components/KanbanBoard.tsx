@@ -2486,6 +2486,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <MessageCircle className="w-3.5 h-3.5" />
             Tell
           </button>
+          {canonical === 'in_review' && !isTerminal && (
+            <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
+          )}
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
           {/* Model badge - centered between Tell and Kill */}
           {activeAgent && activeAgent.model && (

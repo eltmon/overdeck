@@ -5,11 +5,17 @@ import type { ReviewStatus } from './types';
 import { formatRelativeTime, isStale } from './utils';
 import { StatusHistory } from './StatusHistory';
 
+const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
+const DEFAULT_AUTO_REQUEUE_MAX = 7;
+
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
 }
 
 export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionProps) {
+  const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
+  const autoRequeueCount = reviewStatus.autoRequeueCount ?? 0;
+
   return (
     <div className={`mb-2 p-2 rounded text-xs ${
       reviewStatus.updatedAt && isStale(reviewStatus.updatedAt)
@@ -71,8 +77,8 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
              '⟳ Running...'}
           </span>
           {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
-            <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= (reviewStatus.verificationMaxCycles ?? 3) ? 'text-destructive' : 'text-content-muted'}`}>
-              Attempt {reviewStatus.verificationCycleCount}/{reviewStatus.verificationMaxCycles ?? 3}
+            <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= verificationMaxCycles ? 'text-destructive' : 'text-content-muted'}`}>
+              Attempt {reviewStatus.verificationCycleCount}/{verificationMaxCycles}
             </span>
           )}
         </div>
@@ -80,13 +86,13 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
       {reviewStatus.verificationStatus === 'failed' && reviewStatus.verificationNotes && (
         <div className="text-[10px] text-destructive/80 mt-0.5 ml-2">{reviewStatus.verificationNotes}</div>
       )}
-      {(reviewStatus.autoRequeueCount ?? 0) > 0 && (
+      {autoRequeueCount > 0 && (
         <div className="flex items-center gap-2 mt-1">
           <span className="text-content-subtle">Cycles:</span>
-          <span className={(reviewStatus.autoRequeueCount ?? 0) >= 3 ? 'text-destructive font-medium' : 'text-content'}>
-            {reviewStatus.autoRequeueCount}/3
+          <span className={autoRequeueCount >= DEFAULT_AUTO_REQUEUE_MAX ? 'text-destructive font-medium' : 'text-content'}>
+            {autoRequeueCount}/{DEFAULT_AUTO_REQUEUE_MAX}
           </span>
-          {(reviewStatus.autoRequeueCount ?? 0) >= 3 && (
+          {autoRequeueCount >= DEFAULT_AUTO_REQUEUE_MAX && (
             <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-900/20 px-1.5 py-0.5 rounded">
               <AlertTriangle className="w-2.5 h-2.5" />Human review needed
             </span>

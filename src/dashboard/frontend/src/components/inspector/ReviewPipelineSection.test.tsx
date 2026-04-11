@@ -42,12 +42,25 @@ describe('ReviewPipelineSection', () => {
 
   it('shows cycle count when autoRequeueCount > 0', () => {
     render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ autoRequeueCount: 2 })} />);
-    expect(screen.getByText('2/3')).toBeInTheDocument();
+    expect(screen.getByText('2/7')).toBeInTheDocument();
   });
 
-  it('shows human review warning when cycle count >= 3', () => {
-    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ autoRequeueCount: 3 })} />);
+  it('shows human review warning when cycle count >= 7', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ autoRequeueCount: 7 })} />);
     expect(screen.getByText('Human review needed')).toBeInTheDocument();
+  });
+
+  it('shows verification attempts against the configured max cycle count', () => {
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({
+          verificationStatus: 'running',
+          verificationCycleCount: 2,
+          verificationMaxCycles: 10,
+        })}
+      />
+    );
+    expect(screen.getByText('Attempt 2/10')).toBeInTheDocument();
   });
 
   it('shows verification status when not pending', () => {
