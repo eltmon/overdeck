@@ -115,6 +115,7 @@ import { checkReadyForMergeStuck, setMergeReadyNotifier } from '../../../../src/
 // ---------------------------------------------------------------------------
 const NOW = Date.now();
 const THREE_MIN_AGO = new Date(NOW - 3 * 60 * 1000).toISOString();
+const ONE_HOUR_AGO = new Date(NOW - 65 * 60 * 1000).toISOString(); // At least 1 hour old (MERGE_READY_REMINDER_MS)
 const ONE_MIN_AGO  = new Date(NOW - 1 * 60 * 1000).toISOString();
 
 // ---------------------------------------------------------------------------
@@ -133,13 +134,13 @@ describe('checkReadyForMergeStuck', () => {
     setMergeReadyNotifier(mockNotifier);
   });
 
-  it('notifies for a stuck readyForMerge issue older than 2 min (no auto-merge, PAN-354)', async () => {
+  it('notifies for a stuck readyForMerge issue older than 1 hour (no auto-merge, PAN-354)', async () => {
     _statusData = {
       'PAN-344': {
         issueId: 'PAN-344',
         readyForMerge: true,
         mergeStatus: undefined,
-        updatedAt: THREE_MIN_AGO,
+        updatedAt: ONE_HOUR_AGO,
       },
     };
 
@@ -150,7 +151,7 @@ describe('checkReadyForMergeStuck', () => {
     expect(mockNotifier).toHaveBeenCalledWith('PAN-344');
     expect(actions.length).toBeGreaterThan(0);
     expect(actions[0]).toContain('PAN-344');
-    expect(actions[0]).toContain('readyForMerge');
+    expect(actions[0]).toContain('Merge ready');
   });
 
   it('skips an issue where mergeStatus is already "merging"', async () => {
@@ -216,7 +217,8 @@ describe('checkReadyForMergeStuck', () => {
     // Start far in the future to avoid colliding with real-clock cooldowns from other tests
     let fakeNow = NOW + 200 * 60 * 60 * 1000; // +200 hours
 
-    // Make 3 successful attempts, advancing past the 10-min cooldown each time
+    // Make 3 successful attempts, advancing past the cooldown each time
+    // Note: MERGE_READY_REMINDER_MS = 1 hour, MERGE_READY_REMINDER_COOLDOWN_MS = 1 hour
     for (let attempt = 0; attempt < 3; attempt++) {
       vi.setSystemTime(fakeNow);
       _statusData = {
@@ -224,11 +226,11 @@ describe('checkReadyForMergeStuck', () => {
           issueId: CKEY,
           readyForMerge: true,
           mergeStatus: undefined,
-          updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
+          updatedAt: new Date(fakeNow - 65 * 60 * 1000).toISOString(), // 65 min old (> 1 hour requirement)
         },
       };
       await checkReadyForMergeStuck();
-      fakeNow += 11 * 60 * 1000; // advance 11 min (past the 10-min cooldown)
+      fakeNow += 65 * 60 * 1000; // advance 65 min (past the 1-hour cooldown)
     }
 
     const notifyCallsAfterThree = mockNotifier.mock.calls.length;
@@ -241,7 +243,7 @@ describe('checkReadyForMergeStuck', () => {
         issueId: CKEY,
         readyForMerge: true,
         mergeStatus: undefined,
-        updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
+        updatedAt: new Date(fakeNow - 65 * 60 * 1000).toISOString(),
       },
     };
     await checkReadyForMergeStuck();
