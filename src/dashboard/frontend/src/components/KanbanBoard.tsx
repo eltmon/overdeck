@@ -2421,7 +2421,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           <button
             onClick={handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -2458,6 +2458,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <MessageCircle className="w-3.5 h-3.5" />
             Tell
           </button>
+          <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
           {/* Model badge - centered between Tell and Kill */}
           {activeAgent && activeAgent.model && (
             <span className="flex-1 text-center text-[10px] text-content-body font-medium">
