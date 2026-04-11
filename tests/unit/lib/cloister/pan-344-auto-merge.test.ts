@@ -110,13 +110,9 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 // Import after mocks are in place
 import { checkReadyForMergeStuck, setMergeReadyNotifier } from '../../../../src/lib/cloister/deacon.js';
 
-// ---------------------------------------------------------------------------
-// Timestamp helpers
-// ---------------------------------------------------------------------------
-const NOW = Date.now();
-const THREE_MIN_AGO = new Date(NOW - 3 * 60 * 1000).toISOString();
-const ONE_HOUR_AGO = new Date(NOW - 65 * 60 * 1000).toISOString(); // At least 1 hour old (MERGE_READY_REMINDER_MS)
-const ONE_MIN_AGO  = new Date(NOW - 1 * 60 * 1000).toISOString();
+function isoMinutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -126,6 +122,7 @@ describe('checkReadyForMergeStuck', () => {
   const mockNotifier = vi.fn();
 
   beforeEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     _statusData = {};
     _statusExists = true;
@@ -135,12 +132,13 @@ describe('checkReadyForMergeStuck', () => {
   });
 
   it('notifies for a stuck readyForMerge issue older than 1 hour (no auto-merge, PAN-354)', async () => {
+    const issueId = 'PAN-344-REMINDER';
     _statusData = {
-      'PAN-344': {
-        issueId: 'PAN-344',
+      [issueId]: {
+        issueId,
         readyForMerge: true,
         mergeStatus: undefined,
-        updatedAt: ONE_HOUR_AGO,
+        updatedAt: isoMinutesAgo(65),
       },
     };
 
@@ -148,15 +146,15 @@ describe('checkReadyForMergeStuck', () => {
 
     // Must notify via callback, not by calling the merge API
     expect(mockNotifier).toHaveBeenCalledOnce();
-    expect(mockNotifier).toHaveBeenCalledWith('PAN-344');
+    expect(mockNotifier).toHaveBeenCalledWith(issueId);
     expect(actions.length).toBeGreaterThan(0);
-    expect(actions[0]).toContain('PAN-344');
+    expect(actions[0]).toContain(issueId);
     expect(actions[0]).toContain('Merge ready');
   });
 
   it('skips an issue where mergeStatus is already "merging"', async () => {
     _statusData = {
-      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'merging', updatedAt: THREE_MIN_AGO },
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'merging', updatedAt: isoMinutesAgo(3) },
     };
 
     const actions = await checkReadyForMergeStuck();
@@ -167,7 +165,7 @@ describe('checkReadyForMergeStuck', () => {
 
   it('skips an issue where mergeStatus is already "merged"', async () => {
     _statusData = {
-      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'merged', updatedAt: THREE_MIN_AGO },
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'merged', updatedAt: isoMinutesAgo(3) },
     };
 
     const actions = await checkReadyForMergeStuck();
@@ -178,7 +176,7 @@ describe('checkReadyForMergeStuck', () => {
 
   it('skips an issue with mergeStatus=failed', async () => {
     _statusData = {
-      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'failed', updatedAt: THREE_MIN_AGO },
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'failed', updatedAt: isoMinutesAgo(3) },
     };
 
     const actions = await checkReadyForMergeStuck();
@@ -189,7 +187,7 @@ describe('checkReadyForMergeStuck', () => {
 
   it('skips an issue whose readyForMerge status is younger than 2 min', async () => {
     _statusData = {
-      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: undefined, updatedAt: ONE_MIN_AGO },
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: undefined, updatedAt: isoMinutesAgo(1) },
     };
 
     const actions = await checkReadyForMergeStuck();
@@ -215,7 +213,7 @@ describe('checkReadyForMergeStuck', () => {
 
     vi.useFakeTimers();
     // Start far in the future to avoid colliding with real-clock cooldowns from other tests
-    let fakeNow = NOW + 200 * 60 * 60 * 1000; // +200 hours
+    let fakeNow = Date.now() + 200 * 60 * 60 * 1000; // +200 hours
 
     // Make 3 successful attempts, advancing past the cooldown each time
     // Note: MERGE_READY_REMINDER_MS = 1 hour, MERGE_READY_REMINDER_COOLDOWN_MS = 1 hour
@@ -223,12 +221,12 @@ describe('checkReadyForMergeStuck', () => {
       vi.setSystemTime(fakeNow);
       _statusData = {
         [CKEY]: {
-          issueId: CKEY,
-          readyForMerge: true,
-          mergeStatus: undefined,
-          updatedAt: new Date(fakeNow - 65 * 60 * 1000).toISOString(), // 65 min old (> 1 hour requirement)
-        },
-      };
+        issueId: CKEY,
+        readyForMerge: true,
+        mergeStatus: undefined,
+        updatedAt: new Date(fakeNow - 65 * 60 * 1000).toISOString(), // 65 min old (> 1 hour requirement)
+      },
+    };
       await checkReadyForMergeStuck();
       fakeNow += 65 * 60 * 1000; // advance 65 min (past the 1-hour cooldown)
     }
