@@ -1289,6 +1289,9 @@ const postAgentsRoute = HttpRouter.add(
           ? workspacePath
           : projectPath;
         yield* Effect.promise(() => execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' }));
+        if (existsSync(join(gitRoot, '.beads'))) {
+          yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
+        }
         if (existsSync(join(gitRoot, 'STATE.md'))) {
           yield* Effect.promise(() => execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' }));
         }

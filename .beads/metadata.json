@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "pan_475",
+  "project_id": "a90941a6-4d4f-472b-ab25-f6bd26035f16"
+}
