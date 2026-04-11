@@ -144,6 +144,13 @@ describe('ActionsSection', () => {
     expect(screen.getByTestId('reopen-btn')).toBeInTheDocument();
   });
 
+  it('shows Recover instead of Reset Pipeline when the pipeline is stuck', () => {
+    const reviewStatus = makeReviewStatus({ mergeStatus: 'failed', verificationStatus: 'failed' });
+    render(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    expect(screen.getByText('Recover')).toBeInTheDocument();
+    expect(screen.queryByText('Reset Pipeline')).not.toBeInTheDocument();
+  });
+
   it('shows Review & Test button always', () => {
     render(<ActionsSection {...defaultProps} />);
     expect(screen.getByTestId('review-test-btn')).toBeInTheDocument();

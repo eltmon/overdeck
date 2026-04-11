@@ -29,6 +29,7 @@ import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
+import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
 
 
@@ -1979,6 +1980,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
+  const hasPendingQuestion = hasActualPendingQuestion(agent);
+  const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
 
   const priorityColors: Record<number, string> = {
     0: 'border-l-border',         // no priority — neutral
@@ -2308,21 +2311,30 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               </span>
             )}
             {/* Awaiting Input badge - agent is waiting for user response */}
-            {!isTerminal && agent?.hasPendingQuestion && (
+            {!isTerminal && hasPendingQuestion && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
                   onPlan();
                 }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse cursor-pointer hover:bg-warning/90"
-                title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
+                title={`Agent is waiting for user input - click to respond (${agent?.pendingQuestionCount || 1} question${(agent?.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
               >
                 <HelpCircle className="w-3 h-3" />
                 Input
               </span>
             )}
+            {isPipelineStuck && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground animate-pulse uppercase tracking-wide"
+                title="Pipeline is blocked by a failed review, test, rebase, or verification step. Use Recover to rerun the pipeline."
+              >
+                <AlertTriangle className="w-3 h-3" />
+                Stuck
+              </span>
+            )}
             {/* Lifecycle resolution badges (PAN-309) */}
-            {!isTerminal && agent?.resolution === 'done' && !agent?.hasPendingQuestion && (
+            {!isTerminal && !isPipelineStuck && agent?.resolution === 'done' && !hasPendingQuestion && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
                 title="Agent evidence shows work is complete — waiting for agent to call pan work done"
@@ -2331,7 +2343,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Done
               </span>
             )}
-            {!isTerminal && agent?.resolution === 'stuck' && (
+            {!isTerminal && !isPipelineStuck && agent?.resolution === 'stuck' && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground animate-pulse"
                 title={`Agent appears stuck — no clear progress signal after ${agent.resolutionCount || 0} check(s). Consider sending a message.`}
@@ -2340,7 +2352,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Stuck
               </span>
             )}
-            {!isTerminal && agent?.resolution === 'needs_input' && !agent?.hasPendingQuestion && (
+            {!isTerminal && !isPipelineStuck && agent?.resolution === 'needs_input' && !hasPendingQuestion && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse"
                 title="Agent stopped because it needs human input or hit a blocker"
@@ -2645,7 +2657,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         </div>
       )}
 
-      {/* In Review items - Resume Session (if lost) + Reset Pipeline + Reopen */}
+      {/* In Review items - Resume Session (if lost) + Recover + Reopen */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
@@ -2659,7 +2671,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             </button>
           )}
-          <ResetPipelineButton issue={issue} />
+          <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           <ReopenSection issue={issue} inline />
         </div>
       )}
@@ -2696,20 +2708,31 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   );
 }
 
-// Reset pipeline button - resets review/test/merge state and optionally re-dispatches
-function ResetPipelineButton({ issue }: { issue: Issue }) {
+// Recover button - clears failed pipeline state and re-dispatches review/test
+function ResetPipelineButton({
+  issue,
+  reviewStatus,
+}: {
+  issue: Issue;
+  reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus'>;
+}) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
+  const isRecoverable = isReviewPipelineStuck(reviewStatus);
+
+  if (!isRecoverable) {
+    return null;
+  }
 
   return (
     <button
       onClick={async (e) => {
         e.stopPropagation();
         if (await confirm({
-          title: 'Reset & Re-run Pipeline',
-          message: `Reset review/test pipeline for ${issue.identifier}?\n\nThis will:\n• Clear review, test, and merge status\n• Reset circuit breaker counters\n• Remove queued specialist tasks\n• Re-dispatch to review specialist`,
-          confirmLabel: 'Reset & Re-run',
+          title: 'Recover Pipeline',
+          message: `Recover ${issue.identifier}?\n\nThis will:\n• Clear failed review, test, and merge state\n• Reset circuit breaker counters\n• Remove queued specialist tasks\n• Re-dispatch review and test as needed`,
+          confirmLabel: 'Recover',
         })) {
           setIsPending(true);
           try {
@@ -2733,10 +2756,10 @@ function ResetPipelineButton({ issue }: { issue: Issue }) {
       }}
       disabled={isPending}
       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-      title="Reset pipeline state and re-run review & test"
+      title="Recover from the failed review/test/merge state and rerun the pipeline"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-      {isPending ? 'Resetting...' : 'Reset Pipeline'}
+      {isPending ? 'Recovering...' : 'Recover'}
     </button>
   );
 }
