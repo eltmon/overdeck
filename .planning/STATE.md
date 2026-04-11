@@ -24,6 +24,9 @@ None — all beads implemented and closed.
 - [2026-04-08T12:20Z] verification-gate → FAILED — test (pre-existing work-types counts)
 - [2026-04-08T12:23Z] review-agent → PASSED
 - **[2026-04-08T12:26Z] test-agent → FAILED** — `.planning/feedback/005-test-agent-failed.md`
+- **[2026-04-11T04:26Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`
+- **[2026-04-11T04:31Z] verification-gate → FAILED** — `.planning/feedback/007-verification-gate-failed.md`
+- **[2026-04-11T04:37Z] verification-gate → FAILED** — `.planning/feedback/008-verification-gate-failed.md`
 
 ## Summary
 
