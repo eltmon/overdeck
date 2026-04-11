@@ -38,7 +38,7 @@ export interface Issue {
   totalChildCount?: number;  // Total children across all columns
   completedChildCount?: number;  // Children in Done state
   inProgressChildCount?: number;  // Children in active work
-  mergeStatus?: 'pending' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
 }
 
 export interface GitStatus {

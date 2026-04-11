@@ -3000,6 +3000,19 @@ interface TriggerMergeResult {
   mergeResult?: unknown;
 }
 
+// Per-project merge queue: serializes merges to avoid rebase thrashing.
+// Each successful merge changes main, making concurrent rebases stale.
+const _mergeQueues = new Map<string, { current: string | null; queue: string[] }>();
+
+function getOrCreateMergeQueue(projectKey: string): { current: string | null; queue: string[] } {
+  let q = _mergeQueues.get(projectKey);
+  if (!q) {
+    q = { current: null, queue: [] };
+    _mergeQueues.set(projectKey, q);
+  }
+  return q;
+}
+
 async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatus(issueId);
   if (!reviewStatus?.readyForMerge) {
@@ -3061,6 +3074,26 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
+
+  // Serialize merges per project — concurrent rebases thrash each other
+  const projectKey = issuePrefix.toLowerCase();
+  const mergeQ = getOrCreateMergeQueue(projectKey);
+  if (mergeQ.current && mergeQ.current !== issueId.toUpperCase()) {
+    // Another merge is in progress — queue this one
+    const normalizedId = issueId.toUpperCase();
+    if (!mergeQ.queue.includes(normalizedId)) {
+      mergeQ.queue.push(normalizedId);
+    }
+    const position = mergeQ.queue.indexOf(normalizedId) + 1;
+    setReviewStatus(issueId, { mergeStatus: 'queued' });
+    console.log(`[merge] Queued ${issueId} (position ${position}, waiting for ${mergeQ.current})`);
+    return {
+      success: true,
+      statusCode: 200,
+      message: `Queued for merge (position ${position}, waiting for ${mergeQ.current})`,
+    };
+  }
+  mergeQ.current = issueId.toUpperCase();
 
   const workspaceInfo = getWorkspaceInfoForIssue(issueId);
 
@@ -3353,6 +3386,17 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     return { success: false, statusCode: 500, error: error.message };
   } finally {
     _serverManagedMerges.delete(normalizedMergeId);
+
+    // Process next merge in queue — serialized to avoid rebase thrashing
+    mergeQ.current = null;
+    const nextIssueId = mergeQ.queue.shift();
+    if (nextIssueId) {
+      console.log(`[merge] Dequeuing next merge: ${nextIssueId} (${mergeQ.queue.length} remaining)`);
+      // Fire-and-forget: next merge starts after current completes
+      triggerMerge(nextIssueId).catch(err =>
+        console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
+      );
+    }
   }
 }
 
