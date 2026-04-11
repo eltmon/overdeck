@@ -27,6 +27,7 @@ import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
+import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
@@ -106,6 +107,20 @@ async function respondToConfirmation(id: string, confirmed: boolean): Promise<vo
 }
 
 export default function App() {
+  const terminalPath = window.location.pathname;
+  const terminalSession = new URLSearchParams(window.location.search).get('terminal');
+  if (terminalPath.startsWith('/terminal/') || terminalSession) {
+    const sessionName = terminalPath.startsWith('/terminal/')
+      ? terminalPath.replace('/terminal/', '')
+      : terminalSession!;
+    return (
+      <div className="h-screen overflow-hidden bg-[#0d1117]">
+        <EventRouter />
+        <StandaloneTerminal sessionName={sessionName} />
+      </div>
+    );
+  }
+
   const [activeTab, setActiveTabState] = useState<Tab>(getTabFromPath);
   const [selectedAgent, setSelectedAgentState] = useState<string | null>(() => {
     const hash = window.location.hash;

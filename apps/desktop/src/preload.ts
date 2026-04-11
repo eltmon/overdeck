@@ -20,6 +20,8 @@ const IPC = {
   GET_WS_URL: "pan:get-ws-url",
   PICK_FOLDER: "pan:pick-folder",
   OPEN_EXTERNAL: "pan:open-external",
+  OPEN_TERMINAL_WINDOW: "pan:open-terminal-window",
+  SET_ALWAYS_ON_TOP: "pan:set-always-on-top",
   MENU_ACTION: "pan:menu-action",
   GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
   UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
@@ -66,6 +68,12 @@ export interface PanopticonBridge {
   /** Opens a URL in the default browser (https/http only) */
   openExternal(url: string): Promise<void>;
 
+  /** Opens the current terminal in a dedicated desktop window. */
+  openTerminalWindow(sessionName: string, title: string): void;
+
+  /** Toggles always-on-top for the focused terminal window. */
+  setAlwaysOnTop(value: boolean): void;
+
   /**
    * Registers a listener for menu actions dispatched from the main process.
    * Returns an unsubscribe function.
@@ -110,6 +118,14 @@ const bridge: PanopticonBridge = {
 
   openExternal: (url: string) =>
     ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url) as Promise<void>,
+
+  openTerminalWindow: (sessionName: string, title: string) => {
+    ipcRenderer.send(IPC.OPEN_TERMINAL_WINDOW, sessionName, title);
+  },
+
+  setAlwaysOnTop: (value: boolean) => {
+    ipcRenderer.send(IPC.SET_ALWAYS_ON_TOP, value);
+  },
 
   onMenuAction: (listener: (action: string) => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, action: unknown) => {

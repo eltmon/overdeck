@@ -34,6 +34,8 @@ export const IPC = {
   GET_WS_URL: "pan:get-ws-url",
   PICK_FOLDER: "pan:pick-folder",
   OPEN_EXTERNAL: "pan:open-external",
+  OPEN_TERMINAL_WINDOW: "pan:open-terminal-window",
+  SET_ALWAYS_ON_TOP: "pan:set-always-on-top",
   MENU_ACTION: "pan:menu-action",
   GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
   UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
@@ -51,6 +53,7 @@ export let serverPort = 0;
 export let serverUrl = "";
 export let serverWsUrl = "";
 export let isQuitting = false;
+const terminalWindows = new Map<string, BrowserWindow>();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +96,25 @@ export function resolveWindowUrl(): string {
   return `${DESKTOP_SCHEME}://app/index.html`;
 }
 
+function createTerminalWindow(sessionName: string, title: string): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 900,
+    height: 650,
+    title,
+    webPreferences: {
+      preload: Path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+    show: false,
+  });
+
+  win.once("ready-to-show", () => win.show());
+  void win.loadURL(`${resolveWindowUrl()}?terminal=${encodeURIComponent(sessionName)}&title=${encodeURIComponent(title)}`);
+  return win;
+}
+
 // ─── IPC: basic handlers ──────────────────────────────────────────────────────
 
 function registerIpcHandlers(): void {
@@ -123,6 +145,28 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC.GET_DESKTOP_SETTINGS, () => getDesktopSettings());
+
+  ipcMain.on(IPC.OPEN_TERMINAL_WINDOW, (_event, sessionName: unknown, title: unknown) => {
+    if (typeof sessionName !== "string" || typeof title !== "string") return;
+
+    const existing = terminalWindows.get(sessionName);
+    if (existing && !existing.isDestroyed()) {
+      if (!existing.isVisible()) existing.show();
+      existing.focus();
+      return;
+    }
+
+    const win = createTerminalWindow(sessionName, title);
+    terminalWindows.set(sessionName, win);
+    win.on("closed", () => terminalWindows.delete(sessionName));
+  });
+
+  ipcMain.on(IPC.SET_ALWAYS_ON_TOP, (_event, value: unknown) => {
+    const focused = BrowserWindow.getFocusedWindow();
+    if (focused) {
+      focused.setAlwaysOnTop(value === true);
+    }
+  });
 
   ipcMain.handle(IPC.UPDATE_DESKTOP_SETTING, (_event, key: unknown, value: unknown) => {
     if (typeof key !== "string") return;
