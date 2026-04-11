@@ -2,7 +2,7 @@
  * pan work request-review <id> [message]
  *
  * Request a re-review after fixing feedback.
- * Used by agents to automatically queue for re-review (circuit breaker: max 3)
+ * Used by agents to automatically queue for re-review (circuit breaker: max 7)
  */
 
 import chalk from 'chalk';
@@ -22,6 +22,8 @@ interface RequestReviewResponse {
   autoRequeueCount?: number;
   remainingRequeues?: number;
 }
+
+const MAX_AUTO_REQUEUES = 7;
 
 export async function requestReviewCommand(
   id: string,
@@ -44,7 +46,7 @@ export async function requestReviewCommand(
       if (response.status === 429) {
         // Circuit breaker triggered
         console.error(chalk.red('\nCircuit breaker triggered!'));
-        console.error(chalk.yellow(`Maximum automatic re-review requests (${result.autoRequeueCount || 3}) exceeded.`));
+        console.error(chalk.yellow(`Maximum automatic re-review requests (${MAX_AUTO_REQUEUES}) exceeded.`));
         console.error(chalk.dim('A human must click the Review button in the dashboard to continue.'));
         process.exit(1);
       }
