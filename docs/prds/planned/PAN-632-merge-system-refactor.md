@@ -1,151 +1,272 @@
-# PRD: Complete Merge Pipeline — End-to-End Workflow (PAN-632)
+# PRD: Intended Merge System — Work-Agent-Owned Rebases, Coordinated Merge Sets, Release Handoff (PAN-632)
 
-## Problem Statement
+## Purpose
 
-The merge pipeline has gaps at every stage. PRs aren't created by the work agent. The final review after rebase doesn't exist. The polyrepo merge path isn't tested. The workflow is incomplete.
+Lock the intended merge-system design for Panopticon.
 
-## Complete Pipeline
+This document defines the target architecture we want to build toward. It is not a description of current behavior.
 
-Every step is required. No optional steps.
+PAN-632 owns merge coordination through merge completion.
+PAN-399 owns post-merge release orchestration and rollout safety.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ PHASE 1: WORK COMPLETION                                     │
-├─────────────────────────────────────────────────────────────┤
-│ 1. Work agent finishes implementation                        │
-│ 2. Work agent runs: pan work done                            │
-│ 3. pan work done:                                            │
-│    a. Commits any uncommitted changes                        │
-│    b. Pushes feature branch                                  │
-│    c. Creates PR via gh pr create (links issue)              │
-│    d. Sets reviewStatus to pending                           │
-│                                                              │
-│ STATUS: Step 3c NOT IMPLEMENTED — PR created lazily at merge │
-├─────────────────────────────────────────────────────────────┤
-│ PHASE 2: INITIAL REVIEW + TEST                               │
-├─────────────────────────────────────────────────────────────┤
-│ 4. Verification gate: typecheck, lint, test                  │
-│ 5. Review specialist reviews the PR                          │
-│    - Full strict review                                      │
-│    - ANY finding = CHANGES_REQUESTED (no passing with notes) │
-│    - If blocked → feedback to work agent → agent fixes       │
-│ 6. Test specialist runs tests                                │
-│ 7. readyForMerge = true                                      │
-│                                                              │
-│ STATUS: IMPLEMENTED — working                                │
-├─────────────────────────────────────────────────────────────┤
-│ PHASE 3: MERGE (human-triggered)                             │
-├─────────────────────────────────────────────────────────────┤
-│ 8. Human clicks MERGE                                        │
-│ 9. SQLite merge queue: serialize per-project                 │
-│ 10. Work agent rebases onto main:                            │
-│     - Server messages work agent with rebase instructions    │
-│     - Agent rebases, resolves conflicts, pushes              │
-│     - Server polls for new HEAD on remote                    │
-│     - If agent stopped: fall back to in-process rebase       │
-│     - If conflicts unresolvable: fail, notify human          │
-│ 11. Final review specialist (lightweight):                   │
-│     - Was the rebase clean?                                  │
-│     - Any obvious issues from conflict resolution?           │
-│     - NOT a full code review — that already passed           │
-│ 12. Final test: verification gate (typecheck/lint/test)      │
-│ 13. Report commit statuses on post-rebase HEAD               │
-│ 14. Merge:                                                   │
-│     a. MONOREPO: gh pr merge --squash (server runs directly) │
-│     b. POLYREPO: Merge specialist coordinates cross-repo     │
-│        merge via event-driven completion                     │
-│ 15. Dequeue next merge from SQLite queue                     │
-│ 16. Post-merge lifecycle:                                    │
-│     - Apply 'merged' label, remove workflow labels           │
-│     - Close issue on tracker                                 │
-│     - Kill work agent tmux session                           │
-│     - Compact beads                                          │
-│     - Stop Docker containers                                 │
-│                                                              │
-│ STATUS:                                                      │
-│   Step 9: IMPLEMENTED (SQLite queue)                         │
-│   Step 10: IMPLEMENTED (work agent rebase + in-process       │
-│            fallback)                                         │
-│   Step 11: NOT IMPLEMENTED (final review specialist)         │
-│   Step 12: IMPLEMENTED (verification gate)                   │
-│   Step 13: IMPLEMENTED (commit status reporting)             │
-│   Step 14a: IMPLEMENTED (gh pr merge --squash)               │
-│   Step 14b: EXISTS but NOT TESTED with MYN polyrepo          │
-│   Step 15: IMPLEMENTED (SQLite dequeue)                      │
-│   Step 16: IMPLEMENTED (postMergeLifecycle)                  │
-└─────────────────────────────────────────────────────────────┘
-```
+## Core Decisions
 
-## What Needs to Be Built
+### 1. The work agent owns all code-changing git operations
 
-### 1. PR Creation in `pan work done` (Step 3c)
+The work agent is responsible for:
 
-**Currently:** `pan work done` pushes the branch and sets review status. PRs are lazily created by `ensurePRExists()` at review-request or merge time.
+- committing changes
+- pushing branches
+- rebasing onto the target branch
+- resolving conflicts
+- pushing rebased branches
 
-**Required:** `pan work done` (or the request-review flow) must create the PR immediately after pushing. The PR is the artifact that review specialist reviews, test specialist tests against, and the merge flow merges.
+The server is an orchestrator. It records state, drives the queue, dispatches specialists, and performs merge API actions. It does not mutate branch contents on the agent's behalf.
 
-**Files:**
-- `src/cli/commands/work/done.ts` — add PR creation after push
-- `src/dashboard/server/routes/workspaces.ts` — `ensurePRExists()` already exists, reuse it
+If a rebase is required and the work agent cannot complete it, the merge blocks. There is no server-side fallback rebase in the intended design.
 
-### 2. Final Review Specialist (Step 11)
+### 2. Review artifacts are created at work completion
 
-**Currently:** After rebase, the server runs verification (typecheck/lint/test) but no review.
+`pan work done` must create the review artifacts immediately.
 
-**Required:** A lightweight review specialist that checks:
-- Was the rebase clean? (no unresolved conflict markers)
-- Do the changes still match the original review's approval?
-- Any obvious issues introduced by conflict resolution?
-- NOT a full code review — focus on rebase correctness only
+- Monorepo: one PR
+- Polyrepo: one PR/MR per affected repo
 
-**Files:**
-- `src/lib/cloister/prompts/final-review-agent.md` — NEW lightweight review prompt
-- `src/dashboard/server/routes/workspaces.ts` — dispatch final-review after rebase, before verification
-- `src/lib/cloister/specialists.ts` — register final-review-agent as a specialist type
+Those artifacts are the source of truth for review, testing, merge readiness, and human merge visibility.
 
-### 3. Polyrepo Merge Testing (Step 14b)
+### 3. Merge agent is the coordinator for merge sets
 
-**Currently:** `spawnMergeAgentForBranches()` exists for polyrepo merge but hasn't been tested with MYN (multi-repo setup).
+The merge agent is not a code author. It is the coordinator for the full merge set associated with an issue.
 
-**Required:** Test the polyrepo merge path with Mind Your Now:
-- Frontend repo (mind-your-now)
-- Backend repo (mind-your-now-backend)
-- Merge specialist coordinates both repos
-- Event-driven completion (specialist-completion.ts) replaces polling
+Its responsibilities are:
 
-**Files:**
-- `src/lib/cloister/merge-agent.ts` — `spawnMergeAgentForBranches()` needs polling replaced with `waitForSpecialistCompletion()`
-- MYN workspace configuration in `projects.yaml`
+- identify every affected repo for the issue
+- track the PR/MR for each affected repo
+- track forge and target branch for each repo
+- ensure the full set is review-complete, test-complete, and rebase-complete
+- enforce merge ordering rules for polyrepo projects
+- block merge when any required repo in the set is not ready
 
-## Implementation Order
+### 4. Verification runs twice
 
-1. **PR creation in `pan work done`** — most impactful, unblocks branch protection (PAN-505)
-2. **Final review specialist** — completes the merge pipeline
-3. **Polyrepo merge testing** — validates MYN path
+Verification is required in two places:
 
-## Already Implemented (PAN-632)
+1. Before an issue becomes `readyForMerge`
+2. After the work agent rebases onto the latest target branch
 
-These components are done and working:
+The post-rebase verification pass must be non-mutating. It validates the rebased heads as they exist after the work agent push. It does not merge `main` again or otherwise rewrite the branch.
 
-- **SQLite merge queue** (`src/lib/database/merge-queue-db.ts`) — persistent, survives restart
-- **Work agent rebase** — server messages agent, polls for push, falls back to in-process
-- **In-process rebase fallback** (`src/lib/cloister/merge-rebase.ts`) — when agent stopped
-- **Event-driven specialist completion** (`src/lib/cloister/specialist-completion.ts`)
-- **`_serverManagedMerges` fix** — single source of truth from specialists.ts
-- **Post-rebase verification gate** — typecheck/lint/test after rebase
-- **Post-rebase commit status reporting** — on new HEAD SHA
-- **Merge queue API** (`GET /api/merge-queue`) — returns persistent queue state
-- **Startup recovery** — `resetProcessingToQueued()` on server start
-- **readyForMerge cleared on all failure paths**
-- **Merge-ready reminder** (not "stuck") — 1 hour threshold, courtesy notification
+### 5. PAN-632 stops at merge coordination, not release atomicity
+
+PAN-632 guarantees coordinated merge readiness.
+
+PAN-632 does not claim true atomic git merges across multiple repos, and it does not own deployment or rollout atomicity. Those concerns belong to PAN-399.
+
+After merge completion, PAN-632 hands a merged change-set manifest to the release specialist. PAN-399 then owns rollout ordering, health verification, halt-on-failure, and rollback behavior where supported.
+
+### 6. Mixed-forge polyrepo support is a first-class requirement
+
+The intended design must support both GitHub and GitLab in the same project.
+
+That means the merge system must understand:
+
+- GitHub PR creation and merge
+- GitLab MR creation and merge
+- per-repo forge metadata
+- mixed GitHub/GitLab merge sets inside one issue
+
+## Intended End-to-End Flow
+
+### Phase 1: Work Completion
+
+1. The work agent finishes implementation in the workspace.
+2. The work agent commits and pushes every affected branch.
+3. The work agent runs `pan work done`.
+4. `pan work done` creates the review artifact set immediately.
+
+For monorepo:
+
+- one PR for the issue
+
+For polyrepo:
+
+- one PR/MR per affected repo
+
+5. Panopticon records merge-set metadata for the issue:
+
+- affected repos
+- forge for each repo
+- target branch for each repo
+- artifact URL for each repo
+- merge ordering metadata if required
+
+### Phase 2: Initial Review and Test
+
+6. Verification runs on the current branch heads.
+7. Review specialist reviews the review artifact set.
+8. Test specialist runs required tests.
+9. The issue becomes `readyForMerge` only when every required artifact in the merge set has passed its required gates.
+
+### Phase 3: Merge Orchestration
+
+10. A human clicks `MERGE`.
+11. Panopticon places the issue into a project-scoped SQLite merge queue.
+12. When the issue reaches the front of the queue, the merge agent resolves the full merge plan for the issue.
+13. The merge agent instructs the work agent to rebase every affected branch onto the latest target branch.
+14. The work agent performs the rebases, resolves conflicts, and pushes the rebased branches.
+15. If any required repo cannot be rebased cleanly, the entire merge blocks.
+16. Post-rebase verification runs against the rebased heads without mutating them.
+
+Merge execution then diverges by workspace type:
+
+#### Monorepo
+
+17. After rebase and post-rebase verification pass, the server merges the PR.
+
+#### Polyrepo
+
+17. After every repo in the merge set is rebase-complete and verification-complete, the merge agent coordinates the merge set.
+18. The merge agent merges repos in an explicit project-defined order.
+19. The merge agent does not start polyrepo merge execution until the entire required set is ready.
+20. If any repo merge fails, the remaining repos are not merged automatically and the issue is escalated with explicit merge-set state for human handling.
+
+### Phase 4: Handoff and Cleanup
+
+21. After merge success, Panopticon emits a merged change-set manifest.
+22. If the project has release configuration, that manifest is handed to the release specialist defined by PAN-399.
+23. Post-merge lifecycle cleanup runs.
+
+## Merge Agent Responsibilities in Polyrepo Mode
+
+In polyrepo mode, the merge agent must coordinate the issue as a single logical change set.
+
+Required behavior:
+
+- support any subset of repos in the project, not just "frontend + backend"
+- support mixed GitHub/GitLab projects
+- keep artifact state per repo
+- keep review/test/rebase/verification state per repo
+- keep merge ordering rules per repo
+- expose a merge-set status model to the dashboard
+
+The merge agent must not:
+
+- author commits
+- resolve conflicts itself
+- rebase branches itself
+- take over rollout/deploy concerns after merge
+
+## MYN Coverage Requirement
+
+The merge system must explicitly cover Mind Your Now as a true mixed-forge polyrepo case.
+
+The target design must support a single issue spanning any subset of these repos:
+
+- `fe`
+- `api`
+- `infra`
+- `docs`
+- `myn-skills`
+- `openclaw-plugin`
+
+The system must not assume:
+
+- only two repos
+- only GitHub
+- only GitLab
+- repo names like `frontend` and `backend`
+
+Repo identity, forge metadata, and quality-gate applicability must be keyed off the configured repo model, not hard-coded path assumptions.
+
+## What PAN-632 Does Not Include
+
+PAN-632 does not include:
+
+- server-side rebase fallback
+- a mandatory "final review specialist" after rebase
+- deployment sequencing
+- rollout verification
+- rollback logic
+
+If we later add a post-rebase review step, it must be narrowly scoped to conflict-resolution deltas. It is not part of the locked target design for PAN-632.
+
+## Implementation Areas
+
+### 1. Review Artifact Creation at `pan work done`
+
+`pan work done` must create the review artifacts immediately after push.
+
+Needed outcomes:
+
+- monorepo PR creation
+- polyrepo PR/MR creation for each affected repo
+- issue-to-artifact linkage stored in merge-set state
+
+### 2. Merge-Set Data Model
+
+Panopticon needs a first-class merge-set model for an issue.
+
+Minimum required fields:
+
+- issue ID
+- repo key
+- forge
+- target branch
+- source branch
+- artifact URL
+- review status
+- test status
+- rebase status
+- verification status
+- merge order
+
+### 3. Work-Agent-Owned Rebase Flow
+
+The merge flow must dispatch rebase work to the work agent and wait for completion.
+
+Required behavior:
+
+- no server-side git rebase fallback
+- no server-side conflict resolution
+- explicit blocked state when the work agent cannot complete the rebase
+
+### 4. Non-Mutating Post-Rebase Verification
+
+The post-rebase verification path must validate the rebased heads without performing any additional branch mutation.
+
+### 5. Forge Abstraction for Merge Artifacts
+
+Panopticon must support forge-specific create/view/merge behavior behind one repo-level abstraction.
+
+Required targets:
+
+- GitHub PR
+- GitLab MR
+
+### 6. Queue Recovery
+
+The SQLite merge queue must survive restart and automatically resume processing from persisted state.
+
+### 7. Release Handoff
+
+After merge completion, PAN-632 must emit the merged change-set manifest required by PAN-399.
+
+That manifest must be rich enough for release orchestration to understand:
+
+- what changed
+- which repos/components changed
+- the intended merge order
+- the intended release order when relevant
 
 ## Acceptance Criteria
 
-1. `pan work done` creates a PR and links it to the issue
-2. Review specialist reviews the PR (not just the branch)
-3. MERGE click → work agent rebases → final review → verification → merge
-4. Final review specialist catches rebase-introduced issues
-5. Polyrepo merge works with MYN (frontend + backend)
-6. Queue serializes multiple merges per-project via SQLite
-7. Server restart → queue resumes from DB
-8. Branch protection (PAN-505) can be enabled after this ships
+1. `pan work done` creates the full review artifact set immediately.
+2. The work agent is the only actor allowed to perform rebases and conflict resolution.
+3. The server does not perform code-changing git operations during merge orchestration.
+4. An issue is `readyForMerge` only when every required repo in the merge set has passed required gates.
+5. Post-rebase verification is non-mutating.
+6. The merge agent supports mixed GitHub/GitLab merge sets.
+7. MYN is supported as a 6-repo mixed-forge project, not a 2-repo special case.
+8. Polyrepo merge execution does not begin until the entire required merge set is ready.
+9. Queue state survives restart and resumes automatically.
+10. Merge completion emits a change-set manifest suitable for PAN-399 release orchestration.
