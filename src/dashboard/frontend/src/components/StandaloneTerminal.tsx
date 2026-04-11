@@ -11,8 +11,14 @@ export function StandaloneTerminal({ sessionName }: StandaloneTerminalProps) {
   const [title, setTitle] = useState('');
 
   useEffect(() => {
-    // Set initial title from window name (populated by popoutTerminal)
-    setTitle(document.title);
+    // Title passed via URL param (popoutTerminal sets it in the URL)
+    const params = new URLSearchParams(window.location.search);
+    const urlTitle = params.get('title');
+    if (urlTitle) {
+      setTitle(decodeURIComponent(urlTitle));
+    } else {
+      setTitle(document.title);
+    }
   }, []);
 
   const handleAlwaysOnTop = () => {

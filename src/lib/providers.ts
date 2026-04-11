@@ -74,7 +74,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Z.AI (GLM)',
     compatibility: 'direct',
     baseUrl: 'https://api.z.ai/api/anthropic',
-    models: ['glm-4.7', 'glm-4.7-flash'] as unknown as ModelId[],
+    models: ['glm-4.7', 'glm-4.7-flash'],
     tested: true,
     description: 'Anthropic-compatible API, tested 2026-01-28',
   },
