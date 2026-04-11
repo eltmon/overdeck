@@ -22,7 +22,8 @@
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, VBRIEFs, STATE.md, multi-tool sync |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
-| [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements |
+| [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements (historical — see DEACON doc for current state) |
+| [DEACON-HEALTH-MONITORING.md](./DEACON-HEALTH-MONITORING.md) | Deacon health monitoring: all 10 stuck detection mechanisms, thresholds, escalation, recovery |
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
 
@@ -122,14 +123,14 @@
 - **"worker"** → SPECIALIST_WORKFLOW.md
 - **"cloister"** → AGENTS.md, PRD-CLOISTER.md
 - **"handoff"** / **"handoffs"** → SPECIALIST_WORKFLOW.md
-- **"stuck detection"** → AGENTS.md, SPECIALIST_WORKFLOW.md
+- **"stuck detection"** / **"stuck"** / **"nudge"** → DEACON-HEALTH-MONITORING.md
 - **"session ID"** / **"session persistence"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
 - **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
 - **"beads conversion"** / **"createBeadsFromVBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
-- **"deacon"** / **"health monitor"** → SPECIALIST_WORKFLOW.md (Deacon Health Monitor section)
+- **"deacon"** / **"health monitor"** / **"health"** / **"patrol"** → DEACON-HEALTH-MONITORING.md
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
 - **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
 - **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
