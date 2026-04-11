@@ -3002,20 +3002,28 @@ interface TriggerMergeResult {
 
 // Per-project merge queue: serializes merges to avoid rebase thrashing.
 // Each successful merge changes main, making concurrent rebases stale.
-const _mergeQueues = new Map<string, { current: string | null; queue: string[] }>();
+const MERGE_QUEUE_STALE_MS = 5 * 60 * 1000; // 5 minutes — if current merge takes longer, force-clear
+const _mergeQueues = new Map<string, { current: string | null; currentStartedAt: number | null; queue: string[] }>();
 
-function getOrCreateMergeQueue(projectKey: string): { current: string | null; queue: string[] } {
+function getOrCreateMergeQueue(projectKey: string): { current: string | null; currentStartedAt: number | null; queue: string[] } {
   let q = _mergeQueues.get(projectKey);
   if (!q) {
-    q = { current: null, queue: [] };
+    q = { current: null, currentStartedAt: null, queue: [] };
     _mergeQueues.set(projectKey, q);
+  }
+  // Auto-clear stale current merge (polling got stuck, server restart missed it, etc.)
+  if (q.current && q.currentStartedAt && (Date.now() - q.currentStartedAt) > MERGE_QUEUE_STALE_MS) {
+    console.log(`[merge] Force-clearing stale merge queue entry: ${q.current} (started ${Math.round((Date.now() - q.currentStartedAt) / 1000)}s ago)`);
+    q.current = null;
+    q.currentStartedAt = null;
   }
   return q;
 }
 
 /** Dequeue the next merge after current completes (success or failure). */
-function dequeueNextMerge(mergeQ: { current: string | null; queue: string[] }): void {
+function dequeueNextMerge(mergeQ: { current: string | null; currentStartedAt: number | null; queue: string[] }): void {
   mergeQ.current = null;
+  mergeQ.currentStartedAt = null;
   const nextIssueId = mergeQ.queue.shift();
   if (nextIssueId) {
     console.log(`[merge] Dequeuing next merge: ${nextIssueId} (${mergeQ.queue.length} remaining)`);
@@ -3037,9 +3045,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     };
   }
 
-  // Ensure commit statuses are reported before merge (branch protection requires them).
-  // This is a fallback for issues that became readyForMerge before the status reporting was added.
-  if (reviewStatus.prUrl) {
+  // NOTE: Commit status reporting moved to AFTER rebase — see below.
+  // The rebase changes the HEAD SHA, so statuses must be reported on the new commit.
+  if (false && reviewStatus.prUrl) {
     try {
       const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
       if (isGitHubAppConfigured()) {
@@ -3106,6 +3114,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     };
   }
   mergeQ.current = issueId.toUpperCase();
+  mergeQ.currentStartedAt = Date.now();
 
   // Wrap in try/finally to ALWAYS dequeue the next merge on any exit path.
   // Without this, early returns (workspace missing, PR creation fails, etc.)
@@ -3370,7 +3379,27 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
     console.log(`[merge] Post-rebase verification ${verifyResult.outcome} for ${issueId}`);
 
-    // Step 4: Merge PR via GitHub (squash merge for clean history)
+    // Step 4a: Report commit statuses on post-rebase HEAD (branch protection requires them).
+    // Must happen AFTER rebase because rebase changes the HEAD SHA.
+    try {
+      const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
+      if (isGitHubAppConfigured()) {
+        const { stdout: headSha } = await execAsync(
+          `gh pr view ${prNumber} --json headRefOid --jq .headRefOid`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        const sha = headSha.trim();
+        if (sha) {
+          await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/review', 'Review passed');
+          await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/test', 'Tests passed');
+          console.log(`[merge] Reported commit statuses on post-rebase HEAD for ${issueId} (${sha.slice(0, 8)})`);
+        }
+      }
+    } catch (statusErr: any) {
+      console.warn(`[merge] Failed to report commit statuses: ${statusErr.message}`);
+    }
+
+    // Step 4b: Merge PR via GitHub (squash merge for clean history)
     try {
       console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
       const { stdout: mergeOutput } = await execAsync(
