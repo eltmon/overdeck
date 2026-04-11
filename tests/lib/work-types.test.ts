@@ -65,7 +65,6 @@ describe('work-types', () => {
         'convoy:security-reviewer',
         'convoy:performance-reviewer',
         'convoy:correctness-reviewer',
-        'convoy:requirements-reviewer',
         'convoy:synthesis-agent',
       ];
 
