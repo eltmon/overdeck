@@ -505,7 +505,7 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
   }
 
   const wsConfig = projectConfig.workspace;
-  // Safe: guarded above with !projectConfig.workspace.repos
+  // repos is guaranteed non-null by the guard above (!projectConfig.workspace.repos returns early)
   const repos = wsConfig.repos!;
 
   // In progressive mode, only show repos that exist in the workspace

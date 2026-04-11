@@ -1890,7 +1890,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  const { prefs } = useUIPreferences();
+  const { prefs: _prefs } = useUIPreferences();
 
   // Auto-scroll into view when selected via search
   useEffect(() => {
@@ -2316,10 +2316,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               const difficulty = parseDifficultyLabel(issue.labels || []);
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
-            {/* Ready to merge badge — shimmer draws attention to human-action-required state */}
+            {/* Ready to merge badge — yellow indicator when review+tests passed */}
             {isReadyToMerge && (
               <span
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-success-foreground uppercase tracking-wide ${prefs.readyToMergeShimmer ? 'badge-shimmer-rtm' : 'badge-bg-success'}`}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-yellow-900/60 text-yellow-300 border border-yellow-500/40 uppercase tracking-wide"
                 title="Review and tests passed — ready for human merge approval"
               >
                 <GitMerge className="w-3 h-3" />

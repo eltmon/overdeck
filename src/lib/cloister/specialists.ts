@@ -742,10 +742,11 @@ ${basePrompt}`;
 
     // Deterministic session ID: same specialist + project + generation gets the same UUID.
     // Bumping the generation (via API) rotates to a fresh session without deleting old JONLs.
-    // Fresh session every dispatch (PAN-612: thinking signature corruption).
-    // Use randomUUID so each dispatch gets a unique session — deterministic UUIDs
-    // collide with --session-id when a prior session with that ID already exists.
-    const sessionId = randomUUID();
+    // --resume is always the default (session exists from prior runs).
+    // On very first cold start, --resume fails and the launcher falls back to --session-id.
+    const gen = getSessionGeneration(specialistType, projectKey);
+    const sessionName = `specialist-${projectKey}-${specialistType}-gen${gen}`;
+    const sessionId = deterministicUUID(sessionName);
 
     // Write session file for informational purposes (pan specialists list)
     setSessionId(specialistType, sessionId, projectKey);
@@ -2024,11 +2025,9 @@ export async function wakeSpecialist(
       // Start with --resume if we have a session, otherwise generate a new session ID
       // Always start fresh — no --resume. Context compaction corrupts thinking block
       // signatures, making resumed sessions permanently fail (PAN-612).
-      // Always use randomUUID — deterministic IDs collide with --session-id when
-      // a prior session with that ID already exists in Claude's storage.
-      const freshSessionId = randomUUID();
-      setSessionId(name, freshSessionId);
-      const claudeCmd = `claude --session-id "${freshSessionId}" ${modelFlag} ${permissionFlags}`;
+      const effectiveSessionId = sessionId || randomUUID();
+      if (!sessionId) setSessionId(name, effectiveSessionId);
+      const claudeCmd = `claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
