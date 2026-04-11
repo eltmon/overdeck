@@ -351,16 +351,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     },
   });
 
-  const closeMutation = useMutation({
+  const cancelMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/close`, {
+      const res = await fetch(`/api/issues/${issueId}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Closed manually' }),
+        body: JSON.stringify({ wipeWorkspace: true }),
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to close issue');
+        throw new Error(err.error || 'Failed to cancel issue');
       }
       return res.json();
     },
@@ -538,14 +538,14 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     }
   };
 
-  const handleClose = async () => {
+  const handleCancel = async () => {
     if (await confirm({
-      title: 'Close Without Merging',
-      message: `Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)`,
+      title: 'Cancel Issue',
+      message: `Cancel ${issueId}?\n\nThis will:\n- Stop any running agent\n- Close any open PR for the issue\n- Remove the workspace\n- Delete the feature branch\n- Remove beads for this issue\n- Move the issue to Canceled`,
       variant: 'destructive',
-      confirmLabel: 'Close',
+      confirmLabel: 'Cancel Issue',
     })) {
-      closeMutation.mutate();
+      cancelMutation.mutate();
     }
   };
 
@@ -904,7 +904,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
           mergeMutation={mergeMutation}
           reviewMutation={reviewMutation}
           killMutation={killMutation}
-          closeMutation={closeMutation}
+          cancelMutation={cancelMutation}
           reopenMutation={reopenMutation}
           resetReviewMutation={resetReviewMutation}
           startAgentMutation={startAgentMutation}
@@ -914,7 +914,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
           onMerge={handleMerge}
           onReview={handleReview}
           onKill={handleKill}
-          onClose={handleClose}
+          onCancel={handleCancel}
           onReopen={handleReopen}
           onResetReview={handleResetReview}
           onResetSession={() => resetSessionMutation.mutate()}

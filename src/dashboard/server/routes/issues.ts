@@ -117,6 +117,33 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
+async function closeIssuePullRequest(issueId: string): Promise<string[]> {
+  const githubCheck = isGitHubIssue(issueId);
+  if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
+    return ['No GitHub PR to close'];
+  }
+
+  const branchName = `feature/${issueId.toLowerCase()}`;
+  try {
+    const { stdout: prListRaw } = await execAsync(
+      `gh pr list --repo ${githubCheck.owner}/${githubCheck.repo} --head "${branchName}" --state open --json number --jq '.[0].number'`,
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    const prNumber = prListRaw.trim();
+    if (!prNumber) {
+      return ['No open PR found for branch'];
+    }
+
+    await execAsync(
+      `gh pr close ${prNumber} --repo ${githubCheck.owner}/${githubCheck.repo} --comment "Canceled via Panopticon"`,
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    return [`Closed PR #${prNumber} on ${githubCheck.owner}/${githubCheck.repo}`];
+  } catch (err: any) {
+    return [`PR close warning: ${err.message}`];
+  }
+}
+
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -1167,105 +1194,141 @@ const postIssueCancelRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
     const eventStore = yield* EventStoreService;
 
-    const { wipeWorkspace = false } = body as any;
-    const issueLower = id.toLowerCase();
+    const { wipeWorkspace = true } = body as any;
+    const issuePrefix = extractTeamPrefix(id);
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const projectConfig = findProjectByTeam(issuePrefix);
+    const githubCheck = isGitHubIssue(id);
+    const issueDataService = getIssueDataService();
+    const issueSource = issueDataService.getIssueSource(id);
 
-    // Kill tmux sessions and clean up agent state dirs (non-fatal)
+    const ctx: any = {
+      issueId: id,
+      projectPath,
+      projectName: projectConfig?.name || '',
+      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+        : {}),
+    };
+
+    if (issueSource === 'rally') {
+      const rallyConfig = getRallyConfig();
+      if (rallyConfig) {
+        ctx.rally = {
+          apiKey: rallyConfig.apiKey,
+          server: rallyConfig.server,
+          workspace: rallyConfig.workspace,
+          project: rallyConfig.project,
+        };
+      }
+    }
+
+    // Close any open PR before removing the branch/workspace.
     yield* Effect.promise(async () => {
-      for (const session of [`planning-${issueLower}`, `agent-${issueLower}`]) {
-        try {
-          await execAsync(`tmux kill-session -t ${session} 2>/dev/null || true`);
-          cleanupLog.push(`Killed tmux: ${session}`);
-        } catch { /* session might not exist */ }
-      }
-
-      for (const dir of [
-        join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
-        join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
-      ]) {
-        if (existsSync(dir)) {
-          rmSync(dir, { recursive: true, force: true });
-          cleanupLog.push(`Deleted agent state: ${dir}`);
-        }
-      }
-
-      // Clear review/pipeline status
-      try {
-        clearReviewStatus(id.toUpperCase());
-        cleanupLog.push('Cleared review status');
-      } catch { /* might not exist */ }
-
-      // Clear shadow state
-      try {
-        const { removeShadowState } = await import('../../../lib/shadow-state.js');
-        removeShadowState(id);
-        cleanupLog.push('Cleared shadow state');
-      } catch { /* might not exist */ }
+      cleanupLog.push(...await closeIssuePullRequest(id));
     });
 
-    // Optionally wipe workspace (non-fatal, meaningful branching on error)
+    // Teardown workspace and remove issue beads.
+    let teardownFailed = false;
     if (wipeWorkspace) {
       yield* Effect.promise(async () => {
         try {
-          const { deepWipe } = await import('../../../lib/lifecycle/index.js');
-          const issuePrefix = extractTeamPrefix(id);
-          const projectPath = getProjectPath(undefined, issuePrefix);
-          const projectConfig = findProjectByTeam(issuePrefix);
-          const githubCheck = isGitHubIssue(id);
-
-          const ctx = {
-            issueId: id,
-            projectPath,
-            projectName: projectConfig?.name || '',
-            ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-              ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-              : {}),
-          };
-
-          const wipeResult = await deepWipe(ctx, {
+          const { teardownWorkspace } = await import('../../../lib/lifecycle/index.js');
+          const teardownSteps = await teardownWorkspace(ctx, {
             deleteWorkspace: true,
             deleteBranches: true,
-            resetIssue: false,
+            clearBeads: true,
             workspaceConfig: projectConfig?.workspace,
             projectName: projectConfig?.name || '',
           });
-          cleanupLog.push(...wipeResult.steps.flatMap((s: any) => s.details || []));
+          cleanupLog.push(...teardownSteps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
+          teardownFailed = teardownSteps.some((step: any) => !step.success && !step.skipped);
         } catch (wipeErr: any) {
-          cleanupLog.push(`Workspace wipe warning: ${wipeErr.message}`);
+          teardownFailed = true;
+          cleanupLog.push(`Workspace cleanup failed: ${wipeErr.message}`);
         }
       });
     }
 
-    // Move issue to Canceled
-    const githubCheck = isGitHubIssue(id);
+    // Clear pipeline state, queued specialist work, and stale merge metadata.
+    yield* Effect.promise(async () => {
+      try {
+        clearReviewStatus(id.toUpperCase());
+        cleanupLog.push('Cleared review status');
+      } catch { /* non-fatal */ }
 
-    // Close the issue via IssueLifecycle (GitHub: closes issue; Linear: transitions to 'completed' state)
-    yield* lifecycle.close(id).pipe(
-      Effect.tap(() => Effect.sync(() => cleanupLog.push('Closed issue via lifecycle service'))),
+      try {
+        const { checkSpecialistQueue, completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
+        for (const specialist of ['review-agent', 'test-agent', 'merge-agent'] as const) {
+          const queue = checkSpecialistQueue(specialist);
+          for (const item of queue.items) {
+            if (item.payload?.issueId?.toUpperCase() === id.toUpperCase()) {
+              completeSpecialistTask(specialist, item.id);
+            }
+          }
+        }
+        cleanupLog.push('Removed queued specialist tasks');
+      } catch { /* non-fatal */ }
+
+      try {
+        const { resetPostMergeState } = await import('../../../lib/cloister/merge-agent.js');
+        resetPostMergeState(id);
+        resetPostMergeState(id.toUpperCase());
+        cleanupLog.push('Cleared merge state');
+      } catch { /* non-fatal */ }
+
+      try {
+        const { removeShadowState } = await import('../../../lib/shadow-state.js');
+        removeShadowState(id);
+        cleanupLog.push('Cleared shadow state');
+      } catch { /* non-fatal */ }
+    });
+
+    let transitionError: string | null = null;
+    yield* lifecycle.transitionTo(id, 'canceled').pipe(
+      Effect.tap(() => Effect.sync(() => cleanupLog.push('Moved issue to Canceled'))),
       Effect.catch((err) =>
-        Effect.sync(() => cleanupLog.push(`Close warning: ${String(err)}`)),
+        Effect.sync(() => {
+          transitionError = String(err);
+          cleanupLog.push(`Cancel transition failed: ${transitionError}`);
+        }),
       ),
     );
 
-    if (!githubCheck.isGitHub) {
-      cleanupLog.push('Moved Linear issue to canceled state');
-    } else {
-      cleanupLog.push('Closed GitHub issue');
+    if (githubCheck.isGitHub) {
+      for (const label of ['done', 'merged', 'needs-close-out', 'review-ready']) {
+        yield* lifecycle.removeLabel(id, label).pipe(Effect.catch(() => Effect.void));
+      }
     }
 
-    // Invalidate caches
-    const issueDataService = getIssueDataService();
-    issueDataService.invalidateTracker('github').catch(() => {});
-    issueDataService.invalidateTracker('linear').catch(() => {});
+    // Invalidate tracker caches.
+    if (githubCheck.isGitHub) {
+      issueDataService.invalidateTracker('github').catch(() => {});
+    } else if (issueSource === 'rally') {
+      issueDataService.invalidateTracker('rally').catch(() => {});
+    } else {
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
 
-    yield* eventStore.append({
-      type: 'issue.statusChanged',
-      timestamp: new Date().toISOString(),
-      payload: { issueId: id, status: 'Canceled', canonicalStatus: 'done' },
-    });
-    try { issueDataService.patchIssue(id, { status: 'Canceled', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
+    const success = !teardownFailed && !transitionError;
+    if (success) {
+      yield* eventStore.append({
+        type: 'issue.statusChanged',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: id, status: 'Canceled', canonicalStatus: 'canceled' },
+      });
+      try { issueDataService.patchIssue(id, { status: 'Canceled', canonicalStatus: 'canceled' }); } catch { /* non-fatal */ }
+    }
 
-    return jsonResponse({ success: true, cleanupLog });
+    const responseBody = {
+      success,
+      message: success ? `Canceled ${id}` : `Cancel completed with errors for ${id}`,
+      cleanupLog,
+      error: transitionError ?? undefined,
+    };
+    return success
+      ? jsonResponse(responseBody)
+      : jsonResponse(responseBody, { status: 500 });
   })),
 );
 

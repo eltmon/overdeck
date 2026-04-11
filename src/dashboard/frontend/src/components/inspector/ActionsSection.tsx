@@ -22,7 +22,7 @@ interface ActionsSectionProps {
   mergeMutation: AnyMutation;
   reviewMutation: AnyMutation;
   killMutation: AnyMutation;
-  closeMutation: AnyMutation;
+  cancelMutation: AnyMutation;
   reopenMutation: ReopenMutation;
   resetReviewMutation: ResetReviewMutation;
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
@@ -32,7 +32,7 @@ interface ActionsSectionProps {
   onMerge: () => void;
   onReview: () => void;
   onKill: () => void;
-  onClose: () => void;
+  onCancel: () => void;
   onReopen: () => void;
   onResetReview: () => void;
   onResetSession: () => void;
@@ -49,7 +49,7 @@ export function ActionsSection({
   mergeMutation,
   reviewMutation,
   killMutation,
-  closeMutation,
+  cancelMutation,
   reopenMutation,
   resetReviewMutation,
   startAgentMutation,
@@ -59,7 +59,7 @@ export function ActionsSection({
   onMerge,
   onReview,
   onKill,
-  onClose,
+  onCancel,
   onReopen,
   onResetReview,
   onResetSession,
@@ -179,15 +179,17 @@ export function ActionsSection({
           </button>
         )}
 
-        {/* Close Issue */}
-        <button
-          onClick={onClose}
-          disabled={closeMutation.isPending}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-destructive-foreground rounded hover:bg-accent disabled:opacity-50"
-        >
-          {closeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-          Close
-        </button>
+        {/* Cancel Issue */}
+        {reviewStatus?.mergeStatus !== 'merged' && (
+          <button
+            onClick={onCancel}
+            disabled={cancelMutation.isPending}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-destructive-foreground rounded hover:bg-accent disabled:opacity-50"
+          >
+            {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+            {cancelMutation.isPending ? 'Canceling...' : 'Cancel'}
+          </button>
+        )}
 
         {/* Reopen button */}
         {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (

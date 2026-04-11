@@ -116,6 +116,7 @@ describe('IssueLifecycle — integration', () => {
         { id: 'state-open', name: 'Todo', type: 'unstarted' },
         { id: 'state-inprogress', name: 'In Progress', type: 'started' },
         { id: 'state-done', name: 'Done', type: 'completed' },
+        { id: 'state-canceled', name: 'Canceled', type: 'canceled' },
       ]),
     );
     mockLinearUpdateState.mockReturnValue(ok(undefined));
@@ -192,6 +193,39 @@ describe('IssueLifecycle — integration', () => {
 
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('org', 'repo', 1, 'in-progress');
+    });
+
+    it('closes canceled GitHub issues with a wontfix label', async () => {
+      mockResolveTrackerType.mockReturnValue('github');
+      mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'org', repo: 'repo', number: 1 });
+
+      const layer = await makeTestLayer();
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('org/repo#1', 'canceled');
+      }).pipe(Effect.provide(layer));
+
+      await runEffect(program);
+      expect(mockGitHubAddLabel).toHaveBeenCalledWith('org', 'repo', 1, 'wontfix');
+      expect(mockGitHubCloseIssue).toHaveBeenCalledWith('org', 'repo', 1);
+    });
+  });
+
+  describe('transitionTo (Linear canceled)', () => {
+    it('transitions Linear issues to the canceled state when available', async () => {
+      const layer = await makeTestLayer();
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('MIN-1', 'canceled');
+      }).pipe(Effect.provide(layer));
+
+      await runEffect(program);
+      expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-canceled');
+      expect(mockPatchIssue).toHaveBeenCalledWith('MIN-1', expect.objectContaining({ canonicalStatus: 'canceled' }));
     });
   });
 

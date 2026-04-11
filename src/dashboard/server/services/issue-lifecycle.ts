@@ -41,7 +41,7 @@ function emitEvent(event: Record<string, unknown>): Effect.Effect<void, never> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type IssueState = 'open' | 'in_planning' | 'in_progress' | 'in_review' | 'closed';
+export type IssueState = 'open' | 'in_planning' | 'in_progress' | 'in_review' | 'closed' | 'canceled';
 
 // ─── Service interface ────────────────────────────────────────────────────────
 
@@ -114,6 +114,8 @@ function linearStateType(state: IssueState): string {
       return 'started';
     case 'closed':
       return 'completed';
+    case 'canceled':
+      return 'canceled';
   }
 }
 
@@ -145,11 +147,12 @@ function findLinearState(states: ReadonlyArray<LinearState>, state: IssueState):
 // ─── GitHub label helpers ─────────────────────────────────────────────────────
 
 const GITHUB_STATE_LABELS: Record<IssueState, { add: string[]; remove: string[] }> = {
-  open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning'] },
-  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review'] },
-  in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review'] },
-  in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning'] },
-  closed: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning'] },
+  open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
+  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
+  in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
+  in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
+  closed: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
+  canceled: { add: ['wontfix'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'duplicate'] },
 };
 
 // ─── Live layer implementation ────────────────────────────────────────────────
@@ -162,6 +165,7 @@ function canonicalStatus(state: IssueState): string {
     case 'in_progress': return 'in_progress';
     case 'in_review': return 'in_review';
     case 'closed': return 'closed';
+    case 'canceled': return 'canceled';
   }
 }
 
@@ -188,7 +192,7 @@ export const IssueLifecycleLive = Layer.effect(
             for (const label of labelOps.remove) {
               yield* github.removeLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
             }
-            if (state === 'closed') {
+            if (state === 'closed' || state === 'canceled') {
               yield* github.closeIssue(ghInfo.owner, ghInfo.repo, ghInfo.number);
             } else {
               // Reopen the issue if it's currently closed (e.g. reopening after incorrect merge)
