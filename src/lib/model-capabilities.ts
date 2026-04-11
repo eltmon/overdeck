@@ -434,27 +434,51 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work.',
   },
 
-  // Z.AI models
-  'glm-5.1': {
-    model: 'glm-5.1',
+  // Z.AI (GLM) MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'glm-4.7': {
+    model: 'glm-4.7',
     provider: 'zai',
-    displayName: 'GLM-5.1',
-    costPer1MTokens: 2.0,
+    displayName: 'GLM-4.7',
+    costPer1MTokens: 0.5, // Approximate pricing for Z.AI
     contextWindow: 128000,
     skills: {
       'code-generation': 82,
       'code-review': 80,
-      debugging: 80,
-      planning: 78,
-      documentation: 78,
+      debugging: 78,
+      planning: 80,
+      documentation: 80,
       testing: 78,
       security: 75,
-      performance: 75,
-      synthesis: 80,
-      speed: 85,
-      'context-length': 75,
+      performance: 78,
+      synthesis: 82,
+      speed: 75,
+      'context-length': 85,
     },
-    notes: 'Z.AI GLM-5.1 model via Anthropic-compatible API.',
+    notes: 'Z.AI flagship model, Anthropic-compatible API.',
+  },
+
+  'glm-4.7-flash': {
+    model: 'glm-4.7-flash',
+    provider: 'zai',
+    displayName: 'GLM-4.7 Flash',
+    costPer1MTokens: 0.1, // Approximate pricing for Z.AI
+    contextWindow: 128000,
+    skills: {
+      'code-generation': 78,
+      'code-review': 76,
+      debugging: 74,
+      planning: 76,
+      documentation: 76,
+      testing: 74,
+      security: 72,
+      performance: 75,
+      synthesis: 78,
+      speed: 85,
+      'context-length': 85,
+    },
+    notes: 'Z.AI fast variant, Anthropic-compatible API.',
   },
 };
 

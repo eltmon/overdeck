@@ -43,7 +43,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'minimax-m2.7-highspeed': 'minimax',
 
   // Z.AI models
-  'glm-5.1': 'zai',
+  'glm-4.7': 'zai',
+  'glm-4.7-flash': 'zai',
 };
 
 /**
@@ -86,6 +87,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // MiniMax → Anthropic
   'minimax-m2.7': 'claude-sonnet-4-6', // Near-Opus performance → Sonnet
   'minimax-m2.7-highspeed': 'claude-sonnet-4-6', // Same quality, faster → Sonnet
+
+  // Z.AI (GLM) → Anthropic
+  'glm-4.7': 'claude-sonnet-4-6', // Flagship GLM → Sonnet
+  'glm-4.7-flash': 'claude-haiku-4-5', // Fast GLM → Haiku
 };
 
 /**
