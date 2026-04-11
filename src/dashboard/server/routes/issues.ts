@@ -936,6 +936,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         }
 
         await execAsync('git add -f .planning/', { cwd: gitRoot, encoding: 'utf-8' });
+        if (existsSync(join(gitRoot, '.beads'))) {
+          await execAsync('git add .beads/', { cwd: gitRoot, encoding: 'utf-8' });
+        }
 
         try {
           await execAsync('git diff --cached --quiet', { cwd: gitRoot, encoding: 'utf-8' });

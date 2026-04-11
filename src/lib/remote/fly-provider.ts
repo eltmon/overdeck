@@ -459,7 +459,7 @@ with open(path, "w") as f:
     // Commit and push
     const gitResult = await this.ssh(
       vmName,
-      `cd ${workspacePath} && git diff --cached --quiet || (git commit -m ${JSON.stringify(msg)} && git push origin HEAD) 2>&1`
+      `cd ${workspacePath} && git add .beads/ && git diff --cached --quiet || (git commit -m ${JSON.stringify(msg)} && git push origin HEAD) 2>&1`
     );
     return gitResult.exitCode === 0;
   }

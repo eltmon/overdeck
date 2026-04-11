@@ -75,10 +75,11 @@ scripts/*.map
 node_modules
 src/dashboard/frontend/node_modules
 
-# Beads — ephemeral, derived from plan.vbrief.json via createBeadsFromVBrief().
-# vBRIEF is the authoritative state; beads are a runtime index, not repo artifacts.
-.beads/
-.planning/beads/
+# Beads — tracked on feature branches, same as .planning/.
+# DO NOT gitignore — agents need these files for task tracking and the
+# start-agent endpoint runs `git add .beads/` which fails if ignored.
+# The review specialist requires beads completion verification before approval.
+# .beads/
 
 # Stitch temp files
 temp/

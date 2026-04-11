@@ -660,15 +660,34 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           process.exit(1);
         }
       } else {
-        // Planning was done but no beads created — that's a planning bug
-        spinner.fail(`No beads tasks found for ${id}`);
-        console.log('');
-        console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-        console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
-        console.log('');
-        console.log(chalk.bold('To re-run planning:'));
-        console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
-        process.exit(1);
+        // Planning was done but no beads — attempt auto-recovery from vBRIEF (matches dashboard agents.ts path)
+        spinner.text = `No beads found — attempting recovery from vBRIEF plan...`;
+        try {
+          const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
+          const recovery = await createBeadsFromVBrief(workspace);
+          if (recovery.created.length > 0) {
+            spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
+          } else {
+            spinner.fail(`No beads tasks found for ${id} and recovery from vBRIEF failed`);
+            if (recovery.errors.length > 0) {
+              console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
+            }
+            console.log('');
+            console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
+            console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+            console.log('');
+            console.log(chalk.bold('To re-run planning:'));
+            console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+            process.exit(1);
+          }
+        } catch (recoveryErr: any) {
+          spinner.fail(`No beads tasks found for ${id}`);
+          console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
+          console.log('');
+          console.log(chalk.bold('To re-run planning:'));
+          console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+          process.exit(1);
+        }
       }
     }
 
