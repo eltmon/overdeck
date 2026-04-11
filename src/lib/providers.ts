@@ -8,9 +8,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, MiniMaxModel } from './settings.js';
+import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './settings.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'openrouter';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai' | 'openrouter';
 
 /**
  * Provider compatibility types
@@ -69,11 +69,21 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     description: 'Anthropic-compatible API via Kimi Code Plan (OAuth token refresh)',
   },
 
+  zai: {
+    name: 'zai',
+    displayName: 'Z.AI (GLM)',
+    compatibility: 'direct',
+    baseUrl: 'https://api.z.ai/api/anthropic',
+    models: ['glm-4.7', 'glm-4.7-flash'],
+    tested: true,
+    description: 'Anthropic-compatible API, tested 2026-01-28',
+  },
+
   openai: {
     name: 'openai',
     displayName: 'OpenAI',
     compatibility: 'router',
-    models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
+    models: ['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'],
     tested: false,
     description: 'Requires claude-code-router for API translation',
   },
@@ -82,19 +92,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'router',
-    models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
+    models: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     tested: false,
     description: 'Requires claude-code-router for API translation',
-  },
-
-  minimax: {
-    name: 'minimax',
-    displayName: 'MiniMax',
-    compatibility: 'direct',
-    baseUrl: 'https://api.minimax.io/anthropic',
-    models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
-    tested: true,
-    description: 'Anthropic-compatible API, 10B active params, 100 tps highspeed variant',
   },
 
   openrouter: {
@@ -123,23 +123,23 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check OpenAI models
-  if (['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'].includes(modelId)) {
+  if (['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 
   // Check Google models
-  if (['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'].includes(modelId)) {
+  if (['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
-  // Check Kimi models
-  if (['kimi-k2.5'].includes(modelId)) {
-    return PROVIDERS.kimi;
+  // Check Z.AI models
+  if (['glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
+    return PROVIDERS.zai;
   }
 
-  // Check MiniMax models
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(modelId)) {
-    return PROVIDERS.minimax;
+  // Check Kimi models
+  if (['kimi-k2', 'kimi-k2.5'].includes(modelId)) {
+    return PROVIDERS.kimi;
   }
 
   // Default to Anthropic if unknown
@@ -171,7 +171,7 @@ export function getDirectProviders(): ProviderConfig[] {
  * Check if any configured providers require router
  * Used to determine if router installation is needed
  */
-export function needsRouter(apiKeys: { openai?: string; google?: string }): boolean {
+export function needsRouter(apiKeys: { openai?: string; google?: string; zai?: string }): boolean {
   return !!(apiKeys.openai || apiKeys.google);
 }
 
@@ -202,6 +202,11 @@ export function getProviderEnv(
         // Static providers use a long-lived API key
         env.ANTHROPIC_AUTH_TOKEN = apiKey;
       }
+    }
+
+    // Z.AI recommends longer timeout
+    if (provider.name === 'zai') {
+      env.API_TIMEOUT_MS = '300000';
     }
 
     return env;

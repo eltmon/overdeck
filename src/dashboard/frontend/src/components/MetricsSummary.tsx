@@ -23,6 +23,7 @@ interface MetricsSummary {
 
 interface HandoffStats {
   totalHandoffs: number;
+  todayEscalations: number;
   byTrigger: Record<string, number>;
   byModel: {
     from: Record<string, number>;
@@ -81,10 +82,7 @@ export function MetricsSummary() {
     return null;
   }
 
-  // Count cost escalations from today (from handoff stats)
-  const costEscalations = handoffStats
-    ? Object.values(handoffStats.byTrigger).reduce((sum, count) => sum + count, 0)
-    : 0;
+  const todayEscalations = handoffStats?.todayEscalations ?? 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -156,19 +154,17 @@ export function MetricsSummary() {
         </div>
       </div>
 
-      {/* Cost Escalations */}
+      {/* Escalations */}
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-signal-review" />
-            <span className="text-sm text-content-subtle">Cost Escalations</span>
+            <TrendingUp className="w-5 h-5 text-purple-400" />
+            <span className="text-sm text-content-subtle">Escalations</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-content">{costEscalations}</div>
+        <div className="text-2xl font-bold text-content">{todayEscalations}</div>
         <div className="mt-2 text-xs text-content-muted">
-          {handoffStats
-            ? `${(handoffStats.successRate * 100).toFixed(0)}% success rate`
-            : 'No data'}
+          model handoffs today
         </div>
       </div>
 

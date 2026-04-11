@@ -1,13 +1,14 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
+import { getProviderForModel } from './providers.js';
 
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
-export type OpenAIModel = 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'o3';
-export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-3.1-flash-lite-preview';
-export type KimiModel = 'kimi-k2.5';
-export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel;
+export type OpenAIModel = 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
+export type GoogleModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+export type ZAIModel = 'glm-4.7' | 'glm-4.7-flash';
+export type KimiModel = 'kimi-k2' | 'kimi-k2.5';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | ZAIModel | KimiModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -35,6 +36,7 @@ export interface ModelsConfig {
 export interface ApiKeysConfig {
   openai?: string;
   google?: string;
+  zai?: string;
   kimi?: string;
 }
 
@@ -124,6 +126,7 @@ export function loadSettings(): SettingsConfig {
   const envApiKeys: ApiKeysConfig = {};
   if (process.env.OPENAI_API_KEY) envApiKeys.openai = process.env.OPENAI_API_KEY;
   if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
+  if (process.env.ZAI_API_KEY) envApiKeys.zai = process.env.ZAI_API_KEY;
   if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
@@ -198,6 +201,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   anthropic: AnthropicModel[];
   openai: OpenAIModel[];
   google: GoogleModel[];
+  zai: ZAIModel[];
   kimi: KimiModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
@@ -207,21 +211,26 @@ export function getAvailableModels(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3']
+    ? ['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
-    ? ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview']
+    ? ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
+    : [];
+
+  const zaiModels: ZAIModel[] = settings.api_keys.zai
+    ? ['glm-4.7', 'glm-4.7-flash']
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
-    ? ['kimi-k2.5']
+    ? ['kimi-k2', 'kimi-k2.5']
     : [];
 
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
     google: googleModels,
+    zai: zaiModels,
     kimi: kimiModels,
   };
 }
@@ -249,9 +258,11 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
 }
 
 /**
- * Get the command to run an agent with a specific model
- * Always uses 'claude' CLI — non-Anthropic models work via ANTHROPIC_BASE_URL env var
- * pointing to their Anthropic-compatible endpoint.
+ * Get the command to run an agent with a specific model.
+ * - Anthropic models: 'claude --model <flag>'
+ * - Direct-compatible providers (Z.AI, Kimi, Google): 'claude --model <id>'
+ *   (caller sets ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN env vars)
+ * - Router-only providers (OpenAI, OpenRouter): 'claude-code-router'
  */
 export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
   if (isAnthropicModel(modelId)) {
@@ -260,10 +271,17 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
       args: ['--model', getClaudeModelFlag(modelId)],
     };
   }
-  // Non-Anthropic direct providers: use claude CLI with the model name as-is.
-  // The caller must set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN env vars.
+  const provider = getProviderForModel(modelId);
+  if (provider.compatibility === 'direct') {
+    // Direct providers use claude CLI via ANTHROPIC_BASE_URL
+    return {
+      command: 'claude',
+      args: ['--model', modelId],
+    };
+  }
+  // Router-only providers (OpenAI, OpenRouter)
   return {
-    command: 'claude',
-    args: ['--model', modelId],
+    command: 'claude-code-router',
+    args: [],
   };
 }

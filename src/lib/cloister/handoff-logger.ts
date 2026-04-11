@@ -199,6 +199,7 @@ export function readAgentHandoffEvents(agentId: string): HandoffEvent[] {
  */
 export function getHandoffStats(): {
   totalHandoffs: number;
+  todayEscalations: number; // Model escalations (stuck/cost/test) that occurred today
   byTrigger: Record<string, number>;
   byModel: {
     from: Record<string, number>;
@@ -213,9 +214,11 @@ export function getHandoffStats(): {
   verifiedCount: number;         // Total handoffs that have been verified
 } {
   const events = readHandoffEvents();
+  const today = new Date().toISOString().split('T')[0];
 
   const stats = {
     totalHandoffs: events.length,
+    todayEscalations: 0,
     byTrigger: {} as Record<string, number>,
     byModel: {
       from: {} as Record<string, number>,
@@ -232,6 +235,11 @@ export function getHandoffStats(): {
   let recoverySuccessCount = 0;
 
   for (const event of events) {
+    // Count today's escalations (all trigger types are escalations)
+    if (event.timestamp.startsWith(today)) {
+      stats.todayEscalations++;
+    }
+
     // Count by trigger
     stats.byTrigger[event.trigger] = (stats.byTrigger[event.trigger] || 0) + 1;
 

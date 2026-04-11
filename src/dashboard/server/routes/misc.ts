@@ -917,9 +917,9 @@ const getSpecialistHandoffsRoute = HttpRouter.add(
 const getSpecialistHandoffsStatsRoute = HttpRouter.add(
   'GET',
   '/api/specialist-handoffs/stats',
-  Effect.try({
-    try: () => {
-      const stats = getSpecialistHandoffStats();
+  Effect.tryPromise({
+    try: async () => {
+      const stats = await getSpecialistHandoffStats();
       return jsonResponse(stats);
     },
     catch: (error: unknown) => {

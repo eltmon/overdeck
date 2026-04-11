@@ -17,6 +17,7 @@ interface MetricsSummaryData {
 
 interface HandoffStats {
   totalHandoffs: number;
+  todayEscalations: number;
   byTrigger: Record<string, number>;
   successRate: number;
 }
@@ -100,12 +101,9 @@ export function MetricsSummaryRow() {
 
   if (!metrics) return null;
 
-  const costEscalations = handoffStats
-    ? Object.values(handoffStats.byTrigger).reduce((sum, count) => sum + count, 0)
-    : 0;
+  const todayEscalations = handoffStats?.todayEscalations ?? 0;
 
   const stuckColor = metrics.today.stuckCount > 0 ? 'text-destructive' : 'text-muted-foreground';
-  const escalationColor = costEscalations > 0 ? 'text-signal-review' : 'text-muted-foreground';
   const queueColor = (specialistStats?.queueDepth ?? 0) > 10 ? 'text-warning' : 'text-muted-foreground';
 
   return (
@@ -141,8 +139,8 @@ export function MetricsSummaryRow() {
       <MetricTile
         icon={<TrendingUp className="w-4 h-4" />}
         label="Escalations"
-        value={costEscalations}
-        valueClass={escalationColor}
+        value={todayEscalations}
+        subtext="model handoffs today"
       />
       <MetricTile
         icon={<Layers className="w-4 h-4" />}

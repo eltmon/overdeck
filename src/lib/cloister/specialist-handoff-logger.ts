@@ -6,8 +6,46 @@
  */
 
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { PANOPTICON_HOME } from '../paths.js';
+import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
+
+/**
+ * Known specialist agent IDs — matches SpecialistType in specialists.ts.
+ * Used to compute live queue depth from hook.json files.
+ */
+const KNOWN_SPECIALISTS = [
+  'review-agent',
+  'test-agent',
+  'merge-agent',
+  'inspect-agent',
+  'uat-agent',
+] as const;
+
+/**
+ * Compute live queue depth by reading each specialist's hook.json.
+ *
+ * The JSONL log is append-only so status fields never update. We use the
+ * actual hook queue files (written by pushToHook / popFromHook in hooks.ts)
+ * to get the real-time pending item count instead.
+ *
+ * @param agentsDir - Directory containing per-agent subdirectories (defaults to AGENTS_DIR)
+ */
+async function getLiveQueueDepth(agentsDir: string = AGENTS_DIR): Promise<number> {
+  let depth = 0;
+  for (const specialistId of KNOWN_SPECIALISTS) {
+    const hookFile = join(agentsDir, specialistId, 'hook.json');
+    if (!existsSync(hookFile)) continue;
+    try {
+      const content = await readFile(hookFile, 'utf-8');
+      const hook = JSON.parse(content) as { items: unknown[] };
+      depth += hook.items?.length ?? 0;
+    } catch {
+      // Corrupt hook file — skip
+    }
+  }
+  return depth;
+}
 
 /**
  * Specialist handoff event structure
@@ -135,14 +173,14 @@ export function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[
  *
  * @returns Specialist handoff statistics
  */
-export function getSpecialistHandoffStats(): {
+export async function getSpecialistHandoffStats(options?: { agentsDir?: string }): Promise<{
   totalHandoffs: number;
   todayCount: number;
   bySpecialist: Record<string, { sent: number; received: number }>;
   byStatus: Record<string, number>;
   successRate: number;
   queueDepth: number; // Current items with 'queued' or 'processing' status
-} {
+}> {
   const events = readSpecialistHandoffs();
   const today = new Date().toISOString().split('T')[0];
 
@@ -187,14 +225,13 @@ export function getSpecialistHandoffStats(): {
       }
     }
 
-    // Count queue depth (queued or processing)
-    if (event.status === 'queued' || event.status === 'processing') {
-      stats.queueDepth++;
-    }
   }
 
   // Calculate success rate
   stats.successRate = completedCount > 0 ? successCount / completedCount : 0;
+
+  // Compute live queue depth from actual hook files (not stale JSONL status)
+  stats.queueDepth = await getLiveQueueDepth(options?.agentsDir);
 
   return stats;
 }
@@ -208,4 +245,68 @@ export function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
   const events = readSpecialistHandoffs();
   const today = new Date().toISOString().split('T')[0];
   return events.filter(e => e.timestamp.startsWith(today));
+}
+
+/**
+ * Update the status of a specialist handoff record in the JSONL log.
+ *
+ * Finds the most recent queued/processing entry for the given issueId +
+ * toSpecialist pair and rewrites it in-place. Called by /api/specialists/done
+ * so that success-rate calculations reflect actual outcomes rather than always
+ * reading 0% (because the log is append-only and entries never change status
+ * without this function).
+ *
+ * @param issueId - Issue ID (case-sensitive, use normalised form)
+ * @param toSpecialist - Specialist agent name e.g. 'review-agent'
+ * @param status - New status to set
+ * @param result - Optional outcome ('success' | 'failure')
+ * @returns true if a record was found and updated
+ */
+export async function updateSpecialistHandoffStatus(
+  issueId: string,
+  toSpecialist: string,
+  status: 'processing' | 'completed' | 'failed',
+  result?: 'success' | 'failure',
+): Promise<boolean> {
+  if (!existsSync(SPECIALIST_HANDOFF_LOG_FILE)) return false;
+
+  const content = await readFile(SPECIALIST_HANDOFF_LOG_FILE, 'utf-8');
+  const lines = content.trim().split('\n').filter(l => l.trim());
+
+  // Scan in reverse to find the most recent matching active record
+  let matchIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const event = JSON.parse(lines[i]) as SpecialistHandoff;
+      if (
+        event.issueId === issueId &&
+        event.toSpecialist === toSpecialist &&
+        (event.status === 'queued' || event.status === 'processing')
+      ) {
+        matchIdx = i;
+        break;
+      }
+    } catch {
+      // Skip malformed line
+    }
+  }
+
+  if (matchIdx === -1) return false;
+
+  try {
+    const event = JSON.parse(lines[matchIdx]) as SpecialistHandoff;
+    const updated: SpecialistHandoff = {
+      ...event,
+      status,
+      ...(result !== undefined ? { result } : {}),
+      ...(status === 'completed' || status === 'failed'
+        ? { completedAt: new Date().toISOString() }
+        : {}),
+    };
+    lines[matchIdx] = JSON.stringify(updated);
+    await writeFile(SPECIALIST_HANDOFF_LOG_FILE, lines.join('\n') + '\n', 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
 }
