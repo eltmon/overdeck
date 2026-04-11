@@ -671,6 +671,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
     const providerExports = getProviderExportsForModel(state.model);
     const launcherContent = `#!/bin/bash
+export CI=1
 ${providerExports}prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
 `;

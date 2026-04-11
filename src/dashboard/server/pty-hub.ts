@@ -25,29 +25,42 @@ export interface PtyHub {
    * tabs have the same terminal open.
    */
   inputClient: WebSocket | null;
-  /**
-   * Per-client blackout map: rejoining clients receive no data during their
-   * blackout period while the SIGWINCH repaint settles. Only used for hub joins
-   * (not new hubs — those use client-side opacity hide instead).
-   */
-  clientBlackout: Map<WebSocket, number>;
+  /** Per-client bootstrap state used to gate live PTY output until the client is ready. */
+  clientStates: Map<WebSocket, { ready: boolean; pending: string[] }>;
 }
 
 /** Shared registry of active PTY hubs, keyed by tmux session name. */
 export const activePtyHubs = new Map<string, PtyHub>();
 
 /**
- * Broadcast data to all open clients in the hub, respecting per-client blackout periods.
- * Rejoining clients get a brief blackout while the SIGWINCH repaint settles.
+ * Broadcast data to all open clients in the hub. Clients that are still booting
+ * buffer live PTY output until they acknowledge their snapshot.
  */
 export function broadcastToHub(hub: PtyHub, data: string): void {
-  const now = Date.now();
   for (const client of hub.clients) {
     if (client.readyState !== WebSocket.OPEN) continue;
-    const blackoutUntil = hub.clientBlackout.get(client);
-    if (blackoutUntil && now < blackoutUntil) continue;
+    const state = hub.clientStates.get(client);
+    if (state && !state.ready) {
+      state.pending.push(data);
+      continue;
+    }
     client.send(data);
   }
+}
+
+export function setClientReady(hub: PtyHub, ws: WebSocket): void {
+  const state = hub.clientStates.get(ws);
+  if (!state || state.ready || ws.readyState !== WebSocket.OPEN) return;
+  state.ready = true;
+  for (const chunk of state.pending) {
+    ws.send(chunk);
+  }
+  state.pending.length = 0;
+}
+
+export function addClientToHub(hub: PtyHub, ws: WebSocket, ready: boolean): void {
+  hub.clients.add(ws);
+  hub.clientStates.set(ws, { ready, pending: [] });
 }
 
 /**
@@ -67,7 +80,7 @@ export function removeClientFromHub(
   const hub = hubs.get(sessionName);
   if (!hub) return false;
   hub.clients.delete(ws);
-  hub.clientBlackout.delete(ws);
+  hub.clientStates.delete(ws);
   if (hub.clients.size === 0) {
     hubs.delete(sessionName);
     return true; // last client — hub torn down

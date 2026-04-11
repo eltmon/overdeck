@@ -18,6 +18,19 @@ interface XTerminalProps {
   autoCopyOnSelect?: boolean;
 }
 
+interface TerminalSnapshotMessage {
+  type: 'snapshot';
+  cols: number;
+  rows: number;
+  data: string;
+}
+
+interface TerminalSizeMessage {
+  type: 'size';
+  cols: number;
+  rows: number;
+}
+
 // Context menu state
 interface ContextMenuState {
   visible: boolean;
@@ -38,8 +51,10 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   const fitAddon = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
-  const hadFirstData = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remoteSize = useRef<{ cols: number; rows: number } | null>(null);
+  const requestedSize = useRef<{ cols: number; rows: number } | null>(null);
+  const readyForLiveData = useRef(false);
   const maxReconnectAttempts = 5;
   const [shouldReconnect, setShouldReconnect] = useState(true);
 
@@ -78,6 +93,28 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   const getReconnectDelay = (attempt: number): number => {
     return Math.min(1000 * Math.pow(2, attempt), 30000);
   };
+
+  const getMeasuredSize = useCallback((): { cols: number; rows: number } | null => {
+    const term = terminalInstance.current;
+    const fit = fitAddon.current as (FitAddon & { proposeDimensions?: () => { cols: number; rows: number } | undefined }) | null;
+    if (!term || !fit) return null;
+    const proposed = fit.proposeDimensions?.();
+    const cols = proposed?.cols ?? term.cols;
+    const rows = proposed?.rows ?? term.rows;
+    if (!cols || !rows) return null;
+    return { cols, rows };
+  }, []);
+
+  const sendResizeIfNeeded = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !readyForLiveData.current) return;
+    const measured = getMeasuredSize();
+    if (!measured) return;
+    const current = requestedSize.current;
+    if (current?.cols === measured.cols && current.rows === measured.rows) return;
+    requestedSize.current = measured;
+    ws.send(JSON.stringify({ type: 'resize', cols: measured.cols, rows: measured.rows }));
+  }, [getMeasuredSize]);
 
   // Copy selected text to clipboard
   const copySelection = useCallback(async () => {
@@ -252,7 +289,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
       term.loadAddon(fit);
       term.open(terminalRef.current);
-      fit.fit();
 
       terminalInstance.current = term;
       fitAddon.current = fit;
@@ -297,12 +333,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
           wsRef.current.send(data);
         }
       });
-
-      term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
-        }
-      });
     }
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
@@ -317,41 +347,13 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     ws.onopen = () => {
       console.log('XTerminal: WebSocket opened');
-      // Reset first-data flag so the scrollback dump refresh fires on every
-      // new connection (not just the first one). Without this, reconnections
-      // after server restart skip the refresh and leave stale spinner dots.
-      hadFirstData.current = false;
+      readyForLiveData.current = false;
+      remoteSize.current = null;
 
-      // Do NOT reset reconnectAttempts or clear the terminal here — the server
-      // may close immediately if the tmux session doesn't exist yet. Clearing
-      // here causes the screen to flash on every failed reconnect attempt.
-      // Both reset and clear happen only when we receive data (session alive).
-
-      // CRITICAL: Send dimensions IMMEDIATELY on connection, before any data flows
-      // The server waits for this resize message before starting the SSH session
-      // This ensures tmux is created with the correct dimensions from the start
-      fit?.fit();
-
-      // Validate fit result — if cols are unreasonably small, the char measure element
-      // returned a wrong width (happens when the container isn't fully laid out yet).
-      // Retry fit after a short delay to let CSS settle.
-      const sendDimensions = () => {
-        console.log('XTerminal: Sending initial dimensions:', term!.cols, 'x', term!.rows);
-        ws.send(JSON.stringify({ type: 'resize', cols: term!.cols, rows: term!.rows }));
-      };
-
-      if (term!.cols < 40) {
-        console.warn(`XTerminal: fit() returned ${term!.cols} cols — too narrow, retrying in 200ms`);
-        setTimeout(() => {
-          fit?.fit();
-          if (term!.cols < 40) {
-            console.warn(`XTerminal: Still ${term!.cols} cols after retry — sending anyway`);
-          }
-          sendDimensions();
-        }, 200);
-      } else {
-        sendDimensions();
-      }
+      const measured = getMeasuredSize() ?? { cols: term!.cols, rows: term!.rows };
+      requestedSize.current = measured;
+      console.log('XTerminal: Sending attach dimensions:', measured.cols, 'x', measured.rows);
+      ws.send(JSON.stringify({ type: 'attach', cols: measured.cols, rows: measured.rows }));
     };
 
     // DEBUG: Enable detailed logging to diagnose terminal corruption
@@ -412,6 +414,12 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       });
     };
 
+    const queueLiveData = (data: string) => {
+      reconnectAttempts.current = 0;
+      writeQueue.push(data);
+      processWriteQueue();
+    };
+
     ws.onmessage = (event) => {
       let dataStr = '';
 
@@ -432,44 +440,43 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         }
       }
 
-      // Session is alive — on first data, hide terminal briefly while the initial
-      // tmux scrollback dump and SIGWINCH repaint settle. After 350ms, reveal the
-      // terminal with the correct viewport. This prevents the visible flash of
-      // old-size content without suppressing scrollback data (which xterm.js needs
-      // for mousewheel scrolling).
-      if (!hadFirstData.current) {
-        hadFirstData.current = true;
-        if (terminalRef.current) {
-          terminalRef.current.style.opacity = '0';
-          setTimeout(() => {
-            if (terminalRef.current) {
-              terminalRef.current.style.opacity = '1';
-            }
-            // Force a full repaint after the scrollback dump settles.
-            // term.refresh() is NOT enough — it doesn't clear stale rendered cells.
-            // fit.fit() calls term.resize() which triggers a complete DOM re-render,
-            // clearing stale spinner/braille artifacts from the scrollback history.
-            // This is the same thing that happens when the user drags the panel divider.
-            // Run fit() repeatedly for the first 3 seconds to catch all scrollback sizes.
-            if (fit) {
-              let fitCount = 0;
-              const fitInterval = setInterval(() => {
-                if (fit && fitCount < 6) {
-                  fit.fit();
-                  fitCount++;
-                } else {
-                  clearInterval(fitInterval);
-                }
-              }, 500);
-            }
-          }, 350);
+      if (dataStr.startsWith('\u0000')) {
+        let control: TerminalSnapshotMessage | TerminalSizeMessage | null = null;
+        try {
+          control = JSON.parse(dataStr.slice(1)) as TerminalSnapshotMessage | TerminalSizeMessage;
+        } catch {
+          control = null;
+        }
+
+        if (control?.type === 'snapshot') {
+          remoteSize.current = { cols: control.cols, rows: control.rows };
+          requestedSize.current = { cols: control.cols, rows: control.rows };
+          readyForLiveData.current = false;
+          writeQueue.length = 0;
+          isWriting = false;
+
+          const resettable = term as Terminal & { reset?: () => void };
+          resettable.reset?.();
+          term!.resize(control.cols, control.rows);
+          term!.write(control.data, () => {
+            readyForLiveData.current = true;
+            reconnectAttempts.current = 0;
+            ws.send(JSON.stringify({ type: 'ready' }));
+            sendResizeIfNeeded();
+          });
+          return;
+        }
+
+        if (control?.type === 'size') {
+          remoteSize.current = { cols: control.cols, rows: control.rows };
+          if (term!.cols !== control.cols || term!.rows !== control.rows) {
+            term!.resize(control.cols, control.rows);
+          }
+          return;
         }
       }
-      reconnectAttempts.current = 0;
 
-      // Add to queue and trigger processing
-      writeQueue.push(dataStr);
-      processWriteQueue();
+      queueLiveData(dataStr);
     };
 
     ws.onclose = (event) => {
@@ -507,7 +514,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     const handleResize = debounce(() => {
       if (ws.readyState === WebSocket.OPEN) {
-        fit?.fit();
+        sendResizeIfNeeded();
       }
     }, 200);
     window.addEventListener('resize', handleResize);
@@ -515,15 +522,17 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     return () => {
       window.removeEventListener('resize', handleResize);
       setShouldReconnect(false);
+      readyForLiveData.current = false;
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
       }
       ws.close();
+      wsRef.current = null;
       term?.dispose();
       terminalInstance.current = null;
       fitAddon.current = null;
     };
-  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu]);
+  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu, getMeasuredSize, sendResizeIfNeeded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -544,9 +553,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
   useEffect(() => {
     const debouncedFit = debounce(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        fitAddon.current?.fit();
-      }
+      sendResizeIfNeeded();
     }, 200);
 
     const resizeObserver = new ResizeObserver(debouncedFit);
@@ -558,7 +565,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [sendResizeIfNeeded]);
 
   const handleClick = () => {
     terminalInstance.current?.focus();
