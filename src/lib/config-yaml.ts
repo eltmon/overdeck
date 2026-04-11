@@ -364,7 +364,7 @@ function mergeShadowConfig(
 /**
  * Merge multiple configs with precedence: project > global > defaults
  */
-function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
+function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
@@ -373,6 +373,10 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
     },
   };
+
+  // Track providers explicitly disabled in models.providers so that legacy
+  // api_keys and env var fallbacks don't re-enable them.
+  const explicitlyDisabled = new Set<ModelProvider>();
 
   // Filter out null configs
   const validConfigs = configs.filter((c): c is YamlConfig => c !== null);
@@ -396,6 +400,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         }
         if (openai.auth) result.providerAuth.openai = openai.auth;
         if (openai.plan) result.providerPlan.openai = openai.plan;
+      } else if (providers.openai !== undefined) {
+        explicitlyDisabled.add('openai');
       }
 
       // Google
@@ -407,6 +413,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         }
         if (google.auth) result.providerAuth.google = google.auth;
         if (google.plan) result.providerPlan.google = google.plan;
+      } else if (providers.google !== undefined) {
+        explicitlyDisabled.add('google');
       }
 
       // MiniMax (zai in YAML config, minimax internally)
@@ -416,6 +424,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         if (minimax.api_key) {
           result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
         }
+      } else if (providers.zai !== undefined) {
+        explicitlyDisabled.add('minimax');
       }
 
       // Kimi
@@ -425,6 +435,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         if (kimi.api_key) {
           result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
         }
+      } else if (providers.kimi !== undefined) {
+        explicitlyDisabled.add('kimi');
       }
 
       // OpenRouter
@@ -434,6 +446,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         if (openrouter.api_key) {
           result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
         }
+      } else if (providers.openrouter !== undefined) {
+        explicitlyDisabled.add('openrouter');
       }
     }
 
@@ -443,22 +457,31 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
     }
 
     // Merge legacy API keys (for backward compatibility)
+    // Only enable providers that weren't explicitly disabled in models.providers
     if (config.api_keys) {
       if (config.api_keys.openai) {
         result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
-        result.enabledProviders.add('openai');
+        if (!explicitlyDisabled.has('openai')) {
+          result.enabledProviders.add('openai');
+        }
       }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
-        result.enabledProviders.add('google');
+        if (!explicitlyDisabled.has('google')) {
+          result.enabledProviders.add('google');
+        }
       }
       if (config.api_keys.zai) {
         result.apiKeys.minimax = resolveEnvVar(config.api_keys.zai);
-        result.enabledProviders.add('minimax');
+        if (!explicitlyDisabled.has('minimax')) {
+          result.enabledProviders.add('minimax');
+        }
       }
       if (config.api_keys.kimi) {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
-        result.enabledProviders.add('kimi');
+        if (!explicitlyDisabled.has('kimi')) {
+          result.enabledProviders.add('kimi');
+        }
       }
     }
 
@@ -495,7 +518,7 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
     mergeShadowConfig(result.shadow, config);
   }
 
-  return result;
+  return { config: result, explicitlyDisabled };
 }
 
 /**
@@ -611,29 +634,40 @@ export function loadConfig(): ConfigLoadResult {
     }
   }
 
-  const config = mergeConfigs(projectConfig, globalConfig);
+  const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
 
   // Load API keys from environment variables as fallback
   // This allows using ~/.panopticon.env for API keys
+  // Only enable providers that weren't explicitly disabled in models.providers
   if (process.env.OPENAI_API_KEY && !config.apiKeys.openai) {
     config.apiKeys.openai = process.env.OPENAI_API_KEY;
-    config.enabledProviders.add('openai');
+    if (!explicitlyDisabled.has('openai')) {
+      config.enabledProviders.add('openai');
+    }
   }
   if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;
-    config.enabledProviders.add('google');
+    if (!explicitlyDisabled.has('google')) {
+      config.enabledProviders.add('google');
+    }
   }
   if (process.env.ZAI_API_KEY && !config.apiKeys.minimax) {
     config.apiKeys.minimax = process.env.ZAI_API_KEY;
-    config.enabledProviders.add('minimax');
+    if (!explicitlyDisabled.has('minimax')) {
+      config.enabledProviders.add('minimax');
+    }
   }
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;
-    config.enabledProviders.add('kimi');
+    if (!explicitlyDisabled.has('kimi')) {
+      config.enabledProviders.add('kimi');
+    }
   }
   if (process.env.OPENROUTER_API_KEY && !config.apiKeys.openrouter) {
     config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
-    config.enabledProviders.add('openrouter');
+    if (!explicitlyDisabled.has('openrouter')) {
+      config.enabledProviders.add('openrouter');
+    }
   }
 
   // Load tracker API keys from environment variables as fallback

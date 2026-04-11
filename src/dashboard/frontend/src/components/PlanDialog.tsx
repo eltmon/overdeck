@@ -581,7 +581,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto flex flex-col">
+            <div className={`flex-1 flex flex-col ${step === 'planning' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
               {/* Checking step - loading state while checking for active session */}
               {step === 'checking' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">

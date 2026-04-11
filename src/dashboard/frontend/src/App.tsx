@@ -167,6 +167,7 @@ export default function App() {
   }, [setSelectedConvId]);
 
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -463,6 +464,7 @@ export default function App() {
                 <KanbanBoard
                   selectedIssue={selectedIssue}
                   onSelectIssue={setSelectedIssue}
+                  onPlanDialogChange={setPlanDialogIssueId}
                 />
               </div>
               {selectedIssue && selectedIssueData && (
@@ -472,6 +474,7 @@ export default function App() {
                   issueUrl={selectedIssueData.url}
                   issue={selectedIssueData}
                   onClose={() => setSelectedIssue(null)}
+                  suppressTerminal={planDialogIssueId === selectedIssue}
                 />
               )}
             </>

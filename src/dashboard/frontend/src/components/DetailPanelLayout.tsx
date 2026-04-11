@@ -43,9 +43,11 @@ export interface DetailPanelLayoutProps {
   issueUrl?: string;
   issue?: Issue;
   onClose: () => void;
+  /** When true, don't render the terminal — another component (e.g. PlanDialog) owns it */
+  suppressTerminal?: boolean;
 }
 
-export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: DetailPanelLayoutProps) {
+export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, suppressTerminal }: DetailPanelLayoutProps) {
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
@@ -72,7 +74,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: 
 
   if (panelState.panelMode === 'closed') return null;
 
-  const showTerminal = panelState.panelMode === 'inspector+terminal' && !!agent;
+  const showTerminal = panelState.panelMode === 'inspector+terminal' && !!agent && !suppressTerminal;
   const defaultWidth = showTerminal ? 760 : 360;
   const minWidth = showTerminal ? 480 : 280;
   const maxWidth = 1200;

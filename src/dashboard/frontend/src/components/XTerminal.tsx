@@ -106,6 +106,14 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   }, []);
 
   const sendResizeIfNeeded = useCallback(() => {
+    // First, fit the terminal to its container so xterm.js renders at the right size
+    const fit = fitAddon.current;
+    try {
+      fit?.fit();
+    } catch {
+      // fit() can throw if terminal isn't attached yet
+    }
+
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN || !readyForLiveData.current) return;
     const measured = getMeasuredSize();
@@ -289,6 +297,8 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
       term.loadAddon(fit);
       term.open(terminalRef.current);
+      // Fit terminal to container immediately so it uses the full width
+      try { fit.fit(); } catch { /* element may not be sized yet */ }
 
       terminalInstance.current = term;
       fitAddon.current = fit;
