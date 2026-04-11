@@ -129,7 +129,7 @@ export function ActionsSection({
           <button
             data-testid="merge-btn"
             onClick={onMerge}
-            disabled={mergeMutation.isPending || ((reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying') && !isMergeStuck)}
+            disabled={mergeMutation.isPending || ((reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying' || reviewStatus?.mergeStatus === 'queued') && !isMergeStuck)}
             className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-medium ${
               isMergeStuck
                 ? 'bg-warning text-white hover:bg-warning/90'
@@ -143,6 +143,7 @@ export function ActionsSection({
              reviewStatus?.mergeStatus === 'merging' ? <Loader2 className="w-3 h-3 animate-spin" /> :
              <CheckCircle className="w-3 h-3" />}
             {isMergeStuck ? 'RETRY MERGE' :
+             reviewStatus?.mergeStatus === 'queued' ? 'QUEUED' :
              reviewStatus?.mergeStatus === 'verifying' ? 'VERIFYING...' :
              reviewStatus?.mergeStatus === 'merging' ? 'REBASING...' : 'MERGE'}
           </button>

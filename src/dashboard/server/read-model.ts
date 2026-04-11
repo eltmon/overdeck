@@ -33,7 +33,7 @@ const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-ag
 const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
 const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
-const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "merging", "verifying", "merged", "failed"]);
+const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
 
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
