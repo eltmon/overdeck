@@ -7,7 +7,8 @@ export type OpenAIModel = 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'o3';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-3.1-flash-lite-preview';
 export type KimiModel = 'kimi-k2.5';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel;
+export type ZAIModel = 'glm-5.1';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';

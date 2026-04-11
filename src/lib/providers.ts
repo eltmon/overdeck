@@ -38,7 +38,7 @@ export interface ProviderConfig {
   authType?: ProviderAuthType; // Defaults to 'static'
   credentialFile?: string; // Path to credential file (for 'credential-file' auth)
   credentialHelper?: string; // Script that reads credential file and prints token
-  models: ModelId[];
+  models: (ModelId | string)[];
   tested: boolean; // Whether compatibility has been verified
   description: string;
 }
