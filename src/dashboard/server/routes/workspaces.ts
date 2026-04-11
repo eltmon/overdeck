@@ -3368,9 +3368,24 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
-    // Step 5: Post-merge lifecycle (move PRD, close issue, compact beads, etc.)
+    // Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle.
+    // postMergeLifecycle spawns a deploy script that may kill this server process,
+    // so queue processing must happen before that point.
     setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
     completePendingOperation(issueId, null);
+    _serverManagedMerges.delete(normalizedMergeId);
+
+    // Dequeue next merge before lifecycle (which may kill the process)
+    mergeQ.current = null;
+    const nextIssueId = mergeQ.queue.shift();
+    if (nextIssueId) {
+      console.log(`[merge] Dequeuing next merge: ${nextIssueId} (${mergeQ.queue.length} remaining)`);
+      triggerMerge(nextIssueId).catch(err =>
+        console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
+      );
+    }
+
+    // Post-merge lifecycle runs last — may spawn deploy script that kills this server
     await postMergeLifecycle(issueId, projectPath, branchName);
 
     return {
@@ -3383,20 +3398,19 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     console.error(`[merge] Error:`, error);
     setReviewStatus(issueId, { mergeStatus: 'failed' });
     completePendingOperation(issueId, error.message);
-    return { success: false, statusCode: 500, error: error.message };
-  } finally {
-    _serverManagedMerges.delete(normalizedMergeId);
 
-    // Process next merge in queue — serialized to avoid rebase thrashing
+    // Dequeue on failure too
+    _serverManagedMerges.delete(normalizedMergeId);
     mergeQ.current = null;
-    const nextIssueId = mergeQ.queue.shift();
-    if (nextIssueId) {
-      console.log(`[merge] Dequeuing next merge: ${nextIssueId} (${mergeQ.queue.length} remaining)`);
-      // Fire-and-forget: next merge starts after current completes
-      triggerMerge(nextIssueId).catch(err =>
-        console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
+    const nextOnFail = mergeQ.queue.shift();
+    if (nextOnFail) {
+      console.log(`[merge] Dequeuing next merge after failure: ${nextOnFail}`);
+      triggerMerge(nextOnFail).catch(err =>
+        console.error(`[merge] Queue error for ${nextOnFail}: ${err}`)
       );
     }
+
+    return { success: false, statusCode: 500, error: error.message };
   }
 }
 
