@@ -8,6 +8,7 @@ import {
   getReviewStatusFromDb,
   getAllReviewStatusesFromDb,
 } from './database/review-status-db.js';
+import { normalizeReviewStatus } from './review-status-normalize.js';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
@@ -131,13 +132,13 @@ export function setReviewStatus(
         (merged.uatStatus === undefined || merged.uatStatus === 'passed')
       );
 
-  const updated: ReviewStatus = {
+  const updated: ReviewStatus = normalizeReviewStatus({
     ...merged,
     issueId,
     updatedAt: now,
     readyForMerge,
     history,
-  };
+  });
 
   // Report commit statuses to GitHub when readyForMerge transitions to true (PAN-536)
   if (readyForMerge && !existing.readyForMerge && updated.prUrl) {

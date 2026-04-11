@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { groupByLabels, groupByCanceledType, ListIssueRow } from './KanbanBoard';
+import { applyReviewStateToIssue, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow } from './KanbanBoard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -111,6 +111,80 @@ describe('groupByLabels', () => {
     const keys = Object.keys(result);
 
     expect(keys[keys.length - 1]).toBe('Uncategorized');
+  });
+});
+
+describe('applyReviewStateToIssue', () => {
+  const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'issue-1',
+    identifier: 'TEST-123',
+    title: 'Test Issue',
+    description: '',
+    status: 'In Review',
+    priority: 3,
+    labels: ['in-review', 'Review Ready'],
+    url: 'https://test.com/TEST-123',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+    ...overrides,
+  });
+
+  it('maps merged review status to a done issue immediately', () => {
+    const issue = createMockIssue();
+
+    const result = applyReviewStateToIssue(issue, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+    });
+
+    expect(result.status).toBe('Done');
+    expect(result.mergeStatus).toBe('merged');
+    expect(result.targetCanonicalState).toBe('done');
+    expect(result.labels).toContain('merged');
+    expect(result.labels.map((label) => label.toLowerCase())).not.toContain('in-review');
+    expect(result.labels.map((label) => label.toLowerCase())).not.toContain('review ready');
+  });
+});
+
+describe('groupByStatus', () => {
+  const createMockIssue = (id: string, status: string, overrides: Partial<Issue> = {}): Issue => ({
+    id,
+    identifier: `TEST-${id}`,
+    title: `Test Issue ${id}`,
+    description: '',
+    status,
+    priority: 3,
+    labels: [],
+    url: `https://test.com/${id}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+    ...overrides,
+  });
+
+  it('places merged issues into the done column', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'Done', { mergeStatus: 'merged', labels: ['merged'] }),
+      createMockIssue('2', 'In Review'),
+    ];
+
+    const result = groupByStatus(issues);
+
+    expect(result.done.map((issue) => issue.identifier)).toContain('TEST-1');
+    expect(result.in_review.map((issue) => issue.identifier)).toContain('TEST-2');
   });
 });
 

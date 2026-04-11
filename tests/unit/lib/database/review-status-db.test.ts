@@ -177,6 +177,19 @@ describe('getReviewStatusFromDb', () => {
     const result = getReviewStatusFromDb('PAN-G-3');
     expect(result!.history).toBeUndefined();
   });
+
+  it('normalizes stale merge notes away for merged records', () => {
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-G-4',
+      mergeStatus: 'merged',
+      mergeNotes: 'Conflicts in src/example.ts',
+      readyForMerge: true,
+    }));
+
+    const result = getReviewStatusFromDb('PAN-G-4');
+    expect(result!.mergeNotes).toBeUndefined();
+    expect(result!.readyForMerge).toBe(false);
+  });
 });
 
 // ============== getAllReviewStatusesFromDb ==============

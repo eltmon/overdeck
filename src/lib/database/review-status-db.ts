@@ -8,6 +8,7 @@
 
 import { getDatabase } from './index.js';
 import type { ReviewStatus, StatusHistoryEntry } from '../review-status.js';
+import { normalizeReviewStatus } from '../review-status-normalize.js';
 
 // ============== Write operations ==============
 
@@ -162,7 +163,7 @@ interface DbReviewStatusRow {
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
-  return {
+  return normalizeReviewStatus({
     issueId: row.issue_id,
     reviewStatus: row.review_status as ReviewStatus['reviewStatus'],
     testStatus: row.test_status as ReviewStatus['testStatus'],
@@ -179,5 +180,5 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     autoRequeueCount: row.auto_requeue_count ?? undefined,
     prUrl: row.pr_url ?? undefined,
     history: history.length > 0 ? history : undefined,
-  };
+  });
 }

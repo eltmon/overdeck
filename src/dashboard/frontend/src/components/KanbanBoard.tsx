@@ -29,6 +29,7 @@ import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
+import type { ReviewStatusSnapshot } from '@panopticon/contracts';
 
 
 // Difficulty badge colors
@@ -125,7 +126,35 @@ function getCostColor(_cost: number): string {
   return 'bg-surface-overlay text-content-subtle';
 }
 
-function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
+export function applyReviewStateToIssue(
+  issue: Issue,
+  reviewStatus?: Pick<ReviewStatusSnapshot, 'mergeStatus' | 'readyForMerge'>,
+): Issue {
+  const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
+  if (!isMerged) {
+    return {
+      ...issue,
+      mergeStatus: reviewStatus?.mergeStatus ?? issue.mergeStatus,
+    };
+  }
+
+  const labels = new Set(issue.labels || []);
+  labels.delete('in-review');
+  labels.delete('In Review');
+  labels.delete('review ready');
+  labels.delete('Review Ready');
+  labels.add('merged');
+
+  return {
+    ...issue,
+    status: 'Done',
+    mergeStatus: 'merged',
+    labels: Array.from(labels),
+    targetCanonicalState: 'done',
+  };
+}
+
+export function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
   const grouped: Record<string, Issue[]> = {
     backlog: [],
     todo: [],
@@ -877,6 +906,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
   const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
+  const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
   // DnD sensors
   const sensors = useSensors(
@@ -1128,6 +1158,10 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return issues.filter(issue => issue.project && selectedProjects.has(issue.project.id));
   }, [issues, selectedProjects]);
 
+  const filteredIssuesWithReviewState = useMemo(() => (
+    filteredIssuesBase.map((issue) => applyReviewStateToIssue(issue, reviewStatusByIssueId[issue.identifier]))
+  ), [filteredIssuesBase, reviewStatusByIssueId]);
+
   // Inject mock Rally data for visual testing (?mockRally=true)
   const mockRallyEnabled = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1135,9 +1169,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, []);
 
   const filteredIssues = useMemo(() => {
-    if (!mockRallyEnabled) return filteredIssuesBase;
-    return [...filteredIssuesBase, ...generateMockRallyData()];
-  }, [filteredIssuesBase, mockRallyEnabled]);
+    if (!mockRallyEnabled) return filteredIssuesWithReviewState;
+    return [...filteredIssuesWithReviewState, ...generateMockRallyData()];
+  }, [filteredIssuesWithReviewState, mockRallyEnabled]);
 
   // Detect if any filtered issues use Rally hierarchy (for expand/collapse all button)
   const hasAnyRallyHierarchy = useMemo(() =>
@@ -1901,7 +1935,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   // Review status for merge-readiness badge
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
-  const isMerged = issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
+  const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
   const isReadyToMerge = !isMerged && reviewStatus?.readyForMerge === true;
 
   // Determine which agent is relevant based on issue status
@@ -1925,7 +1959,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   // Check if issue has "Review Ready" label (agent completed work)
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
-  const isTerminal = canonical === 'done' || canonical === 'canceled';
+  const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isReviewReady = !isTerminal && (issue.labels?.some(
     (label) => typeof label === 'string' && label.toLowerCase() === 'review ready'
   ) ?? false);

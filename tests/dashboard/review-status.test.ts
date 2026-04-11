@@ -135,6 +135,29 @@ describe('setReviewStatus', () => {
     const result = setReviewStatus('PAN-110', { testStatus: 'failed' }, statusFile);
     expect(result.readyForMerge).toBe(false);
   });
+
+  it('clears stale merge notes when verification starts', () => {
+    setReviewStatus('PAN-111', {
+      mergeStatus: 'failed',
+      mergeNotes: 'Conflicts in src/example.ts',
+    }, statusFile);
+
+    const result = setReviewStatus('PAN-111', { mergeStatus: 'verifying' }, statusFile);
+    expect(result.mergeNotes).toBeUndefined();
+  });
+
+  it('forces merged issues out of ready state and clears merge notes', () => {
+    setReviewStatus('PAN-112', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      mergeNotes: 'Old conflict notes',
+    }, statusFile);
+
+    const result = setReviewStatus('PAN-112', { mergeStatus: 'merged' }, statusFile);
+    expect(result.readyForMerge).toBe(false);
+    expect(result.mergeNotes).toBeUndefined();
+  });
 });
 
 describe('getReviewStatus', () => {
