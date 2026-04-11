@@ -3094,9 +3094,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   // Serialize merges per project — concurrent rebases thrash each other
   const projectKey = issuePrefix.toLowerCase();
   const mergeQ = getOrCreateMergeQueue(projectKey);
-  if (mergeQ.current && mergeQ.current !== issueId.toUpperCase()) {
+  const normalizedId = issueId.toUpperCase();
+  if (mergeQ.current && mergeQ.current !== normalizedId) {
     // Another merge is in progress — queue this one
-    const normalizedId = issueId.toUpperCase();
     if (!mergeQ.queue.includes(normalizedId)) {
       mergeQ.queue.push(normalizedId);
     }
@@ -3109,7 +3109,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       message: `Queued for merge (position ${position}, waiting for ${mergeQ.current})`,
     };
   }
-  mergeQ.current = issueId.toUpperCase();
+  // Set current IMMEDIATELY — before any async work — to prevent race conditions
+  // where concurrent calls both pass the queue check before either sets current.
+  mergeQ.current = normalizedId;
   mergeQ.currentStartedAt = Date.now();
 
   // Wrap in try/finally to ALWAYS dequeue the next merge on any exit path.
