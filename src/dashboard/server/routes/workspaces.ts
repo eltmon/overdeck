@@ -2839,47 +2839,78 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     const rerun = (body as any)?.rerun === true;
     if (rerun) {
       try {
-        const { dispatchToSpecialist } = yield* Effect.promise(() => import(
-          '../../../lib/cloister/specialists.js'
-        ));
-        const resolved = resolveProjectFromIssue(issueId);
-        if (resolved) {
-          const wsInfo = getWorkspaceInfoForIssue(issueId);
-          const issueLower = issueId.toLowerCase();
-          const wsPath =
-            wsInfo.localPath ||
-            join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
+        yield* Effect.promise(async () => {
+          const {
+            spawnEphemeralSpecialist,
+            isRunning,
+            getTmuxSessionName,
+            submitToSpecialistQueue,
+          } = await import('../../../lib/cloister/specialists.js');
+          const resolved = resolveProjectFromIssue(issueId);
+          if (resolved) {
+            const wsInfo = getWorkspaceInfoForIssue(issueId);
+            const issueLower = issueId.toLowerCase();
+            const branchName = `feature/${issueLower}`;
+            const wsPath =
+              wsInfo.localPath ||
+              join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
+            const reviewSession = getTmuxSessionName('review-agent', resolved.projectKey);
+            const reviewRunning = await isRunning('review-agent', resolved.projectKey);
+            const reviewState = getAgentRuntimeState(reviewSession);
+            const reviewIdle =
+              reviewState?.state === 'idle' ||
+              reviewState?.state === 'suspended' ||
+              !reviewRunning;
 
-          setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+            if (!reviewIdle) {
+              submitToSpecialistQueue('review-agent', {
+                priority: 'high',
+                source: 'reset-review',
+                issueId,
+                workspace: wsPath,
+                branch: branchName,
+                prUrl: getReviewStatus(issueId)?.prUrl,
+              });
+              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+              console.log(`[reset-review] Review specialist busy, queued ${issueId}`);
+            } else {
+              const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+                issueId,
+                workspace: wsPath,
+                branch: branchName,
+                prUrl: getReviewStatus(issueId)?.prUrl,
+              });
 
-          dispatchToSpecialist({
-            specialistType: 'review-agent',
-            projectKey: resolved.projectKey,
-            issueId,
-            workspacePath: wsPath,
-            projectPath: resolved.projectPath,
-          })
-            .then(result => {
               if (result.success) {
+                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
                 console.log(`[reset-review] Re-dispatched review for ${issueId}`);
+              } else if (result.error === 'specialist_busy') {
+                submitToSpecialistQueue('review-agent', {
+                  priority: 'high',
+                  source: 'reset-review',
+                  issueId,
+                  workspace: wsPath,
+                  branch: branchName,
+                  prUrl: getReviewStatus(issueId)?.prUrl,
+                });
+                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+                console.log(`[reset-review] Review specialist became busy, queued ${issueId}`);
               } else {
                 console.warn(
-                  `[reset-review] Re-dispatch failed for ${issueId}: ${result.error}`
+                  `[reset-review] Re-dispatch failed for ${issueId}: ${result.message || result.error}`
                 );
                 setReviewStatus(issueId, { reviewStatus: 'pending' });
               }
-            })
-            .catch(err => {
-              console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${err}`);
-              setReviewStatus(issueId, { reviewStatus: 'pending' });
-            });
-        } else {
-          console.warn(
-            `[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`
-          );
-        }
+            }
+          } else {
+            console.warn(
+              `[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`
+            );
+          }
+        });
       } catch (rerunErr) {
         console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${rerunErr}`);
+        setReviewStatus(issueId, { reviewStatus: 'pending' });
       }
     }
 
