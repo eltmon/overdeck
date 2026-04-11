@@ -277,8 +277,13 @@ export function clearStuckMergeStatuses(): void {
   if (stuck.length === 0) return;
   console.log(`[review-status] Clearing ${stuck.length} stuck merge status(es) on startup (merging/verifying/queued)`);
   for (const s of stuck) {
-    // Reset to pending so MERGE button reappears — the in-memory queue was lost on restart
-    setReviewStatus(s.issueId, { mergeStatus: 'pending' });
+    // Reset to pending so MERGE button reappears — the in-memory queue was lost on restart.
+    // Preserve readyForMerge if review+test both passed — the merge just needs to be retried.
+    const shouldBeReady = s.reviewStatus === 'passed' && (s.testStatus === 'passed' || s.testStatus === 'skipped');
+    setReviewStatus(s.issueId, {
+      mergeStatus: 'pending',
+      ...(shouldBeReady ? { readyForMerge: true } : {}),
+    });
   }
 }
 
