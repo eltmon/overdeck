@@ -25,6 +25,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import {
   listConversations,
   getConversationByName,
+  getConversationById,
   createConversation,
   markConversationEnded,
   markConversationActive,
@@ -326,6 +327,33 @@ const getConversationsRoute = HttpRouter.add(
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to list conversations: ' + msg }, { status: 500 });
         }})
+  }),
+);
+
+// ─── Route: GET /api/conversations/:id ────────────────────────────────────────
+
+const getConversationRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:id',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = Number(params['id']);
+    return yield* Effect.promise(async () => {
+      try {
+        if (isNaN(id)) {
+          return jsonResponse({ error: 'Invalid conversation ID' }, { status: 400 });
+        }
+        const conv = getConversationById(id);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
+        return jsonResponse({ ...conv, sessionAlive });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to get conversation: ' + msg }, { status: 500 });
+      }
+    });
   }),
 );
 
@@ -777,6 +805,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
+  getConversationRoute,
   postConversationRoute,
   patchConversationRoute,
   deleteConversationRoute,

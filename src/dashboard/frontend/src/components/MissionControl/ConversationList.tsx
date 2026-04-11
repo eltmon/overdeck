@@ -1,5 +1,6 @@
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive } from 'lucide-react';
+import { Circle, Archive, Copy, Check } from 'lucide-react';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ interface ConversationListProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -76,6 +78,15 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
       }
     },
   });
+
+  const handleCopyLink = useCallback((convId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/conv/${convId}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(convId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -123,6 +134,17 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
             aria-label={`Archive ${conv.name}`}
           >
             <Archive size={11} />
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationCopyBtn}
+            onClick={e => handleCopyLink(conv.id, e)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCopyLink(conv.id, e as unknown as React.MouseEvent); } }}
+            title="Copy link to conversation"
+            aria-label={`Copy link to ${conv.name}`}
+          >
+            {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
           </span>
         </button>
       ))}

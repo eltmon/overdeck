@@ -98,6 +98,19 @@ describe('conversations route — DB integration', () => {
     expect(conv!.status).toBe('ended');
   });
 
+  it('getConversationById returns the correct row by id', async () => {
+    const { createConversation, getConversationById } = await import('../../../../lib/database/conversations-db.js');
+    const created = createConversation({ name: 'by-id-test', tmuxSession: 'conv-by-id-test', cwd: '/cwd' });
+    const conv = getConversationById(created.id);
+    expect(conv).not.toBeNull();
+    expect(conv!.name).toBe('by-id-test');
+  });
+
+  it('getConversationById returns null for unknown id', async () => {
+    const { getConversationById } = await import('../../../../lib/database/conversations-db.js');
+    expect(getConversationById(99999)).toBeNull();
+  });
+
   it('resume on alive session updates last_attached_at', async () => {
     const { createConversation, updateLastAttached, markConversationActive, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
     createConversation({ name: 'resume-me', tmuxSession: 'conv-resume-me', cwd: '/cwd' });
