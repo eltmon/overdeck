@@ -1573,7 +1573,7 @@ curl -s -X POST ${apiUrl}/api/specialists/done \\
 \`\`\`
 
 CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
-CRITICAL: Success means the PR is MERGED on GitHub. Rebase alone is NOT success.\`;
+CRITICAL: Success means the PR is MERGED on GitHub. Rebase alone is NOT success.`;
 
   // Resolve project for per-project ephemeral specialist
   const resolvedProject = resolveProjectFromIssue(issueId);
