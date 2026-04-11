@@ -42,6 +42,14 @@ export interface ReviewStatus {
   reviewedAtCommit?: string;
 }
 
+function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
+  return (
+    status.verificationStatus === undefined ||
+    status.verificationStatus === 'passed' ||
+    status.verificationStatus === 'skipped'
+  );
+}
+
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
@@ -126,7 +134,7 @@ export function setReviewStatus(
     : (
         merged.reviewStatus === 'passed' &&
         merged.testStatus === 'passed' &&
-        merged.verificationStatus !== 'failed' &&
+        verificationSatisfied(merged) &&
         merged.mergeStatus !== 'merged' &&
         // If UAT has been initiated, it must pass too
         (merged.uatStatus === undefined || merged.uatStatus === 'passed')
@@ -192,7 +200,7 @@ export function setReviewStatus(
   if (
     update.reviewStatus === 'passed' &&
     existing.reviewStatus !== 'passed' &&
-    existing.testStatus === 'pending'
+    updated.testStatus === 'pending'
   ) {
     (async () => {
       try {
@@ -285,7 +293,7 @@ export function clearStuckMergeStatuses(): void {
     const shouldBeReady =
       s.reviewStatus === 'passed' &&
       (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
-      s.verificationStatus !== 'failed' &&
+      verificationSatisfied(s) &&
       (s.uatStatus === undefined || s.uatStatus === 'passed');
     setReviewStatus(s.issueId, {
       mergeStatus: 'pending',
