@@ -19,6 +19,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState } from '../../lib/agents.js';
+import { resumeQueuedMerges } from './services/merge-queue-service.js';
 
 declare const Bun: unknown;
 
@@ -92,6 +93,7 @@ try {
   if (resetCount > 0) {
     console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
   }
+  await resumeQueuedMerges();
 } catch (err: any) {
   console.warn(`[panopticon] Failed to reset merge queue: ${err.message}`);
 }

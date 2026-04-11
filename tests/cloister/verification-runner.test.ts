@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 const {
+  execMock,
   setReviewStatusMock,
   getReviewStatusMock,
   runQualityGatesMock,
@@ -16,6 +17,8 @@ const {
   messageAgentMock,
   findProjectByPathMock,
 } = vi.hoisted(() => ({
+  execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
+    .mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' }),
   setReviewStatusMock: vi.fn(),
   getReviewStatusMock: vi.fn(),
   runQualityGatesMock: vi.fn(),
@@ -23,6 +26,21 @@ const {
   messageAgentMock: vi.fn(),
   findProjectByPathMock: vi.fn(),
 }));
+
+vi.mock('child_process', () => {
+  const kCustom = Symbol.for('nodejs.util.promisify.custom');
+
+  function exec(cmd: string, optionsOrCb: any, maybeCallback?: any) {
+    const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCallback;
+    execMock(cmd, typeof optionsOrCb === 'object' ? optionsOrCb : undefined)
+      .then(({ stdout, stderr }) => callback(null, stdout, stderr))
+      .catch((err: any) => callback(err, err.stdout || '', err.stderr || ''));
+  }
+
+  (exec as any)[kCustom] = execMock;
+
+  return { exec };
+});
 
 vi.mock('../../src/lib/review-status.js', () => ({
   getReviewStatus: getReviewStatusMock,
@@ -80,6 +98,8 @@ function makeFailedResults(failedCheck = 'lint') {
 describe('runVerificationForIssue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' });
     getReviewStatusMock.mockReturnValue(null); // no existing status → 0 cycles
     runQualityGatesMock.mockResolvedValue(makePassedResults());
     writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.planning/feedback/001-verification-failed.md' });
@@ -129,6 +149,36 @@ describe('runVerificationForIssue', () => {
 
       expect(writeFeedbackFileMock).not.toHaveBeenCalled();
       expect(messageAgentMock).not.toHaveBeenCalled();
+    });
+
+    it('syncs the configured target branch before gates by default', async () => {
+      findProjectByPathMock.mockReturnValue({
+        name: 'my-project',
+        path: '/some/path',
+        workspace: { default_branch: 'develop' },
+      });
+
+      await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
+
+      expect(execMock).toHaveBeenCalledWith(
+        'git fetch origin develop',
+        expect.objectContaining({ cwd: workspacePath })
+      );
+      expect(execMock).toHaveBeenCalledWith(
+        'git merge origin/develop --no-edit',
+        expect.objectContaining({ cwd: workspacePath })
+      );
+    });
+
+    it('can verify current state without syncing target branch', async () => {
+      await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test', {
+        syncTargetBranch: false,
+      });
+
+      const commands = execMock.mock.calls.map(call => call[0]);
+      expect(commands).not.toContain('git fetch origin main');
+      expect(commands).not.toContain('git merge origin/main --no-edit');
+      expect(runQualityGatesMock).toHaveBeenCalledOnce();
     });
   });
 

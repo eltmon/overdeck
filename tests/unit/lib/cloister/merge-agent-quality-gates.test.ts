@@ -85,6 +85,34 @@ describe('runProjectQualityGates — polyrepo path filtering', () => {
     expect(results).toEqual(PASSING_GATE_RESULT);
   });
 
+  it('matches gates by configured repo alias in polyrepo context', async () => {
+    mockLoadProjectsConfig.mockReturnValue({
+      projects: {
+        myapp: {
+          name: 'My App',
+          path: PROJECT_PATH,
+          workspace: {
+            repos: [
+              { name: 'fe', path: 'frontend' },
+              { name: 'api', path: 'backend' },
+            ],
+          },
+          quality_gates: {
+            'fe-lint': { command: 'pnpm lint', path: 'fe', required: true },
+            'api-lint': { command: './mvnw checkstyle:check', path: 'api', required: true },
+          },
+        },
+      },
+    } as any);
+
+    const results = await runProjectQualityGates(join(PROJECT_PATH, 'frontend'), 'pre_push');
+
+    expect(mockRunQualityGates).toHaveBeenCalledOnce();
+    const [gatesArg] = mockRunQualityGates.mock.calls[0];
+    expect(Object.keys(gatesArg)).toEqual(['fe-lint']);
+    expect(results).toEqual(PASSING_GATE_RESULT);
+  });
+
   it('skips gates with non-matching path in polyrepo context', async () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {

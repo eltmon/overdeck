@@ -303,9 +303,32 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
 
-    // Step 2: Update agent state to stopped (so it appears in dashboard agents list)
+    // Step 2: Create review artifacts immediately and persist merge-set state.
     const { getAgentState, saveAgentState } = await import('../../../lib/agents.js');
     const existingState = getAgentState(agentId);
+    const workspacePath = existingState?.workspace;
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);
+    }
+
+    spinner.text = 'Creating review artifacts...';
+    const { createReviewArtifactsForIssue } = await import('../../../lib/review-artifacts.js');
+    const { setReviewStatus } = await import('../../../lib/review-status.js');
+    const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
+    const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
+    if (primaryArtifact?.artifactUrl) {
+      setReviewStatus(issueId, { prUrl: primaryArtifact.artifactUrl });
+    }
+
+    const createdArtifacts = artifactResult.artifacts.filter(artifact => !artifact.skipped && artifact.url);
+    if (createdArtifacts.length > 0) {
+      console.log(chalk.green(`  ✓ Created review artifact set (${createdArtifacts.length} repo${createdArtifacts.length === 1 ? '' : 's'})`));
+    } else {
+      console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
+    }
+
+    // Step 3: Update agent state to stopped (so it appears in dashboard agents list)
     if (existingState) {
       existingState.status = 'stopped';
       existingState.lastActivity = new Date().toISOString();
@@ -317,7 +340,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       lastActivity: new Date().toISOString(),
     });
 
-    // Step 3: Write completion marker
+    // Step 4: Write completion marker
     mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
     const completedFile = join(AGENTS_DIR, agentId, 'completed');
     writeFileSync(completedFile, JSON.stringify({

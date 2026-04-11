@@ -9,6 +9,10 @@ export interface RepoConfig {
   name: string;
   /** Path to source repo relative to project root */
   path: string;
+  /** Forge for review artifacts and merge operations. */
+  forge?: 'github' | 'gitlab';
+  /** Legacy alias used in existing config for forge selection. */
+  remote?: string;
   /** Branch prefix for feature branches (default: 'feature/') */
   branch_prefix?: string;
   /** Default branch to create feature branches from (default: 'main') */

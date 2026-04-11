@@ -2079,12 +2079,20 @@ export async function runProjectQualityGates(
     // Detect polyrepo context: if projectPath is a subdirectory of project.path,
     // repoRelPath is non-empty (e.g., 'frontend' or 'backend').
     const repoRelPath = relative(project.path, projectPath);
+    const matchedRepo = project.workspace?.repos?.find(repo => (
+      repoRelPath === repo.path ||
+      projectPath === join(project.path, repo.path)
+    ));
+    const repoIdentifiers = matchedRepo
+      ? new Set([matchedRepo.path, matchedRepo.name])
+      : new Set(repoRelPath && !repoRelPath.startsWith('..') ? [repoRelPath] : []);
 
     let gatesToRun = project.quality_gates;
     if (repoRelPath && !repoRelPath.startsWith('..')) {
-      // Polyrepo: only run gates whose path matches this sub-repo
+      // Polyrepo: gates can target either the repo path ("frontend") or the
+      // configured repo key/alias ("fe"). Both map to the same sub-repo.
       const filtered = Object.entries(project.quality_gates).filter(
-        ([, gate]) => gate.path === repoRelPath
+        ([, gate]) => gate.path && repoIdentifiers.has(gate.path)
       );
       if (filtered.length === 0) {
         console.log(`[merge-agent] No quality gates configured for repo path "${repoRelPath}"`);
@@ -2092,7 +2100,7 @@ export async function runProjectQualityGates(
       }
       gatesToRun = Object.fromEntries(filtered);
       console.log(
-        `[merge-agent] Polyrepo: running ${Object.keys(gatesToRun).length} gate(s) for path "${repoRelPath}"`
+        `[merge-agent] Polyrepo: running ${Object.keys(gatesToRun).length} gate(s) for path "${repoRelPath}" (${[...repoIdentifiers].join(', ')})`
       );
     }
 
