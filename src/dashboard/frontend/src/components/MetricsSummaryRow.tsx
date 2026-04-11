@@ -104,7 +104,6 @@ export function MetricsSummaryRow() {
   const todayEscalations = handoffStats?.todayEscalations ?? 0;
 
   const stuckColor = metrics.today.stuckCount > 0 ? 'text-destructive' : 'text-muted-foreground';
-  const escalationColor = costEscalations > 0 ? 'text-signal-review' : 'text-muted-foreground';
   const queueColor = (specialistStats?.queueDepth ?? 0) > 10 ? 'text-warning' : 'text-muted-foreground';
 
   return (
@@ -142,7 +141,6 @@ export function MetricsSummaryRow() {
         label="Escalations"
         value={todayEscalations}
         subtext="model handoffs today"
-        color="#c084fc"
       />
       <MetricTile
         icon={<Layers className="w-4 h-4" />}
