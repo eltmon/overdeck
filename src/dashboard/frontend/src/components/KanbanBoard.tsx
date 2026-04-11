@@ -30,6 +30,7 @@ import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
+import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
 
 
@@ -967,8 +968,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    onSuccess: async () => {
+      await refreshDashboardState(queryClient);
     },
   });
 
@@ -1292,7 +1293,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             onClick={async () => {
               try {
                 await fetch('/api/trackers/refresh', { method: 'POST' });
-                queryClient.invalidateQueries({ queryKey: ['issues'] });
+                await refreshDashboardState(queryClient);
               } catch (e) {
                 console.error('Refresh failed:', e);
               }
@@ -1541,9 +1542,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           issue={planDialogIssue}
           isOpen={true}
           onClose={() => setPlanDialogIssue(null)}
-          onComplete={() => {
+          onComplete={async () => {
             setPlanDialogIssue(null);
-            queryClient.invalidateQueries({ queryKey: ['issues'] });
+            await refreshDashboardState(queryClient);
           }}
         />
       )}
@@ -2029,8 +2030,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       if (!res.ok) throw new Error('Failed to kill agent');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    onSuccess: async () => {
+      await refreshDashboardState(queryClient);
     },
   });
 
@@ -2100,9 +2101,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    onSuccess: async () => {
+      await refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
       showAlert({ message: `Failed to start agent: ${err.message}`, variant: 'error' });
@@ -2145,13 +2145,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     onSuccess: () => {
       setIsResuming(true);
       resumingTimeoutRef.current = setTimeout(() => setIsResuming(false), 60000);
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
       // If the agent is already running, the store snapshot is just stale — refresh it silently
       if (err.message.includes('runtime=active') || err.message.includes('status=running')) {
         setIsResuming(false);
-        queryClient.invalidateQueries({ queryKey: ['agents'] });
+        refreshDashboardState(queryClient);
         return;
       }
       showAlert({ message: `Failed to resume session: ${err.message}`, variant: 'error' });
@@ -2729,8 +2729,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                 }).then(async () => {
-                  await queryClient.refetchQueries({ queryKey: ['issues'] });
-                  await queryClient.refetchQueries({ queryKey: ['agents'] });
+                  await refreshDashboardState(queryClient);
                 }).catch(err => console.error('Reset failed:', err));
               }
             }}
@@ -2834,8 +2833,7 @@ function ResetPipelineButton({
               const err = await res.json();
               console.error('Pipeline reset failed:', err);
             }
-            await queryClient.refetchQueries({ queryKey: ['issues'] });
-            await queryClient.refetchQueries({ queryKey: ['review-status'] });
+            await refreshDashboardState(queryClient);
           } catch (err) {
             console.error('Pipeline reset error:', err);
           } finally {
@@ -2884,8 +2882,7 @@ function MergeIssueButton({
       return res.json();
     },
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['issues'] });
-      await queryClient.refetchQueries({ queryKey: ['review-status'] });
+      await refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
       showAlert({ message: `Failed to merge: ${err.message}`, variant: 'error' });
@@ -2950,9 +2947,7 @@ function CancelIssueButton({ issue }: { issue: Issue }) {
       return data;
     },
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['issues'] });
-      await queryClient.refetchQueries({ queryKey: ['agents'] });
-      await queryClient.refetchQueries({ queryKey: ['review-status'] });
+      await refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
       showAlert({ message: `Failed to cancel: ${err.message}`, variant: 'error' });
@@ -3002,7 +2997,7 @@ function BacklogButton({ issue }: { issue: Issue }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'backlog' }),
           });
-          await queryClient.refetchQueries({ queryKey: ['issues'] });
+          await refreshDashboardState(queryClient);
         } catch (err) {
           console.error('Move to backlog failed:', err);
         } finally {
@@ -3035,7 +3030,7 @@ function TodoButton({ issue }: { issue: Issue }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'todo' }),
           });
-          await queryClient.refetchQueries({ queryKey: ['issues'] });
+          await refreshDashboardState(queryClient);
         } catch (err) {
           console.error('Move to todo failed:', err);
         } finally {
@@ -3070,7 +3065,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
       return res.json();
     },
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['issues'] });
+      await refreshDashboardState(queryClient);
     },
   });
 
@@ -3128,7 +3123,7 @@ function CloseOutSection({ issue }: { issue: Issue }) {
       return data;
     },
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['issues'] });
+      await refreshDashboardState(queryClient);
     },
   });
 

@@ -29,6 +29,7 @@ import { getFriendlyModelName } from './inspector/utils';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useConfirm } from './DialogProvider';
+import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
@@ -324,9 +325,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
+      await refreshDashboardState(queryClient);
     },
   });
 
@@ -342,11 +343,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
-      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
+      await refreshDashboardState(queryClient);
       onClose();
     },
   });
@@ -364,10 +363,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      await refreshDashboardState(queryClient);
       onClose();
     },
   });
@@ -385,10 +383,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      await refreshDashboardState(queryClient);
     },
   });
 
@@ -405,10 +402,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      await refreshDashboardState(queryClient);
     },
   });
 
