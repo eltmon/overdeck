@@ -3309,45 +3309,97 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
     const prNumber = prMatch[1];
 
-    // Step 2: Rebase feature branch onto main — in-process, no specialist (PAN-632)
+    // Step 2: Tell the WORK AGENT to rebase onto main and push.
+    // The work agent knows the codebase and can resolve conflicts intelligently.
+    // If the agent isn't running, fall back to in-process rebase.
     const { postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
+    const { messageAgent, resumeAgent, getAgentState } = await import('../../../lib/agents.js');
+    const { sessionExists } = await import('../../../lib/tmux.js');
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const agentRunning = sessionExists(agentId);
 
-    console.log(`[merge] Rebasing ${branchName} onto main for ${issueId} (in-process)...`);
-    const rebaseResult = await rebaseFeatureBranch(workspacePath, branchName, 'main', issueId);
+    console.log(`[merge] Rebasing ${branchName} onto main for ${issueId} (agent=${agentRunning ? 'running' : 'stopped'})...`);
+
+    let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
+
+    if (agentRunning) {
+      // Agent is running — tell it to rebase and wait for the push
+      const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto main and push:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
+      await messageAgent(agentId, rebaseMsg);
+      console.log(`[merge] Sent rebase request to work agent ${agentId}`);
+
+      // Poll for the push: check if remote HEAD changed
+      const { stdout: headBefore } = await execAsync(
+        `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+      );
+
+      const REBASE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+      const POLL_INTERVAL_MS = 5000;
+      const startTime = Date.now();
+      let newHead: string | null = null;
+
+      while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+
+        // Check if agent pushed
+        try {
+          await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+          const { stdout: headNow } = await execAsync(
+            `git rev-parse origin/${branchName}`,
+            { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+          );
+          if (headNow.trim() !== headBefore.trim()) {
+            newHead = headNow.trim();
+            console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
+            break;
+          }
+        } catch { /* fetch failed, retry */ }
+
+        // Check if agent is still alive
+        if (!sessionExists(agentId)) {
+          console.log(`[merge] Work agent ${agentId} died during rebase — falling back to in-process`);
+          break;
+        }
+      }
+
+      if (newHead) {
+        rebaseResult = { success: true, newHead };
+      } else if (!sessionExists(agentId)) {
+        // Agent died — fall back to in-process rebase
+        console.log(`[merge] Falling back to in-process rebase for ${issueId}`);
+        rebaseResult = await rebaseFeatureBranch(workspacePath, branchName, 'main', issueId);
+      } else {
+        // Timed out
+        rebaseResult = { success: false, reason: `Work agent did not push within ${REBASE_TIMEOUT_MS / 60000} minutes` };
+      }
+    } else {
+      // Agent not running — use in-process rebase as fallback
+      console.log(`[merge] Work agent not running — using in-process rebase for ${issueId}`);
+      rebaseResult = await rebaseFeatureBranch(workspacePath, branchName, 'main', issueId);
+    }
 
     if (!rebaseResult.success) {
       const error = rebaseResult.reason || 'Rebase failed';
       setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
       completePendingOperation(issueId, error);
 
-      // Notify work agent about conflicts
-      if (rebaseResult.conflictFiles?.length) {
-        try {
-          const { messageAgent } = await import('../../../lib/agents.js');
-          const { sessionExists } = await import('../../../lib/tmux.js');
-          const agentId = `agent-${issueId.toLowerCase()}`;
-          if (sessionExists(agentId)) {
-            await messageAgent(agentId,
-              `MERGE CONFLICT: Rebase onto main failed.\n\nConflict files: ${rebaseResult.conflictFiles.join(', ')}\n\nPlease resolve:\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve conflicts\n4. git push --force-with-lease\n5. Resubmit for review`
-            );
-            console.log(`[merge] Sent conflict details to ${agentId}`);
-          }
-        } catch { /* non-fatal */ }
-
-        // Post PR comment
-        try {
-          const prMatch2 = prResult.prUrl?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
-          if (prMatch2) {
-            const [, owner, repo, prNum] = prMatch2;
-            await execAsync(
-              `gh api repos/${owner}/${repo}/issues/${prNum}/comments -f body=${JSON.stringify(`## Merge Failed — Rebase Conflicts\n\nConflicts in: ${rebaseResult.conflictFiles.join(', ')}\n\nThe work agent has been notified to resolve conflicts and resubmit.`)}`,
-              { encoding: 'utf-8' }
-            );
-          }
-        } catch { /* non-fatal */ }
-      }
+      // Post PR comment about failure
+      try {
+        const prMatch2 = prResult.prUrl?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+        if (prMatch2) {
+          const [, owner, repo, prNum] = prMatch2;
+          const body = rebaseResult.conflictFiles?.length
+            ? `## Merge Failed — Rebase Conflicts\n\nConflicts in: ${rebaseResult.conflictFiles.join(', ')}\n\nThe work agent has been notified to resolve conflicts.`
+            : `## Merge Failed\n\n${error}`;
+          await execAsync(
+            `gh api repos/${owner}/${repo}/issues/${prNum}/comments -f body=${JSON.stringify(body)}`,
+            { encoding: 'utf-8' }
+          );
+        }
+      } catch { /* non-fatal */ }
 
       return { success: false, statusCode: 500, error };
     }
