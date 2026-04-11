@@ -154,6 +154,24 @@ export function applyReviewStateToIssue(
   };
 }
 
+export function shouldShowReviewReadyBadge(
+  issue: Issue,
+  reviewStatus?: Pick<ReviewStatusSnapshot, 'readyForMerge' | 'mergeStatus'>,
+): boolean {
+  const canonical = STATUS_LABELS[issue.status] || 'backlog';
+  const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
+  const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
+  if (isTerminal) return false;
+
+  if (reviewStatus) {
+    return reviewStatus.readyForMerge === true;
+  }
+
+  return issue.labels?.some(
+    (label) => typeof label === 'string' && label.toLowerCase() === 'review ready'
+  ) ?? false;
+}
+
 export function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
   const grouped: Record<string, Issue[]> = {
     backlog: [],
@@ -1960,9 +1978,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
-  const isReviewReady = !isTerminal && (issue.labels?.some(
-    (label) => typeof label === 'string' && label.toLowerCase() === 'review ready'
-  ) ?? false);
+  const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
 
   const priorityColors: Record<number, string> = {
     0: 'border-l-border',         // no priority — neutral
