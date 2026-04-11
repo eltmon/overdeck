@@ -160,7 +160,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: 
 
           <Panel id="terminal" minSize="30%">
             <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-              <TerminalPanel agent={agent} onClose={closeTerminal} />
+              <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
             </div>
           </Panel>
         </Group>
