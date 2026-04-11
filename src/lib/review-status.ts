@@ -271,10 +271,13 @@ export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE)
  */
 export function clearStuckMergeStatuses(): void {
   const statuses = loadReviewStatuses();
-  const stuck = Object.values(statuses).filter(s => s.mergeStatus === 'merging');
+  const stuck = Object.values(statuses).filter(s =>
+    s.mergeStatus === 'merging' || s.mergeStatus === 'verifying' || s.mergeStatus === 'queued'
+  );
   if (stuck.length === 0) return;
-  console.log(`[review-status] Clearing ${stuck.length} stuck 'merging' status(es) on startup`);
+  console.log(`[review-status] Clearing ${stuck.length} stuck merge status(es) on startup (merging/verifying/queued)`);
   for (const s of stuck) {
+    // Reset to pending so MERGE button reappears — the in-memory queue was lost on restart
     setReviewStatus(s.issueId, { mergeStatus: 'pending' });
   }
 }
