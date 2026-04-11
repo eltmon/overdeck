@@ -742,11 +742,9 @@ ${basePrompt}`;
 
     // Deterministic session ID: same specialist + project + generation gets the same UUID.
     // Bumping the generation (via API) rotates to a fresh session without deleting old JONLs.
-    // --resume is always the default (session exists from prior runs).
-    // On very first cold start, --resume fails and the launcher falls back to --session-id.
-    const gen = getSessionGeneration(specialistType, projectKey);
-    const sessionName = `specialist-${projectKey}-${specialistType}-gen${gen}`;
-    const sessionId = deterministicUUID(sessionName);
+    // Fresh session every dispatch (PAN-612/PAN-632): deterministic UUIDs collide
+    // with --session-id when a prior session exists. randomUUID avoids collisions.
+    const sessionId = randomUUID();
 
     // Write session file for informational purposes (pan specialists list)
     setSessionId(specialistType, sessionId, projectKey);
