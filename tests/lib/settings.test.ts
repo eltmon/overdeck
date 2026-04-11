@@ -411,6 +411,7 @@ describe('settings', () => {
 
       expect(available.openai).toEqual([]);
       expect(available.google).toEqual([]);
+      expect(available.zai).toEqual([]);
       expect(available.kimi).toEqual([]);
     });
 
@@ -441,7 +442,20 @@ describe('settings', () => {
       expect(available.google).toEqual([
         'gemini-3-pro-preview',
         'gemini-3-flash-preview',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
       ]);
+    });
+
+    it('should return Z.AI models when API key is configured', async () => {
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
+
+      const settings = getDefaultSettings();
+      settings.api_keys.zai = 'zai-test-key';
+
+      const available = getAvailableModels(settings);
+
+      expect(available.zai).toEqual(['glm-4.7', 'glm-4.7-flash']);
     });
 
     it('should return Kimi models when API key is configured', async () => {
@@ -461,12 +475,14 @@ describe('settings', () => {
       const settings = getDefaultSettings();
       settings.api_keys.openai = 'sk-test-key';
       settings.api_keys.google = 'AIza-test-key';
+      settings.api_keys.zai = 'zai-test-key';
 
       const available = getAvailableModels(settings);
 
       expect(available.anthropic.length).toBeGreaterThan(0);
       expect(available.openai.length).toBeGreaterThan(0);
       expect(available.google.length).toBeGreaterThan(0);
+      expect(available.zai.length).toBeGreaterThan(0);
     });
   });
 });

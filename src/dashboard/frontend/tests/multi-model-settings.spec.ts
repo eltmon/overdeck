@@ -45,6 +45,7 @@ interface SettingsConfig {
   api_keys: {
     openai?: string;
     google?: string;
+    zai?: string;
   };
 }
 
@@ -100,7 +101,7 @@ test.describe('Multi-Model Settings', () => {
     await page.waitForTimeout(1000); // Wait for models to refresh
     console.log('  ✓ API key saved, OpenAI models now available');
 
-    // 5. Configure review agent to use gpt-5.4
+    // 5. Configure review agent to use gpt-4o
     console.log('\n[5/6] Configuring review agent model...');
 
     // Find the review agent dropdown (should be in Specialist Models section)
@@ -117,8 +118,8 @@ test.describe('Multi-Model Settings', () => {
     const currentValue = await reviewAgentSelect.inputValue();
     console.log(`  Current review agent model: ${currentValue}`);
 
-    // Select gpt-5.4 (if not already selected, choose something different)
-    const targetModel = currentValue === 'gpt-5.4' ? 'claude-sonnet-4-6' : 'gpt-5.4';
+    // Select gpt-4o (if not already selected, choose something different)
+    const targetModel = currentValue === 'gpt-4o' ? 'claude-sonnet-4-5' : 'gpt-4o';
     await reviewAgentSelect.selectOption(targetModel);
 
     console.log(`  ✓ Model changed to: ${targetModel}`);

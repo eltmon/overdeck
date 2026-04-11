@@ -54,8 +54,8 @@ export interface YamlConfig {
       anthropic?: ProviderConfig | boolean;
       openai?: ProviderConfig | boolean;
       google?: ProviderConfig | boolean;
+      zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
-      minimax?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
     };
 
@@ -76,9 +76,8 @@ export interface YamlConfig {
   api_keys?: {
     openai?: string;
     google?: string;
+    zai?: string;
     kimi?: string;
-    minimax?: string;
-    openrouter?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -130,8 +129,8 @@ export interface NormalizedConfig {
   apiKeys: {
     openai?: string;
     google?: string;
+    zai?: string;
     kimi?: string;
-    minimax?: string;
     openrouter?: string;
   };
 
@@ -369,11 +368,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       const providers = config.models.providers;
       const legacyKeys = config.api_keys || {};
 
-      // Anthropic
-      const anthropic = normalizeProviderConfig(providers.anthropic);
-      if (anthropic.enabled) {
-        result.enabledProviders.add('anthropic');
-      }
+      // Anthropic (always enabled)
+      result.enabledProviders.add('anthropic');
 
       // OpenAI
       const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
@@ -393,21 +389,21 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
         }
       }
 
+      // Z.AI
+      const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+      if (zai.enabled) {
+        result.enabledProviders.add('zai');
+        if (zai.api_key) {
+          result.apiKeys.zai = resolveEnvVar(zai.api_key);
+        }
+      }
+
       // Kimi
       const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
       if (kimi.enabled) {
         result.enabledProviders.add('kimi');
         if (kimi.api_key) {
           result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
-        }
-      }
-
-      // MiniMax
-      const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
-      if (minimax.enabled) {
-        result.enabledProviders.add('minimax');
-        if (minimax.api_key) {
-          result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
         }
       }
 
@@ -427,29 +423,22 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
     }
 
     // Merge legacy API keys (for backward compatibility)
-    // If a `models.providers` section exists, the enabled state is already set above — don't
-    // override it here. Only auto-enable from API keys when there's no explicit providers config.
     if (config.api_keys) {
-      const hasProvidersConfig = !!config.models?.providers;
       if (config.api_keys.openai) {
         result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
-        if (!hasProvidersConfig) result.enabledProviders.add('openai');
+        result.enabledProviders.add('openai');
       }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
-        if (!hasProvidersConfig) result.enabledProviders.add('google');
+        result.enabledProviders.add('google');
+      }
+      if (config.api_keys.zai) {
+        result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
+        result.enabledProviders.add('zai');
       }
       if (config.api_keys.kimi) {
         result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
-        if (!hasProvidersConfig) result.enabledProviders.add('kimi');
-      }
-      if (config.api_keys.minimax) {
-        result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
-        if (!hasProvidersConfig) result.enabledProviders.add('minimax');
-      }
-      if (config.api_keys.openrouter) {
-        result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
-        if (!hasProvidersConfig) result.enabledProviders.add('openrouter');
+        result.enabledProviders.add('kimi');
       }
     }
 
@@ -613,6 +602,10 @@ export function loadConfig(): ConfigLoadResult {
   if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;
     config.enabledProviders.add('google');
+  }
+  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
+    config.apiKeys.zai = process.env.ZAI_API_KEY;
+    config.enabledProviders.add('zai');
   }
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;

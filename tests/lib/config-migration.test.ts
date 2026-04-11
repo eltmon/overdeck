@@ -197,6 +197,7 @@ describe('config-migration', () => {
         api_keys: {
           openai: 'sk-test-123',
           google: 'AIza-test-456',
+          zai: 'zai-test-789',
         },
       };
 
@@ -205,6 +206,7 @@ describe('config-migration', () => {
       expect(yamlConfig.api_keys).toEqual({
         openai: 'sk-test-123',
         google: 'AIza-test-456',
+        zai: 'zai-test-789',
       });
     });
   });
