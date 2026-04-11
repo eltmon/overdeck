@@ -6,9 +6,11 @@
  */
 
 import type Database from 'better-sqlite3';
+import { existsSync } from 'fs';
+import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 /**
  * Initialize the complete database schema.
@@ -482,6 +484,42 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
         ON merge_set_repos(issue_id, merge_order, repo_key);
     `);
+  }
+
+  // v15 → v16: fix stale session_file paths with old CWD encoding (PAN-594)
+  if (currentVersion < 16) {
+    const conversations = db
+      .prepare(
+        `SELECT id, cwd, session_file FROM conversations WHERE session_file IS NOT NULL`
+      )
+      .all() as Array<{ id: number; cwd: string; session_file: string }>;
+
+    for (const conversation of conversations) {
+      const match = conversation.session_file.match(
+        /^(.*[/\\]\.claude[/\\]projects[/\\])([^/\\]+)([/\\]sessions[/\\][^/\\]+\.jsonl)$/
+      );
+
+      if (!match) {
+        continue;
+      }
+
+      const [, prefix, encodedSegment, suffix] = match;
+      const expectedSegment = encodeClaudeProjectDir(conversation.cwd);
+
+      if (encodedSegment === expectedSegment) {
+        continue;
+      }
+
+      const correctedPath = `${prefix}${expectedSegment}${suffix}`;
+      if (!existsSync(correctedPath)) {
+        continue;
+      }
+
+      db.prepare(`UPDATE conversations SET session_file = ? WHERE id = ?`).run(
+        correctedPath,
+        conversation.id
+      );
+    }
   }
 
   // After all migrations, set the version
