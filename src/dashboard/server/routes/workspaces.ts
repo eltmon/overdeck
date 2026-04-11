@@ -2156,14 +2156,10 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       }
 
       if (testStatus === 'passed') {
-        // Mark ready for merge when tests pass — but only if verification also passed.
-        const currentStatus = getReviewStatus(issueId);
-        if (currentStatus?.verificationStatus === 'failed') {
-          console.log(`[review-status] ${issueId} tests passed but verification failed — NOT marking ready for merge`);
-        } else {
-          setReviewStatus(issueId, { readyForMerge: true });
-          console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
-        }
+        // Mark ready for merge when tests pass. Post-rebase verification in
+        // triggerMerge() is the real quality gate — don't block on stale pre-merge verification.
+        setReviewStatus(issueId, { readyForMerge: true });
+        console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
 
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.test-completed',
