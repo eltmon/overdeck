@@ -374,12 +374,23 @@ const getAgentsRoute = HttpRouter.add(
               const isStopped = state.status === 'stopped' || hasCompletedMarker ||
                 (runtimeIdle && state.status !== 'starting');
               if (!isStopped) continue;
-              const lastActivity = runtimeData.lastActivity || state.lastActivity;
-              const stoppedAt = lastActivity ? new Date(lastActivity) : null;
-              if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000) continue;
               const isPlanning = dir.startsWith('planning-');
               const issueId = state.issueId?.toUpperCase() ||
                 (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+              const lastActivity = runtimeData.lastActivity || state.lastActivity;
+              const stoppedAt = lastActivity ? new Date(lastActivity) : null;
+              const reviewStatus = getReviewStatus(issueId);
+              const keepStoppedAgentVisible =
+                !!reviewStatus &&
+                reviewStatus.mergeStatus !== 'merged' &&
+                (
+                  !!reviewStatus.prUrl ||
+                  reviewStatus.readyForMerge === true ||
+                  reviewStatus.reviewStatus !== 'pending' ||
+                  reviewStatus.testStatus !== 'pending' ||
+                  reviewStatus.mergeStatus === 'failed'
+                );
+              if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
               stoppedAgents.push({
                 id: dir,
                 issueId,

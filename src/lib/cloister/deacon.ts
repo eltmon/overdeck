@@ -1192,6 +1192,21 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
     let modified = false;
 
+    const latestHistoryEntry = (
+      history: Array<{ type: string; status: string; notes?: string }> | undefined,
+      type: 'review' | 'test',
+      terminalStatuses: readonly string[],
+    ): { status: string; notes?: string } | null => {
+      if (!history || history.length === 0) return null;
+      for (let i = history.length - 1; i >= 0; i--) {
+        const entry = history[i];
+        if (entry.type === type && terminalStatuses.includes(entry.status)) {
+          return { status: entry.status, notes: entry.notes };
+        }
+      }
+      return null;
+    };
+
     for (const [issueId, status] of Object.entries(statuses)) {
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
@@ -1206,16 +1221,44 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       const hasPassedTest = status.history?.some(
         (h) => h.type === 'test' && h.status === 'passed'
       );
+      const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
+      const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
       // Check for orphaned reviewing status — no specialist (global or per-project) is actively reviewing this issue
       const reviewAgentActive = activeReviewSessions.has(issueId.toUpperCase());
-      if (status.reviewStatus === 'reviewing' && !reviewAgentActive && !hasPassedReview) {
-        console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but no review-agent is working on it`);
-        // Use setReviewStatus (not direct JSON write) so SQLite is updated too
-        setReviewStatus(issueId, { reviewStatus: 'pending' });
-        status.reviewStatus = 'pending';
-        modified = true;
-        actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
+      if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
+        if (latestTerminalReview) {
+          const reviewUpdate: Record<string, unknown> = {
+            reviewStatus: latestTerminalReview.status,
+            reviewNotes: latestTerminalReview.notes,
+          };
+          if (latestTerminalTest) {
+            reviewUpdate['testStatus'] = latestTerminalTest.status;
+            reviewUpdate['testNotes'] = latestTerminalTest.notes;
+          }
+          if (status.mergeStatus === 'failed') {
+            reviewUpdate['mergeStatus'] = 'pending';
+          }
+          setReviewStatus(issueId, reviewUpdate as Parameters<typeof setReviewStatus>[1]);
+          status.reviewStatus = latestTerminalReview.status;
+          if (latestTerminalTest) {
+            status.testStatus = latestTerminalTest.status;
+          }
+          modified = true;
+          actions.push(
+            `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
+            (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
+          );
+          continue;
+        }
+        if (!hasPassedReview) {
+          console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but no review-agent is working on it`);
+          // Use setReviewStatus (not direct JSON write) so SQLite is updated too
+          setReviewStatus(issueId, { reviewStatus: 'pending' });
+          status.reviewStatus = 'pending';
+          modified = true;
+          actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
+        }
       }
 
       // Re-dispatch pending reviews that should be in the pipeline.

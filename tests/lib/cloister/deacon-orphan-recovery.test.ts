@@ -262,4 +262,33 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     const content = readStatusFile();
     expect(content[ISSUE_ID].testStatus).toBe('pending');
   });
+
+  it('restores passed review/test state when top-level status is stuck in reviewing', async () => {
+    writeStatusFile({
+      [ISSUE_ID]: {
+        reviewStatus: 'reviewing',
+        testStatus: 'pending',
+        verificationStatus: 'passed',
+        mergeStatus: 'failed',
+        readyForMerge: false,
+        history: [
+          { type: 'review', status: 'passed', timestamp: new Date().toISOString(), notes: 'Previously reviewed' },
+          { type: 'test', status: 'passed', timestamp: new Date().toISOString(), notes: 'Previously tested' },
+        ],
+      },
+    });
+
+    mockCheckSpecialistQueue.mockReturnValue({ items: [], hasWork: false });
+    mockGetAgentState.mockReturnValue(null);
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Restored orphaned review snapshot/);
+
+    const content = readStatusFile();
+    expect(content[ISSUE_ID].reviewStatus).toBe('passed');
+    expect(content[ISSUE_ID].testStatus).toBe('passed');
+    expect(content[ISSUE_ID].readyForMerge).toBeTypeOf('boolean');
+  });
 });

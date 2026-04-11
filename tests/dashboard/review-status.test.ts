@@ -169,6 +169,16 @@ describe('setReviewStatus', () => {
 
     expect(result.readyForMerge).toBe(false);
   });
+
+  it('does not set readyForMerge when verification is still pending', () => {
+    const result = setReviewStatus('PAN-113b', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'pending',
+    }, statusFile);
+
+    expect(result.readyForMerge).toBe(false);
+  });
 });
 
 describe('getReviewStatus', () => {
