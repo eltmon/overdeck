@@ -870,6 +870,8 @@ const IPC = {
 	GET_WS_URL: "pan:get-ws-url",
 	PICK_FOLDER: "pan:pick-folder",
 	OPEN_EXTERNAL: "pan:open-external",
+	OPEN_TERMINAL_WINDOW: "pan:open-terminal-window",
+	SET_ALWAYS_ON_TOP: "pan:set-always-on-top",
 	MENU_ACTION: "pan:menu-action",
 	GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
 	UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
@@ -884,6 +886,7 @@ let serverPort = 0;
 let serverUrl = "";
 let serverWsUrl = "";
 let isQuitting = false;
+const terminalWindows = /* @__PURE__ */ new Map();
 function resolveResourcePath(fileName) {
 	const candidates = [
 		node_path.join(__dirname, "../resources", fileName),
@@ -905,6 +908,23 @@ function resolveServerStaticDir() {
 function resolveWindowUrl() {
 	if (isDevelopment) return process.env.VITE_DEV_SERVER_URL;
 	return `${DESKTOP_SCHEME}://app/index.html`;
+}
+function createTerminalWindow(sessionName, title) {
+	const win = new electron.BrowserWindow({
+		width: 900,
+		height: 650,
+		title,
+		webPreferences: {
+			preload: node_path.join(__dirname, "preload.js"),
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: false
+		},
+		show: false
+	});
+	win.once("ready-to-show", () => win.show());
+	win.loadURL(`${resolveWindowUrl()}?terminal=${encodeURIComponent(sessionName)}&title=${encodeURIComponent(title)}`);
+	return win;
 }
 function registerIpcHandlers() {
 	electron.ipcMain.on(IPC.GET_SERVER_URL, (event) => {
@@ -930,6 +950,22 @@ function registerIpcHandlers() {
 		await electron.shell.openExternal(parsed.toString());
 	});
 	electron.ipcMain.handle(IPC.GET_DESKTOP_SETTINGS, () => getDesktopSettings());
+	electron.ipcMain.on(IPC.OPEN_TERMINAL_WINDOW, (_event, sessionName, title) => {
+		if (typeof sessionName !== "string" || typeof title !== "string") return;
+		const existing = terminalWindows.get(sessionName);
+		if (existing && !existing.isDestroyed()) {
+			if (!existing.isVisible()) existing.show();
+			existing.focus();
+			return;
+		}
+		const win = createTerminalWindow(sessionName, title);
+		terminalWindows.set(sessionName, win);
+		win.on("closed", () => terminalWindows.delete(sessionName));
+	});
+	electron.ipcMain.on(IPC.SET_ALWAYS_ON_TOP, (_event, value) => {
+		const focused = electron.BrowserWindow.getFocusedWindow();
+		if (focused) focused.setAlwaysOnTop(value === true);
+	});
 	electron.ipcMain.handle(IPC.UPDATE_DESKTOP_SETTING, (_event, key, value) => {
 		if (typeof key !== "string") return;
 		if (updateDesktopSetting(key, value) && key === "autoStart.enabled") electron.app.setLoginItemSettings({ openAtLogin: value === true });
