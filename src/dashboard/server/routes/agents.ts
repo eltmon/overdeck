@@ -1406,14 +1406,14 @@ const postAgentsRoute = HttpRouter.add(
         agentModel = getModelId(`issue-agent:${phase}` as any);
       } catch { /* fall back to state model */ }
       const providerExports = getProviderExportsForModel(agentModel);
-      const resumeContent = `#!/bin/bash\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
+      const resumeContent = `#!/bin/bash\nexport CI=1\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
       yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
 
       // Spawn tmux session with fresh claude session
       const escapedCwd = workspacePath.replace(/"/g, '\\"');
       const providerFlags = getProviderTmuxFlags(agentModel);
       yield* Effect.promise(() => execAsync(
-        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
+        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e CI=1 -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
         { encoding: 'utf-8' }
       ));
 

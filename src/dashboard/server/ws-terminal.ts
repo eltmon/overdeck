@@ -21,9 +21,41 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
-import { activePtyHubs, broadcastToHub, removeClientFromHub, type PtyHub } from './pty-hub.js';
+import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 
 const execAsync = promisify(exec);
+
+type ClientControlMessage =
+  | { type: 'attach'; cols: number; rows: number }
+  | { type: 'ready' }
+  | { type: 'resize'; cols: number; rows: number };
+
+function parseControlMessage(message: string): ClientControlMessage | null {
+  if (!message.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(message) as ClientControlMessage;
+    if (parsed.type === 'ready') return parsed;
+    if ((parsed.type === 'attach' || parsed.type === 'resize') && parsed.cols > 0 && parsed.rows > 0) {
+      return parsed;
+    }
+  } catch {
+    // Ignore invalid JSON; caller treats it as terminal input.
+  }
+  return null;
+}
+
+function sendControl(ws: WebSocket, payload: unknown): void {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(`\u0000${JSON.stringify(payload)}`);
+  }
+}
+
+async function captureSnapshot(sessionName: string, cols: number, rows: number): Promise<string> {
+  const escapedTarget = JSON.stringify(sessionName);
+  await execAsync(`tmux resize-window -t ${escapedTarget} -x ${cols} -y ${rows} 2>/dev/null || true`);
+  const { stdout } = await execAsync(`tmux capture-pane -p -e -S -5000 -t ${escapedTarget}`);
+  return stdout;
+}
 
 /**
  * Install the raw WebSocket terminal handler on the given HTTP server.
@@ -78,6 +110,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     // operations (tmux checks) that take time. Without buffering, messages are lost.
     const earlyMessages: string[] = [];
     let messageHandler: ((data: string) => void) | null = null;
+    let resolvePendingAttach: ((attach: Extract<ClientControlMessage, { type: 'attach' }> | null) => void) | null = null;
 
     ws.on('message', (data) => {
       const message = data.toString();
@@ -89,9 +122,15 @@ export function setupTerminalWebSocket(server: http.Server): void {
       }
     });
 
+    ws.on('close', () => {
+      if (resolvePendingAttach) {
+        resolvePendingAttach(null);
+        resolvePendingAttach = null;
+      }
+    });
+
     // Check if tmux session exists and set up PTY (async)
     (async () => {
-      // Check if tmux session exists
       try {
         const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""');
         const sessions = stdout.trim().split('\n').filter(Boolean);
@@ -104,76 +143,96 @@ export function setupTerminalWebSocket(server: http.Server): void {
         return;
       }
 
-      // ── Hub attachment ──────────────────────────────────────────────────────
-      // If a hub already exists for this session, join it instead of spawning
-      // a new PTY. The existing PTY keeps running; we just add this WebSocket
-      // to its client set and force a repaint so this tab gets the current screen.
+      let attachMessage: Extract<ClientControlMessage, { type: 'attach' }> | null = null;
+      const attachPromise = new Promise<Extract<ClientControlMessage, { type: 'attach' }> | null>((resolve) => {
+        resolvePendingAttach = resolve;
+      });
+      const remainingMessages: string[] = [];
+      for (const msg of earlyMessages) {
+        const parsed = parseControlMessage(msg);
+        if (!attachMessage && parsed?.type === 'attach') {
+          attachMessage = parsed;
+        } else {
+          remainingMessages.push(msg);
+        }
+      }
+      earlyMessages.length = 0;
+
+      const handlePreAttachMessage = (message: string) => {
+        const parsed = parseControlMessage(message);
+        if (!attachMessage && parsed?.type === 'attach') {
+          attachMessage = parsed;
+          resolvePendingAttach?.(parsed);
+          resolvePendingAttach = null;
+          return;
+        }
+        remainingMessages.push(message);
+      };
+
+      messageHandler = handlePreAttachMessage;
+      if (!attachMessage) {
+        attachMessage = await attachPromise;
+      }
+      if (!attachMessage) {
+        return;
+      }
+
       const existingHub = activePtyHubs.get(sessionName);
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
-        existingHub.clients.add(ws);
-        // Most recently connected client takes over as input client
+        addClientToHub(existingHub, ws, false);
         existingHub.inputClient = ws;
-        // Brief blackout for rejoining clients — suppresses the scrollback burst
-        // that tmux dumps when the SIGWINCH repaint fires. The repaint fires after
-        // the blackout so the client receives only the clean current viewport.
-        const BLACKOUT_MS = 200;
-        existingHub.clientBlackout.set(ws, Date.now() + BLACKOUT_MS);
 
-        // Force tmux to repaint so the joining client gets the current terminal state.
-        // Do NOT use dimension toggle (cols-1 → cols) — that dumps stale scrollback
-        // content including spinner characters that appear as dots. Use refresh-client
-        // instead, which repaints without changing dimensions or dumping history.
-        setTimeout(() => {
-          if (existingHub.clients.has(ws) && ws.readyState === WebSocket.OPEN) {
-            execAsync(`tmux refresh-client -t ${sessionName} 2>/dev/null || true`).catch(() => {});
-          }
-        }, BLACKOUT_MS + 50);
+        const snapshot = await captureSnapshot(sessionName, existingHub.cols, existingHub.rows);
+        sendControl(ws, { type: 'snapshot', cols: existingHub.cols, rows: existingHub.rows, data: snapshot });
 
         const handleJoinMessage = (message: string) => {
-          if (message.startsWith('{')) {
-            try {
-              const parsed = JSON.parse(message);
-              if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-                // Only the input client (most recently connected) can resize the PTY.
-                // Other clients must fit to the PTY's current size — otherwise multiple
-                // browser windows/tabs at different sizes would fight over the PTY dimensions,
-                // causing text cutoff for one viewer.
-                if (existingHub.inputClient === ws) {
-                  existingHub.cols = parsed.cols;
-                  existingHub.rows = parsed.rows;
-                  try {
-                    existingHub.pty.resize(parsed.cols, parsed.rows);
-                  } catch { /* ignore */ }
-                  execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
-                    .catch(() => {});
-                }
-                return;
-              }
-            } catch {
-              // Invalid JSON, treat as terminal input
-            }
+          const parsed = parseControlMessage(message);
+          if (parsed?.type === 'ready') {
+            setClientReady(existingHub, ws);
+            return;
           }
-          // Only the active input client forwards keystrokes to the PTY.
-          // This prevents double-echo when multiple browser tabs have the same terminal open.
+          if (parsed?.type === 'resize') {
+            if (existingHub.inputClient !== ws) {
+              sendControl(ws, { type: 'size', cols: existingHub.cols, rows: existingHub.rows });
+              return;
+            }
+            if (parsed.cols === existingHub.cols && parsed.rows === existingHub.rows) return;
+            existingHub.cols = parsed.cols;
+            existingHub.rows = parsed.rows;
+            try {
+              existingHub.pty.resize(parsed.cols, parsed.rows);
+            } catch {
+              return;
+            }
+            execAsync(`tmux resize-window -t ${JSON.stringify(sessionName)} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+              .catch(() => {});
+            for (const client of existingHub.clients) {
+              sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });
+            }
+            return;
+          }
+          if (parsed?.type === 'attach') {
+            return;
+          }
           if (existingHub.inputClient !== ws) return;
           try {
             existingHub.pty.write(message);
-          } catch { /* ignore */ }
+          } catch {
+            // Ignore PTY write races on disconnect.
+          }
         };
 
         messageHandler = handleJoinMessage;
-        for (const msg of earlyMessages) {
+        for (const msg of remainingMessages) {
           handleJoinMessage(msg);
         }
-        earlyMessages.length = 0;
 
         ws.on('close', () => {
           console.log(`[ws-terminal] WebSocket closed for session: ${sessionName} (hub client removed)`);
           const lastClient = removeClientFromHub(activePtyHubs, sessionName, ws);
           if (lastClient) {
             console.log(`[ws-terminal] Last client disconnected for ${sessionName}, tearing down hub`);
-            // PTY (tmux attach) exits naturally when pipes close — no kill needed.
           }
         });
 
@@ -182,40 +241,28 @@ export function setupTerminalWebSocket(server: http.Server): void {
           removeClientFromHub(activePtyHubs, sessionName, ws);
         });
 
-        return; // Done — joined existing hub
+        return;
       }
 
-      // ── New hub creation ────────────────────────────────────────────────────
-      // Pre-resize tmux window to reasonable default before PTY attach
-      try {
-        await execAsync(`tmux resize-window -t ${sessionName} -x 120 -y 29 2>/dev/null || true`, { timeout: 5000 });
-      } catch {
-        console.log(`[ws-terminal] Initial resize failed for ${sessionName}`);
-      }
-
+      const requestedCols = attachMessage.cols;
+      const requestedRows = attachMessage.rows;
       let ptyProcess: pty.IPty | null = null;
       let ptyStarted = false;
-      let lastResizeCols = 0;
-      let lastResizeRows = 0;
       const pendingInput: string[] = [];
 
       const hub: PtyHub = {
-        pty: null as unknown as pty.IPty, // filled in startLocalPty
-        clients: new Set([ws]),
-        cols: 120,
-        rows: 29,
-        inputClient: ws, // first client is the initial input client
-        clientBlackout: new Map(), // Unused — flash handled client-side via opacity hide
+        pty: null as unknown as pty.IPty,
+        clients: new Set(),
+        cols: requestedCols,
+        rows: requestedRows,
+        inputClient: ws,
+        clientStates: new Map(),
       };
 
-      const startLocalPty = async (cols: number, rows: number) => {
-        if (ptyStarted) return;
+      addClientToHub(hub, ws, false);
 
-        // Check if the tmux session exists before spawning the PTY.
-        // If we spawn without checking, tmux prints "can't find session" to the PTY,
-        // that error text is relayed to the client as a WebSocket message, which
-        // confuses the client's reconnect counter (it looks like real terminal data).
-        // Close cleanly with no data so the client just sees ws.onclose.
+      const startLocalPty = async () => {
+        if (ptyStarted) return;
         try {
           await execAsync(`tmux has-session -t ${JSON.stringify(sessionName)}`);
         } catch {
@@ -225,19 +272,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
         }
 
         ptyStarted = true;
-        lastResizeCols = cols;
-        lastResizeRows = rows;
-        hub.cols = cols;
-        hub.rows = rows;
-
-        console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${cols}x${rows}`);
-
-        // Spawn PTY at client's exact dimensions. The PTY attachment causes tmux
-        // to resize its window (window-size=latest), which sends SIGWINCH to Claude.
+        console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${hub.cols}x${hub.rows}`);
         ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
           name: 'xterm-256color',
-          cols,
-          rows,
+          cols: hub.cols,
+          rows: hub.rows,
           cwd: homedir(),
           env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
         });
@@ -245,29 +284,10 @@ export function setupTerminalWebSocket(server: http.Server): void {
         hub.pty = ptyProcess;
         activePtyHubs.set(sessionName, hub);
 
-        // Forward ALL PTY data to clients immediately — no server-side suppression.
-        // The initial tmux dump populates xterm.js's scrollback buffer, which is needed
-        // for mousewheel scrolling. The client handles visual flash by hiding the terminal
-        // element briefly (opacity: 0) until the repaint settles.
         ptyProcess.onData((data) => {
           broadcastToHub(hub, data);
         });
 
-        // PTY spawns at client's exact dimensions (cols, rows above).
-        // The tmux attach itself triggers a proper resize via window-size=latest.
-        // Do NOT force SIGWINCH via dimension toggle — the async resize/repaint
-        // races with the client's opacity reveal and causes text bleeding/corruption.
-        // (Original fix: 2282e695, Feb 3 2026. Regression: April 2026 dimension toggles.)
-        //
-        // After a short delay, force a clean repaint via tmux refresh-client.
-        // This clears stale cursor artifacts in empty rows without changing dimensions.
-        setTimeout(() => {
-          if (ptyProcess && hub.clients.size > 0) {
-            execAsync(`tmux refresh-client -t ${sessionName} 2>/dev/null || true`).catch(() => {});
-          }
-        }, 300);
-
-        // Handle PTY exit — close all client connections
         ptyProcess.onExit(({ exitCode }) => {
           console.log(`[ws-terminal] PTY for ${sessionName} exited with code ${exitCode}`);
           activePtyHubs.delete(sessionName);
@@ -277,49 +297,46 @@ export function setupTerminalWebSocket(server: http.Server): void {
             }
           }
           hub.clients.clear();
+          hub.clientStates.clear();
         });
 
-        // Flush any input that arrived while PTY was starting
         for (const input of pendingInput) {
           ptyProcess.write(input);
         }
         pendingInput.length = 0;
       };
 
-      // Set up message handler for local sessions (using the buffered message pattern)
-      const handleLocalMessage = (message: string) => {
-        // Handle resize messages
-        if (message.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(message);
-            if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-              if (!ptyStarted) {
-                // First resize message — start PTY with correct dimensions
-                startLocalPty(parsed.cols, parsed.rows);
-                return;
-              }
-              // Subsequent resize — update dimensions
-              if (parsed.cols === lastResizeCols && parsed.rows === lastResizeRows) {
-                return;
-              }
-              lastResizeCols = parsed.cols;
-              lastResizeRows = parsed.rows;
-              hub.cols = parsed.cols;
-              hub.rows = parsed.rows;
-              if (ptyProcess) {
-                ptyProcess.resize(parsed.cols, parsed.rows);
-                execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
-                  .catch(() => {});
-              }
-              return;
-            }
-          } catch {
-            // Invalid JSON, treat as terminal input
-          }
-        }
+      const snapshot = await captureSnapshot(sessionName, requestedCols, requestedRows);
+      sendControl(ws, { type: 'snapshot', cols: requestedCols, rows: requestedRows, data: snapshot });
 
-        // Terminal input — only forward if this client is the active input client.
-        // This prevents double-echo if multiple tabs have the same session open.
+      const handleLocalMessage = (message: string) => {
+        const parsed = parseControlMessage(message);
+        if (parsed?.type === 'ready') {
+          setClientReady(hub, ws);
+          void startLocalPty();
+          return;
+        }
+        if (parsed?.type === 'resize') {
+          if (hub.inputClient !== ws) {
+            sendControl(ws, { type: 'size', cols: hub.cols, rows: hub.rows });
+            return;
+          }
+          if (parsed.cols === hub.cols && parsed.rows === hub.rows) return;
+          hub.cols = parsed.cols;
+          hub.rows = parsed.rows;
+          if (ptyProcess) {
+            ptyProcess.resize(parsed.cols, parsed.rows);
+            execAsync(`tmux resize-window -t ${JSON.stringify(sessionName)} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+              .catch(() => {});
+            for (const client of hub.clients) {
+              sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });
+            }
+          }
+          return;
+        }
+        if (parsed?.type === 'attach') {
+          return;
+        }
         if (hub.inputClient !== ws) return;
         if (ptyProcess) {
           ptyProcess.write(message);
@@ -328,20 +345,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
         }
       };
 
-      // Set the message handler and process any buffered early messages
       messageHandler = handleLocalMessage;
-      for (const msg of earlyMessages) {
+      for (const msg of remainingMessages) {
         handleLocalMessage(msg);
       }
-      earlyMessages.length = 0;
 
-      // Clean up on WebSocket close
       ws.on('close', () => {
         console.log(`[ws-terminal] WebSocket closed for session: ${sessionName}`);
         const lastClient = removeClientFromHub(activePtyHubs, sessionName, ws);
         if (lastClient) {
           console.log(`[ws-terminal] Last client disconnected for ${sessionName}, tearing down hub`);
-          // PTY (tmux attach) exits naturally when pipes close — no kill needed.
         }
       });
 

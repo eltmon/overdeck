@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WebSocket } from 'ws';
-import { broadcastToHub, removeClientFromHub, type PtyHub } from '../pty-hub.js';
+import { addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from '../pty-hub.js';
 
 // Minimal mock WebSocket — only the properties our code uses.
 function makeMockWs(readyState: number = WebSocket.OPEN): WebSocket {
@@ -22,17 +22,19 @@ function makeHub(...clients: WebSocket[]): PtyHub {
     cols: 120,
     rows: 30,
     inputClient: null,
-    clientBlackout: new Map(),
+    clientStates: new Map(),
   };
 }
 
 // ── broadcastToHub ─────────────────────────────────────────────────────────────
 
 describe('broadcastToHub', () => {
-  it('sends data to all OPEN clients', () => {
+  it('sends data to all OPEN ready clients', () => {
     const ws1 = makeMockWs(WebSocket.OPEN);
     const ws2 = makeMockWs(WebSocket.OPEN);
     const hub = makeHub(ws1, ws2);
+    addClientToHub(hub, ws1, true);
+    addClientToHub(hub, ws2, true);
 
     broadcastToHub(hub, 'hello');
 
@@ -45,6 +47,9 @@ describe('broadcastToHub', () => {
     const closed = makeMockWs(WebSocket.CLOSED);
     const connecting = makeMockWs(WebSocket.CONNECTING);
     const hub = makeHub(open, closed, connecting);
+    addClientToHub(hub, open, true);
+    addClientToHub(hub, closed, true);
+    addClientToHub(hub, connecting, true);
 
     broadcastToHub(hub, 'ping');
 
@@ -58,22 +63,24 @@ describe('broadcastToHub', () => {
     expect(() => broadcastToHub(hub, 'noop')).not.toThrow();
   });
 
-  it('skips clients within their blackout window', () => {
+  it('buffers output for clients that are not ready yet', () => {
     const open = makeMockWs(WebSocket.OPEN);
     const hub = makeHub(open);
-    hub.clientBlackout.set(open, Date.now() + 10_000); // 10s blackout
+    addClientToHub(hub, open, false);
 
     broadcastToHub(hub, 'scrollback-flood');
 
     expect(open.send).not.toHaveBeenCalled();
+    expect(hub.clientStates.get(open)?.pending).toEqual(['scrollback-flood']);
   });
 
-  it('forwards to clients whose blackout has expired', () => {
+  it('flushes buffered output when a client becomes ready', () => {
     const open = makeMockWs(WebSocket.OPEN);
     const hub = makeHub(open);
-    hub.clientBlackout.set(open, Date.now() - 1); // expired 1ms ago
+    addClientToHub(hub, open, false);
 
     broadcastToHub(hub, 'normal-data');
+    setClientReady(hub, open);
 
     expect(open.send).toHaveBeenCalledWith('normal-data');
   });

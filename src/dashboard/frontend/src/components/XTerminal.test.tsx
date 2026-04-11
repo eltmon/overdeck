@@ -1,21 +1,34 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
 import { XTerminal } from './XTerminal';
 
 // Mock xterm.js — it performs real DOM/media-query operations that break in jsdom.
 // Use plain classes (no vi.fn() methods) so vi.clearAllMocks() doesn't clear them.
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
+    static instances: Array<InstanceType<any>> = [];
     options: Record<string, unknown> = {};
     rows = 24;
     cols = 80;
-    loadAddon(): void {}
-    open(): void {}
-    writeln(): void {}
-    write(): void {}
-    clear(): void {}
-    dispose(): void {}
+    loadAddon = vi.fn();
+    open = vi.fn();
+    writeln = vi.fn();
+    write = vi.fn((data?: string, cb?: () => void) => cb?.());
+    clear = vi.fn();
+    dispose = vi.fn();
+    resize = vi.fn((cols: number, rows: number) => {
+      this.cols = cols;
+      this.rows = rows;
+    });
+    reset = vi.fn();
+    scrollToBottom = vi.fn();
+    buffer = { active: { viewportY: 0, length: 0 } };
+    constructor() {
+      (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
+    }
     onData(): { dispose(): void } { return { dispose() {} }; }
     onSelectionChange(): { dispose(): void } { return { dispose() {} }; }
     onResize(): { dispose(): void } { return { dispose() {} }; }
@@ -26,8 +39,13 @@ vi.mock('@xterm/xterm', () => ({
 
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
-    fit(): void {}
-    dispose(): void {}
+    static instances: Array<InstanceType<any>> = [];
+    fit = vi.fn();
+    proposeDimensions = vi.fn(() => ({ cols: 100, rows: 30 }));
+    dispose = vi.fn();
+    constructor() {
+      (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
+    }
   },
 }));
 
@@ -35,6 +53,7 @@ vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
 // Mock WebSocket — XTerminal uses raw WebSocket to /ws/terminal
 class MockWebSocket {
+  static instances: MockWebSocket[] = [];
   static OPEN = 1;
   static CONNECTING = 0;
   static CLOSING = 2;
@@ -48,11 +67,16 @@ class MockWebSocket {
   send = vi.fn();
   close = vi.fn();
   constructor() {
+    MockWebSocket.instances.push(this);
     // Simulate async open
     setTimeout(() => this.onopen?.(), 0);
   }
 }
-vi.stubGlobal('WebSocket', MockWebSocket);
+Object.defineProperty(globalThis, 'WebSocket', {
+  value: MockWebSocket,
+  writable: true,
+  configurable: true,
+});
 
 // Mock localStorage
 const localStorageMock: Storage = {
@@ -97,6 +121,9 @@ describe('XTerminal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    MockWebSocket.instances = [];
+    (Terminal as unknown as { instances: unknown[] }).instances = [];
+    (FitAddon as unknown as { instances: unknown[] }).instances = [];
 
     // Store original values before modifying
     originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
@@ -226,6 +253,58 @@ describe('XTerminal', () => {
 
     // Should use prop value (true) instead of localStorage (false)
     expect(localStorageMock.getItem).not.toHaveBeenCalled();
+  });
+
+  it('sends attach with measured dimensions on connect', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].send).toHaveBeenCalledWith(
+        JSON.stringify({ type: 'attach', cols: 100, rows: 30 })
+      );
+    });
+  });
+
+  it('applies snapshot before sending ready', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const term = (Terminal as unknown as { instances: Array<{ reset: ReturnType<typeof vi.fn>; resize: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> }> }).instances[0];
+
+    ws.onmessage?.({
+      data: `\u0000${JSON.stringify({ type: 'snapshot', cols: 120, rows: 32, data: 'hello snapshot' })}`,
+    });
+
+    await waitFor(() => {
+      expect(term.reset).toHaveBeenCalled();
+      expect(term.resize).toHaveBeenCalledWith(120, 32);
+      expect(term.write).toHaveBeenCalledWith('hello snapshot', expect.any(Function));
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'ready' }));
+    });
+  });
+
+  it('applies authoritative size updates from the server', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const term = (Terminal as unknown as { instances: Array<{ resize: ReturnType<typeof vi.fn> }> }).instances[0];
+
+    ws.onmessage?.({
+      data: `\u0000${JSON.stringify({ type: 'size', cols: 90, rows: 28 })}`,
+    });
+
+    await waitFor(() => {
+      expect(term.resize).toHaveBeenCalledWith(90, 28);
+    });
   });
 });
 

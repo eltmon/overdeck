@@ -770,6 +770,7 @@ ${basePrompt}`;
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
+export CI=1
 export PANOPTICON_AGENT_ID="${tmuxSession}"
 export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
