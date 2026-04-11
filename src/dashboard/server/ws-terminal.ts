@@ -120,26 +120,13 @@ export function setupTerminalWebSocket(server: http.Server): void {
         const BLACKOUT_MS = 200;
         existingHub.clientBlackout.set(ws, Date.now() + BLACKOUT_MS);
 
-        // Force a SIGWINCH repaint so the new tab gets the current terminal state.
-        // Toggle dimensions briefly: current -> current-1 -> current (two SIGWINCHs).
-        // Fires after blackout so the clean repaint reaches the client.
-        const { cols, rows } = existingHub;
+        // Force tmux to repaint so the joining client gets the current terminal state.
+        // Do NOT use dimension toggle (cols-1 → cols) — that dumps stale scrollback
+        // content including spinner characters that appear as dots. Use refresh-client
+        // instead, which repaints without changing dimensions or dumping history.
         setTimeout(() => {
           if (existingHub.clients.has(ws) && ws.readyState === WebSocket.OPEN) {
-            try {
-              existingHub.pty.resize(cols - 1, rows);
-              execAsync(`tmux resize-window -t ${sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
-                .then(() => new Promise<void>(r => setTimeout(r, 50)))
-                .then(() => {
-                  if (existingHub.clients.has(ws)) {
-                    existingHub.pty.resize(cols, rows);
-                    return execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
-                  }
-                })
-                .catch(() => {});
-            } catch {
-              // PTY may have exited — ignore
-            }
+            execAsync(`tmux refresh-client -t ${sessionName} 2>/dev/null || true`).catch(() => {});
           }
         }, BLACKOUT_MS + 50);
 
