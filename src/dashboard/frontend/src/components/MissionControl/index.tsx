@@ -117,25 +117,34 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
     refetchInterval: 10000,
   });
 
-  // Select conversation by deep-link ID on mount, or auto-select first conversation
-  useEffect(() => {
-    if (conversations.length === 0) return;
-    if (convId) {
-      const conv = conversations.find((c) => String(c.id) === convId);
-      if (conv) {
-        setSelectedConversation(conv.name);
-        return;
-      }
-    }
-    // Auto-select first conversation if none selected
-    if (selectedConversation === null) {
-      setSelectedConversation(conversations[0].name);
-    }
-  }, [convId, conversations, selectedConversation]);
+  // Track the last deep-link ID we applied so we only navigate for *new* deep-links
+  // (e.g. popstate), not on every conversations refetch.
+  const appliedConvId = useRef<string | null>(null);
 
-  // Sync URL when selected conversation changes (e.g. user clicks a conversation in the list)
+  // On mount or when convId changes (popstate), apply the deep-link
+  useEffect(() => {
+    if (!convId || conversations.length === 0) return;
+    if (convId === appliedConvId.current) return;
+    const conv = conversations.find((c) => String(c.id) === convId);
+    if (conv) {
+      setSelectedConversation(conv.name);
+      appliedConvId.current = convId;
+    }
+  }, [convId, conversations]);
+
+  // Auto-select first conversation on initial load if no deep-link
+  useEffect(() => {
+    if (conversations.length === 0 || convId || selectedConversation !== null) return;
+    setSelectedConversation(conversations[0].name);
+  }, [conversations, convId, selectedConversation]);
+
+  // Sync URL when selected conversation changes (user clicks, draft promoted, etc.)
+  // Use a ref to track the previous value so we only call onConvIdChange when it actually changes.
+  const prevSelectedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!onConvIdChange) return;
+    if (selectedConversation === prevSelectedRef.current) return;
+    prevSelectedRef.current = selectedConversation;
     if (!selectedConversation) {
       onConvIdChange(null);
       return;
@@ -175,6 +184,14 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
     setDraftKey(0);
     setIsDraft(false);
     setSelectedConversation(conv.name);
+    // Update URL immediately — the conv isn't in the query cache yet so the
+    // URL-sync effect can't resolve it; do it eagerly here.
+    if (onConvIdChange) {
+      const newId = String(conv.id);
+      onConvIdChange(newId);
+      appliedConvId.current = newId;
+      prevSelectedRef.current = conv.name;
+    }
     // Seed optimistic first message so it appears immediately before polling returns data
     const optimistic: ChatMessage = {
       id: `optimistic-${Date.now()}`,
@@ -188,7 +205,7 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
       streaming: true,
     });
     queryClient.invalidateQueries({ queryKey: ['conversations'] });
-  }, [queryClient]);
+  }, [queryClient, onConvIdChange]);
 
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
