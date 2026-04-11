@@ -1,0 +1,140 @@
+/**
+ * In-Process Rebase (PAN-632)
+ *
+ * Replaces spawnRebaseAgentForBranch with direct git operations via execAsync.
+ * No specialist, no polling, no tmux session — just git commands.
+ */
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { existsSync } from 'fs';
+import { join } from 'path';
+
+const execAsync = promisify(exec);
+
+export interface RebaseResult {
+  success: boolean;
+  skipped?: boolean;
+  conflictFiles?: string[];
+  reason?: string;
+  newHead?: string;
+}
+
+/**
+ * Rebase a feature branch onto a base branch in-process.
+ * Returns immediately with a typed result — no specialist, no polling.
+ *
+ * Steps:
+ * 1. Fetch latest base branch
+ * 2. Check if rebase is needed (commits behind)
+ * 3. Remove .planning/ artifacts (always conflict during rebase)
+ * 4. Rebase onto base branch
+ * 5. Push with --force-with-lease
+ *
+ * On conflict: aborts rebase and returns conflict file list.
+ */
+export async function rebaseFeatureBranch(
+  workspacePath: string,
+  featureBranch: string,
+  baseBranch: string,
+  issueId: string,
+): Promise<RebaseResult> {
+  const execOpts = { cwd: workspacePath, encoding: 'utf-8' as const, timeout: 120_000 };
+  const logPrefix = `[merge-rebase] ${issueId}`;
+
+  try {
+    // Pre-flight: clean up stale git locks
+    const lockFile = join(workspacePath, '.git', 'index.lock');
+    if (existsSync(lockFile)) {
+      try {
+        const { unlinkSync } = await import('fs');
+        unlinkSync(lockFile);
+        console.log(`${logPrefix} Removed stale git index.lock`);
+      } catch { /* non-fatal */ }
+    }
+
+    // Step 1: Fetch latest base branch
+    console.log(`${logPrefix} Fetching origin/${baseBranch}...`);
+    await execAsync(`git fetch origin ${baseBranch}`, execOpts);
+
+    // Step 2: Check if rebase is needed
+    const { stdout: behindCount } = await execAsync(
+      `git rev-list --count HEAD..origin/${baseBranch}`,
+      execOpts,
+    );
+    const behind = parseInt(behindCount.trim(), 10);
+
+    if (behind === 0) {
+      console.log(`${logPrefix} Already up-to-date with origin/${baseBranch}`);
+      const { stdout: currentHead } = await execAsync('git rev-parse HEAD', execOpts);
+      return { success: true, skipped: true, newHead: currentHead.trim() };
+    }
+
+    console.log(`${logPrefix} ${behind} commits behind origin/${baseBranch}, rebasing...`);
+
+    // Step 3: Remove .planning/ artifacts before rebase (always cause conflicts)
+    const planningDir = join(workspacePath, '.planning');
+    if (existsSync(planningDir)) {
+      try {
+        await execAsync('git rm -rf .planning/ 2>/dev/null || true', execOpts);
+        await execAsync(
+          'git diff --cached --quiet || git commit -m "chore: remove planning artifacts before rebase"',
+          execOpts,
+        );
+        console.log(`${logPrefix} Removed .planning/ before rebase`);
+      } catch {
+        // Non-fatal — .planning/ might not be tracked
+      }
+    }
+
+    // Step 4: Rebase onto base branch
+    try {
+      await execAsync(`git rebase origin/${baseBranch}`, execOpts);
+      console.log(`${logPrefix} Rebase successful`);
+    } catch (rebaseErr: any) {
+      // Rebase failed — likely conflicts
+      console.log(`${logPrefix} Rebase failed, checking for conflicts...`);
+
+      // Get conflict files
+      let conflictFiles: string[] = [];
+      try {
+        const { stdout: conflictOutput } = await execAsync(
+          'git diff --name-only --diff-filter=U 2>/dev/null || true',
+          execOpts,
+        );
+        conflictFiles = conflictOutput.trim().split('\n').filter(Boolean);
+      } catch { /* ignore */ }
+
+      // Abort the rebase
+      try {
+        await execAsync('git rebase --abort', execOpts);
+        console.log(`${logPrefix} Rebase aborted`);
+      } catch {
+        // May not be in rebase state
+      }
+
+      const reason = conflictFiles.length > 0
+        ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
+        : `Rebase failed: ${rebaseErr.message?.slice(0, 200) || 'unknown error'}`;
+
+      return { success: false, conflictFiles, reason };
+    }
+
+    // Step 5: Push with --force-with-lease
+    console.log(`${logPrefix} Pushing rebased branch...`);
+    await execAsync(
+      `git push --force-with-lease origin HEAD:${featureBranch}`,
+      execOpts,
+    );
+
+    // Get new HEAD
+    const { stdout: newHead } = await execAsync('git rev-parse HEAD', execOpts);
+    console.log(`${logPrefix} Rebase complete, new HEAD: ${newHead.trim().slice(0, 8)}`);
+
+    return { success: true, newHead: newHead.trim() };
+  } catch (err: any) {
+    const reason = `Rebase error: ${err.message?.slice(0, 300) || 'unknown'}`;
+    console.error(`${logPrefix} ${reason}`);
+    return { success: false, reason };
+  }
+}

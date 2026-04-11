@@ -81,9 +81,20 @@ process.once('SIGINT', () => {
   stopConversationLifecycleService();
 });
 
-// Clear any mergeStatus stuck at 'merging' from before the restart (PAN-490).
-// Pending merges are in-memory only — they don't survive restarts.
+// Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
+
+// Reset stuck merge queue entries (PAN-632): any 'processing' entries were
+// in-flight when the server died — reset to 'queued' so they resume.
+try {
+  const { resetProcessingToQueued } = await import('../../lib/database/merge-queue-db.js');
+  const resetCount = resetProcessingToQueued();
+  if (resetCount > 0) {
+    console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
+  }
+} catch (err: any) {
+  console.warn(`[panopticon] Failed to reset merge queue: ${err.message}`);
+}
 
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();

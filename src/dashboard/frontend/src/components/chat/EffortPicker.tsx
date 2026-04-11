@@ -48,6 +48,7 @@ interface EffortPickerProps {
 export function EffortPicker({ value, onChange, disabled = false, availableLevels }: EffortPickerProps) {
   const [open, setOpen] = useState(false);
   const [dropdownAlign, setDropdownAlign] = useState<'left' | 'right'>('left');
+  const [openUp, setOpenUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +71,13 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
       setDropdownAlign('right');
     } else {
       setDropdownAlign('left');
+    }
+
+    // If dropdown extends past bottom edge of viewport, open upward
+    if (dropdownRect.bottom > window.innerHeight - 8) {
+      setOpenUp(true);
+    } else {
+      setOpenUp(false);
     }
   }, [open]);
 
@@ -113,7 +121,7 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
       {open && (
         <div
           ref={dropdownRef}
-          className={styles.pickerDropdown}
+          className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
           style={dropdownAlign === 'right' ? { left: 'auto', right: 0 } : {}}
         >
           {filteredLevels.map((level) => (

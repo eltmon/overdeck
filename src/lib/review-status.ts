@@ -271,11 +271,13 @@ export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE)
  */
 export function clearStuckMergeStatuses(): void {
   const statuses = loadReviewStatuses();
+  // Don't clear 'queued' — the SQLite merge queue handles that (PAN-632).
+  // Only clear truly stuck transient states.
   const stuck = Object.values(statuses).filter(s =>
-    s.mergeStatus === 'merging' || s.mergeStatus === 'verifying' || s.mergeStatus === 'queued'
+    s.mergeStatus === 'merging' || s.mergeStatus === 'verifying'
   );
   if (stuck.length === 0) return;
-  console.log(`[review-status] Clearing ${stuck.length} stuck merge status(es) on startup (merging/verifying/queued)`);
+  console.log(`[review-status] Clearing ${stuck.length} stuck merge status(es) on startup (merging/verifying)`);
   for (const s of stuck) {
     // Reset to pending so MERGE button reappears — the in-memory queue was lost on restart.
     // Preserve readyForMerge if review+test both passed — the merge just needs to be retried.
