@@ -144,14 +144,14 @@ export function isProviderEnabled(
 }
 
 /**
- * Apply fallback strategy for a model
+ * Validate model availability against enabled providers.
  *
- * If the model's provider is disabled (no API key), return an Anthropic equivalent.
- * Otherwise, return the original model.
+ * If the model's provider is disabled (no API key), throw instead of silently
+ * falling back to Anthropic.
  *
  * @param modelId Requested model
  * @param enabledProviders Set of enabled provider names
- * @returns Original model if provider enabled, otherwise Anthropic fallback
+ * @returns Original model when provider is enabled
  */
 export function applyFallback(
   modelId: ModelId,
@@ -164,10 +164,9 @@ export function applyFallback(
     return modelId;
   }
 
-  // Provider disabled — fall back to the equivalent Anthropic model
-  const fallback = getFallbackModel(modelId);
-  console.warn(`Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`);
-  return fallback;
+  throw new Error(
+    `Model ${modelId} requires ${provider} API key which is not configured.`
+  );
 }
 
 /**
