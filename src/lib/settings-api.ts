@@ -291,6 +291,7 @@ export function getAvailableModelsApi(): {
   anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
@@ -298,12 +299,14 @@ export function getAvailableModelsApi(): {
     anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
     openai: [],
     google: [],
+    minimax: [],
     kimi: [],
     openrouter: [],
   };
@@ -322,6 +325,9 @@ export function getAvailableModelsApi(): {
         break;
       case 'kimi':
         result.kimi.push(entry);
+        break;
+      case 'minimax':
+        result.minimax.push(entry);
         break;
       case 'openrouter':
         result.openrouter.push(entry);

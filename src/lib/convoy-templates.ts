@@ -72,10 +72,15 @@ export const CODE_REVIEW_TEMPLATE: ConvoyTemplate = {
       parallel: true,
     },
     {
+      role: 'requirements',
+      subagent: 'code-review-requirements',
+      parallel: true,
+    },
+    {
       role: 'synthesis',
       subagent: 'code-review-synthesis',
       parallel: false,
-      dependsOn: ['correctness', 'security', 'performance'],
+      dependsOn: ['correctness', 'security', 'performance', 'requirements'],
     },
   ],
   config: {
