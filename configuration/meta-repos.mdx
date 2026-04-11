@@ -1,0 +1,216 @@
+---
+title: Meta Repos
+description: Team conventions, shared skills, and onboarding kits via meta repos
+---
+
+# Meta Repos
+
+A meta repo is a special repository that contains shared skills, architecture documentation, team conventions, and onboarding materials for a project. In progressive polyrepo setups, the meta repo is the single source of truth for agent configuration and team onboarding.
+
+## What a Meta Repo Contains
+
+```
+team-meta/
+├── .agent-template/              # Copied into every workspace
+│   └── .claude/
+│       ├── CLAUDE.md             # Project conventions for agents
+│       └── skills/               # Team-specific skills
+│           └── workspace-add-repo/
+├── panopticon/                   # Panopticon-specific config
+│   └── repo-groups.yaml          # Repo group definitions
+├── docs/                         # Architecture and reference docs
+│   ├── repo-map.md               # What each repo does
+│   ├── architecture.md           # System architecture overview
+│   └── onboarding/               # Team onboarding materials
+│       ├── checklist.md          # Prerequisites checklist
+│       ├── machine-setup.sh      # Automated setup script
+│       └── README.md
+└── README.md
+```
+
+## Directory Structure
+
+### `.agent-template/`
+
+This directory is copied into every workspace created for the project. It contains:
+
+| Path | Purpose |
+|------|---------|
+| `.claude/CLAUDE.md` | Project-specific AI instructions |
+| `.claude/skills/` | Team-specific skills available to agents |
+| `.claude/commands/` | Team-specific commands |
+| `.claude/agents/` | Custom agent definitions |
+
+### `panopticon/repo-groups.yaml`
+
+Defines named groups of repositories for progressive workspace creation:
+
+```yaml
+groups:
+  simphony:
+    - int-micros-simphony
+    - int-micros-simphony-api
+    - micros-symphony-canonical-transform
+
+  aloha:
+    - int-aloha
+    - int-aloha-hrbridge
+    - aloha-agent-canonical-transfer
+
+  shared-lib:
+    - int-aws-hs-service
+    - int-aws-store-config-labels
+```
+
+### `docs/`
+
+Architecture and reference documentation:
+
+| File | Purpose |
+|------|---------|
+| `repo-map.md` | What each repo does, dependencies, common change patterns |
+| `architecture.md` | System architecture overview |
+| `onboarding/checklist.md` | Prerequisites checklist for new team members |
+| `onboarding/machine-setup.sh` | Automated setup script |
+| `onboarding/README.md` | Getting started guide |
+
+## Creating a Meta Repo
+
+### Via Setup Wizard
+
+The setup wizard (`pan setup`) creates a meta repo as part of progressive polyrepo project setup:
+
+```
+Step 6: Meta Repo
+  Progressive polyrepo projects use a meta repo for shared skills,
+  architecture docs, and team conventions.
+
+  Create a new meta repo? [Y/n]: _
+  Meta repo name [team-meta]: _
+```
+
+### Via Setup Agent
+
+The Setup Agent generates meta repo contents automatically:
+
+1. Explores all repositories in the project
+2. Detects conventions, patterns, and dependencies
+3. Generates CLAUDE.md with only non-obvious project-specific rules
+4. Generates repo-map.md documenting each repo's purpose
+5. Generates repo-groups.yaml with logical groupings
+6. Generates onboarding checklist with prerequisites
+
+### Manual Creation
+
+Create the directory structure manually:
+
+```bash
+mkdir -p team-meta/{.agent-template/.claude,panopticon,docs/onboarding}
+```
+
+## Onboarding Flow
+
+When a new team member joins:
+
+1. **Clone the meta repo**
+   ```bash
+   git clone git@github.com:yourorg/team-meta.git
+   ```
+
+2. **Run the machine setup script**
+   ```bash
+   cd team-meta/docs/onboarding
+   ./machine-setup.sh
+   ```
+   This installs prerequisites, authenticates CLI tools, and clones repositories.
+
+3. **Run `pan setup`**
+   ```bash
+   pan setup
+   ```
+   The wizard detects existing repos and applies your team's template with pre-configured settings.
+
+4. **Ready to work**
+   ```bash
+   pan workspace create INT-123
+   ```
+
+## Updating the Meta Repo
+
+When team conventions change:
+
+1. Update the meta repo (normal git workflow)
+2. Changes propagate when agents sync skills:
+   ```bash
+   pan sync
+   ```
+
+Agents pull the latest `.agent-template/` contents when:
+- A new workspace is created
+- `pan sync` is run
+- The Setup Agent runs and regenerates files
+
+## Meta Repo Best Practices
+
+### What to Include in CLAUDE.md
+
+Focus on **non-obvious** conventions only. Don't document:
+
+- How to run `npm install`, `git commit`, etc. (LLMs know these)
+- Standard industry practices
+
+Do document:
+
+- **Deviations from defaults** — "PRs target `qa` not `main`"
+- **Per-repo quirks** — "Each Lambda has its own package.json, no root one"
+- **Breaking behaviors** — "Never run `terraform apply` without approval"
+- **Architecture patterns** — "API gateway handles auth, microservices don't"
+
+### What to Include in Repo Map
+
+For each repo, document:
+
+- **Purpose** — What the repo does
+- **Dependencies** — What it depends on, what depends on it
+- **Common change patterns** — "Changes here usually need corresponding changes in api-service"
+- **Key files** — Where to start looking
+
+### Machine Setup Script
+
+Generated by the Setup Agent based on detected prerequisites:
+
+```bash
+#!/bin/bash
+# Auto-generated by Panopticon Setup Agent
+
+echo "=== Team Onboarding Setup ==="
+
+# Check prerequisites
+command -v git >/dev/null || { echo "Install git first"; exit 1; }
+command -v gh >/dev/null || { echo "Install GitHub CLI"; exit 1; }
+command -v node >/dev/null || { echo "Install Node.js 20+"; exit 1; }
+
+# Authenticate GitHub CLI
+gh auth status || gh auth login
+
+# Clone repos
+REPOS=(
+  "yourorg/int-micros-simphony"
+  "yourorg/int-toast"
+)
+
+for repo in "${REPOS[@]}"; do
+  name=$(basename "$repo")
+  if [ ! -d "$name" ]; then
+    gh repo clone "$repo" "$name"
+  fi
+done
+
+echo "Done! Run 'pan status' to verify setup."
+```
+
+## Related Guides
+
+- [Progressive Polyrepo](/configuration/progressive-polyrepo) — Progressive workspace configuration
+- [Setup Wizard](/configuration/setup-wizard) — Interactive project setup
+- [Projects](/configuration/projects) — Project registry and configuration
