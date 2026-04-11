@@ -159,6 +159,17 @@ export interface ProjectSpecialistMetadata {
   sessionId?: string; // Legacy session ID for transition period
 }
 
+export function isProjectSpecialistActivelyRunning(
+  runtimeState?: { state?: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' } | null,
+  fallbackRunning: boolean = false
+): boolean {
+  if (runtimeState?.state === 'active') return true;
+  if (runtimeState?.state === 'idle' || runtimeState?.state === 'suspended' || runtimeState?.state === 'stopped') {
+    return false;
+  }
+  return fallbackRunning;
+}
+
 /**
  * Registry of all specialist agents (per-project structure)
  */
@@ -1210,6 +1221,21 @@ export function signalSpecialistCompletion(
     }
   }
 
+  // Completion means the run itself is over, even if the tmux session stays alive
+  // during the grace period for inspection or manual termination.
+  setCurrentRun(projectKey, specialistType, null);
+  import('../agents.js')
+    .then(({ saveAgentRuntimeState }) => {
+      saveAgentRuntimeState(getTmuxSessionName(specialistType, projectKey), {
+        state: 'idle',
+        lastActivity: new Date().toISOString(),
+        currentIssue: undefined,
+      });
+    })
+    .catch((error) => {
+      console.error(`[specialist] Failed to mark ${projectKey}/${specialistType} idle:`, error);
+    });
+
   // Start grace period (60 seconds)
   startGracePeriod(projectKey, specialistType, 60000);
 
@@ -1464,12 +1490,23 @@ export async function getAllProjectSpecialistStatuses(): Promise<Array<{
   for (const [projectKey, specialists] of Object.entries(registry.projects)) {
     for (const [specialistType, metadata] of Object.entries(specialists)) {
       const tmuxSession = getTmuxSessionName(specialistType as SpecialistType, projectKey);
-      const running = await isRunning(specialistType as SpecialistType, projectKey);
+      const { getAgentRuntimeState } = await import('../agents.js');
+      const runtimeState = getAgentRuntimeState(tmuxSession);
+      const running = isProjectSpecialistActivelyRunning(
+        runtimeState,
+        await isRunning(specialistType as SpecialistType, projectKey)
+      );
+      const effectiveMetadata = running
+        ? metadata
+        : {
+            ...metadata,
+            currentRun: null,
+          };
 
       results.push({
         projectKey,
         specialistType: specialistType as SpecialistType,
-        metadata,
+        metadata: effectiveMetadata,
         isRunning: running,
         tmuxSession,
       });
