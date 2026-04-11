@@ -37,7 +37,7 @@ export interface ApiKeysConfig {
   openai?: string;
   google?: string;
   kimi?: string;
-  zai?: string;
+  minimax?: string;
 }
 
 // Complete settings structure
@@ -201,7 +201,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   openai: OpenAIModel[];
   google: GoogleModel[];
   kimi: KimiModel[];
-  zai: ZAIModel[];
+  minimax: MiniMaxModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-opus-4-6',
@@ -221,8 +221,8 @@ export function getAvailableModels(settings: SettingsConfig): {
     ? ['kimi-k2.5']
     : [];
 
-  const zaiModels: ZAIModel[] = settings.api_keys.zai
-    ? ['glm-4.7', 'glm-4.7-flash']
+  const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
+    ? ['minimax-m2.7', 'minimax-m2.7-highspeed']
     : [];
 
   return {
@@ -230,7 +230,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     openai: openaiModels,
     google: googleModels,
     kimi: kimiModels,
-    zai: zaiModels,
+    minimax: minimaxModels,
   };
 }
 
