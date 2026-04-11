@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import type { ReviewStatus } from '../../src/lib/review-status.js'
 import {
   toAgentStatus,
   toAgentPhase,
@@ -16,6 +17,7 @@ import {
   toReviewStatus,
   toTestStatus,
   toMergeStatus,
+  toReviewStatusSnapshot,
 } from '../../src/dashboard/server/read-model.js'
 
 // ─── toAgentStatus ────────────────────────────────────────────────────────────
@@ -175,5 +177,26 @@ describe('toMergeStatus', () => {
     expect(toMergeStatus('MERGED')).toBeUndefined()
     expect(toMergeStatus(null)).toBeUndefined()
     expect(toMergeStatus(undefined)).toBeUndefined()
+  })
+})
+
+// ─── toReviewStatusSnapshot ──────────────────────────────────────────────────
+
+describe('toReviewStatusSnapshot', () => {
+  it('preserves authoritative readyForMerge=false from persisted review status', () => {
+    const status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'readyForMerge' | 'updatedAt' | 'prUrl'> = {
+      issueId: 'PAN-486',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'failed',
+      readyForMerge: false,
+      updatedAt: '2026-04-11T17:00:00.000Z',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/486',
+    }
+    const snapshot = toReviewStatusSnapshot(status)
+
+    expect(snapshot.readyForMerge).toBe(false)
+    expect(snapshot.mergeStatus).toBe('failed')
+    expect(snapshot.prUrl).toContain('/pull/486')
   })
 })

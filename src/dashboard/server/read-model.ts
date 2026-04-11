@@ -20,6 +20,7 @@ import {
   applyEvent as applyEventReducer,
 } from '@panopticon/contracts';
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue } from '@panopticon/contracts';
+import type { ReviewStatus } from '../../lib/review-status.js';
 
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
@@ -58,6 +59,18 @@ export function toTestStatus(v: unknown): TestStatusValue | undefined {
 }
 export function toMergeStatus(v: unknown): MergeStatusValue | undefined {
   return v && VALID_MERGE_STATUSES.has(v as MergeStatusValue) ? v as MergeStatusValue : undefined;
+}
+
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'readyForMerge' | 'updatedAt' | 'prUrl'>): ReviewStatusSnapshot {
+  return {
+    issueId: status.issueId,
+    reviewStatus: toReviewStatus(status.reviewStatus),
+    testStatus: toTestStatus(status.testStatus),
+    mergeStatus: toMergeStatus(status.mergeStatus),
+    readyForMerge: status.readyForMerge === true,
+    updatedAt: status.updatedAt,
+    prUrl: status.prUrl || undefined,
+  };
 }
 
 // ─── ReadModelService ────────────────────────────────────────────────────────
@@ -108,6 +121,10 @@ export const ReadModelServiceLive = Layer.effect(
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
+      const { loadReviewStatuses } = yield* Effect.promise(
+        () => import('../../lib/review-status.js'),
+      );
+
       // ── Fast path: projection cache ──────────────────────────────────────────
       // Try to load the full snapshot from SQLite — sub-millisecond if available.
       // Falls back to the slow lib-module path on first boot or corruption.
@@ -161,12 +178,15 @@ export const ReadModelServiceLive = Layer.effect(
           }
 
           const allAgents = [...validAgents, ...newAgents];
+          const statusMap = loadReviewStatuses();
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
             agentsById: Object.fromEntries(allAgents.map((a: any) => [a.id, a])),
             specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
-            reviewStatusByIssueId: Object.fromEntries((cached.reviewStatuses ?? []).map((r) => [r.issueId, r])),
+            reviewStatusByIssueId: Object.fromEntries(
+              Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
+            ),
             issuesRaw: cached.issues ?? [],
             resources: cached.resources,
           };
@@ -183,7 +203,7 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses, getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
             Effect.promise(() => import('../../lib/cloister/specialists.js')),
@@ -271,15 +291,7 @@ export const ReadModelServiceLive = Layer.effect(
         const statusMap = loadReviewStatuses();
         const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
         for (const rs of Object.values(statusMap)) {
-          reviewStatusByIssueId[rs.issueId] = {
-            issueId: rs.issueId,
-            reviewStatus: toReviewStatus(rs.reviewStatus),
-            testStatus: toTestStatus(rs.testStatus),
-            mergeStatus: toMergeStatus(rs.mergeStatus),
-            readyForMerge: rs.reviewStatus === 'passed' && rs.testStatus === 'passed',
-            updatedAt: new Date().toISOString(),
-            prUrl: rs.prUrl || undefined,
-          };
+          reviewStatusByIssueId[rs.issueId] = toReviewStatusSnapshot(rs);
         }
 
         // ── Sequence from event store ──────────────────────────────────────────
