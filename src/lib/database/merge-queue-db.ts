@@ -66,16 +66,17 @@ export function getCurrentMerge(projectKey: string): string | null {
 }
 
 /**
- * Dequeue the next merge for a project. Returns the issue ID or null if queue is empty.
- * Removes the completed/failed current entry and returns the next queued one.
+ * Advance the queue for a project after the current issue completes.
+ * Optionally removes the completed issue, then returns the next queued issue.
  */
-export function dequeueMerge(projectKey: string): string | null {
+export function dequeueMerge(projectKey: string, completedIssueId?: string): string | null {
   const db = getDatabase();
 
-  // Remove completed/failed entries
-  db.prepare(
-    `DELETE FROM merge_queue WHERE project_key = ? AND status IN ('completed', 'failed', 'processing')`
-  ).run(projectKey);
+  if (completedIssueId) {
+    db.prepare(
+      `DELETE FROM merge_queue WHERE project_key = ? AND issue_id = ?`
+    ).run(projectKey, completedIssueId.toUpperCase());
+  }
 
   // Get next queued entry
   const next = db.prepare(

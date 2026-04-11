@@ -1018,10 +1018,11 @@ async function buildTaskPrompt(
 
   // Add specialist-specific instructions
   switch (specialistType) {
-    case 'review-agent':
+    case 'review-agent': {
+      const diffBase = (task.context?.targetBranch as string | undefined) || 'main';
       prompt += `Your task:
-0. FIRST: Check if branch has any changes vs main (git diff --name-only main...HEAD)
-   - If 0 files changed: mark as passed with note "branch identical to main" and STOP
+0. FIRST: Check if branch has any changes vs ${diffBase} (git diff --name-only ${diffBase}...HEAD)
+   - If 0 files changed: mark as passed with note "branch identical to ${diffBase}" and STOP
 1. Review all changes in the branch
 2. Check for code quality issues, security concerns, and best practices
 3. Verify test FILES exist for new code (DO NOT run tests)
@@ -1031,10 +1032,11 @@ async function buildTaskPrompt(
 IMPORTANT: DO NOT run tests. You are the REVIEW agent.
 
 Update status via API:
-- If no changes (stale branch): POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"passed","reviewNotes":"No changes — branch identical to main"}
+- If no changes (stale branch): POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"passed","reviewNotes":"No changes — branch identical to ${diffBase}"}
 - If issues found: POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"blocked","reviewNotes":"..."}
 - If review passes: POST with {"reviewStatus":"passed"} then queue test-agent`;
       break;
+    }
 
     case 'test-agent': {
       // Delegate to shared test-agent prompt builder
@@ -2230,6 +2232,7 @@ CRITICAL: Do NOT delete the feature branch.`;
     }
 
     case 'review-agent': {
+      const diffBase = (task.context?.targetBranch as string | undefined) || 'main';
       // Pre-check: detect stale branch (0 diff from main) before waking the agent
       const workspace = task.workspace || 'unknown';
 
@@ -2246,20 +2249,20 @@ CRITICAL: Do NOT delete the feature branch.`;
           let totalChangedFiles = 0;
           for (const dir of gitDirs) {
             const { stdout: dirDiff } = await execAsync(
-              `cd "${dir}" && git fetch origin main 2>/dev/null; git diff --name-only main...HEAD 2>/dev/null`,
+              `cd "${dir}" && git fetch origin ${diffBase} 2>/dev/null; git diff --name-only ${diffBase}...HEAD 2>/dev/null`,
               { encoding: 'utf-8', timeout: 15000 }
             );
             totalChangedFiles += dirDiff.trim().split('\n').filter((f: string) => f.length > 0).length;
           }
           if (totalChangedFiles === 0) {
             staleBranch = true;
-            console.log(`[specialist] review-agent: stale branch detected for ${task.issueId} — 0 files changed vs main`);
+            console.log(`[specialist] review-agent: stale branch detected for ${task.issueId} — 0 files changed vs ${diffBase}`);
 
             // Auto-complete the review: set reviewStatus to passed
             const { setReviewStatus } = await import('../review-status.js');
             setReviewStatus(task.issueId.toUpperCase(), {
               reviewStatus: 'passed',
-              reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',
+              reviewNotes: `No changes to review — branch identical to ${diffBase} (already merged or stale)`,
             });
             console.log(`[specialist] review-agent: auto-passed ${task.issueId} (stale branch)`);
 
@@ -2282,11 +2285,11 @@ CRITICAL: Do NOT delete the feature branch.`;
       // Build git commands for the prompt — polyrepo workspaces need git commands in subdirectories
       const isPolyrepo = gitDirs.length > 1;
       const gitDiffCommands = gitDirs.length > 0
-        ? gitDirs.map(d => `cd "${d}" && git diff --name-only main...HEAD`).join('\n')
-        : `cd "${workspace}" && git diff --name-only main...HEAD`;
+        ? gitDirs.map(d => `cd "${d}" && git diff --name-only ${diffBase}...HEAD`).join('\n')
+        : `cd "${workspace}" && git diff --name-only ${diffBase}...HEAD`;
       const gitDiffFileCmd = gitDirs.length > 0
-        ? `cd "${gitDir}" && git diff main...HEAD -- <file>`
-        : `cd "${workspace}" && git diff main...HEAD -- <file>`;
+        ? `cd "${gitDir}" && git diff ${diffBase}...HEAD -- <file>`
+        : `cd "${workspace}" && git diff ${diffBase}...HEAD -- <file>`;
 
       prompt = `New review task for ${task.issueId}:
 
@@ -2294,9 +2297,10 @@ Branch: ${task.branch || 'unknown'}
 Workspace: ${workspace}
 ${isPolyrepo ? `Polyrepo: git repos in subdirectories: ${gitDirs.map(d => basename(d)).join(', ')}` : ''}
 ${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
+Target Branch: ${diffBase}
 
 Your task:
-1. Review all changes in the branch compared to main
+1. Review all changes in the branch compared to ${diffBase}
 2. Check for code quality issues, security concerns, and best practices
 3. Verify test FILES exist for new code (DO NOT run tests - test-agent does that)
 4. Provide specific, actionable feedback
@@ -2312,15 +2316,15 @@ ${isPolyrepo ? `This is a polyrepo — run git diff in each repo subdirectory:` 
 ${gitDiffCommands}
 \`\`\`
 
-**If the diff is EMPTY (0 files changed across all repos):** The branch is stale or already merged into main. In this case:
+**If the diff is EMPTY (0 files changed across all repos):** The branch is stale or already merged into ${diffBase}. In this case:
 1. Do NOT attempt a full review
 2. Update status as passed immediately:
 \`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to main (already merged or stale)"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to ${diffBase} (already merged or stale)"}' | jq .
 \`\`\`
 3. Tell the issue agent:
 \`\`\`bash
-pan work tell ${task.issueId} "Review complete: branch has 0 diff from main — already merged or stale. Marking as passed."
+pan work tell ${task.issueId} "Review complete: branch has 0 diff from ${diffBase} — already merged or stale. Marking as passed."
 \`\`\`
 4. Stop here — you are done.
 

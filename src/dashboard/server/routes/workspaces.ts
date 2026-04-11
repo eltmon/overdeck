@@ -71,6 +71,7 @@ import { runVerificationForIssue } from '../../../lib/cloister/verification-runn
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
+import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 
 const execAsync = promisify(exec);
 
@@ -433,11 +434,12 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
 async function ensurePRExists(
   issueId: string,
-  options?: { cwd?: string; branchName?: string }
+  options?: { cwd?: string; branchName?: string; targetBranch?: string }
 ): Promise<{ created: boolean; prUrl?: string; error?: string }> {
   try {
     const issueLower = issueId.toLowerCase();
     const branchName = options?.branchName ?? `feature/${issueLower}`;
+    const targetBranch = options?.targetBranch ?? 'main';
     const execOptions: Parameters<typeof execAsync>[1] = { encoding: 'utf-8' };
     if (options?.cwd) execOptions.cwd = options.cwd;
 
@@ -461,7 +463,7 @@ async function ensurePRExists(
 
     try {
       const { stdout: createOut } = await execAsync(
-        `gh pr create --head ${branchName} --base main --title "${issueId}" --body-file "${bodyFile}"`,
+        `gh pr create --head ${branchName} --base ${targetBranch} --title "${issueId}" --body-file "${bodyFile}"`,
         execOptions
       );
       // gh pr create prints the PR URL as the last line of stdout
@@ -2313,30 +2315,30 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               console.log(`Feature branch push note: ${pushErr.message}`);
             }
 
-            if (!workspaceInfo.isRemote) {
-              try {
-                const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-                const commits = await getWorkspaceGitInfo(workspacePath);
-                setReviewStatus(issueId, { lastReviewCommits: commits });
-              } catch {}
-            }
+	            if (!workspaceInfo.isRemote) {
+	              try {
+	                const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
+	                const commits = await getWorkspaceGitInfo(workspacePath);
+	                setReviewStatus(issueId, { lastReviewCommits: commits });
+	              } catch {}
+	            }
 
-            // Create GitHub PR (or retrieve existing) so review/test agents have a PR URL
-            try {
-              const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName });
-              if (prResult.prUrl) {
-                setReviewStatus(issueId, { prUrl: prResult.prUrl });
-                if (prResult.created) {
-                  console.log(`[review] Created PR for ${issueId}: ${prResult.prUrl}`);
-                } else {
-                  console.log(`[review] Existing PR for ${issueId}: ${prResult.prUrl}`);
-                }
-              } else {
-                console.warn(`[review] Could not create PR for ${issueId}: ${prResult.error}`);
-              }
-            } catch (prErr: any) {
-              console.warn(`[review] PR creation failed for ${issueId}: ${prErr.message}`);
-            }
+	            // Ensure review artifacts exist so review/test agents have stable URLs.
+	            let reviewTargetBranch: string | undefined;
+	            try {
+	              const { createReviewArtifactsForIssue } = await import('../../../lib/review-artifacts.js');
+	              const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
+	              const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
+	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.mergeStatus !== 'skipped')?.targetBranch;
+	              if (primaryArtifact?.artifactUrl) {
+	                setReviewStatus(issueId, { prUrl: primaryArtifact.artifactUrl });
+	                console.log(`[review] Review artifact ready for ${issueId}: ${primaryArtifact.artifactUrl}`);
+	              } else {
+	                console.warn(`[review] No review artifact URL available for ${issueId}`);
+	              }
+	            } catch (artifactErr: any) {
+	              console.warn(`[review] Review artifact creation failed for ${issueId}: ${artifactErr.message}`);
+	            }
 
             const verifyOutcome = await runVerificationForIssue(
               issueId,
@@ -2387,23 +2389,17 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               reviewState?.state === 'suspended' ||
               !reviewRunning;
 
-            const isRemoteWorkspace = workspaceInfo.isRemote && workspaceInfo.vmName;
-            const flyAppName = isRemoteWorkspace ? getFlyAppName(workspaceInfo.vmName!) : '';
-            const sshPrefix = isRemoteWorkspace ? `fly ssh console -a ${flyAppName} -C "` : '';
-            const sshSuffix = isRemoteWorkspace ? '"' : '';
-            const cdPrefix = isRemoteWorkspace ? `cd ${workspacePath} && ` : '';
-            const workspaceAccessInstructions = isRemoteWorkspace
-              ? `**REMOTE WORKSPACE** - Fly.io to access:\n   fly ssh console -a ${flyAppName}\n   cd ${workspacePath}`
-              : `cd ${workspacePath}`;
-
             if (!reviewIdle) {
               console.log(`[review] review-agent busy, queuing ${issueId}`);
+              const prUrl = getReviewStatus(issueId)?.prUrl;
               submitToSpecialistQueue('review-agent', {
                 priority: 'normal',
                 source: 'review-endpoint',
                 issueId,
                 workspace: workspacePath,
                 branch: branchName,
+                prUrl,
+                context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
                 isRemote: workspaceInfo.isRemote,
                 vmName: workspaceInfo.vmName,
               });
@@ -2413,55 +2409,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               return;
             }
 
-            const reviewPrompt = `STRICT REVIEW for ${issueId}
-
-You are a DEMANDING code reviewer. Find EVERY issue before code can proceed to testing.
-DO NOT BE NICE. BE THOROUGH.
-
-=== CONTEXT ===
-ISSUE: ${issueId}
-WORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}
-BRANCH: ${branchName}
-PROJECT: ${projectPath}
-${isRemoteWorkspace ? `REMOTE VM: ${workspaceInfo.vmName} (Fly machine)` : ''}
-
-=== WORKSPACE ACCESS ===
-${workspaceAccessInstructions}
-
-=== MANDATORY REQUIREMENTS (Block if ANY violated) ===
-1. **Tests Required** - Every new function MUST have test files. No exceptions.
-2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
-3. **No Dead Code** - Remove unused imports, functions, variables.
-4. **Error Handling** - All async operations must handle errors.
-5. **Type Safety** - No \`any\` without justification.
-
-=== YOUR TASK ===
-1. ${workspaceAccessInstructions}
-2. Review ALL changes: ${sshPrefix}${cdPrefix}git diff main...${branchName}${sshSuffix}
-3. Check EVERY file for issues
-4. List EVERY issue found with file:line references
-
-**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
-**The TEST agent will run tests in the next step. Just verify test FILES exist.**
-
-=== WHEN DONE ===
-**IF ANY ISSUES FOUND:**
-- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[list issues]"}'
-- Use /send-feedback-to-agent to notify agent-${issueLower}
-- DO NOT hand off to test-agent
-
-**IF CODE IS PERFECT:**
-- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
-- The test-agent will be automatically dispatched when you post reviewStatus:"passed". Do NOT manually queue the test-agent.
-- After posting the status, your work is DONE. Do not do anything else.`;
-
             let reviewResult: { success: boolean; message: string; error?: string };
             if (reviewProjectKey) {
+              const prUrl = getReviewStatus(issueId)?.prUrl;
               reviewResult = await spawnEphemeral(reviewProjectKey, 'review-agent', {
                 issueId,
                 branch: branchName,
                 workspace: workspacePath,
-                promptOverride: reviewPrompt,
+                prUrl,
+                context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
               });
             } else {
               console.error(
@@ -2485,6 +2441,8 @@ ${workspaceAccessInstructions}
                   issueId,
                   branch: branchName,
                   workspace: workspacePath,
+                  prUrl: getReviewStatus(issueId)?.prUrl,
+                  context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
                 });
                 completePendingOperation(issueId, null);
                 setReviewStatus(issueId, { reviewStatus: 'reviewing' });
@@ -3004,14 +2962,12 @@ import {
   getCurrentMerge,
   markMergeProcessing,
   dequeueMerge,
-  removeMerge,
   getAllActiveQueues,
 } from '../../../lib/database/merge-queue-db.js';
-import { rebaseFeatureBranch } from '../../../lib/cloister/merge-rebase.js';
 
 /** Dequeue the next merge after current completes (success or failure). */
-function dequeueNextMerge(projectKey: string): void {
-  const nextIssueId = dequeueMerge(projectKey);
+function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
+  const nextIssueId = dequeueMerge(projectKey, completedIssueId);
   if (nextIssueId) {
     console.log(`[merge] Dequeuing next merge: ${nextIssueId}`);
     triggerMerge(nextIssueId).catch(err =>
@@ -3119,37 +3075,45 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
   setPendingOperation(issueId, 'merge');
+  let queueAdvanced = false;
+
+  const advanceQueue = (): void => {
+    if (queueAdvanced) return;
+    queueAdvanced = true;
+    _serverManagedMerges.delete(normalizedMergeId);
+    dequeueNextMerge(projectKey, normalizedId);
+  };
 
   try {
     if (workspaceInfo.isRemote && workspaceInfo.vmName) {
       console.log(
-        `[merge] Remote workspace detected for ${issueId}, using GitHub PR merge...`
+        `[merge] Remote workspace detected for ${issueId}, using review artifact merge...`
       );
+      const { getMergeSet, ensureMergeSetForIssue } = await import('../../../lib/merge-set.js');
+      const { getForgeAdapter } = await import('../../../lib/forge.js');
+      const remoteMergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
+      const remotePrimaryRepo = remoteMergeSet?.repos[0];
+      const remoteTargetBranch = remotePrimaryRepo?.targetBranch || 'main';
+      const remoteForge = remotePrimaryRepo?.forge || 'github';
 
-      const prResult = await ensurePRExists(issueId);
+      const prResult = await ensurePRExists(issueId, { targetBranch: remoteTargetBranch });
       if (!prResult.prUrl) {
         const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
-
-      const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
-      if (!prMatch) {
-        const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 400, error };
-      }
-      const prNumber = prMatch[1];
+      const artifactUrl = remotePrimaryRepo?.artifactUrl || prResult.prUrl;
+      const artifactId = remotePrimaryRepo?.artifactId;
 
       try {
-        console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
-        const { stdout: mergeOutput } = await execAsync(
-          `gh pr merge ${prNumber} --repo eltmon/panopticon-cli --squash`,
-          { encoding: 'utf-8' }
-        );
-        console.log(`[merge] PR merge output: ${mergeOutput}`);
+        console.log(`[merge] Merging ${remoteForge} review artifact for ${issueId}...`);
+        await getForgeAdapter(remoteForge).mergeReviewArtifact({
+          forge: remoteForge,
+          url: artifactUrl,
+          id: artifactId,
+          method: 'squash',
+        });
 
         setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
         completePendingOperation(issueId, null);
@@ -3185,83 +3149,195 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
 
     if (isPolyrepo && projectConfig?.workspace?.repos) {
-      console.log(`[merge] Polyrepo detected for ${issueId}, using merge-agent per repo...`);
-      const repos = projectConfig.workspace.repos;
-      const defaultBranch = projectConfig.workspace.default_branch || 'main';
+      console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
+      const { getMergeSet, ensureMergeSetForIssue, upsertMergeSet, withRepoState } = await import('../../../lib/merge-set.js');
+      const { runQualityGates } = await import('../../../lib/cloister/validation.js');
+      const { getForgeAdapter } = await import('../../../lib/forge.js');
+      const { messageAgent } = await import('../../../lib/agents.js');
+      const { sessionExists } = await import('../../../lib/tmux.js');
+      let mergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
+      if (!mergeSet) {
+        const error = `No merge set found for ${issueId}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error };
+      }
+
+      const activeRepos = mergeSet.repos
+        .filter(repo => repo.mergeStatus !== 'skipped' && !!repo.artifactUrl)
+        .sort((a, b) => a.mergeOrder - b.mergeOrder);
+
+      if (activeRepos.length === 0) {
+        const error = `No changed repos are marked ready for coordinated merge in ${issueId}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error };
+      }
+
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      if (!sessionExists(agentId)) {
+        const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error };
+      }
+
+      mergeSet = {
+        ...mergeSet,
+        status: 'merging',
+        updatedAt: new Date().toISOString(),
+      };
+      upsertMergeSet(mergeSet);
+
       const mergeResults: Array<{
         repo: string;
         success: boolean;
         message: string;
         testsStatus?: string;
       }> = [];
+      const repoHeadsBefore = new Map<string, string>();
 
-      for (const repo of repos) {
-        const repoMainPath = join(projectPath, repo.path);
-        const repoWorkspacePath = join(workspacePath, repo.name);
-
-        if (
-          !existsSync(repoWorkspacePath) ||
-          !existsSync(join(repoWorkspacePath, '.git'))
-        ) {
-          console.log(`[merge] Skipping ${repo.name}: workspace repo not found`);
+      for (const repo of activeRepos) {
+        const repoWorkspacePath = join(workspacePath, repo.repoKey);
+        if (!existsSync(repoWorkspacePath) || !existsSync(join(repoWorkspacePath, '.git'))) {
+          const error = `Workspace repo ${repo.repoKey} is missing`;
+          mergeResults.push({ repo: repo.repoKey, success: false, message: error });
           continue;
         }
 
-        try {
-          const { stdout: diffStat } = await execAsync(
-            `git diff ${defaultBranch}..${branchName} --stat`,
-            { cwd: repoMainPath, encoding: 'utf-8' }
-          );
-          if (!diffStat.trim()) {
-            console.log(`[merge] Skipping ${repo.name}: no changes on ${branchName}`);
-            mergeResults.push({ repo: repo.name, success: true, message: 'No changes, skipped' });
-            continue;
+        const { stdout: headBefore } = await execAsync(
+          `git rev-parse origin/${repo.sourceBranch} 2>/dev/null || echo NONE`,
+          { cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 10000 }
+        );
+        repoHeadsBefore.set(repo.repoKey, headBefore.trim());
+        mergeSet = withRepoState(mergeSet, repo.repoKey, { rebaseStatus: 'requested' });
+      }
+      upsertMergeSet(mergeSet);
+
+      if (mergeResults.some(result => !result.success)) {
+        const error = `Polyrepo merge prerequisites failed for ${issueId}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error, repos: mergeResults };
+      }
+
+      const rebaseInstructions = activeRepos.map((repo, index) => (
+        `${index + 1}. cd ${repo.repoKey}\n   git fetch origin ${repo.targetBranch}\n   git rebase origin/${repo.targetBranch}\n   git push --force-with-lease`
+      )).join('\n');
+      const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Rebase and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every rebase, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
+      await messageAgent(agentId, rebaseMsg);
+
+      const REBASE_TIMEOUT_MS = 10 * 60 * 1000;
+      const POLL_INTERVAL_MS = 5000;
+      const pushedRepos = new Set<string>();
+      const rebaseStart = Date.now();
+
+      while (Date.now() - rebaseStart < REBASE_TIMEOUT_MS && pushedRepos.size < activeRepos.length) {
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+        for (const repo of activeRepos) {
+          if (pushedRepos.has(repo.repoKey)) continue;
+
+          const repoWorkspacePath = join(workspacePath, repo.repoKey);
+          try {
+            await execAsync('git fetch origin', { cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 15000 });
+            const { stdout: headNow } = await execAsync(
+              `git rev-parse origin/${repo.sourceBranch}`,
+              { cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 5000 }
+            );
+            if (headNow.trim() !== repoHeadsBefore.get(repo.repoKey)) {
+              pushedRepos.add(repo.repoKey);
+              mergeSet = withRepoState(mergeSet, repo.repoKey, { rebaseStatus: 'passed' });
+              upsertMergeSet(mergeSet);
+            }
+          } catch {
+            // Retry until timeout or agent exit.
           }
-          console.log(`[merge] ${repo.name}: found changes on ${branchName}`);
-        } catch {
-          console.log(`[merge] Skipping ${repo.name}: branch ${branchName} not found`);
-          mergeResults.push({
-            repo: repo.name,
-            success: true,
-            message: 'Branch not found, skipped',
-          });
+        }
+
+        if (!sessionExists(agentId)) break;
+      }
+
+      if (pushedRepos.size !== activeRepos.length) {
+        const remaining = activeRepos
+          .filter(repo => !pushedRepos.has(repo.repoKey))
+          .map(repo => repo.repoKey);
+        const error = !sessionExists(agentId)
+          ? `Work agent ${agentId} stopped before completing polyrepo rebases for ${remaining.join(', ')}`
+          : `Work agent did not push rebased branches for ${remaining.join(', ')} within ${REBASE_TIMEOUT_MS / 60000} minutes`;
+        for (const repoKey of remaining) {
+          mergeSet = withRepoState(mergeSet, repoKey, { rebaseStatus: 'failed' });
+        }
+        upsertMergeSet(mergeSet);
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 500, error };
+      }
+
+      setReviewStatus(issueId, { mergeStatus: 'verifying' });
+      for (const repo of activeRepos) {
+        const repoConfig = projectConfig.workspace.repos.find(configRepo => configRepo.name === repo.repoKey);
+        const repoWorkspacePath = join(workspacePath, repo.repoKey);
+        const gateIdentifiers = new Set<string>([
+          repo.repoKey,
+          repoConfig?.path || '',
+        ].filter(Boolean));
+        const gates = Object.fromEntries(
+          Object.entries(projectConfig.quality_gates || {}).filter(
+            ([, gate]) => gate.path && gateIdentifiers.has(gate.path)
+          )
+        );
+
+        mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'running' });
+        upsertMergeSet(mergeSet);
+
+        if (Object.keys(gates).length === 0) {
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'skipped' });
+          upsertMergeSet(mergeSet);
           continue;
         }
 
+        const gateResults = await runQualityGates(gates, repoWorkspacePath, 'pre_push');
+        const failedGate = gateResults.find(result => !result.passed && result.required !== false);
+        if (failedGate) {
+          const error = `Polyrepo post-rebase verification failed for ${repo.repoKey} at ${failedGate.name}`;
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'failed' });
+          upsertMergeSet(mergeSet);
+          setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+          completePendingOperation(issueId, error);
+          return { success: false, statusCode: 500, error };
+        }
+
+        mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'passed' });
+        upsertMergeSet(mergeSet);
+      }
+
+      setReviewStatus(issueId, { mergeStatus: 'merging' });
+      for (const repo of activeRepos) {
+        const repoWorkspacePath = join(workspacePath, repo.repoKey);
         try {
-          await execAsync(`git push origin ${branchName}`, {
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merging' });
+          upsertMergeSet(mergeSet);
+          await getForgeAdapter(repo.forge).mergeReviewArtifact({
+            forge: repo.forge,
+            url: repo.artifactUrl,
+            id: repo.artifactId,
             cwd: repoWorkspacePath,
-            encoding: 'utf-8',
+            method: 'squash',
           });
-        } catch (pushErr: any) {
-          console.log(`[merge] Push note for ${repo.name}: ${pushErr.message}`);
-        }
-
-        try {
-          const { spawnMergeAgentForBranches } = await import(
-            '../../../lib/cloister/merge-agent.js'
-          );
-          const mergeResult = await spawnMergeAgentForBranches(
-            repoMainPath,
-            branchName,
-            defaultBranch,
-            issueId,
-            { skipDoneReport: true }
-          );
-
-          if (mergeResult.success) {
-            mergeResults.push({
-              repo: repo.name,
-              success: true,
-              message: 'Merged via merge-agent',
-              testsStatus: mergeResult.testsStatus,
-            });
-          } else {
-            const error = mergeResult.reason || mergeResult.notes || 'Merge-agent failed';
-            mergeResults.push({ repo: repo.name, success: false, message: error });
-          }
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          upsertMergeSet(mergeSet);
+          mergeResults.push({
+            repo: repo.repoKey,
+            success: true,
+            message: `Merged via ${repo.forge}`,
+          });
         } catch (mergeErr: any) {
-          mergeResults.push({ repo: repo.name, success: false, message: mergeErr.message });
+          const error = mergeErr.message || 'Artifact merge failed';
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'failed' });
+          upsertMergeSet(mergeSet);
+          mergeResults.push({ repo: repo.repoKey, success: false, message: error });
+          break;
         }
       }
 
@@ -3271,15 +3347,28 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         const error = `Polyrepo merge failed for: ${failedRepos
           .map(r => `${r.repo} (${r.message})`)
           .join(', ')}`;
+        mergeSet = {
+          ...mergeSet,
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        };
+        upsertMergeSet(mergeSet);
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error, repos: mergeResults };
       }
 
+      mergeSet = {
+        ...mergeSet,
+        status: 'merged',
+        updatedAt: new Date().toISOString(),
+      };
+      upsertMergeSet(mergeSet);
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
       completePendingOperation(issueId, null);
 
       const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
+      advanceQueue();
       await postMergeLifecycle(issueId, projectPath);
 
       return {
@@ -3291,8 +3380,15 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     // Monorepo / single-repo merge: PR-based flow
+    const { getMergeSet, ensureMergeSetForIssue } = await import('../../../lib/merge-set.js');
+    const { getForgeAdapter } = await import('../../../lib/forge.js');
+    const monorepoMergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
+    const primaryRepo = monorepoMergeSet?.repos[0];
+    const targetBranch = primaryRepo?.targetBranch || 'main';
+    const primaryForge = primaryRepo?.forge || 'github';
+
     // Step 1: Ensure PR exists (creates if needed)
-    const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName });
+    const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName, targetBranch });
     if (!prResult.prUrl) {
       const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
       setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
@@ -3300,33 +3396,40 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 400, error };
     }
 
-    const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
-    if (!prMatch) {
-      const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
+    const artifactUrl = primaryRepo?.artifactUrl || prResult.prUrl;
+    const artifactId = primaryRepo?.artifactId;
+    const prNumber = primaryForge === 'github'
+      ? artifactUrl.match(/\/pull\/(\d+)/)?.[1]
+      : undefined;
+    if (primaryForge === 'github' && !prNumber) {
+      const error = `Could not parse PR number from URL: ${artifactUrl}`;
       setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 400, error };
     }
-    const prNumber = prMatch[1];
 
-    // Step 2: Tell the WORK AGENT to rebase onto main and push.
-    // The work agent knows the codebase and can resolve conflicts intelligently.
-    // If the agent isn't running, fall back to in-process rebase.
+    // Step 2: Tell the WORK AGENT to rebase onto the target branch and push.
+    // The server coordinates; the work agent owns all code-changing git operations.
     const { postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
-    const { messageAgent, resumeAgent, getAgentState } = await import('../../../lib/agents.js');
+    const { messageAgent } = await import('../../../lib/agents.js');
     const { sessionExists } = await import('../../../lib/tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
     const agentRunning = sessionExists(agentId);
 
-    console.log(`[merge] Rebasing ${branchName} onto main for ${issueId} (agent=${agentRunning ? 'running' : 'stopped'})...`);
+    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${agentRunning ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
-    if (agentRunning) {
+    if (!agentRunning) {
+      rebaseResult = {
+        success: false,
+        reason: `Work agent ${agentId} is not running. Merge requires the work agent to rebase onto ${targetBranch} and push.`,
+      };
+    } else {
       // Agent is running — tell it to rebase and wait for the push
-      const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto main and push:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
+      const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
       await messageAgent(agentId, rebaseMsg);
       console.log(`[merge] Sent rebase request to work agent ${agentId}`);
 
@@ -3360,7 +3463,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
         // Check if agent is still alive
         if (!sessionExists(agentId)) {
-          console.log(`[merge] Work agent ${agentId} died during rebase — falling back to in-process`);
+          console.log(`[merge] Work agent ${agentId} stopped during rebase`);
           break;
         }
       }
@@ -3368,17 +3471,14 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       if (newHead) {
         rebaseResult = { success: true, newHead };
       } else if (!sessionExists(agentId)) {
-        // Agent died — fall back to in-process rebase
-        console.log(`[merge] Falling back to in-process rebase for ${issueId}`);
-        rebaseResult = await rebaseFeatureBranch(workspacePath, branchName, 'main', issueId);
+        rebaseResult = {
+          success: false,
+          reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
+        };
       } else {
         // Timed out
-        rebaseResult = { success: false, reason: `Work agent did not push within ${REBASE_TIMEOUT_MS / 60000} minutes` };
+        rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
       }
-    } else {
-      // Agent not running — use in-process rebase as fallback
-      console.log(`[merge] Work agent not running — using in-process rebase for ${issueId}`);
-      rebaseResult = await rebaseFeatureBranch(workspacePath, branchName, 'main', issueId);
     }
 
     if (!rebaseResult.success) {
@@ -3388,16 +3488,17 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
       // Post PR comment about failure
       try {
-        const prMatch2 = prResult.prUrl?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
-        if (prMatch2) {
-          const [, owner, repo, prNum] = prMatch2;
+        if (artifactUrl) {
           const body = rebaseResult.conflictFiles?.length
             ? `## Merge Failed — Rebase Conflicts\n\nConflicts in: ${rebaseResult.conflictFiles.join(', ')}\n\nThe work agent has been notified to resolve conflicts.`
             : `## Merge Failed\n\n${error}`;
-          await execAsync(
-            `gh api repos/${owner}/${repo}/issues/${prNum}/comments -f body=${JSON.stringify(body)}`,
-            { encoding: 'utf-8' }
-          );
+          await getForgeAdapter(primaryForge).commentOnArtifact({
+            forge: primaryForge,
+            url: artifactUrl,
+            id: artifactId,
+            cwd: workspacePath,
+            body,
+          });
         }
       } catch { /* non-fatal */ }
 
@@ -3417,23 +3518,25 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       workspacePath,
       { isRemote: false },
       'merge-verify',
+      { syncTargetBranch: false },
     );
 
     if (verifyResult.outcome === 'failed') {
-      const error = `Post-rebase verification failed: ${verifyResult.reason || 'typecheck/lint/test errors'}`;
+      const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;
       console.log(`[merge] ${error}`);
       setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
       completePendingOperation(issueId, error);
 
       // Post comment on PR so failure is visible
       try {
-        const prMatch2 = prResult.prUrl?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
-        if (prMatch2) {
-          const [, owner, repo, prNum] = prMatch2;
-          await execAsync(
-            `gh api repos/${owner}/${repo}/issues/${prNum}/comments -f body=${JSON.stringify(`## Merge Blocked — Post-Rebase Verification Failed\n\n${verifyResult.reason || 'typecheck/lint/test errors after rebase'}\n\nThe branch was rebased successfully but verification failed. The work agent needs to fix the errors and resubmit.`)}`,
-            { encoding: 'utf-8' }
-          );
+        if (artifactUrl) {
+          await getForgeAdapter(primaryForge).commentOnArtifact({
+            forge: primaryForge,
+            url: artifactUrl,
+            id: artifactId,
+            cwd: workspacePath,
+            body: `## Merge Blocked — Post-Rebase Verification Failed\n\nFailed check: ${verifyResult.failedCheck}\n\nThe branch was rebased successfully but verification failed. The work agent needs to fix the errors and resubmit.`,
+          });
         }
       } catch { /* non-fatal */ }
 
@@ -3445,7 +3548,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // Must happen AFTER rebase because rebase changes the HEAD SHA.
     try {
       const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
-      if (isGitHubAppConfigured()) {
+      if (primaryForge === 'github' && prNumber && isGitHubAppConfigured()) {
         const { stdout: headSha } = await execAsync(
           `gh pr view ${prNumber} --json headRefOid --jq .headRefOid`,
           { encoding: 'utf-8', timeout: 10000 }
@@ -3461,16 +3564,18 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       console.warn(`[merge] Failed to report commit statuses: ${statusErr.message}`);
     }
 
-    // Step 4b: Merge PR via GitHub (squash merge for clean history)
+    // Step 4b: Merge the review artifact via the configured forge.
     try {
-      console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
-      const { stdout: mergeOutput } = await execAsync(
-        `gh pr merge ${prNumber} --squash`,
-        { cwd: workspacePath, encoding: 'utf-8' }
-      );
-      console.log(`[merge] PR merged: ${mergeOutput.trim()}`);
+      console.log(`[merge] Merging ${primaryForge} review artifact for ${issueId}...`);
+      await getForgeAdapter(primaryForge).mergeReviewArtifact({
+        forge: primaryForge,
+        url: artifactUrl,
+        id: artifactId,
+        cwd: workspacePath,
+        method: 'squash',
+      });
     } catch (prMergeErr: any) {
-      const error = `gh pr merge failed: ${prMergeErr.message}`;
+      const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
       setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 500, error };
@@ -3481,10 +3586,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // so queue processing must happen before that point.
     setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
     completePendingOperation(issueId, null);
-    _serverManagedMerges.delete(normalizedMergeId);
 
     // Dequeue next merge before lifecycle (which may kill the process)
-    dequeueNextMerge(projectKey);
+    advanceQueue();
 
     // Post-merge lifecycle runs last — may spawn deploy script that kills this server
     await postMergeLifecycle(issueId, projectPath, branchName);
@@ -3492,7 +3596,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     return {
       success: true,
       statusCode: 200,
-      message: `Successfully merged PR #${prNumber} for ${issueId}`,
+      message: `Successfully merged ${primaryForge} review artifact for ${issueId}`,
       prUrl: prResult.prUrl,
     };
   } catch (error: any) {
@@ -3501,13 +3605,12 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     completePendingOperation(issueId, error.message);
     return { success: false, statusCode: 500, error: error.message };
   } finally {
-    _serverManagedMerges.delete(normalizedMergeId);
-    // ALWAYS dequeue on any exit path — DB-backed, survives restart.
-    removeMerge(normalizedId);
-    dequeueNextMerge(projectKey);
+    advanceQueue();
   }
 
 }
+
+setMergeQueueTriggerHandler(triggerMerge);
 
 // ─── Route: POST /api/workspaces/:issueId/merge ───────────────────────────────
 

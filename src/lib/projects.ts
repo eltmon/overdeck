@@ -28,6 +28,7 @@ export interface IssueRoutingRule {
 export interface WorkspaceConfig {
   type?: 'polyrepo' | 'monorepo';
   workspaces_dir?: string;
+  default_branch?: string;
   repos?: RepoConfig[];
   dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
   ports?: Record<string, { range: [number, number] }>;
