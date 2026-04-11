@@ -52,6 +52,23 @@ join(PANOPTICON_HOME, ".manifest.json");
 const PRDS_DIR = join(join(PANOPTICON_HOME, "docs"), "prds");
 join(PRDS_DIR, "drafts");
 join(PRDS_DIR, "published");
+/**
+* Encode a filesystem path to match Claude Code's project directory naming.
+*
+* Claude Code replaces ALL non-alphanumeric characters (except hyphens) with
+* hyphens when encoding the CWD into the project directory name under
+* ~/.claude/projects/. For example:
+*
+*   /Users/edward.becker/Projects → -Users-edward-becker-Projects
+*   /home/eltmon/Projects         → -home-eltmon-Projects
+*   /tmp/test_under.dot+plus@at   → -tmp-test-under-dot-plus-at
+*
+* This is critical for session file lookup — a mismatch means JSONL files
+* are never found and conversation messages appear permanently empty.
+*/
+function encodeClaudeProjectDir(cwdPath) {
+	return cwdPath.replace(/[^a-zA-Z0-9-]/g, "-");
+}
 //#endregion
 //#region ../src/lib/cost.ts
 const DEFAULT_PRICING = [
@@ -484,7 +501,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
   `);
-	db.pragma(`user_version = 15`);
+	db.pragma(`user_version = 16`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -492,7 +509,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 15) return;
+	if (currentVersion === 16) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -654,7 +671,20 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
         ON merge_set_repos(issue_id, merge_order, repo_key);
     `);
-	db.pragma(`user_version = 15`);
+	if (currentVersion < 16) {
+		const conversations = db.prepare(`SELECT id, cwd, session_file FROM conversations WHERE session_file IS NOT NULL`).all();
+		for (const conversation of conversations) {
+			const match = conversation.session_file.match(/^(.*[/\\]\.claude[/\\]projects[/\\])([^/\\]+)([/\\]sessions[/\\][^/\\]+\.jsonl)$/);
+			if (!match) continue;
+			const [, prefix, encodedSegment, suffix] = match;
+			const expectedSegment = encodeClaudeProjectDir(conversation.cwd);
+			if (encodedSegment === expectedSegment) continue;
+			const correctedPath = `${prefix}${expectedSegment}${suffix}`;
+			if (!existsSync(correctedPath)) continue;
+			db.prepare(`UPDATE conversations SET session_file = ? WHERE id = ?`).run(correctedPath, conversation.id);
+		}
+	}
+	db.pragma(`user_version = 16`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
