@@ -1998,13 +1998,28 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
   const hasPendingQuestion = hasActualPendingQuestion(agent);
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
+  const phaseLabel =
+    canonical === 'backlog' ? 'Backlog' :
+    canonical === 'todo' ? 'Ready to start' :
+    canonical === 'in_progress' ? (isRunning ? 'Agent active' : 'Work paused') :
+    canonical === 'in_review' ? (isReadyToMerge ? 'Awaiting merge' : isPipelineStuck ? 'Needs recovery' : 'Review pipeline') :
+    canonical === 'done' ? 'Completed' :
+    'Canceled';
+  const cardTone = isPipelineStuck
+    ? 'from-destructive/12 via-destructive/5 to-transparent'
+    : isReadyToMerge
+      ? 'from-warning/20 via-warning/6 to-transparent'
+      : isRunning
+        ? 'from-primary/16 via-primary/6 to-transparent'
+        : 'from-surface-overlay/60 via-surface/40 to-transparent';
+  const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-divider/70 bg-surface/80 px-2.5 py-2';
 
-  const priorityColors: Record<number, string> = {
-    0: 'border-l-border',         // no priority — neutral
-    1: 'border-l-destructive',    // urgent — red
-    2: 'border-l-warning',        // high — amber
-    3: 'border-l-muted-foreground', // medium — subtle gray
-    4: 'border-l-border',         // low — barely visible
+  const priorityAccentColors: Record<number, string> = {
+    0: 'bg-border',
+    1: 'bg-destructive',
+    2: 'bg-warning',
+    3: 'bg-muted-foreground',
+    4: 'bg-border',
   };
 
   // Kill agent mutation
@@ -2200,23 +2215,99 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       ref={cardRef}
       data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
-      className={`rounded-lg p-3 border border-divider border-l-4 cursor-pointer transition-all ${isSessionLost ? 'border-l-warning' : (priorityColors[issue.priority] || 'border-l-content-muted')} ${
+      className={`group relative overflow-hidden rounded-2xl border border-divider/70 cursor-pointer transition-all shadow-[0_6px_22px_rgba(0,0,0,0.08)] ${isSessionLost ? 'border-warning/50' : ''} ${
         isSelected
-          ? 'ring-2 ring-blue-500'
-          : 'hover:border-divider'
-      } ${isRunning ? 'badge-bg-primary' : 'bg-surface'}`}
+          ? 'ring-2 ring-warning/70 shadow-[0_12px_30px_rgba(245,158,11,0.18)]'
+          : 'hover:-translate-y-0.5 hover:border-divider-strong hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
+      } bg-[linear-gradient(145deg,var(--color-surface)_0%,rgba(255,255,255,0.03)_100%)]`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+      <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${cardTone}`} />
+      <div
+        className={`absolute inset-y-0 left-0 w-1.5 ${
+          isPipelineStuck
+            ? 'bg-destructive'
+            : isReadyToMerge
+              ? 'bg-warning'
+              : isRunning
+                ? 'bg-primary'
+                : (priorityAccentColors[issue.priority] || 'bg-content-muted')
+        }`}
+      />
+
+      <div className="relative p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              {issue.project && (
+                <span
+                  className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_0_4px_rgba(255,255,255,0.05)]"
+                  style={{ backgroundColor: issue.project.color || '#6b7280' }}
+                  title={issue.project.name}
+                />
+              )}
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-content-subtle">
+                {phaseLabel}
+              </span>
+              {issue.source === 'github' && (
+                <span title="GitHub Issue" className="inline-flex items-center">
+                  <Github className="w-3 h-3 text-content-subtle" />
+                </span>
+              )}
+              <a
+                href={issue.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-content hover:text-primary"
+              >
+                <span>{issue.identifier}</span>
+                <ExternalLink className="w-3 h-3 opacity-50" />
+              </a>
+            </div>
+
+            <p className="mt-2 text-[15px] font-medium leading-5 text-content line-clamp-2">
+              {issue.title}
+            </p>
+
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              {(issue.labels || [])
+                .filter((label) => typeof label === 'string' && !['review ready', 'needs-close-out', 'merged', 'closed-out'].includes(label.toLowerCase()))
+                .slice(0, 3)
+                .map((label) => (
+                  <span
+                    key={label}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${getLabelStyle(label)}`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              {issue.assignee && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-divider/70 bg-surface/80 px-2.5 py-1 text-[11px] text-content-subtle">
+                  <User className="w-3 h-3" />
+                  {issue.assignee.name.split(' ')[0]}
+                </span>
+              )}
+              {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
+                      ? 'badge-bg-signal-cost text-signal-cost-foreground'
+                      : 'border border-divider/70 bg-surface/80 text-content-subtle'
+                  }`}
+                  title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
+                >
+                  {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
+                    <Cloud className="w-3 h-3" />
+                  ) : (
+                    <Monitor className="w-3 h-3" />
+                  )}
+                  {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
             {/* Project color indicator */}
-            {issue.project && (
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: issue.project.color || '#6b7280' }}
-                title={issue.project.name}
-              />
-            )}
             {isRunning && (
               <div className="flex gap-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0ms' }} />
@@ -2239,21 +2330,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Session lost
               </span>
             )}
-            <a
-              href={issue.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-sm font-medium text-content hover:text-primary flex items-center gap-1"
-            >
-              {issue.source === 'github' && (
-                <span title="GitHub Issue">
-                  <Github className="w-3 h-3 text-content-subtle" />
-                </span>
-              )}
-              <span className="text-content font-medium">{issue.identifier}</span>
-              <ExternalLink className="w-3 h-3 opacity-50" />
-            </a>
             {/* Agent attribution badges */}
             {(() => {
               const badges = [];
@@ -2430,48 +2506,29 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Needs Review
               </span>
             )}
-            {/* Cost badge — click for breakdown modal */}
+            </div>
+          </div>
+
+          <div className="shrink-0">
             {costsLoading && !cost && (
-              <span className="ml-auto w-12 h-4 bg-surface-overlay rounded animate-pulse" />
+              <span className="inline-block h-7 w-16 rounded-full bg-surface-overlay animate-pulse" />
             )}
             {cost && cost.totalCost > 0 && (
-              <span
+              <button
                 onClick={(e) => { e.stopPropagation(); setShowCostModal(true); }}
-                className={`ml-auto px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer hover:ring-1 hover:ring-white/20 transition-all ${getCostColor(cost.totalCost)}`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-all hover:ring-1 hover:ring-white/20 ${getCostColor(cost.totalCost)}`}
                 title="Click for cost breakdown"
               >
-                <DollarSign className="w-3 h-3 inline -mt-0.5" />
+                <DollarSign className="w-3 h-3" />
                 {formatCost(cost.totalCost).slice(1)}
-              </span>
+              </button>
             )}
           </div>
-          <p className="text-sm text-content-body mt-1 line-clamp-2">{issue.title}</p>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 mt-2 flex-wrap">
-        {issue.assignee && (
-          <span className="inline-flex items-center gap-1 text-xs text-content-subtle">
-            <User className="w-3 h-3" />
-            {issue.assignee.name.split(' ')[0]}
-          </span>
-        )}
-        {(issue.labels || [])
-          .filter((label) => typeof label === 'string' && !['review ready', 'needs-close-out', 'merged', 'closed-out'].includes(label.toLowerCase()))
-          .slice(0, 2)
-          .map((label) => (
-            <span
-              key={label}
-              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${getLabelStyle(label)}`}
-            >
-              {label}
-            </span>
-          ))}
-      </div>
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
+        <div className={actionBarClass}>
           <button
             onClick={handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -2559,7 +2616,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
+        <div className={actionBarClass}>
           {isPlanningActive ? (
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
@@ -2617,7 +2674,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
+        <div className={actionBarClass}>
           {isPlanningActive ? (
             <button
               data-testid={`action-watch-planning-${issue.identifier}`}
@@ -2688,7 +2745,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* In Review items - Resume Session (if lost) + Recover + Reopen */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
+        <div className={actionBarClass}>
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
           {(isSessionLost || isResuming) && (
             <button
@@ -2709,7 +2766,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* Done items - Reopen + Close Out */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-divider-strong flex-wrap">
+        <div className={actionBarClass}>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
             className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -2735,6 +2792,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         isOpen={showCostModal}
         onClose={() => setShowCostModal(false)}
       />
+      </div>
     </div>
   );
 }

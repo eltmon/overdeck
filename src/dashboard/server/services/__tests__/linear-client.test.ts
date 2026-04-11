@@ -132,6 +132,25 @@ describe('LinearClient Effect service', () => {
       expect(mockSdkSearchIssues).toHaveBeenCalledWith('MIN-1', { first: 1 });
     });
 
+    it('handles search results that expose labels as a property instead of a function', async () => {
+      const raw = makeRawIssue({
+        identifier: 'MIN-7',
+        labels: Promise.resolve({ nodes: [{ id: 'label-1', name: 'bug' }] }),
+      });
+      mockSdkSearchIssues.mockResolvedValue({ nodes: [raw] });
+
+      const { LinearClient, LinearClientLive } = await import('../linear-client.js');
+
+      const program = Effect.gen(function* () {
+        const client = yield* LinearClient;
+        return yield* client.getIssue('MIN-7');
+      }).pipe(Effect.provide(LinearClientLive));
+
+      const issue = await runEffect(program);
+      expect(issue.identifier).toBe('MIN-7');
+      expect(issue.labels).toEqual([{ id: 'label-1', name: 'bug' }]);
+    });
+
     it('fails with IssueNotFound when SDK returns null', async () => {
       // mockSdkIssue is already set to return null in beforeEach
 

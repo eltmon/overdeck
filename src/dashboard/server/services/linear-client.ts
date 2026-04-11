@@ -139,6 +139,22 @@ function wrapLinearError(tracker: string, err: unknown): TrackerApiError | RateL
   return new TrackerApiError({ tracker, message: msg, cause: err });
 }
 
+async function resolveLinearLabels(raw: any): Promise<Array<{ id: string; name: string }>> {
+  const source = typeof raw?.labels === 'function'
+    ? await raw.labels()
+    : await raw?.labels;
+  const nodes = Array.isArray(source?.nodes)
+    ? source.nodes
+    : Array.isArray(source)
+      ? source
+      : [];
+
+  return nodes.map((label: any) => ({
+    id: String(label?.id ?? ''),
+    name: String(label?.name ?? ''),
+  }));
+}
+
 function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
   return {
     getIssue: (id) =>
@@ -161,8 +177,7 @@ function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
 
           const state = await raw.state;
           const team = await raw.team;
-          const labelsConn = await raw.labels();
-          const labels = labelsConn.nodes.map((l: any) => ({ id: l.id, name: l.name }));
+          const labels = await resolveLinearLabels(raw);
 
           return {
             id: raw.id as string,
