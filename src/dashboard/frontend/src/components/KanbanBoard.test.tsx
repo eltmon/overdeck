@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowReviewReadyBadge } from './KanbanBoard';
+import { applyReviewStateToIssue, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge } from './KanbanBoard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -185,6 +185,28 @@ describe('shouldShowReviewReadyBadge', () => {
   it('falls back to the review ready label when no review status exists', () => {
     const issue = createMockIssue();
     expect(shouldShowReviewReadyBadge(issue)).toBe(true);
+  });
+});
+
+describe('shouldShowAgentDoneBadge', () => {
+  it('shows the done badge while work is still in progress', () => {
+    expect(shouldShowAgentDoneBadge({
+      issueStatus: 'In Progress',
+      isTerminal: false,
+      isPipelineStuck: false,
+      resolution: 'done',
+      hasPendingQuestion: false,
+    })).toBe(true);
+  });
+
+  it('hides the done badge once the issue is in review', () => {
+    expect(shouldShowAgentDoneBadge({
+      issueStatus: 'In Review',
+      isTerminal: false,
+      isPipelineStuck: false,
+      resolution: 'done',
+      hasPendingQuestion: false,
+    })).toBe(false);
   });
 });
 
