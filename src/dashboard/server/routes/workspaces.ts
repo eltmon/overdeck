@@ -3807,6 +3807,32 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
+// ─── Route: GET /api/merge-queue ─────────────────────────────────────────────
+
+const getMergeQueueRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-queue',
+  httpHandler(Effect.gen(function* () {
+    const queues: Array<{
+      projectKey: string;
+      current: string | null;
+      queue: string[];
+      queueLength: number;
+    }> = [];
+    for (const [projectKey, q] of _mergeQueues) {
+      if (q.current || q.queue.length > 0) {
+        queues.push({
+          projectKey,
+          current: q.current,
+          queue: [...q.queue],
+          queueLength: q.queue.length,
+        });
+      }
+    }
+    return jsonResponse({ queues });
+  })),
+);
+
 export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
@@ -3828,6 +3854,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   deleteWorkspacePendingRoute,
   getWorkspaceTldrRoute,
   postWorkspaceRefreshTokenRoute,
+  getMergeQueueRoute,
 );
 
 export default workspacesRouteLayer;
