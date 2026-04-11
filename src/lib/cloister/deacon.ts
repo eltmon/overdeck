@@ -1502,13 +1502,15 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 // Ready-for-merge stuck detection (PAN-344)
 // ============================================================================
 
-// Minimum age (ms) of a readyForMerge status before deacon considers it stuck.
-// Primary trigger fires synchronously in setReviewStatus; 2 min gives it time to start.
-const MERGE_STUCK_STALENESS_MS = 2 * 60 * 1000; // 2 minutes
-// Minimum wait (ms) between successive auto-merge attempts for the same issue
-const MERGE_STUCK_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-// Circuit breaker: stop attempting after this many tries
-const MERGE_STUCK_MAX_ATTEMPTS = 3;
+// Minimum age (ms) of a readyForMerge status before deacon sends a merge-ready reminder.
+// This is NOT a stuck detection — it's a courtesy notification that a merge is waiting
+// for the human to click MERGE. One hour is reasonable; the human may be reviewing,
+// working on other things, or intentionally waiting.
+const MERGE_READY_REMINDER_MS = 60 * 60 * 1000; // 1 hour
+// Minimum wait (ms) between successive merge-ready reminders for the same issue
+const MERGE_READY_REMINDER_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+// Circuit breaker: stop reminding after this many times (per server lifetime)
+const MERGE_READY_REMINDER_MAX = 3;
 
 // In-memory cooldowns for stuck-merge detection (reset on server restart is acceptable —
 // cooldowns are a performance optimisation, not critical state)
@@ -1579,25 +1581,22 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
       if (!status.readyForMerge) continue;
       if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
 
-      // Staleness check: must have been readyForMerge for at least 2 minutes.
-      // Skip entries without a timestamp — we cannot determine staleness.
+      // Wait at least 1 hour before sending a merge-ready reminder.
+      // The human controls when to merge — this is just a courtesy notification.
       if (!status.updatedAt) continue;
       const statusAge = now - new Date(status.updatedAt).getTime();
-      if (statusAge < MERGE_STUCK_STALENESS_MS) continue;
+      if (statusAge < MERGE_READY_REMINDER_MS) continue;
 
       // Per-issue cooldown (in-memory — reset on restart is acceptable for a rate-limiter)
       const lastAttempt = mergeStuckCooldowns.get(key);
-      if (lastAttempt && (now - lastAttempt) < MERGE_STUCK_COOLDOWN_MS) continue;
+      if (lastAttempt && (now - lastAttempt) < MERGE_READY_REMINDER_COOLDOWN_MS) continue;
 
       // Circuit breaker (persisted to deacon state so restart doesn't reset the count)
       const attempts = attemptCounts[key] ?? 0;
-      if (attempts >= MERGE_STUCK_MAX_ATTEMPTS) {
-        console.log(`[deacon] Merge stuck circuit breaker active for ${key} (${attempts}/${MERGE_STUCK_MAX_ATTEMPTS} attempts)`);
-        continue;
-      }
+      if (attempts >= MERGE_READY_REMINDER_MAX) continue;
 
-      const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
-      console.warn(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}) — merge requires manual action via MERGE button`);
+      const ageHours = Math.round((now - new Date(status.updatedAt).getTime()) / 3600000 * 10) / 10;
+      console.log(`[deacon] Merge-ready reminder for ${key} (ready for ${ageHours}h, reminder ${attempts + 1}/${MERGE_READY_REMINDER_MAX})`);
 
       // Record attempt before notifying so a crash doesn't leave us in a retry loop
       mergeStuckCooldowns.set(key, now);
@@ -1606,7 +1605,7 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 
       // Notify the dashboard via Socket.io so the user knows to click MERGE.
       // Auto-triggering merge was removed in PAN-354; the MERGE button is the sole trigger.
-      const msg = `Stuck-merge: ${key} has been readyForMerge for ${ageMin}m — click MERGE to proceed`;
+      const msg = `Merge ready: ${key} has been waiting for merge for ${ageHours}h — click MERGE when ready`;
       if (mergeReadyNotifier) {
         mergeReadyNotifier(status.issueId ?? key);
         actions.push(msg);
