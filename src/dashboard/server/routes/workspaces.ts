@@ -186,6 +186,17 @@ function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
   return undefined;
 }
 
+function parseGitHubPullRequestUrl(url?: string | null): { owner: string; repo: string; number: number } | null {
+  if (!url) return null;
+  const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  if (!match) return null;
+  return {
+    owner: match[1],
+    repo: match[2],
+    number: Number.parseInt(match[3], 10),
+  };
+}
+
 interface WorkspaceInfo {
   exists: boolean;
   isRemote: boolean;
@@ -3398,9 +3409,8 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     const artifactUrl = primaryRepo?.artifactUrl || prResult.prUrl;
     const artifactId = primaryRepo?.artifactId;
-    const prNumber = primaryForge === 'github'
-      ? artifactUrl.match(/\/pull\/(\d+)/)?.[1]
-      : undefined;
+    const githubPrRef = primaryForge === 'github' ? parseGitHubPullRequestUrl(artifactUrl) : null;
+    const prNumber = githubPrRef ? String(githubPrRef.number) : undefined;
     if (primaryForge === 'github' && !prNumber) {
       const error = `Could not parse PR number from URL: ${artifactUrl}`;
       setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
@@ -3547,16 +3557,13 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // Step 4a: Report commit statuses on post-rebase HEAD (branch protection requires them).
     // Must happen AFTER rebase because rebase changes the HEAD SHA.
     try {
-      const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
-      if (primaryForge === 'github' && prNumber && isGitHubAppConfigured()) {
-        const { stdout: headSha } = await execAsync(
-          `gh pr view ${prNumber} --json headRefOid --jq .headRefOid`,
-          { encoding: 'utf-8', timeout: 10000 }
-        );
-        const sha = headSha.trim();
+      const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
+      if (githubPrRef && isGitHubAppConfigured()) {
+        const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
+        const sha = prState.headSha.trim();
         if (sha) {
-          await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/review', 'Review passed');
-          await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/test', 'Tests passed');
+          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'panopticon/review', 'Review passed');
+          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'panopticon/test', 'Tests passed');
           console.log(`[merge] Reported commit statuses on post-rebase HEAD for ${issueId} (${sha.slice(0, 8)})`);
         }
       }
@@ -3565,6 +3572,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     // Step 4b: Merge the review artifact via the configured forge.
+    let artifactMerged = false;
     try {
       console.log(`[merge] Merging ${primaryForge} review artifact for ${issueId}...`);
       await getForgeAdapter(primaryForge).mergeReviewArtifact({
@@ -3574,11 +3582,24 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         cwd: workspacePath,
         method: 'squash',
       });
+      artifactMerged = true;
     } catch (prMergeErr: any) {
-      const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
-      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
-      completePendingOperation(issueId, error);
-      return { success: false, statusCode: 500, error };
+      try {
+        const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
+        if (githubPrRef && isGitHubAppConfigured()) {
+          const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
+          artifactMerged = prState.merged;
+        }
+      } catch {
+        // Fall through to the original merge error below.
+      }
+
+      if (!artifactMerged) {
+        const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 500, error };
+      }
     }
 
     // Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle.

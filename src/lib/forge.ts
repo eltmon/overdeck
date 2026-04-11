@@ -3,8 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { unlink, writeFile } from 'node:fs/promises';
+import {
+  getPullRequestState,
+  isGitHubAppConfigured,
+  mergePullRequestWithApp,
+  parsePullRequestRef,
+} from './github-app.js';
 
 const execAsync = promisify(exec);
+const GITHUB_MERGE_POLL_INTERVAL_MS = 5000;
+const GITHUB_MERGE_TIMEOUT_MS = 2 * 60 * 1000;
 
 export type ForgeType = 'github' | 'gitlab';
 
@@ -114,6 +122,19 @@ async function getExistingGitLabArtifact(
   };
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientGitHubMergeState(state: Awaited<ReturnType<typeof getPullRequestState>>): boolean {
+  if (state.merged) return false;
+  if (state.draft) return false;
+  if (state.checksFailed) return false;
+  if (state.checksPending) return true;
+  if (state.mergeable === null) return true;
+  return ['unknown', 'blocked', 'behind', 'unstable', 'has_hooks'].includes(state.mergeableState || '');
+}
+
 const githubForgeAdapter: ForgeAdapter = {
   forge: 'github',
 
@@ -141,10 +162,64 @@ const githubForgeAdapter: ForgeAdapter = {
   async mergeReviewArtifact(input) {
     const target = buildGitHubReviewTarget(input);
     const method = input.method || 'squash';
-    await execAsync(
-      `gh pr merge ${target}${buildRepositoryFlag(input.repository)} --${method}`,
-      { cwd: input.cwd, encoding: 'utf-8' }
-    );
+    if (!isGitHubAppConfigured()) {
+      await execAsync(
+        `gh pr merge ${target}${buildRepositoryFlag(input.repository)} --${method}`,
+        { cwd: input.cwd, encoding: 'utf-8' }
+      );
+      return;
+    }
+
+    const ref = parsePullRequestRef(input);
+    const deadline = Date.now() + GITHUB_MERGE_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      const state = await getPullRequestState(ref.owner, ref.repo, ref.number);
+
+      if (state.merged) return;
+      if (state.state !== 'OPEN') {
+        throw new Error(`GitHub PR #${ref.number} is closed but not merged`);
+      }
+      if (state.draft) {
+        throw new Error(`GitHub PR #${ref.number} is still marked as draft`);
+      }
+      if (state.checksFailed) {
+        throw new Error(`GitHub PR #${ref.number} has failing required checks`);
+      }
+
+      if (isTransientGitHubMergeState(state)) {
+        await delay(GITHUB_MERGE_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      try {
+        const mergeResult = await mergePullRequestWithApp(
+          ref.owner,
+          ref.repo,
+          ref.number,
+          method,
+          state.headSha || undefined,
+        );
+        if (mergeResult.merged) return;
+      } catch (err: any) {
+        const message = String(err?.message || err);
+        if (
+          message.includes('405') ||
+          message.includes('409') ||
+          message.includes('422') ||
+          message.includes('not mergeable') ||
+          message.includes('Base branch was modified') ||
+          message.includes('required status check') ||
+          message.includes('Head branch was modified')
+        ) {
+          await delay(GITHUB_MERGE_POLL_INTERVAL_MS);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw new Error(`Timed out waiting for GitHub PR #${ref.number} to become mergeable`);
   },
 
   async commentOnArtifact(input) {
