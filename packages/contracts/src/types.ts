@@ -36,7 +36,7 @@ export type ReviewStatusValue = typeof ReviewStatusValue.Type
 export const TestStatusValue = Schema.Literals(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"])
 export type TestStatusValue = typeof TestStatusValue.Type
 
-export const MergeStatusValue = Schema.Literals(["pending", "merging", "merged", "failed"])
+export const MergeStatusValue = Schema.Literals(["pending", "merging", "verifying", "merged", "failed"])
 export type MergeStatusValue = typeof MergeStatusValue.Type
 
 // ─── Agent ────────────────────────────────────────────────────────────────────

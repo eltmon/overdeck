@@ -3283,7 +3283,44 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
-    // Step 3: Merge PR via GitHub (squash merge for clean history)
+    // Step 3: Post-rebase verification gate (typecheck, lint, test)
+    // Ensures the rebase didn't introduce issues before merging.
+    setReviewStatus(issueId, { mergeStatus: 'verifying' });
+    console.log(`[merge] Running post-rebase verification for ${issueId}...`);
+
+    const { runVerificationForIssue } = await import(
+      '../../../lib/cloister/verification-runner.js'
+    );
+    const verifyResult = await runVerificationForIssue(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'merge-verify',
+    );
+
+    if (verifyResult.outcome === 'failed') {
+      const error = `Post-rebase verification failed: ${verifyResult.reason || 'typecheck/lint/test errors'}`;
+      console.log(`[merge] ${error}`);
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error });
+      completePendingOperation(issueId, error);
+
+      // Post comment on PR so failure is visible
+      try {
+        const prMatch2 = prResult.prUrl?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+        if (prMatch2) {
+          const [, owner, repo, prNum] = prMatch2;
+          await execAsync(
+            `gh api repos/${owner}/${repo}/issues/${prNum}/comments -f body=${JSON.stringify(`## Merge Blocked — Post-Rebase Verification Failed\n\n${verifyResult.reason || 'typecheck/lint/test errors after rebase'}\n\nThe branch was rebased successfully but verification failed. The work agent needs to fix the errors and resubmit.`)}`,
+            { encoding: 'utf-8' }
+          );
+        }
+      } catch { /* non-fatal */ }
+
+      return { success: false, statusCode: 500, error };
+    }
+    console.log(`[merge] Post-rebase verification ${verifyResult.outcome} for ${issueId}`);
+
+    // Step 4: Merge PR via GitHub (squash merge for clean history)
     try {
       console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
       const { stdout: mergeOutput } = await execAsync(
@@ -3298,7 +3335,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
-    // Step 4: Post-merge lifecycle (move PRD, close issue, compact beads, etc.)
+    // Step 5: Post-merge lifecycle (move PRD, close issue, compact beads, etc.)
     setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
     completePendingOperation(issueId, null);
     await postMergeLifecycle(issueId, projectPath, branchName);
