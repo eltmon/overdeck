@@ -11,7 +11,7 @@ export interface ReviewStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'merging' | 'verifying' | 'merged' | 'failed';
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
   inspectNotes?: string;
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
