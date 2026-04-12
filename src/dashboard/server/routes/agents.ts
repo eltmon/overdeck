@@ -82,6 +82,7 @@ import {
   getAgentPendingQuestions as getAgentPendingQuestionsShared,
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
+import { parseConversationMessages } from '../services/conversation-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
@@ -543,6 +544,32 @@ const getAgentOutputRoute = HttpRouter.add(
           return jsonResponse({ output: '' });
         }
       })
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/conversation ─────────────────────────────────
+
+const getAgentConversationRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/conversation',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+
+    return yield* Effect.promise(async () => {
+      const emptyResult = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
+      try {
+        const jsonlPath = await getAgentJsonlPathShared(id);
+        if (!jsonlPath || !existsSync(jsonlPath)) {
+          return jsonResponse(emptyResult);
+        }
+        const result = await parseConversationMessages(jsonlPath);
+        // Force streaming: false — tmux session is dead, any "streaming" state is stale
+        return jsonResponse({ ...result, streaming: false });
+      } catch {
+        return jsonResponse(emptyResult);
+      }
+    });
   })),
 );
 
@@ -1842,6 +1869,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
 export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
+  getAgentConversationRoute,
   postAgentMessageRoute,
   deleteAgentRoute,
   getAgentHealthHistoryRoute,

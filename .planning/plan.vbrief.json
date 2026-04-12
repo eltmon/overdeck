@@ -1,150 +1,141 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-11T12:00:00Z",
+    "created": "2026-04-12T22:40:18Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-645: Tests: root Vitest config does not discover ActionsSection.test.tsx",
-    "updated": "2026-04-12T19:51:53.135Z"
+    "description": "Plan for PAN-473: Workspace detail — structured conversation view for stopped agents"
   },
   "plan": {
-    "id": "pan-645",
-    "title": "Tests: root Vitest config does not discover ActionsSection.test.tsx",
+    "id": "pan-473",
+    "title": "Workspace detail: structured conversation view for stopped agents",
     "status": "approved",
-    "uid": "a3f7e1c2-8d4b-4f6a-9e3c-5b2d1a0f8e7c",
+    "uid": "606b26da-13f7-4227-b225-1ff6ce6c786d",
     "author": "agent:claude-opus-4-6",
-    "sequence": 21,
-    "created": "2026-04-11T12:00:00Z",
-    "updated": "2026-04-12T19:51:53.135Z",
+    "sequence": 1,
+    "created": "2026-04-12T22:40:18Z",
+    "updated": "2026-04-12T22:40:18Z",
     "references": [
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/645",
-        "label": "PAN-645",
-        "type": "issue"
-      }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/473", "label": "PAN-473", "type": "issue" }
     ],
-    "tags": [
-      "testing",
-      "vitest",
-      "config"
-    ],
+    "tags": ["dashboard", "frontend", "backend", "conversation", "workspace-detail"],
     "narratives": {
-      "Problem": "Root vitest include patterns only match tests/**/*.test.ts and src/**/__tests__/**/*.test.ts, missing 13 colocated *.test.tsx frontend files. Even expanding patterns wouldn't work because root config lacks jsdom environment and React plugin.",
-      "Proposal": "Create a vitest.workspace.ts that references all three project vitest configs (root, frontend, desktop), letting root vitest discover and run all tests with correct environments. Simplify npm test script to a single vitest invocation."
+      "Problem": "When an agent's tmux session is dead, TerminalPanel.tsx renders raw tmux capture output inside a <pre> tag, flattening user messages, tool calls, code blocks, and timestamps into monospace noise. Mission Control already parses Claude Code JSONL transcripts into a structured MessagesTimeline view — PAN-473 wires that same renderer into the workspace detail panel for stopped agents.",
+      "Proposal": "Two-file wiring exercise. (1) Add GET /api/agents/:id/conversation to src/dashboard/server/routes/agents.ts that resolves the JSONL via getAgentJsonlPath() and calls parseConversationMessages() from conversation-service.ts (same function ws-rpc.ts already uses). Return ParseResult shape; return empty arrays with HTTP 200 when no JSONL exists so frontend can fall back. Force streaming:false for stopped agents. (2) In TerminalPanel.tsx, when isStopped, add a useQuery for the conversation and render <MessagesTimeline> instead of <pre> when messages exist, else fall back to raw output. No new components. Remote-agent JSONL shipping is explicitly out of scope."
     },
     "items": [
       {
-        "id": "create-workspace-config",
-        "title": "Create vitest.workspace.ts at project root",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-11T12:00:00Z",
+        "id": "backend-endpoint",
+        "title": "Add GET /api/agents/:id/conversation endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T22:40:18Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-645"
+          "issueLabel": "pan-473"
         },
         "narrative": {
-          "Action": "Create vitest.workspace.ts referencing vitest.config.ts, src/dashboard/frontend/vitest.config.ts, and apps/desktop/vitest.config.ts. Each project keeps its own environment, plugins, and include patterns."
+          "Action": "Add a new Effect HttpRouter.add handler in src/dashboard/server/routes/agents.ts that resolves the JSONL session file via getAgentJsonlPathShared(id), calls parseConversationMessages(jsonlPath) from ./services/conversation-service.js, and returns a JSON response with { messages, workLog, streaming: false, totalCost, byteOffset }. The streaming flag must be forced to false regardless of what parseConversationMessages returns, because any live-streaming state is stale for a dead tmux session. When the JSONL path does not exist on disk (legacy agents, remote agents without JSONL sync, fresh agents that never produced a transcript), return 200 with { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 } — NOT a 404 — so the frontend has a clean fallback signal. Register the new route in the agentsRouteLayer Layer.mergeAll list (currently at line 1842) alongside the other routes. Follow the existing getAgentOutputRoute pattern at line 478 for handler structure. parseConversationMessages is already async (fs/promises), so no execSync / blocking-call concerns apply."
         },
         "subItems": [
           {
-            "id": "create-workspace-config.ac1",
-            "title": "vitest.workspace.ts exists at project root and references all three vitest configs",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T14:34:38.864Z"
+            "id": "backend-endpoint.ac1",
+            "title": "GET /api/agents/:id/conversation returns 200 with { messages, workLog, streaming, totalCost, byteOffset } when a valid JSONL file exists for the agent",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "create-workspace-config.ac2",
-            "title": "npx vitest --run from root discovers ActionsSection.test.tsx and other colocated frontend tests",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T14:34:38.864Z"
+            "id": "backend-endpoint.ac2",
+            "title": "GET /api/agents/:id/conversation returns 200 with empty arrays and streaming:false when the JSONL file does not exist (must not 404 or 500)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-endpoint.ac3",
+            "title": "The response `streaming` field is always false regardless of what parseConversationMessages returns, because the endpoint targets stopped agents",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-endpoint.ac4",
+            "title": "The new route is registered in agentsRouteLayer (Layer.mergeAll at the bottom of routes/agents.ts) so it is actually served — a forgotten Layer.mergeAll entry is a common regression and must be verified",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-endpoint.ac5",
+            "title": "Handler uses only async I/O (fs/promises, execAsync) — no execSync, readFileSync, or other blocking calls in the dashboard server path (per CLAUDE.md and .claude/rules/no-execsync-server.md)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-endpoint.ac6",
+            "title": "npm run typecheck, npm run lint, and npm test all pass after the change",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-12T19:51:53.135Z"
+        ]
       },
       {
-        "id": "update-test-script",
-        "title": "Simplify npm test script to single vitest invocation",
-        "status": "completed",
+        "id": "frontend-render",
+        "title": "Render MessagesTimeline for stopped agents in TerminalPanel",
+        "status": "pending",
         "priority": "medium",
-        "created": "2026-04-11T12:00:00Z",
+        "created": "2026-04-12T22:40:18Z",
         "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-645"
+          "difficulty": "simple",
+          "issueLabel": "pan-473"
         },
         "narrative": {
-          "Action": "Update package.json test script from 'vitest --run --no-file-parallelism && cd src/dashboard/frontend && npm test' to 'vitest --run --no-file-parallelism' since the workspace config handles frontend test discovery."
+          "Action": "In src/dashboard/frontend/src/components/TerminalPanel.tsx, when isStopped === true, add a second useQuery keyed ['agent-conversation', agent.id] that fetches GET /api/agents/:id/conversation and is enabled only when isStopped. If the response has messages.length > 0, render <MessagesTimeline messages={messages} workLog={workLog} streaming={false} /> (imported from ./chat/MessagesTimeline) inside the flex content container in place of the existing <pre>. If messages.length === 0 (no JSONL found), fall back to the current raw <pre>{output}</pre> rendering unchanged so legacy and remote agents still show something useful. Update the header label to show 'Conversation' when the timeline is rendering and keep 'Last output' otherwise. The refresh button should refetch both the raw-output and the conversation queries (simplest: call refetch() on both, or invalidate both query keys via queryClient). Reuse MessagesTimeline / ChatMarkdown / WorkLogGroup exactly as ConversationPanel.tsx does — no new components, no style overrides. Do not modify XTerminal, MessagesTimeline, or any chat primitives. Do not change the isStopped probe logic (tmux-alive query) or the running-agent path."
         },
         "subItems": [
           {
-            "id": "update-test-script.ac1",
-            "title": "npm test runs both backend and frontend tests in a single vitest invocation",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T14:34:38.863Z"
-          }
-        ],
-        "completed": "2026-04-12T19:51:53.134Z"
-      },
-      {
-        "id": "verify-discovery",
-        "title": "Verify test discovery and execution",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-11T12:00:00Z",
-        "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-645"
-        },
-        "narrative": {
-          "Action": "Run npx vitest --run against ActionsSection.test.tsx from root to confirm it executes. Run npm test to confirm all backend and frontend tests pass. Verify no regressions in existing test runs."
-        },
-        "subItems": [
-          {
-            "id": "verify-discovery.ac1",
-            "title": "npx vitest --run src/dashboard/frontend/src/components/inspector/ActionsSection.test.tsx succeeds from project root",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T14:34:38.862Z"
+            "id": "frontend-render.ac1",
+            "title": "When viewing a stopped agent whose JSONL session file exists, the workspace detail panel shows <MessagesTimeline> with structured message bubbles, tool calls as collapsible work-log groups, and timestamps — NOT a raw <pre> dump",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "verify-discovery.ac2",
-            "title": "npm test passes with no regressions",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T14:34:38.862Z"
+            "id": "frontend-render.ac2",
+            "title": "When viewing a stopped agent with no JSONL file (legacy/remote), the panel falls back to the existing <pre>{output}</pre> rendering — it must not show a broken empty state, an error toast, or nothing at all",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "frontend-render.ac3",
+            "title": "Running agents (isStopped === false) continue to render <XTerminal> exactly as before — the conversation view applies only to stopped agents",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "frontend-render.ac4",
+            "title": "The refresh button in the stopped-agent header refetches both the raw output and the conversation queries so the view stays in sync when the agent's JSONL is updated externally",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "frontend-render.ac5",
+            "title": "The header label reads 'Conversation' when MessagesTimeline is rendering and 'Last output' when the <pre> fallback is rendering, so the user can tell which view they are looking at",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "frontend-render.ac6",
+            "title": "No new chat components, no duplicated parsing logic, no local copies of ChatMessage/WorkLogEntry types — MessagesTimeline and chat-types are imported from src/dashboard/frontend/src/components/chat/ exactly as ConversationPanel.tsx does",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "frontend-render.ac7",
+            "title": "npm run typecheck, npm run lint, and npm test all pass; the feature is exercised in a browser against at least one stopped agent with a real JSONL transcript to confirm the timeline renders correctly (per CLAUDE.md 'test in a browser before reporting complete')",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-12T19:51:53.134Z"
+        ]
       }
     ],
     "edges": [
-      {
-        "from": "create-workspace-config",
-        "to": "update-test-script",
-        "type": "blocks"
-      },
-      {
-        "from": "create-workspace-config",
-        "to": "verify-discovery",
-        "type": "blocks"
-      },
-      {
-        "from": "update-test-script",
-        "to": "verify-discovery",
-        "type": "blocks"
-      }
+      { "from": "backend-endpoint", "to": "frontend-render", "type": "blocks" }
     ]
   }
 }
