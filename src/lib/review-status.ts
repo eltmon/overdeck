@@ -43,11 +43,12 @@ export interface ReviewStatus {
 }
 
 function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
-  return (
-    status.verificationStatus === undefined ||
-    status.verificationStatus === 'passed' ||
-    status.verificationStatus === 'skipped'
-  );
+  // Only block readyForMerge if verification explicitly FAILED.
+  // 'pending' means "scheduled but not yet run this cycle" — not a failure signal.
+  // request-review resets verificationStatus to 'pending' as part of its cycle reset,
+  // but subsequent review+test passing should still yield readyForMerge=true.
+  // The post-rebase gate in triggerMerge() is the authoritative quality gate (PAN-XXX).
+  return status.verificationStatus !== 'failed';
 }
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -299,6 +300,40 @@ export function clearStuckMergeStatuses(): void {
       mergeStatus: 'pending',
       ...(shouldBeReady ? { readyForMerge: true } : {}),
     });
+  }
+}
+
+/**
+ * On server startup, fix any issues where review+test both passed and
+ * verificationStatus is not 'failed', but readyForMerge is stuck at false.
+ *
+ * This happens when:
+ * 1. A merge attempt was made (merging → verifying)
+ * 2. The server restarted while verifying — clearStuckMergeStatuses reset mergeStatus to 'pending'
+ * 3. At restart time, verificationStatus was 'pending' (reset by the request-review cycle)
+ * 4. The old verificationSatisfied check blocked readyForMerge because of 'pending' status
+ *
+ * With verificationSatisfied now only blocking on 'failed', these issues should be
+ * re-evaluated and readyForMerge restored so they reappear on the Awaiting Merge page.
+ */
+export function fixStuckReadyForMerge(): void {
+  const statuses = loadReviewStatuses();
+  const stuck = Object.values(statuses).filter(s =>
+    s.readyForMerge === false &&
+    s.reviewStatus === 'passed' &&
+    (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
+    verificationSatisfied(s) &&
+    // Only fix 'pending'/'queued' merge states — not 'failed' ones.
+    // 'failed' means the merge actually attempted and broke; those need human review,
+    // not automatic restoration. 'merged' is done. Only pending/queued are stuck-but-valid.
+    (s.mergeStatus === 'pending' || s.mergeStatus === 'queued' || s.mergeStatus === undefined || s.mergeStatus === null) &&
+    (s.uatStatus === undefined || s.uatStatus === 'passed')
+  );
+  if (stuck.length === 0) return;
+  console.log(`[review-status] Restoring readyForMerge for ${stuck.length} issue(s) with passed review+test`);
+  for (const s of stuck) {
+    console.log(`[review-status] Restoring readyForMerge=true for ${s.issueId} (verif=${s.verificationStatus}, merge=${s.mergeStatus})`);
+    setReviewStatus(s.issueId, { readyForMerge: true });
   }
 }
 
