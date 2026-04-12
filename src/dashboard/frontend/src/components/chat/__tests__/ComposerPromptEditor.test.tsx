@@ -27,12 +27,18 @@ const localStorageMock = {
 };
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
-// Capture the OnChangePlugin onChange callback so tests can trigger slash menu
-let capturedOnChange: (() => void) | null = null;
+// Capture the root element so we can fire keydown events on it
+let capturedRootElement: HTMLDivElement;
 
 const mockEditor = {
   registerCommand: vi.fn(() => () => {}),
-  read: vi.fn((cb: () => void) => cb()),
+  getRootElement: () => {
+    if (!capturedRootElement) {
+      capturedRootElement = document.createElement('div');
+      capturedRootElement.contentEditable = 'true';
+    }
+    return capturedRootElement;
+  },
 };
 
 // Mock window.getSelection / Range
@@ -44,9 +50,6 @@ const mockSelection = {
   getRangeAt: vi.fn(() => mockRange),
 };
 vi.stubGlobal('getSelection', vi.fn(() => mockSelection));
-
-// jsdom doesn't implement scrollIntoView
-window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 // Mock Lexical
 vi.mock('@lexical/react/LexicalComposer', () => ({
@@ -75,10 +78,7 @@ vi.mock('@lexical/react/LexicalHistoryPlugin', () => ({
 }));
 
 vi.mock('@lexical/react/LexicalOnChangePlugin', () => ({
-  OnChangePlugin: ({ onChange }: { onChange: () => void }) => {
-    capturedOnChange = onChange;
-    return null;
-  },
+  OnChangePlugin: () => null,
 }));
 
 vi.mock('@lexical/react/LexicalComposerContext', () => ({
@@ -117,7 +117,7 @@ describe('ComposerPromptEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
-    capturedOnChange = null;
+    capturedRootElement = undefined as unknown as HTMLDivElement;
   });
 
   afterEach(() => {
@@ -176,7 +176,7 @@ describe('ComposerPromptEditor', () => {
       );
 
       // Fire / keydown on the root element (where the listener is registered)
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
 
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
     });
@@ -189,7 +189,7 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
 
       const menu = screen.getByRole('listbox', { name: 'Slash commands' });
       expect(menu).toBeInTheDocument();
@@ -207,7 +207,7 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Escape handler is on document
@@ -226,7 +226,7 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Click outside (on body, which is definitely outside the menu)
@@ -245,7 +245,7 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Click /model button
@@ -257,7 +257,7 @@ describe('ComposerPromptEditor', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('navigates down with ArrowDown through sequential commands', () => {
+    it('navigates down with ArrowDown', () => {
       render(
         <ComposerPromptEditor
           conversationName="test-conversation"
@@ -265,32 +265,32 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Initially /model is selected (index 0)
       expect(screen.getByText('/model').closest('button')).toHaveAttribute('aria-selected', 'true');
 
-      // ArrowDown → /context selected (index 1)
+      // ArrowDown → /context selected
       act(() => {
         fireEvent.keyDown(document, { key: 'ArrowDown' });
       });
       expect(screen.getByText('/context').closest('button')).toHaveAttribute('aria-selected', 'true');
 
-      // ArrowDown → /effort selected (index 2)
+      // ArrowDown → /effort selected
       act(() => {
         fireEvent.keyDown(document, { key: 'ArrowDown' });
       });
       expect(screen.getByText('/effort').closest('button')).toHaveAttribute('aria-selected', 'true');
 
-      // ArrowDown → /cancel selected (index 3)
+      // ArrowDown → /cancel selected
       act(() => {
         fireEvent.keyDown(document, { key: 'ArrowDown' });
       });
       expect(screen.getByText('/cancel').closest('button')).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('navigates up with ArrowUp through sequential commands', () => {
+    it('navigates up with ArrowUp', () => {
       render(
         <ComposerPromptEditor
           conversationName="test-conversation"
@@ -298,18 +298,27 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      act(() => { capturedOnChange?.(); });
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
 
-      // Initially /model is selected (index 0)
-      expect(screen.getByText('/model').closest('button')).toHaveAttribute('aria-selected', 'true');
+      // Navigate forward to /cancel (index 3)
+      act(() => { fireEvent.keyDown(document, { key: 'ArrowDown' }); });
+      act(() => { fireEvent.keyDown(document, { key: 'ArrowDown' }); });
+      act(() => { fireEvent.keyDown(document, { key: 'ArrowDown' }); });
+      expect(screen.getByText('/cancel').closest('button')).toHaveAttribute('aria-selected', 'true');
 
-      // ArrowDown to /context
+      // ArrowUp → /effort
       act(() => {
-        fireEvent.keyDown(document, { key: 'ArrowDown' });
+        fireEvent.keyDown(document, { key: 'ArrowUp' });
+      });
+      expect(screen.getByText('/effort').closest('button')).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowUp → /context
+      act(() => {
+        fireEvent.keyDown(document, { key: 'ArrowUp' });
       });
       expect(screen.getByText('/context').closest('button')).toHaveAttribute('aria-selected', 'true');
 
-      // ArrowUp → wraps back to /model
+      // ArrowUp → /model
       act(() => {
         fireEvent.keyDown(document, { key: 'ArrowUp' });
       });
