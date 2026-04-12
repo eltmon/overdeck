@@ -72,7 +72,7 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-1') as { session_file: string };
     expect(row.session_file).toBe(correctedPath);
-    expect(db.pragma('user_version', { simple: true })).toBe(16);
+    expect(db.pragma('user_version', { simple: true })).toBe(17);
   });
 
   it('leaves session_file unchanged when the corrected transcript is missing', () => {
@@ -101,6 +101,6 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-2') as { session_file: string };
     expect(row.session_file).toBe(stalePath);
-    expect(db.pragma('user_version', { simple: true })).toBe(16);
+    expect(db.pragma('user_version', { simple: true })).toBe(17);
   });
 });
