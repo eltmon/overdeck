@@ -912,8 +912,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         <Square className="w-4 h-4" />
                         Stop
                       </button>
-                      {/* Only show Done when the planning agent has finished (session no longer active or completion marker exists) */}
-                      {(statusQuery.data && (!statusQuery.data.active || statusQuery.data.hasCompletionMarker)) && (
+                      {/* Done appears only when the planning agent has written .planning/.planning-complete via `pan plan-finalize`. Tmux liveness is not consulted — Stop kills the session, Done finalizes the plan. */}
+                      {(statusQuery.data && statusQuery.data.hasCompletionMarker) && (
                         <button
                           onClick={() => {
                             stopPlanningMutation.mutate();

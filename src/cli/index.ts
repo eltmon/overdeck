@@ -54,6 +54,7 @@ import { registerRemoteCommands } from './commands/remote/index.js';
 import { registerConfigCommand } from './commands/config.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
+import { planFinalizeCommand } from './commands/plan-finalize.js';
 
 const program = new Command();
 
@@ -101,6 +102,13 @@ program
   .description('List and manage skills')
   .option('--json', 'Output as JSON')
   .action(skillsCommand);
+
+program
+  .command('plan-finalize')
+  .description('Finalize a planning session: create beads from vBRIEF plan and write completion marker')
+  .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
+  .option('--json', 'Emit JSON result')
+  .action(planFinalizeCommand);
 
 // Register work commands (pan work issue, pan work status, etc.)
 registerWorkCommands(program);

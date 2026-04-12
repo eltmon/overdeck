@@ -900,28 +900,11 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           ? join(projectPath, 'workspaces', `feature-${issueLower}`)
           : projectPath;
 
-        // Create beads from vBRIEF plan if available
-        let beadsWarning: string | null = null;
-        const { findPlan } = await import('../../../lib/vbrief/io.js');
-        const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
-        if (findPlan(gitRoot)) {
-          try {
-            const beadsResult = await createBeadsFromVBrief(gitRoot);
-            if (beadsResult.created.length > 0) {
-              console.log(`[complete-planning] Created ${beadsResult.created.length} beads from vBRIEF plan`);
-            }
-            if (!beadsResult.success || beadsResult.errors.length > 0) {
-              const detail = beadsResult.errors.length > 0
-                ? beadsResult.errors[0]
-                : 'Beads creation did not complete successfully';
-              beadsWarning = `Beads tasks were not created: ${detail}. Start Agent will attempt recovery, or re-run planning to regenerate.`;
-              console.warn(`[complete-planning] createBeadsFromVBrief warning: ${beadsWarning}`);
-            }
-          } catch (vbriefErr: any) {
-            beadsWarning = `Beads tasks were not created: ${vbriefErr.message}. Start Agent will attempt recovery, or re-run planning to regenerate.`;
-            console.warn(`[complete-planning] createBeadsFromVBrief failed: ${vbriefErr.message}`);
-          }
-        }
+        // Beads are created by the planning agent via `pan plan-finalize`, which also
+        // writes .planning/.planning-complete. By the time this endpoint runs, the marker
+        // and beads are expected to already exist. We do not create beads here — fixing
+        // the planning prompt is the right place to enforce that contract.
+        const beadsWarning: string | null = null;
 
         // Auto-copy planning artifacts to docs/prds/active/<issue-id>/ (skip if already exist).
         // MUST use canonicalPrdSubdir() (lowercase) — passing the raw `id` previously stranded
@@ -956,8 +939,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           await execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 });
         } catch { /* bd might not be installed */ }
 
-        // Write .planning-complete marker
-        await writeFile(join(planningDir, '.planning-complete'), '', 'utf-8');
+        // The .planning-complete marker is written by `pan plan-finalize` from the
+        // planning agent, not here. The Done button is gated on its existence, so by
+        // the time this endpoint fires the marker is already on disk.
 
         // Git operations
         const isGitRepo = existsSync(join(gitRoot, '.git'));
