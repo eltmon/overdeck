@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { renderPrompt } from './prompts.js';
 
 interface ResumeContext {
   /** Current status from STATE.md header */
@@ -145,90 +146,45 @@ export function buildResumePrompt(
   userMessage?: string,
 ): string {
   const ctx = gatherResumeContext(workspacePath, issueId, agentDir, userMessage);
+  const issueLower = issueId.toLowerCase();
 
-  const lines: string[] = [];
+  const pendingFeedbackBlock = ctx.pendingFeedback.length > 0
+    ? `## Pending Feedback (ACTION REQUIRED)\n\nThese feedback files exist in \`.planning/feedback/\` — read and address them:\n${ctx.pendingFeedback.map(f => `- \`.planning/feedback/${f}\``).join('\n')}`
+    : '';
 
-  lines.push(`# Agent Resumed — ${issueId}`);
-  lines.push('');
-  lines.push('You have been **resumed** from a previous session. Your full conversation history is intact.');
-  if (ctx.stoppedDuration) {
-    lines.push(`You were stopped for approximately **${ctx.stoppedDuration}**.`);
-  }
-  lines.push('');
-
-  // User message (highest priority)
-  if (ctx.userMessage) {
-    lines.push('## Operator Message');
-    lines.push('');
-    lines.push(ctx.userMessage);
-    lines.push('');
-  }
-
-  // Pending feedback (second highest — must be addressed)
-  if (ctx.pendingFeedback.length > 0) {
-    lines.push('## Pending Feedback (ACTION REQUIRED)');
-    lines.push('');
-    lines.push('These feedback files exist in `.planning/feedback/` — read and address them:');
-    for (const f of ctx.pendingFeedback) {
-      lines.push(`- \`.planning/feedback/${f}\``);
-    }
-    lines.push('');
-  }
-
-  // Current state from STATE.md
-  if (ctx.stateStatus) {
-    lines.push(`## Last Known Status: ${ctx.stateStatus}`);
-    lines.push('');
-  }
-
-  if (ctx.currentPhase) {
-    lines.push('## Where You Left Off');
-    lines.push('');
-    lines.push(ctx.currentPhase);
-    lines.push('');
-  }
-
-  // Remaining work
+  let remainingWorkBlock = '';
   if (ctx.remainingWork) {
-    lines.push('## Remaining Work');
-    lines.push('');
-    lines.push(ctx.remainingWork);
-    lines.push('');
+    remainingWorkBlock = `## Remaining Work\n\n${ctx.remainingWork}`;
   } else if (ctx.openBeads) {
-    lines.push('## Open Beads');
-    lines.push('');
-    lines.push(ctx.openBeads);
-    lines.push('');
+    remainingWorkBlock = `## Open Beads\n\n${ctx.openBeads}`;
   }
 
-  // If STATE.md was missing or empty, tell the agent to figure it out
-  if (!ctx.stateContent) {
-    lines.push('## No STATE.md Found');
-    lines.push('');
-    lines.push('There is no `.planning/STATE.md` in this workspace. Check your conversation history');
-    lines.push('above and `bd list` output to determine where you left off. Then create STATE.md');
-    lines.push('with the required format before continuing work.');
-    lines.push('');
-  }
+  const noStateBlock = !ctx.stateContent
+    ? `## No STATE.md Found\n\nThere is no \`.planning/STATE.md\` in this workspace. Check your conversation history\nabove and \`bd list\` output to determine where you left off. Then create STATE.md\nwith the required format before continuing work.`
+    : '';
 
-  // Instructions
-  lines.push('## What To Do Now');
-  lines.push('');
+  let instructionsBlock: string;
   if (ctx.pendingFeedback.length > 0) {
-    lines.push('1. Read the pending feedback files listed above and address them');
-    lines.push('2. Verify STATE.md is accurate, update if needed');
-    lines.push('3. Continue with the per-bead workflow');
+    instructionsBlock = '1. Read the pending feedback files listed above and address them\n2. Verify STATE.md is accurate, update if needed\n3. Continue with the per-bead workflow';
   } else if (ctx.stateStatus?.toLowerCase().includes('ready for merge') ||
              ctx.stateStatus?.toLowerCase().includes('implementation complete')) {
-    lines.push('1. Re-read `.planning/STATE.md` to verify status');
-    lines.push('2. Run `bd list -l ' + issueId.toLowerCase() + '` to check for unclosed beads');
-    lines.push('3. If all work is truly done, run `pan work done`');
-    lines.push('4. If there is remaining work, update STATE.md and continue');
+    instructionsBlock = `1. Re-read \`.planning/STATE.md\` to verify status\n2. Run \`bd list -l ${issueLower}\` to check for unclosed beads\n3. If all work is truly done, run \`pan work done\`\n4. If there is remaining work, update STATE.md and continue`;
   } else {
-    lines.push('1. Re-read `.planning/STATE.md` to verify it matches reality');
-    lines.push('2. Run `bd ready -l ' + issueId.toLowerCase() + '` to find the next unblocked bead');
-    lines.push('3. Continue with the per-bead workflow (implement → commit → update STATE.md → bd close → wait for inspection)');
+    instructionsBlock = `1. Re-read \`.planning/STATE.md\` to verify it matches reality\n2. Run \`bd ready -l ${issueLower}\` to find the next unblocked bead\n3. Continue with the per-bead workflow (implement → commit → update STATE.md → bd close → wait for inspection)`;
   }
 
-  return lines.join('\n');
+  return renderPrompt({
+    name: 'resume-work',
+    vars: {
+      ISSUE_ID: issueId,
+      INSTRUCTIONS_BLOCK: instructionsBlock,
+      STOPPED_DURATION: ctx.stoppedDuration || '',
+      USER_MESSAGE: ctx.userMessage || '',
+      PENDING_FEEDBACK_BLOCK: pendingFeedbackBlock,
+      STATE_STATUS: ctx.stateStatus || '',
+      CURRENT_PHASE: ctx.currentPhase || '',
+      REMAINING_WORK_BLOCK: remainingWorkBlock,
+      NO_STATE_BLOCK: noStateBlock,
+    },
+  });
 }
