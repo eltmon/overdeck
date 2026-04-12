@@ -634,11 +634,54 @@ export async function spawnEphemeralSpecialist(
   // Ensure project specialist directory exists
   ensureProjectSpecialistDir(projectKey, specialistType);
 
+  const tmuxSession = getTmuxSessionName(specialistType, projectKey);
+
+  // Busy check FIRST — before any state mutation. A rejected dispatch must NOT
+  // create a run log, advance currentRun, or write task files into the shared
+  // agent directory. Earlier ordering polluted metadata and left empty
+  // "incomplete" log files when a concurrent dispatch was rejected.
+  try {
+    const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', { encoding: 'utf-8' });
+    if (sessions.split('\n').map(s => s.trim()).includes(tmuxSession)) {
+      const { getAgentRuntimeState } = await import('../agents.js');
+      const existingState = getAgentRuntimeState(tmuxSession);
+      if (existingState?.state === 'active') {
+        // PAN-511: verify the session is actually running before treating it as busy.
+        const actuallyRunning = await isRunning(specialistType, projectKey);
+        if (actuallyRunning) {
+          return {
+            success: false,
+            message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
+            error: 'specialist_busy',
+          };
+        }
+        console.log(`[specialist] ${tmuxSession} state=active but not running — clearing stale state`);
+        const { saveAgentRuntimeState } = await import('../agents.js');
+        saveAgentRuntimeState(tmuxSession, {
+          state: 'idle',
+          lastActivity: new Date().toISOString(),
+          currentIssue: undefined,
+        });
+      }
+      // Stale or idle session — kill it (and any orphaned descendants) before spawning fresh
+      console.log(`[specialist] Killing stale ${tmuxSession} session before respawn`);
+      await execAsync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' }).catch(() => {});
+      // Belt-and-suspenders: terminate any orphaned launcher/script/claude trees
+      // that previous broken pipelines left parented to the tmux server.
+      await execAsync(
+        `pkill -TERM -f "agents/${tmuxSession}/run-claude.sh" 2>/dev/null || true; pkill -TERM -f "agents/${tmuxSession}/launcher.sh" 2>/dev/null || true`,
+        { encoding: 'utf-8' },
+      ).catch(() => {});
+    }
+  } catch {
+    // Non-fatal: session check failure shouldn't block spawn
+  }
+
   // Load context digest
   const { loadContextDigest } = await import('./specialist-context.js');
   const contextDigest = loadContextDigest(projectKey, specialistType);
 
-  // Create run log
+  // Create run log (only after we've committed to actually spawning)
   const { createRunLog } = await import('./specialist-logs.js');
   const { runId, filePath: logFilePath } = createRunLog(
     projectKey,
@@ -665,7 +708,6 @@ export async function spawnEphemeralSpecialist(
 ${basePrompt}`;
 
   // Spawn tmux session — use project path so specialist has correct context
-  const tmuxSession = getTmuxSessionName(specialistType, projectKey);
   const project = getProject(projectKey);
   const cwd = project?.path || getDevrootPath() || homedir();
 
@@ -676,40 +718,6 @@ ${basePrompt}`;
   } catch { /* non-fatal */ }
 
   try {
-    // Check if session already exists (stale from previous run)
-    try {
-      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', { encoding: 'utf-8' });
-      if (sessions.split('\n').map(s => s.trim()).includes(tmuxSession)) {
-        const { getAgentRuntimeState } = await import('../agents.js');
-        const existingState = getAgentRuntimeState(tmuxSession);
-        if (existingState?.state === 'active') {
-          // PAN-511: verify the session is actually running before treating it as busy.
-          // If state says 'active' but the process isn't alive (e.g. Claude Code crashed),
-          // the runtime.json is stale. Kill the dead session and spawn fresh instead of
-          // returning specialist_busy which would permanently block new dispatches.
-          const actuallyRunning = await isRunning(specialistType, projectKey);
-          if (actuallyRunning) {
-            return {
-              success: false,
-              message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
-              error: 'specialist_busy',
-            };
-          }
-          console.log(`[specialist] ${tmuxSession} state=active but not running — clearing stale state`);
-          const { saveAgentRuntimeState } = await import('../agents.js');
-          saveAgentRuntimeState(tmuxSession, {
-            state: 'idle',
-            lastActivity: new Date().toISOString(),
-            currentIssue: undefined,
-          });
-        }
-        // Stale session — kill it before spawning fresh
-        console.log(`[specialist] Killing stale ${tmuxSession} session before respawn`);
-        await execAsync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' }).catch(() => {});
-      }
-    } catch {
-      // Non-fatal: session check failure shouldn't block spawn
-    }
     // Determine model for this specialist
     let model = 'claude-sonnet-4-6'; // default
     try {
@@ -794,10 +802,17 @@ echo ""
 echo "## Specialist completed task"
 `, { mode: 0o755 });
 
-    // Outer launcher: wraps inner script with script(1) for PTY + tee for log file.
-    // script -qfec forces a PTY so Claude outputs in real time (visible in tmux pane + God View).
+    // Outer launcher: exec into script(1) so the tmux pane's main process IS script.
+    // CRITICAL: must use `exec` (not a pipeline) so tmux kill-session SIGHUP propagates
+    // through script -> child bash -> claude. The previous `script ... | tee LOG` form
+    // left script + bash + claude as orphans whenever the launcher bash was killed,
+    // because bash does NOT forward SIGHUP to non-job-controlled pipeline children.
+    // script's positional arg writes the typescript directly to LOGFILE (in append mode
+    // via -a), so we get the same log capture as the old tee pipeline without the pipe.
+    // -q quiet (no Script started/done banners), -f flush on every write, -a append,
+    // -e propagate child exit code, -c run command.
     writeFileSync(launcherScript, `#!/bin/bash
-script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
+exec script -qfaec "bash '${innerScript}'" "${logFilePath}"
 `, { mode: 0o755 });
 
     // Spawn Claude Code via launcher script (with provider env vars)

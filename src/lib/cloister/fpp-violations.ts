@@ -1,5 +1,8 @@
 /**
- * FPP (First Principles Programming) Violation Detection
+ * FPP (Fixed Point Principle) Violation Detection
+ *
+ * "Any runnable action is a fixed point and must resolve before the
+ * system can rest." Borrowed from Gastown; inspired by Doctor Who.
  *
  * Detects when agents have pending work but are idle, and sends
  * escalating nudges to get them back on track.
