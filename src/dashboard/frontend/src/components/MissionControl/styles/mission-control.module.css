@@ -92,7 +92,7 @@
 }
 
 .sidebarHeader {
-  padding: var(--mc-space-3) var(--mc-space-4) var(--mc-space-3);
+  padding: var(--mc-space-2) var(--mc-space-3) var(--mc-space-2);
   border-bottom: 1px solid var(--mc-border);
   flex-shrink: 0;
 }
@@ -122,7 +122,7 @@
 }
 
 .sidebarTitle {
-  font-size: var(--mc-font-size-md);
+  font-size: 13px;
   font-weight: 600;
   margin: 0;
   white-space: nowrap;
@@ -152,7 +152,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--mc-space-1);
-  padding: var(--mc-space-1) var(--mc-space-2);
+  padding: 2px 6px;
   border: none;
   background: transparent;
   border-radius: calc(var(--mc-radius) - 2px);
