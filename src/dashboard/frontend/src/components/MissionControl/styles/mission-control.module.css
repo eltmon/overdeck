@@ -200,7 +200,7 @@
   display: flex;
   align-items: center;
   gap: var(--mc-space-2);
-  padding: var(--mc-space-2) var(--mc-space-4);
+  padding: 6px var(--mc-space-3);
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
@@ -243,8 +243,8 @@
 .featureItem {
   display: flex;
   align-items: center;
-  gap: var(--mc-space-2);
-  padding: var(--mc-space-2) var(--mc-space-4) var(--mc-space-2) var(--mc-space-8);
+  gap: 6px;
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-6);
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
@@ -1049,7 +1049,7 @@
 /* Sidebar Footer */
 .sidebarFooter {
   border-top: 1px solid var(--mc-border);
-  padding: var(--mc-space-2) var(--mc-space-4);
+  padding: var(--mc-space-1) var(--mc-space-3);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1186,8 +1186,8 @@
 .conversationItem {
   display: flex;
   align-items: center;
-  gap: var(--mc-space-2);
-  padding: var(--mc-space-2) var(--mc-space-2) var(--mc-space-2) var(--mc-space-8);
+  gap: 6px;
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-6);
   position: relative;
   cursor: pointer;
   transition: background 0.1s;
