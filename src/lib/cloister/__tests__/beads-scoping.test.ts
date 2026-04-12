@@ -90,9 +90,9 @@ describe('readBeadsTasks label scoping', () => {
   });
 });
 
-describe('work-agent.md template label scoping', () => {
+describe('work.md template label scoping', () => {
   it('contains bd ready with label filter placeholder', () => {
-    const templatePath = join(__dirname, '..', 'prompts', 'work-agent.md');
+    const templatePath = join(__dirname, '..', 'prompts', 'work.md');
     const template = readFileSync(templatePath, 'utf-8');
 
     // Both occurrences of bd ready should include label filter
@@ -105,7 +105,7 @@ describe('work-agent.md template label scoping', () => {
   });
 
   it('contains warning about shared database scoping', () => {
-    const templatePath = join(__dirname, '..', 'prompts', 'work-agent.md');
+    const templatePath = join(__dirname, '..', 'prompts', 'work.md');
     const template = readFileSync(templatePath, 'utf-8');
 
     expect(template).toContain('shared database contains beads from ALL issues');

@@ -23,6 +23,7 @@ import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCred
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
+import { renderPrompt } from './prompts.js';
 
 const execAsync = promisify(exec);
 
@@ -922,86 +923,28 @@ export async function buildTestAgentPromptContent(task: {
       : '- Single test suite at workspace root';
 
   const timeoutMs = testConfigs && Object.values(testConfigs).some(c => c.type === 'maven') ? '600000' : '300000';
+  const multiSuite = testIsPolyrepo || (!!testConfigs && Object.keys(testConfigs).length > 1);
+  const dnsDomain = testProjectConfig?.workspace?.dns?.domain || '';
 
-  return `Your task:
-1. Run ALL test suites — redirect output to file, read only summaries
-2. If ALL pass, skip baseline and report PASS
-3. If failures, run baseline on main and compare
-4. Only fail for NEW regressions (not pre-existing)
-5. Update status via API when done
-
-## Test Suites
-
-${testConfigSummary}
-
-## CRITICAL: Context Management — Output Redirection
-
-**NEVER let full test output flow into your context.** Always redirect to file and read only summaries.
-
-## CRITICAL: Bash Timeout for Test Commands
-
-**ALWAYS use timeout: ${timeoutMs} when running test commands.**
-
-## Step 1: Run Feature Branch Tests
-
-\`\`\`bash
-(
-${testCommands}
-) > /tmp/test-feature.txt 2>&1
-# Use timeout: ${timeoutMs} for this command
-echo "--- Feature test output tail ---"
-tail -40 /tmp/test-feature.txt
-grep "EXIT_CODE" /tmp/test-feature.txt
-\`\`\`
-
-## Step 2: Check Results
-
-- If ALL exit codes are 0 → skip baseline, go to "Update Status"
-- If any failures → continue to Step 3
-
-## Step 3: Baseline Comparison (ONLY if failures found)
-
-\`\`\`bash
-(
-${baselineCommands}
-) > /tmp/test-main.txt 2>&1
-# Use timeout: ${timeoutMs} for this command
-echo "--- Baseline test output tail ---"
-tail -40 /tmp/test-main.txt
-grep "EXIT_CODE" /tmp/test-main.txt
-\`\`\`
-
-Then compare failures:
-\`\`\`bash
-grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-feature.txt | head -30
-grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-main.txt | head -30
-\`\`\`
-
-**Pass criteria:** Feature branch introduces ZERO new test failures vs main.
-**Fail criteria:** Feature branch introduces NEW failures not present on main.
-
-## REQUIRED: Update Status via API
-
-You MUST execute the appropriate curl command and verify it succeeds.
-
-If NO new regressions (tests PASS):
-\`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary]"}' | jq .
-\`\`\`
-
-If NEW regressions found (tests FAIL):
-\`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures]"}' | jq .
-\`\`\`
-
-## Container Smoke Test
-
-After unit tests pass, verify Docker workspace frontend is accessible if containers are running:
-\`\`\`bash
-docker ps --filter "name=${featureName}" --format "{{.Names}} {{.Status}}" 2>/dev/null
-\`\`\`
-
-IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
+  return renderPrompt({
+    name: 'test',
+    vars: {
+      ISSUE_ID: task.issueId,
+      BRANCH: task.branch || 'unknown',
+      WORKSPACE: testWorkspace,
+      IS_POLYREPO: testIsPolyrepo,
+      TEST_COMMANDS: testCommands,
+      BASELINE_COMMANDS: baselineCommands,
+      TEST_CONFIG_SUMMARY: testConfigSummary,
+      TIMEOUT_MS: timeoutMs,
+      API_URL: apiUrl,
+      FEATURE_NAME: featureName,
+      DOCKER_PS_FORMAT: '{{.Names}} {{.Status}}',
+      POLYREPO_DIRS: testIsPolyrepo ? testGitInfo.gitDirs.map(d => basename(d)).join(', ') : '',
+      MULTI_SUITE: multiSuite,
+      DNS_DOMAIN: dnsDomain,
+    },
+  });
 }
 
 /**
@@ -1046,21 +989,35 @@ async function buildTaskPrompt(
   switch (specialistType) {
     case 'review-agent': {
       const diffBase = (task.context?.targetBranch as string | undefined) || 'main';
-      prompt += `Your task:
-0. FIRST: Check if branch has any changes vs ${diffBase} (git diff --name-only ${diffBase}...HEAD)
-   - If 0 files changed: mark as passed with note "branch identical to ${diffBase}" and STOP
-1. Review all changes in the branch
-2. Check for code quality issues, security concerns, and best practices
-3. Verify test FILES exist for new code (DO NOT run tests)
-4. Provide specific, actionable feedback
-5. Update status via API when done
+      const workspace = task.workspace || 'unknown';
+      const reviewGitInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
+      const gitDirs = reviewGitInfo.gitDirs;
+      const isPolyrepo = gitDirs.length > 1;
+      const gitDir = gitDirs[0] || workspace;
+      const gitDiffCommands = gitDirs.length > 0
+        ? gitDirs.map(d => `cd "${d}" && git diff --name-only ${diffBase}...HEAD`).join('\n')
+        : `cd "${workspace}" && git diff --name-only ${diffBase}...HEAD`;
+      const gitDiffFileCmd = gitDirs.length > 0
+        ? `cd "${gitDir}" && git diff ${diffBase}...HEAD -- <file>`
+        : `cd "${workspace}" && git diff ${diffBase}...HEAD -- <file>`;
+      const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
 
-IMPORTANT: DO NOT run tests. You are the REVIEW agent.
-
-Update status via API:
-- If no changes (stale branch): POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"passed","reviewNotes":"No changes — branch identical to ${diffBase}"}
-- If issues found: POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"blocked","reviewNotes":"..."}
-- If review passes: POST with {"reviewStatus":"passed"} then queue test-agent`;
+      prompt += renderPrompt({
+        name: 'review',
+        vars: {
+          ISSUE_ID: task.issueId,
+          BRANCH: task.branch || 'unknown',
+          WORKSPACE: workspace,
+          DIFF_BASE: diffBase,
+          IS_POLYREPO: isPolyrepo,
+          GIT_DIFF_COMMANDS: gitDiffCommands,
+          GIT_DIFF_FILE_CMD: gitDiffFileCmd,
+          API_URL: apiUrl,
+          PR_URL: task.prUrl || '',
+          POLYREPO_DIRS: isPolyrepo ? gitDirs.map(d => basename(d)).join(', ') : '',
+        },
+      });
       break;
     }
 
@@ -1073,17 +1030,23 @@ Update status via API:
 
     case 'merge-agent': {
       const bInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
-      if (bInfo.isPolyrepo) {
-        prompt += `This is a POLYREPO project with ${bInfo.gitDirs.length} repos: ${bInfo.gitDirs.map(d => basename(d)).join(', ')}.
-You must merge each repo separately.\n\n`;
-      }
-      prompt += `Your task:
-1. Fetch the latest main branch
-2. Attempt to merge ${bInfo.branch} into main
-3. Resolve conflicts intelligently if needed
-4. Run tests to verify merge is clean
-5. Complete merge if tests pass
-6. NEVER use git push --force`;
+      const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+      prompt += renderPrompt({
+        name: 'merge',
+        vars: {
+          ISSUE_ID: task.issueId,
+          SOURCE_BRANCH: bInfo.branch || task.branch || 'unknown',
+          TARGET_BRANCH: 'main',
+          PROJECT_PATH: task.workspace || 'unknown',
+          DO_PUSH: false,
+          DO_BUILD: false,
+          API_URL: apiUrl,
+          IS_POLYREPO: bInfo.isPolyrepo,
+          POLYREPO_DIRS: bInfo.isPolyrepo ? bInfo.gitDirs.map(d => basename(d)).join(', ') : '',
+          PR_URL: task.prUrl || '',
+        },
+      });
       break;
     }
   }
@@ -2226,60 +2189,21 @@ export async function wakeSpecialistWithTask(
       const mergeInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
       const mergeBranch = mergeInfo.branch;
 
-      const mergeRepoInstructions = mergeInfo.isPolyrepo
-        ? `\nIMPORTANT: This is a POLYREPO project. There are ${mergeInfo.gitDirs.length} separate git repositories to merge:
-${mergeInfo.gitDirs.map((d, i) => `${i + 1}. ${basename(d)}: ${d}`).join('\n')}
-
-The workspace root is NOT a git repo. You must cd into each subdirectory to run git commands.
-You MUST complete the merge for ALL repos.\n`
-        : '';
-
-      prompt = `New merge task for ${task.issueId}:
-
-Branch: ${mergeBranch}
-Workspace: ${mergeWorkspace}
-${mergeInfo.isPolyrepo ? `Polyrepo: git repos in subdirectories: ${mergeInfo.gitDirs.map(d => basename(d)).join(', ')}` : ''}
-${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
-${mergeRepoInstructions}
-For ${mergeInfo.isPolyrepo ? 'EACH repo' : 'the repo'}, perform these steps:
-
-PHASE 1 — SYNC & BASELINE (before merge):
-1. ${mergeInfo.isPolyrepo ? 'cd into the repo directory' : `cd ${mergeWorkspace}`}
-2. git checkout main
-3. git fetch origin main
-4. Sync local main with origin/main:
-   Run: git rev-list --left-right --count main...origin/main
-   If REMOTE_AHEAD > 0: git rebase origin/main
-   If rebase conflicts: abort and report failure.
-5. Run tests on main to establish a baseline. Record BASELINE_PASS and BASELINE_FAIL.
-
-PHASE 2 — MERGE (dry run):
-6. git merge ${mergeBranch} --no-edit
-7. If conflicts: resolve them intelligently, then git add and git commit
-8. If clean merge: the merge commit is auto-created (or fast-forward)
-
-PHASE 3 — VERIFY:
-9. Run tests again. Record MERGE_PASS and MERGE_FAIL.
-
-PHASE 4 — DECIDE:
-10. Compare results:
-    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures): ROLLBACK with git reset --hard ORIG_HEAD and report FAILED
-    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): Report PASSED (merge is validated)
-    - Pre-existing failures on main are NOT a reason to rollback
-
-CRITICAL: Do NOT push to main. Do NOT run git push origin main.
-The merge validation stays LOCAL. A human will click Merge in the dashboard to push.
-
-PHASE 5 — REPORT:
-11. Call the Panopticon API to report results:
-    curl -s -X POST ${apiUrl}/api/specialists/done \\
-      -H "Content-Type: application/json" \\
-      -d '{"specialist":"merge","issueId":"${task.issueId}","status":"passed|failed","notes":"<summary>"}'
-
-CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
-CRITICAL: NEVER push to main — only humans merge. Your job is to VALIDATE the merge, not execute it.
-CRITICAL: NEVER use git push --force.
-CRITICAL: Do NOT delete the feature branch.`;
+      prompt = renderPrompt({
+        name: 'merge',
+        vars: {
+          ISSUE_ID: task.issueId,
+          SOURCE_BRANCH: mergeBranch || 'unknown',
+          TARGET_BRANCH: 'main',
+          PROJECT_PATH: mergeWorkspace,
+          DO_PUSH: false,
+          DO_BUILD: false,
+          API_URL: apiUrl,
+          IS_POLYREPO: mergeInfo.isPolyrepo,
+          POLYREPO_DIRS: mergeInfo.isPolyrepo ? mergeInfo.gitDirs.map(d => basename(d)).join(', ') : '',
+          PR_URL: task.prUrl || '',
+        },
+      });
       break;
     }
 
@@ -2343,274 +2267,26 @@ CRITICAL: Do NOT delete the feature branch.`;
         ? `cd "${gitDir}" && git diff ${diffBase}...HEAD -- <file>`
         : `cd "${workspace}" && git diff ${diffBase}...HEAD -- <file>`;
 
-      prompt = `New review task for ${task.issueId}:
-
-Branch: ${task.branch || 'unknown'}
-Workspace: ${workspace}
-${isPolyrepo ? `Polyrepo: git repos in subdirectories: ${gitDirs.map(d => basename(d)).join(', ')}` : ''}
-${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
-Target Branch: ${diffBase}
-
-Your task:
-1. Review all changes in the branch compared to ${diffBase}
-2. Check for code quality issues, security concerns, and best practices
-3. Verify test FILES exist for new code (DO NOT run tests - test-agent does that)
-4. Provide specific, actionable feedback
-
-IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.
-The TEST agent will run tests in the next step.
-
-## How to Review Changes
-
-**Step 0 (CRITICAL):** First check if there are ANY changes to review:
-${isPolyrepo ? `This is a polyrepo — run git diff in each repo subdirectory:` : ''}
-\`\`\`bash
-${gitDiffCommands}
-\`\`\`
-
-**If the diff is EMPTY (0 files changed across all repos):** The branch is stale or already merged into ${diffBase}. In this case:
-1. Do NOT attempt a full review
-2. Update status as passed immediately:
-\`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to ${diffBase} (already merged or stale)"}' | jq .
-\`\`\`
-3. Tell the issue agent:
-\`\`\`bash
-pan work tell ${task.issueId} "Review complete: branch has 0 diff from ${diffBase} — already merged or stale. Marking as passed."
-\`\`\`
-4. Stop here — you are done.
-
-**Step 1:** Get the list of changed files:
-\`\`\`bash
-${gitDiffCommands}
-\`\`\`
-
-**Step 2:** Read the CURRENT version of each changed file using the Read tool.
-Review the actual file contents — do NOT rely solely on diff output.
-
-**Step 3:** If you need to see what specifically changed, use:
-\`\`\`bash
-${gitDiffFileCmd}
-\`\`\`
-
-## Avoiding False Positives
-
-**CRITICAL:** When reviewing diffs, understand that:
-- Lines starting with \`+\` are ADDITIONS (new code)
-- Lines starting with \`-\` are DELETIONS (removed code)
-- Lines without prefix are CONTEXT (unchanged surrounding code)
-- The SAME content may appear in both \`-\` and \`+\` sections when code is moved or reformatted — this is NOT duplication
-- A section shown in diff context does NOT mean it appears twice in the actual file
-- **Always read the actual file** to verify before claiming duplicate or redundant content
-
-Do NOT flag:
-- Code that appears in both removed and added hunks (it was moved, not duplicated)
-- Diff context lines as "duplicate sections" — they exist once in the real file
-- Reformatted/restructured code as "duplicated"
-
-## REQUIRED: Update Status via API
-
-You MUST execute these curl commands and verify they succeed. Do NOT just describe them - actually RUN them with Bash.
-
-If issues found:
-\`\`\`bash
-# EXECUTE THIS - verify you see JSON response with reviewStatus
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[describe issues]"}' | jq .
-\`\`\`
-Then use send-feedback-to-agent skill to notify issue agent.
-
-If review passes:
-\`\`\`bash
-# EXECUTE THIS FIRST - verify you see JSON response with reviewStatus:"passed"
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}' | jq .
-
-# THEN EXECUTE THIS - verify you see JSON response with queued task
-curl -s -X POST ${apiUrl}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${task.issueId}","workspace":"${task.workspace}","branch":"${task.branch}"}' | jq .
-\`\`\`
-
-⚠️ VERIFICATION: After running each curl, confirm you see valid JSON output. If you get an error, report it.`;
+      prompt = renderPrompt({
+        name: 'review',
+        vars: {
+          ISSUE_ID: task.issueId,
+          BRANCH: task.branch || 'unknown',
+          WORKSPACE: workspace,
+          DIFF_BASE: diffBase,
+          IS_POLYREPO: isPolyrepo,
+          GIT_DIFF_COMMANDS: gitDiffCommands,
+          GIT_DIFF_FILE_CMD: gitDiffFileCmd,
+          API_URL: apiUrl,
+          PR_URL: task.prUrl || '',
+          POLYREPO_DIRS: isPolyrepo ? gitDirs.map(d => basename(d)).join(', ') : '',
+        },
+      });
       break;
     }
 
     case 'test-agent': {
-      // Resolve polyrepo structure and project test config
-      const testWorkspace = task.workspace || 'unknown';
-      const testGitInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
-      const testIsPolyrepo = testGitInfo.isPolyrepo;
-
-      // Look up project test config from projects.yaml
-      const { extractTeamPrefix, findProjectByTeam } = await import('../projects.js');
-      const testTeamPrefix = extractTeamPrefix(task.issueId);
-      const testProjectConfig = testTeamPrefix ? findProjectByTeam(testTeamPrefix) : null;
-      const testConfigs = testProjectConfig?.tests;
-
-      // Build per-repo test commands from projects.yaml config
-      let testCommands = '';
-      let baselineCommands = '';
-      const featureName = task.issueId.toLowerCase();
-      // Derive main workspace path for baseline comparison
-      const mainWorkspacePath = testWorkspace.replace(/workspaces\/feature-[^/]+/, 'workspaces/main');
-      const projectRootPath = testProjectConfig?.path || testWorkspace.replace(/\/workspaces\/.*/, '');
-
-      if (testConfigs && Object.keys(testConfigs).length > 0) {
-        // Use projects.yaml test config — each entry may target a different repo subdirectory
-        const testEntries = Object.entries(testConfigs);
-        const testSuites: string[] = [];
-        const baselineSuites: string[] = [];
-        for (const [name, cfg] of testEntries) {
-          const testDir = testIsPolyrepo
-            ? `${testWorkspace}/${cfg.path}`
-            : (cfg.path === '.' ? testWorkspace : `${testWorkspace}/${cfg.path}`);
-          const baseDir = testIsPolyrepo
-            ? `${mainWorkspacePath}/${cfg.path}`
-            : (cfg.path === '.' ? mainWorkspacePath : `${mainWorkspacePath}/${cfg.path}`);
-          // Fall back to project root for monorepo baseline if main workspace doesn't exist
-          const fallbackDir = cfg.path === '.' ? projectRootPath : `${projectRootPath}/${cfg.path}`;
-          testSuites.push(`echo "\\n=== Test suite: ${name} (${cfg.type}) ===" && cd "${testDir}" && ${cfg.command} 2>&1; echo "EXIT_CODE_${name}: $?"`);
-          baselineSuites.push(`echo "\\n=== Baseline: ${name} (${cfg.type}) ===" && cd "${baseDir}" 2>/dev/null && ${cfg.command} 2>&1 || (cd "${fallbackDir}" 2>/dev/null && ${cfg.command} 2>&1) || echo "BASELINE_SKIP_${name}: could not run baseline"; echo "EXIT_CODE_${name}: $?"`);
-        }
-        testCommands = testSuites.map((cmd, i) => `# Suite ${i + 1}\n${cmd}`).join('\n');
-        baselineCommands = baselineSuites.map((cmd, i) => `# Suite ${i + 1}\n${cmd}`).join('\n');
-      } else if (testIsPolyrepo) {
-        // No projects.yaml config but detected polyrepo — discover test commands per repo
-        const testSuites: string[] = [];
-        const baselineSuites: string[] = [];
-        for (const gitDir of testGitInfo.gitDirs) {
-          const repoName = basename(gitDir);
-          // Auto-detect test runner in each repo
-          testSuites.push(`echo "\\n=== ${repoName} ===" && cd "${gitDir}" && if [ -f pom.xml ]; then ./mvnw test 2>&1; elif [ -f package.json ]; then npm test 2>&1; else echo "No test runner found"; fi; echo "EXIT_CODE_${repoName}: $?"`);
-          const baseDir = `${mainWorkspacePath}/${repoName}`;
-          baselineSuites.push(`echo "\\n=== Baseline: ${repoName} ===" && cd "${baseDir}" 2>/dev/null && if [ -f pom.xml ]; then ./mvnw test 2>&1; elif [ -f package.json ]; then npm test 2>&1; else echo "No test runner found"; fi; echo "EXIT_CODE_${repoName}: $?"`);
-        }
-        testCommands = testSuites.join('\n');
-        baselineCommands = baselineSuites.join('\n');
-      } else {
-        // Monorepo fallback — single test command
-        testCommands = `cd "${testWorkspace}" && npm test 2>&1; echo "EXIT_CODE: $?"`;
-        baselineCommands = `cd "${mainWorkspacePath}" 2>/dev/null && npm test 2>&1 || (cd "${projectRootPath}" && npm test 2>&1); echo "EXIT_CODE: $?"`;
-      }
-
-      // Build test suite summary for the prompt
-      const testConfigSummary = testConfigs
-        ? Object.entries(testConfigs).map(([name, cfg]) => `- **${name}** (${cfg.type}): \`${cfg.command}\` in \`${cfg.path}/\``).join('\n')
-        : testIsPolyrepo
-          ? testGitInfo.gitDirs.map(d => `- **${basename(d)}**: auto-detected`).join('\n')
-          : '- Single test suite at workspace root';
-
-      prompt = `New test task for ${task.issueId}:
-
-Branch: ${task.branch || 'unknown'}
-Workspace: ${testWorkspace}
-${testIsPolyrepo ? `Polyrepo: git repos in subdirectories: ${testGitInfo.gitDirs.map(d => basename(d)).join(', ')}` : ''}
-
-## Test Suites
-
-${testConfigSummary}
-
-Your task:
-1. Run ALL test suites — redirect output to file, read only summaries
-2. If ALL pass, skip baseline and report PASS
-3. If failures, run baseline on main and compare
-4. Only fail for NEW regressions (not pre-existing)
-5. Update status via API when done
-
-## CRITICAL: Context Management — Output Redirection
-
-**NEVER let full test output flow into your context.** Always redirect to file and read only summaries.
-Raw test output from large suites (1000+ tests) WILL fill your context and cause compaction, losing your task.
-
-## CRITICAL: Bash Timeout for Test Commands
-
-**ALWAYS use timeout: 300000 (5 minutes) when running test commands.**
-For Maven/Spring Boot tests, use timeout: 600000 (10 minutes) — they take longer.
-
-## Step 1: Run Feature Branch Tests
-
-${testIsPolyrepo || (testConfigs && Object.keys(testConfigs).length > 1)
-  ? `**Run ALL test suites** — each suite is a separate repo/runner. Redirect ALL output to one file.`
-  : ''}
-
-\`\`\`bash
-(
-${testCommands}
-) > /tmp/test-feature.txt 2>&1
-# Use timeout: ${testConfigs && Object.values(testConfigs).some(c => c.type === 'maven') ? '600000' : '300000'} for this command
-echo "--- Feature test output tail ---"
-tail -40 /tmp/test-feature.txt
-grep "EXIT_CODE" /tmp/test-feature.txt
-\`\`\`
-
-## Step 2: Check Results
-
-- If ALL exit codes are 0 → skip baseline, go to "Update Status"
-- If any failures → continue to Step 3
-
-## Step 3: Baseline Comparison (ONLY if failures found)
-
-\`\`\`bash
-(
-${baselineCommands}
-) > /tmp/test-main.txt 2>&1
-# Use timeout: ${testConfigs && Object.values(testConfigs).some(c => c.type === 'maven') ? '600000' : '300000'} for this command
-echo "--- Baseline test output tail ---"
-tail -40 /tmp/test-main.txt
-grep "EXIT_CODE" /tmp/test-main.txt
-\`\`\`
-
-Then compare failures (targeted, NOT full output):
-\`\`\`bash
-grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-feature.txt | head -30
-grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-main.txt | head -30
-\`\`\`
-
-Tests that fail on BOTH = pre-existing (don't block). Tests that fail ONLY on feature = NEW regression (block).
-
-**Pass criteria:** Feature branch introduces ZERO new test failures vs main.
-**Fail criteria:** Feature branch introduces NEW failures not present on main.
-
-## REQUIRED: Update Status via API
-
-You MUST execute the appropriate curl command and verify it succeeds. Do NOT just describe it - actually RUN it with Bash.
-
-If NO new regressions (tests PASS):
-\`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any, and which suites were tested]"}' | jq .
-\`\`\`
-
-If NEW regressions found (tests FAIL):
-\`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only — specify which suite/repo]"}' | jq .
-\`\`\`
-Then use send-feedback-to-agent skill to notify issue agent of NEW failures only.
-
-⚠️ VERIFICATION: After running curl, confirm you see valid JSON output with the updated status. If you get an error or empty response, the update FAILED - report this.
-
-**NEVER run test commands without redirecting to a file.** This is not optional.
-
-## REQUIRED: Container Smoke Test
-
-After unit tests pass, verify the Docker workspace frontend is accessible.
-This is NOT optional — UI changes that pass unit tests but break in containers must be caught.
-
-\`\`\`bash
-# Check if containers are running for this workspace
-docker ps --filter "name=${featureName}" --format "{{.Names}} {{.Status}}" 2>/dev/null
-\`\`\`
-
-If containers are running, test these URLs:
-- **Frontend**: \`curl -sk https://feature-${featureName}.${testProjectConfig?.workspace?.dns?.domain || 'pan.localhost'}/ | head -5\`
-- **API proxy**: \`curl -sk https://feature-${featureName}.${testProjectConfig?.workspace?.dns?.domain || 'pan.localhost'}/api/health\`
-- **API issues**: \`curl -sk https://feature-${featureName}.${testProjectConfig?.workspace?.dns?.domain || 'pan.localhost'}/api/issues | head -100\`
-
-**Pass criteria:**
-1. Frontend returns HTML containing \`<div id="root">\`
-2. \`/api/health\` returns JSON with \`"status":"ok"\`
-3. \`/api/issues\` returns JSON array (not an error)
-
-**If ANY of these fail, the test FAILS** — report via the API with details about which check failed.
-If containers are NOT running, note it but don't fail (containers may not be configured for this project).
-
-IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
+      prompt = await buildTestAgentPromptContent(task);
       break;
     }
 
