@@ -39,6 +39,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
+import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { readIssueHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
@@ -1385,17 +1386,20 @@ const postIssueReopenRoute = HttpRouter.add(
 
     // Reset specialist pipeline state, post-merge state, and agent markers (all non-fatal)
     yield* Effect.promise(async () => {
-      // Reset specialist pipeline state (review/test/merge)
+      // Reset specialist pipeline state, remove from queues, and update STATE.md
+      // via reopenWorkspaceState (shared logic with `pan work reopen` CLI command)
       try {
-        clearReviewStatus(id.toUpperCase());
-        const { checkSpecialistQueue, completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
-        for (const specialist of ['review-agent', 'test-agent', 'merge-agent'] as const) {
-          const queue = checkSpecialistQueue(specialist);
-          for (const item of queue.items) {
-            if (item.payload?.issueId?.toUpperCase() === id.toUpperCase()) {
-              completeSpecialistTask(specialist, item.id);
-            }
-          }
+        const teamPrefix = extractTeamPrefix(id);
+        const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+        const projectPath = projectConfig?.path || '';
+        const workspacePath = projectPath
+          ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
+          : '';
+        if (workspacePath) {
+          reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason });
+        } else {
+          // Fallback: no workspace path, just clear review status
+          clearReviewStatus(id.toUpperCase());
         }
       } catch { /* non-fatal */ }
 
