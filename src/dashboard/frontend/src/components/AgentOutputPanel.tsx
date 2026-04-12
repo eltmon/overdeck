@@ -28,10 +28,10 @@ function parseSpecialistSession(agentId: string): { projectKey: string; type: st
   return { projectKey: match[1], type: match[2] };
 }
 
-// Derive issueId for work agents: agent-pan-505 → PAN-505
-function deriveWorkAgentIssueId(agentId: string, agentIssueId?: string): string | null {
+// Derive issueId for work and planning agents: agent-pan-505 → PAN-505, planning-pan-503 → PAN-503
+function deriveAgentIssueId(agentId: string, agentIssueId?: string): string | null {
   if (agentIssueId) return agentIssueId;
-  const match = agentId.match(/^agent-([a-z]+)-(\d+)$/i);
+  const match = agentId.match(/^(?:agent|planning)-([a-z]+)-(\d+)$/i);
   if (match) return `${match[1].toUpperCase()}-${match[2]}`;
   return null;
 }
@@ -84,8 +84,8 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     };
   }, [specialist, agentId, specialistIsRunning]);
 
-  // For work agents: derive from store or agentId pattern
-  const workAgentIssueId = specialist ? null : deriveWorkAgentIssueId(agentId, agent?.issueId);
+  // For work and planning agents: derive from store or agentId pattern
+  const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, agent?.issueId);
 
   const label = specialist
     ? `${specialist.projectKey} / ${specialist.type.replace('-agent', '')}`
