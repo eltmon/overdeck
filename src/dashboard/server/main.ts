@@ -13,11 +13,11 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge } from '../../lib/review-status.js';
+import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
 import { getEventStore } from './event-store.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { setAgentStoppedNotifier } from '../../lib/cloister/deacon.js';
+import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 
@@ -67,6 +67,22 @@ setAgentStoppedNotifier((agentId) => {
   } catch { /* non-fatal — event store may not be ready during early boot */ }
 });
 console.log('[panopticon] Agent stopped notifier → domain events wired');
+
+// Wire deacon merge-ready reminder → domain events so the frontend re-reads the
+// Awaiting Merge list when deacon fires its 1h staleness reminder.
+setMergeReadyNotifier((issueId) => {
+  try {
+    const status = getReviewStatus(issueId);
+    if (!status) return;
+    const es = getEventStore();
+    es.append({
+      type: 'review.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: { issueId, status },
+    } as any);
+  } catch { /* non-fatal */ }
+});
+console.log('[panopticon] Merge-ready notifier → domain events wired');
 
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
