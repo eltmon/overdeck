@@ -131,6 +131,19 @@ For each bug found during the operation:
 - Ghost agents after crash (fixed: `recoverOrphanedAgents` in deacon startup)
 - Done column empty in store selector (fixing: `selectIssuesByCycle` over-filters)
 - Planning tag on implementation agents (investigating: badge display logic)
+- `readyForMerge` stuck at false when `verificationStatus='pending'` after server restart (fixed: `verificationSatisfied()` now only blocks on `'failed'`; `normalizeReviewStatus()` aligned; `fixStuckReadyForMerge()` runs at startup — commit 96037ae7, 24f658d7)
+- `messageAgent` silently drops feedback into dead tmux shell when agent is stopped but `remain-on-exit` session persists — `sessionExists()` returned true, bypassing auto-restart (fixed: removed `!sessionExists()` guard, added `killSession()` before `createSession()` — commit 3b67d978)
+- `mergeReadyNotifier` never registered — deacon spammed "No mergeReadyNotifier registered" on every patrol cycle (fixed: wired in `main.ts` to emit `review.status_changed` domain event — commit 24f658d7)
+- Awaiting Merge page showed cancelled issues and had no priority ordering (fixed: filter cancelled/wontfix, sort PAN first then others, FIFO within tier — commit ece9919a)
+
+## Flywheel Run Log
+
+### 2026-04-12 — Run 1
+- **Issues inventoried**: 6 PAN issues in In Progress/In Review (PAN-544, PAN-596, PAN-645, PAN-647, PAN-655, PAN-662, PAN-670)
+- **Issues moved to Awaiting Merge**: 4 (PAN-544, PAN-647, PAN-655, PAN-670)
+- **Bugs fixed**: 5 substrate bugs (see Known Recurring Issues entries above)
+- **Friction points removed**: urgency-first priority ladder added to all flywheel docs and the all-up skill; Awaiting Merge now priority-sorted
+- **Still in pipeline**: PAN-645 (review→test→merge cycle; one failing test remaining); PAN-596 and PAN-662 (blocked on pre-existing failures that PAN-645 will fix once it merges)
 
 ## How to Run This Operation
 
