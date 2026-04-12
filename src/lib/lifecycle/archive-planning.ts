@@ -18,9 +18,9 @@ import {
   ARCHIVES_DIR,
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
-  PROJECT_PRDS_ACTIVE_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../paths.js';
+import { findPrdAtStatus, canonicalPrdSubdir } from '../prd-locations.js';
 import type { LifecycleContext, StepResult, ArchiveOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 
@@ -55,92 +55,52 @@ export async function movePrd(
   opts: ArchiveOptions = {},
 ): Promise<StepResult> {
   const { pushToRemote = true } = opts;
-  const issueLower = ctx.issueId.toLowerCase();
   const step = 'archive-planning:move-prd';
 
-  // Per-issue subdirectory paths (new format: docs/prds/active/<issue-id>/STATE.md)
-  const activeIssueDir = join(
-    ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
-    PROJECT_PRDS_ACTIVE_SUBDIR, issueLower,
-  );
-  const completedIssueDir = join(
-    ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
-    PROJECT_PRDS_COMPLETED_SUBDIR, issueLower,
-  );
-
-  // Legacy flat paths (old format: docs/prds/active/<issue-id>-plan.md)
-  const legacyActivePrdPath = join(
-    ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
-    PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`,
-  );
-  const legacyCompletedPrdPath = join(
-    ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
-    PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`,
-  );
-
-  // Already in completed (either format) — idempotent skip
-  if (existsSync(completedIssueDir) || existsSync(legacyCompletedPrdPath)) {
+  // Idempotent skip: if any completed PRD already exists in any format, we're done.
+  if (findPrdAtStatus(ctx.projectPath, ctx.issueId, 'completed')) {
     return stepSkipped(step, ['PRD already in completed/']);
   }
 
-  // Determine source: prefer new subdirectory format, fall back to legacy flat file
-  const useNewFormat = existsSync(activeIssueDir);
-  const useLegacyFormat = !useNewFormat && existsSync(legacyActivePrdPath);
-
-  if (!useNewFormat && !useLegacyFormat) {
+  // Find source PRD in active/ in any format/case (subdir lower/upper, flat lower/upper).
+  const source = findPrdAtStatus(ctx.projectPath, ctx.issueId, 'active');
+  if (!source) {
     return stepSkipped(step, ['No PRD found in active/ (may not have had one)']);
   }
 
-  if (useNewFormat) {
-    // Move entire issue subdirectory
-    const completedParent = join(
-      ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR,
-    );
-    if (!existsSync(completedParent)) {
-      mkdirSync(completedParent, { recursive: true });
-    }
-    try {
-      await execAsync(`git mv "${activeIssueDir}" "${completedIssueDir}"`, { cwd: ctx.projectPath });
-      await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
-      if (pushToRemote) {
-        await execAsync('git push', { cwd: ctx.projectPath });
-      }
-      return stepOk(step, [`Moved PRD subdirectory from active/ to completed/ via git mv`]);
-    } catch {
-      // git mv failed — fall back to copy
-      try {
-        cpSync(activeIssueDir, completedIssueDir, { recursive: true });
-        return stepOk(step, ['Copied PRD subdirectory to completed/ (git mv failed, plain copy succeeded)']);
-      } catch (err) {
-        return stepFailed(step, `Failed to preserve PRD: ${(err as Error).message}`);
-      }
-    }
-  } else {
-    // Legacy flat file: move single file
-    const completedDir = dirname(legacyCompletedPrdPath);
-    if (!existsSync(completedDir)) {
-      mkdirSync(completedDir, { recursive: true });
-    }
-    try {
-      await execAsync(`git mv "${legacyActivePrdPath}" "${legacyCompletedPrdPath}"`, { cwd: ctx.projectPath });
-      await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
-      if (pushToRemote) {
-        await execAsync('git push', { cwd: ctx.projectPath });
-      }
-      return stepOk(step, [`Moved PRD from active/ to completed/ via git mv`]);
-    } catch {
-      try {
-        cpSync(legacyActivePrdPath, legacyCompletedPrdPath);
-        if (!existsSync(legacyCompletedPrdPath)) {
-          return stepFailed(step, 'PRD copy appeared to succeed but file not found at destination');
-        }
-        return stepOk(step, ['Copied PRD to completed/ (git mv failed, plain copy succeeded)']);
-      } catch (err) {
-        return stepFailed(step, `Failed to preserve PRD: ${(err as Error).message}`);
-      }
-    }
+  // Destination is always the canonical lowercase form, mirroring source format.
+  const issueLower = ctx.issueId.toLowerCase();
+  const completedSubdir = canonicalPrdSubdir(ctx.projectPath, ctx.issueId, 'completed');
+  const completedFlat = join(
+    ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
+    PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`,
+  );
+  const dest = source.format === 'subdir' ? completedSubdir : completedFlat;
+  const destParent = dirname(dest);
+  if (!existsSync(destParent)) {
+    mkdirSync(destParent, { recursive: true });
   }
 
+  const formatLabel = source.format === 'subdir' ? 'PRD subdirectory' : 'PRD';
+  try {
+    await execAsync(`git mv "${source.path}" "${dest}"`, { cwd: ctx.projectPath });
+    await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
+    if (pushToRemote) {
+      await execAsync('git push', { cwd: ctx.projectPath });
+    }
+    return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv`]);
+  } catch {
+    // git mv failed — fall back to plain copy. cpSync handles both file and directory.
+    try {
+      cpSync(source.path, dest, { recursive: true });
+      if (!existsSync(dest)) {
+        return stepFailed(step, 'PRD copy appeared to succeed but destination not found');
+      }
+      return stepOk(step, [`Copied ${formatLabel} to completed/ (git mv failed, plain copy succeeded)`]);
+    } catch (err) {
+      return stepFailed(step, `Failed to preserve PRD: ${(err as Error).message}`);
+    }
+  }
 }
 
 /**
