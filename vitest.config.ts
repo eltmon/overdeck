@@ -11,7 +11,7 @@ export default defineConfig({
       forks: { minForks: 1, maxForks: 2, singleFork: false },
     },
     include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
