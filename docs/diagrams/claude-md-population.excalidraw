@@ -1,0 +1,1518 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 700,
+      "y": 40,
+      "width": 900,
+      "height": 40,
+      "strokeColor": "#1e1e1e",
+      "text": "Panopticon: CLAUDE.md Population & Spawn Locations",
+      "fontSize": 28,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "subtitle",
+      "type": "text",
+      "x": 760,
+      "y": 80,
+      "width": 800,
+      "height": 24,
+      "strokeColor": "#868e96",
+      "text": "Where each agent spawns and which CLAUDE.md it reads",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "zone-source",
+      "type": "rectangle",
+      "x": 60,
+      "y": 140,
+      "width": 520,
+      "height": 880,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "opacity": 40,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "zone-source-label",
+      "type": "text",
+      "x": 80,
+      "y": 150,
+      "width": 480,
+      "height": 24,
+      "strokeColor": "#868e96",
+      "text": "SOURCES (Templates & Inputs)",
+      "fontSize": 18,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "zone-spawn",
+      "type": "rectangle",
+      "x": 620,
+      "y": 140,
+      "width": 640,
+      "height": 880,
+      "backgroundColor": "#fff4e6",
+      "strokeColor": "#e8590c",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "opacity": 30,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "zone-spawn-label",
+      "type": "text",
+      "x": 640,
+      "y": 150,
+      "width": 480,
+      "height": 24,
+      "strokeColor": "#e8590c",
+      "text": "AGENTS (cwd + Auto-loaded CLAUDE.md)",
+      "fontSize": 18,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "zone-fs",
+      "type": "rectangle",
+      "x": 1300,
+      "y": 140,
+      "width": 600,
+      "height": 880,
+      "backgroundColor": "#e3fafc",
+      "strokeColor": "#0c8599",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "opacity": 30,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "zone-fs-label",
+      "type": "text",
+      "x": 1320,
+      "y": 150,
+      "width": 480,
+      "height": 24,
+      "strokeColor": "#0c8599",
+      "text": "FILESYSTEM (cwd resolution)",
+      "fontSize": 18,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys1",
+      "type": "rectangle",
+      "x": 80,
+      "y": 200,
+      "width": 480,
+      "height": 160,
+      "backgroundColor": "#a5d8ff",
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys1-label",
+      "type": "text",
+      "x": 100,
+      "y": 215,
+      "width": 440,
+      "height": 22,
+      "strokeColor": "#1971c2",
+      "text": "System 1 (ACTIVE) — generateClaudeMd()",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys1-path",
+      "type": "text",
+      "x": 100,
+      "y": 240,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "templates/claude-md/sections/",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys1-files",
+      "type": "text",
+      "x": 100,
+      "y": 260,
+      "width": 440,
+      "height": 80,
+      "strokeColor": "#1e1e1e",
+      "text": "• workspace-info.md\n• beads.md\n• commands-skills.md (stale, PAN-589)\n• warnings.md",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys1-fn",
+      "type": "text",
+      "x": 100,
+      "y": 340,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "src/lib/template.ts:76",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys2",
+      "type": "rectangle",
+      "x": 80,
+      "y": 380,
+      "width": 480,
+      "height": 120,
+      "backgroundColor": "#ffc9c9",
+      "strokeColor": "#e03131",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys2-label",
+      "type": "text",
+      "x": 100,
+      "y": 395,
+      "width": 440,
+      "height": 22,
+      "strokeColor": "#e03131",
+      "text": "System 2 (DEAD) — templates/context/",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys2-files",
+      "type": "text",
+      "x": 100,
+      "y": 420,
+      "width": 440,
+      "height": 68,
+      "strokeColor": "#1e1e1e",
+      "text": "• CLAUDE.md.template\n• WORKSPACE.md.template\n• STATE.md.template\n• REOPEN_PROMPT.md.template",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "sys2-note",
+      "type": "text",
+      "x": 100,
+      "y": 485,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#e03131",
+      "text": "Zero references in src/ — DELETE",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "role-prompts",
+      "type": "rectangle",
+      "x": 80,
+      "y": 520,
+      "width": 480,
+      "height": 180,
+      "backgroundColor": "#eebefa",
+      "strokeColor": "#9c36b5",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "role-label",
+      "type": "text",
+      "x": 100,
+      "y": 535,
+      "width": 440,
+      "height": 22,
+      "strokeColor": "#9c36b5",
+      "text": "Role Prompts (Specialists)",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "role-path",
+      "type": "text",
+      "x": 100,
+      "y": 560,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "src/lib/cloister/prompts/",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "role-files",
+      "type": "text",
+      "x": 100,
+      "y": 580,
+      "width": 440,
+      "height": 110,
+      "strokeColor": "#1e1e1e",
+      "text": "• work-agent.md   (16.5K)\n• review-agent.md   (18.8K)\n• test-agent.md   (9.9K)\n• merge-agent.md   (9.8K)\n• inspect-agent.md   (5.6K)\n• uat-agent.md   (7.4K)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "plan-prompt",
+      "type": "rectangle",
+      "x": 80,
+      "y": 720,
+      "width": 480,
+      "height": 140,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "plan-label",
+      "type": "text",
+      "x": 100,
+      "y": 735,
+      "width": 440,
+      "height": 22,
+      "strokeColor": "#e8590c",
+      "text": "Planning Prompt (INLINE)",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "plan-fn",
+      "type": "text",
+      "x": 100,
+      "y": 760,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "buildPlanningPrompt() — TypeScript",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "plan-path",
+      "type": "text",
+      "x": 100,
+      "y": 780,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "src/lib/planning/spawn-planning-session.ts:143",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "plan-out",
+      "type": "text",
+      "x": 100,
+      "y": 800,
+      "width": 440,
+      "height": 40,
+      "strokeColor": "#e8590c",
+      "text": "Output: .planning/PLANNING_PROMPT.md\n(NO planning-specific CLAUDE.md exists)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "proj-overlay",
+      "type": "rectangle",
+      "x": 80,
+      "y": 880,
+      "width": 480,
+      "height": 120,
+      "backgroundColor": "#b2f2bb",
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "proj-label",
+      "type": "text",
+      "x": 100,
+      "y": 895,
+      "width": 440,
+      "height": 22,
+      "strokeColor": "#2f9e44",
+      "text": "Project Overlay (per-repo)",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "proj-path",
+      "type": "text",
+      "x": 100,
+      "y": 920,
+      "width": 440,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "<projectRoot>/.panopticon/claude-md/sections/",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "proj-note",
+      "type": "text",
+      "x": 100,
+      "y": 945,
+      "width": 440,
+      "height": 40,
+      "strokeColor": "#1e1e1e",
+      "text": "Layered ON TOP of System 1 (alphabetical)\nMerged inside generateClaudeMd()",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:26.544Z",
+      "updatedAt": "2026-04-12T12:52:26.544Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan",
+      "type": "rectangle",
+      "x": 660,
+      "y": 200,
+      "width": 560,
+      "height": 180,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "strokeWidth": 3,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan-title",
+      "type": "text",
+      "x": 680,
+      "y": 215,
+      "width": 520,
+      "height": 24,
+      "strokeColor": "#e8590c",
+      "text": "PLANNING AGENT",
+      "fontSize": 18,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan-cwd",
+      "type": "text",
+      "x": 680,
+      "y": 245,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "cwd: workspaces/feature-<id>/   (workspace worktree)",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan-spawn",
+      "type": "text",
+      "x": 680,
+      "y": 268,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "spawn: spawn-planning-session.ts:606  ·  tmux new-session -c <workspace>",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan-loads",
+      "type": "text",
+      "x": 680,
+      "y": 290,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "Auto-loads: <workspace>/CLAUDE.md  (System 1 + project overlay)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan-init",
+      "type": "text",
+      "x": 680,
+      "y": 312,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "Init message: \"Read .planning/PLANNING_PROMPT.md\" (file argument)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-plan-gap",
+      "type": "text",
+      "x": 680,
+      "y": 335,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#e03131",
+      "text": "GAP: no agent-taxonomy section, confused with subagents (PAN-598)",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work",
+      "type": "rectangle",
+      "x": 660,
+      "y": 410,
+      "width": 560,
+      "height": 180,
+      "backgroundColor": "#a5d8ff",
+      "strokeColor": "#1971c2",
+      "strokeWidth": 3,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work-title",
+      "type": "text",
+      "x": 680,
+      "y": 425,
+      "width": 520,
+      "height": 24,
+      "strokeColor": "#1971c2",
+      "text": "WORK AGENT (implementation)",
+      "fontSize": 18,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work-cwd",
+      "type": "text",
+      "x": 680,
+      "y": 455,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "cwd: workspaces/feature-<id>/   (workspace worktree)",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work-spawn",
+      "type": "text",
+      "x": 680,
+      "y": 478,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "spawn: src/lib/agents.ts:789 createSession(agentId, options.workspace, ...)",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work-loads",
+      "type": "text",
+      "x": 680,
+      "y": 500,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "Auto-loads: <workspace>/CLAUDE.md  (System 1 + project overlay)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work-prompt",
+      "type": "text",
+      "x": 680,
+      "y": 522,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "Prompt: buildWorkAgentPrompt() → sendKeysAsync after ready",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-work-prompt2",
+      "type": "text",
+      "x": 680,
+      "y": 545,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "(also reads project CLAUDE.md via WORK-AGENT.md template references)",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec",
+      "type": "rectangle",
+      "x": 660,
+      "y": 620,
+      "width": 560,
+      "height": 230,
+      "backgroundColor": "#eebefa",
+      "strokeColor": "#9c36b5",
+      "strokeWidth": 3,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-title",
+      "type": "text",
+      "x": 680,
+      "y": 635,
+      "width": 520,
+      "height": 24,
+      "strokeColor": "#9c36b5",
+      "text": "SPECIALISTS  (review / test / merge / inspect / uat)",
+      "fontSize": 18,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-cwd",
+      "type": "text",
+      "x": 680,
+      "y": 668,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#e03131",
+      "text": "cwd: project.path  (DEVROOT, the main repo)  — NOT the workspace",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-spawn",
+      "type": "text",
+      "x": 680,
+      "y": 691,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "spawn: specialists.ts:670 cwd = project?.path || getDevrootPath()",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-loads",
+      "type": "text",
+      "x": 680,
+      "y": 713,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#e03131",
+      "text": "Auto-loads: <projectRoot>/CLAUDE.md  (the devroot one, NOT workspace)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-prompt",
+      "type": "text",
+      "x": 680,
+      "y": 736,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "Prompt: role template (review-agent.md etc) → task-prompt.md as CLI arg",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-vars",
+      "type": "text",
+      "x": 680,
+      "y": 758,
+      "width": 520,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "Vars injected: {{projectPath}}, {{workspacePath}}, {{branch}}, {{prUrl}}",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-asym",
+      "type": "text",
+      "x": 680,
+      "y": 781,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#e03131",
+      "text": "ASYMMETRY: workspace CLAUDE.md is reachable only by explicit cat",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-spec-tmux",
+      "type": "text",
+      "x": 680,
+      "y": 802,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "tmux new-session -c <projectPath> — PTY wrapped via script(1)",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-deacon",
+      "type": "rectangle",
+      "x": 660,
+      "y": 870,
+      "width": 560,
+      "height": 130,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-deacon-title",
+      "type": "text",
+      "x": 680,
+      "y": 885,
+      "width": 520,
+      "height": 22,
+      "strokeColor": "#868e96",
+      "text": "DEACON / Stuck Recovery",
+      "fontSize": 16,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-deacon-cwd",
+      "type": "text",
+      "x": 680,
+      "y": 912,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "cwd: workspace  (uses agent.workspace from runtime state)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-deacon-spawn",
+      "type": "text",
+      "x": 680,
+      "y": 933,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "spawn: deacon.ts:1026 — respawn dead work agent in same workspace",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "agent-deacon-loads",
+      "type": "text",
+      "x": 680,
+      "y": 955,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "Auto-loads: <workspace>/CLAUDE.md (matches work agent)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:52:58.616Z",
+      "updatedAt": "2026-04-12T12:52:58.616Z",
+      "version": 1
+    },
+    {
+      "id": "fs-workspace",
+      "type": "rectangle",
+      "x": 1320,
+      "y": 200,
+      "width": 560,
+      "height": 300,
+      "backgroundColor": "#99e9f2",
+      "strokeColor": "#0c8599",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-ws-title",
+      "type": "text",
+      "x": 1340,
+      "y": 215,
+      "width": 520,
+      "height": 24,
+      "strokeColor": "#0c8599",
+      "text": "WORKSPACE WORKTREE",
+      "fontSize": 17,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-ws-path",
+      "type": "text",
+      "x": 1340,
+      "y": 245,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "<projectRoot>/workspaces/feature-<issue-id>/",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-ws-tree",
+      "type": "text",
+      "x": 1340,
+      "y": 270,
+      "width": 520,
+      "height": 200,
+      "strokeColor": "#1e1e1e",
+      "text": "├── .git                  (worktree pointer)\n├── .planning/\n│   ├── PLANNING_PROMPT.md   ← buildPlanningPrompt() output\n│   ├── STATE.md\n│   ├── plan.vbrief.json\n│   └── prd.md (copied from docs/prds)\n├── .beads/issues.jsonl\n├── .panopticon/claude-md/sections/   (project overlay)\n├── CLAUDE.md             ◀── generated at workspace create\n└── [feature branch source files]",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-devroot",
+      "type": "rectangle",
+      "x": 1320,
+      "y": 520,
+      "width": 560,
+      "height": 240,
+      "backgroundColor": "#a5d8ff",
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-dr-title",
+      "type": "text",
+      "x": 1340,
+      "y": 535,
+      "width": 520,
+      "height": 24,
+      "strokeColor": "#1971c2",
+      "text": "DEVROOT (project root)",
+      "fontSize": 17,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-dr-path",
+      "type": "text",
+      "x": 1340,
+      "y": 565,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "<projectRoot>/  (e.g. /home/eltmon/Projects/panopticon-cli)",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-dr-tree",
+      "type": "text",
+      "x": 1340,
+      "y": 590,
+      "width": 520,
+      "height": 150,
+      "strokeColor": "#1e1e1e",
+      "text": "├── CLAUDE.md             ◀── hand-written, repo-tracked\n│                          (used by SPECIALISTS!)\n├── .panopticon/claude-md/sections/   (project overlay source)\n├── docs/prds/{active,planned}/\n├── templates/claude-md/sections/   (System 1 source)\n├── templates/context/   (System 2 — DEAD)\n├── src/ ...\n└── workspaces/feature-<id>/  (worktrees)",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-agentdir",
+      "type": "rectangle",
+      "x": 1320,
+      "y": 780,
+      "width": 560,
+      "height": 220,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-ad-title",
+      "type": "text",
+      "x": 1340,
+      "y": 795,
+      "width": 520,
+      "height": 24,
+      "strokeColor": "#e8590c",
+      "text": "AGENT STATE DIR",
+      "fontSize": 17,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-ad-path",
+      "type": "text",
+      "x": 1340,
+      "y": 825,
+      "width": 520,
+      "height": 18,
+      "strokeColor": "#1e1e1e",
+      "text": "~/.panopticon/agents/<sessionName>/",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "fs-ad-tree",
+      "type": "text",
+      "x": 1340,
+      "y": 850,
+      "width": 520,
+      "height": 160,
+      "strokeColor": "#1e1e1e",
+      "text": "├── launcher.sh             ← outer wrapper (script(1) PTY)\n├── run-claude.sh           ← specialist inner script\n├── init-prompt.txt         ← planning agent\n├── initial-prompt.md       ← work agent (sendKeysAsync)\n├── task-prompt.md          ← specialist (CLI arg)\n├── resume-prompt.md        ← work agent resume path\n├── state.json              ← lifecycle status\n└── ready                   ← readiness signal",
+      "fontSize": 12,
+      "createdAt": "2026-04-12T12:53:25.565Z",
+      "updatedAt": "2026-04-12T12:53:25.565Z",
+      "version": 1
+    },
+    {
+      "id": "arr-sys1-plan",
+      "type": "arrow",
+      "x": 567.998959620257,
+      "y": 283.99998321968155,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "label": {
+        "text": "generateClaudeMd"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.00208075948603,
+          1.3548722703142744
+        ]
+      ],
+      "start": {
+        "id": "sys1"
+      },
+      "end": {
+        "id": "agent-plan"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-sys1-work",
+      "type": "arrow",
+      "x": 552.9939674183954,
+      "y": 362.67527876136614,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          125.83024698139093,
+          44.64944247726771
+        ]
+      ],
+      "start": {
+        "id": "sys1"
+      },
+      "end": {
+        "id": "agent-work"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-proj-plan",
+      "type": "arrow",
+      "x": 382.7524566629002,
+      "y": 874.2111341437336,
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "label": {
+        "text": "overlay"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          465.879702058815,
+          -488.4222682874672
+        ]
+      ],
+      "start": {
+        "id": "proj-overlay"
+      },
+      "end": {
+        "id": "agent-plan"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-proj-work",
+      "type": "arrow",
+      "x": 411.0695117033363,
+      "y": 875.370023952471,
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          395.5882493206001,
+          -280.740047904942
+        ]
+      ],
+      "start": {
+        "id": "proj-overlay"
+      },
+      "end": {
+        "id": "agent-work"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-role-spec",
+      "type": "arrow",
+      "x": 567.8422035321863,
+      "y": 659.9681861960053,
+      "strokeColor": "#9c36b5",
+      "strokeWidth": 3,
+      "label": {
+        "text": "task-prompt"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.31559293562736,
+          16.999111478957275
+        ]
+      ],
+      "start": {
+        "id": "role-prompts"
+      },
+      "end": {
+        "id": "agent-spec"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-role-work",
+      "type": "arrow",
+      "x": 567.8769861283731,
+      "y": 566.0218250417403,
+      "strokeColor": "#9c36b5",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "label": {
+        "text": "work-agent.md"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.24602774325376,
+          -14.94687588993213
+        ]
+      ],
+      "start": {
+        "id": "role-prompts"
+      },
+      "end": {
+        "id": "agent-work"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-plan-prompt",
+      "type": "arrow",
+      "x": 413.02730431580267,
+      "y": 714.9779803904818,
+      "strokeColor": "#e8590c",
+      "strokeWidth": 3,
+      "label": {
+        "text": "PLANNING_PROMPT.md"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          409.1453913683947,
+          -329.9559607809635
+        ]
+      ],
+      "start": {
+        "id": "plan-prompt"
+      },
+      "end": {
+        "id": "agent-plan"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-plan-fs",
+      "type": "arrow",
+      "x": 1227.9671456517417,
+      "y": 316.1788314228856,
+      "strokeColor": "#e8590c",
+      "strokeWidth": 2,
+      "label": {
+        "text": "cwd"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.0657086965166,
+          7.642337154228812
+        ]
+      ],
+      "start": {
+        "id": "agent-plan"
+      },
+      "end": {
+        "id": "fs-workspace"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-work-fs",
+      "type": "arrow",
+      "x": 1227.8010628463317,
+      "y": 434.59066753492465,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "label": {
+        "text": "cwd"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.39787430733668,
+          -19.18133506984924
+        ]
+      ],
+      "start": {
+        "id": "agent-work"
+      },
+      "end": {
+        "id": "fs-workspace"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-spec-fs",
+      "type": "arrow",
+      "x": 1227.91839174,
+      "y": 693.5572011889394,
+      "strokeColor": "#e03131",
+      "strokeWidth": 3,
+      "label": {
+        "text": "cwd (DEVROOT)"
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.16321651999988,
+          -12.114402377878832
+        ]
+      ],
+      "start": {
+        "id": "agent-spec"
+      },
+      "end": {
+        "id": "fs-devroot"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-deacon-fs",
+      "type": "arrow",
+      "x": 1019.3201088471585,
+      "y": 864.6935398854732,
+      "strokeColor": "#868e96",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          405.4623464082472,
+          -359.3870797709464
+        ]
+      ],
+      "start": {
+        "id": "agent-deacon"
+      },
+      "end": {
+        "id": "fs-workspace"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-plan-agentdir",
+      "type": "arrow",
+      "x": 1044.9195205871677,
+      "y": 385.3813823519705,
+      "strokeColor": "#868e96",
+      "strokeWidth": 1,
+      "strokeStyle": "dotted",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          428.1609588256647,
+          389.237235296059
+        ]
+      ],
+      "start": {
+        "id": "agent-plan"
+      },
+      "end": {
+        "id": "fs-agentdir"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-spec-agentdir",
+      "type": "arrow",
+      "x": 1227.788110433755,
+      "y": 802.5866016927758,
+      "strokeColor": "#868e96",
+      "strokeWidth": 1,
+      "strokeStyle": "dotted",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84.42377913248993,
+          19.8267966144482
+        ]
+      ],
+      "start": {
+        "id": "agent-spec"
+      },
+      "end": {
+        "id": "fs-agentdir"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "arr-work-agentdir",
+      "type": "arrow",
+      "x": 1099.195104533407,
+      "y": 594.0698344970132,
+      "strokeColor": "#868e96",
+      "strokeWidth": 1,
+      "strokeStyle": "dotted",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          307.7636370870323,
+          181.86033100597365
+        ]
+      ],
+      "start": {
+        "id": "agent-work"
+      },
+      "end": {
+        "id": "fs-agentdir"
+      },
+      "createdAt": "2026-04-12T12:53:41.871Z",
+      "updatedAt": "2026-04-12T12:53:41.871Z",
+      "version": 1
+    },
+    {
+      "id": "legend",
+      "type": "rectangle",
+      "x": 60,
+      "y": 1060,
+      "width": 1840,
+      "height": 200,
+      "backgroundColor": "#fff9db",
+      "strokeColor": "#e8590c",
+      "strokeWidth": 2,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-title",
+      "type": "text",
+      "x": 80,
+      "y": 1075,
+      "width": 800,
+      "height": 28,
+      "strokeColor": "#e8590c",
+      "text": "KEY FINDINGS",
+      "fontSize": 20,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-1",
+      "type": "text",
+      "x": 80,
+      "y": 1110,
+      "width": 1800,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "1. ASYMMETRY: Planning + Work agents spawn in workspace worktree → read workspace CLAUDE.md (System 1 + project overlay).  Specialists spawn in DEVROOT → read devroot CLAUDE.md.",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-2",
+      "type": "text",
+      "x": 80,
+      "y": 1135,
+      "width": 1800,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "2. Claude Code auto-loads CLAUDE.md from cwd. Work agent's WORK template explicitly cats project CLAUDE.md too. Specialists never auto-see workspace CLAUDE.md — only via {{workspacePath}} explicit reads.",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-3",
+      "type": "text",
+      "x": 80,
+      "y": 1160,
+      "width": 1800,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "3. PLANNING agent has NO planning-specific CLAUDE.md. It inherits the generic workspace one and gets PLANNING_PROMPT.md as initial-message file argument. This is the source of PAN-598 confusion.",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-4",
+      "type": "text",
+      "x": 80,
+      "y": 1185,
+      "width": 1800,
+      "height": 20,
+      "strokeColor": "#e03131",
+      "text": "4. System 2 (templates/context/) is fully orphaned — zero src/ references. Safe to delete.",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-5",
+      "type": "text",
+      "x": 80,
+      "y": 1210,
+      "width": 1800,
+      "height": 20,
+      "strokeColor": "#1e1e1e",
+      "text": "5. Specialists run from devroot for a reason: they need access to project-wide tools, scripts, and CI configuration. They reach into the workspace via injected {{workspacePath}} variable.",
+      "fontSize": 14,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    },
+    {
+      "id": "legend-6",
+      "type": "text",
+      "x": 80,
+      "y": 1235,
+      "width": 1800,
+      "height": 20,
+      "strokeColor": "#868e96",
+      "text": "6. Solid arrows = primary content flow.  Dashed = overlay/auxiliary.  Dotted = state-dir writes (prompts/launchers).",
+      "fontSize": 13,
+      "createdAt": "2026-04-12T12:54:00.566Z",
+      "updatedAt": "2026-04-12T12:54:00.566Z",
+      "version": 1
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}
