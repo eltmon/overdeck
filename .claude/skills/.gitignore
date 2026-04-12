@@ -2,6 +2,7 @@
 beads
 beads-completion-check
 beads-panopticon-guide
+benchmark
 bug-fix
 clear-writing
 code-review
@@ -28,6 +29,7 @@ pan-issue
 pan-kill
 pan-logs
 pan-network
+pan-dev
 pan-plan
 pan-projects
 pan-quickstart
@@ -57,3 +59,4 @@ stitch-react-components
 stitch-setup
 web-design-guidelines
 work-complete
+workspace-add-repo

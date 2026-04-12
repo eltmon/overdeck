@@ -2351,6 +2351,12 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       if (exitMatch && exitMatch[1] === '0') continue;
 
       const issueLower = match[1];
+      const containerType = match[2];
+
+      // Init containers are one-shot setup jobs — a clean exit (code 0) is not a crash.
+      // Restarting them causes an infinite loop: they complete, exit 0, get restarted, repeat.
+      if (containerType === 'init') continue;
+
       const agentId = `agent-${issueLower}`;
 
       // Only restart if the agent is active (has a tmux session)
