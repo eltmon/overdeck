@@ -216,6 +216,7 @@ function ComposerPlugin({
 }: InnerPluginProps) {
   const [editor] = useLexicalComposerContext();
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTextRef = useRef<string>('');
 
   // Register Enter key handler.
   // NOTE: We do NOT check `disabled` here — the submit handler owns that check.
@@ -238,36 +239,28 @@ function ComposerPlugin({
     );
   }, [editor, onCommandKeyDown]);
 
-  // Register / key handler to trigger slash menu
-  useEffect(() => {
-    const root = editor.getRootElement();
-    if (!root) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const target = e.target as HTMLElement;
-        if (target === root || root.contains(target)) {
-          onSlashKey();
-        }
-      }
-    };
-
-    root.addEventListener('keydown', handleKeyDown);
-    return () => root.removeEventListener('keydown', handleKeyDown);
-  }, [editor, onSlashKey]);
-
-  // Debounced draft persistence
+  // Debounced draft persistence + slash menu trigger.
+  // Detecting '/' here (instead of via a keydown listener on the root element)
+  // ensures the menu opens regardless of focus/selection timing — including
+  // when '/' is the very first character typed in an empty editor.
   const handleChange = useCallback(() => {
     editor.read(() => {
       const text = $getRoot().getTextContent();
+      const prev = lastTextRef.current;
+      lastTextRef.current = text;
       onTextChange(text);
+
+      // Trigger slash menu when a new '/' character is appended at the end
+      if (text.length > prev.length && text.endsWith('/')) {
+        onSlashKey();
+      }
 
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
       draftTimerRef.current = setTimeout(() => {
         saveDraft(conversationName, text);
       }, 300);
     });
-  }, [editor, conversationName, onTextChange]);
+  }, [editor, conversationName, onTextChange, onSlashKey]);
 
   return <OnChangePlugin onChange={handleChange} />;
 }
