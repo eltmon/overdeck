@@ -108,6 +108,21 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
     // Looks like a project root, not a workspace — fall back to resolution
     providedPath = undefined;
   }
+
+  // Guard: if the provided path looks like a workspace but the issue ID doesn't match the
+  // directory name, fall back to canonical resolution. This catches routing mismatches where
+  // e.g. PAN-645's feedback would be written into feature-pan-647's directory.
+  if (providedPath?.includes('/workspaces/feature-')) {
+    const dirName = providedPath.replace(/.*\/workspaces\/feature-/, '').replace(/\/.*$/, '');
+    const expectedSuffix = opts.issueId.toLowerCase();
+    if (!dirName.includes(expectedSuffix) && !expectedSuffix.replace(/^[a-z]+-/, '').includes(dirName)) {
+      console.error(
+        `[feedback-writer] MISMATCH: issueId=${opts.issueId} but workspacePath points to feature-${dirName} — falling back to canonical resolution`
+      );
+      providedPath = undefined;
+    }
+  }
+
   const workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
   if (!workspacePath) {
     return { success: false, error: `Workspace not found for ${opts.issueId}` };
