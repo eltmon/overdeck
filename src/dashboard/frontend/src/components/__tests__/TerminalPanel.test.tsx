@@ -1,0 +1,172 @@
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { Agent } from '../../types';
+
+// ─── Module mocks ─────────────────────────────────────────────────────────────
+
+vi.mock('../XTerminal', () => ({
+  XTerminal: ({ sessionName }: { sessionName: string }) => (
+    <div data-testid="xterm">{sessionName}</div>
+  ),
+}));
+
+vi.mock('../chat/MessagesTimeline', () => ({
+  MessagesTimeline: ({ messages }: { messages: unknown[] }) => (
+    <div data-testid="messages-timeline">{messages.length} messages</div>
+  ),
+}));
+
+vi.mock('lucide-react', () => ({
+  X: () => <span data-testid="icon-x" />,
+  RefreshCw: () => <span data-testid="icon-refresh" />,
+  ExternalLink: () => <span data-testid="icon-external" />,
+}));
+
+// ─── Import under test ────────────────────────────────────────────────────────
+
+import { TerminalPanel } from '../TerminalPanel';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeAgent(overrides: Partial<Agent> = {}): Agent {
+  return {
+    id: 'test-agent-1',
+    issueId: 'PAN-473',
+    status: 'stopped',
+    ...overrides,
+  } as Agent;
+}
+
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+}
+
+function renderPanel(agent: Agent, fetchImpl: typeof global.fetch) {
+  global.fetch = fetchImpl;
+  const client = makeQueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <TerminalPanel agent={agent} onClose={() => {}} />
+    </QueryClientProvider>,
+  );
+}
+
+/** Build a fetch mock that answers route-by-route. */
+function makeFetch(opts: {
+  tmuxAlive: boolean;
+  conversationMessages?: unknown[];
+  output?: string;
+}): typeof global.fetch {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url.includes('/tmux-alive')) {
+      return new Response(JSON.stringify({ alive: opts.tmuxAlive }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (url.includes('/conversation')) {
+      const messages = opts.conversationMessages ?? [];
+      return new Response(
+        JSON.stringify({ messages, workLog: [], streaming: false, totalCost: 0, byteOffset: 0 }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (url.includes('/output')) {
+      return new Response(JSON.stringify({ output: opts.output ?? '' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response('Not found', { status: 404 });
+  }) as typeof global.fetch;
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('TerminalPanel — stopped agent content rendering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the XTerminal when tmux session is alive', async () => {
+    renderPanel(makeAgent(), makeFetch({ tmuxAlive: true }));
+
+    // Optimistic: XTerminal is shown immediately, before probe resolves
+    expect(screen.getByTestId('xterm')).toBeInTheDocument();
+  });
+
+  it('renders last output (pre element) when agent is stopped and conversation is empty', async () => {
+    renderPanel(
+      makeAgent(),
+      makeFetch({ tmuxAlive: false, conversationMessages: [], output: 'last terminal output' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('last terminal output')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('messages-timeline')).not.toBeInTheDocument();
+  });
+
+  it('renders "No saved output available." when stopped with no output and no conversation', async () => {
+    renderPanel(
+      makeAgent(),
+      makeFetch({ tmuxAlive: false, conversationMessages: [], output: '' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No saved output available.')).toBeInTheDocument();
+    });
+  });
+
+  it('renders MessagesTimeline when agent is stopped and conversation has messages', async () => {
+    const messages = [
+      { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'world' }] },
+    ];
+
+    renderPanel(
+      makeAgent(),
+      makeFetch({ tmuxAlive: false, conversationMessages: messages }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('messages-timeline')).toBeInTheDocument();
+    });
+    expect(screen.getByText('2 messages')).toBeInTheDocument();
+    // The pre/output element should NOT be rendered
+    expect(screen.queryByText('No saved output available.')).not.toBeInTheDocument();
+  });
+
+  it('shows "Conversation" header label when messages are present', async () => {
+    const messages = [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }];
+
+    renderPanel(
+      makeAgent(),
+      makeFetch({ tmuxAlive: false, conversationMessages: messages }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Conversation')).toBeInTheDocument();
+    });
+  });
+
+  it('shows "Last output" header label when stopped with no messages', async () => {
+    renderPanel(
+      makeAgent(),
+      makeFetch({ tmuxAlive: false, conversationMessages: [], output: 'some output' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Last output')).toBeInTheDocument();
+    });
+  });
+});

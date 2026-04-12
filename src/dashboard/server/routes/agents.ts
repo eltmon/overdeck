@@ -549,27 +549,34 @@ const getAgentOutputRoute = HttpRouter.add(
 
 // ─── Route: GET /api/agents/:id/conversation ─────────────────────────────────
 
+const EMPTY_CONVERSATION = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
+
+/**
+ * Resolve and parse an agent's conversation JSONL file.
+ * Exported for unit testing — the Effect route layer is not directly unit-testable.
+ */
+export async function buildConversationResponse(id: string): Promise<typeof EMPTY_CONVERSATION> {
+  try {
+    const jsonlPath = await getAgentJsonlPathShared(id);
+    if (!jsonlPath || !existsSync(jsonlPath)) {
+      return EMPTY_CONVERSATION;
+    }
+    const result = await parseConversationMessages(jsonlPath);
+    // Force streaming: false — tmux session is dead, any "streaming" state is stale
+    return { ...result, streaming: false };
+  } catch (err) {
+    console.error('[conversation] failed for', id, err);
+    return EMPTY_CONVERSATION;
+  }
+}
+
 const getAgentConversationRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/conversation',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-
-    return yield* Effect.promise(async () => {
-      const emptyResult = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
-      try {
-        const jsonlPath = await getAgentJsonlPathShared(id);
-        if (!jsonlPath || !existsSync(jsonlPath)) {
-          return jsonResponse(emptyResult);
-        }
-        const result = await parseConversationMessages(jsonlPath);
-        // Force streaming: false — tmux session is dead, any "streaming" state is stale
-        return jsonResponse({ ...result, streaming: false });
-      } catch {
-        return jsonResponse(emptyResult);
-      }
-    });
+    return yield* Effect.promise(async () => jsonResponse(await buildConversationResponse(id)));
   })),
 );
 
