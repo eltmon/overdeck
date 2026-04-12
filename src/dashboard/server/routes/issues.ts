@@ -1952,6 +1952,124 @@ const getIssueBeadsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/planning-state ───────────────────────────────
+//
+// Lightweight summary of an issue's planning artifacts:
+//   { hasPlan, hasBeads, beadsCount }
+// Used by kanban cards to color the vBRIEF/Tasks chips and decide whether to
+// show "Generate Tasks" instead of "Tasks". Cheap so it can be polled per-card.
+
+const getIssuePlanningStateRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/planning-state',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const issueLower = id.toLowerCase();
+
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    }
+    if (!projectPath) {
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
+      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
+    }
+
+    const workspacePath = projectPath
+      ? join(projectPath, 'workspaces', `feature-${issueLower}`)
+      : '';
+    const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
+    const hasPlan = !!planPath && existsSync(planPath);
+
+    // bd query is best-effort: a missing/broken database must NOT prevent the
+    // chip from coloring vBRIEF correctly. Errors are swallowed inside the
+    // promise so Effect.promise never sees a rejection.
+    const beadsCount = workspacePath && existsSync(workspacePath)
+      ? yield* Effect.promise(async () => {
+          try {
+            const { stdout } = await execAsync(
+              `bd list --json -l "${issueLower}" --status all --limit 0`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 8000 },
+            );
+            const arr = JSON.parse(stdout || '[]');
+            return Array.isArray(arr) ? arr.length : 0;
+          } catch {
+            return 0;
+          }
+        })
+      : 0;
+
+    return jsonResponse({
+      hasPlan,
+      hasBeads: beadsCount > 0,
+      beadsCount,
+      workspacePath,
+    });
+  })),
+);
+
+// ─── Route: POST /api/issues/:id/generate-tasks ──────────────────────────────
+//
+// Runs createBeadsFromVBrief() against the workspace, then writes the
+// .planning-complete marker. Same logic as `pan plan-finalize`, exposed so the
+// dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
+// exists but beads were never created (e.g. plans authored before the
+// agent-driven finalize flow shipped).
+
+const postIssueGenerateTasksRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/generate-tasks',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const issueLower = id.toLowerCase();
+
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    }
+    if (!projectPath) {
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
+      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
+    }
+
+    if (!projectPath) {
+      return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, 404);
+    }
+
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+    if (!existsSync(planPath)) {
+      return jsonResponse(
+        { success: false, error: `No vBRIEF plan at ${planPath} — run planning first.` },
+        409,
+      );
+    }
+
+    const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
+    const result = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
+
+    if (!result.success || result.created.length === 0) {
+      const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
+      return jsonResponse({ success: false, created: result.created, errors }, 500);
+    }
+
+    const markerPath = join(workspacePath, '.planning', '.planning-complete');
+    yield* Effect.promise(() => writeFile(markerPath, '', 'utf-8'));
+
+    return jsonResponse({
+      success: true,
+      created: result.created,
+      count: result.created.length,
+    });
+  })),
+);
+
 // ─── Route: GET /api/issues/:id/costs ────────────────────────────────────────
 
 const getIssueCostsRoute = HttpRouter.add(
@@ -2030,6 +2148,8 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueDeepWipeRoute,
   postIssueCloseOutRoute,
   getIssueBeadsRoute,
+  getIssuePlanningStateRoute,
+  postIssueGenerateTasksRoute,
   getIssueCostsRoute,
 );
 

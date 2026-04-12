@@ -235,6 +235,43 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     refetchInterval: step === 'planning' ? 2000 : false, // Only poll during active session
   });
 
+  // Planning state — drives the "tasks need generation" callout in the footer.
+  // Polled while the planning step is open so the callout vanishes the moment
+  // beads exist (whether the agent ran pan plan-finalize or the user clicked
+  // Generate Tasks here).
+  const planningStateQuery = useQuery({
+    queryKey: ['planning-state', issue.identifier],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
+      if (!res.ok) throw new Error('Failed to fetch planning state');
+      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number }>;
+    },
+    enabled: step === 'planning',
+    refetchInterval: step === 'planning' ? 4000 : false,
+  });
+  const planningHasPlan = planningStateQuery.data?.hasPlan ?? false;
+  const planningBeadsCount = planningStateQuery.data?.beadsCount ?? 0;
+  const tasksNeedGeneration = planningHasPlan && planningBeadsCount === 0;
+
+  const generateTasksMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/generate-tasks`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        throw new Error(body?.error || (body?.errors?.[0] ?? 'Failed to generate tasks'));
+      }
+      return body as { success: true; created: string[]; count: number };
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ['planning-state', issue.identifier] });
+      await statusQuery.refetch();
+      toast.success(`Generated ${data.count} bead${data.count === 1 ? '' : 's'} from the vBRIEF plan.`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Generate tasks failed: ${err.message}`);
+    },
+  });
+
   // Stop planning mutation - stops agent AND marks planning as complete (changes to "Planned")
   const stopPlanningMutation = useMutation({
     mutationFn: async () => {
@@ -883,6 +920,32 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                       </>
                     )}
                   </div>
+
+                  {/* Tasks-needed callout — shown when a vBRIEF plan exists but no beads were created.
+                      Planning isn't truly "done" until tasks exist; this surfaces the action
+                      directly in the planning dialog instead of forcing the user to find the
+                      Generate Tasks chip on the kanban card. */}
+                  {tasksNeedGeneration && (
+                    <div className="border-t border-warning/40 bg-warning/10 px-4 py-3 flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-warning-foreground mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-warning-foreground">Tasks not yet generated</p>
+                        <p className="text-xs text-content-subtle mt-0.5">
+                          A vBRIEF plan exists but no beads have been created. Generate tasks to finish planning so the Done button unlocks.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => generateTasksMutation.mutate()}
+                        disabled={generateTasksMutation.isPending}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-warning hover:bg-warning/90 text-warning-foreground text-sm font-medium rounded transition-colors disabled:opacity-50 shrink-0"
+                      >
+                        {generateTasksMutation.isPending
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Sparkles className="w-4 h-4" />}
+                        Generate Tasks
+                      </button>
+                    </div>
+                  )}
 
                   {/* Footer with controls */}
                   <div className="border-t border-divider px-4 py-2 flex items-center justify-between bg-surface-raised">

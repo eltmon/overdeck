@@ -2030,6 +2030,111 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     4: 'bg-border',
   };
 
+  // Planning state — drives chip coloring + Generate Tasks affordance.
+  // Only fetched when this card has any chance of having a plan (anything past
+  // backlog where the agent could have produced one). We poll every 30s so the
+  // chip flips from red→green right after Generate Tasks runs.
+  const planningStateQuery = useQuery({
+    queryKey: ['planning-state', issue.identifier],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
+      if (!res.ok) throw new Error('Failed to fetch planning state');
+      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number }>;
+    },
+    enabled: !!issue.identifier,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
+  const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
+  const needsTaskGeneration = hasPlan && beadsCount === 0;
+
+  const generateTasksMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/generate-tasks`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        throw new Error(body?.error || (body?.errors?.[0] ?? 'Failed to generate tasks'));
+      }
+      return body as { success: true; created: string[]; count: number };
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ['planning-state', issue.identifier] });
+      await refreshDashboardState(queryClient);
+      void showAlert({ title: 'Tasks generated', message: `Created ${data.count} bead${data.count === 1 ? '' : 's'} from the vBRIEF plan.` });
+    },
+    onError: (err: Error) => {
+      void showAlert({ title: 'Generate tasks failed', message: err.message, variant: 'error' });
+    },
+  });
+
+  const handleTasksClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (needsTaskGeneration) {
+      if (!generateTasksMutation.isPending) generateTasksMutation.mutate();
+    } else {
+      onViewBeads && onViewBeads(issue);
+    }
+  };
+
+  // Reusable chip elements — colored by planning state.
+  // vBRIEF green when a plan exists; Tasks red when plan exists but no beads
+  // (and the click action becomes "Generate Tasks" instead of "view beads").
+  const tasksChip = (
+    <button
+      onClick={handleTasksClick}
+      disabled={generateTasksMutation.isPending}
+      className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${
+        needsTaskGeneration
+          ? 'text-destructive hover:text-destructive/80 font-medium'
+          : beadsCount > 0
+            ? 'text-success hover:text-success/80'
+            : 'text-muted-foreground hover:text-foreground'
+      }`}
+      title={needsTaskGeneration ? 'Generate beads from vBRIEF plan' : 'Tasks'}
+    >
+      {generateTasksMutation.isPending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : <List className="w-3.5 h-3.5" />}
+      {needsTaskGeneration ? 'Generate Tasks' : 'Tasks'}
+    </button>
+  );
+
+  // Plan/See Plan chip — opens the planning dialog. Green "See Plan" when a
+  // plan already exists (clearer than "Re-plan" when the user is *continuing*
+  // an in-progress planning session, not starting over).
+  const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
+  const planChip = (
+    <button
+      data-testid={`action-plan-${issue.identifier}`}
+      onClick={(e) => { e.stopPropagation(); handlePlan(e); }}
+      className={`flex items-center gap-1 text-xs transition-colors ${
+        planLabelExists
+          ? 'text-success hover:text-success/80'
+          : 'text-muted-foreground hover:text-foreground'
+      }`}
+      title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
+    >
+      <FileText className="w-3.5 h-3.5" />
+      {planLabelExists ? 'See Plan' : 'Plan'}
+    </button>
+  );
+
+  const vbriefChip = (
+    <button
+      onClick={(e) => { e.stopPropagation(); onViewVBrief && onViewVBrief(issue); }}
+      className={`flex items-center gap-1 text-xs transition-colors ${
+        hasPlan
+          ? 'text-success hover:text-success/80'
+          : 'text-muted-foreground hover:text-foreground'
+      }`}
+      title="vBRIEF"
+    >
+      <ScrollText className="w-3.5 h-3.5" />
+      vBRIEF
+    </button>
+  );
+
   // Kill agent mutation
   const killMutation = useMutation({
     mutationFn: async (agentId: string) => {
@@ -2555,22 +2660,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <Eye className="w-3.5 h-3.5" />
             Watch
           </button>
-          <button
-            onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Tasks"
-          >
-            <List className="w-3.5 h-3.5" />
-            Tasks
-          </button>
-          <button
-            onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="vBRIEF"
-          >
-            <ScrollText className="w-3.5 h-3.5" />
-            vBRIEF
-          </button>
+          {tasksChip}
+          {vbriefChip}
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -2643,34 +2734,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <Eye className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <button
-              data-testid={`action-plan-${issue.identifier}`}
-              onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
-            </button>
+            planChip
           )}
-          {issue.labels?.some(l => l.toLowerCase() === 'planned') && (
+          {planLabelExists && (
             <>
-              <button
-                onClick={() => onViewBeads && onViewBeads(issue)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                title="Tasks"
-              >
-                <List className="w-3.5 h-3.5" />
-                Tasks
-              </button>
-              <button
-                onClick={() => onViewVBrief && onViewVBrief(issue)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                title="vBRIEF"
-              >
-                <ScrollText className="w-3.5 h-3.5" />
-                vBRIEF
-              </button>
+              {tasksChip}
+              {vbriefChip}
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
@@ -2700,41 +2769,35 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <Eye className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <button
-              data-testid={`action-plan-${issue.identifier}`}
-              onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title={issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
-            </button>
+            planChip
           )}
-          <button
-            onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Tasks"
-          >
-            <List className="w-3.5 h-3.5" />
-            Tasks
-          </button>
-          <button
-            onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="vBRIEF"
-          >
-            <ScrollText className="w-3.5 h-3.5" />
-            vBRIEF
-          </button>
-          <button
-            onClick={handleResumeSession}
-            disabled={resumeSessionMutation.isPending}
-            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-            title="Resume Session"
-          >
-            {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
-          </button>
+          {tasksChip}
+          {vbriefChip}
+          {/* Resume Session only when there's an actual prior work agent to resume.
+              For freshly-planned issues with no work agent yet, show Start Agent
+              instead (gated on beads existing). */}
+          {activeAgent ? (
+            <button
+              onClick={handleResumeSession}
+              disabled={resumeSessionMutation.isPending}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+              title="Resume Session"
+            >
+              {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
+            </button>
+          ) : beadsCount > 0 ? (
+            <button
+              ref={startButtonRef}
+              onClick={handleStartAgent}
+              disabled={startAgentMutation.isPending}
+              className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
+              title={startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
+            >
+              {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              <span>Start Agent</span>
+            </button>
+          ) : null}
           <button
             onClick={async (e) => {
               e.stopPropagation();
