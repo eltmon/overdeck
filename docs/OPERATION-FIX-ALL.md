@@ -137,6 +137,7 @@ For each bug found during the operation:
 - Awaiting Merge page showed cancelled issues and had no priority ordering (fixed: filter cancelled/wontfix, sort PAN first then others, FIFO within tier — commit ece9919a)
 - ActivityPanel showed no pipeline events — only post-merge lifecycle steps were logged. All `setReviewStatus()` transitions (review, test, verification, merge phase) now emit `activity.entry` events so "PAN-645 — verification running", "PAN-670 — merged", etc. appear in real-time (fixed: added `emitActivityEntry()` calls in `review-status.ts` after `notifyPipeline()` — commit 463b1cd4)
 - `tests/dashboard/review-status.test.ts` had stale assertion testing OLD `verificationStatus='pending'` blocking behavior — broke verification gate for any branch rebasing onto main after the `verificationSatisfied()` fix (fixed: updated test to expect `readyForMerge=true` for `pending`, aligned with `verificationSatisfied()` — commit b0a79b4f)
+- Dashboard `POST /api/issues/:id/reopen` bypassed `reopenWorkspaceState()` with its own inline state reset — `clearReviewStatus()` deleted the entry entirely (losing history) and STATE.md was never updated with the "Reopened" section. The `reopen.ts` comment said it was called by both CLI and dashboard; the dashboard was lying. Also had no success/error toast, so failures were silent. (fixed: import and call `reopenWorkspaceState()`, add toast in `reopenMutation.onSuccess`/`onError` — commit 2318beb5)
 
 ## Flywheel Run Log
 
