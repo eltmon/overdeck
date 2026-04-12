@@ -1,19 +1,22 @@
 # PAN-473: Workspace detail — structured conversation view for stopped agents
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-Bead feature-pan-489-u2q closed. Starting bead feature-pan-489-jzn: update TerminalPanel.tsx to render MessagesTimeline for stopped agents.
+All beads complete. Quality gates pass (typecheck, lint, tests — pre-existing shadow-state failure unrelated to this issue).
 
 ## Completed Work
-- [x] feature-pan-489-u2q: Added GET /api/agents/:id/conversation endpoint to agents.ts, imported parseConversationMessages from conversation-service, registered in agentsRouteLayer
+- [x] feature-pan-489-u2q: Added GET /api/agents/:id/conversation endpoint to agents.ts (commit: efc84f39)
+- [x] feature-pan-489-jzn: Updated TerminalPanel.tsx to fetch conversation for stopped agents and render MessagesTimeline when messages exist
 
 ## Remaining Work
-- [ ] feature-pan-489-jzn: Update TerminalPanel.tsx to fetch conversation when agent is stopped, render MessagesTimeline if messages exist, fall back to raw output otherwise
+(none)
 
 ## Key Decisions
 - Force `streaming: false` in conversation endpoint response — tmux session is dead, stale streaming state would show a live cursor on archival content
-- Return empty shape (HTTP 200) when JSONL file doesn't exist — clean fallback signal for frontend without treating it as an error
+- Return empty shape (HTTP 200) when JSONL file doesn't exist — clean fallback signal for frontend
+- No styles module needed for MessagesTimeline container — it handles its own scrolling internally
+- `refetch` helper in TerminalPanel invalidates both output and conversation queries
 
 ## Specialist Feedback
 - (none yet)
