@@ -26,9 +26,33 @@ infrastructure bug** preventing the autonomous pipeline from working end-to-end.
 - **Ignore**: MIN (Mind Your Now) and AUR (Auricle) issues — PAN only
 - **Goal**: Get every active PAN issue to Done (merge-ready) by fixing every infrastructure bug encountered along the way
 
+## Issue Priority Ordering
+
+**Urgency drives the order of attention throughout the entire operation** — not just the Awaiting Merge queue. When multiple issues need oversight simultaneously, always prioritize:
+
+| Priority | Criteria | Examples |
+|----------|----------|---------|
+| **P0 — Hotfix/Emergency** | PAN issue with `P0` label, or title contains "hotfix"/"emergency"/"critical" | Production bug, data loss, broken core pipeline |
+| **P1 — Core Substrate Bug** | PAN issue with `P1` or `bug` label | Stuck agent recovery, merge failures, specialist dispatch |
+| **P2 — PAN Feature/Enhancement** | Regular PAN issues (enhancement, no priority label) | Dashboard features, UX improvements |
+| **P3 — Other Projects** | MIN, AUR, KRUX, etc. | MYN features, Auricle bugs |
+
+Within each tier, apply **oldest-ready-first** (FIFO) — don't let issues age in the queue.
+
+**This ordering applies everywhere:**
+- Which stuck agents to diagnose first
+- Which substrate bugs to fix first
+- The Awaiting Merge page sort order (PAN before others)
+- Which planning agents to answer first when multiple need input
+
 ## Workflow
 
-### Phase 1: Inventory & Triage
+### Phase 1: Inventory & Triage (priority-ordered)
+
+**Before diving into individual issues, build a priority-sorted work queue.**
+Classify every active PAN issue by the priority table above, then work
+top-down — P0 before P1 before P2. Issues within the same tier are worked
+oldest-first. Never let a P0 block because you were attending to a P2.
 
 1. Get full state picture:
    - Dashboard API: all agents, their statuses, phases
