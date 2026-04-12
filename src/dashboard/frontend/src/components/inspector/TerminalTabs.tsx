@@ -140,7 +140,6 @@ export function TerminalTabs({
                   if (!tab.isActive && !pinned) {
                     onTogglePin();
                   }
-                  savePinState(issueId, tab.sessionName);
                 }
               }}
               title={tab.disabled ? 'Session not available' : tab.label}

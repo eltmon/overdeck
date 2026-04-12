@@ -217,7 +217,8 @@ describe('TerminalTabs', () => {
       expect(loadPersistedPin('pan-509')).toBeNull();
     });
 
-    it('clicking a tab stores session in localStorage', () => {
+    it('clicking a tab calls onSelectSession with the session name (parent handles persistence)', () => {
+      const onSelectSession = vi.fn();
       const tabs = [
         makeTab({ id: 'working', label: 'Work', sessionName: 'agent-123', isActive: true }),
         makeTab({ id: 'reviewing', label: 'Review', sessionName: 'specialist-review-agent', isActive: false }),
@@ -229,12 +230,13 @@ describe('TerminalTabs', () => {
           tabs={tabs}
           selectedSession="agent-123"
           pinned={false}
+          onSelectSession={onSelectSession}
         />,
       );
       act(() => {
         fireEvent.click(screen.getByText('Review'));
       });
-      expect(localStorage.getItem('pan-terminal-pin-pan-509')).toBe('specialist-review-agent');
+      expect(onSelectSession).toHaveBeenCalledWith('specialist-review-agent');
     });
   });
 });

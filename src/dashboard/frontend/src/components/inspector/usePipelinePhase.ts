@@ -73,9 +73,6 @@ export function derivePipelinePhase(
   // Build available tabs — only include tabs that are relevant to the current state
   const tabs: TerminalTab[] = [];
 
-  // Planning tab: shown if a planning session exists (can't check from pure fn, handled by hook)
-  // We include it in the list but callers add it conditionally
-
   // Work tab: always show if agent exists
   if (workSession) {
     tabs.push({
@@ -129,12 +126,8 @@ export function derivePipelinePhase(
  */
 export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult & {
   markSessionDead: (sessionName: string) => void;
-  deadSessions: Set<string>;
-  planningSessionName: string;
 } {
-  const { issueId } = input;
   const [deadSessions, setDeadSessions] = useState<Set<string>>(() => new Set());
-  const planningSessionName = `planning-${issueId}`;
 
   const markSessionDead = useCallback((sessionName: string) => {
     setDeadSessions(prev => {
@@ -184,7 +177,5 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
   return {
     ...debouncedResult,
     markSessionDead,
-    deadSessions,
-    planningSessionName,
   };
 }

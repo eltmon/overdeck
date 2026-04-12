@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 
-export type SessionState = 'connecting' | 'connected' | 'ended';
+export type SessionState = 'connecting' | 'ended';
 
 interface TerminalSessionWrapperProps {
   sessionName: string;
@@ -73,7 +73,7 @@ export function TerminalSessionWrapper({ sessionName, onSessionEnded }: Terminal
     );
   }
 
-  // 'connecting' or 'connected': render XTerminal normally
+  // 'connecting': render XTerminal normally
   return (
     <XTerminal
       key={`${sessionName}-${state}`}
