@@ -92,7 +92,6 @@ export function loadPersistedPin(issueId: string): string | null {
 }
 
 export function TerminalTabs({
-  issueId,
   tabs,
   selectedSession,
   activePhase,
