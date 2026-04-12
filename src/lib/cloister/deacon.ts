@@ -1212,15 +1212,20 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // statuses that the specialist already reported results for.
       // History contains the ground truth; the top-level status fields
       // are just the latest snapshot.
-      const hasPassedReview = status.history?.some(
-        (h) => h.type === 'review' && h.status === 'passed'
-      );
-      // Only skip re-dispatch if tests actually passed — a prior 'failed' result
-      // should NOT prevent re-dispatch, because the agent may have fixed the failures
-      // and resubmitted. The current testStatus (dispatch_failed) is what matters.
-      const hasPassedTest = status.history?.some(
-        (h) => h.type === 'test' && h.status === 'passed'
-      );
+      // "hasPassedX" means: the LATEST test/review history entry is 'passed',
+      // i.e. no newer 'testing'/'reviewing' marker has been recorded since.
+      // A stale 'passed' from a previous round must NOT block re-dispatch when
+      // new commits have triggered another round (the snapshot is bumped back
+      // to 'testing' but the old 'passed' is still in history).
+      const latestHistoryByType = (type: 'review' | 'test'): string | undefined => {
+        if (!status.history) return undefined;
+        for (let i = status.history.length - 1; i >= 0; i--) {
+          if (status.history[i].type === type) return status.history[i].status;
+        }
+        return undefined;
+      };
+      const hasPassedReview = latestHistoryByType('review') === 'passed';
+      const hasPassedTest = latestHistoryByType('test') === 'passed';
       const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
       const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
@@ -2228,7 +2233,7 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
  * Gives up after 5 restarts within 30 minutes to avoid restart loops.
  * Kills orphaned host processes before restarting to fix the inotify root cause.
  */
-export async function checkWorkspaceContainerHealth(): Promise<string[]> {
+export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): Promise<string[]> {
   const actions: string[] = [];
   try {
     // Find all workspace-related containers that are exited (crashed)
@@ -2239,19 +2244,27 @@ export async function checkWorkspaceContainerHealth(): Promise<string[]> {
     const crashed = stdout.trim().split('\n').filter(Boolean);
     if (crashed.length === 0) return actions;
 
-    const state = loadState();
+    const state = sharedState ?? loadState();
     if (!state.containerRestarts) state.containerRestarts = {};
     let stateDirty = false;
 
     const now = Date.now();
 
     for (const line of crashed) {
-      const [name] = line.split('|');
+      const [name, status] = line.split('|');
       if (!name) continue;
 
-      // Extract issue ID from container name: panopticon-feature-pan-451-frontend-1 → pan-451
-      const match = name.match(/panopticon-feature-([\w-]+?)-(frontend|server|init)-/);
+      // Init containers are one-shot by design — they run setup, exit, and stay exited.
+      // Restarting them is meaningless and floods agents with bogus "container crashed" alerts.
+      // Match service containers only (frontend/server), not init.
+      const match = name.match(/panopticon-feature-([\w-]+?)-(frontend|server)-/);
       if (!match) continue;
+
+      // Skip clean shutdowns (exit code 0). Status format: "Exited (N) X minutes ago".
+      // A service container exiting 0 is intentional (e.g., post-merge teardown), not a crash.
+      const exitMatch = status?.match(/Exited \((\d+)\)/);
+      if (exitMatch && exitMatch[1] === '0') continue;
+
       const issueLower = match[1];
       const agentId = `agent-${issueLower}`;
 
@@ -2359,7 +2372,9 @@ export async function checkWorkspaceContainerHealth(): Promise<string[]> {
       }
     }
 
-    if (stateDirty) saveState(state);
+    // When called with sharedState, the caller is responsible for persisting.
+    // Saving here would race with runPatrol's later saveState() and clobber records.
+    if (stateDirty && !sharedState) saveState(state);
   } catch {
     // Docker not available or other error — skip silently
   }
@@ -2467,7 +2482,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   for (const a of queueActions) addLog('action', a, state.patrolCycle);
 
   // PAN-464: Check workspace Docker container health and auto-restart crashed containers
-  const containerActions = await checkWorkspaceContainerHealth();
+  const containerActions = await checkWorkspaceContainerHealth(state);
   actions.push(...containerActions);
   for (const a of containerActions) addLog('action', a, state.patrolCycle);
 

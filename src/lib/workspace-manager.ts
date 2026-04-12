@@ -5,7 +5,7 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, rmdirSync, statSync, renameSync, unlinkSync, lstatSync } from 'fs';
-import { join, dirname, basename, extname, resolve } from 'path';
+import { join, dirname, basename, extname, resolve, relative } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -250,6 +250,27 @@ async function createWorktree(
 
     // Configure beads role so agents don't get "beads.role not configured" warnings
     await execAsync('git config beads.role contributor', { cwd: targetPath }).catch(() => {});
+
+    // Point the worktree's .beads/ at the source repo's shared Dolt database via a redirect file.
+    // Without this, `bd` in the worktree spins up its own empty database with no issue_prefix
+    // configured, so the first `bd create` errors with "database not initialized: issue_prefix
+    // config is missing". The redirect keeps all worktrees reading/writing the canonical beads
+    // store alongside main. Mirrors the pattern in src/lib/vbrief/beads.ts.
+    const sourceBeadsDir = join(repoPath, '.beads');
+    if (existsSync(sourceBeadsDir)) {
+      const worktreeBeadsDir = join(targetPath, '.beads');
+      const redirectPath = join(worktreeBeadsDir, 'redirect');
+      if (!existsSync(redirectPath)) {
+        try {
+          mkdirSync(worktreeBeadsDir, { recursive: true });
+          // bd resolves the redirect path relative to the worktree root (the parent of .beads/)
+          const relPath = relative(targetPath, sourceBeadsDir);
+          writeFileSync(redirectPath, relPath, 'utf-8');
+        } catch {
+          // Non-fatal — if redirect creation fails, bd falls back to its usual bootstrap path.
+        }
+      }
+    }
 
     return { success: true, message: `Created worktree at ${targetPath}` };
   } catch (error) {
