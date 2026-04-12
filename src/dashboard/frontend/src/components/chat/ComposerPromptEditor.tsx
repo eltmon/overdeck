@@ -106,6 +106,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-skills', label: 'pan skills', description: 'List and manage skills', insert: 'pan skills', category: 'Core' },
   { id: 'pan-migrate-config', label: 'pan migrate-config', description: 'Migrate settings.json to config.yaml', insert: 'pan migrate-config', category: 'Core' },
   { id: 'pan-test-run', label: 'pan test run', description: 'Run tests', insert: 'pan test run ', category: 'Core' },
+  { id: 'pan-plan-finalize', label: 'pan plan-finalize', description: 'Finalize a planning session: create beads from vBRIEF and write completion marker', insert: 'pan plan-finalize', category: 'Core' },
 
   // ─── Work (Agent Management) ─────────────────────────────────────────────────
   { id: 'pan-work-issue', label: 'pan work issue', description: 'Spawn agent for an issue', insert: 'pan work issue ', category: 'Work' },
