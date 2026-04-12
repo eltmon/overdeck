@@ -417,7 +417,11 @@ program
       const child = spawn(node22, [bundledServer], {
             detached: true,
             stdio: 'ignore',
-            env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
+            env: {
+              ...process.env,
+              DASHBOARD_PORT: String(dashboardPort),
+              PANOPTICON_MODE: isProduction ? 'production' : 'development',
+            },
           });
 
       // Handle spawn errors before unref
@@ -455,7 +459,11 @@ program
 
       const child = spawn(node22, [bundledServer], {
             stdio: 'inherit',
-            env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
+            env: {
+              ...process.env,
+              DASHBOARD_PORT: String(dashboardPort),
+              PANOPTICON_MODE: isProduction ? 'production' : 'development',
+            },
           });
 
       child.on('error', (err) => {
