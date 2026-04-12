@@ -62,7 +62,7 @@
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
     "build": "npm run build:cli && npm run build:scripts && npm run build:dashboard",
-    "build:cli": "tsdown && mkdir -p dist/cli/prompts && cp src/lib/cloister/prompts/*.md dist/cli/prompts/",
+    "build:cli": "node scripts/build-cli.mjs",
     "build:contracts": "cd packages/contracts && npm run build",
     "build:scripts": "cd scripts && tsdown",
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
