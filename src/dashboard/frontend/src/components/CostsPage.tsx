@@ -158,7 +158,17 @@ function TrendChart({ trends }: { trends: DailyTrend[] }) {
       scales: {
         x: {
           grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 11 }, maxRotation: 45 },
+          ticks: {
+            color: 'rgba(255,255,255,0.4)',
+            font: { size: 11 },
+            maxRotation: 45,
+            autoSkip: false,
+            callback: (_value: string | number, index: number, ticks: unknown[]) => {
+              // Show date label only on week boundaries (every 7th tick from the end)
+              const fromEnd = ticks.length - 1 - index;
+              return fromEnd % 7 === 0 ? labels[index] : '';
+            },
+          },
         },
         y: {
           grid: { color: 'rgba(255,255,255,0.05)' },
