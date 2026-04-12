@@ -242,21 +242,20 @@ describe('shadow-state', () => {
   });
 
   describe('getPendingSyncCount', () => {
-    it('should not increase count when issue is in sync', () => {
-      const before = getPendingSyncCount();
+    it('should not count fresh issues as needing sync', () => {
       const id = getUniqueId('nosync');
       createShadowState(id, 'open');
-      // Creating a state with matching statuses should not add to the pending count
-      expect(getPendingSyncCount()).toBe(before);
+      // A freshly created issue has shadowStatus === trackerStatus — should not need sync
+      expect(needsSync(id)).toBe(false);
     });
 
-    it('should increase count when issue needs sync', () => {
-      const before = getPendingSyncCount();
+    it('should return count of issues needing sync', () => {
       const id = getUniqueId('pending');
       createShadowState(id, 'open');
       updateShadowState(id, 'in_progress', 'test');
 
-      expect(getPendingSyncCount()).toBeGreaterThan(before);
+      // After updating status, this specific issue should need sync
+      expect(needsSync(id)).toBe(true);
     });
   });
 

@@ -6,6 +6,7 @@ import { XTerminal } from './XTerminal';
 import { MessagesTimeline } from './chat/MessagesTimeline';
 import type { ConversationResponse } from '@panopticon/contracts';
 import { ActivityView } from './MissionControl/ActivityView';
+import { deriveAgentIssueId } from './AgentOutputPanel';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -22,14 +23,6 @@ function popoutTerminal(sessionName: string, title: string): void {
   const popupName = `terminal-${sessionName}`;
   const features = 'width=900,height=650,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
   window.open(`/terminal/${sessionName}?title=${encodeURIComponent(title)}`, popupName, features);
-}
-
-// Derive issueId for planning agents: planning-pan-503 → PAN-503
-function derivePlanningAgentIssueId(agent: Agent): string | null {
-  if (agent.issueId) return agent.issueId;
-  const match = agent.id.match(/^planning-([a-z]+)-(\d+)$/i);
-  if (match) return `${match[1].toUpperCase()}-${match[2]}`;
-  return null;
 }
 
 async function fetchOutput(agentId: string): Promise<string> {
@@ -52,7 +45,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
 
   // Planning agents get ActivityView instead of XTerminal
   const isPlanningAgent = agent.agentPhase === 'planning' || agent.id.startsWith('planning-');
-  const planningIssueId = isPlanningAgent ? derivePlanningAgentIssueId(agent) : null;
+  const planningIssueId = isPlanningAgent ? deriveAgentIssueId(agent.id, agent.issueId) : null;
 
   // Check if agent's tmux session is alive via a lightweight probe.
   // The store status can be stale after server restarts, so verify with the server.
