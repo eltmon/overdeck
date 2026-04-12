@@ -111,7 +111,6 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
         await execAsync(`bd init --prefix ${prefix}`, {
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
         });
-        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] bd init succeeded for prefix ${prefix}`);
       } catch (initErr: any) {
         // Init failed — return early with a specific error so callers know exactly what happened

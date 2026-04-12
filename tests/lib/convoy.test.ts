@@ -21,6 +21,7 @@ describe('convoy', () => {
 
     // Mock paths
     vi.doMock('../../src/lib/paths.js', () => ({
+      PANOPTICON_HOME: tempDir,
       AGENTS_DIR: mockAgentsDir,
       PANOPTICON_HOME: tempDir,
     }));
