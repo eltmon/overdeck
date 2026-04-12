@@ -4,7 +4,7 @@ import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { XTerminal } from './XTerminal';
 import { MessagesTimeline } from './chat/MessagesTimeline';
-import type { ChatMessage, WorkLogEntry } from './chat/chat-types';
+import type { ConversationResponse } from '@panopticon/contracts';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -30,15 +30,7 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
-interface ConversationResult {
-  messages: ChatMessage[];
-  workLog: WorkLogEntry[];
-  streaming: boolean;
-  totalCost: number;
-  byteOffset: number;
-}
-
-async function fetchConversation(agentId: string): Promise<ConversationResult> {
+async function fetchConversation(agentId: string): Promise<ConversationResponse> {
   const res = await fetch(`/api/agents/${agentId}/conversation`);
   if (!res.ok) throw new Error('Failed to fetch conversation');
   return res.json();

@@ -83,6 +83,7 @@ import {
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
+import type { ConversationResponse } from '@panopticon/contracts';
 import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
@@ -549,13 +550,13 @@ const getAgentOutputRoute = HttpRouter.add(
 
 // ─── Route: GET /api/agents/:id/conversation ─────────────────────────────────
 
-const EMPTY_CONVERSATION = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
+const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
 /**
  * Resolve and parse an agent's conversation JSONL file.
  * Exported for unit testing — the Effect route layer is not directly unit-testable.
  */
-export async function buildConversationResponse(id: string): Promise<typeof EMPTY_CONVERSATION> {
+export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
   try {
     const jsonlPath = await getAgentJsonlPathShared(id);
     if (!jsonlPath || !existsSync(jsonlPath)) {

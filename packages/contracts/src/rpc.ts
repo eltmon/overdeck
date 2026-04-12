@@ -82,6 +82,18 @@ export const WorkLogEntry = Schema.Struct({
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
 
+/**
+ * Response shape for GET /api/agents/:id/conversation.
+ * Shared between the dashboard server route and the frontend TerminalPanel.
+ */
+export interface ConversationResponse {
+  messages: ChatMessage[];
+  workLog: WorkLogEntry[];
+  streaming: boolean;
+  totalCost: number;
+  byteOffset: number;
+}
+
 export const ConversationEvent = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal('messages'),

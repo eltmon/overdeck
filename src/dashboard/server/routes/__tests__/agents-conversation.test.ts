@@ -23,8 +23,8 @@ vi.mock('../../services/conversation-service.js', () => ({
   parseConversationMessages: vi.fn(),
 }));
 
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
   return { ...actual, existsSync: vi.fn() };
 });
 
@@ -33,7 +33,7 @@ vi.mock('fs', async (importOriginal) => {
 import { buildConversationResponse } from '../agents.js';
 import { getAgentJsonlPath } from '../../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../../services/conversation-service.js';
-import { existsSync } from 'fs';
+import { existsSync } from 'node:fs';
 
 const mockGetAgentJsonlPath = vi.mocked(getAgentJsonlPath);
 const mockParseConversationMessages = vi.mocked(parseConversationMessages);
