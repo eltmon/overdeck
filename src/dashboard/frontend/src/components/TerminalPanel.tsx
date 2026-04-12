@@ -2,11 +2,11 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
-import { XTerminal } from './XTerminal';
 import { MessagesTimeline } from './chat/MessagesTimeline';
 import type { ConversationResponse } from '@panopticon/contracts';
 import { ActivityView } from './MissionControl/ActivityView';
 import { deriveAgentIssueId } from './AgentOutputPanel';
+import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -200,21 +200,21 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
             />
           </div>
         ) : (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
         )
       ) : (
         <div className="flex-1 min-h-0">
-          <XTerminal
+          <TerminalSessionWrapper
             sessionName={activeSession}
-            onDisconnect={onSessionEnded ? () => onSessionEnded(activeSession) : undefined}
+            onSessionEnded={onSessionEnded ? () => onSessionEnded(activeSession) : undefined}
           />
         </div>
       )}

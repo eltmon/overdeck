@@ -237,7 +237,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                   selectedSession={selectedSession}
                   activePhase={phase}
                   pinned={pinned}
-                  onSelectSession={handleTabSelect}
+                  onSelectSession={handleSelectSession}
                   onTogglePin={handleTogglePin}
                 />
               )}
