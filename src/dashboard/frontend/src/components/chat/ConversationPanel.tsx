@@ -43,6 +43,16 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || 'claude-opus-4-6');
   const queryClient = useQueryClient();
 
+  // Sync the picker when the backing conversation's model changes (e.g. after a
+  // resume/switch-model that persisted a new model). useState's lazy initializer
+  // only fires once, so without this the picker shows the stale model forever.
+  useEffect(() => {
+    if (conversation.model && conversation.model !== selectedModel) {
+      setSelectedModel(conversation.model);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.model]);
+
   // Query messages at this level so we can access streaming status in the header
   const { data: messagesData } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
