@@ -39,6 +39,7 @@ interface ActionsSectionProps {
   onDismissPending: () => void;
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
+  hasSession?: boolean;
 }
 
 export function ActionsSection({
@@ -66,10 +67,11 @@ export function ActionsSection({
   onDismissPending,
   onStartAgent,
   onCreateWorkspace,
+  hasSession,
 }: ActionsSectionProps) {
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
-  const isResume = !!agent && agent.status === 'stopped';
+  const isResume = !!agent && agent.status === 'stopped' && hasSession === true && !resetSessionMutation.isSuccess;
 
   // Stuck merge detection: if mergeStatus has been 'merging' for > 2 min, enable retry (PAN-490)
   const STUCK_MERGE_MS = 2 * 60 * 1000;

@@ -1943,12 +1943,21 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
   return actions;
 }
 
+// PAN-650: Bounded poking for stuck agents.
+// Without these limits, the patrol fires every 60s and re-sends the same poke
+// forever, eating tokens overnight. Cap pokes and require cooldown between them;
+// after the cap, transition resolution → 'abandoned' so the agent falls out of
+// the patrol filter and surfaces in the dashboard for human attention.
+const STUCK_POKE_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between pokes
+const STUCK_POKE_MAX = 3;                       // Max pokes before abandoning
+const stuckPokeState: Map<string, { lastPoke: number; pokes: number }> = new Map();
+
 /**
  * Patrol work agent resolution fields (PAN-309).
  *
  * For each running work agent:
  * - resolution === 'done' && count >= 2: auto-complete via pan work done
- * - resolution === 'stuck' && count >= 3: send a poke message
+ * - resolution === 'stuck' && count >= 3: send a poke (rate-limited, capped — PAN-650)
  */
 export async function patrolWorkAgentResolutions(): Promise<string[]> {
   const actions: string[] = [];
@@ -1962,7 +1971,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       if (!agent.id.startsWith('agent-') || isSpecialistSession(agent.id)) continue;
 
       const runtimeState = getAgentRuntimeState(agent.id);
-      if (!runtimeState?.resolution || runtimeState.resolution === 'working' || runtimeState.resolution === 'completed') continue;
+      if (!runtimeState?.resolution || runtimeState.resolution === 'working' || runtimeState.resolution === 'completed' || runtimeState.resolution === 'abandoned') continue;
 
       const resolution = runtimeState.resolution;
       const count = runtimeState.resolutionCount || 0;
@@ -1998,14 +2007,36 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         }
 
       } else if (resolution === 'stuck' && count >= 3) {
-        // Agent is stuck — send a poke to unstick it
-        console.log(`[deacon] Poking stuck agent ${agent.id} (${issueId}): count=${count}`);
+        // Agent is stuck — send a poke to unstick it.
+        // Rate-limit to STUCK_POKE_COOLDOWN_MS and cap at STUCK_POKE_MAX (PAN-650).
+        const now = Date.now();
+        const pokeState = stuckPokeState.get(agent.id) ?? { lastPoke: 0, pokes: 0 };
+
+        if (now - pokeState.lastPoke < STUCK_POKE_COOLDOWN_MS) continue;
+
+        if (pokeState.pokes >= STUCK_POKE_MAX) {
+          // Exhausted poke budget — abandon the agent so it stops being patrolled
+          // and surfaces in the dashboard for human intervention.
+          console.log(`[deacon] Abandoning stuck agent ${agent.id} (${issueId}) after ${pokeState.pokes} pokes`);
+          saveAgentRuntimeState(agent.id, {
+            resolution: 'abandoned',
+            resolutionCount: count,
+            resolutionUpdatedAt: new Date().toISOString(),
+          });
+          stuckPokeState.delete(agent.id);
+          actions.push(`Deacon abandoned stuck agent ${agent.id} (${issueId}) after ${STUCK_POKE_MAX} pokes`);
+          addLog('warn', `Abandoned stuck agent ${issueId} after ${STUCK_POKE_MAX} pokes — needs human attention`, undefined);
+          continue;
+        }
+
+        console.log(`[deacon] Poking stuck agent ${agent.id} (${issueId}): poke ${pokeState.pokes + 1}/${STUCK_POKE_MAX}`);
 
         try {
-          const pokeMsg = `Deacon health check: you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan work done ${issueId} -c "Implementation complete"`;
+          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan work done ${issueId} -c "Implementation complete"`;
           await sendKeysAsync(agent.id, pokeMsg);
-          actions.push(`Deacon poked stuck agent ${agent.id} (${issueId})`);
-          addLog('action', `Poked stuck agent ${issueId} (count=${count})`, undefined);
+          stuckPokeState.set(agent.id, { lastPoke: now, pokes: pokeState.pokes + 1 });
+          actions.push(`Deacon poked stuck agent ${agent.id} (${issueId}) [${pokeState.pokes + 1}/${STUCK_POKE_MAX}]`);
+          addLog('action', `Poked stuck agent ${issueId} (poke ${pokeState.pokes + 1}/${STUCK_POKE_MAX})`, undefined);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`[deacon] Failed to poke ${agent.id}:`, msg);
@@ -2123,18 +2154,67 @@ export function containerRestartBackoffMs(count: number): number {
  * PAN-464: Kill orphaned host processes (e.g., Vite, node) for a workspace path.
  * Orphaned Vite watchers exhaust inotify handles, causing ENOSPC in containers.
  * Runs before restarting the container so the root cause is cleared.
+ *
+ * CRITICAL: Must not kill the active work agent's process tree. The agent's tmux
+ * pane runs bash+claude with cwd=workspace, so lsof +D returns it. We collect the
+ * tmux pane PIDs for agent and planning sessions matching this workspace and exclude
+ * them + all descendants from the kill list.
  */
 async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<void> {
   try {
+    // 1. Collect tmux pane PIDs for agent sessions in this workspace
+    const protectedPids = new Set<string>([String(process.pid)]);
+    try {
+      const { stdout: sessions } = await execAsync(
+        `tmux list-sessions -F "#{session_name}" 2>/dev/null || true`,
+        { encoding: 'utf-8', timeout: 3000 },
+      );
+      const agentSessions = sessions.trim().split('\n').filter(s => s.startsWith('agent-') || s.startsWith('planning-'));
+      for (const session of agentSessions) {
+        try {
+          const { stdout: panePid } = await execAsync(
+            `tmux list-panes -t "${session}" -F "#{pane_pid}" 2>/dev/null || true`,
+            { encoding: 'utf-8', timeout: 3000 },
+          );
+          const pid = panePid.trim().split('\n')[0]?.trim();
+          if (pid && /^\d+$/.test(pid)) {
+            // Add the pane PID and all its descendants to protected list
+            protectedPids.add(pid);
+            try {
+              const { stdout: descendants } = await execAsync(
+                `pgrep -P ${pid} 2>/dev/null; ps -o pid= --ppid ${pid} 2>/dev/null | xargs -I{} pgrep -P {} 2>/dev/null`,
+                { encoding: 'utf-8', timeout: 3000 },
+              );
+              for (const d of descendants.trim().split(/\s+/)) {
+                if (d && /^\d+$/.test(d)) protectedPids.add(d);
+              }
+              // Also walk the full descendant tree
+              const { stdout: allDesc } = await execAsync(
+                `pstree -p ${pid} 2>/dev/null | grep -oE '\\([0-9]+\\)' | tr -d '()' || true`,
+                { encoding: 'utf-8', timeout: 3000 },
+              );
+              for (const d of allDesc.trim().split('\n')) {
+                if (d && /^\d+$/.test(d.trim())) protectedPids.add(d.trim());
+              }
+            } catch { /* non-fatal */ }
+          }
+        } catch { /* non-fatal */ }
+      }
+    } catch { /* non-fatal */ }
+
+    // 2. Find processes with files open in the workspace
     const { stdout } = await execAsync(
       `lsof +D "${workspacePath}" -t 2>/dev/null || true`,
       { encoding: 'utf-8', timeout: 10000 },
     );
     const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
-    const safePids = pids.filter(p => p !== String(process.pid));
+
+    // 3. Filter out protected PIDs (agent tmux panes and descendants)
+    const safePids = pids.filter(p => !protectedPids.has(p));
+
     if (safePids.length > 0) {
       await execAsync(`kill ${safePids.join(' ')} 2>/dev/null || true`, { encoding: 'utf-8', timeout: 5000 });
-      console.log(`[deacon] Killed ${safePids.length} orphaned process(es) in ${workspacePath} before container restart`);
+      console.log(`[deacon] Killed ${safePids.length} orphaned process(es) in ${workspacePath} before container restart (protected ${protectedPids.size - 1} agent PIDs)`);
     }
   } catch {
     // Non-fatal — proceed with restart even if cleanup fails
@@ -2391,32 +2471,24 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...containerActions);
   for (const a of containerActions) addLog('action', a, state.patrolCycle);
 
-  // Detect dead-end agents: review blocked or tests failed but agent is idle
-  const deadEndActions = await checkDeadEndAgents();
-  actions.push(...deadEndActions);
-  for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
+  // Dead-end and first-completion nudges DISABLED — too flaky, risk of
+  // draining AI token credits by sending unnecessary prompts to agents.
+  // If an agent is stuck, the human operator can nudge it manually via the
+  // dashboard's Tell action.
 
   // Safety-net: trigger merge for issues stuck in readyForMerge state (PAN-344)
   const mergeStuckActions = await checkReadyForMergeStuck();
   actions.push(...mergeStuckActions);
   for (const a of mergeStuckActions) addLog('action', a, state.patrolCycle);
 
-  // Detect work agents that forgot to call "pan work done" (Layer 3 safety net)
-  const firstCompletionActions = await checkFirstCompletionAgents();
-  actions.push(...firstCompletionActions);
-  for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
+  // Resolution patrol DISABLED — auto-completing and poking agents consumes
+  // API credits and is unreliable. Human operator can take action via dashboard.
 
-  // Patrol work agent resolution fields: auto-complete done agents, poke stuck agents (PAN-309)
-  const resolutionActions = await patrolWorkAgentResolutions();
-  actions.push(...resolutionActions);
-  for (const a of resolutionActions) addLog('action', a, state.patrolCycle);
+  // Lazy agent correction DISABLED — sends messages to agents which costs
+  // API credits. Human operator can check lazy behavior via dashboard.
 
-  // Check for lazy agent behavior and auto-correct (PAN-80, fixed in PAN-154)
-  const lazyActions = await checkAndCorrectLazyAgents();
-  actions.push(...lazyActions);
-  for (const a of lazyActions) addLog('action', a, state.patrolCycle);
-
-  // Check for work agents stuck in extended thinking loops
+  // Stuck work agent recovery still runs — it only intervenes after 10 minutes
+  // of no tool use, escalating to Escape/Ctrl-C/respawn (not paid messages).
   const stuckActions = await checkStuckWorkAgents();
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
