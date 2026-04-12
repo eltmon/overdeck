@@ -13,7 +13,7 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
-import { clearStuckMergeStatuses } from '../../lib/review-status.js';
+import { clearStuckMergeStatuses, fixStuckReadyForMerge } from '../../lib/review-status.js';
 import { getEventStore } from './event-store.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
@@ -84,6 +84,8 @@ process.once('SIGINT', () => {
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
+// Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
+fixStuckReadyForMerge();
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
