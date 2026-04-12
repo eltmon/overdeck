@@ -12,6 +12,7 @@ import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { getAgentDir } from '../agents.js';
+import { renderPrompt } from './prompts.js';
 
 const execAsync = promisify(exec);
 
@@ -307,28 +308,14 @@ export function buildHandoffPrompt(
   context: HandoffContext,
   additionalInstructions?: string
 ): string {
-  const lines: string[] = [];
-
-  lines.push('# Agent Handoff');
-  lines.push('');
-  lines.push(`You are taking over work on issue ${context.issueId} from a ${context.previousModel} agent.`);
-  lines.push('');
-  lines.push(`**Handoff Reason:** ${context.reason}`);
-  lines.push('');
-  lines.push('Please review the context below and continue the work.');
-  lines.push('');
-  lines.push('---');
-  lines.push('');
-  lines.push(serializeHandoffContext(context));
-
-  if (additionalInstructions) {
-    lines.push('---');
-    lines.push('');
-    lines.push('## Additional Instructions');
-    lines.push('');
-    lines.push(additionalInstructions);
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return renderPrompt({
+    name: 'handoff-to-work',
+    vars: {
+      ISSUE_ID: context.issueId,
+      PREVIOUS_MODEL: context.previousModel,
+      REASON: context.reason,
+      HANDOFF_CONTEXT: serializeHandoffContext(context),
+      ADDITIONAL_INSTRUCTIONS_BLOCK: additionalInstructions || '',
+    },
+  });
 }
