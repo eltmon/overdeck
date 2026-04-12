@@ -396,9 +396,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return res.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
+      toast.success(data?.message ?? `${issueId} reopened — ready for new agent run`);
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       await refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 
