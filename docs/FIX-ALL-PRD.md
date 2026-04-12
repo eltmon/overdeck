@@ -48,6 +48,11 @@ fix.
    produces the upgrades that make the next Fix-All run cheaper.
 4. **Visible merge queue.** Users see a single page listing every issue that has
    reached merge-ready, with one-click access to UAT and to merge.
+5. **Urgency-first everywhere.** The entire flywheel — inventory, diagnosis,
+   substrate fixes, merge queue — operates in priority order:
+   P0 hotfixes → P1 core PAN substrate bugs → P2 PAN features → P3 other projects.
+   Within each tier, oldest-ready first. Critical Panopticon infrastructure
+   issues must never wait behind low-priority enhancements or non-PAN work.
 
 ## Non-goals
 
