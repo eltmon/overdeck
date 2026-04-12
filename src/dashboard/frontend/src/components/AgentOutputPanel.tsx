@@ -85,6 +85,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
   }, [specialist, agentId, specialistIsRunning]);
 
   // For work and planning agents: derive from store or agentId pattern
+  const isPlanningAgent = agent?.agentPhase === 'planning' || agentId.startsWith('planning-');
   const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, agent?.issueId);
 
   const label = specialist
@@ -128,6 +129,9 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
             ) : null
           ) : workAgentIssueId ? (
             <ActivityView issueId={workAgentIssueId} />
+          ) : isPlanningAgent ? (
+            // Planning agent with non-derivable issueId → fall back to raw terminal
+            <XTerminal sessionName={agentId} onDisconnect={() => setTerminalFailed(true)} />
           ) : (
             <div className="flex items-center justify-center h-full text-xs text-content-muted">
               No issue associated with this session

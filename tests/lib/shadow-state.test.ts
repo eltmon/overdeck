@@ -242,19 +242,21 @@ describe('shadow-state', () => {
   });
 
   describe('getPendingSyncCount', () => {
+    // NOTE: getPendingSyncCount() scans ALL files in ~/.panopticon/shadow-state/, so
+    // asserting a global count of 0 is environment-dependent. Tests below use
+    // needsSync(id) on the specific issue under test instead.
+    // Tracked in: https://github.com/eltmon/panopticon-cli/issues/683
     it('should not count fresh issues as needing sync', () => {
       const id = getUniqueId('nosync');
       createShadowState(id, 'open');
-      // A freshly created issue has shadowStatus === trackerStatus — should not need sync
       expect(needsSync(id)).toBe(false);
     });
 
-    it('should return count of issues needing sync', () => {
+    it('should count issues needing sync', () => {
       const id = getUniqueId('pending');
       createShadowState(id, 'open');
       updateShadowState(id, 'in_progress', 'test');
 
-      // After updating status, this specific issue should need sync
       expect(needsSync(id)).toBe(true);
     });
   });

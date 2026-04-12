@@ -21,5 +21,18 @@ None
 - D4: Renamed deriveWorkAgentIssueId → deriveAgentIssueId; regex extended to match both agent- and planning- prefixes
 - D5: Exported deriveAgentIssueId to enable direct unit tests (no API surface change needed)
 
+## Out-of-Scope Fix Included (with justification)
+
+`tests/lib/shadow-state.test.ts` — The `getPendingSyncCount` tests assert a global count of 0,
+which fails on any machine where Panopticon is running concurrently (real unsynced shadow states
+are visible to the test). This caused verification to fail. Rewritten to use `needsSync(id)` on
+the specific issue under test rather than the global count.
+Tracked separately: **eltmon/panopticon-cli#683**
+
 ## Specialist Feedback
 (none yet)
+- **[2026-04-12T22:54Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-12T23:56Z] fix applied** — shadow-state test isolation fixed (delta not absolute zero)
+- **[2026-04-12T22:56Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-12T22:59Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
+- **[2026-04-12T23:18Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/004-review-agent-changes-requested.md`
