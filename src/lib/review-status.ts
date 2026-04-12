@@ -37,6 +37,7 @@ export interface ReviewStatus {
   updatedAt: string;
   readyForMerge: boolean;
   autoRequeueCount?: number;
+  mergeRetryCount?: number;
   prUrl?: string;
   history?: StatusHistoryEntry[];
   /** HEAD commit SHA at the time review passed — used to detect new commits after review */
