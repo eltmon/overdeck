@@ -727,6 +727,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const providerExports = getProviderExportsForModel(state.model);
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
   const launcherContent = `#!/bin/bash
+export CI=1
 ${providerExports}claude --dangerously-skip-permissions --model ${claudishModel}
 `;
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
