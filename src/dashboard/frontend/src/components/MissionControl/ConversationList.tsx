@@ -215,9 +215,6 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     try { localStorage.setItem(TAB_STORAGE_KEY, t); } catch { /* ignore */ }
   }, []);
 
-  // Keyboard shortcut: 'f' toggles favorite on selected conversation
-  // (handled at window level in the list itself)
-
   // ── Sorted + grouped list ────────────────────────────────────────────────────
   const displayConversations = useMemo(() => {
     let filtered = conversations;
