@@ -96,6 +96,19 @@ export const selectReviewStatus =
   (s: DashboardState): ReviewStatusSnapshot | undefined =>
     s.reviewStatusByIssueId[issueId]
 
+/**
+ * Issues currently awaiting a human merge click — `readyForMerge: true`
+ * and not already merged. Sorted oldest-ready first (FIFO) so issues
+ * don't age in the queue.
+ */
+export const selectAwaitingMerge = (s: DashboardState): ReviewStatusSnapshot[] =>
+  Object.values(s.reviewStatusByIssueId)
+    .filter(
+      (rs): rs is ReviewStatusSnapshot =>
+        rs?.readyForMerge === true && rs.mergeStatus !== 'merged',
+    )
+    .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''))
+
 export const selectAgentOutput =
   (agentId: string) =>
   (s: DashboardState): string[] =>
