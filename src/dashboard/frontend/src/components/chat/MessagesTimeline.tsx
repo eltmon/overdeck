@@ -171,9 +171,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 <div
                   key={virtualItem.key}
                   data-index={virtualItem.index}
-                  ref={(el) => {
-                    if (el) rowVirtualizer.measureElement(el);
-                  }}
+                  ref={rowVirtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
