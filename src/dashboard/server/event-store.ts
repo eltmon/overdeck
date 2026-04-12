@@ -35,6 +35,12 @@ export type Unsubscribe = () => void;
 export interface EventStore {
   /** Append a domain event. Returns the assigned sequence number. */
   append(event: Omit<DomainEvent, 'sequence'>): number;
+  /**
+   * Emit an event to in-memory subscribers ONLY — no SQLite persistence.
+   * Use for high-frequency derived events (e.g. issues.snapshot) that are
+   * too large to accumulate in the event log but still need live fan-out.
+   */
+  emitOnly(event: Omit<DomainEvent, 'sequence'>): void;
   /** Return all events with sequence > fromSequence (exclusive lower bound). */
   readFrom(fromSequence: number): StoredEvent[];
   /** Return events of a given type, most recent first, capped at limit. */
@@ -43,6 +49,11 @@ export interface EventStore {
   subscribe(fn: EventSubscriber): Unsubscribe;
   /** Run 7-day retention compaction. Called at startup. */
   compact(): void;
+  /**
+   * Purge all rows of a given event type. Used at startup to clean up
+   * oversized event types that were mistakenly persisted (e.g. issues.snapshot).
+   */
+  purgeType(type: string): number;
   /** Return the highest sequence number in the store (0 if empty). */
   getLatestSequence(): number;
 }
@@ -151,7 +162,10 @@ export function createEventStore(db: DbAdapter): EventStore {
     `INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`,
   );
   const readFromStmt = db.prepare<EventRow>(
-    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > ? ORDER BY sequence ASC`,
+    // Exclude event types with oversized payloads that would OOM the server on replay.
+    // issues.snapshot is a high-frequency derived event (~1.5 MB each) that is not
+    // useful for replay — clients get current issues via getSnapshot instead.
+    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > ? AND type != 'issues.snapshot' ORDER BY sequence ASC`,
   );
   const compactStmt = db.prepare<void>(
     `DELETE FROM events WHERE timestamp < ?`,
@@ -164,6 +178,9 @@ export function createEventStore(db: DbAdapter): EventStore {
   );
   const queryByTypeStmt = db.prepare<EventRow>(
     `SELECT sequence, type, timestamp, payload FROM events WHERE type = ? ORDER BY sequence DESC LIMIT ?`,
+  );
+  const purgeTypeStmt = db.prepare<void>(
+    `DELETE FROM events WHERE type = ?`,
   );
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
@@ -187,6 +204,18 @@ export function createEventStore(db: DbAdapter): EventStore {
     return sequence;
   }
 
+  function emitOnly(event: Omit<DomainEvent, 'sequence'>): void {
+    const timestamp =
+      (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
+    const stored: StoredEvent = {
+      sequence: -1, // sentinel: in-memory only, not persisted
+      type: event.type,
+      timestamp,
+      payload: (event as Record<string, unknown>)['payload'] ?? {},
+    };
+    emitter.emit('event', stored);
+  }
+
   function readFrom(fromSequence: number): StoredEvent[] {
     const rows = readFromStmt.all([fromSequence]);
     return rows.map(rowToStored);
@@ -205,6 +234,11 @@ export function createEventStore(db: DbAdapter): EventStore {
     }
   }
 
+  function purgeType(type: string): number {
+    const result = purgeTypeStmt.run([type]);
+    return result.changes;
+  }
+
   function getLatestSequence(): number {
     const row = latestSeqStmt.get();
     return row?.seq ?? 0;
@@ -216,7 +250,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     return rows.map(rowToStored).reverse();
   }
 
-  return { append, readFrom, queryByType, subscribe, compact, getLatestSequence };
+  return { append, emitOnly, readFrom, queryByType, subscribe, compact, purgeType, getLatestSequence };
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
@@ -237,6 +271,13 @@ export async function initEventStore(): Promise<EventStore> {
     _db = db;
     const store = createEventStore(db);
     store.compact();
+    // One-time migration: purge issues.snapshot rows that were mistakenly persisted
+    // in older versions. Each row is ~1.5 MB; thousands of them cause startup OOM.
+    // Safe to run unconditionally — purgeType is a no-op if no rows exist.
+    const purged = store.purgeType('issues.snapshot');
+    if (purged > 0) {
+      console.log(`[event-store] Purged ${purged} oversized issues.snapshot events from persistent store`);
+    }
     _store = store;
     // Initialize projection cache with same DB connection
     import('./services/projection-cache.js').then(({ initProjectionCache }) => {
