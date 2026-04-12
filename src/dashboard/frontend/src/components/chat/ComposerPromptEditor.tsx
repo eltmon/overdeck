@@ -337,7 +337,7 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
   useEffect(() => {
     if (menuRef.current) {
       const selected = menuRef.current.querySelector('[aria-selected="true"]');
-      selected?.scrollIntoView({ block: 'nearest' });
+      selected?.scrollIntoView?.({ block: 'nearest' });
     }
   }, [selectedIndex]);
 

@@ -276,8 +276,11 @@ describe('syncMainIntoWorkspace', () => {
     });
   });
 
+  // These tests exercise the real 5-second polling loop in merge-agent.ts
+  // (POLL_INTERVAL = 5000). Default 10s test timeout is too tight under load;
+  // bump to 20s so the gate doesn't flake when the host is busy.
   describe('conflict handling — agent delegation', () => {
-    it('wakes merge-agent specialist when git merge has conflicts', async () => {
+    it('wakes merge-agent specialist when git merge has conflicts', { timeout: 20000 }, async () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: true, message: 'woken' } as any);
 
@@ -311,7 +314,7 @@ describe('syncMainIntoWorkspace', () => {
       expect(result.changedFiles).toContain('src/foo.ts');
     });
 
-    it('aborts merge and returns failure when agent reports MERGE_RESULT: FAILURE', async () => {
+    it('aborts merge and returns failure when agent reports MERGE_RESULT: FAILURE', { timeout: 20000 }, async () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: true, message: 'woken' } as any);
 
@@ -343,7 +346,7 @@ describe('syncMainIntoWorkspace', () => {
       expect(mergeAbortCalled).toBe(true);
     });
 
-    it('returns failure when wakeSpecialist fails, and aborts the merge', async () => {
+    it('returns failure when wakeSpecialist fails, and aborts the merge', { timeout: 20000 }, async () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: false, message: 'specialist not available' } as any);
 
@@ -369,7 +372,7 @@ describe('syncMainIntoWorkspace', () => {
       expect(mergeAbortCalled).toBe(true);
     });
 
-    it('returns failure when agent succeeds but conflict markers remain', async () => {
+    it('returns failure when agent succeeds but conflict markers remain', { timeout: 20000 }, async () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: true, message: 'woken' } as any);
 
@@ -401,7 +404,7 @@ describe('syncMainIntoWorkspace', () => {
       expect(mergeAbortCalled).toBe(true);
     });
 
-    it('uses spawnEphemeralSpecialist when resolveProjectFromIssue returns a project key', async () => {
+    it('uses spawnEphemeralSpecialist when resolveProjectFromIssue returns a project key', { timeout: 20000 }, async () => {
       // Override the projects mock to return a project key for this test
       vi.mocked(resolveProjectFromIssue).mockReturnValueOnce({ projectKey: 'pan' } as any);
       const spawnMock = vi.mocked(spawnEphemeralSpecialist);

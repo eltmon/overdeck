@@ -10,6 +10,10 @@ import { join } from 'path';
 export const FIXTURES_DIR = join(__dirname, 'fixtures');
 export const TEMP_DIR = join(__dirname, '.temp');
 
+// Collapse merge-agent polling intervals in tests so syncMainIntoWorkspace
+// conflict tests finish in milliseconds instead of 5s each. See merge-agent.ts.
+process.env.PANOPTICON_TEST_POLL_MS = '10';
+
 // Clean up temp directory before each test
 beforeEach(() => {
   try {
