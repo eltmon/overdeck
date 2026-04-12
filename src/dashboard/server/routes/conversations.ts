@@ -173,6 +173,101 @@ void backfillConversationModels().catch((err: unknown) => {
  * Uses a minimal launcher script for proper terminal env setup.
  * Accepts a claudeSessionId to deterministically control the JSONL file path.
  */
+// ─── Compaction helpers ───────────────────────────────────────────────────────
+//
+// When stopping a conversation and resuming with a different model — or when the
+// session has accumulated a lot of context — we run `/compact` against the JSONL
+// before respawning. This writes a `compact_boundary` entry that subsequent
+// `--resume` calls honor, so the new model only loads the summary forward.
+//
+// Compaction always runs on Haiku (cheap, fast, and avoids tripping the user's
+// usage limit on whatever the original model was).
+
+const COMPACT_MODEL = 'claude-haiku-4-5-20251001';
+const COMPACT_TOKEN_THRESHOLD = 100_000;
+
+function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
+  if (!sessionFile) return undefined;
+  return sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined;
+}
+
+/**
+ * Estimate the current context size of a Claude Code session by reading the
+ * most recent `usage` block from its JSONL file. Returns 0 if the file is
+ * missing, empty, or has no usage entries yet.
+ */
+async function estimateContextTokens(sessionFile: string | null | undefined): Promise<number> {
+  if (!sessionFile || !existsSync(sessionFile)) return 0;
+  try {
+    const content = await readFile(sessionFile, 'utf-8');
+    const lines = content.split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      try {
+        const entry = JSON.parse(line);
+        const usage = entry?.message?.usage ?? entry?.usage;
+        if (usage && typeof usage.input_tokens === 'number') {
+          return (usage.input_tokens ?? 0)
+            + (usage.cache_creation_input_tokens ?? 0)
+            + (usage.cache_read_input_tokens ?? 0);
+        }
+      } catch {
+        // Skip malformed line
+      }
+    }
+  } catch (err) {
+    console.warn(`[conversations] estimateContextTokens failed for ${sessionFile}:`, err);
+  }
+  return 0;
+}
+
+/**
+ * Run `/compact` against a stopped session via Haiku. Appends a compact_boundary
+ * entry to the JSONL so subsequent --resume calls load only the summary forward.
+ * Throws on failure — callers decide whether to swallow.
+ */
+async function compactSession(sessionFile: string, cwd: string): Promise<void> {
+  const sessionId = sessionIdFromFile(sessionFile);
+  if (!sessionId) throw new Error('compactSession: cannot extract session id');
+  console.log(`[conversations] Compacting session ${sessionId} via ${COMPACT_MODEL}`);
+  const cmd = `claude --resume "${sessionId}" --model ${COMPACT_MODEL} --print --dangerously-skip-permissions "/compact"`;
+  await execAsync(cmd, {
+    cwd,
+    encoding: 'utf-8',
+    maxBuffer: 16 * 1024 * 1024,
+    timeout: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Decide whether to compact, then do it (best-effort). Compaction runs when
+ * the model is being changed (so the new model doesn't choke on the original
+ * model's accumulated context) OR when the session is already over the token
+ * threshold (so any resume avoids `Input is too long`).
+ */
+async function maybeCompactBeforeRespawn(opts: {
+  sessionFile: string | null | undefined;
+  cwd: string;
+  modelChanged: boolean;
+}): Promise<void> {
+  if (!opts.sessionFile || !existsSync(opts.sessionFile)) return;
+
+  const tokens = await estimateContextTokens(opts.sessionFile);
+  const overThreshold = tokens > COMPACT_TOKEN_THRESHOLD;
+  if (!opts.modelChanged && !overThreshold) {
+    console.log(`[conversations] Skipping compact (modelChanged=false, tokens=${tokens})`);
+    return;
+  }
+
+  console.log(`[conversations] Compacting before respawn (modelChanged=${opts.modelChanged}, tokens=${tokens})`);
+  try {
+    await compactSession(opts.sessionFile, opts.cwd);
+  } catch (err) {
+    console.error('[conversations] Compact failed, proceeding without compaction:', err);
+  }
+}
+
 async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
@@ -502,18 +597,25 @@ const postConversationResumeRoute = HttpRouter.add(
         }
 
         // Respawn: resume the previous Claude Code session using --resume
-        // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.sessionFile
-          ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
-          : undefined;
-        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId).catch(
-          (err: unknown) => {
+        const oldSessionId = sessionIdFromFile(conv.sessionFile);
+        const modelChanged = !!model && model !== conv.model;
+
+        // Persist the new model so the dropdown reflects what we're respawning with.
+        if (model && modelChanged) updateConversationModel(name, model);
+
+        // Compact + respawn run in the background so the HTTP response stays fast.
+        // The frontend's existing polling will pick up the live session once tmux is up.
+        void (async () => {
+          try {
+            await maybeCompactBeforeRespawn({ sessionFile: conv.sessionFile, cwd: conv.cwd, modelChanged });
+            await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
+          } catch (err) {
             console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
-          },
-        );
+          }
+        })();
 
         markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', reattached: false });
+        return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, reattached: false });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
@@ -552,16 +654,24 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         if (model) updateConversationModel(name, model);
 
         // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.sessionFile
-          ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
-          : undefined;
+        const oldSessionId = sessionIdFromFile(conv.sessionFile);
 
-        // Spawn with the new model
-        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, conv.effort ?? undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
-          (err: unknown) => {
-            console.error(`[conversations] Failed to respawn session after model switch ${conv.tmuxSession}:`, err);
-          },
-        );
+        // Compact (if needed) then respawn with the new model — fire and forget
+        // so the HTTP response returns immediately. switch-model is always a model
+        // change by definition, so modelChanged: true triggers compaction unconditionally.
+        const sessionFile = conv.sessionFile;
+        const cwd = conv.cwd;
+        const tmuxSession = conv.tmuxSession;
+        const effort = conv.effort ?? undefined;
+        const issueId = conv.issueId ?? undefined;
+        void (async () => {
+          try {
+            await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+            await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, !!oldSessionId);
+          } catch (err) {
+            console.error(`[conversations] Failed to respawn session after model switch ${tmuxSession}:`, err);
+          }
+        })();
 
         markConversationActive(name);
         return jsonResponse({ ...conv, status: 'active', model, reattached: false });
