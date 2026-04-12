@@ -94,6 +94,15 @@ async function stopConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to stop conversation');
 }
 
+export async function updateConversationTitle(name: string, title: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error('Failed to update conversation title');
+}
+
 async function favoriteConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/favorite`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to favorite conversation');
