@@ -55,9 +55,42 @@ export function AwaitingMergePage() {
     return map;
   }, [issues]);
 
+  // Priority: PAN (core substrate) first, then other projects, oldest-ready within each tier.
+  // Filter cancelled issues — they should never appear in the merge queue.
+  const sortedAwaiting = useMemo(() => {
+    const projectPriority = (id: string): number => {
+      const prefix = id.toUpperCase().split('-')[0];
+      if (prefix === 'PAN') return 0;
+      if (prefix === 'KRUX') return 1;
+      return 2; // MIN, AUR, MYN, etc.
+    };
+    return awaiting
+      .filter((rs) => {
+        const issue = issuesById.get(rs.issueId.toLowerCase());
+        // Filter out issues the tracker has marked as cancelled/wontfix.
+        if (issue?.state === 'canceled' || issue?.state === 'cancelled') return false;
+        // Filter out issues that are 'done' with a failed merge OR a 'merged' tracker label —
+        // they were completed outside Panopticon (PR merged manually on GitHub).
+        // Only keep 'done' issues whose Panopticon mergeStatus is still non-failed with no
+        // 'merged' label (the PR is genuinely open and waiting for a merge click).
+        if (issue?.state === 'done') {
+          if (rs.mergeStatus === 'failed' || issue?.mergeStatus === 'failed') return false;
+          if (Array.isArray(issue?.labels) && issue.labels.includes('merged')) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const pa = projectPriority(a.issueId);
+        const pb = projectPriority(b.issueId);
+        if (pa !== pb) return pa - pb;
+        // Within the same priority tier: oldest-ready first (FIFO)
+        return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '');
+      });
+  }, [awaiting, issuesById]);
+
   // One workspace fetch per ready issue (parallel via useQueries)
   const workspaceQueries = useQueries({
-    queries: awaiting.map((rs) => ({
+    queries: sortedAwaiting.map((rs) => ({
       queryKey: ['workspace', rs.issueId],
       queryFn: () => fetchWorkspace(rs.issueId),
       staleTime: 30_000,
@@ -74,7 +107,7 @@ export function AwaitingMergePage() {
               Awaiting Merge
             </h1>
             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">
-              {awaiting.length}
+              {sortedAwaiting.length}
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -83,11 +116,11 @@ export function AwaitingMergePage() {
           </p>
         </header>
 
-        {awaiting.length === 0 ? (
+        {sortedAwaiting.length === 0 ? (
           <EmptyState />
         ) : (
           <ul className="space-y-3">
-            {awaiting.map((rs, idx) => {
+            {sortedAwaiting.map((rs, idx) => {
               const issue = issuesById.get(rs.issueId.toLowerCase());
               const ws = workspaceQueries[idx]?.data;
               return (
