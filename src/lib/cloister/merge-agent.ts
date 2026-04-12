@@ -32,6 +32,7 @@ import { resolveProjectFromIssue } from '../projects.js';
 import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
 import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
+import { renderPrompt } from './prompts.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -1077,105 +1078,19 @@ export async function spawnMergeAgentForBranches(
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
   const skipDoneReport = options?.skipDoneReport ?? false;
 
-  // When called from the polyrepo merge loop, the server manages overall status.
-  // The merge-agent should NOT call /api/specialists/done — doing so would
-  // prematurely set the issue's overall mergeStatus to 'merged' after one repo,
-  // even if other repos haven't been merged yet.
-  const doneReportInstructions = skipDoneReport
-    ? `DO NOT call /api/specialists/done — the server manages status for this merge.
-    After pushing, simply STOP. If you need to rollback, rollback and STOP.`
-    : `Then report by calling the Panopticon API:
-    curl -s -X POST ${apiUrl}/api/specialists/done \\
-      -H "Content-Type: application/json" \\
-      -d '{"specialist":"merge","issueId":"${issueId}","status":"<passed or failed>","notes":"<reason if failed>"}'
-
-CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.`;
-
-  const taskPrompt = `MERGE TASK for ${issueId}:
-
-PROJECT: ${projectPath}
-SOURCE BRANCH: ${sourceBranch}
-TARGET BRANCH: ${targetBranch}
-
-INSTRUCTIONS:
-
-PHASE 1 — SYNC & BASELINE (before merge):
-1. cd ${projectPath}
-2. git checkout ${targetBranch}
-3. git fetch origin ${targetBranch}
-4. Sync local ${targetBranch} with origin/${targetBranch}:
-   Run: git rev-list --left-right --count ${targetBranch}...origin/${targetBranch}
-   (Output: "LOCAL_AHEAD  REMOTE_AHEAD". If REMOTE_AHEAD > 0, local is behind origin.)
-   If local is behind origin (REMOTE_AHEAD > 0):
-     a. git rebase origin/${targetBranch}
-        (Replays local commits on top of origin — preserves linear history, no merge commits, no data loss)
-     b. If rebase conflicts: abort with git rebase --abort, then STOP — human intervention needed.
-     c. If rebase succeeds: continue to next step
-   If local is up-to-date or ahead-only (REMOTE_AHEAD = 0): continue to next step
-5. Run tests on the CURRENT ${targetBranch} to establish a baseline:
-   - Use the Task tool with subagent_type="Bash" to run: npm test 2>&1 || true
-   - Record the number of passing and failing tests as BASELINE_PASS and BASELINE_FAIL
-   - This baseline is critical — you will compare post-merge results against it
-
-PHASE 2 — MERGE:
-6. git merge ${sourceBranch}
-7. If clean merge: the merge commit is auto-created (or fast-forward). Skip to Phase 3.
-8. If conflicts:
-   a. Immediately abort: git merge --abort
-   b. ROLLBACK — report FAILURE with note "Merge conflicts detected — work agent must rebase before merge"
-   c. Do NOT attempt to manually resolve conflicts. The work agent or human must handle this.
-
-PHASE 3 — VERIFY:
-9. Build the project to verify no compile errors:
-   - Use the Task tool with subagent_type="Bash" to run the build command
-   - For Node.js: NODE_OPTIONS="--max-old-space-size=8192" npm run build
-   - For Java/Maven: ./mvnw compile
-   - Check package.json or pom.xml to determine the right command
-10. Run tests using the Task tool with subagent_type="Bash":
-    - For Node.js: npm test
-    - Record the number of passing and failing tests as MERGE_PASS and MERGE_FAIL
-
-PHASE 4 — DECIDE:
-11. Compare results:
-    - If build failed: ROLLBACK (go to step 12)
-    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures introduced): ROLLBACK (go to step 12)
-    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH (go to step 13)
-    - Pre-existing failures on ${targetBranch} are NOT a reason to rollback
-12. ROLLBACK: git reset --hard ORIG_HEAD
-    (ORIG_HEAD is set by git at merge time — always points to pre-merge state)
-    ${doneReportInstructions.includes('DO NOT') ? 'Then STOP.' : `Then report failure by calling the Panopticon API:
-    curl -s -X POST ${apiUrl}/api/specialists/done \\
-      -H "Content-Type: application/json" \\
-      -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"<reason for rollback>"}'
-    Then STOP.`}
-13. PUSH: git push origin ${targetBranch}
-    If push is rejected (non-fast-forward / "tip of your current branch is behind"):
-      a. git fetch origin ${targetBranch}
-      b. git rebase origin/${targetBranch}
-         (Replay on top of any new remote commits — safe, no data loss)
-      c. If rebase conflicts: abort with git rebase --abort, ROLLBACK (go to step 12)
-      d. If rebase succeeds: retry git push origin ${targetBranch}
-      e. If push fails again after one retry: ROLLBACK (go to step 12)
-    ${doneReportInstructions}
-
-CRITICAL: You MUST complete this merge. The approve operation is waiting.
-
-WHY USE SUBAGENTS FOR BUILD/TEST:
-- Subagents have isolated context and won't pollute your working memory
-- Build and test output can be verbose - subagents handle this cleanly
-- If tests fail, the subagent returns a clear summary
-
-DO NOT:
-- Delete the feature branch (locally or remotely)
-- Clean up workspaces
-- Use git push --force or --force-with-lease — NEVER force-push under any circumstances
-- Skip the build step - compile errors after merge are common
-- Skip the baseline test run — without it you cannot distinguish new failures from pre-existing ones
-- Use HEAD~1 for rollback — use ORIG_HEAD which git sets automatically at merge time
-- Run git stash — the TypeScript layer handles stash/restore automatically
-- Do anything beyond the sync, merge, build, test, and push steps above
-
-Report any issues or conflicts you encountered.`;
+  const taskPrompt = renderPrompt({
+    name: 'merge',
+    vars: {
+      ISSUE_ID: issueId,
+      SOURCE_BRANCH: sourceBranch,
+      TARGET_BRANCH: targetBranch,
+      PROJECT_PATH: projectPath,
+      DO_PUSH: true,
+      DO_BUILD: true,
+      API_URL: apiUrl,
+      SKIP_DONE_REPORT: skipDoneReport,
+    },
+  });
 
   // Resolve project key for per-project ephemeral lifecycle (PAN-300)
   const resolvedProject = resolveProjectFromIssue(issueId);
@@ -1922,21 +1837,22 @@ export async function syncMainIntoWorkspace(
     .then(r => r.stdout.trim())
     .catch(() => `feature/${issueId.toLowerCase()}`);
 
-  // Build prompt from template
-  const promptPath = join(__dirname, 'prompts', 'sync-main.md');
   let taskPrompt: string;
   try {
-    const template = readFileSync(promptPath, 'utf-8');
-    taskPrompt = template
-      .replace(/{{projectPath}}/g, projectPath)
-      .replace(/{{workspaceBranch}}/g, workspaceBranch)
-      .replace(/{{issueId}}/g, issueId)
-      .replace(/{{conflictFiles}}/g, conflictFiles.map(f => `- ${f}`).join('\n'));
+    taskPrompt = renderPrompt({
+      name: 'sync-main',
+      vars: {
+        projectPath,
+        workspaceBranch,
+        issueId,
+        conflictFiles: conflictFiles.map(f => `- ${f}`).join('\n'),
+      },
+    });
   } catch (templateErr: any) {
-    console.error(`[sync-main] Could not load sync-main.md template: ${templateErr.message}`);
-    logActivity('sync_main_error', `Template load failed: ${templateErr.message}`);
+    console.error(`[sync-main] Could not render sync-main prompt: ${templateErr.message}`);
+    logActivity('sync_main_error', `Prompt render failed: ${templateErr.message}`);
     try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
-    return { success: false, conflictFiles, reason: 'Internal error: sync-main prompt template not found' };
+    return { success: false, conflictFiles, reason: 'Internal error: sync-main prompt render failed' };
   }
 
   // Wake the merge-agent specialist using per-project ephemeral lifecycle when possible

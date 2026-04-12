@@ -92,9 +92,19 @@ vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
     ...actual,
-    readFileSync: vi.fn().mockReturnValue(''),
+    readFileSync: vi.fn((path: string, ...args: any[]) => {
+      // Return minimal merge.md template (with frontmatter) so renderPrompt works
+      if (String(path).includes('merge.md')) {
+        return '---\nname: merge\ndescription: Merge-agent prompt\nrequires:\n  - ISSUE_ID\n  - SOURCE_BRANCH\n  - TARGET_BRANCH\n  - PROJECT_PATH\n  - DO_PUSH\n  - DO_BUILD\n  - API_URL\noptional:\n  - SKIP_DONE_REPORT\n  - IS_POLYREPO\n  - POLYREPO_DIRS\n---\nMERGE TASK for {{ISSUE_ID}}: merge {{SOURCE_BRANCH}} into {{TARGET_BRANCH}} in {{PROJECT_PATH}}';
+      }
+      return '';
+    }),
     writeFileSync: vi.fn(),
-    existsSync: vi.fn().mockReturnValue(false),
+    existsSync: vi.fn((path: string) => {
+      // Let renderPrompt find the prompts directory, block everything else
+      if (String(path).includes('cloister/prompts') || String(path).includes('merge.md')) return true;
+      return false;
+    }),
     mkdirSync: vi.fn(),
     appendFileSync: vi.fn(),
   };

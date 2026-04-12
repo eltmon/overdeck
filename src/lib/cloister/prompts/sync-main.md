@@ -1,3 +1,12 @@
+---
+name: sync-main
+description: Resolve merge conflicts when syncing origin/main into a workspace branch.
+requires:
+  - projectPath
+  - workspaceBranch
+  - issueId
+  - conflictFiles
+---
 # Sync Main — Conflict Resolution
 
 You are resolving git merge conflicts from merging `origin/main` into a workspace branch.

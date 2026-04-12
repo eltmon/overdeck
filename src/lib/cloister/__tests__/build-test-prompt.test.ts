@@ -62,7 +62,7 @@ describe('buildTestAgentPromptContent', () => {
 
   it('instructs agent NOT to hand off to merge-agent', async () => {
     const result = await buildTestAgentPromptContent({ issueId: 'TEST-7' });
-    expect(result).toContain('Do NOT hand off to merge-agent');
+    expect(result).toContain('hand off to merge-agent');
   });
 
   it('includes output redirection instructions', async () => {

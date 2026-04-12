@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { processEnvBlocks, processIfBlocks, substituteVariables } from '../template.js';
+import { join } from 'path';
+import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { readWorkspacePlan } from '../vbrief/io.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
@@ -9,35 +8,6 @@ import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-/**
- * Resolve the prompts directory, handling both dev (src/) and bundled (dist/) layouts.
- */
-function resolvePromptsDir(): string {
-  // Try direct sibling path first (works in dev: src/lib/cloister/prompts/)
-  const direct = join(__dirname, 'prompts');
-  if (existsSync(direct) && existsSync(join(direct, 'work-agent.md'))) {
-    return direct;
-  }
-
-  // Fallback: resolve from package root (works when bundled into dist/)
-  let packageRoot = __dirname;
-  if (packageRoot.includes('/src/')) {
-    packageRoot = packageRoot.replace(/\/src\/.*$/, '');
-  } else {
-    // dist/cli/ or dist/dashboard/ → go up to package root
-    packageRoot = join(packageRoot, '..', '..');
-  }
-  const fromRoot = join(packageRoot, 'src', 'lib', 'cloister', 'prompts');
-  if (existsSync(fromRoot)) {
-    return fromRoot;
-  }
-
-  return direct; // Let it fail with a clear error below
-}
 
 export interface WorkAgentPromptContext {
   issueId: string;
@@ -50,19 +20,7 @@ export interface WorkAgentPromptContext {
   trackerContext?: string;
 }
 
-/**
- * Build the unified work agent prompt from the template.
- */
 export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
-  const templatePath = join(resolvePromptsDir(), 'work-agent.md');
-
-  if (!existsSync(templatePath)) {
-    throw new Error(`Work agent prompt template not found at ${templatePath}`);
-  }
-
-  let template = readFileSync(templatePath, 'utf-8');
-
-  // Gather dynamic context (only for LOCAL when filesystem is accessible)
   let beadsTasksStr = '';
   let stitchDesignsStr = '';
   let polyrepoContextStr = '';
@@ -82,43 +40,25 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
     }
 
     polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
-
-    // Check for pending specialist feedback
     pendingFeedbackStr = readPendingFeedback(ctx.workspacePath);
   }
 
-  // Build variables map
-  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-  const vars: Record<string, string | undefined> = {
-    ISSUE_ID: ctx.issueId,
-    ISSUE_ID_LOWER: ctx.issueId.toLowerCase(),
-    WORKSPACE_PATH: ctx.workspacePath,
-    PROJECT_ROOT: ctx.projectRoot || '',
-    API_URL: apiUrl,
-    BEADS_TASKS: beadsTasksStr,
-    STITCH_DESIGNS: stitchDesignsStr,
-    POLYREPO_CONTEXT: polyrepoContextStr,
-    PENDING_FEEDBACK: pendingFeedbackStr,
-    NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
-  };
-
-  // Processing pipeline: env blocks → if blocks → variable substitution
-  template = processEnvBlocks(template, ctx.env);
-  template = processIfBlocks(template, vars);
-  template = substituteVariables(template, vars as any);
-
-  // Wrap in orchestration markers to distinguish Panopticon's injected instructions
-  // from the agent's actual reasoning. Log parsers and context compressors can
-  // recognize these markers and handle orchestration context separately.
-  return `<!-- panopticon:orchestration-context-start -->
-<!-- This is Panopticon orchestration context injected automatically.
-     It contains workspace setup instructions, not agent reasoning.
-     Session summarizers should SKIP this block and focus on the agent's
-     actual work, decisions, and tradeoffs that follow. -->
-
-${template}
-
-<!-- panopticon:orchestration-context-end -->`;
+  return renderPrompt({
+    name: 'work',
+    vars: {
+      ISSUE_ID: ctx.issueId,
+      ISSUE_ID_LOWER: ctx.issueId.toLowerCase(),
+      WORKSPACE_PATH: ctx.workspacePath,
+      LOCAL: ctx.env === 'LOCAL',
+      REMOTE: ctx.env === 'REMOTE',
+      PROJECT_ROOT: ctx.projectRoot || '',
+      BEADS_TASKS: beadsTasksStr,
+      STITCH_DESIGNS: stitchDesignsStr,
+      POLYREPO_CONTEXT: polyrepoContextStr,
+      PENDING_FEEDBACK: pendingFeedbackStr,
+      NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
+    },
+  });
 }
 
 /**

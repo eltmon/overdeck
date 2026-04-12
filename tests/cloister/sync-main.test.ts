@@ -62,9 +62,9 @@ vi.mock('fs', async (importOriginal) => {
     ...actual,
     appendFileSync: vi.fn(), // suppress activity log writes
     readFileSync: vi.fn((path: string, ...args: any[]) => {
-      // Return a minimal sync-main.md template so the import path works
+      // Return a minimal sync-main.md template (with frontmatter) so renderPrompt works
       if (String(path).includes('sync-main.md')) {
-        return 'SYNC TASK for {{issueId}} in {{projectPath}} branch {{workspaceBranch}}\nConflicts:\n{{conflictFiles}}';
+        return '---\nname: sync-main\ndescription: Sync main into workspace\nrequires:\n  - projectPath\n  - workspaceBranch\n  - issueId\n  - conflictFiles\noptional: []\n---\nSYNC TASK for {{issueId}} in {{projectPath}} branch {{workspaceBranch}}\nConflicts:\n{{{conflictFiles}}}';
       }
       return actual.readFileSync(path, ...args);
     }),
