@@ -255,11 +255,19 @@ ${effort === 'high'
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
   - STATE.md (decisions, approach, architecture)
-  - Beads tasks (via \`bd create\`)
+  - vBRIEF plan at \`.planning/plan.vbrief.json\` (see format below)
   - Implementation plan at \`docs/prds/active/{issue-id-lowercase}/STATE.md\` (copy of STATE.md, required for dashboard). The directory name MUST be lowercase (e.g. \`pan-596\`, not \`PAN-596\`) — uppercase strands the PRD where the lifecycle code can't find it.
 - Present options and tradeoffs for the user to decide
 
-When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
+**Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:
+
+\`\`\`
+pan plan-finalize
+\`\`\`
+
+This converts your \`plan.vbrief.json\` into beads tasks and writes the \`.planning/.planning-complete\` marker that lets the dashboard show the **Done** button. Do NOT run \`bd create\` yourself — \`pan plan-finalize\` does it deterministically from the vBRIEF.
+
+After \`pan plan-finalize\` succeeds, STOP. Tell the user: "Planning finalized — click Done in the dashboard to hand off to the implementation agent." Do not kill the tmux session yourself; the Stop button handles that if needed.
 
 ---
 ${effortSection}
@@ -307,9 +315,10 @@ When discovery is complete:
 1. Create STATE.md with decisions made
 2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id-lowercase}/STATE.md\` (required for dashboard). Use the LOWERCASE issue id for the directory name.
 3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` — **MUST follow the exact format below**
-4. Summarize the plan and STOP
+4. Run \`pan plan-finalize\` from the workspace root. This creates beads tasks from your vBRIEF and writes the \`.planning/.planning-complete\` marker.
+5. Summarize the plan and STOP
 
-**DO NOT run \`bd create\` commands.** Beads tasks are created automatically from \`plan.vbrief.json\` by Cloister when planning completes.
+**DO NOT run \`bd create\` commands directly.** \`pan plan-finalize\` is the only sanctioned way to materialize beads from a vBRIEF plan — it's deterministic and idempotent.
 
 ### vBRIEF Plan Format (REQUIRED)
 
