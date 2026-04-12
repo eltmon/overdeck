@@ -3,11 +3,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   cacheDir: '.cache/vitest',
   test: {
+    name: 'root',
     globals: true,
     environment: 'node',
     pool: 'forks',
     poolOptions: {
-      forks: { minForks: 1, maxForks: 4 },
+      forks: { minForks: 1, maxForks: 2, singleFork: false },
     },
     include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
