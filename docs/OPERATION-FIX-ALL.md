@@ -141,6 +141,16 @@ For each bug found during the operation:
 
 ## Flywheel Run Log
 
+### 2026-04-12 — Run 2
+- **Issues inventoried**: 6 PAN issues (PAN-544, PAN-596, PAN-645, PAN-647, PAN-655, PAN-662). PAN-662 and PAN-596 agents actively working (review=failed being fixed by agents). PAN-544 agent signaled done.
+- **Issues moved to Awaiting Merge**: 4 (PAN-544, PAN-645, PAN-647, PAN-655 — all have PRs and readyForMerge=true)
+- **Bugs fixed**: 3 substrate bugs
+  1. Deacon has no auto-retry for `mergeStatus=failed` — skips all 'failed' merges in every patrol loop. Added `checkFailedMergeRetry()`: 30-min cooldown, 3 retries, resets to readyForMerge=true (commit 605ffaaa)
+  2. `POST /api/workspaces/:issueId/review-status` didn't accept `verificationStatus` or `readyForMerge`, making it impossible to reset stale `verificationStatus=failed` that blocked the auto-calculated readyForMerge (commit 7396ba18)
+  3. Multiple waves of prompt-system refactoring and feature work sitting uncommitted on main (5 commits of dirt cleared: dead code, docs, lifecycle events, deacon fix, endpoint fix)
+- **Friction points removed**: merge retry is now automatic (30-min cooldown) for any transient post-rebase test failure
+- **Still in pipeline**: PAN-662 and PAN-596 agents actively working to fix their review failures
+
 ### 2026-04-12 — Run 1
 - **Issues inventoried**: 6 PAN issues in In Progress/In Review (PAN-544, PAN-596, PAN-645, PAN-647, PAN-655, PAN-662, PAN-670)
 - **Issues moved to Awaiting Merge**: 4 (PAN-544, PAN-647, PAN-655, PAN-670)
