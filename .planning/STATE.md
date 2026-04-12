@@ -18,3 +18,5 @@ All beads complete, running final quality gates before signaling done
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-12T03:51Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-12T03:52Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
