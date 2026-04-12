@@ -1677,6 +1677,91 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   return actions;
 }
 
+// Track per-issue cooldowns for failed-merge retry to avoid rapid re-queuing
+const failedMergeRetryCooldowns = new Map<string, number>();
+
+// Minimum time (ms) after merge failure before attempting a retry
+const FAILED_MERGE_RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+// Max number of automatic retries before requiring manual intervention
+const FAILED_MERGE_MAX_RETRIES = 3;
+
+/**
+ * Auto-retry issues whose mergeStatus='failed' due to transient post-rebase
+ * verification failures (e.g. flaky tests or tests fixed on main after failure).
+ *
+ * When review+test both passed but the post-rebase gate failed, the issue is
+ * stuck: the deacon's merge-ready loop skips mergeStatus='failed' entries and
+ * there is no other retry mechanism. After a 30-min cooldown, this patrol resets
+ * the issue to readyForMerge=true so it reappears on the Awaiting Merge page.
+ *
+ * Guards:
+ *   - Review + test must both be 'passed' (don't retry if code quality failed)
+ *   - 30-min per-issue cooldown (in-memory, reset on server restart is fine)
+ *   - Circuit breaker: max 3 retries (mergeRetryCount)
+ */
+export async function checkFailedMergeRetry(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    if (!existsSync(REVIEW_STATUS_FILE)) return actions;
+
+    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+    const statuses: Record<string, {
+      issueId?: string;
+      reviewStatus?: string;
+      testStatus?: string;
+      mergeStatus?: string;
+      readyForMerge?: boolean;
+      mergeRetryCount?: number;
+      updatedAt?: string;
+    }> = JSON.parse(content);
+
+    const now = Date.now();
+
+    for (const [key, status] of Object.entries(statuses)) {
+      // Only act on issues where merge failed but review+test both passed
+      if (status.mergeStatus !== 'failed') continue;
+      if (status.reviewStatus !== 'passed' || status.testStatus !== 'passed') continue;
+
+      // Circuit breaker: max retries to avoid infinite loop on permanent failures
+      const retryCount = status.mergeRetryCount || 0;
+      if (retryCount >= FAILED_MERGE_MAX_RETRIES) {
+        console.log(`[deacon] Failed-merge circuit breaker for ${key} (${retryCount}/${FAILED_MERGE_MAX_RETRIES} retries used)`);
+        continue;
+      }
+
+      // Cooldown: wait at least 30 min after the merge failure before retrying
+      if (status.updatedAt) {
+        const statusAge = now - new Date(status.updatedAt).getTime();
+        if (statusAge < FAILED_MERGE_RETRY_COOLDOWN_MS) continue;
+      }
+
+      // Per-issue in-memory cooldown to avoid re-triggering on the same patrol cycle
+      const lastRetry = failedMergeRetryCooldowns.get(key);
+      if (lastRetry && (now - lastRetry) < FAILED_MERGE_RETRY_COOLDOWN_MS) continue;
+
+      failedMergeRetryCooldowns.set(key, now);
+
+      const issueId = status.issueId || key;
+      const nextRetry = retryCount + 1;
+      console.log(`[deacon] Auto-retrying failed merge for ${issueId} (attempt ${nextRetry}/${FAILED_MERGE_MAX_RETRIES})`);
+
+      setReviewStatus(issueId, {
+        mergeStatus: 'pending',
+        readyForMerge: true,
+        mergeRetryCount: nextRetry,
+      });
+
+      actions.push(`Reset failed merge for ${issueId} — retry ${nextRetry}/${FAILED_MERGE_MAX_RETRIES} (readyForMerge restored)`);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error in checkFailedMergeRetry:', msg);
+  }
+
+  return actions;
+}
+
 // Track per-issue cooldowns for dead-end recovery to avoid spamming
 const deadEndCooldowns = new Map<string, number>();
 
@@ -2495,6 +2580,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const mergeStuckActions = await checkReadyForMergeStuck();
   actions.push(...mergeStuckActions);
   for (const a of mergeStuckActions) addLog('action', a, state.patrolCycle);
+
+  // Auto-retry merges that failed due to transient post-rebase verification failures
+  const failedMergeRetryActions = await checkFailedMergeRetry();
+  actions.push(...failedMergeRetryActions);
+  for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
 
   // Resolution patrol DISABLED — auto-completing and poking agents consumes
   // API credits and is unreliable. Human operator can take action via dashboard.
