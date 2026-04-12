@@ -90,22 +90,22 @@ startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
 // Clean up pollers on graceful shutdown
-const emitShutdownActivity = (signal: string) => {
+const emitShutdownActivity = () => {
   try {
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
-      message: `Dashboard stopping (${signal})`,
+      message: 'Dashboard stopping',
     });
   } catch { /* non-fatal */ }
 };
 process.once('SIGTERM', () => {
-  emitShutdownActivity('SIGTERM');
+  emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
 });
 process.once('SIGINT', () => {
-  emitShutdownActivity('SIGINT');
+  emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
 });

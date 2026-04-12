@@ -237,10 +237,11 @@ export const makeServerLayer = Layer.unwrap(
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
           console.log(`[panopticon] Dashboard listening on http://${config.host}:${config.port}`);
+          const mode = process.env['PANOPTICON_MODE'] === 'production' ? 'production mode' : 'development mode';
           emitActivityEntry({
             source: 'dashboard',
             level: 'success',
-            message: `Dashboard started on ${config.host}:${config.port}`,
+            message: `Dashboard started in ${mode}`,
           });
         });
       }),

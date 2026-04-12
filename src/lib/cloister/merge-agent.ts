@@ -603,7 +603,7 @@ function logActivity(action: string, details: string, issueId?: string): void {
   emitActivityEntry({
     source: 'merge-agent',
     level: action.includes('fail') || action.includes('error') ? 'error' : action.includes('warn') ? 'warn' : 'success',
-    message: `[merge-agent] ${action}: ${details}`,
+    message: details,
     issueId,
   });
 }
