@@ -968,9 +968,14 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   }
 
   // Check if agent is stopped — auto-restart to deliver feedback (PAN-367)
+  // IMPORTANT: restart even if the tmux session still exists. Planning/work sessions use
+  // `remain-on-exit on` so the shell persists after the agent process exits. sessionExists()
+  // returns true for a dead shell, which used to bypass the restart and silently drop the
+  // feedback message into a defunct terminal. If state.status === 'stopped', the process
+  // is gone regardless of shell presence — we must restart.
   const agentState = getAgentState(normalizedId);
-  if (agentState && agentState.status === 'stopped' && !sessionExists(normalizedId)) {
-    console.log(`[agents] Auto-restarting stopped agent ${normalizedId} to deliver feedback`);
+  if (agentState && agentState.status === 'stopped') {
+    console.log(`[agents] Auto-restarting stopped agent ${normalizedId} to deliver feedback (session exists: ${sessionExists(normalizedId)})`);
 
     const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
@@ -983,6 +988,12 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     }
 
     clearReadySignal(normalizedId);
+    // If the session still exists (remain-on-exit dead shell), kill it so createSession
+    // doesn't fail with "duplicate session". The agent state is 'stopped' so the process
+    // has already exited — it's safe to reclaim the session name.
+    if (sessionExists(normalizedId)) {
+      try { killSession(normalizedId); } catch { /* ignore */ }
+    }
     const claudeCmd = `claude --dangerously-skip-permissions --model ${agentState.model || 'claude-sonnet-4-6'} "You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working."`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
