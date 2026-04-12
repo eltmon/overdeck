@@ -194,7 +194,7 @@ Diagnostics endpoint returning per-tracker cache health:
 | App.tsx | agents | 5s | 5s | Local data, no external API |
 | KanbanBoard | issues | 5s | 60s (default) | Socket handles real-time |
 | KanbanBoard | specialists | 5s | 5s | Local data |
-| ActivityPanel | activity | 1s | 2s | Local data, reduced churn |
+| ActivityPanel | activity | 1s | 2s | Bootstrap fallback only — primary flow is WebSocket events |
 
 `staleTime` increased from 2s to 30s. `refetchIntervalInBackground` set to `false`.
 
