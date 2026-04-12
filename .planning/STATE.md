@@ -1,30 +1,20 @@
 # PAN-619: Cost tracking — comma-format total cost, add day/week ticks to 30-day trend
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
-## Decisions
+## Current Phase
+All beads complete, running final quality gates before signaling done
 
-### 1. Comma-format all dollar values
-- Apply `toLocaleString('en-US', { minimumFractionDigits: N, maximumFractionDigits: N })` to all dollar displays
-- Summary-level values (totalCost, per-issue cost, budget): 2 decimal places with commas
-- Sub-cent precision values (modal detail, agent/model stats): 4 decimal places with commas
-- Chart Y-axis and tooltip: keep current precision but add comma formatting
-- Implement as a small `formatCost(value, decimals)` helper at top of CostsPage.tsx
+## Completed Work
+- [x] feature-pan-489-17v: Added formatCost helper and applied comma-formatting to all dollar values in CostsPage (commit: e378afb0)
+- [x] feature-pan-489-2ax: Added autoSkip:false + week-boundary tick callback to 30-day trend x-axis (commit: 9630ac52)
 
-### 2. Day/week ticks on 30-day trend chart
-- Chart.js x-axis already receives all 30 MM-DD labels
-- Configure `ticks.callback` and `ticks.autoSkip: false` to show all tick marks
-- Use `ticks.callback` to only render label text on week boundaries (every 7th tick from the end), showing empty string for other days
-- This gives daily tick marks with weekly date labels — clean and readable
-- No changes to data fetching or backend needed
+## Remaining Work
+(none)
 
-### Scope
-- Single file change: `src/dashboard/frontend/src/components/CostsPage.tsx`
-- No backend changes
-- No new dependencies
+## Key Decisions
+- D1: formatCost uses toLocaleString('en-US', ...) — browser-native, no extra deps
+- D2: Chart x-axis ticks use autoSkip:false + callback showing labels only on week boundaries (every 7th tick from end), so all 30 daily tick marks render but only ~4 date labels show
 
-### Out of Scope
-- Cost calculation logic
-- Chart colors/styling beyond tick marks
-- Backend API changes
-- Other dashboard pages
+## Specialist Feedback
+(none yet)
