@@ -140,6 +140,25 @@ A skill that, when invoked, kicks off the flywheel:
 5. After UAT signal from the user, drives Playwright to click the merge button
    on each row.
 
+## Docs are part of every fix
+
+Every substrate fix in a flywheel revolution must be **bracketed by a docs
+sweep**:
+
+- **Before the fix:** scan `docs/INDEX.md` and the documents covering the
+  area you're about to change (architecture, the matching PRD, `CLAUDE.md`,
+  `.claude/rules/`, route/service docs). Note anything the fix will change,
+  invalidate, or extend. If a documented invariant *is* the bug, the doc is
+  part of the fix.
+- **After the fix:** go back to those same documents and update them to
+  describe the new behavior — new flags, new endpoints, removed assumptions,
+  changed invariants. If the area had no doc and probably should, add one
+  and link it from `docs/INDEX.md`.
+
+Doc updates ship in the same commit as the code fix (or in a paired `docs:`
+commit pushed before the revolution ends). Stale documentation is dirt; the
+flywheel must leave docs cleaner than it found them, every time.
+
 ## Main must always be clean
 
 The flywheel only works if `main` is the boring source of truth. Every revolution
