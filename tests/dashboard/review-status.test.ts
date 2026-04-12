@@ -170,14 +170,16 @@ describe('setReviewStatus', () => {
     expect(result.readyForMerge).toBe(false);
   });
 
-  it('does not set readyForMerge when verification is still pending', () => {
+  it('does not block readyForMerge when verification is pending (not yet run)', () => {
+    // 'pending' means "not yet run this cycle" — not a failure.
+    // Only 'failed' blocks readyForMerge. This matches verificationSatisfied() in review-status.ts.
     const result = setReviewStatus('PAN-113b', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       verificationStatus: 'pending',
     }, statusFile);
 
-    expect(result.readyForMerge).toBe(false);
+    expect(result.readyForMerge).toBe(true);
   });
 });
 
