@@ -141,6 +141,18 @@ For each bug found during the operation:
 
 ## Flywheel Run Log
 
+### 2026-04-12 — Run 3
+- **Issues inventoried**: 9 PAN issues (PAN-473, PAN-503, PAN-509, PAN-596, PAN-611, PAN-645, PAN-647, PAN-662, PAN-670). All work agents at idle after rate-limit reset.
+- **Issues moved to Awaiting Merge**: 0 (all needed fixes before review could proceed)
+- **Bugs fixed**: 4 substrate bugs
+  1. `feedback-writer.ts`: silent workspace/issueId mismatch wrote PAN-645 feedback into PAN-647's workspace (commit e958e9cf) — added path guard, falls back to canonical resolution on mismatch
+  2. `build:cli` (tsdown) was wiping `dist/dashboard/` on every CLI build — added `scripts/build-cli.mjs` to preserve dashboard dir during CLI builds (commit c472c3b2)
+  3. Erroneous planning sessions started for PAN-473 and PAN-503 (already In Review) after rate-limit restart — killed orphaned sessions, filed PAN-682
+  4. PAN-647's entire feedback history was PAN-645's — invalid feedback cleared, agent woken with correct context
+- **Friction points removed**: pan-wake skill created for rate-limit recovery; PAN-611 pre-staged code moved to correct feature workspace instead of leaking on main
+- **Issues with root causes still open**: PAN-681 (upstream cause of workspace/issueId mismatch), PAN-682 (planning restart guards for In-Review issues), PAN-675 (deacon rate-limit detection), PAN-676 (label cleanup on closed issues), PAN-677 (deacon auto-recovery for planning agents)
+- **Still in pipeline**: PAN-473 (review changes requested); PAN-503 (review changes requested); PAN-509 (In Progress); PAN-596 (merge conflicts); PAN-611 (In Progress); PAN-645 (review changes requested); PAN-647 (needs fresh review after wrong feedback cleared); PAN-662 (review changes requested); PAN-670 (merge conflict)
+
 ### 2026-04-12 — Run 2
 - **Issues inventoried**: 6 PAN issues (PAN-544, PAN-596, PAN-645, PAN-647, PAN-655, PAN-662). PAN-662 and PAN-596 agents actively working (review=failed being fixed by agents). PAN-544 agent signaled done.
 - **Issues moved to Awaiting Merge**: 4 (PAN-544, PAN-645, PAN-647, PAN-655 — all have PRs and readyForMerge=true)
