@@ -21,3 +21,13 @@ All beads complete. Quality gates pass (typecheck, lint, tests — pre-existing 
 ## Specialist Feedback
 - (none yet)
 - **[2026-04-12T22:48Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-12T22:51Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+
+## Final Status
+All review feedback addressed:
+- Silent `catch {}` fixed with `console.error` logging including agent id context
+- `buildConversationResponse` helper extracted and exported for testability
+- 4 route tests added (agents-conversation.test.ts): null path, missing file, successful parse, error fallback
+- 6 TerminalPanel component tests added: XTerminal vs MessagesTimeline vs raw-output branching, header labels
+- shadow-state test isolation fixed (getPendingSyncCount delta check)
+- Full suite: 204 test files, 2740 tests, all passing. typecheck + lint clean.
