@@ -42,6 +42,7 @@ import { metricsRouteLayer } from './routes/metrics.js'
 import { miscRouteLayer } from './routes/misc.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
+import { emitActivityEntry } from '../../lib/activity-logger.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -236,6 +237,11 @@ export const makeServerLayer = Layer.unwrap(
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
           console.log(`[panopticon] Dashboard listening on http://${config.host}:${config.port}`);
+          emitActivityEntry({
+            source: 'dashboard',
+            level: 'success',
+            message: `Dashboard started on ${config.host}:${config.port}`,
+          });
         });
       }),
     );
