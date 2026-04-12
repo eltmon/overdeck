@@ -347,7 +347,9 @@ export const ReadModelServiceLive = Layer.effect(
           // Persist updated snapshot to projection cache
           projectionCache?.save(buildSnapshot());
 
-          // Emit issues.snapshot event to event store
+          // Fan-out issues.snapshot to live WebSocket subscribers via in-memory PubSub.
+          // Uses emitOnly (NOT append) — issues.snapshot is ~1.5 MB and must never be
+          // persisted to the event log. Persisting it causes startup OOM on replay.
           // Uses cached reference to avoid async dynamic import delay
           // (delay caused frontend to miss updates after patchIssue)
           try {
@@ -355,7 +357,7 @@ export const ReadModelServiceLive = Layer.effect(
               import('./event-store.js').then(({ getEventStore }) => {
                 _cachedEventStore = getEventStore();
                 try {
-                  _cachedEventStore.append({
+                  _cachedEventStore.emitOnly({
                     type: 'issues.snapshot',
                     timestamp: new Date().toISOString(),
                     payload: { issues: cleaned },
@@ -363,7 +365,7 @@ export const ReadModelServiceLive = Layer.effect(
                 } catch { /* event store not ready */ }
               }).catch(() => {});
             } else {
-              _cachedEventStore.append({
+              _cachedEventStore.emitOnly({
                 type: 'issues.snapshot',
                 timestamp: new Date().toISOString(),
                 payload: { issues: cleaned },
