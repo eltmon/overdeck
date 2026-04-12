@@ -1625,7 +1625,8 @@ export async function syncMainIntoWorkspace(
   // Poll tmux output for MERGE_RESULT markers
   const tmuxSession = getTmuxSessionName('merge-agent', syncProjectKey ?? undefined);
   const startTime = Date.now();
-  const POLL_INTERVAL = 5000;
+  // Tests override via PANOPTICON_TEST_POLL_MS to avoid real 5-second waits.
+  const POLL_INTERVAL = Number(process.env.PANOPTICON_TEST_POLL_MS) || 5000;
   const SYNC_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
   let lastOutput = '';
 
