@@ -2,9 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 // react-resizable-panels v4 exports: Group, Panel, Separator (NOT PanelGroup/PanelResizeHandle)
 // v4 props: orientation (NOT direction), onLayoutChanged (NOT onLayout)
 import { Panel, Group, Separator } from 'react-resizable-panels';
+import { useQuery } from '@tanstack/react-query';
 import { InspectorPanel } from './InspectorPanel';
 import { TerminalPanel } from './TerminalPanel';
+import { TerminalTabs, savePinState, loadPersistedPin } from './inspector/TerminalTabs';
+import { MergedSummaryCard } from './inspector/MergedSummaryCard';
+import { usePipelinePhase } from './inspector/usePipelinePhase';
 import { Agent, Issue } from '../types';
+import type { ReviewStatus } from './inspector/types';
 
 type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 
@@ -50,6 +55,69 @@ export interface DetailPanelLayoutProps {
 export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, suppressTerminal }: DetailPanelLayoutProps) {
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
+
+  // Fetch review status here so both InspectorPanel badge and TerminalTabs use the same data
+  const { data: reviewStatus } = useQuery<ReviewStatus>({
+    queryKey: ['review-status', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/review-status`);
+      if (!res.ok) throw new Error('Failed to fetch review status');
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  const { data: costData } = useQuery<{ totalCost?: number }>({
+    queryKey: ['issueCosts', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/costs`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: reviewStatus?.mergeStatus === 'merged',
+    staleTime: 60000,
+  });
+
+  const projectKey = issue?.project?.id;
+  const { phase, availableTerminals, markSessionDead } = usePipelinePhase({
+    issueId,
+    agent,
+    reviewStatus,
+    projectKey,
+  });
+
+  // Pinned session state: null = auto-follow, string = pinned to that session
+  const [pinnedSession, setPinnedSession] = useState<string | null>(() =>
+    loadPersistedPin(issueId),
+  );
+  const [pinned, setPinned] = useState(() => loadPersistedPin(issueId) !== null);
+
+  // The currently displayed session: pinned overrides auto
+  const activePhaseSession = availableTerminals.find(t => t.isActive && !t.disabled)?.sessionName ?? null;
+  const selectedSession = pinned ? pinnedSession : activePhaseSession;
+
+  const handleSelectSession = useCallback((sessionName: string | null) => {
+    setPinnedSession(sessionName);
+    savePinState(issueId, sessionName);
+  }, [issueId]);
+
+  const handleTogglePin = useCallback(() => {
+    setPinned(prev => {
+      const next = !prev;
+      if (!next) {
+        // Un-pinning: clear pin from localStorage
+        savePinState(issueId, null);
+        setPinnedSession(null);
+      }
+      return next;
+    });
+  }, [issueId]);
+
+  // When a new tab is clicked in TerminalTabs, engage pin
+  const handleTabSelect = useCallback((sessionName: string | null) => {
+    handleSelectSession(sessionName);
+    if (!pinned) setPinned(true);
+  }, [handleSelectSession, pinned]);
 
   // Reset panel state when issue changes
   useEffect(() => {
@@ -161,8 +229,46 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
           />
 
           <Panel id="terminal" minSize="30%">
-            <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-              <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
+            <div className="flex flex-col" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+              {availableTerminals.length > 0 && (
+                <TerminalTabs
+                  issueId={issueId}
+                  tabs={availableTerminals}
+                  selectedSession={selectedSession}
+                  activePhase={phase}
+                  pinned={pinned}
+                  onSelectSession={handleTabSelect}
+                  onTogglePin={handleTogglePin}
+                />
+              )}
+              <div className="flex-1 min-h-0">
+                {phase === 'merged' ? (
+                  <MergedSummaryCard
+                    mergedAt={reviewStatus?.updatedAt ?? new Date().toISOString()}
+                    prUrl={null}
+                    totalCost={costData?.totalCost}
+                    onViewLastLog={
+                      availableTerminals.some(t => t.id === 'merging' && !t.disabled)
+                        ? () => {
+                            const mergeTab = availableTerminals.find(t => t.id === 'merging');
+                            if (mergeTab?.sessionName) handleTabSelect(mergeTab.sessionName);
+                          }
+                        : null
+                    }
+                  />
+                ) : selectedSession ? (
+                  <TerminalPanel
+                    key={selectedSession}
+                    agent={agent}
+                    onClose={closeTerminal}
+                    sessionName={selectedSession}
+                    title={selectedSession}
+                    onSessionEnded={markSessionDead}
+                  />
+                ) : (
+                  <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
+                )}
+              </div>
             </div>
           </Panel>
         </Group>

@@ -11,6 +11,12 @@ import { deriveAgentIssueId } from './AgentOutputPanel';
 interface TerminalPanelProps {
   agent: Agent;
   onClose: () => void;
+  /** Override the tmux session to stream. Defaults to agent.id for back-compat. */
+  sessionName?: string;
+  /** Override the header title. Defaults to agent.id. */
+  title?: string;
+  /** Called when XTerminal exhausts reconnect attempts for this session. */
+  onSessionEnded?: (sessionName: string) => void;
 }
 
 function popoutTerminal(sessionName: string, title: string): void {
@@ -38,7 +44,9 @@ async function fetchConversation(agentId: string): Promise<ConversationResponse>
   return res.json();
 }
 
-export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
+export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
+  const activeSession = sessionNameProp ?? agent.id;
+  const displayTitle = titleProp ?? agent.id;
   const terminalRef = useRef<HTMLPreElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -147,7 +155,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : agent.id}
+          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -162,7 +170,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
           )}
           {!isStopped && (
             <button
-              onClick={() => popoutTerminal(agent.id, `agent-${agent.issueId ?? agent.id} · ${agent.issueId ?? agent.id}`)}
+              onClick={() => popoutTerminal(activeSession, displayTitle)}
               className="p-1 rounded transition-colors hover:bg-white/10"
               style={{ color: textSecondary }}
               title="Pop out terminal"
@@ -204,7 +212,10 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         )
       ) : (
         <div className="flex-1 min-h-0">
-          <XTerminal sessionName={agent.id} />
+          <XTerminal
+            sessionName={activeSession}
+            onDisconnect={onSessionEnded ? () => onSessionEnded(activeSession) : undefined}
+          />
         </div>
       )}
     </div>
