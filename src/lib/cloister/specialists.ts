@@ -1782,13 +1782,15 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   }
 
   // Create identity prompt for the specialist
-  const identityPrompt = `You are the ${name} specialist agent for Panopticon.
-Your role: ${name === 'merge-agent' ? 'Resolve merge conflicts and ensure clean integrations' :
-             name === 'review-agent' ? 'Review code changes and provide quality feedback' :
-             name === 'test-agent' ? 'Execute and analyze test results' : 'Assist with development tasks'}
-
-You will be woken up when your services are needed. For now, acknowledge your initialization and wait.
-Say: "I am the ${name} specialist, ready and waiting for tasks."`;
+  const role =
+    name === 'merge-agent' ? 'Resolve merge conflicts and ensure clean integrations' :
+    name === 'review-agent' ? 'Review code changes and provide quality feedback' :
+    name === 'test-agent' ? 'Execute and analyze test results' :
+    'Assist with development tasks';
+  const identityPrompt = renderPrompt({
+    name: 'identity-wake',
+    vars: { SPECIALIST_NAME: name, ROLE: role },
+  });
 
   try {
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
