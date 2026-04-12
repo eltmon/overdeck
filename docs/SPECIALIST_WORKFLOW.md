@@ -736,41 +736,69 @@ pan work sync-main PAN-143
 
 ## Prompt Templates
 
-Each specialist uses a Markdown prompt template that gets populated with runtime context (workspace path, branch, issue ID, etc.) before being sent to Claude Code.
+Every specialist and orchestration prompt is a Mustache template with YAML frontmatter, loaded through the unified `renderPrompt()` API in `src/lib/cloister/prompts.ts`. See the full authoring guide at [reference/prompts](../reference/prompts.mdx).
 
 ### Template Location
 
 - **Source**: `src/lib/cloister/prompts/`
 - **Runtime (built)**: `dist/dashboard/prompts/`
 
-The build pipeline copies `*.md` from source to dist (see [BUILD.md](./BUILD.md#specialist-prompt-templates)).
+The build pipeline copies `*.md` from source to dist (see [BUILD.md](./BUILD.md#specialist-prompt-templates)). `resolvePromptsDir()` in the loader handles both paths transparently.
 
 ### Available Templates
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
-| `work-agent.md` | Work agents | Implementation task instructions |
-| `review-agent.md` | review-agent | Code review checklist and criteria |
-| `test-agent.md` | test-agent | Test execution and baseline comparison |
-| `merge-agent.md` | merge-agent | PR merge and conflict resolution |
+| `work.md` | Work agents | Implementation task instructions |
+| `planning.md` | Planning agents | vBRIEF authoring and PRD analysis |
+| `review.md` | review-agent | Code review checklist and criteria |
+| `test.md` | test-agent | Test execution and baseline comparison |
+| `merge.md` | merge-agent | PR merge, rebase, and conflict resolution |
 | `sync-main.md` | merge-agent | Sync-from-main conflict resolution |
+| `resume-work.md` | Cloister resume path | Wake a stalled work agent with feedback |
+| `handoff-to-work.md` | Planning → work handoff | Bridge prompt carrying serialized plan context |
+| `identity-wake.md` | Specialist bootstrap | Initial role/identity message for long-lived specialists |
+| `inspect-agent.md` | inspect-agent (legacy) | Ad-hoc inspection path, not yet migrated to renderPrompt |
 
-### Template Variables
+### Frontmatter Contract
 
-Templates use `{{variable}}` syntax replaced at runtime:
+Each template declares its variables up front:
 
-- `{{projectPath}}` — workspace directory
-- `{{workspaceBranch}}` — current feature branch name
-- `{{issueId}}` — issue identifier (PAN-143, MIN-678, etc.)
-- `{{conflictFiles}}` — list of files with merge conflicts (sync-main only)
+```yaml
+---
+name: review
+description: Code review instructions for review-agent
+requires:
+  - ISSUE_ID
+  - WORKSPACE_PATH
+  - BRANCH_NAME
+optional:
+  - ADDITIONAL_CONTEXT
+---
+```
+
+- `requires` — must be present and non-empty at render time; omission throws `PromptError`.
+- `optional` — permitted but not required; undefined becomes empty string.
+- Any variable not listed in `requires` or `optional` is **unknown** and throws at render time (fail loud).
+
+### Template Syntax
+
+Templates use [Mustache](https://mustache.github.io/) with HTML escaping disabled globally:
+
+- `{{VAR}}` — variable substitution (no escaping, braces stay literal via `Mustache.escape = String`)
+- `{{#VAR}}...{{/VAR}}` — truthy section (renders block when VAR is truthy)
+- `{{^VAR}}...{{/VAR}}` — inverted section (renders when VAR is falsy/empty)
+- `{{#VAR}}{{VAR}}{{/VAR}}` — context fall-through (render VAR only if set)
+
+No partials, lambdas, or helpers — keep composition in TypeScript.
 
 ### Adding a New Template
 
-1. Create `src/lib/cloister/prompts/your-template.md`
-2. Use `{{variable}}` placeholders for runtime context
-3. Load in your code: `join(__dirname, 'prompts', 'your-template.md')`
-4. Replace variables: `template.replace(/{{variable}}/g, value)`
-5. The build pipeline automatically copies new `.md` files to `dist/dashboard/prompts/`
+1. Create `src/lib/cloister/prompts/your-template.md` with frontmatter declaring `requires`/`optional`.
+2. Use Mustache `{{VAR}}` syntax throughout the body.
+3. Call it from TypeScript: `renderPrompt({ name: 'your-template', vars: { VAR: value } })`.
+4. Add a loader contract test in `src/lib/cloister/__tests__/prompts.test.ts` (requires-present, unknowns-reject, rendering).
+5. The build pipeline automatically copies new `.md` files to `dist/dashboard/prompts/` — no config changes needed.
 
 ## Deacon Health Monitor
 

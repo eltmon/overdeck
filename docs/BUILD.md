@@ -71,14 +71,18 @@ This means `__dirname` in the bundled code resolves to **`dist/dashboard/`** —
 
 ### Specialist Prompt Templates
 
-Specialist agents (review-agent, test-agent, merge-agent) use prompt templates stored as `.md` files in `src/lib/cloister/prompts/`. At runtime, these are loaded via:
+All specialist and planning prompts are stored as Mustache templates with YAML frontmatter in `src/lib/cloister/prompts/`. At runtime, callers use the unified `renderPrompt()` loader from `src/lib/cloister/prompts.ts`:
 
 ```typescript
-const templatePath = join(__dirname, 'prompts', 'merge-agent.md');
-const template = readFileSync(templatePath, 'utf-8');
+import { renderPrompt } from './prompts.js';
+
+const prompt = renderPrompt({
+  name: 'merge',
+  vars: { ISSUE_ID, BRANCH_NAME, WORKSPACE_PATH, /* ... */ },
+});
 ```
 
-In the bundled server, `__dirname` = `dist/dashboard/`, so this looks for `dist/dashboard/prompts/merge-agent.md`. The build pipeline copies these files:
+The loader reads templates via `resolvePromptsDir()`, which handles both the dev path (`src/lib/cloister/prompts/`) and the bundled path (`dist/dashboard/prompts/`). In production, `__dirname` = `dist/dashboard/`, so templates are loaded from `dist/dashboard/prompts/<name>.md`. The build pipeline copies these files:
 
 ```
 src/lib/cloister/prompts/*.md → dist/dashboard/prompts/
@@ -86,7 +90,9 @@ src/lib/cloister/prompts/*.md → dist/dashboard/prompts/
 
 This copy step is part of `build:dashboard:server` in `package.json`.
 
-**If you add a new prompt template**: Place it in `src/lib/cloister/prompts/` and it will automatically be copied during build (the `cp` command uses `*.md` glob).
+**Template catalogue** (as of v0.5.0): `work.md`, `planning.md`, `review.md`, `test.md`, `merge.md`, `sync-main.md`, `resume-work.md`, `handoff-to-work.md`, `identity-wake.md`, plus `inspect-agent.md` (legacy ad-hoc path).
+
+**If you add a new prompt template**: Place it in `src/lib/cloister/prompts/`, declare its `requires`/`optional` vars in frontmatter, and call `renderPrompt({ name, vars })`. Missing required vars, unknown vars, and YAML errors all throw `PromptError` at render time (fail loud). See [Prompt Templates reference](../reference/prompts.mdx) for the full authoring guide.
 
 ### Development Mode (`npm run dev`)
 
@@ -107,11 +113,16 @@ dist/
 │   ├── server.js              # Effect server entry (tsdown)
 │   ├── *.js                   # Server code-split chunks (tsdown/Rolldown)
 │   ├── prompts/               # Specialist prompt templates (copied)
-│   │   ├── merge-agent.md
-│   │   ├── review-agent.md
+│   │   ├── handoff-to-work.md
+│   │   ├── identity-wake.md
+│   │   ├── inspect-agent.md
+│   │   ├── merge.md
+│   │   ├── planning.md
+│   │   ├── resume-work.md
+│   │   ├── review.md
 │   │   ├── sync-main.md
-│   │   ├── test-agent.md
-│   │   └── work-agent.md
+│   │   ├── test.md
+│   │   └── work.md
 │   └── public/                # React frontend (Vite)
 │       ├── index.html
 │       └── assets/
