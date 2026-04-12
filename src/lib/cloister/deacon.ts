@@ -1158,7 +1158,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     }
 
     const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
+    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; mergeStatus?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
 
     // Build a set of all active specialist sessions (global + per-project)
     // so we can check if ANY specialist is working on review/test tasks.
