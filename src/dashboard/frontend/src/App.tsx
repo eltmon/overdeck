@@ -9,6 +9,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConvoyPanel } from './components/ConvoyPanel';
 import { HandoffsPage } from './components/HandoffsPage';
+import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
@@ -53,6 +54,7 @@ const TAB_PATHS: Record<Tab, string> = {
   resources: '/resources',
   convoys: '/convoys',
   handoffs: '/handoffs',
+  'awaiting-merge': '/awaiting-merge',
   activity: '/activity',
   metrics: '/metrics',
   costs: '/costs',
@@ -540,6 +542,11 @@ export default function App() {
         {activeTab === 'handoffs' && (
           <div className="w-full overflow-auto">
             <HandoffsPage />
+          </div>
+        )}
+        {activeTab === 'awaiting-merge' && (
+          <div className="w-full overflow-auto">
+            <AwaitingMergePage />
           </div>
         )}
         {activeTab === 'settings' && (

@@ -4,7 +4,7 @@ import {
   Eye, LayoutGrid, Bot, Server, Network, ArrowRightLeft,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2,
+  Hammer, Loader2, GitMerge,
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
@@ -19,6 +19,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
+      { id: 'awaiting-merge' as Tab, label: 'Awaiting Merge', icon: GitMerge },
       { id: 'agents' as Tab, label: 'Agents', icon: Bot },
     ],
   },
