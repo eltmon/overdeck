@@ -3,6 +3,7 @@ import { Loader2, ChevronRight, ChevronDown, GripHorizontal, Terminal, FileText,
 import styles from '../styles/mission-control.module.css';
 import { XTerminal } from '../../XTerminal';
 import { ConversationPanel } from '../../chat/ConversationPanel';
+import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import type { Conversation } from '../ConversationList';
 
 interface ActivitySection {
@@ -317,7 +318,9 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
               className={contentClass}
               style={contentStyle}
             >
-              {section.transcript || '(no output yet)'}
+              {section.transcript
+                ? <ChatMarkdown text={section.transcript} isStreaming={section.status === 'running'} />
+                : '(no output yet)'}
             </div>
           )}
 
