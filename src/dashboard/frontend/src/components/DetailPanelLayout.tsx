@@ -78,6 +78,14 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     staleTime: 60000,
   });
 
+  const projectKey = issue?.project?.id;
+  const { phase, availableTerminals, markSessionDead } = usePipelinePhase({
+    issueId,
+    agent,
+    reviewStatus,
+    projectKey,
+  });
+
   // Shares cache key with InspectorPanel's workspace query — no extra network request
   const { data: workspaceData } = useQuery<WorkspaceInfo>({
     queryKey: ['workspace', issueId],
@@ -88,14 +96,6 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     },
     enabled: phase === 'merged',
     staleTime: 30000,
-  });
-
-  const projectKey = issue?.project?.id;
-  const { phase, availableTerminals, markSessionDead } = usePipelinePhase({
-    issueId,
-    agent,
-    reviewStatus,
-    projectKey,
   });
 
   // Pinned session state: null = auto-follow, string = pinned to that session
