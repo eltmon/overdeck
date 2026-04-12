@@ -70,7 +70,7 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
   const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
-    return saved ? Number(saved) : 600;
+    return saved ? Math.max(280, Number(saved)) : 600;
   });
   const isDragging = useRef(false);
   const startX = useRef(0);
@@ -224,7 +224,7 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging.current) return;
       const delta = e.clientX - startX.current;
-      const newWidth = Math.max(240, Math.min(600, startWidth.current + delta));
+      const newWidth = Math.max(280, Math.min(600, startWidth.current + delta));
       setSidebarWidth(newWidth);
       currentWidth.current = newWidth;
     };

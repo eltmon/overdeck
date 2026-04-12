@@ -97,24 +97,38 @@
   flex-shrink: 0;
 }
 
+/* Account for the fixed hamburger menu button on small screens */
+@media (max-width: 767px) {
+  .sidebarHeader {
+    padding-left: 48px;
+  }
+}
+
 .sidebarHeaderRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--mc-space-2);
   gap: var(--mc-space-2);
+  flex-wrap: nowrap;
 }
 
 .sidebarHeaderGroup {
   display: flex;
   align-items: center;
   gap: var(--mc-space-2);
+  flex-shrink: 1;
+  min-width: 24px;
 }
 
 .sidebarTitle {
   font-size: var(--mc-font-size-md);
   font-weight: 600;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .sidebarSubtitle {
@@ -1840,18 +1854,19 @@
   user-select: none;
 }
 
-/* Slash command menu */
+/* Slash command menu — opens upward from the composer */
 .slashMenu {
   position: fixed;
   z-index: 1000;
-  min-width: 280px;
-  max-width: 320px;
+  min-width: 300px;
+  max-width: 360px;
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
   background: var(--mc-bg-main);
   border: 1px solid var(--mc-border);
   border-radius: var(--mc-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.16);
   padding: var(--mc-space-1);
-  overflow: hidden;
 }
 
 .slashMenuItem {
@@ -1935,6 +1950,8 @@
 /* Model/Effort pickers */
 .pickerContainer {
   position: relative;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .pickerBtn {
@@ -1949,6 +1966,9 @@
   color: var(--mc-text-muted);
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .pickerBtn:hover:not(:disabled) {
