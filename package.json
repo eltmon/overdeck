@@ -71,7 +71,7 @@
     "build:desktop": "cd apps/desktop && npm run build && npm run dist:linux && npm run dist:mac",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "vitest --run --no-file-parallelism",
+    "test": "vitest run --no-file-parallelism",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",

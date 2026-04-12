@@ -4,7 +4,7 @@
     "created": "2026-04-11T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-645: Tests: root Vitest config does not discover ActionsSection.test.tsx",
-    "updated": "2026-04-12T14:35:46.859Z"
+    "updated": "2026-04-12T14:35:53.668Z"
   },
   "plan": {
     "id": "pan-645",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "a3f7e1c2-8d4b-4f6a-9e3c-5b2d1a0f8e7c",
     "author": "agent:claude-opus-4-6",
-    "sequence": 15,
+    "sequence": 18,
     "created": "2026-04-11T12:00:00Z",
-    "updated": "2026-04-12T14:35:46.859Z",
+    "updated": "2026-04-12T14:35:53.668Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/645",
@@ -65,7 +65,7 @@
             "completed": "2026-04-12T14:34:38.864Z"
           }
         ],
-        "completed": "2026-04-12T14:35:46.859Z"
+        "completed": "2026-04-12T14:35:53.668Z"
       },
       {
         "id": "update-test-script",
@@ -91,7 +91,7 @@
             "completed": "2026-04-12T14:34:38.863Z"
           }
         ],
-        "completed": "2026-04-12T14:35:46.859Z"
+        "completed": "2026-04-12T14:35:53.668Z"
       },
       {
         "id": "verify-discovery",
@@ -126,7 +126,7 @@
             "completed": "2026-04-12T14:34:38.862Z"
           }
         ],
-        "completed": "2026-04-12T14:35:46.858Z"
+        "completed": "2026-04-12T14:35:53.667Z"
       }
     ],
     "edges": [
