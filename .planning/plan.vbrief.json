@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-12T22:40:18Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-473: Workspace detail — structured conversation view for stopped agents"
+    "description": "Plan for PAN-473: Workspace detail — structured conversation view for stopped agents",
+    "updated": "2026-04-12T22:46:51.907Z"
   },
   "plan": {
     "id": "pan-473",
@@ -11,13 +12,23 @@
     "status": "approved",
     "uid": "606b26da-13f7-4227-b225-1ff6ce6c786d",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 16,
     "created": "2026-04-12T22:40:18Z",
-    "updated": "2026-04-12T22:40:18Z",
+    "updated": "2026-04-12T22:46:51.907Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/473", "label": "PAN-473", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/473",
+        "label": "PAN-473",
+        "type": "issue"
+      }
     ],
-    "tags": ["dashboard", "frontend", "backend", "conversation", "workspace-detail"],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "backend",
+      "conversation",
+      "workspace-detail"
+    ],
     "narratives": {
       "Problem": "When an agent's tmux session is dead, TerminalPanel.tsx renders raw tmux capture output inside a <pre> tag, flattening user messages, tool calls, code blocks, and timestamps into monospace noise. Mission Control already parses Claude Code JSONL transcripts into a structured MessagesTimeline view — PAN-473 wires that same renderer into the workspace detail panel for stopped agents.",
       "Proposal": "Two-file wiring exercise. (1) Add GET /api/agents/:id/conversation to src/dashboard/server/routes/agents.ts that resolves the JSONL via getAgentJsonlPath() and calls parseConversationMessages() from conversation-service.ts (same function ws-rpc.ts already uses). Return ParseResult shape; return empty arrays with HTTP 200 when no JSONL exists so frontend can fall back. Force streaming:false for stopped agents. (2) In TerminalPanel.tsx, when isStopped, add a useQuery for the conversation and render <MessagesTimeline> instead of <pre> when messages exist, else fall back to raw output. No new components. Remote-agent JSONL shipping is explicitly out of scope."
@@ -26,7 +37,7 @@
       {
         "id": "backend-endpoint",
         "title": "Add GET /api/agents/:id/conversation endpoint",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T22:40:18Z",
         "metadata": {
@@ -40,45 +51,64 @@
           {
             "id": "backend-endpoint.ac1",
             "title": "GET /api/agents/:id/conversation returns 200 with { messages, workLog, streaming, totalCost, byteOffset } when a valid JSONL file exists for the agent",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           },
           {
             "id": "backend-endpoint.ac2",
             "title": "GET /api/agents/:id/conversation returns 200 with empty arrays and streaming:false when the JSONL file does not exist (must not 404 or 500)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.907Z"
           },
           {
             "id": "backend-endpoint.ac3",
             "title": "The response `streaming` field is always false regardless of what parseConversationMessages returns, because the endpoint targets stopped agents",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.907Z"
           },
           {
             "id": "backend-endpoint.ac4",
             "title": "The new route is registered in agentsRouteLayer (Layer.mergeAll at the bottom of routes/agents.ts) so it is actually served — a forgotten Layer.mergeAll entry is a common regression and must be verified",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.907Z"
           },
           {
             "id": "backend-endpoint.ac5",
             "title": "Handler uses only async I/O (fs/promises, execAsync) — no execSync, readFileSync, or other blocking calls in the dashboard server path (per CLAUDE.md and .claude/rules/no-execsync-server.md)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.907Z"
           },
           {
             "id": "backend-endpoint.ac6",
             "title": "npm run typecheck, npm run lint, and npm test all pass after the change",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.907Z"
           }
-        ]
+        ],
+        "completed": "2026-04-12T22:46:51.906Z"
       },
       {
         "id": "frontend-render",
         "title": "Render MessagesTimeline for stopped agents in TerminalPanel",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T22:40:18Z",
         "metadata": {
@@ -92,50 +122,76 @@
           {
             "id": "frontend-render.ac1",
             "title": "When viewing a stopped agent whose JSONL session file exists, the workspace detail panel shows <MessagesTimeline> with structured message bubbles, tool calls as collapsible work-log groups, and timestamps — NOT a raw <pre> dump",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.905Z"
           },
           {
             "id": "frontend-render.ac2",
             "title": "When viewing a stopped agent with no JSONL file (legacy/remote), the panel falls back to the existing <pre>{output}</pre> rendering — it must not show a broken empty state, an error toast, or nothing at all",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           },
           {
             "id": "frontend-render.ac3",
             "title": "Running agents (isStopped === false) continue to render <XTerminal> exactly as before — the conversation view applies only to stopped agents",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           },
           {
             "id": "frontend-render.ac4",
             "title": "The refresh button in the stopped-agent header refetches both the raw output and the conversation queries so the view stays in sync when the agent's JSONL is updated externally",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           },
           {
             "id": "frontend-render.ac5",
             "title": "The header label reads 'Conversation' when MessagesTimeline is rendering and 'Last output' when the <pre> fallback is rendering, so the user can tell which view they are looking at",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           },
           {
             "id": "frontend-render.ac6",
             "title": "No new chat components, no duplicated parsing logic, no local copies of ChatMessage/WorkLogEntry types — MessagesTimeline and chat-types are imported from src/dashboard/frontend/src/components/chat/ exactly as ConversationPanel.tsx does",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           },
           {
             "id": "frontend-render.ac7",
             "title": "npm run typecheck, npm run lint, and npm test all pass; the feature is exercised in a browser against at least one stopped agent with a real JSONL transcript to confirm the timeline renders correctly (per CLAUDE.md 'test in a browser before reporting complete')",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:46:51.906Z"
           }
-        ]
+        ],
+        "completed": "2026-04-12T22:46:51.905Z"
       }
     ],
     "edges": [
-      { "from": "backend-endpoint", "to": "frontend-render", "type": "blocks" }
+      {
+        "from": "backend-endpoint",
+        "to": "frontend-render",
+        "type": "blocks"
+      }
     ]
   }
 }

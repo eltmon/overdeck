@@ -20,3 +20,4 @@ All beads complete. Quality gates pass (typecheck, lint, tests — pre-existing 
 
 ## Specialist Feedback
 - (none yet)
+- **[2026-04-12T22:48Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
