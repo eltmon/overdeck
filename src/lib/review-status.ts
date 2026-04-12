@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
+import { emitActivityEntry } from './activity-logger.js';
 import {
   upsertReviewStatus as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -192,6 +193,54 @@ export function setReviewStatus(
   saveReviewStatuses(statuses, filePath);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
+
+  // Emit activity log entries for meaningful pipeline state transitions.
+  // Each transition produces one entry so the ActivityPanel shows live pipeline progress.
+  if (update.verificationStatus && update.verificationStatus !== existing.verificationStatus) {
+    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+      running:  { level: 'info',    msg: `${issueId} — verification running` },
+      passed:   { level: 'success', msg: `${issueId} — verification passed` },
+      failed:   { level: 'error',   msg: `${issueId} — verification failed${update.verificationNotes ? ': ' + update.verificationNotes : ''}` },
+      skipped:  { level: 'info',    msg: `${issueId} — verification skipped` },
+    };
+    const entry = vMap[update.verificationStatus];
+    if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, issueId });
+  }
+  if (update.reviewStatus && update.reviewStatus !== existing.reviewStatus) {
+    const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+      reviewing: { level: 'info',    msg: `${issueId} — review started` },
+      passed:    { level: 'success', msg: `${issueId} — review passed` },
+      failed:    { level: 'error',   msg: `${issueId} — review failed${update.reviewNotes ? ': ' + update.reviewNotes : ''}` },
+      blocked:   { level: 'warn',    msg: `${issueId} — review blocked${update.reviewNotes ? ': ' + update.reviewNotes : ''}` },
+    };
+    const entry = rMap[update.reviewStatus];
+    if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, issueId });
+  }
+  if (update.testStatus && update.testStatus !== existing.testStatus) {
+    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+      testing:         { level: 'info',    msg: `${issueId} — tests running` },
+      passed:          { level: 'success', msg: `${issueId} — tests passed` },
+      failed:          { level: 'error',   msg: `${issueId} — tests failed${update.testNotes ? ': ' + update.testNotes : ''}` },
+      skipped:         { level: 'info',    msg: `${issueId} — tests skipped` },
+      dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
+    };
+    const entry = tMap[update.testStatus];
+    if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, issueId });
+  }
+  if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
+    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+      queued:    { level: 'info',    msg: `${issueId} — queued for merge` },
+      merging:   { level: 'info',    msg: `${issueId} — merge in progress` },
+      verifying: { level: 'info',    msg: `${issueId} — post-merge verification` },
+      merged:    { level: 'success', msg: `${issueId} — merged` },
+      failed:    { level: 'error',   msg: `${issueId} — merge failed${update.mergeNotes ? ': ' + update.mergeNotes : ''}` },
+    };
+    const entry = mMap[update.mergeStatus];
+    if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, issueId });
+  }
+  if (update.readyForMerge === true && !existing.readyForMerge) {
+    emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
+  }
 
   // Queue test-agent when review transitions to 'passed'.
   // This fires regardless of how setReviewStatus() is called (API or direct import),
