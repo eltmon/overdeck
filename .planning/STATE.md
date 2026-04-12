@@ -23,3 +23,6 @@ Closing final bead (mtq) after committing jm3 script simplification.
 - **[2026-04-12T14:36Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
 - **[2026-04-12T14:36Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
 - **[2026-04-12T14:39Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
+- **[2026-04-12T14:48Z] verification-gate → FAILED** — `.planning/feedback/005-verification-gate-failed.md`
+- **[2026-04-12T14:52Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`
+- **[2026-04-12T14:55Z] verification-gate → FAILED** — `.planning/feedback/007-verification-gate-failed.md`
