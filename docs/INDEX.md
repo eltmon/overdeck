@@ -62,6 +62,14 @@
 
 ---
 
+## External Integrations
+
+| Document | Description |
+|----------|-------------|
+| [EXTERNAL-EVENT-STREAM.md](./EXTERNAL-EVENT-STREAM.md) | Public SSE event feed at `/events/stream` — contract, event catalog, stability policy, example consumers (curl, Python, Node), and the `pan-tts` reference sidecar |
+
+---
+
 ## Testing
 
 | Document | Description |
@@ -152,6 +160,13 @@
 - **"git"** / **"worktree"** → README.md, CLAUDE.md
 - **"terminal"** / **"WebSocket"** / **"PTY"** / **"tmux attach"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture)
 - **"capture-pane"** / **"send-keys"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture, tmux Message Delivery)
+
+### External Integrations & Event Stream
+- **"external event"** / **"event stream"** / **"SSE"** / **"/events/stream"** → EXTERNAL-EVENT-STREAM.md
+- **"webhook"** / **"subscriber"** / **"sidecar"** / **"third-party integration"** → EXTERNAL-EVENT-STREAM.md
+- **"activity.entry"** / **"public event catalog"** / **"DomainEvent"** → EXTERNAL-EVENT-STREAM.md
+- **"TTS"** / **"text-to-speech"** / **"pan-tts"** → EXTERNAL-EVENT-STREAM.md, `skills/pan-tts/SKILL.md`
+- **"Last-Event-ID"** / **"event replay"** / **"resume"** → EXTERNAL-EVENT-STREAM.md
 
 ### Monitoring & Cost
 - **"cost"** / **"billing"** / **"tracking"** → cost-tracking.md, CONFIGURATION.md
