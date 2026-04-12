@@ -143,6 +143,19 @@ interface ContentBlock {
 }
 
 /**
+ * Returns true for Claude Code internal injections that should not appear as user messages:
+ *   - XML-tagged system context (<system-reminder>, <command-name>, etc.)
+ *   - Skill file content injections ("Base directory for this skill: ...")
+ *   - Memory/hook injections ("Human:" prefix blocks, etc.)
+ */
+function isSystemInjection(text: string): boolean {
+  if (text.startsWith('<')) return true;
+  if (text.startsWith('Base directory for this skill:')) return true;
+  if (text.startsWith('Human:') && text.includes('\n\nAssistant:')) return true;
+  return false;
+}
+
+/**
  * Parse JSONL session file from a byte offset.
  *
  * Returns parsed messages, work log entries, new byte offset, and streaming status.
@@ -191,8 +204,8 @@ export async function parseConversationMessages(
 
       // Content can be a string (plain text) or array of content blocks
       if (typeof rawContent === 'string' && rawContent.trim()) {
-        // Skip command/system messages (XML tags from Claude Code internals)
-        if (!rawContent.startsWith('<')) {
+        // Skip XML system messages and Claude Code skill/context injections
+        if (!isSystemInjection(rawContent)) {
           const ts = entry.timestamp ?? new Date().toISOString();
           lastUserTimestamp = ts;
           messages.push({
@@ -228,7 +241,7 @@ export async function parseConversationMessages(
                 tone: block.is_error ? 'error' : pending.tone,
               });
             }
-          } else if (block.type === 'text' && block.text) {
+          } else if (block.type === 'text' && block.text && !isSystemInjection(block.text)) {
             const ts = entry.timestamp ?? new Date().toISOString();
             lastUserTimestamp = ts;
             messages.push({
