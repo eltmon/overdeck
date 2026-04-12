@@ -575,6 +575,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     writeFileSync(promptFile, initMessage);
     writeFileSync(launcherScript, `#!/bin/bash
 # Set terminal environment for proper rendering (match remote launcher)
+export CI=1
 export TERM=xterm-256color
 export COLORTERM=truecolor
 export LANG=C.UTF-8
