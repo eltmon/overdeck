@@ -1,0 +1,628 @@
+---
+title: Prompt Templates
+description: How Panopticon builds the prompts it sends to Claude — the Mustache-based loader, frontmatter contract, template catalogue, and authoring guide.
+---
+
+# Prompt Templates
+
+Every prompt that Panopticon sends to Claude — the work agent that implements a
+feature, the review specialist that audits the diff, the merge agent that lands
+a PR, the planning agent that generates a vBRIEF — is built from a versioned
+Markdown template under `src/lib/cloister/prompts/`.
+
+A single loader, [`renderPrompt`](#the-renderprompt-api) at
+`src/lib/cloister/prompts.ts`, is the **only** sanctioned way to turn one of
+those templates into a finished prompt string. Every specialist, every handoff,
+every resume call goes through it.
+
+This page is the authoritative guide to that system: what the templates are,
+how the loader works, the frontmatter contract, the full template catalogue,
+and how to add, edit, or migrate a prompt without breaking production.
+
+## Why templates at all
+
+Before the unified loader, prompts were assembled a dozen different ways —
+inline template literals in TypeScript, `readFileSync` of raw Markdown files,
+ad-hoc `String.replace` passes, and a pair of home-grown `processIfBlocks` /
+`processEnvBlocks` helpers. Each specialist invented its own variable syntax
+and its own idea of what an "optional" section looked like.
+
+That sprawl produced three recurring failures:
+
+1. **Silent typos.** A variable like `{{issueId}}` referenced in the template
+   but named `issue_id` at the call site rendered as the literal string
+   `{{issueId}}` in the prompt sent to Claude. No error, no warning — the
+   specialist just got a broken prompt and ran on bad context.
+2. **Drift between similar templates.** The merge-agent prompt used by the
+   full-push path and the wake-time validation path were two separate string
+   builders that were supposed to stay in sync and didn't.
+3. **No way to see what a prompt expects.** Finding the variables a template
+   depended on meant reading the TypeScript call site line by line.
+
+The template system fixes all three. Every template declares its variables in
+YAML frontmatter; the loader validates them on every render; missing or
+unknown variables throw a `PromptError` with the exact template path and the
+list of offending keys.
+
+## Core principles
+
+<Note>
+Keep these five rules in mind when you touch any prompt template.
+</Note>
+
+### 1. Fail loud, fail early
+
+Missing a required variable is a programming error, not a runtime condition to
+recover from. The loader throws `PromptError` with the template path and the
+list of missing keys. There is no silent fallback, no empty-string
+substitution, no "render partial output and hope nobody notices". If you see a
+`PromptError` in a log, it means a call site is wrong and needs to be fixed —
+not that the loader needs a guard.
+
+### 2. One template, one API
+
+Templates are read only via `renderPrompt({ name, vars })`. There is no
+`readFileSync` on a prompt file anywhere in the codebase. If you find one,
+that's a bug — migrate it to `renderPrompt`.
+
+### 3. Composition happens in TypeScript
+
+Mustache is deliberately a small, logic-less templating language. The loader
+disables HTML escaping globally (`Mustache.escape = String`) because we're
+generating prompts for an LLM, not HTML — but everything else is vanilla
+Mustache with its usual section syntax.
+
+Any non-trivial composition — choosing between two instruction variants,
+joining an array of file paths, formatting a table of beads — happens in
+TypeScript. The TypeScript builds a string, then passes that string to the
+template as a single variable. This keeps templates readable and keeps
+business logic in a place where `tsc` and your tests can see it.
+
+### 4. Variables are declared, not discovered
+
+Every variable used by the template's body must appear in the frontmatter as
+either `requires` or `optional`. Undeclared variables are rejected by the
+loader. Undefined required variables are rejected by the loader. Both errors
+point at the template path and name the offending keys.
+
+This means reading the frontmatter tells you exactly what a template expects
+— you never have to grep the body to reconstruct the contract.
+
+### 5. Prompts are not docstrings
+
+A prompt template is production code that steers an LLM's behavior. Treat it
+accordingly: prefer explicit instructions over implicit assumptions, prefer
+concrete examples over abstract rules, and when you change a template, think
+about what's going to happen the first time an agent runs it against a real
+workspace.
+
+## The `renderPrompt` API
+
+```typescript
+import { renderPrompt } from './prompts.js';
+
+const prompt = renderPrompt({
+  name: 'work',
+  vars: {
+    ISSUE_ID: 'PAN-742',
+    BRANCH: 'feature/pan-742',
+    // ...every required variable declared in work.md
+  },
+});
+```
+
+### Signature
+
+```typescript
+export function renderPrompt(options: RenderPromptOptions): string;
+
+export interface RenderPromptOptions {
+  name: string;                          // template basename without .md
+  vars: Record<string, unknown>;         // values for required + optional vars
+}
+```
+
+The `name` is the filename under `src/lib/cloister/prompts/` without the
+`.md` extension. `renderPrompt({ name: 'work' })` loads `work.md`.
+
+### What happens on every call
+
+1. **Load + cache.** The file is read from disk once and cached in an in-memory
+   `Map` keyed by name. Subsequent calls reuse the parsed `ParsedPrompt`
+   (frontmatter + body + resolved path).
+2. **Parse frontmatter.** The leading `---` YAML block is extracted via
+   `js-yaml`. Missing frontmatter, invalid YAML, or a missing `name` /
+   `description` field all throw `PromptError`.
+3. **Validate `requires`.** Every key listed in `requires` must be present in
+   `vars` and not `undefined`/`null`. Missing keys are collected and reported
+   in one error message.
+4. **Validate unknown keys.** Every key in `vars` must be listed in either
+   `requires` or `optional`. Undeclared keys are collected and reported in one
+   error message.
+5. **Render.** The body is passed to `Mustache.render(body, vars)` with HTML
+   escaping disabled.
+
+### Error handling
+
+Everything throws `PromptError` — a subclass of `Error` exported from the
+module. Typical messages:
+
+```
+Prompt "work" (.../prompts/work.md) requires variables that are missing: BRANCH, DIFFICULTY.
+Provided: ISSUE_ID, VBRIEF_PATH
+
+Prompt "review" (.../prompts/review.md) was passed unknown variables: DEBUG_MODE.
+Declare them in the template's "requires" or "optional" frontmatter, or remove them from the call site.
+
+Prompt template "work" at .../prompts/work.md is missing YAML frontmatter (expected "---\n<yaml>\n---\n<body>" header).
+
+Failed to load prompt template "work" from .../prompts/work.md: ENOENT: no such file or directory
+```
+
+Do not catch these. They indicate bugs in call sites or templates that must
+be fixed, not runtime conditions. The fail-loud posture is deliberate — if a
+call site is allowed to silently skip a required variable, the resulting
+prompt silently loses context and the agent silently does the wrong thing.
+
+### Cache invalidation
+
+`clearPromptCache()` is exported for test isolation. Production code never
+calls it — templates are bundled at build time and don't change during a
+dashboard's lifetime.
+
+### Prompts directory resolution
+
+`resolvePromptsDir()` looks for `prompts/` in two places, in order:
+
+1. `join(__dirname, 'prompts')` — the expected location in both dev
+   (`src/lib/cloister/prompts`) and production (`dist/dashboard/prompts`).
+2. If `__dirname` contains `/src/`, the resolver strips everything from
+   `/src/` onward and re-anchors to `<package>/src/lib/cloister/prompts`.
+   This is the tsx dev-mode fallback for cases where the module is imported
+   from a nested path that has been re-exported through multiple barrel files.
+
+See [BUILD.md](https://github.com/eltmon/panopticon-cli/blob/main/docs/BUILD.md#specialist-prompt-templates)
+for how the build pipeline copies `*.md` from source to `dist/dashboard/prompts/`.
+
+## Frontmatter contract
+
+Every template starts with a YAML frontmatter block delimited by `---`. The
+loader enforces this structure — a missing or malformed block throws
+`PromptError` before a single byte of the body is read.
+
+```markdown
+---
+name: work
+description: Work-agent prompt — implementation-phase instructions, per-bead workflow, finalization steps.
+requires:
+  - ISSUE_ID
+  - ISSUE_TITLE
+  - BRANCH
+  - VBRIEF_PATH
+  - DIFFICULTY
+optional:
+  - SPEC_SECTION
+  - POLYREPO_HEADER
+  - TRACKER_CONTEXT
+---
+Body of the prompt starts here...
+```
+
+### Fields
+
+| Field | Type | Required | Purpose |
+|-------|------|----------|---------|
+| `name` | string | yes | Must match the filename (without `.md`). Used for error messages and cross-references. |
+| `description` | string | yes | One-line summary shown in catalogues and reference docs. Write it for the reader who's scanning a list of templates, not for the one already inside the file. |
+| `requires` | string array | no (defaults to `[]`) | Variables that MUST be provided in `vars`. A missing or `undefined`/`null` value throws `PromptError`. |
+| `optional` | string array | no (defaults to `[]`) | Variables that MAY be provided. Rendering with an optional variable omitted is fine — the corresponding Mustache section simply renders empty. |
+
+### `requires` vs `optional`
+
+The rule of thumb:
+
+- If the template's output would be broken or misleading without the
+  variable, list it as `requires`.
+- If the variable is genuinely a "fill this in if you have it, leave the
+  section out otherwise" case, list it as `optional`.
+
+`requires` is stricter than you might think: passing an empty string
+(`""`) satisfies the check — only `undefined` and `null` fail. This is
+intentional. An empty-string `CURRENT_PHASE` in the resume prompt means
+"STATE.md had no phase", not "the caller forgot to compute one". The
+caller is the one who decides whether "empty" is a legitimate value.
+
+### Unknown keys are an error
+
+If `vars` contains a key that isn't listed in `requires` or `optional`, the
+loader refuses to render. This catches two classes of bug:
+
+1. You renamed a template variable and forgot to update the call site.
+2. You added a new variable to the call site and forgot to declare it in
+   the frontmatter.
+
+Both show up as a single clear error message with the offending keys.
+
+## Mustache syntax reference
+
+We use [Mustache.js](https://github.com/janl/mustache.js) v4. HTML escaping is
+disabled globally, so `{{VAR}}` and `{{&VAR}}` behave identically and you
+never need to worry about `&lt;` or `&amp;` showing up in prompts.
+
+### Variable substitution
+
+```mustache
+Issue: {{ISSUE_ID}}
+Branch: {{BRANCH}}
+```
+
+### Truthy sections
+
+Render the enclosed block if the variable is truthy (non-empty string, `true`,
+a non-empty array, an object). Empty strings and `false` hide the block.
+
+```mustache
+{{#USER_MESSAGE}}
+## Operator Message
+
+{{USER_MESSAGE}}
+{{/USER_MESSAGE}}
+```
+
+Note the pattern `{{#VAR}}{{VAR}}{{/VAR}}` — that's Mustache context
+fall-through: inside a truthy section, the variable itself is still
+accessible in the parent scope and gets substituted normally. This is how the
+resume prompt hides entire headings when their content is empty.
+
+### Inverted sections
+
+Render if the variable is falsy/empty.
+
+```mustache
+{{^DO_PUSH}}
+Do NOT push to main — you are validating only.
+{{/DO_PUSH}}
+```
+
+The merge template uses inverted sections extensively to toggle between
+validation-only and full-push flows from a single `DO_PUSH` boolean.
+
+### Boolean flags
+
+```typescript
+renderPrompt({
+  name: 'merge',
+  vars: {
+    // ...
+    DO_PUSH: true,
+    DO_BUILD: true,
+    SKIP_DONE_REPORT: false,
+  },
+});
+```
+
+Booleans work as expected inside `{{#VAR}}` and `{{^VAR}}`. They are the
+cleanest way to toggle whole sections of a template based on a flow
+decision made in TypeScript.
+
+### No partials, no lambdas, no custom helpers
+
+Mustache supports partials and lambdas; we don't use them. Composing from
+smaller template fragments would push the contract across multiple files;
+lambdas would put logic back into the template. Both defeat the point of
+having a declared contract per file.
+
+If you find yourself reaching for a helper, the right move is almost always
+to do the work in TypeScript and pass the result in as a pre-built string
+variable.
+
+## Template catalogue
+
+The ten templates currently under `src/lib/cloister/prompts/`:
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
+| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: per-bead loop, commit + update STATE.md + `bd close`, quality gates, finalization. |
+| `planning.md` | Planning agent (`buildPlanningPrompt`) | Discovery session: explore codebase, ask questions via AskUserQuestion, generate `plan.vbrief.json` + STATE.md, run `pan plan-finalize`. NEVER implements code. |
+| `review.md` | Review specialist (wake path) | Strict code review against vBRIEF acceptance criteria; pass/fail decision posted back to the dashboard. |
+| `test.md` | Test specialist (wake path) | Runs the project's test suite, compares against baseline, posts pass/fail with structured markers. |
+| `merge.md` | Merge specialist (wake path) and `spawnMergeAgentForBranches` (full push flow) | Unified merge template. `DO_PUSH`/`DO_BUILD`/`SKIP_DONE_REPORT` booleans toggle between validation-only and full push + build + report flows. |
+| `sync-main.md` | `syncMainIntoWorkspace` (via merge specialist) | Sync latest main into the workspace's feature branch; abort on conflict and hand back to work agent. |
+| `inspect-agent.md` | Inspect specialist (`buildInspectPrompt`) | Per-bead spec verification mid-implementation. Still uses the legacy ad-hoc replace path — see [Legacy templates](#legacy-templates). |
+| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent via `claude --resume` when a work agent is woken up from a stopped session. Includes STATE.md snapshot, open beads, pending feedback, and next-step instructions. |
+| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps a serialized `HandoffContext` (git state, beads, STATE.md, AI summaries) with a preamble explaining who took over and why. |
+| `identity-wake.md` | `initializeSpecialist` | Short identity prompt — tells a newly-initialized specialist who it is and to wait for tasks. |
+
+### Deleted (replaced by the loader)
+
+These files used to live under `prompts/` or were built inline by dead code.
+They no longer exist:
+
+- `merge-agent.md` → replaced by `merge.md` with `DO_PUSH`/`DO_BUILD` flags
+- `review-agent.md` → replaced by `review.md`
+- `test-agent.md` → replaced by `test.md`
+- `uat-agent.md` → uat specialist was removed from the pipeline
+- `work-agent.md` → replaced by `work.md`
+
+If you find references to any of those paths in comments, PRD docs, or old
+commits, they are stale.
+
+### Legacy templates
+
+`inspect-agent.md` still uses the pre-loader pattern: `inspect-agent.ts`
+reads it via `readFileSync` and does ad-hoc `String.replace` for a fixed set
+of `{{variable}}` placeholders. It also wraps its output in the
+orchestration markers that the dashboard uses to collapse context.
+
+It works and it's in active use, so it hasn't been migrated. If you're
+editing it, either:
+
+1. Keep using the ad-hoc pattern (add your new variable, update the
+   `replace` chain in `inspect-agent.ts`), or
+2. Migrate it to `renderPrompt`, wire the migration into
+   `buildInspectPrompt`, and delete the ad-hoc replace chain.
+
+Option 2 is strongly preferred for any non-trivial change, but a small
+one-line tweak can stay on the legacy path.
+
+## Orchestration markers
+
+Two templates wrap their output in HTML comments:
+
+```
+<!-- panopticon:orchestration-context-start -->
+...template body...
+<!-- panopticon:orchestration-context-end -->
+```
+
+- `planning.md` — marks the orchestration-context block so that session
+  summarizers and the dashboard know which part of the planning prompt is
+  Panopticon setup vs. the agent's actual work.
+- `inspect-agent.ts` — wraps its rendered prompt in the same markers via a
+  wrapping template literal.
+
+Do **not** add these markers to new templates unless you have a specific
+dashboard-display reason and you've checked the code that consumes them. For
+the vast majority of prompts, unmarked Markdown is the right shape.
+
+## Composition pattern
+
+Most non-trivial templates use a pattern we call **pre-built blocks**: the
+TypeScript call site composes a multi-line Markdown string based on runtime
+state, and passes that string in as a single optional variable. The template
+then conditionally renders the block via a Mustache section.
+
+### Example: `resume-work.md`
+
+```mustache
+{{#PENDING_FEEDBACK_BLOCK}}
+{{PENDING_FEEDBACK_BLOCK}}
+{{/PENDING_FEEDBACK_BLOCK}}
+```
+
+And the call site:
+
+```typescript
+const pendingFeedbackBlock = ctx.pendingFeedback.length > 0
+  ? `## Pending Feedback (ACTION REQUIRED)\n\nThese feedback files exist in \`.planning/feedback/\` — read and address them:\n${ctx.pendingFeedback.map(f => `- \`.planning/feedback/${f}\``).join('\n')}`
+  : '';
+
+return renderPrompt({
+  name: 'resume-work',
+  vars: {
+    // ...
+    PENDING_FEEDBACK_BLOCK: pendingFeedbackBlock,
+    // ...
+  },
+});
+```
+
+When `pendingFeedbackBlock` is non-empty, the section renders; when it's
+empty, the section disappears entirely. The template stays readable (no
+nested conditionals, no formatting logic) and the TypeScript stays honest
+about what the block looks like.
+
+### When to use in-template conditionals vs pre-built blocks
+
+- **In-template sections (`{{#VAR}}...{{/VAR}}`)** are right when the block
+  is a fixed, static chunk of instructions that's either present or absent
+  based on a boolean flag. The `merge.md` push/no-push toggles are a good
+  example: the alternative paths are both long, both fully specified in the
+  template, and both known at template-authoring time.
+- **Pre-built blocks** are right when the block's content is dynamic — it
+  joins a list, formats a table, runs git commands, reads STATE.md — and
+  the template's job is just to decide whether to include it. The
+  resume-work feedback list is a good example: the TypeScript knows how to
+  format it, the template just needs to show or hide it.
+
+If you're torn, default to pre-built blocks. It's always easier to read a
+template that delegates dynamic content to the call site than one that
+tries to be clever.
+
+## Testing prompts
+
+Prompt tests live in `src/lib/cloister/__tests__/prompts.test.ts`. They fall
+into three categories:
+
+### 1. Loader contract tests
+
+These test the loader itself against small inline fixture templates created
+in a temp directory: missing frontmatter, invalid YAML, missing `requires`,
+unknown vars, empty strings as `requires`, Mustache section rendering, etc.
+They exercise every error path in `renderPrompt` and every branch of the
+frontmatter parser.
+
+### 2. Live-template smoke tests
+
+These render the real templates against realistic `vars` fixtures and assert
+that key strings appear (or don't appear) in the output. The `merge.md`
+tests are a good example: four tests covering the push+build flow, the
+validation-only flow, the `SKIP_DONE_REPORT` branch, and the polyrepo
+header.
+
+Smoke tests are load-bearing — they catch cases where someone edits a
+template in a way that looks fine to Mustache but breaks a downstream
+specialist's expectations.
+
+### 3. Caller-side tests
+
+Tests that verify TypeScript call sites pass the right variables, live
+alongside the calling module (e.g., `build-test-prompt.test.ts` for the
+test-specialist dispatch path). These catch the "call site got out of sync
+with the frontmatter" class of bug.
+
+### Writing a new smoke test
+
+When you add a template, add at least one smoke test that:
+
+1. Renders the template with a realistic set of `vars`.
+2. Asserts the presence of fixed strings that the template always produces.
+3. Asserts the presence / absence of conditional blocks for each branch the
+   template can take.
+
+Keep the fixture `vars` small and local to the test — no shared state, no
+global setup. The loader is pure, so tests can be dead simple.
+
+## Authoring workflow
+
+### Adding a new template
+
+1. Create `src/lib/cloister/prompts/<name>.md`.
+2. Write the frontmatter first. List every variable you'll reference in the
+   body under `requires` (if it must be provided) or `optional` (if it's
+   fine to omit). Write a one-line `description`.
+3. Write the body using `{{VAR}}` for substitution and `{{#VAR}}...{{/VAR}}`
+   for optional sections.
+4. Add a caller in TypeScript:
+   ```typescript
+   import { renderPrompt } from './prompts.js';
+
+   const prompt = renderPrompt({
+     name: '<name>',
+     vars: { /* every required variable */ },
+   });
+   ```
+5. Add at least one smoke test in `prompts.test.ts`.
+6. Run `npx vitest run src/lib/cloister/__tests__/prompts.test.ts` and
+   `npx tsc --noEmit`.
+7. Run `npm run build` — the build pipeline copies `*.md` from
+   `src/lib/cloister/prompts/` to `dist/dashboard/prompts/`. If you skip
+   this step, the production dashboard will throw a `PromptError` at
+   runtime.
+
+### Editing an existing template
+
+1. Decide whether the change is contract-breaking: does it add a new
+   required variable, remove one, or change the meaning of an existing
+   one? If yes, update every call site in the same commit.
+2. Update the frontmatter. Adding a new variable means adding it to
+   `requires` or `optional` — the loader will refuse to render until you
+   do.
+3. Update the body.
+4. Update or add smoke tests.
+5. Run typecheck + prompts tests.
+
+### Migrating a legacy ad-hoc prompt
+
+If you find a call site that builds a prompt via template literals,
+`readFileSync` + ad-hoc `replace`, or any other pre-loader pattern, the
+migration path is:
+
+1. Create the new `prompts/<name>.md` template with frontmatter that
+   matches the variables the ad-hoc code was substituting.
+2. Replace the ad-hoc builder with a single `renderPrompt({ name, vars })`
+   call.
+3. If the old code had conditional logic (e.g., "if foo, include bar"),
+   decide per case: simple toggles become Mustache sections, dynamic
+   content becomes a pre-built block variable.
+4. Delete the ad-hoc builder, the old template file if there was one,
+   and any helper functions that existed only to support it.
+5. Add smoke tests.
+6. Run typecheck + prompts tests.
+
+The typical commit layout is: template + loader call + tests + deletion
+of the old code, all in one PR. The loader's fail-loud validation makes
+it very hard to leave a half-migrated path in place — either the call
+site works or it throws.
+
+## Troubleshooting
+
+### "requires variables that are missing"
+
+```
+Prompt "merge" (.../prompts/merge.md) requires variables that are missing: TARGET_BRANCH.
+Provided: ISSUE_ID, SOURCE_BRANCH, PROJECT_PATH, DO_PUSH, DO_BUILD, API_URL
+```
+
+The call site isn't passing a variable the template declares as required.
+Fix the call site — don't "fix" the template by moving the variable to
+`optional`, unless the template genuinely works with it absent.
+
+### "was passed unknown variables"
+
+```
+Prompt "review" (.../prompts/review.md) was passed unknown variables: DEBUG_MODE.
+Declare them in the template's "requires" or "optional" frontmatter, or remove them from the call site.
+```
+
+Either the call site is passing a variable that the template no longer
+uses (delete it from the call site), or the variable is new and hasn't
+been declared yet (add it to the frontmatter).
+
+### "missing YAML frontmatter"
+
+```
+Prompt template "<name>" at .../<name>.md is missing YAML frontmatter (expected "---\n<yaml>\n---\n<body>" header).
+```
+
+The template file doesn't start with a `---` frontmatter block. This
+happens when someone deletes the frontmatter by accident, or pastes a
+body-only template from an old pattern. Add the frontmatter.
+
+### "Failed to load prompt template"
+
+```
+Failed to load prompt template "work" from .../prompts/work.md: ENOENT: no such file or directory
+```
+
+Three likely causes:
+
+1. **Typo in `name`.** `renderPrompt({ name: 'work-agent' })` when the file
+   is `work.md`.
+2. **Missing build copy.** You edited or added a template but didn't run
+   `npm run build`, so `dist/dashboard/prompts/` is stale. Rebuild.
+3. **Wrong working directory.** The dashboard server resolves prompts
+   relative to `dist/dashboard/` — if you're running a script from some
+   other location and it imports the loader, double-check that the
+   `prompts/` directory actually exists where the loader expects it.
+
+### A template renders the literal `{{VAR}}` instead of a value
+
+Mustache left the variable in place because nothing in `vars` matched that
+name. The loader would normally throw an "unknown variables" error if the
+variable was passed but undeclared — if you're seeing literal braces in the
+output, the variable isn't being passed at all *and* the template doesn't
+list it in `requires`.
+
+Either add the variable to `requires` (to force the call site to provide
+it) or fix the call site to pass it.
+
+### A Mustache section renders when it shouldn't
+
+Check whether the value you're passing is actually falsy by Mustache's
+rules. Empty string: falsy. `0`: falsy. `false`: falsy. `null` /
+`undefined`: falsy. An empty array: falsy. An empty object: **truthy** —
+the section will render. This trips people up when they pass
+`{ some: 'object' }` expecting the section to hide.
+
+If you want a section to hide on "nothing to say", pass an empty string,
+not an empty object.
+
+## Further reading
+
+- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/panopticon-cli/blob/main/src/lib/cloister/prompts.ts) — the full loader (~180 lines).
+- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/panopticon-cli/tree/main/src/lib/cloister/prompts) — the current catalogue.
+- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/panopticon-cli/blob/main/src/lib/cloister/__tests__/prompts.test.ts) — loader contract tests + live smoke tests.
+- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/panopticon-cli/blob/main/docs/BUILD.md#specialist-prompt-templates) — how templates are copied into the bundled dashboard.
+- **Specialist pipeline:** [`docs/SPECIALIST_WORKFLOW.md`](https://github.com/eltmon/panopticon-cli/blob/main/docs/SPECIALIST_WORKFLOW.md) — where each template sits in the lifecycle (work → review → test → merge).
+- **Mustache.js:** [github.com/janl/mustache.js](https://github.com/janl/mustache.js) — canonical reference for section syntax, context fall-through, and the set of things we deliberately don't use.
