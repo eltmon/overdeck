@@ -5,8 +5,11 @@ import { jsonResponse } from "../http-helpers.js";
  * Implements conversation session management endpoints:
  *   GET    /api/conversations                — list all conversations
  *   POST   /api/conversations                — spawn a new conversation
- *   DELETE /api/conversations/:name          — kill session, mark ended
+ *   POST   /api/conversations/:name/stop     — kill session, mark ended (preserves row)
+ *   POST   /api/conversations/:name/archive  — kill session and hide from list
  *   POST   /api/conversations/:name/resume   — reattach or respawn
+ *
+ * Conversations are NEVER deleted from the database. The only removal verb is `archive`.
  */
 
 import { exec } from 'node:child_process';
@@ -433,32 +436,35 @@ const postConversationRoute = HttpRouter.add(
   }),
 );
 
-// ─── Route: DELETE /api/conversations/:name ───────────────────────────────────
+// ─── Route: POST /api/conversations/:name/stop ────────────────────────────────
+//
+// Stop the agent for a conversation: kill the tmux session and mark the
+// conversation ended. The conversation row is preserved — it stays in the list
+// (with a gray dot) and can be resumed later. Conversations are NEVER deleted;
+// the only removal verb is `archive`.
 
-const deleteConversationRoute = HttpRouter.add(
-  'DELETE',
-  '/api/conversations/:name',
+const postConversationStopRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/stop',
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-    try {
+      try {
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        // Kill tmux session
         await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
-
-        // Mark ended in DB
         markConversationEnded(name);
 
         return jsonResponse({ success: true });
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to delete conversation: ' + msg }, { status: 500 });
-        }})
+        return jsonResponse({ error: 'Failed to stop conversation: ' + msg }, { status: 500 });
+      }
+    });
   }),
 );
 
@@ -808,7 +814,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationRoute,
   postConversationRoute,
   patchConversationRoute,
-  deleteConversationRoute,
+  postConversationStopRoute,
   postConversationResumeRoute,
   postConversationSwitchModelRoute,
   postConversationRestartAllRoute,

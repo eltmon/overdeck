@@ -1188,6 +1188,7 @@
   align-items: center;
   gap: var(--mc-space-2);
   padding: var(--mc-space-2) var(--mc-space-2) var(--mc-space-2) var(--mc-space-8);
+  position: relative;
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
@@ -1208,6 +1209,37 @@
 
 .conversationItemSelected {
   background: var(--mc-bg-selected);
+}
+
+.conversationStopBtn {
+  position: absolute;
+  left: var(--mc-space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  padding: 0;
+}
+
+.conversationItem:hover .conversationStopBtn {
+  opacity: 1;
+}
+
+.conversationStopBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
 }
 
 .conversationDot {

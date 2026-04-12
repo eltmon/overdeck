@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X } from 'lucide-react';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +50,11 @@ async function archiveConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to archive conversation');
 }
 
+async function stopConversation(name: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/stop`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to stop conversation');
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ConversationListProps {
@@ -71,6 +76,16 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
 
   const archiveMutation = useMutation({
     mutationFn: archiveConversation,
+    onSuccess: (_data, name) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      if (selectedConversation === name) {
+        onSelectConversation(null);
+      }
+    },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: stopConversation,
     onSuccess: (_data, name) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       if (selectedConversation === name) {
@@ -110,6 +125,19 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
           onClick={() => onSelectConversation(conv.name)}
           title={conv.name}
         >
+          {conv.sessionAlive && (
+            <span
+              role="button"
+              tabIndex={0}
+              className={styles.conversationStopBtn}
+              onClick={e => { e.stopPropagation(); if (!stopMutation.isPending) stopMutation.mutate(conv.name); }}
+              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !stopMutation.isPending) { e.stopPropagation(); stopMutation.mutate(conv.name); } }}
+              title="Stop agent"
+              aria-label={`Stop agent for ${conv.name}`}
+            >
+              <X size={11} />
+            </span>
+          )}
           <Circle
             size={7}
             className={styles.conversationDot}
