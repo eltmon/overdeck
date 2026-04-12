@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import styles from '../styles/mission-control.module.css';
+import { ChatMarkdown } from '../../chat/ChatMarkdown';
 
 interface ActivitySection {
   type: string;
@@ -70,7 +71,9 @@ export function IsolationMode({ section, onClose }: IsolationModeProps) {
         <span className={styles.sectionTime}>{section.sessionId}</span>
       </div>
       <div ref={contentRef} className={styles.isolationContent}>
-        {section.transcript || '(no output)'}
+        {section.transcript
+          ? <ChatMarkdown text={section.transcript} isStreaming={section.status === 'running'} />
+          : '(no output)'}
       </div>
     </div>
   );
