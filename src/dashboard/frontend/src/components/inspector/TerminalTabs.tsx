@@ -37,7 +37,7 @@ interface TerminalTabsProps {
   onTogglePin: () => void;
 }
 
-const PHASE_CHIP_COLORS: Record<string, { bg: string; text: string }> = {
+export const PHASE_CHIP_COLORS: Record<string, { bg: string; text: string }> = {
   planning:        { bg: '#1e3a5f', text: '#60a5fa' },
   working:         { bg: '#1a3a1a', text: '#4ade80' },
   verifying:       { bg: '#2d2a14', text: '#fbbf24' },
@@ -48,7 +48,7 @@ const PHASE_CHIP_COLORS: Record<string, { bg: string; text: string }> = {
   merged:          { bg: '#1a3a2d', text: '#34d399' },
 };
 
-const PHASE_LABELS: Record<string, string> = {
+export const PHASE_LABELS: Record<string, string> = {
   planning:          'Planning',
   working:           'Working',
   verifying:         'Verifying',

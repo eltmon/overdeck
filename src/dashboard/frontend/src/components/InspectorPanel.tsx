@@ -33,6 +33,7 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
+import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector/TerminalTabs';
 
 interface SessionCost {
   id: string;
@@ -110,39 +111,13 @@ export interface InspectorPanelProps {
   issueId: string;
   issueUrl?: string;
   issue?: Issue;
+  /** Current pipeline phase — passed from parent (DetailPanelLayout) via usePipelinePhase */
+  phase?: PipelinePhase | string;
   onClose: () => void;
   onOpenTerminal?: () => void;
 }
 
-/** Derive the current pipeline phase label from already-fetched data — no new network requests. */
-export function derivePhaseLabel(
-  agent: Agent | undefined,
-  reviewStatus: ReviewStatus | undefined,
-): string {
-  if (!reviewStatus && !agent) return '';
-  const ms = reviewStatus?.mergeStatus;
-  if (ms === 'queued' || ms === 'merging' || ms === 'verifying') return 'Merging';
-  if (ms === 'merged') return 'Merged';
-  if (reviewStatus?.testStatus === 'testing') return 'Testing';
-  if (reviewStatus?.reviewStatus === 'reviewing') return 'Reviewing';
-  if (
-    reviewStatus?.reviewStatus === 'failed' &&
-    (agent?.status === 'healthy' || agent?.status === 'starting')
-  ) return 'Review Feedback';
-  if (agent?.status === 'healthy' || agent?.status === 'starting') return 'Working';
-  return '';
-}
-
-const PHASE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
-  'Merging':         { bg: '#2d2014', text: '#fb923c' },
-  'Merged':          { bg: '#1a3a2d', text: '#34d399' },
-  'Testing':         { bg: '#1a2d3a', text: '#38bdf8' },
-  'Reviewing':       { bg: '#2d1a3a', text: '#c084fc' },
-  'Review Feedback': { bg: '#3a1a1a', text: '#f87171' },
-  'Working':         { bg: '#1a3a1a', text: '#4ade80' },
-};
-
-export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpenTerminal }: InspectorPanelProps) {
+export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, onClose, onOpenTerminal }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [copied, setCopied] = useState(false);
@@ -648,16 +623,14 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
               <span className="w-1.5 h-1.5 rounded-full bg-content-muted shrink-0" />
             )}
             <span className="font-mono text-sm font-semibold text-content truncate">{issueId.toUpperCase()}</span>
-            {(() => {
-              const phaseLabel = derivePhaseLabel(agent, reviewStatus);
-              if (!phaseLabel) return null;
-              const colors = PHASE_BADGE_COLORS[phaseLabel] ?? { bg: '#1e2d47', text: '#92a4c9' };
+            {phase && PHASE_LABELS[phase] && (() => {
+              const colors = PHASE_CHIP_COLORS[phase] ?? { bg: '#1e2d47', text: '#92a4c9' };
               return (
                 <span
                   className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0"
                   style={{ backgroundColor: colors.bg, color: colors.text }}
                 >
-                  {phaseLabel}
+                  {PHASE_LABELS[phase]}
                 </span>
               );
             })()}

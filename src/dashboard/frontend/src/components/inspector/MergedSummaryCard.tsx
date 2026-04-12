@@ -12,7 +12,7 @@ export interface MergedSummaryCardProps {
 }
 
 function formatCost(cost: number): string {
-  if (cost < 0.01) return `$${(cost * 100).toFixed(2)}¢`;
+  if (cost < 0.01) return `${(cost * 100).toFixed(2)}¢`;
   return `$${cost.toFixed(2)}`;
 }
 

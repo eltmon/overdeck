@@ -9,7 +9,7 @@ import { TerminalTabs, savePinState, loadPersistedPin } from './inspector/Termin
 import { MergedSummaryCard } from './inspector/MergedSummaryCard';
 import { usePipelinePhase } from './inspector/usePipelinePhase';
 import { Agent, Issue } from '../types';
-import type { ReviewStatus } from './inspector/types';
+import type { ReviewStatus, WorkspaceInfo } from './inspector/types';
 
 type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 
@@ -76,6 +76,18 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     },
     enabled: reviewStatus?.mergeStatus === 'merged',
     staleTime: 60000,
+  });
+
+  // Shares cache key with InspectorPanel's workspace query — no extra network request
+  const { data: workspaceData } = useQuery<WorkspaceInfo>({
+    queryKey: ['workspace', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}`);
+      if (!res.ok) throw new Error('Failed to fetch workspace info');
+      return res.json();
+    },
+    enabled: phase === 'merged',
+    staleTime: 30000,
   });
 
   const projectKey = issue?.project?.id;
@@ -213,6 +225,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                 issueId={issueId}
                 issueUrl={issueUrl}
                 issue={issue}
+                phase={phase}
                 onClose={onClose}
                 onOpenTerminal={openTerminal}
               />
@@ -245,7 +258,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                 {phase === 'merged' ? (
                   <MergedSummaryCard
                     mergedAt={reviewStatus?.updatedAt ?? new Date().toISOString()}
-                    prUrl={null}
+                    prUrl={workspaceData?.mrUrl ?? null}
                     totalCost={costData?.totalCost}
                     onViewLastLog={
                       availableTerminals.some(t => t.id === 'merging' && !t.disabled)
@@ -280,6 +293,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             issueId={issueId}
             issueUrl={issueUrl}
             issue={issue}
+            phase={phase}
             onClose={onClose}
             onOpenTerminal={agent ? openTerminal : undefined}
           />
