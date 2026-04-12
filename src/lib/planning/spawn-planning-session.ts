@@ -269,6 +269,38 @@ This converts your \`plan.vbrief.json\` into beads tasks and writes the \`.plann
 
 After \`pan plan-finalize\` succeeds, STOP. Tell the user: "Planning finalized — click Done in the dashboard to hand off to the implementation agent." Do not kill the tmux session yourself; the Stop button handles that if needed.
 
+## Panopticon Agent Taxonomy
+
+Panopticon orchestrates several distinct agent types. **You are the planning agent.** The other agents in the pipeline have different roles, different working directories, and read different \`CLAUDE.md\` files. Confusing them is a common error — read this section carefully before exploring the codebase.
+
+### Agents in the Panopticon pipeline
+
+| Agent | Role | Working dir | CLAUDE.md auto-loaded |
+|-------|------|-------------|-----------------------|
+| **planning** (you) | Discovery, vBRIEF, STATE.md. No code. | workspace worktree | workspace |
+| **work** | Implementation from your vBRIEF + beads tasks | workspace worktree | workspace |
+| **inspect** | Per-bead spec verification mid-implementation | project root | project root |
+| **review** | Strict code review against acceptance criteria | project root | project root |
+| **test** | Test execution and failure analysis | project root | project root |
+| **uat** | Browser-based requirement verification (Playwright) | project root | project root |
+| **merge** | PR merge, conflict resolution, post-merge cleanup | project root | project root |
+
+**Critical asymmetry:** the workspace \`CLAUDE.md\` you see is NOT the one specialists see. Specialists run in the project root and auto-load the repo-tracked devroot \`CLAUDE.md\`. Instructions you put in \`STATE.md\` reach the work agent (same workspace) but not specialists. If you need a specialist to know something, put it in your vBRIEF as an acceptance criterion — that propagates through the pipeline via the role-prompt templates in \`src/lib/cloister/prompts/\`.
+
+### Claude Code subagents (NOT Panopticon specialists)
+
+You may spawn ephemeral **Claude Code subagents** via the \`Agent\` tool for parallel exploration. These are NOT the same as Panopticon specialists:
+
+- \`codebase-explorer\`, \`general-purpose\` — fast read-only code search
+- \`Plan\` — architectural planning helper
+- \`code-review-correctness\` / \`-security\` / \`-performance\` — independent reviewers
+
+**These subagents live and die inside your session.** They have no role in the Panopticon pipeline and no relationship to \`review-agent\`/\`test-agent\`/\`merge-agent\`. If you encounter references in the codebase to "Explorer agent", "explore subagent", \`subagent:*\` work types, or files in \`.claude/agents/\` — those are Claude Code subagents, not Panopticon specialists. Do not conflate them.
+
+### What happens after you finalize
+
+After \`pan plan-finalize\` and the user clicks **Done**, the pipeline runs without you: work agent → inspect → review → test → uat → merge. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work agent can succeed without coming back to you for clarification, and so specialists downstream have unambiguous targets to verify against.
+
 ---
 ${effortSection}
 ## Issue Details
