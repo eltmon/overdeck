@@ -4,7 +4,7 @@
     "created": "2026-04-11T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-619: Cost tracking: comma-format total cost, add day/week ticks to 30-day trend",
-    "updated": "2026-04-12T03:52:33.026Z"
+    "updated": "2026-04-12T03:52:44.753Z"
   },
   "plan": {
     "id": "pan-619",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "a437bc7a-0454-43d2-8ae3-6536f018fe82",
     "author": "agent:claude-opus-4-6",
-    "sequence": 20,
+    "sequence": 22,
     "created": "2026-04-11T12:00:00Z",
-    "updated": "2026-04-12T03:52:33.026Z",
+    "updated": "2026-04-12T03:52:44.753Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/619",
@@ -83,7 +83,7 @@
             "completed": "2026-04-12T03:51:06.944Z"
           }
         ],
-        "completed": "2026-04-12T03:52:33.025Z"
+        "completed": "2026-04-12T03:52:44.753Z"
       },
       {
         "id": "trend-chart-ticks",
@@ -127,7 +127,7 @@
             "completed": "2026-04-12T03:51:06.944Z"
           }
         ],
-        "completed": "2026-04-12T03:52:33.026Z"
+        "completed": "2026-04-12T03:52:44.753Z"
       }
     ],
     "edges": []
