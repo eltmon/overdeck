@@ -461,11 +461,11 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
 
-    -- ===== Favorites (PAN-662: conversation + project favorites) =====
+    -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      type       TEXT NOT NULL,  -- 'conversation' or 'project'
-      item_id    TEXT NOT NULL,  -- conversation name or project path
+      type       TEXT NOT NULL,  -- 'conversation'
+      item_id    TEXT NOT NULL,  -- conversation name
       created_at TEXT NOT NULL,
       UNIQUE(type, item_id)
     );
