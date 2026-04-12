@@ -2282,37 +2282,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     && canonical === 'in_review'
     && activeAgent?.runtimeState !== 'completed';
 
-  const [confirmingStart, setConfirmingStart] = useState(false);
   const startButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    if (!confirmingStart) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      if (startButtonRef.current && !startButtonRef.current.contains(e.target as Node)) {
-        setConfirmingStart(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setConfirmingStart(false);
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [confirmingStart]);
 
   const handleStartAgent = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirmingStart) {
-      // Second click — confirmed
-      setConfirmingStart(false);
-      startAgentMutation.mutate();
-    } else {
-      // First click — show inline confirm, stays until clicked outside or Escape
-      setConfirmingStart(true);
-    }
+    startAgentMutation.mutate();
   };
 
   const handlePlan = (e: React.MouseEvent) => {
@@ -2744,8 +2718,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 ref={startButtonRef}
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending}
-                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
-                title={startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                title={startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
               >
                 {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               </button>
@@ -2791,8 +2765,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               ref={startButtonRef}
               onClick={handleStartAgent}
               disabled={startAgentMutation.isPending}
-              className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-warning-foreground font-medium' : 'text-primary hover:text-primary/80'}`}
-              title={startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+              title={startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span>Start Agent</span>
