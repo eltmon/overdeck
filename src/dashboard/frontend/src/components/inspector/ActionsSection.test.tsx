@@ -113,7 +113,7 @@ describe('ActionsSection', () => {
 
   it('shows Cancel button for non-merged issues', () => {
     render(<ActionsSection {...defaultProps} reviewStatus={makeReviewStatus()} />);
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
+    expect(screen.getByText('Cancel Issue')).toBeInTheDocument();
   });
 
   it('calls onKill when Stop clicked', () => {

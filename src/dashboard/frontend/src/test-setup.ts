@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom';
 import { Terminal } from '@xterm/xterm';
 
+// jsdom doesn't implement scrollIntoView — mock it globally
+Element.prototype.scrollIntoView = () => {};
+
 // Mock matchMedia globally — xterm.js calls window.matchMedia(...).addListener()
 // in a setTimeout that can fire after per-test mocks are cleaned up.
 Object.defineProperty(window, 'matchMedia', {
