@@ -135,6 +135,8 @@ For each bug found during the operation:
 - `messageAgent` silently drops feedback into dead tmux shell when agent is stopped but `remain-on-exit` session persists — `sessionExists()` returned true, bypassing auto-restart (fixed: removed `!sessionExists()` guard, added `killSession()` before `createSession()` — commit 3b67d978)
 - `mergeReadyNotifier` never registered — deacon spammed "No mergeReadyNotifier registered" on every patrol cycle (fixed: wired in `main.ts` to emit `review.status_changed` domain event — commit 24f658d7)
 - Awaiting Merge page showed cancelled issues and had no priority ordering (fixed: filter cancelled/wontfix, sort PAN first then others, FIFO within tier — commit ece9919a)
+- ActivityPanel showed no pipeline events — only post-merge lifecycle steps were logged. All `setReviewStatus()` transitions (review, test, verification, merge phase) now emit `activity.entry` events so "PAN-645 — verification running", "PAN-670 — merged", etc. appear in real-time (fixed: added `emitActivityEntry()` calls in `review-status.ts` after `notifyPipeline()` — commit 463b1cd4)
+- `tests/dashboard/review-status.test.ts` had stale assertion testing OLD `verificationStatus='pending'` blocking behavior — broke verification gate for any branch rebasing onto main after the `verificationSatisfied()` fix (fixed: updated test to expect `readyForMerge=true` for `pending`, aligned with `verificationSatisfied()` — commit b0a79b4f)
 
 ## Flywheel Run Log
 
