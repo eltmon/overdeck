@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-12T22:42:28Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-503: Planning agent: use ActivityView (conversation-style) in workspace detail pane, keep XTerminal in planning dialog"
+    "description": "Plan for PAN-503: Planning agent: use ActivityView (conversation-style) in workspace detail pane, keep XTerminal in planning dialog",
+    "updated": "2026-04-12T22:53:11.272Z"
   },
   "plan": {
     "id": "pan-503",
@@ -11,13 +12,22 @@
     "status": "approved",
     "uid": "b95a7175-7a61-44de-8c06-0622bc65dd91",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 18,
     "created": "2026-04-12T22:42:28Z",
-    "updated": "2026-04-12T22:42:28Z",
+    "updated": "2026-04-12T22:53:11.272Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/503", "label": "PAN-503", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/503",
+        "label": "PAN-503",
+        "type": "issue"
+      }
     ],
-    "tags": ["dashboard", "frontend", "planning-agent", "activity-view"],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "planning-agent",
+      "activity-view"
+    ],
     "narratives": {
       "Problem": "Planning agent output is shown as a raw XTerminal in both the planning dialog and the workspace/agent detail pane. The detail pane is a review context where ActivityView (the conversation-style view used for work agents) would be much more readable. The live-watch PlanDialog is where raw terminal fidelity belongs.",
       "Proposal": "Route planning agents through ActivityView in TerminalPanel (workspace detail pane) and in AgentOutputPanel's Activity view (Agents tab). Keep PlanDialog unchanged so live planning still uses XTerminal. The split is conditional by render site — no user toggle. The backend /api/command-deck/activity/:issueId endpoint and ActivityView component already support planning sections; the only changes needed are the two agent-hosting shell components plus tests."
@@ -26,7 +36,7 @@
       {
         "id": "agent-output-panel-planning",
         "title": "Extend AgentOutputPanel to route planning agents to ActivityView",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T22:42:28Z",
         "metadata": {
@@ -40,33 +50,46 @@
           {
             "id": "agent-output-panel-planning.ac1",
             "title": "Selecting a planning agent (id starting with 'planning-') in the Agents tab renders ActivityView with the derived issueId in Activity view",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.272Z"
           },
           {
             "id": "agent-output-panel-planning.ac2",
             "title": "Selecting the same planning agent and switching to Terminal view still renders XTerminal against the planning session id",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.272Z"
           },
           {
             "id": "agent-output-panel-planning.ac3",
             "title": "Work-agent and specialist behavior in AgentOutputPanel is unchanged (existing tests pass without modification to work/specialist cases)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.272Z"
           },
           {
             "id": "agent-output-panel-planning.ac4",
             "title": "A planning agent whose issueId cannot be derived still renders the XTerminal fallback rather than the 'No issue associated' placeholder",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.272Z"
           }
-        ]
+        ],
+        "completed": "2026-04-12T22:53:11.272Z"
       },
       {
         "id": "terminal-panel-planning",
         "title": "Render ActivityView instead of XTerminal for planning agents in TerminalPanel",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T22:42:28Z",
         "metadata": {
@@ -80,33 +103,46 @@
           {
             "id": "terminal-panel-planning.ac1",
             "title": "When TerminalPanel receives a planning-phase agent, ActivityView is rendered and no XTerminal is mounted",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           },
           {
             "id": "terminal-panel-planning.ac2",
             "title": "When TerminalPanel receives a work agent or specialist, XTerminal (live) or raw last-output (stopped) is rendered exactly as before",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           },
           {
             "id": "terminal-panel-planning.ac3",
             "title": "The 'Pop out terminal' button is hidden for planning agents (no raw terminal to pop out) but continues to appear for running non-planning agents",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           },
           {
             "id": "terminal-panel-planning.ac4",
             "title": "The DetailPanelLayout continues to call TerminalPanel unchanged — no new prop is required for the planning conditional",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           }
-        ]
+        ],
+        "completed": "2026-04-12T22:53:11.271Z"
       },
       {
         "id": "plan-dialog-untouched",
         "title": "Verify PlanDialog continues to render XTerminal for live planning",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-12T22:42:28Z",
         "metadata": {
@@ -120,21 +156,28 @@
           {
             "id": "plan-dialog-untouched.ac1",
             "title": "PlanDialog.tsx imports XTerminal and renders it in the active planning branch — no diff is introduced in this file",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.272Z"
           },
           {
             "id": "plan-dialog-untouched.ac2",
             "title": "Manual smoke: opening the Plan dialog for a running planning session still shows the live tmux terminal view",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.272Z"
           }
-        ]
+        ],
+        "completed": "2026-04-12T22:53:11.272Z"
       },
       {
         "id": "tests-planning-activity",
         "title": "Add/extend frontend tests for planning-agent ActivityView routing",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T22:42:28Z",
         "metadata": {
@@ -148,27 +191,45 @@
           {
             "id": "tests-planning-activity.ac1",
             "title": "New or updated TerminalPanel test verifies ActivityView is rendered for a planning-phase agent and XTerminal is not",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           },
           {
             "id": "tests-planning-activity.ac2",
             "title": "New or updated AgentOutputPanel test verifies planning-<prefix>-<n> agentId produces a non-null derived issueId and renders ActivityView in the default (Activity) view mode",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           },
           {
             "id": "tests-planning-activity.ac3",
             "title": "npm run typecheck, npm run lint, and npm test all pass at the workspace root",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T22:53:11.271Z"
           }
-        ]
+        ],
+        "completed": "2026-04-12T22:53:11.270Z"
       }
     ],
     "edges": [
-      { "from": "agent-output-panel-planning", "to": "tests-planning-activity", "type": "blocks" },
-      { "from": "terminal-panel-planning", "to": "tests-planning-activity", "type": "blocks" }
+      {
+        "from": "agent-output-panel-planning",
+        "to": "tests-planning-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-panel-planning",
+        "to": "tests-planning-activity",
+        "type": "blocks"
+      }
     ]
   }
 }
