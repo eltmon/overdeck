@@ -92,6 +92,13 @@ const SLASH_COMMANDS: SlashCommand[] = [
     insert: '/cancel',
     category: 'AI CLI',
   },
+  {
+    id: 'all-up',
+    label: '/all-up',
+    description: 'Run the Fix-All flywheel: pan-oversee every PAN issue, fix substrate bugs at root cause, surface merge-ready issues on the Awaiting Merge page',
+    insert: '/all-up',
+    category: 'AI CLI',
+  },
 
   // ─── Core System ─────────────────────────────────────────────────────────────
   { id: 'pan-up', label: 'pan up', description: 'Start dashboard and Traefik', insert: 'pan up', category: 'Core' },
