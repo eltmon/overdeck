@@ -1,197 +1,174 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-12T22:40:18Z",
+    "created": "2026-04-12T22:42:28Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-473: Workspace detail — structured conversation view for stopped agents",
-    "updated": "2026-04-12T22:46:51.907Z"
+    "description": "Plan for PAN-503: Planning agent: use ActivityView (conversation-style) in workspace detail pane, keep XTerminal in planning dialog"
   },
   "plan": {
-    "id": "pan-473",
-    "title": "Workspace detail: structured conversation view for stopped agents",
+    "id": "pan-503",
+    "title": "Planning agent: use ActivityView in workspace detail pane, keep XTerminal in planning dialog",
     "status": "approved",
-    "uid": "606b26da-13f7-4227-b225-1ff6ce6c786d",
+    "uid": "b95a7175-7a61-44de-8c06-0622bc65dd91",
     "author": "agent:claude-opus-4-6",
-    "sequence": 16,
-    "created": "2026-04-12T22:40:18Z",
-    "updated": "2026-04-12T22:46:51.907Z",
+    "sequence": 1,
+    "created": "2026-04-12T22:42:28Z",
+    "updated": "2026-04-12T22:42:28Z",
     "references": [
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/473",
-        "label": "PAN-473",
-        "type": "issue"
-      }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/503", "label": "PAN-503", "type": "issue" }
     ],
-    "tags": [
-      "dashboard",
-      "frontend",
-      "backend",
-      "conversation",
-      "workspace-detail"
-    ],
+    "tags": ["dashboard", "frontend", "planning-agent", "activity-view"],
     "narratives": {
-      "Problem": "When an agent's tmux session is dead, TerminalPanel.tsx renders raw tmux capture output inside a <pre> tag, flattening user messages, tool calls, code blocks, and timestamps into monospace noise. Mission Control already parses Claude Code JSONL transcripts into a structured MessagesTimeline view — PAN-473 wires that same renderer into the workspace detail panel for stopped agents.",
-      "Proposal": "Two-file wiring exercise. (1) Add GET /api/agents/:id/conversation to src/dashboard/server/routes/agents.ts that resolves the JSONL via getAgentJsonlPath() and calls parseConversationMessages() from conversation-service.ts (same function ws-rpc.ts already uses). Return ParseResult shape; return empty arrays with HTTP 200 when no JSONL exists so frontend can fall back. Force streaming:false for stopped agents. (2) In TerminalPanel.tsx, when isStopped, add a useQuery for the conversation and render <MessagesTimeline> instead of <pre> when messages exist, else fall back to raw output. No new components. Remote-agent JSONL shipping is explicitly out of scope."
+      "Problem": "Planning agent output is shown as a raw XTerminal in both the planning dialog and the workspace/agent detail pane. The detail pane is a review context where ActivityView (the conversation-style view used for work agents) would be much more readable. The live-watch PlanDialog is where raw terminal fidelity belongs.",
+      "Proposal": "Route planning agents through ActivityView in TerminalPanel (workspace detail pane) and in AgentOutputPanel's Activity view (Agents tab). Keep PlanDialog unchanged so live planning still uses XTerminal. The split is conditional by render site — no user toggle. The backend /api/command-deck/activity/:issueId endpoint and ActivityView component already support planning sections; the only changes needed are the two agent-hosting shell components plus tests."
     },
     "items": [
       {
-        "id": "backend-endpoint",
-        "title": "Add GET /api/agents/:id/conversation endpoint",
-        "status": "completed",
+        "id": "agent-output-panel-planning",
+        "title": "Extend AgentOutputPanel to route planning agents to ActivityView",
+        "status": "pending",
         "priority": "medium",
-        "created": "2026-04-12T22:40:18Z",
+        "created": "2026-04-12T22:42:28Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-473"
+          "issueLabel": "pan-503"
         },
         "narrative": {
-          "Action": "Add a new Effect HttpRouter.add handler in src/dashboard/server/routes/agents.ts that resolves the JSONL session file via getAgentJsonlPathShared(id), calls parseConversationMessages(jsonlPath) from ./services/conversation-service.js, and returns a JSON response with { messages, workLog, streaming: false, totalCost, byteOffset }. The streaming flag must be forced to false regardless of what parseConversationMessages returns, because any live-streaming state is stale for a dead tmux session. When the JSONL path does not exist on disk (legacy agents, remote agents without JSONL sync, fresh agents that never produced a transcript), return 200 with { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 } — NOT a 404 — so the frontend has a clean fallback signal. Register the new route in the agentsRouteLayer Layer.mergeAll list (currently at line 1842) alongside the other routes. Follow the existing getAgentOutputRoute pattern at line 478 for handler structure. parseConversationMessages is already async (fs/promises), so no execSync / blocking-call concerns apply."
+          "Action": "In src/dashboard/frontend/src/components/AgentOutputPanel.tsx, generalize deriveWorkAgentIssueId so it also matches the planning-<prefix>-<n> pattern and rename it to deriveAgentIssueId (or equivalent). Planning agents selected in the Agents tab must render <ActivityView issueId=... /> in the Activity view, with XTerminal remaining available in the Terminal view. Do not change the existing work-agent or specialist branches."
         },
         "subItems": [
           {
-            "id": "backend-endpoint.ac1",
-            "title": "GET /api/agents/:id/conversation returns 200 with { messages, workLog, streaming, totalCost, byteOffset } when a valid JSONL file exists for the agent",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
+            "id": "agent-output-panel-planning.ac1",
+            "title": "Selecting a planning agent (id starting with 'planning-') in the Agents tab renders ActivityView with the derived issueId in Activity view",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "backend-endpoint.ac2",
-            "title": "GET /api/agents/:id/conversation returns 200 with empty arrays and streaming:false when the JSONL file does not exist (must not 404 or 500)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.907Z"
+            "id": "agent-output-panel-planning.ac2",
+            "title": "Selecting the same planning agent and switching to Terminal view still renders XTerminal against the planning session id",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "backend-endpoint.ac3",
-            "title": "The response `streaming` field is always false regardless of what parseConversationMessages returns, because the endpoint targets stopped agents",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.907Z"
+            "id": "agent-output-panel-planning.ac3",
+            "title": "Work-agent and specialist behavior in AgentOutputPanel is unchanged (existing tests pass without modification to work/specialist cases)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "backend-endpoint.ac4",
-            "title": "The new route is registered in agentsRouteLayer (Layer.mergeAll at the bottom of routes/agents.ts) so it is actually served — a forgotten Layer.mergeAll entry is a common regression and must be verified",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.907Z"
-          },
-          {
-            "id": "backend-endpoint.ac5",
-            "title": "Handler uses only async I/O (fs/promises, execAsync) — no execSync, readFileSync, or other blocking calls in the dashboard server path (per CLAUDE.md and .claude/rules/no-execsync-server.md)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.907Z"
-          },
-          {
-            "id": "backend-endpoint.ac6",
-            "title": "npm run typecheck, npm run lint, and npm test all pass after the change",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.907Z"
+            "id": "agent-output-panel-planning.ac4",
+            "title": "A planning agent whose issueId cannot be derived still renders the XTerminal fallback rather than the 'No issue associated' placeholder",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-12T22:46:51.906Z"
+        ]
       },
       {
-        "id": "frontend-render",
-        "title": "Render MessagesTimeline for stopped agents in TerminalPanel",
-        "status": "completed",
+        "id": "terminal-panel-planning",
+        "title": "Render ActivityView instead of XTerminal for planning agents in TerminalPanel",
+        "status": "pending",
         "priority": "medium",
-        "created": "2026-04-12T22:40:18Z",
+        "created": "2026-04-12T22:42:28Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-473"
+          "issueLabel": "pan-503"
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/TerminalPanel.tsx, when isStopped === true, add a second useQuery keyed ['agent-conversation', agent.id] that fetches GET /api/agents/:id/conversation and is enabled only when isStopped. If the response has messages.length > 0, render <MessagesTimeline messages={messages} workLog={workLog} streaming={false} /> (imported from ./chat/MessagesTimeline) inside the flex content container in place of the existing <pre>. If messages.length === 0 (no JSONL found), fall back to the current raw <pre>{output}</pre> rendering unchanged so legacy and remote agents still show something useful. Update the header label to show 'Conversation' when the timeline is rendering and keep 'Last output' otherwise. The refresh button should refetch both the raw-output and the conversation queries (simplest: call refetch() on both, or invalidate both query keys via queryClient). Reuse MessagesTimeline / ChatMarkdown / WorkLogGroup exactly as ConversationPanel.tsx does — no new components, no style overrides. Do not modify XTerminal, MessagesTimeline, or any chat primitives. Do not change the isStopped probe logic (tmux-alive query) or the running-agent path."
+          "Action": "In src/dashboard/frontend/src/components/TerminalPanel.tsx, detect planning agents (agentPhase === 'planning' or id starts with 'planning-'). When detected and an issueId is resolvable, render <ActivityView issueId=... /> in place of <XTerminal /> and hide the 'pop out terminal' button for that case. Non-planning agents (work agents, specialists) must be untouched. Do not drop the existing tmux-alive probe behavior for non-planning agents."
         },
         "subItems": [
           {
-            "id": "frontend-render.ac1",
-            "title": "When viewing a stopped agent whose JSONL session file exists, the workspace detail panel shows <MessagesTimeline> with structured message bubbles, tool calls as collapsible work-log groups, and timestamps — NOT a raw <pre> dump",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.905Z"
+            "id": "terminal-panel-planning.ac1",
+            "title": "When TerminalPanel receives a planning-phase agent, ActivityView is rendered and no XTerminal is mounted",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "frontend-render.ac2",
-            "title": "When viewing a stopped agent with no JSONL file (legacy/remote), the panel falls back to the existing <pre>{output}</pre> rendering — it must not show a broken empty state, an error toast, or nothing at all",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
+            "id": "terminal-panel-planning.ac2",
+            "title": "When TerminalPanel receives a work agent or specialist, XTerminal (live) or raw last-output (stopped) is rendered exactly as before",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "frontend-render.ac3",
-            "title": "Running agents (isStopped === false) continue to render <XTerminal> exactly as before — the conversation view applies only to stopped agents",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
+            "id": "terminal-panel-planning.ac3",
+            "title": "The 'Pop out terminal' button is hidden for planning agents (no raw terminal to pop out) but continues to appear for running non-planning agents",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "frontend-render.ac4",
-            "title": "The refresh button in the stopped-agent header refetches both the raw output and the conversation queries so the view stays in sync when the agent's JSONL is updated externally",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
-          },
-          {
-            "id": "frontend-render.ac5",
-            "title": "The header label reads 'Conversation' when MessagesTimeline is rendering and 'Last output' when the <pre> fallback is rendering, so the user can tell which view they are looking at",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
-          },
-          {
-            "id": "frontend-render.ac6",
-            "title": "No new chat components, no duplicated parsing logic, no local copies of ChatMessage/WorkLogEntry types — MessagesTimeline and chat-types are imported from src/dashboard/frontend/src/components/chat/ exactly as ConversationPanel.tsx does",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
-          },
-          {
-            "id": "frontend-render.ac7",
-            "title": "npm run typecheck, npm run lint, and npm test all pass; the feature is exercised in a browser against at least one stopped agent with a real JSONL transcript to confirm the timeline renders correctly (per CLAUDE.md 'test in a browser before reporting complete')",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:46:51.906Z"
+            "id": "terminal-panel-planning.ac4",
+            "title": "The DetailPanelLayout continues to call TerminalPanel unchanged — no new prop is required for the planning conditional",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-12T22:46:51.905Z"
+        ]
+      },
+      {
+        "id": "plan-dialog-untouched",
+        "title": "Verify PlanDialog continues to render XTerminal for live planning",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-12T22:42:28Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-503"
+        },
+        "narrative": {
+          "Action": "Confirm via code read and a manual dashboard smoke check that src/dashboard/frontend/src/components/PlanDialog.tsx still mounts XTerminal (not ActivityView) when the planning session is running. This is a verification task, not a code change."
+        },
+        "subItems": [
+          {
+            "id": "plan-dialog-untouched.ac1",
+            "title": "PlanDialog.tsx imports XTerminal and renders it in the active planning branch — no diff is introduced in this file",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "plan-dialog-untouched.ac2",
+            "title": "Manual smoke: opening the Plan dialog for a running planning session still shows the live tmux terminal view",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "tests-planning-activity",
+        "title": "Add/extend frontend tests for planning-agent ActivityView routing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T22:42:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-503"
+        },
+        "narrative": {
+          "Action": "Cover the two new conditionals with Vitest + React Testing Library. For TerminalPanel: a test asserting a planning-phase agent mounts ActivityView (mock the /api/command-deck/activity/:issueId fetch) and does NOT mount XTerminal. For AgentOutputPanel: a test asserting a planning-<prefix>-<n> agentId resolves to the correct issueId and Activity view renders ActivityView. Follow existing mocking patterns in StandaloneTerminal.test.tsx and InspectorPanel.test.tsx. Run npm run typecheck, npm run lint, and npm test at workspace root before signalling done."
+        },
+        "subItems": [
+          {
+            "id": "tests-planning-activity.ac1",
+            "title": "New or updated TerminalPanel test verifies ActivityView is rendered for a planning-phase agent and XTerminal is not",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "tests-planning-activity.ac2",
+            "title": "New or updated AgentOutputPanel test verifies planning-<prefix>-<n> agentId produces a non-null derived issueId and renders ActivityView in the default (Activity) view mode",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "tests-planning-activity.ac3",
+            "title": "npm run typecheck, npm run lint, and npm test all pass at the workspace root",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
       }
     ],
     "edges": [
-      {
-        "from": "backend-endpoint",
-        "to": "frontend-render",
-        "type": "blocks"
-      }
+      { "from": "agent-output-panel-planning", "to": "tests-planning-activity", "type": "blocks" },
+      { "from": "terminal-panel-planning", "to": "tests-planning-activity", "type": "blocks" }
     ]
   }
 }
