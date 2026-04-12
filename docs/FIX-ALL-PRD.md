@@ -199,6 +199,8 @@ it's "more shipped features per day, per human-second of attention."
 - [ ] Every bug encountered during a `/all-up` run has a corresponding commit
       in Panopticon.
 - [ ] Manual user input is required only for: UAT verification + merge approval.
+- [ ] After every revolution, `main` is clean: working tree empty, all commits
+      pushed to `origin/main`, build current.
 
 ## Exit Criteria for a Single Run
 
@@ -212,6 +214,10 @@ A `/all-up` run is "done" when:
    user-approved rows have been merged.
 4. A short flywheel report is appended to `OPERATION-FIX-ALL.md`'s log:
    *issues moved, bugs fixed, friction points eliminated*.
+5. `main` is clean and pushed (`git status` reports no changes; HEAD matches
+   `origin/main`). If anything is left uncommitted, it's either committed,
+   stashed with a tracked reason, or recorded as a known recurring-dirt bug
+   to fix on the next revolution.
 
 ## Why this matters
 
