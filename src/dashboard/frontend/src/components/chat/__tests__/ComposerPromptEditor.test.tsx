@@ -45,6 +45,9 @@ const mockSelection = {
 };
 vi.stubGlobal('getSelection', vi.fn(() => mockSelection));
 
+// jsdom doesn't implement scrollIntoView
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
 // Mock Lexical
 vi.mock('@lexical/react/LexicalComposer', () => ({
   LexicalComposer: ({ children }: any) => <div data-testid="lexical-composer">{children}</div>,
@@ -254,7 +257,7 @@ describe('ComposerPromptEditor', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('navigates down with ArrowDown and wraps around', () => {
+    it('navigates down with ArrowDown through sequential commands', () => {
       render(
         <ComposerPromptEditor
           conversationName="test-conversation"
@@ -287,7 +290,7 @@ describe('ComposerPromptEditor', () => {
       expect(screen.getByText('/cancel').closest('button')).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('navigates up with ArrowUp and wraps around', () => {
+    it('navigates up with ArrowUp through sequential commands', () => {
       render(
         <ComposerPromptEditor
           conversationName="test-conversation"
