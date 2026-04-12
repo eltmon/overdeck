@@ -617,6 +617,40 @@ Agent runs `pan work done` (Bash command)
 
 The verification gate (PAN-174) runs between agent completion and review-agent wake. It executes the `quality_gates` defined in `projects.yaml` (typecheck, lint, test). If any gate fails, feedback is sent to the agent's tmux session and the completion marker is NOT processed, allowing the agent to fix issues and re-signal completion. After 3 consecutive failures, the gate is bypassed to prevent permanent blocking. See `src/lib/cloister/verification-gate.ts`.
 
+#### verificationStatus semantics
+
+`verificationStatus` reflects the most recent gate run within the current review cycle:
+
+| Value | Meaning | Blocks `readyForMerge`? |
+|-------|---------|------------------------|
+| `undefined` | No gate has run yet | No |
+| `pending` | Scheduled but not yet run this cycle | **No** — "pending" is not failure |
+| `running` | Gate is actively executing | No |
+| `passed` | All gates passed | No |
+| `skipped` | Gates bypassed (3-strike rule) | No |
+| `failed` | At least one gate failed | **Yes** |
+
+**Only `'failed'` blocks `readyForMerge`.** `'pending'` means "this cycle's gate hasn't run yet" — it is reset to `pending` at the start of each review cycle by `request-review`, and is not a signal of failure. This is enforced in `verificationSatisfied()` in `review-status.ts` and aligned in `normalizeReviewStatus()`.
+
+A second verification gate also runs **post-rebase in the merge queue** (before the GitHub merge). This gate uses the same `quality_gates` but runs in the workspace state after rebase, not after the original `pan work done`. Its failure sends feedback to the work agent and pauses the merge; the queue advances to the next issue.
+
+### Activity Log
+
+Every call to `setReviewStatus()` that changes a status field emits an `activity.entry` domain event. These events flow through the SQLite event store → WebSocket → Zustand store → `ActivityPanel` in real-time.
+
+**Events emitted per transition:**
+
+| Field changed | Event emitted |
+|---------------|--------------|
+| `verificationStatus: running` | `"PAN-XXX — verification running"` (source: `cloister`) |
+| `verificationStatus: passed/failed/skipped` | `"PAN-XXX — verification passed/failed/skipped"` |
+| `reviewStatus: reviewing/passed/failed/blocked` | `"PAN-XXX — review started/passed/failed/blocked"` (source: `review-specialist`) |
+| `testStatus: testing/passed/failed` | `"PAN-XXX — tests running/passed/failed"` (source: `test-specialist`) |
+| `mergeStatus: queued/merging/verifying/merged/failed` | `"PAN-XXX — queued for merge / merge in progress / post-merge verification / merged / merge failed"` (source: `merge-agent`) |
+| `readyForMerge: true` (transition) | `"PAN-XXX — ready for merge"` (source: `cloister`) |
+
+The REST `GET /api/activity` endpoint provides a bootstrap fallback for the ActivityPanel on initial load; the primary real-time flow is via WebSocket.
+
 ### Key API Endpoints
 
 | Endpoint | Purpose | Counter Effect |
