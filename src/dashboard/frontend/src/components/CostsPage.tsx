@@ -84,6 +84,12 @@ interface IssueDetail {
   stages: Record<string, StageStats>;
 }
 
+// ============== Helpers ==============
+
+function formatCost(value: number, decimals: number): string {
+  return value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
 // ============== API ==============
 
 async function fetchCosts(): Promise<CostsResponse> {
@@ -145,7 +151,7 @@ function TrendChart({ trends }: { trends: DailyTrend[] }) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => `$${(ctx.raw as number).toFixed(4)}`,
+            label: (ctx) => `$${formatCost(ctx.raw as number, 4)}`,
           },
         },
       },
@@ -159,7 +165,7 @@ function TrendChart({ trends }: { trends: DailyTrend[] }) {
           ticks: {
             color: 'rgba(255,255,255,0.4)',
             font: { size: 11 },
-            callback: (v) => `$${Number(v).toFixed(3)}`,
+            callback: (v) => `$${formatCost(Number(v), 3)}`,
           },
         },
       },
@@ -212,7 +218,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
             <>
               {/* Summary */}
               <div>
-                <div className="text-3xl font-bold text-success mb-1">${detail.totalCost.toFixed(4)}</div>
+                <div className="text-3xl font-bold text-success mb-1">${formatCost(detail.totalCost, 4)}</div>
                 <div className="text-sm text-content-subtle">
                   {(detail.inputTokens + detail.outputTokens + detail.cacheReadTokens + detail.cacheWriteTokens).toLocaleString()} total tokens
                 </div>
@@ -247,7 +253,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
                         <div key={model} className="bg-surface/50 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-content font-mono truncate mr-2">{model}</span>
-                            <span className="text-sm text-success font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
+                            <span className="text-sm text-success font-semibold shrink-0">${formatCost(stats.cost, 4)}</span>
                           </div>
                           <div className="flex gap-4 text-xs text-content-subtle">
                             <span>{stats.calls} calls</span>
@@ -270,7 +276,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
                         <div key={stage} className="bg-surface/50 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-content capitalize">{stage}</span>
-                            <span className="text-sm text-success font-semibold">${stats.cost.toFixed(4)}</span>
+                            <span className="text-sm text-success font-semibold">${formatCost(stats.cost, 4)}</span>
                           </div>
                           <div className="flex gap-4 text-xs text-content-subtle">
                             <span>{stats.calls} calls</span>
@@ -366,7 +372,7 @@ export function CostsPage() {
             <DollarSign className="w-6 h-6 text-success" />
             <h3 className="text-lg font-semibold text-content">Total Cost</h3>
           </div>
-          <div className="text-3xl font-bold text-content mb-2">${totalCost.toFixed(2)}</div>
+          <div className="text-3xl font-bold text-content mb-2">${formatCost(totalCost, 2)}</div>
           <div className="text-sm text-content-subtle">{costs.issues.length} issues tracked</div>
         </div>
 
@@ -435,7 +441,7 @@ export function CostsPage() {
                       {issue.budgetWarning && <AlertTriangle className="w-4 h-4 text-warning" />}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-success font-bold">${issue.totalCost.toFixed(2)}</span>
+                      <span className="text-success font-bold">${formatCost(issue.totalCost, 2)}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); setModalIssue(issue.issueId); }}
                         className="p-1 rounded text-content-subtle hover:text-primary hover:bg-primary/10 transition-colors"
@@ -449,7 +455,7 @@ export function CostsPage() {
                   {issue.budget && (
                     <div className="mb-2">
                       <div className="flex items-center justify-between text-xs text-content-subtle mb-1">
-                        <span>Budget: ${issue.budget.toFixed(2)}</span>
+                        <span>Budget: ${formatCost(issue.budget, 2)}</span>
                         <span>{budgetPercent.toFixed(0)}%</span>
                       </div>
                       <div className="w-full bg-surface-overlay rounded-full h-2">
@@ -517,7 +523,7 @@ export function CostsPage() {
                       <div key={model} className="bg-surface/50 rounded p-3">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-content font-mono truncate mr-2">{model}</span>
-                          <span className="text-sm text-success font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
+                          <span className="text-sm text-success font-semibold shrink-0">${formatCost(stats.cost, 4)}</span>
                         </div>
                         <div className="flex gap-4 text-xs text-content-subtle">
                           <span>{stats.calls} calls</span>
@@ -539,7 +545,7 @@ export function CostsPage() {
                         <div key={stage} className="bg-surface/50 rounded p-3">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-content capitalize">{stage}</span>
-                            <span className="text-sm text-success font-semibold">${stats.cost.toFixed(4)}</span>
+                            <span className="text-sm text-success font-semibold">${formatCost(stats.cost, 4)}</span>
                           </div>
                           <div className="text-xs text-content-subtle">{stats.tokens.toLocaleString()} tokens</div>
                         </div>
