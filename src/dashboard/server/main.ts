@@ -15,6 +15,7 @@ import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
 import { getEventStore } from './event-store.js';
+import { emitActivityEntry } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
@@ -89,11 +90,22 @@ startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
 // Clean up pollers on graceful shutdown
+const emitShutdownActivity = (signal: string) => {
+  try {
+    emitActivityEntry({
+      source: 'dashboard',
+      level: 'info',
+      message: `Dashboard stopping (${signal})`,
+    });
+  } catch { /* non-fatal */ }
+};
 process.once('SIGTERM', () => {
+  emitShutdownActivity('SIGTERM');
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
 });
 process.once('SIGINT', () => {
+  emitShutdownActivity('SIGINT');
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
 });
