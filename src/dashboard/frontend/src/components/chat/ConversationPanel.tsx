@@ -45,6 +45,8 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const draftTitleRef = useRef('');
+  const committingRef = useRef(false);
   const queryClient = useQueryClient();
 
   // Sync the picker when the backing conversation's model changes (e.g. after a
@@ -94,7 +96,10 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   });
 
   const startEditingTitle = useCallback(() => {
-    setDraftTitle(conversation.title ?? conversation.name);
+    committingRef.current = false;
+    const initial = conversation.title ?? conversation.name;
+    draftTitleRef.current = initial;
+    setDraftTitle(initial);
     setEditingTitle(true);
     setTimeout(() => {
       titleInputRef.current?.select();
@@ -102,13 +107,15 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   }, [conversation.title, conversation.name]);
 
   const commitTitleRename = useCallback(() => {
-    const trimmed = draftTitle.trim();
+    if (committingRef.current) return;
+    committingRef.current = true;
+    const trimmed = draftTitleRef.current.trim();
     const original = conversation.title ?? conversation.name;
     setEditingTitle(false);
     if (trimmed && trimmed !== original) {
       renameMutation.mutate(trimmed);
     }
-  }, [draftTitle, conversation.title, conversation.name, renameMutation]);
+  }, [conversation.title, conversation.name, renameMutation]);
 
   const cancelTitleEditing = useCallback(() => {
     setEditingTitle(false);
@@ -165,7 +172,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
               ref={titleInputRef}
               className={styles.conversationTitleInput}
               value={draftTitle}
-              onChange={e => setDraftTitle(e.target.value)}
+              onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
               onKeyDown={e => {
                 if (e.key === 'Enter') commitTitleRename();
                 if (e.key === 'Escape') cancelTitleEditing();
