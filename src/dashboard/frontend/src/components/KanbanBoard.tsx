@@ -1552,6 +1552,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             setPlanDialogIssue(null);
             await refreshDashboardState(queryClient);
           }}
+          onTerminalReleased={() => onPlanDialogChange?.(null)}
         />
       )}
 
@@ -2456,6 +2457,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Stuck
               </span>
             )}
+            {!isTerminal && !isPipelineStuck && agent?.resolution === 'abandoned' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground border border-yellow-500"
+                title="Deacon exhausted its poke budget — agent needs human attention"
+              >
+                <XCircle className="w-3 h-3" />
+                Abandoned
+              </span>
+            )}
             {!isTerminal && !isPipelineStuck && agent?.resolution === 'needs_input' && !hasPendingQuestion && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse"
@@ -2466,7 +2476,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               </span>
             )}
             {/* Idle badge — time-based health indicator. Shows when agent hasn't been active for 30+ min */}
-            {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && (
+            {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && agent?.resolution !== 'abandoned' && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
                 title={`Agent has not been active for ${agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h ${agentIdleMinutes % 60}m` : `${agentIdleMinutes}m`} — Deacon will poke it`}

@@ -15,6 +15,7 @@ interface PlanDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: () => void;
+  onTerminalReleased?: () => void;
 }
 
 interface StartPlanningResult {
@@ -63,7 +64,7 @@ const getDefaultWorkspaceLocation = (): 'local' | 'remote' => {
   return stored === 'remote' ? 'remote' : 'local'; // Default to local
 };
 
-export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogProps) {
+export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalReleased }: PlanDialogProps) {
   const [step, setStep] = useState<Step>('checking');
   const [result, setResult] = useState<StartPlanningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -262,6 +263,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         toast.warning(data.beadsWarning, { duration: 10000 });
       }
       setStep('complete');
+      onTerminalReleased?.();
     },
     onError: (err: Error) => {
       console.error('Stop planning failed:', err);

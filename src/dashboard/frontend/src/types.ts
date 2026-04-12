@@ -47,7 +47,7 @@ export interface GitStatus {
   latestCommit: string;
 }
 
-export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear';
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
 export interface Agent {
   id: string;
@@ -71,6 +71,7 @@ export interface Agent {
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
+  hasSession?: boolean;          // Whether a resumable Claude session exists
 }
 
 export interface AgentHealth {

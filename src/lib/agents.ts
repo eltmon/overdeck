@@ -3,6 +3,7 @@ import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sendKeysAsync, sessionExists, getAgentSessions, capturePane } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
@@ -236,7 +237,7 @@ export function saveAgentState(state: AgentState): void {
 /**
  * Agent runtime state (hook-based tracking)
  */
-export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear';
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
 export interface AgentRuntimeState {
   state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized';
@@ -719,23 +720,17 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     clearCredentialFileAuth(options.workspace);
   }
 
-  // Create tmux session and start claude
-  // For prompts with special shell characters, use a launcher script to safely pass the prompt
-  // The script reads the file into a variable, which bash then safely expands
-  let claudeCmd: string;
-  if (prompt) {
-    const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-    const providerExports = getProviderExportsForModel(state.model);
-    const launcherContent = `#!/bin/bash
-export CI=1
-${providerExports}prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --model ${claudishModel} "\$prompt"
+  // Create tmux session and start claude in interactive mode.
+  // Previous approach used a positional prompt argument (print mode) which exits after
+  // one tool-use cycle on recent Claude Code versions. The fix is to start interactive
+  // (no positional prompt), then send the prompt via sendKeysAsync once Claude is ready.
+  const providerExports = getProviderExportsForModel(state.model);
+  const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
+  const launcherContent = `#!/bin/bash
+${providerExports}claude --dangerously-skip-permissions --model ${claudishModel}
 `;
-    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
-    claudeCmd = `bash "${launcherScript}"`;
-  } else {
-    claudeCmd = `claude --dangerously-skip-permissions --model ${claudishModel}`;
-  }
+  writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+  const claudeCmd = `bash ${launcherScript}`;
 
   // Pre-trust workspace directory in Claude Code to avoid the trust prompt
   try {
@@ -789,6 +784,8 @@ exec claude --dangerously-skip-permissions --model ${claudishModel} "\$prompt"
     }
   }
 
+  clearReadySignal(agentId);
+
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,
@@ -799,6 +796,44 @@ exec claude --dangerously-skip-permissions --model ${claudishModel} "\$prompt"
       ...sageoxEnv // Add SageOx environment variables
     }
   });
+
+  // Send the initial prompt after Claude's interactive prompt is ready.
+  // Wait for the session to be ready by polling tmux output for Claude's prompt.
+  if (prompt) {
+    // Wait for tmux session to exist and Claude to show its prompt
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      if (!sessionExists(agentId)) {
+        console.error(`[${agentId}] Tmux session died before becoming ready`);
+        break;
+      }
+      // Try reading ready signal first (fastest path)
+      if (existsSync(join(getAgentDir(agentId), 'ready'))) {
+        ready = true;
+        break;
+      }
+      // Fallback: check tmux output for Claude's prompt indicator
+      try {
+        const pane = await new Promise<string>((resolve, reject) => {
+          exec(`tmux capture-pane -t ${agentId} -p 2>/dev/null`, (err, stdout) => {
+            if (err) reject(err); else resolve(stdout);
+          });
+        });
+        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
+          ready = true;
+          break;
+        }
+      } catch { /* non-fatal */ }
+    }
+    if (ready) {
+      // Small delay after ready to ensure Claude is fully rendered and accepting input
+      await new Promise(r => setTimeout(r, 500));
+      await sendKeysAsync(agentId, prompt);
+    } else {
+      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    }
+  }
 
   // Update status
   state.status = 'running';

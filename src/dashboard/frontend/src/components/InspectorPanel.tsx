@@ -130,6 +130,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
 
+  // Check if a stopped agent has a resumable session (drives "Resume Session" vs "Start Agent" label)
+  const { data: hasSession } = useQuery({
+    queryKey: ['agent-session', agent?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${agent!.id}/has-session`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return data.hasSession === true;
+    },
+    enabled: !!agent && agent.status === 'stopped',
+    staleTime: 10000,
+  });
+
   const startedAt = agent ? new Date(agent.startedAt) : null;
   const durationMs = startedAt ? Date.now() - startedAt.getTime() : 0;
   const durationMins = Math.floor(durationMs / 60000);
@@ -917,6 +930,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
+          hasSession={hasSession}
         />
 
         {/* Issue labels/tags for no-agent view */}

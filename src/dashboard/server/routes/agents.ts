@@ -391,6 +391,7 @@ const getAgentsRoute = HttpRouter.add(
                   reviewStatus.mergeStatus === 'failed'
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
+              const hasSession = !!getLatestSessionId(dir);
               stoppedAgents.push({
                 id: dir,
                 issueId,
@@ -409,6 +410,7 @@ const getAgentsRoute = HttpRouter.add(
                 pendingQuestionCount: 0,
                 resolution: runtimeData.resolution || 'working',
                 resolutionCount: runtimeData.resolutionCount || 0,
+                hasSession,
               });
             } catch {}
           }
@@ -1420,14 +1422,14 @@ const postAgentsRoute = HttpRouter.add(
         agentModel = getModelId(`issue-agent:${phase}` as any);
       } catch { /* fall back to state model */ }
       const providerExports = getProviderExportsForModel(agentModel);
-      const resumeContent = `#!/bin/bash\nexport CI=1\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
+      const resumeContent = `#!/bin/bash\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
       yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
 
       // Spawn tmux session with fresh claude session
       const escapedCwd = workspacePath.replace(/"/g, '\\"');
       const providerFlags = getProviderTmuxFlags(agentModel);
       yield* Effect.promise(() => execAsync(
-        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e CI=1 -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
+        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
         { encoding: 'utf-8' }
       ));
 
@@ -1765,6 +1767,20 @@ const postAgentsRestartAllRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/agents/:id/has-session ─────────────────────────────────
+// Returns whether a stopped agent has a resumable Claude session.
+
+const getAgentHasSessionRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/has-session',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const sessionId = getLatestSessionId(id);
+    return jsonResponse({ hasSession: !!sessionId });
+  })),
+);
+
 // ─── Route: POST /api/agents/:id/reset-session ─────────────────────────────
 // Clears saved Claude session tracking so the next start creates a fresh session.
 // Workspace, beads, and git state are preserved. JSONL files kept for cost history.
@@ -1852,6 +1868,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentsRoute,
   postAgentsRestartAllRoute,
   getAgentTmuxAliveRoute,
+  getAgentHasSessionRoute,
   postAgentResetSessionRoute,
 );
 
