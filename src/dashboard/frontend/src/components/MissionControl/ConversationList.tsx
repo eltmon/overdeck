@@ -41,7 +41,7 @@ export type DraftSession = true;
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
 
-type SortOption = 'lastActivity' | 'lastAccessed' | 'created' | 'alphabetical';
+export type SortOption = 'lastActivity' | 'lastAccessed' | 'created' | 'alphabetical';
 type ListTab = 'all' | 'favorites';
 
 const SORT_LABELS: Record<SortOption, string> = {
@@ -106,7 +106,7 @@ async function unfavoriteConversation(name: string): Promise<void> {
 
 // ─── Sorting helpers ──────────────────────────────────────────────────────────
 
-function getSortKey(conv: Conversation, sort: SortOption): string | number {
+export function getSortKey(conv: Conversation, sort: SortOption): string | number {
   switch (sort) {
     case 'lastActivity':
       return conv.lastAttachedAt ?? conv.createdAt;
@@ -119,7 +119,7 @@ function getSortKey(conv: Conversation, sort: SortOption): string | number {
   }
 }
 
-function sortConversations(convs: Conversation[], sort: SortOption): Conversation[] {
+export function sortConversations(convs: Conversation[], sort: SortOption): Conversation[] {
   return [...convs].sort((a, b) => {
     const ka = getSortKey(a, sort);
     const kb = getSortKey(b, sort);

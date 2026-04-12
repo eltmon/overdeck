@@ -191,7 +191,7 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
 
-    -- ===== Favorites (PAN-662: conversation + project favorites) =====
+    -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       type       TEXT NOT NULL,  -- 'conversation' or 'project'
@@ -534,7 +534,7 @@ export function runMigrations(db: Database.Database): void {
     }
   }
 
-  // v16 → v17: add favorites table (PAN-662: conversation + project favorites)
+  // v16 → v17: add favorites table (PAN-662: conversation favorites)
   if (currentVersion < 17) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS favorites (

@@ -252,7 +252,7 @@ export function canReplaceTitle(conv: Conversation): boolean {
 
 // ─── Favorites (PAN-662) ──────────────────────────────────────────────────────
 
-export type FavoriteType = 'conversation' | 'project';
+export type FavoriteType = 'conversation';
 
 /** Return all item IDs that are favorited for the given type. */
 export function listFavoritedIds(type: FavoriteType): string[] {
@@ -277,11 +277,3 @@ export function removeFavorite(type: FavoriteType, itemId: string): void {
   db.prepare(`DELETE FROM favorites WHERE type = ? AND item_id = ?`).run(type, itemId);
 }
 
-/** Check whether a specific item is favorited. */
-export function isFavorited(type: FavoriteType, itemId: string): boolean {
-  const db = getDatabase();
-  const row = db
-    .prepare(`SELECT 1 FROM favorites WHERE type = ? AND item_id = ? LIMIT 1`)
-    .get(type, itemId);
-  return row !== undefined;
-}
