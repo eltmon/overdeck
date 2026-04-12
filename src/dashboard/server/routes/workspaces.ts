@@ -1999,12 +1999,14 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes } = body as {
+    const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes, verificationStatus, readyForMerge } = body as {
       reviewStatus?: string;
       testStatus?: string;
       mergeStatus?: string;
       reviewNotes?: string;
       testNotes?: string;
+      verificationStatus?: string;
+      readyForMerge?: boolean;
     };
 
     const update: Partial<ReviewStatus> = {};
@@ -2013,6 +2015,8 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     if (mergeStatus) update.mergeStatus = mergeStatus as any;
     if (reviewNotes) update.reviewNotes = reviewNotes;
     if (testNotes) update.testNotes = testNotes;
+    if (verificationStatus) update.verificationStatus = verificationStatus as any;
+    if (readyForMerge !== undefined) update.readyForMerge = readyForMerge;
 
     const status = setReviewStatus(issueId, update);
     console.log(`[review-status] Updated ${issueId}:`, status);
