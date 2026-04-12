@@ -29,7 +29,7 @@ function parseSpecialistSession(agentId: string): { projectKey: string; type: st
 }
 
 // Derive issueId for work and planning agents: agent-pan-505 → PAN-505, planning-pan-503 → PAN-503
-function deriveAgentIssueId(agentId: string, agentIssueId?: string): string | null {
+export function deriveAgentIssueId(agentId: string, agentIssueId?: string): string | null {
   if (agentIssueId) return agentIssueId;
   const match = agentId.match(/^(?:agent|planning)-([a-z]+)-(\d+)$/i);
   if (match) return `${match[1].toUpperCase()}-${match[2]}`;
