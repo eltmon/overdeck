@@ -14,62 +14,14 @@ export interface TemplateVariables {
   [key: string]: string | undefined;
 }
 
-export function loadTemplate(templatePath: string): string {
-  if (!existsSync(templatePath)) {
-    throw new Error(`Template not found: ${templatePath}`);
-  }
-  return readFileSync(templatePath, 'utf8');
-}
-
-/**
- * Process {{#env LOCAL}}...{{/env}} and {{#env REMOTE}}...{{/env}} blocks.
- * Keeps content for matching env, strips blocks for non-matching env.
- */
-export function processEnvBlocks(template: string, env: 'LOCAL' | 'REMOTE'): string {
-  // Keep matching env blocks (strip the tags, keep content)
-  let result = template.replace(
-    new RegExp(`\\{\\{#env ${env}\\}\\}([\\s\\S]*?)\\{\\{/env\\}\\}`, 'g'),
-    '$1'
-  );
-
-  // Remove non-matching env blocks entirely
-  const otherEnv = env === 'LOCAL' ? 'REMOTE' : 'LOCAL';
-  result = result.replace(
-    new RegExp(`\\{\\{#env ${otherEnv}\\}\\}[\\s\\S]*?\\{\\{/env\\}\\}`, 'g'),
-    ''
-  );
-
-  return result;
-}
-
-/**
- * Process {{#if varName}}...{{/if}} blocks.
- * Keeps content when the variable is truthy (non-empty string), strips otherwise.
- */
-export function processIfBlocks(template: string, vars: Record<string, string | undefined>): string {
-  return template.replace(
-    /\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
-    (_match, varName: string, content: string) => {
-      const value = vars[varName];
-      return value && value.trim() ? content : '';
-    }
-  );
-}
-
-export function substituteVariables(
-  template: string,
-  variables: TemplateVariables
-): string {
-  let result = template;
-
+function loadSection(path: string, variables: TemplateVariables): string {
+  let result = readFileSync(path, 'utf8');
   for (const [key, value] of Object.entries(variables)) {
     if (value !== undefined) {
-      // Replace {{KEY}} and ${KEY} patterns
       result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
       result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), value);
     }
   }
-
   return result;
 }
 
@@ -79,7 +31,6 @@ export function generateClaudeMd(
 ): string {
   const sections: string[] = [];
 
-  // Layer 1: Panopticon default sections
   const defaultOrder = [
     'workspace-info.md',
     'beads.md',
@@ -90,12 +41,10 @@ export function generateClaudeMd(
   for (const section of defaultOrder) {
     const sectionPath = join(CLAUDE_MD_TEMPLATES, section);
     if (existsSync(sectionPath)) {
-      const content = loadTemplate(sectionPath);
-      sections.push(substituteVariables(content, variables));
+      sections.push(loadSection(sectionPath, variables));
     }
   }
 
-  // Layer 2: Project-specific sections
   const projectSections = join(projectPath, '.panopticon', 'claude-md', 'sections');
   if (existsSync(projectSections)) {
     const projectFiles = readdirSync(projectSections)
@@ -103,12 +52,10 @@ export function generateClaudeMd(
       .sort();
 
     for (const file of projectFiles) {
-      const content = loadTemplate(join(projectSections, file));
-      sections.push(substituteVariables(content, variables));
+      sections.push(loadSection(join(projectSections, file), variables));
     }
   }
 
-  // If no sections found, return minimal CLAUDE.md
   if (sections.length === 0) {
     return `# Workspace: ${variables.FEATURE_FOLDER}
 
