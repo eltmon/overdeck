@@ -1,29 +1,20 @@
-# Agent State: PAN-647
+# PAN-670: TLDR pipeline verification test
 
-**Last Updated:** 2026-04-12T02:19:03.982Z
+## Status: Implementation Complete
 
-## Current Position
+## Current Phase
+All work complete.
 
-- **Issue:** PAN-647
-- **Title:** Command Deck sidebar too wide and low-density at smaller resolutions
-- **Status:** Planning complete, ready for execution
-- **Linear:** https://github.com/eltmon/panopticon-cli/issues/647
+## Completed Work
+- [x] feature-pan-489-1v0: Added TLDR pipeline verification comment to docs/TLDR.md (commit: ffb931cb)
+- [x] Fixed pre-existing test failures: teardown-workspace.test.ts (missing mock exports), ActionsSection.test.tsx (button text "Cancel Issue"), ComposerPromptEditor.test.tsx (slash menu trigger + nav assertions), test-setup.ts (scrollIntoView mock)
 
-## Decisions Made During Planning
+## Remaining Work
+None
 
-- No specific decisions recorded
+## Key Decisions
+- D1: Added the verification comment at the end of docs/TLDR.md after the last table row, as an HTML comment so it doesn't disrupt the document's rendered output.
 
-## Planned Tasks
-
-- [ ] Understand requirements
-- [ ] Implement changes (after: Understand requirements)
-- [ ] Add tests (after: Implement changes)
-- [ ] Verify and cleanup (after: Add tests)
-
-## Blockers/Concerns
-
-- None identified during planning
-
-## Notes
-
-<!-- Add notes as work progresses -->
+## Specialist Feedback
+- [2026-04-12T14:35Z] verification-gate (PAN-647) → FAILED — wrong workspace, does not apply to PAN-670
+- [2026-04-12T14:59Z] verification-gate (PAN-647) → FAILED — wrong workspace, does not apply to PAN-670

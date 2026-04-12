@@ -390,3 +390,5 @@ The read-enforcer applies quality gates to prevent useless summaries:
 | `scripts/tldr-post-edit` | PostToolUse dirty file tracker |
 | `src/dashboard/server/index.ts` | Dashboard API endpoints |
 | `skills/pan-tldr/SKILL.md` | Agent-facing skill documentation |
+
+<!-- TLDR pipeline verified end-to-end: 2026-04-12 (PAN-670) -->
