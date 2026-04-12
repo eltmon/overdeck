@@ -1,42 +1,21 @@
 # PAN-645: Tests: root Vitest config does not discover ActionsSection.test.tsx
 
-## Problem
+## Status: In Progress
 
-The root `vitest.config.ts` include patterns (`tests/**/*.test.ts`, `src/**/__tests__/**/*.test.ts`) don't match colocated `*.test.tsx` files in the frontend. Running `npx vitest --run <path-to-frontend-test>` from root fails with "No test files found". There are 13 colocated `.test.tsx` files affected, not just `ActionsSection.test.tsx`.
+## Current Phase
+Creating workspace config (bead feature-pan-489-mtq). Vitest upgraded to 2.x to support workspace project mode; frontend config updated to use absolute paths.
 
-Even if the root patterns were expanded, the root config uses `environment: 'node'` with no jsdom or React plugin — frontend tests would still fail.
+## Completed Work
+- (in progress) feature-pan-489-mtq: Create vitest.workspace.ts + upgrade vitest 1.x→2.x + fix frontend config paths
 
-## Decision
+## Remaining Work
+- [ ] feature-pan-489-mtq: commit and close
+- [ ] feature-pan-489-jm3: Simplify npm test script (remove the `&& cd frontend && npm test` suffix)
+- [ ] feature-pan-489-0ra: Verify discovery + full suite
 
-Use **Vitest workspace configuration** (`vitest.workspace.ts`) to unify test discovery across the monorepo. This is Vitest's built-in solution for multi-project setups.
+## Key Decisions
+- **Vitest 2.x instead of 1.x**: Vitest 1.6.1 has a bug where `defineWorkspace` loads configs but fails test execution with "Cannot read properties of undefined (reading 'config')" at the `describe` call. Upgrading to 2.1.9 fixes this. Not upgraded to 4.x because v4 changed `vi.mock` factory semantics in a way that breaks ~113 existing backend tests.
+- **Frontend vitest.config.ts uses absolute paths**: The original `setupFiles: ['./src/test-setup.ts']` resolved relative to CWD, which broke when the config was loaded from root. Uses `path.resolve(__dirname, ...)` now so it works regardless of invocation directory.
 
-## Approach
-
-1. Create `vitest.workspace.ts` at project root referencing all three vitest configs:
-   - `vitest.config.ts` (root — CLI/server backend tests, node env)
-   - `src/dashboard/frontend/vitest.config.ts` (frontend tests, jsdom env)
-   - `apps/desktop/vitest.config.ts` (desktop tests, node env)
-
-2. Update `package.json` test script from:
-   ```
-   vitest --run --no-file-parallelism && cd src/dashboard/frontend && npm test
-   ```
-   to:
-   ```
-   vitest --run --no-file-parallelism
-   ```
-   Since the workspace config will discover frontend tests automatically.
-
-3. Verify that `npx vitest --run src/dashboard/frontend/src/components/inspector/ActionsSection.test.tsx` succeeds from root.
-
-## Convention
-
-Colocated `*.test.tsx` files alongside components is the accepted convention for frontend tests. The `__tests__/` convention is also acceptable. Both are discovered by the frontend vitest config.
-
-## Scope
-
-- Create `vitest.workspace.ts`
-- Update root `package.json` test script
-- Verify discovery works
-- NOT moving any test files
-- NOT changing individual vitest configs
+## Specialist Feedback
+(none yet)
