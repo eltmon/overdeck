@@ -318,20 +318,52 @@ variable.
 
 ## Template catalogue
 
-The ten templates currently under `src/lib/cloister/prompts/`:
+The ten templates currently under `src/lib/cloister/prompts/`, grouped by the role they play in the pipeline.
+
+### Work agent templates
+
+Templates that drive the **work agent** — the specialist that actually writes code against beads tasks.
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
 | `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: per-bead loop, commit + update STATE.md + `bd close`, quality gates, finalization. |
+| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent via `claude --resume` when a work agent is woken up from a stopped session. Includes STATE.md snapshot, open beads, pending feedback, and next-step instructions. |
+| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps a serialized `HandoffContext` (git state, beads, STATE.md, AI summaries) with a preamble explaining who took over and why. |
+
+### Planning agent templates
+
+Templates for the **planning agent**, the discovery-phase agent that converts a PRD or raw issue into a vBRIEF plan.
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
 | `planning.md` | Planning agent (`buildPlanningPrompt`) | Discovery session: explore codebase, ask questions via AskUserQuestion, generate `plan.vbrief.json` + STATE.md, run `pan plan-finalize`. NEVER implements code. |
+
+### Specialist agent templates
+
+Templates for the **post-work pipeline specialists** (review → test → merge) that run automatically after a work agent signals completion.
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
 | `review.md` | Review specialist (wake path) | Strict code review against vBRIEF acceptance criteria; pass/fail decision posted back to the dashboard. |
 | `test.md` | Test specialist (wake path) | Runs the project's test suite, compares against baseline, posts pass/fail with structured markers. |
 | `merge.md` | Merge specialist (wake path) and `spawnMergeAgentForBranches` (full push flow) | Unified merge template. `DO_PUSH`/`DO_BUILD`/`SKIP_DONE_REPORT` booleans toggle between validation-only and full push + build + report flows. |
 | `sync-main.md` | `syncMainIntoWorkspace` (via merge specialist) | Sync latest main into the workspace's feature branch; abort on conflict and hand back to work agent. |
-| `inspect-agent.md` | Inspect specialist (`buildInspectPrompt`) | Per-bead spec verification mid-implementation. Still uses the legacy ad-hoc replace path — see [Legacy templates](#legacy-templates). |
-| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent via `claude --resume` when a work agent is woken up from a stopped session. Includes STATE.md snapshot, open beads, pending feedback, and next-step instructions. |
-| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps a serialized `HandoffContext` (git state, beads, STATE.md, AI summaries) with a preamble explaining who took over and why. |
+
+### Bootstrap templates
+
+Short templates used during specialist **initialization** — not part of any per-issue workflow.
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
 | `identity-wake.md` | `initializeSpecialist` | Short identity prompt — tells a newly-initialized specialist who it is and to wait for tasks. |
+
+### Legacy (ad-hoc) templates
+
+Templates still on the **pre-loader ad-hoc pattern**. They work, but new edits should migrate to `renderPrompt` — see the [Legacy templates](#legacy-templates) section below for migration guidance.
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
+| `inspect-agent.md` | Inspect specialist (`buildInspectPrompt`) | Per-bead spec verification mid-implementation. Still uses the legacy `readFileSync` + `String.replace` path. |
 
 ### Deleted (replaced by the loader)
 
