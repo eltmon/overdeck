@@ -32,13 +32,7 @@ import { EventStoreService } from '../services/domain-services.js';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
-import {
-  PROJECT_DOCS_SUBDIR,
-  PROJECT_PRDS_SUBDIR,
-  PROJECT_PRDS_ACTIVE_SUBDIR,
-  PROJECT_PRDS_PLANNED_SUBDIR,
-  PROJECT_PRDS_COMPLETED_SUBDIR,
-} from '../../../lib/paths.js';
+import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
@@ -392,9 +386,18 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
   } = { transcripts: [], discussions: [], notes: [] };
 
+  // Helper: read PRD content from a location, handling both flat and subdir formats.
+  const readPrdContent = async (loc: PrdLocation | null): Promise<string | undefined> => {
+    if (!loc) return undefined;
+    if (loc.format === 'flat') {
+      return (await readOptional(loc.path)) ?? undefined;
+    }
+    // Subdirectory format: STATE.md is the human-readable PRD content.
+    return (await readOptional(join(loc.path, 'STATE.md'))) ?? undefined;
+  };
+
   if (!await pathExists(planningDir)) {
-    const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
-    const prd = await readOptional(activePrdPath);
+    const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
     if (prd) result.prd = prd;
     return result;
   }
@@ -411,16 +414,11 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
   }
 
   if (!result.prd) {
-    const prdsDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR);
-    if (await pathExists(prdsDir)) {
-      outer: for (const subdir of [PROJECT_PRDS_ACTIVE_SUBDIR, PROJECT_PRDS_PLANNED_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR]) {
-        const subdirPath = join(prdsDir, subdir);
-        if (!await pathExists(subdirPath)) continue;
-        const files = (await readdir(subdirPath).catch(() => [] as string[])).filter(f => f.toLowerCase().includes(issueLower) && f.endsWith('.md'));
-        if (files.length > 0) {
-          result.prd = await readOptional(join(subdirPath, files[0]!)) ?? undefined;
-          break outer;
-        }
+    for (const status of ['active', 'planned', 'completed'] as const) {
+      const content = await readPrdContent(findPrdAtStatus(projectPath, issueId, status));
+      if (content) {
+        result.prd = content;
+        break;
       }
     }
   }

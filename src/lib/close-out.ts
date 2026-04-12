@@ -17,9 +17,9 @@ import {
   AGENTS_DIR,
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
-  PROJECT_PRDS_ACTIVE_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
+import { findPrdAtStatus, canonicalPrdSubdir } from './prd-locations.js';
 import { sessionExists } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
@@ -170,48 +170,46 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
   const steps: CloseOutStep[] = [];
   const issueLower = ctx.issueId.toLowerCase();
 
-  // Step 1: Verify PRD preserved
+  // Step 1: Verify PRD preserved.
+  // Tolerates all four legacy formats (subdir/flat × lowercase/uppercase) via findPrdAtStatus.
   try {
-    const completedPrdPath = join(
-      ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
-      PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`
-    );
-    const activePrdPath = join(
-      ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
-      PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`
-    );
-
-    if (existsSync(completedPrdPath)) {
+    if (findPrdAtStatus(ctx.projectPath, ctx.issueId, 'completed')) {
       steps.push({ name: 'Verify PRD preserved', status: 'passed', message: 'PRD in completed/' });
-    } else if (existsSync(activePrdPath)) {
-      // Move from active to completed
-      const completedDir = dirname(completedPrdPath);
-      if (!existsSync(completedDir)) {
-        mkdirSync(completedDir, { recursive: true });
-      }
-      try {
-        await execAsync(`git mv "${activePrdPath}" "${completedPrdPath}"`, { cwd: ctx.projectPath });
-        await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed (close-out)"`, { cwd: ctx.projectPath });
-        await execAsync(`git push`, { cwd: ctx.projectPath });
-        steps.push({ name: 'Verify PRD preserved', status: 'passed', message: 'Moved PRD from active/ to completed/' });
-      } catch (mvErr) {
-        // If git mv fails (dirty tree, index lock, etc.), fall back to copy
+    } else {
+      const source = findPrdAtStatus(ctx.projectPath, ctx.issueId, 'active');
+      if (!source) {
+        steps.push({ name: 'Verify PRD preserved', status: 'skipped', message: 'No PRD found (may not have had one)' });
+      } else {
+        const completedSubdir = canonicalPrdSubdir(ctx.projectPath, ctx.issueId, 'completed');
+        const completedFlat = join(
+          ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
+          PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`,
+        );
+        const dest = source.format === 'subdir' ? completedSubdir : completedFlat;
+        const destParent = dirname(dest);
+        if (!existsSync(destParent)) {
+          mkdirSync(destParent, { recursive: true });
+        }
         try {
-          cpSync(activePrdPath, completedPrdPath);
-          // Verify the copy landed
-          if (existsSync(completedPrdPath)) {
-            steps.push({ name: 'Verify PRD preserved', status: 'passed', message: 'Copied PRD to completed/ (git mv failed, plain copy succeeded)' });
-          } else {
-            steps.push({ name: 'Verify PRD preserved', status: 'failed', message: 'PRD copy appeared to succeed but file not found at destination' });
-            return { success: false, issueId: ctx.issueId, steps, error: 'PRD preservation failed — file not at destination after copy' };
+          await execAsync(`git mv "${source.path}" "${dest}"`, { cwd: ctx.projectPath });
+          await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed (close-out)"`, { cwd: ctx.projectPath });
+          await execAsync(`git push`, { cwd: ctx.projectPath });
+          steps.push({ name: 'Verify PRD preserved', status: 'passed', message: 'Moved PRD from active/ to completed/' });
+        } catch {
+          try {
+            cpSync(source.path, dest, { recursive: true });
+            if (existsSync(dest)) {
+              steps.push({ name: 'Verify PRD preserved', status: 'passed', message: 'Copied PRD to completed/ (git mv failed, plain copy succeeded)' });
+            } else {
+              steps.push({ name: 'Verify PRD preserved', status: 'failed', message: 'PRD copy appeared to succeed but file not found at destination' });
+              return { success: false, issueId: ctx.issueId, steps, error: 'PRD preservation failed — file not at destination after copy' };
+            }
+          } catch (cpErr) {
+            steps.push({ name: 'Verify PRD preserved', status: 'failed', message: `Failed to copy PRD: ${(cpErr as Error).message}` });
+            return { success: false, issueId: ctx.issueId, steps, error: 'PRD preservation failed — both git mv and copy failed' };
           }
-        } catch (cpErr) {
-          steps.push({ name: 'Verify PRD preserved', status: 'failed', message: `Failed to copy PRD: ${(cpErr as Error).message}` });
-          return { success: false, issueId: ctx.issueId, steps, error: 'PRD preservation failed — both git mv and copy failed' };
         }
       }
-    } else {
-      steps.push({ name: 'Verify PRD preserved', status: 'skipped', message: 'No PRD found (may not have had one)' });
     }
   } catch (err) {
     steps.push({ name: 'Verify PRD preserved', status: 'skipped', message: `Warning: ${(err as Error).message}` });

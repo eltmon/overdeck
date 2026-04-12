@@ -63,12 +63,7 @@ import {
   getAgentDir,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
-import {
-  PROJECT_DOCS_SUBDIR,
-  PROJECT_PRDS_SUBDIR,
-  PROJECT_PRDS_ACTIVE_SUBDIR,
-  PROJECT_PRDS_COMPLETED_SUBDIR,
-} from '../../../lib/paths.js';
+import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
@@ -1158,20 +1153,19 @@ const postAgentsRoute = HttpRouter.add(
     const projectPath = getProjectPath(projectId, issuePrefix);
 
     const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
-    const prdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
-    const hasPrd = existsSync(prdPath);
+    // findPrdAnywhere checks active → completed → planned and tolerates all four
+    // legacy/buggy formats (subdir vs flat file, lowercase vs uppercase). The previous
+    // direct path build only matched a single format and wrongly rejected reopens of
+    // issues whose PRD was stranded in an uppercase subdirectory.
+    const hasPrd = findPrdAnywhere(projectPath, issueId) !== null;
     const hasDraftPrd = hasPRDDraft(issueId);
 
     if (!hasPrd && !hasDraftPrd && !workspaceExists) {
-      const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`);
-      const hasCompletedPrd = existsSync(completedPrdPath);
-      if (!hasCompletedPrd) {
-        return jsonResponse({
-          error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
-          hint: 'Use "pan work plan" to create a PRD draft, then start work.',
-          issueId,
-        }, { status: 422 });
-      }
+      return jsonResponse({
+        error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
+        hint: 'Use "pan work plan" to create a PRD draft, then start work.',
+        issueId,
+      }, { status: 422 });
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);

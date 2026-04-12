@@ -50,6 +50,7 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { sessionExistsAsync } from '../../../lib/tmux.js';
+import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
 
@@ -922,9 +923,11 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           }
         }
 
-        // Auto-copy planning artifacts to docs/prds/active/<issue-id>/ (skip if already exist)
+        // Auto-copy planning artifacts to docs/prds/active/<issue-id>/ (skip if already exist).
+        // MUST use canonicalPrdSubdir() (lowercase) — passing the raw `id` previously stranded
+        // PRDs in uppercase directories that downstream readers/archivers couldn't find.
         try {
-          const issueActiveDir = join(gitRoot, 'docs', 'prds', 'active', id);
+          const issueActiveDir = canonicalPrdSubdir(gitRoot, id, 'active');
           await mkdir(issueActiveDir, { recursive: true });
           const stateMd = join(planningDir, 'STATE.md');
           const planVbrief = join(planningDir, 'plan.vbrief.json');
