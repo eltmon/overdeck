@@ -358,6 +358,48 @@ describe('checkWorkspaceContainerHealth', () => {
   });
 
   // -------------------------------------------------------------------------
+  // (h) Init containers exit 0 by design — never restart, never alert
+  // -------------------------------------------------------------------------
+
+  it('(h) ignores init containers entirely (one-shot, exit 0 is normal)', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': { stdout: 'panopticon-feature-pan-596-init-1|Exited (0) 30 seconds ago\n' },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(0);
+    expect(mockSendKeysAsync).not.toHaveBeenCalled();
+    const restartCalled = (mockExec.mock.calls as Array<[string]>).some(([cmd]) => cmd.includes('docker restart'));
+    expect(restartCalled).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // (i) Service container exit 0 — clean shutdown, not a crash
+  // -------------------------------------------------------------------------
+
+  it('(i) skips service containers that exited cleanly (exit 0)', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': { stdout: `${CONTAINER}|Exited (0) 30 seconds ago\n` },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(0);
+    expect(mockSendKeysAsync).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
   // (g) Docker restart fails → alert agent
   // -------------------------------------------------------------------------
 

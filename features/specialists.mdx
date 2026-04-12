@@ -1,75 +1,119 @@
 ---
 title: Specialist Agents
-description: Dedicated agents for review, testing, inspection, UAT, and merging
+description: Dedicated agents for review, testing, inspection, UAT, and merging — the pipeline that takes work from "done" to "merged"
 ---
 
 # Specialist Agents
 
-Specialized AI agents that perform focused tasks in the development workflow.
+Work agents write code. **Specialists** turn that code into something you can actually merge. They review, test, click through the UI, resolve conflicts, and hand off to each other automatically — you just click **Merge** at the end.
+
+![Panopticon kanban board with specialists running](/images/specialists/01-board-hero.png)
 
 ## Overview
 
-Specialist agents are **permanent, long-lived agents** that handle specific phases of the development lifecycle. Unlike work agents (which are temporary and tied to a single issue), specialists persist across multiple issues and build context over time.
+A specialist is a focused agent with one job. It takes a completed piece of work, does that job, reports `passed` or `failed`, and either advances the work to the next stage or bounces it back to the work-agent with feedback.
 
-**Key characteristics:**
-- **Persistent** - Run continuously in tmux sessions
-- **Cross-issue** - Work on multiple issues, building codebase knowledge
-- **Specialized** - Each has a narrow, focused responsibility
-- **Coordinated** - Managed by [Cloister](/features/cloister) for handoffs
+Specialists are **per-project and ephemeral** — they spawn on-demand against a workspace, do their job, and terminate. There is no global specialist pool to warm up, no long-lived tmux sessions to babysit, and nothing to initialize before you start working.
 
-## Types of Specialists
+**What makes them different from work agents:**
+- **Narrow scope.** Each specialist has one responsibility and a purpose-built prompt.
+- **Per-project.** Spawned against a specific project's workspace with the right tools and context.
+- **Queued.** If one specialist is busy, new tasks queue up and drain automatically.
+- **Coordinated.** [Cloister](/features/cloister) handles handoffs between stages.
 
-Panopticon includes five built-in specialists:
+## The Five Specialists
 
 | Specialist | Purpose | Trigger |
 |------------|---------|---------|
-| **review-agent** | Code review before merge | Human clicks "Review" in dashboard |
-| **test-agent** | Runs test suite after implementation | Automatically after review passes |
-| **inspect-agent** | Per-step verification against spec | After each bead completion during implementation |
-| **uat-agent** | Browser-based requirement verification | Automatically after tests pass |
-| **merge-agent** | Handles git merge and conflict resolution | Human clicks "Approve & Merge" |
+| **review-agent** | Code review before merge | Human clicks **Review** (dashboard) |
+| **test-agent** | Runs the full test suite | Auto after review passes |
+| **inspect-agent** | Per-status-change verification | Any specialist reports `passed` |
+| **uat-agent** | Browser-based acceptance testing via Playwright | Auto after tests pass |
+| **merge-agent** | All merges + conflict resolution | Human clicks **Approve & Merge** |
+
+![Specialists dashboard showing Cloister Deacon and per-project specialists](/images/specialists/02-agents-page.png)
+
+## Review Pipeline Flow
+
+The happy path is a sequential handoff. A human kicks it off; the rest is automatic until the final merge click.
+
+```
+Human clicks "Review"
+        │
+        ▼
+┌───────────────────┐
+│   review-agent    │  logic, security, perf, style
+└─────────┬─────────┘
+          │ passed → queue test-agent
+          │ failed → feedback to work-agent
+          ▼
+┌───────────────────┐
+│    test-agent     │  runs full test suite
+└─────────┬─────────┘
+          │ passed → queue uat-agent
+          │ failed → feedback to work-agent
+          ▼
+┌───────────────────┐
+│    uat-agent      │  browser walks through ACs
+└─────────┬─────────┘
+          │ passed → ready-to-merge
+          │ failed → feedback with screenshots
+          ▼
+┌───────────────────┐
+│   Human clicks    │  <— only human gate after Review
+│ "Approve & Merge" │
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│   merge-agent     │  merges, resolves conflicts, reruns tests
+└───────────────────┘
+```
+
+**inspect-agent** runs alongside this pipeline rather than inside it — every time any specialist reports `passed`, inspect verifies the state transition against the spec before the next stage runs.
+
+![Model + specialist handoffs tracked over time](/images/specialists/04-handoffs.png)
 
 ## Review Agent
 
-The review-agent performs comprehensive code review, checking for:
-- Logic errors and edge cases
-- Security vulnerabilities
-- Performance issues
-- Code quality and best practices
+The review-agent is the gatekeeper. It reads the diff, the PRD, and the vBRIEF plan, and looks for:
+
+- Logic errors and missed edge cases
+- Security vulnerabilities (OWASP top 10, injection, auth bypass)
+- Performance issues (N+1 queries, unnecessary work, leaked resources)
+- Code quality and adherence to project conventions
 
 **Triggering review-agent:**
 
 ```bash
-# Via dashboard - click "Review" button on issue card
-# Or via CLI:
-pan specialists wake review-agent --issue MIN-123
+# Via dashboard: click "Review" on an issue card
+# Via CLI:
+pan specialists wake review-agent --task "review PAN-655"
 ```
 
 **Review outcomes:**
-- **PASSED** - Code looks good, automatically queues test-agent
-- **BLOCKED** - Issues found, sends feedback to work-agent with required fixes
-- **SKIPPED** - Review not applicable or already completed
+- `passed` — queues test-agent automatically
+- `failed` — sends structured feedback to the work-agent, blocks the pipeline
+- `skipped` — not applicable (e.g., docs-only change)
 
-The review-agent can run in convoy mode for parallel specialized reviews. See the [code-review convoy](/cli/convoy-commands#code-review-template) for details.
+Review can also run in **convoy mode** — multiple reviewers in parallel, each with a focused lens (security, performance, requirements). See the [code-review convoy](/cli/convoy-commands#code-review-template).
 
 ## Test Agent
 
-The test-agent runs the full test suite and analyzes failures. It's automatically invoked after the review-agent passes.
+The test-agent runs every configured test suite for the project and analyzes the failures rather than just reporting pass/fail.
 
 **What it does:**
-1. Runs all configured test suites (backend, frontend, integration, e2e)
-2. Analyzes test failures to understand root causes
-3. Reports results with actionable feedback
-4. If tests pass, queues UAT agent (if enabled) or marks ready for merge
+1. Runs all configured suites (backend, frontend unit, integration, e2e)
+2. Diagnoses failures — flake vs. real regression vs. environmental
+3. Reports results with actionable, file:line-referenced feedback
+4. On pass, queues uat-agent (if enabled) or marks the work ready-to-merge
 
 **Test outcomes:**
-- **PASSED** - All tests pass, queues UAT or marks ready for merge
-- **FAILED** - Tests failing, sends detailed feedback to work-agent
-- **SKIPPED** - Tests not applicable or already run
+- `passed` — advances to UAT or ready-to-merge
+- `failed` — feedback with failing test names and excerpts goes back to the work-agent
+- `skipped` — no test suite applies to this change
+- `dispatch_failed` — Cloister couldn't launch the test run (infra issue, not a code failure)
 
-**Test configuration:**
-
-Configure test suites in `~/.panopticon/projects.yaml`:
+**Project configuration** in `~/.panopticon/projects.yaml`:
 
 ```yaml
 projects:
@@ -90,26 +134,16 @@ projects:
 
 ## Inspect Agent
 
-The inspect-agent performs **per-step verification** during implementation. After an agent completes each bead (task unit), the inspect specialist verifies that the implementation matches the spec before the agent proceeds to the next bead.
-
-**What it does:**
-1. Reads the current bead's requirements from the PRD
-2. Inspects the code changes made for that bead
-3. Verifies implementation matches the spec
-4. If verified, agent proceeds to the next bead
-5. If issues found, sends feedback to the work-agent for correction
+The inspect-agent performs **per-status-change verification**. Whenever any specialist reports a status transition (review passed, test passed, etc.), inspect re-reads the spec and checks that the new state actually matches what the PRD asked for.
 
 **Why it matters:**
-- Catches spec drift early, before multiple beads compound the problem
-- Ensures each implementation step is correct before building on it
-- Reduces the amount of rework needed at the review stage
+- Catches spec drift before it compounds across multiple stages
+- Prevents a review-agent that's too generous from sliding a broken change through
+- Keeps the pipeline honest about the difference between "it compiled" and "it works"
 
-**Triggering inspect-agent:**
-
-Inspect is triggered automatically by Cloister after each bead completion. It can also be configured per-project:
+Inspect is wired into `/api/specialists/done` — it fires on status change, not on a fixed schedule. Enable it per-project:
 
 ```yaml
-# In ~/.panopticon/projects.yaml
 projects:
   myproject:
     specialists:
@@ -119,114 +153,61 @@ projects:
 
 ## UAT Agent
 
-The UAT (User Acceptance Testing) agent performs **browser-based requirement verification** using Playwright MCP. It runs after the test specialist passes, verifying that the implemented features actually work from a user's perspective.
+The UAT (User Acceptance Testing) agent opens a real browser via Playwright MCP and walks through the acceptance criteria like a user would.
 
 **What it does:**
-1. Reads the PRD and acceptance criteria
-2. Launches a browser via Playwright MCP
-3. Walks through user-facing requirements
-4. Verifies each acceptance criterion is met
-5. If all criteria pass, marks ready for human merge approval
-6. If criteria fail, sends detailed feedback with screenshots to the work-agent
+1. Reads the PRD and the vBRIEF acceptance criteria
+2. Launches a browser against the project's dev URL
+3. Executes each AC as a user flow
+4. Takes screenshots as evidence (pass *and* fail)
+5. On pass, marks ready-to-merge; on fail, sends screenshots + DOM snapshots back
 
 **UAT outcomes:**
-- **PASSED** - All acceptance criteria verified, ready for human to approve merge
-- **FAILED** - Criteria not met, sends feedback with evidence to work-agent
-- **SKIPPED** - UAT not applicable (e.g., backend-only changes)
-
-**Configuration:**
+- `passed` — all ACs verified, ready for human merge approval
+- `failed` — feedback includes the failing step, a screenshot, and the observed DOM
+- `skipped` — backend-only or otherwise UI-irrelevant change
 
 ```yaml
-# In ~/.panopticon/projects.yaml
 projects:
   myproject:
     specialists:
       uat_agent:
         enabled: true
-        dev_url: "https://myapp.localhost"  # URL to test against
+        dev_url: "https://myapp.localhost"
 ```
 
 ## Merge Agent
 
-The merge-agent handles **ALL** merges, not just conflicts. This ensures:
-- It sees all code changes coming through the pipeline
-- It builds context about the codebase over time
-- When conflicts DO occur, it has better understanding for intelligent resolution
-- Tests are always run before completing the merge
+The merge-agent handles **every** merge, not just conflicted ones. This is deliberate:
+
+- It sees every diff that flows through the pipeline, building context
+- When conflicts *do* occur, it already understands the codebase
+- Tests are always re-run post-merge, catching integration regressions
+
+![Inspector panel with merge-agent terminal streaming live](/images/specialists/08-inspector.png)
 
 **Workflow:**
-
-1. **Pull latest main** - Ensures local main is up-to-date
-2. **Analyze incoming changes** - Reviews what the feature branch contains
-3. **Perform merge** - Merges feature branch into main
-4. **Resolve conflicts** - If conflicts exist, uses AI to resolve them intelligently
-5. **Run tests** - Verifies the merge didn't break anything
-6. **Commit merge** - Commits the merge with descriptive message
-7. **Report results** - Returns success/failure with details
+1. Pull latest `main`
+2. Analyze the incoming diff
+3. Merge the feature branch
+4. Resolve conflicts with AI, documenting each decision
+5. Re-run tests post-merge
+6. Commit the merge with a descriptive message
+7. Report results back to the dashboard
 
 **Triggering merge-agent:**
 
 ```bash
-# Via dashboard - click "Approve & Merge" on an issue card
-# merge-agent is ALWAYS invoked, regardless of whether conflicts exist
-
-# Via CLI
-pan specialists wake merge-agent --issue MIN-123
+# Via dashboard: click "Approve & Merge" on an issue card
+# Via CLI:
+pan specialists wake merge-agent --task "merge PAN-655"
 ```
 
-The merge-agent uses a specialized prompt template that instructs it to:
-- Never force-push
-- Always run tests before completing
-- Document conflict resolution decisions
-- Provide detailed feedback on what was merged
-
-## Review Pipeline Flow
-
-The complete review pipeline is a sequential handoff between specialists:
-
-```
-Human clicks "Review"
-        │
-        ▼
-┌───────────────────┐
-│   review-agent    │ Reviews code, checks for issues
-└─────────┬─────────┘
-          │ If PASSED: queues test-agent
-          │ If BLOCKED: sends feedback to work-agent
-          ▼
-┌───────────────────┐
-│    test-agent     │ Runs test suite, analyzes failures
-└─────────┬─────────┘
-          │ If PASSED: queues uat-agent (if enabled)
-          │ If FAILED: sends feedback to work-agent
-          ▼
-┌───────────────────┐
-│    uat-agent      │ Browser-based requirement verification
-└─────────┬─────────┘
-          │ If PASSED: marks ready for merge
-          │ If FAILED: sends feedback to work-agent
-          ▼
-┌───────────────────┐
-│  (Human clicks    │ Human approval required
-│  "Approve & Merge"│ before merge
-└─────────┬─────────┘
-          ▼
-┌───────────────────┐
-│   merge-agent     │ Performs merge, resolves conflicts
-└───────────────────┘
-```
-
-Additionally, **inspect-agent** runs during implementation (between beads), not as part of the post-implementation pipeline.
-
-**Key Points:**
-- **Human-initiated start** - A human must click "Review" to start the pipeline
-- **Automatic handoffs** - review-agent → test-agent → uat-agent happens automatically
-- **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
-- **Feedback loops** - Failed reviews/tests/UAT send feedback back to the work-agent
+The merge-agent prompt forbids force-push, requires test re-runs, and mandates that conflict resolution decisions are documented in the merge commit message.
 
 ## Queue Processing
 
-Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
+Each specialist has a per-project task queue at `~/.panopticon/agents/{name}/hook.json`, managed via the **FPP (Fixed Point Principle)** — borrowed from Gastown, inspired by Doctor Who: *any runnable action is a fixed point and must resolve before the system can rest.*
 
 ```
 1. Task arrives (via API or handoff)
@@ -234,126 +215,132 @@ Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) 
         ▼
 2. wakeSpecialistOrQueue() checks if specialist is busy
         │
-        ├── If IDLE: Wake specialist immediately with task
+        ├── IDLE: wake specialist immediately with task
         │
-        └── If BUSY: Add task to queue (hook.json)
+        └── BUSY: push task onto hook.json
                 │
                 ▼
-3. When specialist completes current task:
+3. On specialist completion (/api/specialists/done):
         │
-        ├── Updates status via API (passed/failed/skipped)
-        │
-        └── Dashboard automatically wakes specialist for next queued task
+        ├── Cloister marks specialist idle
+        ├── Drains the next queued task
+        └── Wakes the specialist with it
 ```
 
-**Queue priority order:** `urgent` > `high` > `normal` > `low`
+**Queue priority order:** `urgent` > `high` > `normal` > `low`.
 
-**Completion triggers:** When a specialist reports status (`passed`, `failed`, or `skipped`), the dashboard:
-1. Sets the specialist state to `idle`
-2. Checks the specialist's queue for pending work
-3. If work exists, immediately wakes the specialist with the next task
+The FPP watchdog notices when a specialist has pending hook work but is idle, and sends escalating nudges until the work resolves.
 
 ## Agent Self-Requeue (Circuit Breaker)
 
-After a human initiates the first review, work-agents can request re-review up to 3 times automatically:
+After a human kicks off the first review, a work-agent can request re-review automatically when it thinks it has fixed the feedback:
 
 ```bash
-# Work-agent requests re-review after fixing issues
 pan work request-review MIN-123 -m "Fixed: added tests for edge cases"
 ```
 
-**Circuit breaker behavior:**
-- First human click resets the counter to 0
-- Each `pan work request-review` increments the counter
-- After 3 automatic re-requests, returns HTTP 429
-- Human must click "Review" in dashboard to continue
+The circuit breaker prevents infinite "fail → refix → re-review" loops:
 
-This prevents infinite loops where an agent repeatedly fails review.
+- First human **Review** click resets the counter to 0
+- Each `pan work request-review` increments it
+- After **7 automatic re-requests**, the endpoint returns HTTP 429
+- A human must click **Review** in the dashboard to unstick it
 
 **API endpoint:** `POST /api/workspaces/:issueId/request-review`
 
-## Specialist Auto-Initialization
-
-When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures all five specialists (review-agent, test-agent, inspect-agent, uat-agent, merge-agent) are ready to receive wake signals without manual setup.
-
-**Manual initialization:**
-
-```bash
-# Initialize all specialists
-pan specialists init
-
-# Initialize specific specialist
-pan specialists init review-agent
-```
+The constant lives at `src/dashboard/server/routes/workspaces.ts:81` (`MAX_AUTO_REQUEUE = 7`).
 
 ## Specialist Safeguards
 
-All specialist agents are configured to:
-1. **Run in workspaces only** - Never in the main project directory
-2. **Never checkout branches** - They work with the branch already in the workspace
-3. **Create workspaces if needed** - Use `pan workspace create <ISSUE-ID>` instead of `git checkout`
+Specialists are constrained to prevent them from corrupting the main project repo:
 
-These safeguards are enforced through:
-- **Prompt instructions** - Clear warnings in all specialist prompts
-- **Code enforcement** - Specialists spawn with workspace as cwd
-- **Git hooks** - Auto-revert if checkout detected in tmux sessions
+1. **Spawned at project root** — the workspace directory is passed as *task context*, never by `cd`-ing into it blindly
+2. **Never checkout branches** — they work with whatever branch the workspace already has
+3. **Workspace-first operations** — `pan workspace create <ISSUE-ID>` is the only way to create new work
 
-See [Workspace Commands](/cli/workspace-commands#main-project-branch-convention) for more on branch protection.
+These are enforced in three layers:
+
+- **Prompt** — clear, repeated warnings in every specialist prompt template
+- **Code** — wake paths validate the target before spawning
+- **Git hooks** — `scripts/git-hooks/post-checkout` auto-reverts any checkout detected inside a specialist tmux session
+
+See [Workspace Commands](/cli/workspace-commands#main-project-branch-convention) for branch protection details.
 
 ## Configuration
 
-Specialist configuration lives in `~/.panopticon/cloister/config.json`:
+Specialist configuration lives in `~/.panopticon/cloister.toml`:
 
-```json
-{
-  "specialists": {
-    "review_agent": {
-      "enabled": true,
-      "auto_wake": false,
-      "model": "sonnet"
-    },
-    "test_agent": {
-      "enabled": true,
-      "auto_wake": true,
-      "model": "sonnet"
-    },
-    "inspect_agent": {
-      "enabled": true,
-      "model": "sonnet"
-    },
-    "uat_agent": {
-      "enabled": true,
-      "model": "sonnet"
-    },
-    "merge_agent": {
-      "enabled": true,
-      "auto_wake": false,
-      "model": "sonnet"
-    }
-  }
-}
+```toml
+[specialists.review_agent]
+enabled = true
+auto_wake = false
+
+[specialists.test_agent]
+enabled = true
+auto_wake = true
+
+[specialists.inspect_agent]
+enabled = true
+
+[specialists.uat_agent]
+enabled = true
+
+[specialists.merge_agent]
+enabled = true
+auto_wake = false
+
+[model_selection.specialist_models]
+review_agent   = "sonnet"
+test_agent     = "haiku"
+merge_agent    = "sonnet"
+planning_agent = "opus"
 ```
 
-**Configuration options:**
-- `enabled` - Whether the specialist is active
-- `auto_wake` - Whether to automatically wake on trigger (vs manual)
-- `model` - Which AI model to use (haiku, sonnet, opus)
+**Options:**
+- `enabled` — whether the specialist runs at all
+- `auto_wake` — auto-wake on trigger vs. wait for an explicit wake signal
+- `[model_selection.specialist_models]` — per-specialist model override (haiku / sonnet / opus)
+
+## When to Disable Each Specialist
+
+Specialists are powerful but not free — each one adds latency and API cost. Sensible tradeoffs:
+
+- **review-agent** — almost never disable. The one gate between work-agents and prod.
+- **test-agent** — disable only if your test suite is broken or prohibitively slow. Fix the suite instead.
+- **inspect-agent** — disable for projects without a PRD/spec culture; it has nothing to verify against.
+- **uat-agent** — disable for backend-only services or CLIs with no browser surface.
+- **merge-agent** — keep enabled even for conflict-free projects; it's your integration test safety net.
 
 ## Viewing Specialist Status
 
 ```bash
-# Check status of all specialists
-pan specialists status
+# All specialists with their current state
+pan specialists list
 
-# View specific specialist
-pan specialists status review-agent
+# JSON output for scripting
+pan specialists list --json
 
-# See specialist queue
+# What's sitting in a specialist's queue
 pan specialists queue review-agent
+
+# Reset a wedged specialist (clears session, starts fresh)
+pan specialists reset review-agent
+
+# Clear a stuck queue without touching the session
+pan specialists clear-queue review-agent
+
+# Tail an active run in real-time
+pan specialists logs myproject review-agent --tail
 ```
+
+![Project health panel with per-project specialist roll-up](/images/specialists/06-health.png)
+
+You can also watch handoffs and costs flow through the dashboard as they happen:
+
+![Cost tracking across models and specialists](/images/specialists/09-costs.png)
 
 ## Related Guides
 
-- [Cloister](/features/cloister) - AI lifecycle manager that coordinates specialists
-- [Convoys](/features/convoys) - Parallel specialist execution for code review
-- [Agent Commands](/cli/agent-commands) - CLI commands for working with agents
+- [Cloister](/features/cloister) — the lifecycle manager that coordinates specialists
+- [Convoys](/features/convoys) — parallel specialist execution for code review
+- [Agent Commands](/cli/agent-commands) — full CLI reference for working with agents

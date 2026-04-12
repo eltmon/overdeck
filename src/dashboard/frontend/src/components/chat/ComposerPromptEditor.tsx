@@ -421,8 +421,30 @@ export function ComposerPromptEditor({
     (t: string) => {
       setText(t);
       onChange?.(t);
+
+      // Derive slash menu filter from text content (chars after the last '/').
+      // This lets typed characters appear naturally in the editor while the
+      // menu filters live as the user types.
+      if (isSlashMenuOpen) {
+        const slashIdx = t.lastIndexOf('/');
+        if (slashIdx === -1) {
+          // User backspaced past the '/' — close the menu
+          setIsSlashMenuOpen(false);
+          setSelectedIndex(0);
+        } else {
+          const newFilter = t.slice(slashIdx + 1);
+          // If the filter contains a space or newline, the user has moved on — close
+          if (/[\s]/.test(newFilter)) {
+            setIsSlashMenuOpen(false);
+            setSelectedIndex(0);
+          } else {
+            setFilterText(newFilter);
+            setSelectedIndex(0);
+          }
+        }
+      }
     },
-    [onChange],
+    [onChange, isSlashMenuOpen],
   );
 
   const handleSlashKey = useCallback(() => {
@@ -465,7 +487,10 @@ export function ComposerPromptEditor({
     setSelectedIndex(0);
   }, []);
 
-  // Handle keyboard navigation in slash menu
+  // Handle keyboard navigation in slash menu.
+  // Only intercepts navigation/selection keys — character keys flow through
+  // to the Lexical editor so they appear in the input, and the filter is
+  // derived from the editor's text content in handleChange above.
   useEffect(() => {
     if (!isSlashMenuOpen) return;
 
@@ -494,27 +519,14 @@ export function ComposerPromptEditor({
         e.preventDefault();
         e.stopPropagation();
         handleSlashClose();
-      } else if (e.key === 'Backspace') {
-        e.preventDefault();
-        e.stopPropagation();
-        setFilterText((prev) => {
-          if (prev.length === 0) {
-            // No filter text left — close the menu
-            handleSlashClose();
-            return prev;
-          }
-          return prev.slice(0, -1);
-        });
       } else if (e.key === 'Tab') {
-        // Let Tab close the menu naturally
-        handleSlashClose();
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Capture typed characters into the filter — prevent them from reaching the editor
         e.preventDefault();
         e.stopPropagation();
-        setFilterText((prev) => prev + e.key);
-        setSelectedIndex(0);
+        if (filtered.length > 0 && filtered[selectedIndex]) {
+          handleSlashSelect(filtered[selectedIndex]);
+        }
       }
+      // All other keys (characters, Backspace, etc.) flow through to Lexical
     };
 
     // Use capture phase so we intercept before Lexical's keydown handler
