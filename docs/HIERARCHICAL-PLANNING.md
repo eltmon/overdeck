@@ -189,6 +189,16 @@ Key differences from single-issue plans:
 
 ---
 
+## Planning Dialog UI
+
+The planning agent uses an interactive dialog in Claude Code to guide users through the planning process and display the generated vBRIEF plan:
+
+![Planning Dialog Screenshot](screenshot-plan-dialog.png)
+
+This dialog captures user input, displays the vBRIEF plan structure, and manages the transition from planning to execution.
+
+---
+
 ## How It Works
 
 ### Linear / GitHub: Single-Level vBRIEF
