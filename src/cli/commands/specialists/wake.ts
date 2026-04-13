@@ -5,8 +5,6 @@
  */
 
 import chalk from 'chalk';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { setTimeout as sleep } from 'timers/promises';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -19,9 +17,8 @@ import {
   type SpecialistType,
 } from '../../../lib/cloister/specialists.js';
 import { PANOPTICON_HOME } from '../../../lib/paths.js';
-import { sendKeys } from '../../../lib/tmux.js';
+import { createSessionAsync, sendKeys } from '../../../lib/tmux.js';
 
-const execAsync = promisify(exec);
 const TASKS_DIR = join(PANOPTICON_HOME, 'specialists', 'tasks');
 
 /**
@@ -108,10 +105,7 @@ export async function wakeCommand(name: string, options: WakeOptions): Promise<v
 
     // Create tmux session
     console.log(chalk.dim(`Creating tmux session: ${tmuxSession}`));
-    await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,
-      { encoding: 'utf-8' }
-    );
+    await createSessionAsync(tmuxSession, cwd, claudeCmd);
 
     // Give Claude a moment to start
     await sleep(2000);

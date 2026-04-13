@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, sendKeys, sendKeysAsync, sessionExists, getAgentSessions, capturePane } from './tmux.js';
+import { createSession, killSession, sendKeys, sendKeysAsync, sessionExists, getAgentSessions, capturePane, capturePaneAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -886,11 +886,7 @@ ${providerExports}${getAgentRuntimeBaseCommand(state.model)}
       }
       // Fallback: check tmux output for Claude's prompt indicator
       try {
-        const pane = await new Promise<string>((resolve, reject) => {
-          exec(`tmux capture-pane -t ${agentId} -p 2>/dev/null`, (err, stdout) => {
-            if (err) reject(err); else resolve(stdout);
-          });
-        });
+        const pane = await capturePaneAsync(agentId, 200);
         if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
           ready = true;
           break;

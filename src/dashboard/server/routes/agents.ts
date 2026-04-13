@@ -86,6 +86,7 @@ import {
 import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panopticon/contracts';
 import { EventStoreService } from '../services/domain-services.js';
+import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -202,11 +203,10 @@ const getAgentsRoute = HttpRouter.add(
           return jsonResponse(agentsCache.data);
         }
 
-        const { stdout } = yield* Effect.promise(() => execAsync('tmux list-sessions -F "#{session_name}|#{session_created}" 2>/dev/null || true'));
-        const agentLines = stdout
-          .trim()
-          .split('\n')
-          .filter(line => line.startsWith('agent-') || line.startsWith('planning-'));
+        const sessions = yield* Effect.promise(() => listSessionsAsync());
+        const agentLines = sessions
+          .filter((session) => session.name.startsWith('agent-') || session.name.startsWith('planning-'))
+          .map((session) => `${session.name}|${Math.floor(session.created.getTime() / 1000)}`);
 
         const agentsDir = join(homedir(), '.panopticon', 'agents');
         const remoteAgentIds: string[] = [];
@@ -507,17 +507,10 @@ const getAgentOutputRoute = HttpRouter.add(
 
           let stdout: string;
           if (isRemote && vmName) {
-            const result = await execAsync(
-              flyExecCmd(vmName, `tmux capture-pane -t '${id}' -p -S -${lines} 2>/dev/null || echo 'Session not found'`),
-              { maxBuffer: 10 * 1024 * 1024, timeout: 15000 }
-            );
-            stdout = result.stdout;
+            const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js');
+            stdout = await getRemoteAgentOutput(id, vmName, parseInt(String(lines), 10) || 100);
           } else {
-            const result = await execAsync(
-              `tmux capture-pane -t "${id}" -p -S -${lines} 2>/dev/null || echo "Session not found"`,
-              { maxBuffer: 10 * 1024 * 1024 }
-            );
-            stdout = result.stdout;
+            stdout = await capturePaneAsync(id, parseInt(String(lines), 10) || 100);
           }
 
           if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
@@ -613,11 +606,8 @@ const postAgentMessageRoute = HttpRouter.add(
     }
 
     if (isRemote && vmName) {
-      const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
-      yield* Effect.promise(() => execAsync(
-        flyExecCmd(vmName, `tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter`),
-        { timeout: 15000 }
-      ));
+      const { sendToRemoteAgent } = await import('../../../lib/remote/remote-agents.js');
+      yield* Effect.promise(() => sendToRemoteAgent(id, vmName, message));
       return jsonResponse({ success: true, remote: true });
     } else {
       yield* Effect.promise(() => messageAgent(id, message));
@@ -740,20 +730,19 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
       );
 
       if (optionIndex === -1) {
-        yield* Effect.promise(() => execAsync(`tmux send-keys -t "${id}" "4"`));
-        const escapedAnswer = answer.replace(/'/g, "'\\''");
-        yield* Effect.promise(() => execAsync(`tmux send-keys -t "${id}" '${escapedAnswer}'`));
-        yield* Effect.promise(() => execAsync(`tmux send-keys -t "${id}" C-m`));
+        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, '4'])));
+        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, answer])));
+        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'C-m'])));
       } else {
         const keyNumber = optionIndex + 1;
-        yield* Effect.promise(() => execAsync(`tmux send-keys -t "${id}" "${keyNumber}"`));
+        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, String(keyNumber)])));
       }
 
-      yield* Effect.promise(() => execAsync(`tmux send-keys -t "${id}" Tab`));
+      yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'Tab'])));
       yield* Effect.promise(() => delay(100));
     }
 
-    yield* Effect.promise(() => execAsync(`tmux send-keys -t "${id}" C-m`));
+    yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'C-m'])));
     return jsonResponse({ success: true });
   })),
 );
@@ -879,7 +868,7 @@ const postAgentSuspendRoute = HttpRouter.add(
     }
 
     saveSessionId(id, effectiveSessionId);
-    yield* Effect.promise(() => execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`));
+    yield* Effect.promise(() => killSessionAsync(id).catch(() => { /* no tmux session to kill */ }));
     saveAgentRuntimeState(id, {
       state: 'suspended',
       suspendedAt: new Date().toISOString(),
@@ -1426,7 +1415,7 @@ const postAgentsRoute = HttpRouter.add(
       // through the Effect error channel, not as JS exceptions. Use .catch() in the Promise
       // chain instead so the Effect never fails when the session doesn't exist.
       yield* Effect.promise(() =>
-        execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' })
+        killSessionAsync(agentSessionName)
           .catch(() => { /* No existing session — good */ })
       );
 
@@ -1456,11 +1445,24 @@ const postAgentsRoute = HttpRouter.add(
       yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
 
       // Spawn tmux session with fresh claude session
-      const escapedCwd = workspacePath.replace(/"/g, '\\"');
       const providerFlags = getProviderTmuxFlags(agentModel);
-      yield* Effect.promise(() => execAsync(
-        `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e CI=1 -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false${providerFlags} "bash ${resumeLauncher}"`,
-        { encoding: 'utf-8' }
+      const providerEnv = Object.fromEntries(
+        Array.from(providerFlags.matchAll(/-e\s+([^=\s]+)=\"([^\"]*)\"/g), ([, key, value]) => [key, value]),
+      );
+      yield* Effect.promise(() => createSessionAsync(
+        agentSessionName,
+        workspacePath,
+        `bash ${resumeLauncher}`,
+        {
+          env: {
+            CI: '1',
+            PANOPTICON_AGENT_ID: agentSessionName,
+            PANOPTICON_ISSUE_ID: issueId,
+            PANOPTICON_SESSION_TYPE: phase,
+            CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+            ...providerEnv,
+          },
+        },
       ));
 
       console.log(`[start-agent] Resumed ${agentSessionName} with fresh session (previous: ${savedSessionId.slice(0, 8)}...)`);
@@ -1521,8 +1523,8 @@ const postAgentsRoute = HttpRouter.add(
     // through the Effect error channel, not as JS exceptions. Use .catch() in the Promise
     // chain instead so the Effect never fails when the session doesn't exist.
     yield* Effect.promise(() =>
-      execAsync(`tmux has-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' })
-        .then(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }))
+      sessionExistsAsync(agentSessionName)
+        .then((exists) => exists ? killSessionAsync(agentSessionName) : undefined)
         .then(() => console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`))
         .catch(() => { /* No existing session — good */ })
     );
@@ -1736,12 +1738,8 @@ const getAgentTmuxAliveRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const agentId = params['id'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        await execAsync(`tmux has-session -t ${agentId} 2>/dev/null`, { encoding: 'utf-8' });
-        return jsonResponse({ alive: true });
-      } catch {
-        return jsonResponse({ alive: false });
-      }
+      const alive = await sessionExistsAsync(agentId);
+      return jsonResponse({ alive });
     });
   }),
 );
@@ -1859,7 +1857,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
 
     // Kill zombie tmux session if exists
     yield* Effect.promise(() =>
-      execAsync(`tmux kill-session -t "${id}" 2>/dev/null`, { encoding: 'utf-8' })
+      killSessionAsync(id)
         .catch(() => { /* no session to kill */ })
     );
 

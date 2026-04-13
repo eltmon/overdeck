@@ -20,7 +20,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
 import { findPrdAtStatus, canonicalPrdSubdir } from './prd-locations.js';
-import { sessionExists } from './tmux.js';
+import { killSessionAsync, sessionExists } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
 import { extractNumber, extractPrefix, normalizeIssueId } from './issue-id.js';
@@ -308,7 +308,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     for (const session of sessionPatterns) {
       if (sessionExists(session)) {
         try {
-          await execAsync(`tmux kill-session -t ${session}`);
+          await killSessionAsync(session);
           cleaned = true;
         } catch { /* session may already be dead */ }
       }

@@ -65,6 +65,7 @@ import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { checkSpecialistQueue } from '../../../lib/cloister/specialists.js';
+import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
@@ -798,15 +799,13 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = !hasDocker && existsSync(join(projectPath, 'infra', 'new-feature'));
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, mrUrl, sessionsResult, paneResult] = yield* Effect.promise(() => Promise.all([
+        const [git, repoGit, containers, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           getMrUrlAsync(issueId, workspacePath),
-          execAsync('tmux list-sessions 2>/dev/null || echo ""').catch(() => ({ stdout: '' })),
-          execAsync(
-            `tmux capture-pane -t "${agentSession}" -p 2>/dev/null | tail -50`
-          ).catch(() => ({ stdout: '' })),
+          listSessionNamesAsync(),
+          capturePaneAsync(agentSession, 50).catch(() => ''),
         ]));
 
         let hasAgent = false;
@@ -814,12 +813,10 @@ const getWorkspaceRoute = HttpRouter.add(
         let agentModel: string | undefined;
         let agentModelFull: string | undefined;
 
-        const sessions = sessionsResult.stdout;
-        if (sessions.includes(agentSession)) {
+        if (sessionNames.includes(agentSession)) {
           hasAgent = true;
           agentSessionId = agentSession;
 
-          const paneOutput = paneResult.stdout;
           // Match Anthropic models: [Opus], [Sonnet 4.6], [Haiku 4.5]
           // Also match OpenAI models: [gpt-5.4], [oai@gpt-5.4], [o3], [cx@o3], [o4-mini]
           const modelMatch = paneOutput.match(

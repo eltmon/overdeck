@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import { stopAgent, getAgentState } from '../../../lib/agents.js';
 import { sessionExists, killSession } from '../../../lib/tmux.js';
 import { createFlyProviderFromConfig } from '../../../lib/remote/index.js';
+import { killRemoteAgent } from '../../../lib/remote/remote-agents.js';
 import { loadConfig } from '../../../lib/config.js';
 import { loadWorkspaceMetadata, deleteWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 
@@ -75,7 +76,8 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
       // Kill all processes on VM (tmux, claude, etc.)
       try {
-        await fly.ssh(vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
+        await killRemoteAgent(`agent-${issueLower}`, vmName).catch(() => {});
+        await fly.ssh(vmName, `pkill -f claude 2>/dev/null || true`);
         cleanupLog.push(`Killed processes on VM: ${vmName}`);
         console.log(chalk.green(`  ✓ Killed processes on VM: ${vmName}`));
       } catch (e) {
@@ -111,7 +113,8 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
           // Kill processes and delete VM
           try {
-            await fly.ssh(state.vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
+            await killRemoteAgent(agentId, state.vmName).catch(() => {});
+            await fly.ssh(state.vmName, `pkill -f claude 2>/dev/null || true`);
             await fly.deleteVm(state.vmName);
             cleanupLog.push(`Deleted remote VM: ${state.vmName}`);
             console.log(chalk.green(`  ✓ Deleted remote VM: ${state.vmName}`));

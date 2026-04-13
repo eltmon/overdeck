@@ -4,11 +4,8 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { loadCloisterConfig } from '../../lib/cloister/config.js';
-
-const execAsync = promisify(exec);
+import { capturePaneAsync, sessionExistsAsync } from '../../lib/tmux.js';
 
 /**
  * Check if agent tmux session is alive
@@ -20,13 +17,13 @@ export async function checkAgentHealthAsync(agentId: string): Promise<{
 }> {
   try {
     // Check if tmux session exists
-    await execAsync(`tmux has-session -t "${agentId}" 2>/dev/null`);
+    const alive = await sessionExistsAsync(agentId);
+    if (!alive) {
+      return { alive: false };
+    }
 
     // Get recent output to check if active
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${agentId}" -p -S -5 2>/dev/null`,
-      { maxBuffer: 1024 * 1024 }
-    );
+    const stdout = await capturePaneAsync(agentId, 5);
 
     return { alive: true, lastOutput: stdout.trim() };
   } catch {

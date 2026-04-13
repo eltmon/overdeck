@@ -8,7 +8,7 @@ import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
-import { sendKeysAsync, sessionExists } from '../tmux.js';
+import { capturePaneAsync, listSessionNamesAsync, sendKeysAsync, sessionExists, sessionExistsAsync } from '../tmux.js';
 import { emitActivityEntry, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
@@ -641,8 +641,7 @@ function announceMerge(
  */
 async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
-    const { stdout } = await execAsync(`tmux capture-pane -t "${sessionName}" -p`, { encoding: 'utf-8' });
-    return stdout;
+    return await capturePaneAsync(sessionName);
   } catch {
     return '';
   }
@@ -652,12 +651,7 @@ async function captureTmuxOutput(sessionName: string): Promise<string> {
  * Check if specialist-merge-agent tmux session is running (async)
  */
 async function isMergeAgentRunning(): Promise<boolean> {
-  try {
-    await execAsync(`tmux has-session -t specialist-merge-agent 2>/dev/null`, { encoding: 'utf-8' });
-    return true;
-  } catch {
-    return false;
-  }
+  return sessionExistsAsync('specialist-merge-agent');
 }
 
 /**
@@ -886,9 +880,8 @@ export async function spawnMergeAgentForBranches(
       }
       // Dead-session check: if runtime.json says active but tmux session is gone,
       // the specialist died without resetting state. Reset to idle and proceed immediately.
-      try {
-        await execAsync(`tmux has-session -t "${mergeSession}" 2>/dev/null`);
-      } catch {
+      const mergeSessionAlive = await sessionExistsAsync(mergeSession);
+      if (!mergeSessionAlive) {
         // tmux has-session exits non-zero when the session does not exist
         console.log(`[merge-agent] Specialist session ${mergeSession} is dead (state was ${state.state}), resetting to idle`);
         saveAgentRuntimeState(mergeSession, { state: 'idle', lastActivity: new Date().toISOString() });
@@ -1280,9 +1273,8 @@ CRITICAL: Success means the PR is MERGED on GitHub. Rebase alone is NOT success.
     while (Date.now() - idleStart < IDLE_MAX_WAIT) {
       const state = getAgentRuntimeState(mergeSession);
       if (!state || state.state === 'idle' || state.state === 'suspended') break;
-      try {
-        await execAsync(`tmux has-session -t "${mergeSession}" 2>/dev/null`);
-      } catch {
+      const mergeSessionAlive = await sessionExistsAsync(mergeSession);
+      if (!mergeSessionAlive) {
         saveAgentRuntimeState(mergeSession, { state: 'idle', lastActivity: new Date().toISOString() });
         break;
       }

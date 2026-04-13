@@ -55,7 +55,7 @@ import { cpus as osCpus, freemem, totalmem } from 'node:os';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { readHandoffEvents, getHandoffStats } from '../../../lib/cloister/handoff-logger.js';
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../../lib/cloister/specialist-handoff-logger.js';
-import { sendKeysAsync } from '../../../lib/tmux.js';
+import { createSessionAsync, killSessionAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import {
@@ -1029,12 +1029,7 @@ const getPlanningStatusRoute = HttpRouter.add(
         let sessionExists = false;
         if (!isRemote) {
           try {
-            const { stdout: sessionsOutput } = await execAsync(
-              'tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""',
-              { encoding: 'utf-8' },
-            );
-            const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
-            sessionExists = sessions.includes(sessionName);
+            sessionExists = await sessionExistsAsync(sessionName);
           } catch {}
         }
 
@@ -1158,21 +1153,12 @@ const postPlanningMessageRoute = HttpRouter.add(
         let sessionExists = false;
         if (!isRemote) {
           try {
-            const { stdout: sessionsOutput } = await execAsync(
-              'tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""',
-              { encoding: 'utf-8' },
-            );
-            const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
-            sessionExists = sessions.includes(sessionName);
+            sessionExists = await sessionExistsAsync(sessionName);
           } catch {}
         }
 
         if (sessionExists) {
-          const messageFile = join(planningDir, 'user-message.txt');
-          await writeFile(messageFile, message);
-          await execAsync(`tmux load-buffer "${messageFile}"`, { encoding: 'utf-8' });
-          await execAsync(`tmux paste-buffer -t ${sessionName}`, { encoding: 'utf-8' });
-          await execAsync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
+          await sendKeysAsync(sessionName, message, 'planning user message');
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
             timestamp: new Date().toISOString(),
@@ -1273,14 +1259,10 @@ Continue the PLANNING session. Do NOT implement anything.
           { mode: 0o755 },
         );
 
-        await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, {
-          encoding: 'utf-8',
-        });
+        await createSessionAsync(sessionName, agentCwd, `bash '${launcherScript}'`);
 
         try {
-          await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, {
-            encoding: 'utf-8',
-          });
+          await resizeWindowAsync(sessionName, 200, 50);
         } catch {}
 
         await Effect.runPromise(eventStore.append({
@@ -1321,9 +1303,7 @@ const deletePlanningSessionRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
     try {
-        await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, {
-          encoding: 'utf-8',
-        });
+        await killSessionAsync(sessionName).catch(() => { /* no planning session to kill */ });
         return jsonResponse({ success: true });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

@@ -1359,7 +1359,8 @@ async function destroyRemoteWorkspace(
     // Step 1: Kill any running agent
     spinner.text = 'Stopping agent...';
     const agentId = `agent-${normalizedId}`;
-    await fly.ssh(metadata.vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
+    const { killRemoteAgent } = await import('../../lib/remote/remote-agents.js');
+    await killRemoteAgent(agentId, metadata.vmName);
 
     // Step 2: Delete VM
     spinner.text = 'Deleting VM...';

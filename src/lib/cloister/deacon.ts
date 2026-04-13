@@ -54,7 +54,7 @@ import {
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState } from '../agents.js';
-import { sessionExists, sendKeysAsync } from '../tmux.js';
+import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 
 // ============================================================================
 // Configuration
@@ -421,7 +421,7 @@ export async function forceKillSpecialist(
 
   try {
     // Kill the tmux session (non-blocking)
-    await execAsync(`tmux kill-session -t "${tmuxSession}"`);
+    await killSessionAsync(tmuxSession);
 
     // Update state
     healthState.lastForceKillTime = new Date().toISOString();
@@ -604,7 +604,7 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
         saveSessionId(agent.id, sessionId);
 
         // Kill tmux session (async to avoid blocking event loop - PAN-72)
-        await execAsync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`);
+        await killSessionAsync(agent.id).catch(() => { /* no session to kill */ });
 
         // Update state
         saveAgentRuntimeState(agent.id, {
@@ -678,10 +678,7 @@ export async function checkLazyAgent(sessionName: string): Promise<{
     }
 
     // Capture recent tmux output (last 20 lines only - recent behavior)
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${sessionName}" -p -S -20 2>/dev/null || echo ""`,
-      { encoding: 'utf-8' }
-    );
+    const stdout = await capturePaneAsync(sessionName, 20);
 
     if (!stdout.trim()) {
       return { isLazy: false };
@@ -731,12 +728,7 @@ export async function checkLazyAgent(sessionName: string): Promise<{
 export async function sendAntiLazyMessage(sessionName: string): Promise<boolean> {
   try {
     // Send the anti-lazy message
-    await execAsync(
-      `tmux send-keys -t "${sessionName}" "${ANTI_LAZY_MESSAGE.replace(/"/g, '\\"')}"`,
-      { encoding: 'utf-8' }
-    );
-    // Send Enter
-    await execAsync(`tmux send-keys -t "${sessionName}" Enter`, { encoding: 'utf-8' });
+    await sendKeysAsync(sessionName, ANTI_LAZY_MESSAGE, 'deacon anti-lazy');
 
     // Record cooldown to prevent spam
     lazyMessageCooldowns.set(sessionName, Date.now());
@@ -870,10 +862,7 @@ const ACTIVE_STATUS_PATTERNS = [
  */
 export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
   try {
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${sessionName}" -p -S -5 2>/dev/null || echo ""`,
-      { encoding: 'utf-8' }
-    );
+    const stdout = await capturePaneAsync(sessionName, 5);
 
     if (!stdout.trim()) return false;
 
@@ -966,11 +955,7 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     // Capture tmux output to check for stuck thinking
     let tmuxOutput: string;
     try {
-      const { stdout } = await execAsync(
-        `tmux capture-pane -t "${agent.id}" -p -S -10 2>/dev/null || echo ""`,
-        { encoding: 'utf-8' }
-      );
-      tmuxOutput = stdout;
+      tmuxOutput = await capturePaneAsync(agent.id, 10);
     } catch {
       continue;
     }
@@ -995,11 +980,11 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     try {
       if (attempts === 0) {
         // First attempt: send Escape to cancel thinking
-        await execAsync(`tmux send-keys -t "${agent.id}" Escape 2>/dev/null || true`);
+        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'Escape'])} 2>/dev/null || true`);
         actions.push(`Stuck recovery: sent Escape to ${agent.id} (thinking ${thinkingMinutes}m)`);
       } else if (attempts === 1) {
         // Second attempt: send Ctrl+C to interrupt
-        await execAsync(`tmux send-keys -t "${agent.id}" C-c 2>/dev/null || true`);
+        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'C-c'])} 2>/dev/null || true`);
         actions.push(`Stuck recovery: sent Ctrl+C to ${agent.id} (thinking ${thinkingMinutes}m)`);
       } else {
         // Third+ attempt: kill and respawn
@@ -1014,18 +999,15 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
         }
 
         // Kill the stuck tmux session
-        await execAsync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`);
+        await killSessionAsync(agent.id).catch(() => { /* no stale session */ });
 
         // Small delay to let tmux clean up
         await new Promise(r => setTimeout(r, 1000));
 
         // Respawn in a new tmux session with the same launcher
         // Kill stale session first to prevent "duplicate session" error (PAN-430)
-        await execAsync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`, { encoding: 'utf-8' });
-        await execAsync(
-          `tmux new-session -d -s "${agent.id}" -c "${workspace}" "bash ${launcherPath}"`,
-          { encoding: 'utf-8' }
-        );
+        await killSessionAsync(agent.id).catch(() => { /* no stale session */ });
+        await createSessionAsync(agent.id, workspace, `bash ${launcherPath}`);
 
         // Reset recovery state since we respawned fresh
         stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });
@@ -1081,8 +1063,10 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
       try {
         // Check if tmux session is active — never clean up running agents
         try {
-          await execAsync(`tmux has-session -t "${dir.name}" 2>/dev/null`);
-          continue; // Session exists, skip
+          const exists = await sessionExistsAsync(dir.name);
+          if (exists) {
+            continue; // Session exists, skip
+          }
         } catch {
           // No session — candidate for cleanup
         }
@@ -1977,10 +1961,7 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       // contain stale tool call names (e.g., "Bash(...)") from prior output.
       // Instead, check the very last line for the Claude Code idle prompt marker.
       try {
-        const { stdout: lastLines } = await execAsync(
-          `tmux capture-pane -t "${agent.id}" -p -S -3 2>/dev/null || echo ""`,
-          { encoding: 'utf-8' }
-        );
+        const lastLines = await capturePaneAsync(agent.id, 3);
         // Check the last few non-empty lines for idle prompt indicators
         const lines = lastLines.split('\n').filter(l => l.trim().length > 0);
         const tail = lines.slice(-3).join('\n');
@@ -2241,10 +2222,7 @@ async function checkSpecialistQueues(): Promise<string[]> {
         if (lastActivityAge > tenMinutes) {
           console.log(`[deacon] Stale specialist detected: ${tmuxSession} (last activity: ${Math.round(lastActivityAge / 60000)}m ago) — killing and treating as idle`);
           try {
-            const { exec } = await import('child_process');
-            const { promisify } = await import('util');
-            const execAsync = promisify(exec);
-            await execAsync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' }).catch(() => {});
+            await killSessionAsync(tmuxSession).catch(() => {});
           } catch { /* non-fatal */ }
           isIdle = true;
         }
@@ -2309,18 +2287,11 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
     // 1. Collect tmux pane PIDs for agent sessions in this workspace
     const protectedPids = new Set<string>([String(process.pid)]);
     try {
-      const { stdout: sessions } = await execAsync(
-        `tmux list-sessions -F "#{session_name}" 2>/dev/null || true`,
-        { encoding: 'utf-8', timeout: 3000 },
-      );
-      const agentSessions = sessions.trim().split('\n').filter(s => s.startsWith('agent-') || s.startsWith('planning-'));
+      const sessions = await listSessionNamesAsync();
+      const agentSessions = sessions.filter(s => s.startsWith('agent-') || s.startsWith('planning-'));
       for (const session of agentSessions) {
         try {
-          const { stdout: panePid } = await execAsync(
-            `tmux list-panes -t "${session}" -F "#{pane_pid}" 2>/dev/null || true`,
-            { encoding: 'utf-8', timeout: 3000 },
-          );
-          const pid = panePid.trim().split('\n')[0]?.trim();
+          const pid = (await listPaneValuesAsync(session, '#{pane_pid}'))[0]?.trim();
           if (pid && /^\d+$/.test(pid)) {
             // Add the pane PID and all its descendants to protected list
             protectedPids.add(pid);
@@ -2414,9 +2385,8 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       const agentId = `agent-${issueLower}`;
 
       // Only restart if the agent is active (has a tmux session)
-      try {
-        await execAsync(`tmux has-session -t ${agentId} 2>/dev/null`, { encoding: 'utf-8', timeout: 3000 });
-      } catch {
+      const agentRunning = await sessionExistsAsync(agentId);
+      if (!agentRunning) {
         // Agent not running — skip restart
         continue;
       }
@@ -2751,7 +2721,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         addLog('warn', `Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing`, state.patrolCycle);
         console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
         try {
-          await execAsync(`tmux kill-session -t "${projSpec.tmuxSession}"`);
+          await killSessionAsync(projSpec.tmuxSession);
           // Do NOT clearSessionId — the Claude session still exists in storage
           // and should be resumed on next dispatch. Clearing causes --session-id
           // "already in use" errors.
@@ -2856,13 +2826,10 @@ function recoverOrphanedAgents(context?: string): string[] {
         // Claude exits. Check if the pane's process is actually dead.
         if (dir.startsWith('planning-')) {
           try {
-            const result = execSync(
-              `tmux list-panes -t "${dir}" -F "#{pane_dead}" 2>/dev/null`,
-              { encoding: 'utf-8', timeout: 3000 }
-            ).trim();
+            const result = listPaneValues(dir, '#{pane_dead}')[0]?.trim() ?? '';
             if (result !== '1') continue; // pane is alive — truly still running
             // Pane is dead — kill the zombie tmux session and fall through to recovery
-            try { execSync(`tmux kill-session -t "${dir}" 2>/dev/null`); } catch { /* ignore */ }
+            try { killSession(dir); } catch { /* ignore */ }
           } catch {
             continue; // can't check — assume alive
           }
@@ -2899,21 +2866,13 @@ function recoverOrphanedAgents(context?: string): string[] {
  */
 async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
   const actions: string[] = [];
-  let sessionList: string;
+  let planningSessions: string[];
   try {
-    const { stdout } = await execAsync(
-      `tmux list-sessions -F "#{session_name}" 2>/dev/null || true`,
-      { encoding: 'utf-8', timeout: 5000 }
-    );
-    sessionList = stdout;
+    planningSessions = (await listSessionNamesAsync())
+      .filter(s => s.startsWith('planning-'));
   } catch {
     return actions;
   }
-
-  const planningSessions = sessionList
-    .split('\n')
-    .map(s => s.trim())
-    .filter(s => s.startsWith('planning-'));
 
   for (const planningSession of planningSessions) {
     // planning-pan-596 → agent-pan-596
@@ -2921,10 +2880,7 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
     if (!sessionExists(workAgentSession)) continue;
 
     try {
-      await execAsync(`tmux kill-session -t "${planningSession}" 2>/dev/null || true`, {
-        encoding: 'utf-8',
-        timeout: 5000,
-      });
+      await killSessionAsync(planningSession).catch(() => {});
     } catch { /* non-fatal */ }
 
     // Mark planning agent state as stopped so the UI doesn't show a "running" pill.
