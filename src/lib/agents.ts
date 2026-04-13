@@ -12,9 +12,10 @@ import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
 import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
-import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresClaudish } from './providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import { loadConfig } from './config.js';
+import { getOpenAIAuthStatusSync } from './openai-auth.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix } from './projects.js';
@@ -41,9 +42,10 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
 
+  const { config } = loadYamlConfig();
+
   // OpenRouter API key is stored in config.yaml under providers.openrouter.api_key
   if (provider.name === 'openrouter') {
-    const { config } = loadYamlConfig();
     const apiKey = config.apiKeys.openrouter;
     if (apiKey) {
       return getProviderEnv(provider, apiKey);
@@ -51,11 +53,24 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
     throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
   }
 
-  const { config } = loadYamlConfig();
   const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+
+  if (provider.name === 'openai') {
+    const authStatus = getOpenAIAuthStatusSync();
+    const prefersSubscription = config.providerAuth?.openai === 'subscription' || (!apiKey && authStatus.loggedIn);
+    if (prefersSubscription && authStatus.loggedIn) {
+      return getProviderEnv(provider, 'subscription-oauth');
+    }
+  }
+
   if (apiKey) {
     return getProviderEnv(provider, apiKey);
   }
+
+  if (provider.name === 'openai' && getOpenAIAuthStatusSync().loggedIn) {
+    return getProviderEnv(provider, 'subscription-oauth');
+  }
+
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
 }
 
@@ -703,8 +718,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Determine auth mode for OpenAI from config (subscription vs api-key)
   const yamlConfig = loadYamlConfig();
-  const openaiAuthMode = yamlConfig.config?.providerAuth?.['openai'];
-  const effectiveAuthMode = openaiAuthMode ?? 'api-key';
+  const provider = getProviderForModel(selectedModel as ModelId);
+  const openaiAuthStatus = getOpenAIAuthStatusSync();
+  const openaiApiKey = yamlConfig.config?.apiKeys.openai;
+  const openaiAuthMode = yamlConfig.config?.providerAuth?.['openai']
+    ?? (!openaiApiKey && openaiAuthStatus.loggedIn ? 'subscription' : 'api-key');
+  const effectiveAuthMode = provider.name === 'openai' ? openaiAuthMode : undefined;
 
   // Get claudish-prefixed model if needed (e.g. oai@gpt-5.4 or cx@o3)
   const claudishModel = getClaudishPrefix(selectedModel, effectiveAuthMode);
@@ -713,7 +732,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // so Claude Code can refresh short-lived tokens dynamically.
   // For all other providers, CLEAR any stale apiKeyHelper from previous runs
   // (e.g. switching from Kimi to Anthropic plan-based auth).
-  const provider = getProviderForModel(selectedModel as ModelId);
   if (provider.authType === 'credential-file') {
     setupCredentialFileAuth(provider, options.workspace);
   } else {

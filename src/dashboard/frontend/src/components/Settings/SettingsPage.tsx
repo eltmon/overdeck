@@ -64,6 +64,27 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
+interface ClaudeAuthStatus {
+  installed: boolean;
+  loggedIn: boolean;
+  expired: boolean;
+  subscriptionType: string | null;
+  rateLimitTier: string | null;
+  expiresAt: number | null;
+  hasAnthropicApiKey: boolean;
+}
+
+interface OpenAIAuthStatus {
+  installed: boolean;
+  loggedIn: boolean;
+  expired: boolean;
+  authMode: string | null;
+  accountId: string | null;
+  lastRefresh: string | null;
+  accessTokenExpiresAt: number | null;
+  hasOpenAIApiKey: boolean;
+}
+
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   const res = await fetch('/api/settings', {
     method: 'PUT',
@@ -83,6 +104,18 @@ async function fetchOptimalDefaults(): Promise<SettingsConfig> {
   return res.json();
 }
 
+async function fetchClaudeAuthStatus(): Promise<ClaudeAuthStatus> {
+  const res = await fetch('/api/settings/claude-auth');
+  if (!res.ok) throw new Error('Failed to fetch Claude auth status');
+  return res.json();
+}
+
+async function fetchOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
+  const res = await fetch('/api/settings/openai-auth');
+  if (!res.ok) throw new Error('Failed to fetch OpenAI auth status');
+  return res.json();
+}
+
 interface TestApiKeyResult {
   success: boolean;
   error: string | null;
@@ -99,6 +132,13 @@ async function testApiKey(provider: string, apiKey: string, model?: string): Pro
   });
   if (!res.ok) throw new Error('Failed to test API key');
   return res.json();
+}
+
+function formatAuthTimestamp(value?: number | string | null): string | null {
+  if (!value) return null;
+  const date = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
 }
 
 // Provider definitions
@@ -242,7 +282,27 @@ export function SettingsPage() {
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [clearingCache, setClearingCache] = useState(false);
   const [activeSection, setActiveSection] = useState<string>('smart-selection');
+  const [claudeAuth, setClaudeAuth] = useState<ClaudeAuthStatus | null>(null);
+  const [openaiAuth, setOpenAIAuth] = useState<OpenAIAuthStatus | null>(null);
+  const [refreshingAuth, setRefreshingAuth] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const refreshProviderAuth = useCallback(async () => {
+    setRefreshingAuth(true);
+    try {
+      const [claudeStatus, openaiStatus] = await Promise.all([
+        fetchClaudeAuthStatus(),
+        fetchOpenAIAuthStatus(),
+      ]);
+      setClaudeAuth(claudeStatus);
+      setOpenAIAuth(openaiStatus);
+    } catch (err) {
+      console.error('Failed to refresh provider auth status:', err);
+      toast.error('Failed to refresh provider login status');
+    } finally {
+      setRefreshingAuth(false);
+    }
+  }, []);
 
   // Track active section based on scroll position
   // The settings page lives inside an overflow-auto container, not the window
@@ -282,6 +342,10 @@ export function SettingsPage() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    void refreshProviderAuth();
+  }, [refreshProviderAuth]);
 
   useEffect(() => {
     if (settings && !formData) {
@@ -566,8 +630,129 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Provider Configuration */}
+      {/* Provider Logins + Configuration */}
       <section id="providers" className="mb-12 scroll-mt-4">
+        <div className="flex items-center gap-3 mb-6">
+          <h2 className="text-content text-2xl font-bold">Provider Logins</h2>
+          <div className="h-px flex-1 bg-divider-strong" />
+          <button
+            onClick={() => void refreshProviderAuth()}
+            disabled={refreshingAuth}
+            className="shrink-0 p-2 rounded-lg border border-divider hover:border-divider-strong text-content-muted hover:text-content transition-colors disabled:opacity-50"
+            title="Refresh provider login status"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshingAuth ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+          <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className={`mt-1 size-3 rounded-full shrink-0 ${
+                claudeAuth?.loggedIn ? 'bg-emerald-400' :
+                claudeAuth?.installed ? 'bg-amber-400' :
+                'bg-surface-emphasis'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-content font-bold">Claude Code Login</h3>
+                  {claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
+                    <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                      {claudeAuth.subscriptionType.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                {claudeAuth === null ? (
+                  <p className="text-content-muted text-sm mt-2">Checking local Claude auth…</p>
+                ) : !claudeAuth.installed ? (
+                  <p className="text-content-muted text-sm mt-2">
+                    Claude Code is not installed on this machine.
+                  </p>
+                ) : claudeAuth.loggedIn ? (
+                  <>
+                    <p className="text-content-body text-sm mt-2">
+                      Local Claude subscription login detected.
+                    </p>
+                    {claudeAuth.rateLimitTier && (
+                      <p className="text-content-muted text-xs mt-1">
+                        Rate tier: <code className="font-mono">{claudeAuth.rateLimitTier}</code>
+                      </p>
+                    )}
+                    {formatAuthTimestamp(claudeAuth.expiresAt) && (
+                      <p className="text-content-muted text-xs mt-1">
+                        Token expiry: {formatAuthTimestamp(claudeAuth.expiresAt)}
+                      </p>
+                    )}
+                    {claudeAuth.hasAnthropicApiKey && (
+                      <p className="text-amber-400 text-xs mt-2 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span><code className="font-mono">ANTHROPIC_API_KEY</code> is also set and can override subscription auth for direct Anthropic calls.</span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-content-muted text-sm mt-2">
+                    No active Claude Code login detected.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className={`mt-1 size-3 rounded-full shrink-0 ${
+                openaiAuth?.loggedIn ? 'bg-emerald-400' :
+                openaiAuth?.installed ? 'bg-amber-400' :
+                'bg-surface-emphasis'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-content font-bold">OpenAI / Codex Login</h3>
+                  {openaiAuth?.loggedIn && (
+                    <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                      ChatGPT OAuth
+                    </span>
+                  )}
+                </div>
+                {openaiAuth === null ? (
+                  <p className="text-content-muted text-sm mt-2">Checking local Codex auth…</p>
+                ) : !openaiAuth.installed ? (
+                  <p className="text-content-muted text-sm mt-2">
+                    Codex is not installed or initialized on this machine.
+                  </p>
+                ) : openaiAuth.loggedIn ? (
+                  <>
+                    <p className="text-content-body text-sm mt-2">
+                      Local Codex/ChatGPT login detected. GPT work agents can use claudish subscription auth without an API key.
+                    </p>
+                    {openaiAuth.accountId && (
+                      <p className="text-content-muted text-xs mt-1">
+                        Account: <code className="font-mono">{openaiAuth.accountId}</code>
+                      </p>
+                    )}
+                    {formatAuthTimestamp(openaiAuth.lastRefresh) && (
+                      <p className="text-content-muted text-xs mt-1">
+                        Last refresh: {formatAuthTimestamp(openaiAuth.lastRefresh)}
+                      </p>
+                    )}
+                    {openaiAuth.expired && (
+                      <p className="text-amber-400 text-xs mt-2 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>The cached access token is stale, but Codex may still refresh it automatically on next use.</span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-content-muted text-sm mt-2">
+                    No local Codex/ChatGPT login detected. Without that login, GPT models fall back to API-key auth.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Provider Configuration
           <div className="h-px flex-1 bg-divider-strong" />
@@ -577,6 +762,12 @@ export function SettingsPage() {
             const isDefault = provider.id === 'anthropic';
             const isEnabled = isDefault || formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
+            const isEnvVarRef = apiKey.startsWith('$');
+            const hasConfiguredValue = !!apiKey;
+            const hasDirectApiKey = hasConfiguredValue && !isEnvVarRef;
+            const canViewModels = provider.id === 'openai'
+              ? hasConfiguredValue || !!openaiAuth?.loggedIn
+              : hasDirectApiKey;
 
             return (
               <div
@@ -599,6 +790,11 @@ export function SettingsPage() {
                     <provider.icon className="w-5 h-5 text-content-subtle" />
                   </div>
                   <span className="font-bold text-content">{provider.name}</span>
+                  {isDefault && claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
+                    <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                      {claudeAuth.subscriptionType.toUpperCase()}
+                    </span>
+                  )}
                   <div className="ml-auto">
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
@@ -616,65 +812,106 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="relative">
-                    <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
-                    {/* Check if it's an unresolved env var reference */}
-                    {apiKey.startsWith('$') ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
+                  {isDefault ? (
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
+                      {claudeAuth?.loggedIn ? (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="text-xs text-emerald-300 font-medium">
+                            Using Claude Code subscription login
+                          </span>
                         </div>
-                        <p className="text-[10px] text-amber-400/70 mt-1">
-                          Set this environment variable or enter the key directly below
-                        </p>
-                        <input
-                          type="text"
-                          placeholder={provider.placeholder}
-                          onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                          autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
-                        />
-                      </div>
-                    ) : (
+                      ) : claudeAuth?.hasAnthropicApiKey ? (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                          <Key className="w-4 h-4 text-blue-400 shrink-0" />
+                          <span className="text-xs text-blue-300 font-medium">Using Anthropic API key from environment</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span className="text-xs text-amber-300">No Claude auth detected. See Provider Logins above.</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {provider.id === 'openai' && (
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
+                          {openaiAuth?.loggedIn && !hasConfiguredValue ? (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs text-emerald-300 font-medium">
+                                Using Codex subscription login via claudish
+                              </span>
+                            </div>
+                          ) : openaiAuth?.loggedIn && hasConfiguredValue ? (
+                            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                              <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                              <span className="text-xs text-blue-300">
+                                Codex subscription login is available, but an API key is also configured. Remove the key if you want GPT agents to rely only on the local login.
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                       <div className="relative">
-                        <input
-                          type={showApiKey[provider.id] ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                          disabled={isDefault}
-                          placeholder={provider.placeholder}
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck={false}
-                          data-lpignore="true"
-                          data-1p-ignore="true"
-                          data-form-type="other"
-                          className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                            isDefault ? 'cursor-not-allowed text-content-muted' : 'text-content-body'
-                          }`}
-                        />
-                        {!isDefault && (
-                          <button
-                            onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                            className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
-                          >
-                            {showApiKey[provider.id] ? (
-                              <Eye className="w-4 h-4" />
-                            ) : (
-                              <Eye className="w-4 h-4 opacity-50" />
-                            )}
-                          </button>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">
+                          {provider.id === 'openai' && openaiAuth?.loggedIn ? 'API Key Override (Optional)' : 'API Key'}
+                        </label>
+                        {isEnvVarRef ? (
+                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 text-amber-400 text-xs">
+                              <AlertTriangle className="w-4 h-4" />
+                              <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
+                            </div>
+                            <p className="text-[10px] text-amber-400/70 mt-1">
+                              Set this environment variable or enter the key directly below
+                            </p>
+                            <input
+                              type="text"
+                              placeholder={provider.placeholder}
+                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                              autoComplete="off"
+                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                            />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              type={showApiKey[provider.id] ? 'text' : 'password'}
+                              value={apiKey}
+                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                              placeholder={provider.placeholder}
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="off"
+                              spellCheck={false}
+                              data-lpignore="true"
+                              data-1p-ignore="true"
+                              data-form-type="other"
+                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                            />
+                            <button
+                              onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
+                              className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                            >
+                              {showApiKey[provider.id] ? (
+                                <Eye className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4 opacity-50" />
+                              )}
+                            </button>
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                  {/* Action Buttons */}
+                    </>
+                  )}
+
                   {!isDefault && (
                     <div className="flex flex-col gap-2">
-                      {/* Show Models Button - only if we have a real API key */}
-                      {apiKey && !apiKey.startsWith('$') && (
+                      {canViewModels && (
                         <button
                           onClick={() => setModelsModalProvider(provider.id)}
                           className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-xs text-blue-400 transition-colors w-full"
@@ -683,8 +920,7 @@ export function SettingsPage() {
                           View Models
                         </button>
                       )}
-                      {/* Test API Key Button - only if we have a real API key (not env var ref) */}
-                      {apiKey && !apiKey.startsWith('$') && (
+                      {hasDirectApiKey && (
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleTestApiKey(provider.id)}
@@ -1088,8 +1324,9 @@ export function SettingsPage() {
               {(() => {
                 const providerApiKey = formData?.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
                 const isEnvVarRef = providerApiKey.startsWith('$');
+                const canUseSubscriptionLogin = modelsModalProvider === 'openai' && !!openaiAuth?.loggedIn;
 
-                if (!providerApiKey) {
+                if (!providerApiKey && !canUseSubscriptionLogin) {
                   return (
                     <div className="text-center py-8">
                       <Key className="w-10 h-10 text-content-muted mb-2 mx-auto" />
@@ -1113,10 +1350,18 @@ export function SettingsPage() {
 
                 return (
                   <div className="space-y-3">
+                  {canUseSubscriptionLogin && !providerApiKey && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                      <p className="text-emerald-300 text-xs">
+                        Using local Codex subscription login. Model testing in this dialog still requires a direct API key.
+                      </p>
+                    </div>
+                  )}
                   {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
                     const testKey = `${modelsModalProvider}:${model.id}`;
                     const testResult = modelTestResults[testKey];
                     const isTesting = testingModel === testKey;
+                    const canTestModel = !!providerApiKey && !isEnvVarRef;
 
                     return (
                       <div
@@ -1158,7 +1403,7 @@ export function SettingsPage() {
                           <div className="flex flex-col items-end gap-2">
                             <button
                               onClick={() => handleTestModel(modelsModalProvider, model.id)}
-                              disabled={isTesting}
+                              disabled={!canTestModel || isTesting}
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 transition-colors disabled:opacity-50 whitespace-nowrap"
                             >
                               {isTesting ? (
