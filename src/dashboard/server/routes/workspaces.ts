@@ -2046,10 +2046,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
 
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
-        const apiUrl =
-          process.env.DASHBOARD_URL ||
-          `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-        const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above BEFORE resubmitting\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests to verify your fixes\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
+        const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan work done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan work done has completed successfully.`;
         try {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
@@ -2144,10 +2141,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
 
       if (testStatus === 'failed' && testNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
-        const apiUrl =
-          process.env.DASHBOARD_URL ||
-          `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-        const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures BEFORE resubmitting\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite to verify your fixes pass\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
+        const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures, then invoke the /rebase-and-submit skill\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite locally to verify your fixes pass\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan work done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan work done has completed successfully.`;
         try {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
