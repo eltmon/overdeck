@@ -57,6 +57,7 @@ import {
   resumeAgent,
   messageAgent,
   stopAgent,
+  getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
   getProviderTmuxFlags,
   listRunningAgents,
@@ -1451,7 +1452,7 @@ const postAgentsRoute = HttpRouter.add(
         agentModel = getModelId(`issue-agent:${phase}` as any);
       } catch { /* fall back to state model */ }
       const providerExports = getProviderExportsForModel(agentModel);
-      const resumeContent = `#!/bin/bash\nexport CI=1\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
+      const resumeContent = `#!/bin/bash\nexport CI=1\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec ${getAgentRuntimeBaseCommand(agentModel)} -p "$prompt"\n`;
       yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
 
       // Spawn tmux session with fresh claude session

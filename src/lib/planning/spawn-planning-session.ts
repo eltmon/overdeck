@@ -16,11 +16,11 @@ import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
-import { getAgentCommand, isAnthropicModel } from '../settings.js';
 import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { getProviderForModel, getProviderEnv } from '../providers.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
+import { getAgentRuntimeBaseCommand } from '../agents.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -415,17 +415,16 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
     const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     writeFileSync(planningPromptPath, planningPrompt);
-    const agentCmd = getAgentCommand(planningModel);
-    const cmdWithArgs = agentCmd.args.length > 0
-      ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
-      : `${agentCmd.command} --dangerously-skip-permissions`;
+    const cmdWithArgs = getAgentRuntimeBaseCommand(planningModel);
 
     // Get provider env vars for non-Anthropic models
     let providerExports = '';
     const provider = getProviderForModel(planningModel);
     if (provider.name !== 'anthropic') {
       const { config } = loadYamlConfig();
-      const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+      const apiKey = provider.name === 'openai' && config.providerAuth?.openai === 'subscription'
+        ? 'subscription-oauth'
+        : config.apiKeys[provider.name as keyof typeof config.apiKeys];
       if (apiKey) {
         const envVars = getProviderEnv(provider, apiKey);
         providerExports = Object.entries(envVars)
