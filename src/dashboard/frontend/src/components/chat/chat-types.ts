@@ -21,7 +21,7 @@ export interface WorkLogEntry {
   /** Tool result output (populated when tool_result is received). */
   result?: string;
   command?: string;
-  changedFiles?: string[];
+  changedFiles?: readonly string[];
   tone: 'thinking' | 'tool' | 'info' | 'error';
   toolTitle?: string;
 }
