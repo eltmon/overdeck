@@ -99,6 +99,18 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
     { skill: 'debugging', weight: 0.3 }, // Resolving issues
   ],
 
+  'specialist-inspect-agent': [
+    { skill: 'code-review', weight: 0.4 }, // Compare implementation to bead/spec
+    { skill: 'debugging', weight: 0.3 }, // Catch regressions and bad diffs
+    { skill: 'testing', weight: 0.3 }, // Compile/smoke verification
+  ],
+
+  'specialist-uat-agent': [
+    { skill: 'testing', weight: 0.4 }, // Browser verification is primary
+    { skill: 'debugging', weight: 0.3 }, // Investigating console/network failures
+    { skill: 'documentation', weight: 0.3 }, // Requirement coverage and evidence capture
+  ],
+
   // ═══════════════════════════════════════════════════════════════════════════
   // SUBAGENTS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -169,6 +181,16 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
     { skill: 'planning', weight: 0.5 }, // Primary skill
     { skill: 'synthesis', weight: 0.3 }, // Combining requirements
     { skill: 'documentation', weight: 0.2 }, // Documenting decisions
+  ],
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WORKFLOW JOBS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'status-review': [
+    { skill: 'synthesis', weight: 0.4 }, // Summarize current planning state
+    { skill: 'planning', weight: 0.4 }, // Judge progress vs intended plan
+    { skill: 'documentation', weight: 0.2 }, // Write clear executive summary
   ],
 
   // ═══════════════════════════════════════════════════════════════════════════

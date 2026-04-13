@@ -1,6 +1,8 @@
 # Specialist Workflow Guide
 
-This document explains how worker agents interact with specialist agents (inspect-agent, review-agent, test-agent, uat-agent, merge-agent) through the queue system.
+This document explains how worker agents interact with specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) through the queue system.
+
+For the canonical inventory of agent types, prompt templates, routing IDs, and spawn entrypoints, see [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md).
 
 ## Overview
 

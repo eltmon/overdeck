@@ -9,6 +9,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import {
+  FALLBACK_DEFAULT_CONVERSATION_MODEL,
+  getDefaultConversationModel,
+  ensureDefaultConversationModel,
+} from './defaultConversationModel';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -62,26 +67,43 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'max'] },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', effortLevels: ['low', 'medium', 'high'] },
+      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'max'] },
       { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', effortLevels: [] },
+    ],
+  },
+  {
+    provider: 'openai',
+    label: 'OpenAI',
+    models: [
+      { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
     ],
   },
 ];
 
 const MODEL_STORAGE_KEY = 'conv-composer-model';
-export const DEFAULT_MODEL = 'claude-opus-4-6';
+export const FALLBACK_DEFAULT_MODEL = FALLBACK_DEFAULT_CONVERSATION_MODEL;
+
+let knownModelIds = new Set(FALLBACK_GROUPS.flatMap((group) => group.models.map((model) => model.id)));
+
+function isKnownModel(modelId: string): boolean {
+  return knownModelIds.has(modelId);
+}
+
+function syncKnownModels(groups: readonly ModelGroup[]): void {
+  knownModelIds = new Set(groups.flatMap((group) => group.models.map((model) => model.id)));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export function loadStoredModel(): string {
+export function loadStoredModel(resolvedDefault = getDefaultConversationModel()): string {
   try {
     const stored = localStorage.getItem(MODEL_STORAGE_KEY);
-    if (stored) return stored;
+    if (stored && isKnownModel(stored)) return stored;
   } catch {
     // Ignore
   }
-  return DEFAULT_MODEL;
+  return resolvedDefault || FALLBACK_DEFAULT_MODEL;
 }
 
 export function saveStoredModel(modelId: string): void {
@@ -135,10 +157,11 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
     }
   }, [open]);
 
-  // Fetch available models from the API on mount
+  // Fetch available models on mount so known models stay in sync with the current provider config.
   useEffect(() => {
     async function loadModels() {
       try {
+        await ensureDefaultConversationModel();
         const [availRes, orRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
             Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
@@ -159,7 +182,6 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
         const newGroups: ModelGroup[] = [];
 
-        // Static providers (excluding openrouter — handled separately)
         for (const [prov, models] of Object.entries(avail)) {
           if (prov === 'openrouter') continue;
           if (!Array.isArray(models) || models.length === 0) continue;
@@ -176,11 +198,8 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
           });
         }
 
-        // OpenRouter favorites
         const orFavorites: string[] = orData.favorites ?? [];
-        const orFavoriteModels = (orData.models ?? []).filter((m) =>
-          orFavorites.includes(m.id),
-        );
+        const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.includes(m.id));
         if (orFavoriteModels.length > 0) {
           newGroups.push({
             provider: 'openrouter',
@@ -196,10 +215,13 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         }
 
         if (newGroups.length > 0) {
+          syncKnownModels(newGroups);
           setGroups(newGroups);
+        } else {
+          syncKnownModels(FALLBACK_GROUPS);
         }
       } catch {
-        // Keep fallback groups on error
+        syncKnownModels(FALLBACK_GROUPS);
       }
     }
     void loadModels();

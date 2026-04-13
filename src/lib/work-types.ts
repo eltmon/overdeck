@@ -11,7 +11,7 @@
  */
 export interface WorkTypeMetadata {
   /** Broad category this work type belongs to */
-  category: 'issue-agent' | 'specialist' | 'subagent' | 'convoy' | 'pre-work' | 'cli';
+  category: 'issue-agent' | 'specialist' | 'subagent' | 'convoy' | 'pre-work' | 'workflow' | 'cli';
   /** Optional phase within the category (e.g., for issue-agent phases) */
   phase?: string;
   /** Human-readable description */
@@ -19,7 +19,9 @@ export interface WorkTypeMetadata {
 }
 
 /**
- * Complete registry of all 20 work types with metadata
+ * Complete registry of all routable work types with metadata.
+ *
+ * These IDs are the canonical source for model routing and settings overrides.
  */
 export const WORK_TYPES = {
   // Issue agent phases (6)
@@ -49,7 +51,7 @@ export const WORK_TYPES = {
     description: 'Responding to code review feedback',
   },
 
-  // Specialist agents (3)
+  // Specialist agents (5)
   'specialist-review-agent': {
     category: 'specialist',
     description: 'Comprehensive code review specialist',
@@ -61,6 +63,14 @@ export const WORK_TYPES = {
   'specialist-merge-agent': {
     category: 'specialist',
     description: 'Merge request finalization specialist',
+  },
+  'specialist-inspect-agent': {
+    category: 'specialist',
+    description: 'Per-bead inspection specialist',
+  },
+  'specialist-uat-agent': {
+    category: 'specialist',
+    description: 'Browser-based user acceptance testing specialist',
   },
 
   // Subagents (4)
@@ -103,12 +113,19 @@ export const WORK_TYPES = {
     description: 'Synthesizes findings from convoy reviewers',
   },
 
-  // Pre-work agents (5)
+  // Pre-work agents
   'planning-agent': {
     category: 'pre-work',
     description: 'Interactive planning and discovery agent',
   },
-  // CLI contexts (2)
+
+  // Workflow jobs
+  'status-review': {
+    category: 'workflow',
+    description: 'Executive-facing planning status review generation',
+  },
+
+  // CLI contexts
   'cli:interactive': {
     category: 'cli',
     description: 'Interactive CLI session',

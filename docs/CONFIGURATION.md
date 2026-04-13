@@ -352,6 +352,8 @@ Current router-backed work types:
 | `specialist-review-agent` | Dedicated code review specialist stage |
 | `specialist-test-agent` | Specialist verification and test-focused validation |
 | `specialist-merge-agent` | Final merge preparation and merge-time housekeeping |
+| `specialist-inspect-agent` | Per-bead inspection stage invoked during implementation |
+| `specialist-uat-agent` | Browser-based UAT stage after automated tests pass |
 | `subagent:explore` | Fast helper subagent for searching and reading |
 | `subagent:plan` | Helper subagent for task breakdown and approach sketches |
 | `subagent:bash` | Helper subagent for shell-heavy work |

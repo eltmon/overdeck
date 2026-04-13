@@ -13,7 +13,14 @@ import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, DEFAULT_MODEL, MODEL_EFFORT_SUPPORT, loadStoredModel, saveStoredModel } from './ModelPicker';
+import {
+  ModelPicker,
+  MODEL_EFFORT_SUPPORT,
+  FALLBACK_DEFAULT_MODEL,
+  loadStoredModel,
+  saveStoredModel,
+} from './ModelPicker';
+import { getDefaultConversationModel, ensureDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -47,9 +54,9 @@ interface DraftConversationPanelProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function DraftConversationPanel({ onPromoted }: DraftConversationPanelProps) {
-  const [model, setModel] = useState<string>(loadStoredModel);
+  const [model, setModel] = useState<string>(() => loadStoredModel(getDefaultConversationModel()));
   const [effortLevels, setEffortLevels] = useState<readonly string[]>(
-    () => MODEL_EFFORT_SUPPORT[DEFAULT_MODEL as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
+    () => MODEL_EFFORT_SUPPORT[getDefaultConversationModel() as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
   );
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
@@ -58,6 +65,25 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   const editorRef = useRef<LexicalEditor | null>(null);
   // Unique key per draft instance so Lexical doesn't reuse stale state
   const draftKey = useMemo(() => `draft-${Date.now()}`, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void ensureDefaultConversationModel().then(() => {
+      if (cancelled) return;
+      const resolvedModel = loadStoredModel(getDefaultConversationModel());
+      setModel(resolvedModel);
+      setEffortLevels(
+        MODEL_EFFORT_SUPPORT[resolvedModel as keyof typeof MODEL_EFFORT_SUPPORT] ??
+        MODEL_EFFORT_SUPPORT[FALLBACK_DEFAULT_MODEL as keyof typeof MODEL_EFFORT_SUPPORT] ??
+        ['low', 'medium', 'high'],
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-focus the editor when the draft panel mounts (e.g. after clicking "+")
   useEffect(() => {

@@ -132,6 +132,8 @@ describe('work-type-router', () => {
           'issue-agent:exploration',
           'issue-agent:exploration',
           'specialist-review-agent',
+          'specialist-inspect-agent',
+          'specialist-uat-agent',
           'subagent:explore',
           'convoy:security-reviewer',
           'planning-agent',

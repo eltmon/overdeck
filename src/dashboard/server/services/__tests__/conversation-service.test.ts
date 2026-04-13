@@ -145,6 +145,47 @@ describe('parseConversationMessages', () => {
     expect(result.streaming).toBe(false);
   });
 
+  it('summarizes a user-last conversation as working', async () => {
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'u-1',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        message: {
+          content: [{ type: 'text', text: 'Keep going' }],
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { summarizeConversationActivity } = await import('../conversation-service.js');
+    const result = await summarizeConversationActivity('/fake/session.jsonl');
+
+    expect(result.streaming).toBe(false);
+    expect(result.isWorking).toBe(true);
+  });
+
+  it('summarizes a completed assistant-last conversation as idle', async () => {
+    const lines = [
+      {
+        type: 'assistant',
+        timestamp: '2024-01-01T00:00:01.000Z',
+        message: {
+          id: 'msg-done',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'All set' }],
+          stop_reason: 'end_turn',
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { summarizeConversationActivity } = await import('../conversation-service.js');
+    const result = await summarizeConversationActivity('/fake/session.jsonl');
+
+    expect(result.isWorking).toBe(false);
+  });
+
   it('creates WorkLogEntry for tool_use and completes it on tool_result', async () => {
     const lines = [
       {

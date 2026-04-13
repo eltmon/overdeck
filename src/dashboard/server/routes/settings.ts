@@ -260,19 +260,41 @@ const postTestApiKeyRoute = HttpRouter.add(
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
             });
             latencyMs = Date.now() - startTime;
+            const contentType = resp.headers.get('content-type');
+            const location = resp.headers.get('location');
+            const responseText = await resp.text();
+            console.error('[settings:test-api-key:minimax]', JSON.stringify({
+              status: resp.status,
+              redirected: resp.redirected,
+              url: resp.url,
+              location,
+              contentType,
+              bodyPreview: responseText.slice(0, 300),
+            }));
             if (resp.ok) {
-              const data = await resp.json() as { content?: Array<{ text?: string }> };
-              response = data.content?.[0]?.text?.trim() || '';
-              success = response.includes(expectedAnswer);
-              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              try {
+                const data = JSON.parse(responseText) as { content?: Array<{ text?: string }>; usage?: unknown };
+                console.error('[settings:test-api-key:minimax:parsed]', JSON.stringify({
+                  hasContent: Array.isArray(data.content),
+                  usageType: typeof data.usage,
+                  keys: Object.keys(data),
+                }));
+                response = data.content?.[0]?.text?.trim() || '';
+                success = response.includes(expectedAnswer);
+                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              } catch (parseErr) {
+                console.error('[settings:test-api-key:minimax:parse-error]', parseErr);
+                error = `MiniMax returned non-JSON response: ${responseText.slice(0, 100)}`;
+              }
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 404) {
               error = `Model not found: ${apiModel}`;
             } else {
-              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+              error = `HTTP ${resp.status}: ${responseText.slice(0, 100)}`;
             }
           } catch (err) {
+            console.error('[settings:test-api-key:minimax:request-error]', err);
             error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
           }
           break;
@@ -287,17 +309,22 @@ const postTestApiKeyRoute = HttpRouter.add(
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
             });
             latencyMs = Date.now() - startTime;
+            const responseText = await resp.text();
             if (resp.ok) {
-              const data = await resp.json() as { content?: Array<{ text?: string }> };
-              response = data.content?.[0]?.text?.trim() || '';
-              success = response.includes(expectedAnswer);
-              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              try {
+                const data = JSON.parse(responseText) as { content?: Array<{ text?: string }> };
+                response = data.content?.[0]?.text?.trim() || '';
+                success = response.includes(expectedAnswer);
+                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              } catch {
+                error = `Z.AI returned non-JSON response: ${responseText.slice(0, 100)}`;
+              }
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 404) {
               error = `Model not found: ${apiModel}`;
             } else {
-              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+              error = `HTTP ${resp.status}: ${responseText.slice(0, 100)}`;
             }
           } catch (err) {
             error = `Network error: ${err instanceof Error ? err.message : String(err)}`;

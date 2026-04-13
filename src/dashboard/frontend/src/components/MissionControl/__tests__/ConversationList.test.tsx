@@ -7,6 +7,17 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
 
+vi.mock('lucide-react', () => ({
+  Circle: (props: Record<string, unknown>) => <svg data-testid="conversation-dot" {...props} />,
+  Loader2: (props: Record<string, unknown>) => <svg data-testid="conversation-spinner" {...props} />,
+  Archive: () => <svg />,
+  Copy: () => <svg />,
+  Check: () => <svg />,
+  X: () => <svg />,
+  Pencil: () => <svg />,
+  Star: () => <svg />,
+}));
+
 vi.mock('../styles/mission-control.module.css', () => ({
   default: {
     conversationList: 'conversationList',
@@ -19,6 +30,7 @@ vi.mock('../styles/mission-control.module.css', () => ({
     conversationCopyBtn: 'conversationCopyBtn',
     conversationStopBtn: 'conversationStopBtn',
     conversationDot: 'conversationDot',
+    conversationWorkingSpinner: 'conversationWorkingSpinner',
     conversationEmpty: 'conversationEmpty',
     skeletonList: 'skeletonList',
     skeletonItem: 'skeletonItem',
@@ -37,6 +49,7 @@ const mockConversation = {
   endedAt: null,
   lastAttachedAt: null,
   sessionAlive: false,
+  isWorking: false,
   title: 'My Test Conversation',
 };
 
@@ -116,6 +129,30 @@ describe('ConversationList rename flow', () => {
   it('renders the conversation title', () => {
     renderList();
     expect(screen.getByText('My Test Conversation')).toBeInTheDocument();
+  });
+
+  it('renders a spinner for actively working conversations', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: true }]);
+    render(
+      <QueryClientProvider client={client}>
+        <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('conversation-spinner')).toBeInTheDocument();
+    expect(screen.queryByTestId('conversation-dot')).not.toBeInTheDocument();
+  });
+
+  it('renders a dot for alive but idle conversations', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: false }]);
+    render(
+      <QueryClientProvider client={client}>
+        <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('conversation-dot')).toBeInTheDocument();
+    expect(screen.queryByTestId('conversation-spinner')).not.toBeInTheDocument();
   });
 
   it('shows an edit input with the current title when the pencil button is clicked', () => {

@@ -6,7 +6,7 @@ Each work type is a routable job slot. You can override any of these IDs in `mod
 
 ## Overview
 
-- Panopticon currently routes **20 router-backed work types**
+- Panopticon currently routes **23 router-backed work types**
 - Work types are grouped by workflow role, not by provider
 - Capability-based selection picks defaults automatically
 - Overrides let you pin any one work type to any supported model
@@ -52,6 +52,8 @@ These are dedicated long-running workflow stages.
 | `specialist-review-agent` | Dedicated review pass before merge | `claude-opus-4-6` | Lower to Sonnet if you want to reduce cost on routine repos |
 | `specialist-test-agent` | Dedicated test specialist pass | `claude-sonnet-4-6` | Raise to GPT-5.4 for harder debugging-heavy test suites |
 | `specialist-merge-agent` | Merge prep, merge-time validation, conflict handling | `claude-sonnet-4-6` | Raise to Opus for very risky multi-repo or conflict-heavy workflows |
+| `specialist-inspect-agent` | Per-bead inspection gate during implementation | `claude-sonnet-4-6` | Raise to Opus when spec fidelity is critical or diffs are complex |
+| `specialist-uat-agent` | Browser-based user acceptance testing after tests pass | `claude-sonnet-4-6` | Raise to Opus for high-stakes UX validation or complex product flows |
 
 ### Guidance
 
@@ -104,6 +106,7 @@ The planning phase is separate from the issue-agent implementation loop.
 | Work type | When it runs | Typical default | Why you might override it |
 |-----------|--------------|-----------------|---------------------------|
 | `planning-agent` | Up-front planning and vBRIEF generation | capability-based, usually `claude-opus-4-6` | Use Gemini Pro for cheaper large-context planning or GPT-5.4 for a more code-shaped planning style |
+| `status-review` | Executive-style planning progress summaries in Mission Control | `claude-sonnet-4-6` | Raise to Opus if you want deeper requirement-to-progress analysis |
 
 ### Guidance
 
