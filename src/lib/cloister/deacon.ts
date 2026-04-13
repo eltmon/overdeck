@@ -1158,7 +1158,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     }
 
     const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; mergeStatus?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
+    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; mergeStatus?: string; mergeNotes?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
 
     // Build a set of all active specialist sessions (global + per-project)
     // so we can check if ANY specialist is working on review/test tasks.
@@ -1248,7 +1248,14 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             reviewUpdate['testNotes'] = latestTerminalTest.notes;
           }
           if (status.mergeStatus === 'failed') {
-            reviewUpdate['mergeStatus'] = 'pending';
+            // Only reset transient failures (e.g. git conflicts, network errors).
+            // CI check failures must stay 'failed' until the work agent pushes a fix —
+            // resetting to 'pending' would re-queue the merge and cycle indefinitely.
+            const isCiFailure = typeof status.mergeNotes === 'string' &&
+              status.mergeNotes.includes('failing required checks');
+            if (!isCiFailure) {
+              reviewUpdate['mergeStatus'] = 'pending';
+            }
           }
           setReviewStatus(issueId, reviewUpdate as Parameters<typeof setReviewStatus>[1]);
           status.reviewStatus = latestTerminalReview.status;
@@ -1538,6 +1545,9 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         reviewedAtCommit: undefined,
         reviewNotes: undefined,
         testNotes: undefined,
+        // Reset merge retry counter so checkFailedMergeRetry can retry again after
+        // the work agent pushes a fix (e.g. to address a CI check failure).
+        mergeRetryCount: 0,
       });
       actions.push(
         `Reset review for ${issueId}: new commits after review passed ` +
@@ -1717,6 +1727,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
       reviewStatus?: string;
       testStatus?: string;
       mergeStatus?: string;
+      mergeNotes?: string;
       readyForMerge?: boolean;
       mergeRetryCount?: number;
       updatedAt?: string;
@@ -1728,6 +1739,42 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
       // Only act on issues where merge failed but review+test both passed
       if (status.mergeStatus !== 'failed') continue;
       if (status.reviewStatus !== 'passed' || status.testStatus !== 'passed') continue;
+
+      // CI check failures are permanent until the work agent pushes a fix — retrying
+      // the merge won't help. Write feedback to the workspace so the agent knows what
+      // to fix, then saturate the circuit breaker so we don't re-enter this branch.
+      // checkPostReviewCommits() will reset the retry count once new commits are pushed.
+      const isCiCheckFailure = typeof status.mergeNotes === 'string' &&
+        status.mergeNotes.includes('failing required checks');
+      if (isCiCheckFailure) {
+        const retryCountCi = status.mergeRetryCount || 0;
+        if (retryCountCi >= FAILED_MERGE_MAX_RETRIES) continue; // already processed
+        console.log(`[deacon] CI check failure for ${key} — routing to work agent, not retrying merge`);
+        setReviewStatus(key, {
+          mergeRetryCount: FAILED_MERGE_MAX_RETRIES, // saturate to suppress future re-entry
+          readyForMerge: false,
+        });
+        const issueIdForFb = status.issueId || key;
+        const ciNotes = status.mergeNotes!;
+        const { writeFeedbackFile } = await import('./feedback-writer.js');
+        await writeFeedbackFile({
+          issueId: issueIdForFb,
+          specialist: 'merge-agent',
+          outcome: 'ci-failure',
+          summary: 'CI checks are failing — merge blocked until CI passes',
+          markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan work done ${issueIdForFb}\n\`\`\``,
+        }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueIdForFb}:`, err.message));
+        // Nudge the work agent session if it's running
+        const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
+        if (sessionExists(agentSession)) {
+          const port = process.env.API_PORT || process.env.PORT || '3011';
+          await sendKeysAsync(agentSession,
+            `CI checks are failing on the PR. Check .planning/feedback/ for details, fix the failures, commit and push, then run: pan work done ${issueIdForFb} — or resubmit via: curl -X POST http://localhost:${port}/api/workspaces/${issueIdForFb}/request-review -H "Content-Type: application/json" -d '{}'`
+          );
+        }
+        actions.push(`CI check failure for ${issueIdForFb} — wrote feedback, saturated merge retry counter`);
+        continue;
+      }
 
       // Circuit breaker: max retries to avoid infinite loop on permanent failures
       const retryCount = status.mergeRetryCount || 0;

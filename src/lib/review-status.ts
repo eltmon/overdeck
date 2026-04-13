@@ -139,6 +139,10 @@ export function setReviewStatus(
         merged.testStatus === 'passed' &&
         verificationSatisfied(merged) &&
         merged.mergeStatus !== 'merged' &&
+        // Don't auto-recompute rfm=true when the previous merge attempt failed —
+        // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
+        // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
+        merged.mergeStatus !== 'failed' &&
         // If UAT has been initiated, it must pass too
         (merged.uatStatus === undefined || merged.uatStatus === 'passed')
       );
