@@ -391,6 +391,16 @@ program
       return;
     }
 
+    // Kill any existing dashboard processes before starting a new one.
+    // This prevents EADDRINUSE when pan up is run while a dashboard is already running.
+    // Uses SIGTERM (default) so the old instance can clean up gracefully.
+    try {
+      execSync(`lsof -ti:${dashboardPort} 2>/dev/null | xargs -r kill 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`lsof -ti:${dashboardApiPort} 2>/dev/null | xargs -r kill 2>/dev/null || true`, { stdio: 'pipe' });
+    } catch {
+      // No existing processes — that's fine
+    }
+
     // Start dashboard
     if (isProduction) {
       console.log(chalk.dim('Starting dashboard (bundled mode)...'));
