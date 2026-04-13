@@ -91,7 +91,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'minimax',
     displayName: 'MiniMax',
     compatibility: 'direct',
-    baseUrl: 'https://api.minimax.chat/coding',
+    baseUrl: 'https://api.minimax.io/anthropic',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
     tested: true,
     description: 'Anthropic-compatible API via MiniMax API',

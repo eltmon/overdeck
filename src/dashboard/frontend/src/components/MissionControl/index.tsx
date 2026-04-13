@@ -7,7 +7,7 @@ import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
-import { ConversationPanel } from '../chat/ConversationPanel';
+import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
@@ -53,13 +53,21 @@ interface MissionControlProps {
   issues?: Issue[];
   /** Deep-link conversation ID — selects this conversation on mount */
   convId?: string | null;
+  conversationViewMode?: ViewMode;
   /** Called when the selected conversation changes so App can sync the URL */
   onConvIdChange?: (id: string | null) => void;
+  onConversationViewModeChange?: (mode: ViewMode) => void;
 }
 
 type SidebarTab = 'conversations' | 'projects';
 
-export function MissionControl({ issues = [], convId, onConvIdChange }: MissionControlProps) {
+export function MissionControl({
+  issues = [],
+  convId,
+  conversationViewMode = 'conversation',
+  onConvIdChange,
+  onConversationViewModeChange,
+}: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
@@ -361,7 +369,16 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (
-                <ConversationPanel key={conv.name} conversation={conv} onArchived={() => { setSelectedConversation(null); queryClient.invalidateQueries({ queryKey: ['conversations'] }); }} />
+                <ConversationPanel
+                  key={conv.name}
+                  conversation={conv}
+                  viewMode={conversationViewMode}
+                  onViewModeChange={onConversationViewModeChange}
+                  onArchived={() => {
+                    setSelectedConversation(null);
+                    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                  }}
+                />
               ) : (
                 <div className={styles.contentEmpty}>
                   <div style={{ textAlign: 'center' }}>

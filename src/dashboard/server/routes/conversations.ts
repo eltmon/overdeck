@@ -50,6 +50,7 @@ import {
   killSessionAsync,
   createSessionAsync,
   setOptionAsync,
+  waitForClaudePrompt,
 } from '../../../lib/tmux.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import {
@@ -114,6 +115,15 @@ function sanitizeName(name: string): string {
 /** Check if a tmux session exists (async, non-blocking) */
 async function tmuxSessionExists(sessionName: string): Promise<boolean> {
   return sessionExistsAsync(sessionName);
+}
+
+async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await sessionExistsAsync(sessionName)) return;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  throw new Error(`Timed out waiting for tmux session ${sessionName}`);
 }
 
 /**
@@ -614,19 +624,13 @@ const postConversationResumeRoute = HttpRouter.add(
         // Persist the new model so the dropdown reflects what we're respawning with.
         if (model && modelChanged) updateConversationModel(name, model);
 
-        // Compact + respawn run in the background so the HTTP response stays fast.
-        // The frontend's existing polling will pick up the live session once tmux is up.
-        void (async () => {
-          try {
-            await maybeCompactBeforeRespawn({ sessionFile: conv.sessionFile, cwd: conv.cwd, modelChanged });
-            await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
-          } catch (err) {
-            console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
-          }
-        })();
+        await maybeCompactBeforeRespawn({ sessionFile: conv.sessionFile, cwd: conv.cwd, modelChanged });
+        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
+        await waitForTmuxSession(conv.tmuxSession);
+        await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
 
         markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, reattached: false });
+        return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, reattached: false, sessionAlive: true });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
@@ -667,25 +671,19 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         // Extract the session UUID from the existing session file path
         const oldSessionId = sessionIdFromFile(conv.sessionFile);
 
-        // Compact (if needed) then respawn with the new model — fire and forget
-        // so the HTTP response returns immediately. switch-model is always a model
-        // change by definition, so modelChanged: true triggers compaction unconditionally.
+        // Compact (if needed) then respawn with the new model before reporting success.
         const sessionFile = conv.sessionFile;
         const cwd = conv.cwd;
         const tmuxSession = conv.tmuxSession;
         const effort = conv.effort ?? undefined;
         const issueId = conv.issueId ?? undefined;
-        void (async () => {
-          try {
-            await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
-            await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, !!oldSessionId);
-          } catch (err) {
-            console.error(`[conversations] Failed to respawn session after model switch ${tmuxSession}:`, err);
-          }
-        })();
+        await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, !!oldSessionId);
+        await waitForTmuxSession(tmuxSession);
+        await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
 
         markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', model, reattached: false });
+        return jsonResponse({ ...conv, status: 'active', model, reattached: false, sessionAlive: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to switch model: ' + msg }, { status: 500 });

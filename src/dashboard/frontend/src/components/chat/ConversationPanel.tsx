@@ -13,12 +13,14 @@ import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ViewMode = 'conversation' | 'terminal';
+export type ViewMode = 'conversation' | 'terminal';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ConversationPanelProps {
   conversation: Conversation;
+  viewMode?: ViewMode;
+  onViewModeChange?: (mode: ViewMode) => void;
   onArchived?: () => void;
 }
 
@@ -36,10 +38,12 @@ async function resumeConversation(name: string, model?: string, effort?: string)
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationPanel({ conversation, onArchived }: ConversationPanelProps) {
-  // Default to conversation view; persist per-conversation preference wouldn't make sense
-  // since new conversations should always start in conversation view
-  const [viewMode, setViewMode] = useState<ViewMode>('conversation');
+export function ConversationPanel({
+  conversation,
+  viewMode = 'conversation',
+  onViewModeChange,
+  onArchived,
+}: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
@@ -72,6 +76,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
     mutationFn: () => resumeConversation(conversation.name, selectedModel),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
       setResumed(true);
     },
   });
@@ -139,8 +144,8 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   }, [conversation.name, queryClient, onArchived]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-  }, []);
+    onViewModeChange?.(mode);
+  }, [onViewModeChange]);
 
   const handleCopyLink = useCallback(() => {
     const url = `${window.location.origin}/conv/${conversation.id}`;
