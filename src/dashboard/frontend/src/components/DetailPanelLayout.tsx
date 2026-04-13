@@ -130,6 +130,13 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     setPanelState(loadPanelState(issueId));
   }, [issueId]);
 
+  // Reset pin state when issue changes
+  useEffect(() => {
+    const saved = loadPinState(issueId);
+    setPinnedSession(saved);
+    setPinned(saved !== null);
+  }, [issueId]);
+
   const openTerminal = useCallback(() => {
     setPanelState(prev => {
       const newState: PanelState = { ...prev, panelMode: 'inspector+terminal' };

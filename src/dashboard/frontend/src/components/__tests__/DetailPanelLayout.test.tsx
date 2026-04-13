@@ -28,7 +28,8 @@ vi.mock('../TerminalPanel', () => ({
 
 vi.mock('../inspector/TerminalTabs', () => ({
   TerminalTabs: () => <div data-testid="terminal-tabs" />,
-  loadPinState: () => null,
+  // Use the real localStorage key so tests can pre-populate state
+  loadPinState: (issueId: string) => localStorage.getItem(`pan-terminal-pin-${issueId}`),
   savePinState: vi.fn(),
 }));
 
@@ -99,12 +100,16 @@ function makeFetch(reviewStatusOverrides: ReviewStatusOverrides = {}): typeof gl
   }) as typeof global.fetch;
 }
 
-function renderLayout(agent: Agent, fetchImpl: typeof global.fetch = makeFetch()) {
+function renderLayout(
+  agent: Agent,
+  fetchImpl: typeof global.fetch = makeFetch(),
+  issueId = 'PAN-509',
+) {
   global.fetch = fetchImpl;
   const client = makeQueryClient();
   return render(
     <QueryClientProvider client={client}>
-      <DetailPanelLayout agent={agent} issueId="PAN-509" onClose={vi.fn()} />
+      <DetailPanelLayout agent={agent} issueId={issueId} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -164,6 +169,90 @@ describe('DetailPanelLayout', () => {
 
       // Not the work agent session
       expect(screen.getByTestId('terminal-panel')).not.toHaveAttribute('data-session', 'agent-123');
+    });
+  });
+
+  describe('Issue 3 — pin state resets when issueId changes', () => {
+    it('re-reads pin state from localStorage when issueId prop changes', async () => {
+      const sessionA = 'specialist-session-for-issue-a';
+      const sessionB = 'specialist-session-for-issue-b';
+
+      // Pre-populate pin state for both issues
+      localStorage.setItem('pan-terminal-pin-PAN-509', sessionA);
+      localStorage.setItem('pan-terminal-pin-PAN-510', sessionB);
+      // Panel state so the terminal section renders
+      localStorage.setItem(
+        'pan-panel-state-PAN-510',
+        JSON.stringify({ panelMode: 'inspector+terminal', inspectorDefaultSize: '35%' }),
+      );
+
+      mockPipelineResult = {
+        phase: 'working' as PipelinePhase,
+        activeSession: 'fallback-active-session',
+        availableTerminals: [],
+        markSessionDead: vi.fn(),
+      };
+
+      const { rerender } = renderLayout(makeAgent({ issueId: 'PAN-509' }));
+
+      // Issue A: TerminalPanel shows the pinned session for PAN-509
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', sessionA);
+      });
+
+      // Switch to issue B by updating the issueId prop
+      const client = makeQueryClient();
+      rerender(
+        <QueryClientProvider client={client}>
+          <DetailPanelLayout agent={makeAgent({ issueId: 'PAN-510' })} issueId="PAN-510" onClose={vi.fn()} />
+        </QueryClientProvider>,
+      );
+
+      // Issue B: TerminalPanel must show the pinned session for PAN-510, not the stale PAN-509 session
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', sessionB);
+      });
+      expect(screen.getByTestId('terminal-panel')).not.toHaveAttribute('data-session', sessionA);
+    });
+
+    it('clears pin state when switching to an issue with no saved pin', async () => {
+      const sessionA = 'specialist-session-for-issue-a';
+
+      localStorage.setItem('pan-terminal-pin-PAN-509', sessionA);
+      localStorage.setItem(
+        'pan-panel-state-PAN-510',
+        JSON.stringify({ panelMode: 'inspector+terminal', inspectorDefaultSize: '35%' }),
+      );
+      // PAN-510 has no saved pin
+
+      const activeSessionB = 'active-work-session-b';
+      mockPipelineResult = {
+        phase: 'working' as PipelinePhase,
+        activeSession: activeSessionB,
+        availableTerminals: [],
+        markSessionDead: vi.fn(),
+      };
+
+      const { rerender } = renderLayout(makeAgent({ issueId: 'PAN-509' }));
+
+      // Issue A: shows pinned session
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', sessionA);
+      });
+
+      // Switch to issue B (no saved pin)
+      const client = makeQueryClient();
+      rerender(
+        <QueryClientProvider client={client}>
+          <DetailPanelLayout agent={makeAgent({ issueId: 'PAN-510' })} issueId="PAN-510" onClose={vi.fn()} />
+        </QueryClientProvider>,
+      );
+
+      // Must fall back to activeSession (not pinned), not the stale PAN-509 session
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', activeSessionB);
+      });
+      expect(screen.getByTestId('terminal-panel')).not.toHaveAttribute('data-session', sessionA);
     });
   });
 
