@@ -42,7 +42,13 @@ const readJsonBody = Effect.gen(function* () {
 /** Determine provider from model ID */
 function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'zai' {
   if (modelId.startsWith('claude-')) return 'anthropic';
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o3-') || modelId.startsWith('o1')) return 'openai';
+  if (
+    modelId.startsWith('gpt-')
+    || modelId === 'o3'
+    || modelId.startsWith('o3-')
+    || modelId === 'o4-mini'
+    || modelId.startsWith('o1')
+  ) return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
   if (modelId.startsWith('glm-')) return 'zai';
@@ -52,6 +58,12 @@ function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google'
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models
+  'gpt-5.4-pro': { apiModel: 'gpt-5.4-pro' },
+  'gpt-5.4': { apiModel: 'gpt-5.4' },
+  'gpt-5.4-mini': { apiModel: 'gpt-5.4-mini' },
+  'gpt-5.4-nano': { apiModel: 'gpt-5.4-nano' },
+  'o3': { apiModel: 'o3' },
+  'o4-mini': { apiModel: 'o4-mini' },
   'gpt-5.2-codex': { apiModel: 'gpt-4o' },
   'o3-deep-research': { apiModel: 'gpt-4o' },
   'gpt-4o': { apiModel: 'gpt-4o' },

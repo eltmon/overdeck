@@ -49,6 +49,7 @@ import {
   Capability,
   MODELS_BY_PROVIDER,
 } from './AgentCards/ModelOverrideModal';
+import { FALLBACK_DEFAULT_MODEL, getEffectiveModelId } from './modelDefaults';
 
 // API Functions
 async function fetchSettings(): Promise<SettingsConfig> {
@@ -189,9 +190,6 @@ const AGENT_CATEGORIES: AgentCategory[] = [
   },
 ];
 
-// Default model
-const DEFAULT_MODEL = 'claude-sonnet-4-5';
-
 // Section navigation definitions
 const SETTINGS_SECTIONS = [
   { id: 'smart-selection', label: 'Smart Selection', icon: Route },
@@ -207,12 +205,22 @@ function getModelDisplay(modelId?: string): string {
   const model = getModelById(modelId as ModelId);
   if (model) return model.name;
   // Fallback for unknown models
-  if (modelId.includes('claude')) return modelId.includes('opus') ? 'Opus 4.6' : modelId.includes('haiku') ? 'Haiku' : 'Sonnet 4.5';
-  if (modelId.includes('gpt')) return 'GPT-4o';
-  if (modelId.includes('gemini')) return modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
-  if (modelId.includes('kimi')) return modelId.includes('k2.5') || modelId.includes('2.5') ? 'Kimi K2.5' : 'Kimi K2';
-  if (modelId.includes('glm')) return 'GLM-4';
-  return modelId;
+  const id = modelId.toLowerCase();
+  if (id.includes('claude')) return id.includes('opus') ? 'Claude Opus 4.6' : id.includes('haiku') ? 'Claude Haiku 4.5' : 'Claude Sonnet 4.6';
+  if (id.includes('gpt-5.4-pro')) return 'GPT-5.4 Pro';
+  if (id.includes('gpt-5.4') && id.includes('mini')) return 'GPT-5.4 Mini';
+  if (id.includes('gpt-5.4') && id.includes('nano')) return 'GPT-5.4 Nano';
+  if (id.includes('gpt-5.4') || id.includes('gpt-5.2-codex')) return 'GPT-5.4';
+  if (id.includes('gpt-4o-mini')) return 'GPT-5.4 Nano';
+  if (id.includes('gpt-4o')) return 'GPT-5.4 Mini';
+  if (id.includes('o4') && id.includes('mini')) return 'O4 Mini';
+  if (id.includes('o3')) return 'O3';
+  if (id.includes('gemini') && id.includes('lite')) return 'Gemini 3.1 Flash Lite';
+  if (id.includes('gemini') && id.includes('flash')) return 'Gemini 3 Flash';
+  if (id.includes('gemini')) return 'Gemini 3.1 Pro';
+  if (id.includes('kimi')) return 'Kimi K2.5';
+  if (id.includes('glm')) return 'GLM 5.1';
+  return modelId === FALLBACK_DEFAULT_MODEL ? 'Claude Sonnet 4.6' : modelId;
 }
 
 export function SettingsPage() {
@@ -825,7 +833,7 @@ export function SettingsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {category.agents.map((agent) => {
-                  const currentModelId = (formData.models.overrides[agent.id] || DEFAULT_MODEL) as ModelId;
+                  const currentModelId = getEffectiveModelId(agent.id, formData.models.overrides);
                   const modelDisplay = getModelDisplay(currentModelId);
                   const { score, matched, missing } = getCapabilityMatchScore(currentModelId, agent.id);
                   const requiredCaps = WORK_TYPE_CAPABILITIES[agent.id] || [];
@@ -1041,7 +1049,7 @@ export function SettingsPage() {
       {modalWorkType && (
         <ModelOverrideModal
           workType={modalWorkType}
-          currentModel={(formData.models.overrides[modalWorkType] || DEFAULT_MODEL) as ModelId}
+          currentModel={getEffectiveModelId(modalWorkType, formData.models.overrides)}
           isOverride={!!formData.models.overrides[modalWorkType]}
           enabledProviders={Object.entries(formData.models.providers)
             .filter(([_, enabled]) => enabled)

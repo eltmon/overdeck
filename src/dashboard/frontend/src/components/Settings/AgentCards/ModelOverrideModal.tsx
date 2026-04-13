@@ -1,4 +1,17 @@
 import { useState, useMemo } from 'react';
+import {
+  type LucideIcon,
+  Gem,
+  Sparkles,
+  Zap,
+  Code2,
+  Brain,
+  FlaskConical,
+  Layers,
+  Globe,
+  X,
+  CheckCircle2,
+} from 'lucide-react';
 import { WorkTypeId, ModelId } from '../types';
 
 // Model capabilities that can be matched to work types
@@ -7,7 +20,7 @@ export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-effici
 export interface ModelDef {
   id: ModelId;
   name: string;
-  icon: string;
+  icon: LucideIcon;
   tier?: 'premium' | 'balanced' | 'fast';
   capabilities: Capability[];
   description?: string;
@@ -33,42 +46,41 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: 'diamond', tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
-      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: 'auto_awesome', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
-      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: 'auto_awesome', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous gen Sonnet, strong coding performance' },
-      { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
+      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
+      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
+      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous gen Sonnet, strong coding performance' },
+      { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },
   openai: {
     name: 'OpenAI',
     models: [
-      { id: 'gpt-5.2-codex' as ModelId, name: 'GPT-5.2 Codex', icon: 'code', tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math'], description: '80% SWE-bench, premium coding' },
-      { id: 'o3-deep-research' as ModelId, name: 'O3 Deep Research', icon: 'psychology', tier: 'premium', capabilities: ['reasoning', 'complex-math'], description: 'Deep reasoning model for debugging' },
-      { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: 'science', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
-      { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
+      { id: 'gpt-5.4-pro' as ModelId, name: 'GPT-5.4 Pro', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math', 'agentic'], description: 'Top-tier OpenAI coding and reasoning' },
+      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Code2, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Best everyday OpenAI implementation model' },
+      { id: 'o3' as ModelId, name: 'O3', icon: Brain, tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math'], description: 'Deep reasoning model for debugging and analysis' },
+      { id: 'o4-mini' as ModelId, name: 'O4 Mini', icon: FlaskConical, tier: 'balanced', capabilities: ['reasoning', 'code', 'fast'], description: 'Fast reasoning model with strong code support' },
+      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: Layers, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code', 'reasoning'], description: 'Fast, cheap, and capable for high-volume work' },
+      { id: 'gpt-5.4-nano' as ModelId, name: 'GPT-5.4 Nano', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Cheapest OpenAI lane for tiny helper tasks' },
     ],
   },
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-3-pro-preview' as ModelId, name: 'Gemini 3 Pro', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: '1M context, first >1500 Elo on LMArena' },
-      { id: 'gemini-3-flash-preview' as ModelId, name: 'Gemini 3 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Extremely fast with 1M context' },
-      { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', icon: 'model_training', tier: 'balanced', capabilities: ['reasoning', 'large-context', 'code'], description: 'Advanced reasoning, 1M context' },
-      { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and efficient with large context' },
+      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship with strong large-context reasoning' },
+      { id: 'gemini-3-flash' as ModelId, name: 'Gemini 3 Flash', icon: Zap, tier: 'balanced', capabilities: ['fast', 'large-context', 'code'], description: 'Fast large-context model for exploration-heavy work' },
+      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Lowest-cost Gemini lane' },
     ],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
-      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Strong value, 65.8% SWE-bench, 128K context' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best-value implementation model, 256K context' },
     ],
   },
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-4.7' as ModelId, name: 'GLM 4.7', icon: 'hub', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Top open-source for agentic coding, 73.8% SWE-bench, 200K context' },
-      { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
+      { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Globe, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Direct-compatible large-context alternative' },
     ],
   },
 };
@@ -83,6 +95,8 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'specialist-review-agent': ['reasoning', 'code'],
   'specialist-test-agent': ['code', 'reasoning'],
   'specialist-merge-agent': ['code'],
+  'specialist-inspect-agent': ['reasoning', 'code'],
+  'specialist-uat-agent': ['reasoning', 'code'],
   'convoy:security-reviewer': ['reasoning', 'code'],
   'convoy:performance-reviewer': ['reasoning', 'code'],
   'convoy:correctness-reviewer': ['reasoning', 'code'],
@@ -91,6 +105,8 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'subagent:plan': ['reasoning'],
   'subagent:bash': ['fast', 'code'],
   'subagent:general-purpose': ['reasoning', 'code'],
+  'planning-agent': ['reasoning'],
+  'status-review': ['reasoning'],
   'cli:interactive': ['reasoning', 'code'],
   'cli:quick-command': ['fast'],
 };
@@ -105,6 +121,8 @@ export const WORK_TYPE_NAMES: Record<string, string> = {
   'specialist-review-agent': 'Review Agent',
   'specialist-test-agent': 'Test Agent',
   'specialist-merge-agent': 'Merge Agent',
+  'specialist-inspect-agent': 'Inspect Agent',
+  'specialist-uat-agent': 'UAT Agent',
   'convoy:security-reviewer': 'Security Reviewer',
   'convoy:performance-reviewer': 'Performance Reviewer',
   'convoy:correctness-reviewer': 'Correctness Reviewer',
@@ -113,6 +131,8 @@ export const WORK_TYPE_NAMES: Record<string, string> = {
   'subagent:plan': 'Plan Subagent',
   'subagent:bash': 'Bash Subagent',
   'subagent:general-purpose': 'General Purpose Subagent',
+  'planning-agent': 'Planning Agent',
+  'status-review': 'Status Review',
   'cli:interactive': 'CLI Interactive',
   'cli:quick-command': 'CLI Quick Command',
 };
@@ -148,28 +168,34 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // Anthropic models
   if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
-  if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-5');
+  if (idLower.includes('sonnet') && idLower.includes('4.6')) return models.find(m => m.id === 'claude-sonnet-4-6');
+  if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-6');
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
-  if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-5');
+  if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-6');
 
   // OpenAI models
-  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
-  if (idLower.includes('o1') || idLower.includes('o3')) return models.find(m => m.id === 'o3-deep-research');
+  if (idLower.includes('gpt-5.4-pro')) return models.find(m => m.id === 'gpt-5.4-pro');
+  if (idLower.includes('gpt-5.4') && idLower.includes('mini')) return models.find(m => m.id === 'gpt-5.4-mini');
+  if (idLower.includes('gpt-5.4') && idLower.includes('nano')) return models.find(m => m.id === 'gpt-5.4-nano');
+  if (idLower.includes('gpt-5.4') || idLower.includes('gpt-5.2-codex')) return models.find(m => m.id === 'gpt-5.4');
+  if (idLower.includes('gpt-4o-mini')) return models.find(m => m.id === 'gpt-5.4-nano');
+  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-5.4-mini');
+  if (idLower.includes('o4') && idLower.includes('mini')) return models.find(m => m.id === 'o4-mini');
+  if (idLower.includes('o3')) return models.find(m => m.id === 'o3');
 
   // Google models
-  if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-2.5-flash');
-  if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-2.5-pro');
+  if (idLower.includes('gemini') && idLower.includes('lite')) return models.find(m => m.id === 'gemini-3.1-flash-lite-preview');
+  if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');
+  if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
 
   // Kimi models
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
-    if (idLower.includes('k2.5') || idLower.includes('2.5')) return models.find(m => m.id === 'kimi-k2.5');
-    return models.find(m => m.id === 'kimi-k2');
+    return models.find(m => m.id === 'kimi-k2.5');
   }
 
   // GLM / Z.AI models
   if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
-    if (idLower.includes('flash')) return models.find(m => m.id === 'glm-4.7-flash');
-    return models.find(m => m.id === 'glm-4.7');
+    return models.find(m => m.id === 'glm-5.1');
   }
 
   return undefined;
@@ -271,8 +297,8 @@ export function ModelOverrideModal({
                 ))}
               </div>
             </div>
-            <button onClick={onClose} className="text-content-muted hover:text-content transition-colors p-1">
-              <span className="material-symbols-outlined">close</span>
+            <button onClick={onClose} className="text-content-muted hover:text-content transition-colors p-1" aria-label="Close model picker">
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -308,9 +334,7 @@ export function ModelOverrideModal({
                     <div className={`flex items-center justify-center rounded-lg shrink-0 size-10 transition-colors ${
                       isSelected || isRecommended ? 'bg-blue-500/20' : 'bg-surface-emphasis group-hover:bg-divider'
                     }`}>
-                      <span className={`material-symbols-outlined text-xl ${isSelected || isRecommended ? 'text-blue-400' : 'text-content-muted'}`}>
-                        {model.icon}
-                      </span>
+                      <model.icon className={`w-5 h-5 ${isSelected || isRecommended ? 'text-blue-400' : 'text-content-muted'}`} />
                     </div>
 
                     <div className="flex flex-1 flex-col justify-center min-w-0">
@@ -364,9 +388,7 @@ export function ModelOverrideModal({
                       ) : (
                         <span className="text-content-muted text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       )}
-                      {isSelected && (
-                        <span className="material-symbols-outlined text-blue-400">check_circle</span>
-                      )}
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
                     </div>
                   </div>
                 );
