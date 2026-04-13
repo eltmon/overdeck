@@ -289,6 +289,60 @@ export async function repairClosedWontfixIssues(): Promise<void> {
   }
 }
 
+/**
+ * Startup repair: detect issues with readyForMerge=true pointing at a PR that is
+ * CLOSED (not merged) on GitHub. These are the residue of cancel-flow divergence
+ * (PAN-509): before the Run 6 fix in closeIssuePullRequest(), `/cancel` closed the
+ * PR but left the stale prUrl in review-status, so a subsequent re-review cycle
+ * marked readyForMerge=true against a dead PR. The Run 6 triggerMerge validator
+ * now refuses to merge in this state, but the data is still stuck — this sweep
+ * clears it so the issue re-enters the pipeline and a fresh PR gets created.
+ *
+ * Fire-and-forget — non-fatal, errors are logged.
+ */
+export async function repairClosedPRs(): Promise<void> {
+  try {
+    const { setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+
+    const candidates = Object.values(statuses).filter(
+      s => s.readyForMerge === true && s.mergeStatus !== 'merged' && s.prUrl,
+    );
+    if (candidates.length === 0) return;
+
+    for (const s of candidates) {
+      const resolved = resolveGitHubIssue(s.issueId);
+      if (!resolved.isGitHub || !s.prUrl) continue;
+
+      const prNumMatch = s.prUrl.match(/\/pull\/(\d+)$/);
+      if (!prNumMatch) continue;
+      const prNumber = prNumMatch[1];
+
+      try {
+        const { stdout } = await execAsync(
+          `gh pr view ${prNumber} --repo ${resolved.owner}/${resolved.repo} --json state --jq .state`,
+          { encoding: 'utf-8', timeout: 10000 },
+        );
+        const state = stdout.trim();
+        if (state !== 'CLOSED') continue;
+
+        console.log(`[label-cleanup] ${s.issueId} PR #${prNumber} is CLOSED (not merged) — clearing stale readyForMerge and prUrl so issue re-enters pipeline`);
+        setReviewStatus(s.issueId, {
+          prUrl: undefined,
+          readyForMerge: false,
+          mergeStatus: undefined,
+          reviewStatus: 'pending',
+          mergeNotes: `Cleared stale closed PR #${prNumber} on startup (repairClosedPRs). Re-run review to create a fresh PR.`,
+        });
+      } catch {
+        // non-fatal — best-effort
+      }
+    }
+  } catch (err) {
+    console.warn(`[label-cleanup] repairClosedPRs failed: ${err}`);
+  }
+}
+
 async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'label-cleanup:merged';
   try {
