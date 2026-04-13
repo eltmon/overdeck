@@ -1764,12 +1764,13 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
           summary: 'CI checks are failing — merge blocked until CI passes',
           markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan work done ${issueIdForFb}\n\`\`\``,
         }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueIdForFb}:`, err.message));
-        // Nudge the work agent session if it's running
+        // Nudge the work agent session if it's running. Use the /rebase-and-submit
+        // skill as the atomic task contract so Claude doesn't stop partway through
+        // the submit flow (the failure mode that caused PAN-509 to sit idle).
         const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
         if (sessionExists(agentSession)) {
-          const port = process.env.API_PORT || process.env.PORT || '3011';
           await sendKeysAsync(agentSession,
-            `CI checks are failing on the PR. Check .planning/feedback/ for details, fix the failures, commit and push, then run: pan work done ${issueIdForFb} — or resubmit via: curl -X POST http://localhost:${port}/api/workspaces/${issueIdForFb}/request-review -H "Content-Type: application/json" -d '{}'`
+            `CI checks are failing on the PR. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueIdForFb}. The skill is an atomic task — do not stop until pan work done has completed successfully.`
           );
         }
         actions.push(`CI check failure for ${issueIdForFb} — wrote feedback, saturated merge retry counter`);
@@ -1908,8 +1909,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       // Send the agent a nudge message with the correct resubmit command
       try {
         const nudgeMessage = isReviewBlocked
-          ? `The review agent found issues in your code. Check .planning/feedback/ for details, fix the issues, commit and push, then resubmit with: curl -X POST http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}' — or run: pan work done ${issueId} -c "Fixed review issues"`
-          : `Tests failed for your changes. Check .planning/feedback/ for details, fix the failures, commit and push, then resubmit with: curl -X POST http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}' — or run: pan work done ${issueId} -c "Fixed test failures"`;
+          ? `The review agent found issues in your code. Read .planning/feedback/ for details, fix the issues, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan work done has completed successfully.`
+          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan work done has completed successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
