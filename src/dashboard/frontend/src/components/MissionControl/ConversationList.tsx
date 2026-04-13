@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X, Pencil, Star } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -19,6 +19,7 @@ export interface Conversation {
   endedAt: string | null;
   lastAttachedAt: string | null;
   sessionAlive: boolean;
+  isWorking?: boolean;
   isFavorited?: boolean;
   /** Absolute path to the Claude Code JSONL session file. Null until discovered. */
   sessionFile?: string | null;
@@ -364,14 +365,22 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     <X size={11} />
                   </span>
                 )}
-                <Circle
-                  size={7}
-                  className={styles.conversationDot}
-                  style={{
-                    fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-                    color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-                  }}
-                />
+                {conv.isWorking ? (
+                  <Loader2
+                    size={12}
+                    className={styles.conversationWorkingSpinner}
+                    aria-label={`Agent working in ${conv.name}`}
+                  />
+                ) : (
+                  <Circle
+                    size={7}
+                    className={styles.conversationDot}
+                    style={{
+                      fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+                      color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+                    }}
+                  />
+                )}
                 {editingName === conv.name ? (
                   <input
                     ref={editInputRef}

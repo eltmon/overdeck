@@ -7,6 +7,7 @@ import { updateConversationTitle } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
+import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
@@ -41,7 +42,7 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   const [viewMode, setViewMode] = useState<ViewMode>('conversation');
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || 'claude-opus-4-6');
+  const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -201,6 +202,9 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
             style={{ fill: statusColor, color: statusColor }}
           />
           {statusLabel}
+        </span>
+        <span className={styles.conversationSessionId}>
+          {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
         </span>
 
         {/* Copy link button */}

@@ -16,6 +16,7 @@ export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<WorkTypeId, ModelId>> =
   'convoy:security-reviewer': 'claude-opus-4-6',
   'convoy:performance-reviewer': 'claude-sonnet-4-6',
   'convoy:correctness-reviewer': 'claude-sonnet-4-6',
+  'convoy:requirements-reviewer': 'claude-sonnet-4-6',
   'convoy:synthesis-agent': 'claude-sonnet-4-6',
   'subagent:explore': 'claude-haiku-4-5',
   'subagent:plan': 'claude-haiku-4-5',

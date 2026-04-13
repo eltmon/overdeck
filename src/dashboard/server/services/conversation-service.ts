@@ -35,6 +35,12 @@ export interface ParseResult {
   totalCost: number;
 }
 
+export interface ConversationActivitySummary {
+  messages: ChatMessage[];
+  streaming: boolean;
+  isWorking: boolean;
+}
+
 // ─── CWD encoding ─────────────────────────────────────────────────────────────
 
 /**
@@ -333,6 +339,15 @@ export async function parseConversationMessages(
   }
 
   return { messages, workLog, byteOffset: newByteOffset, streaming, totalCost };
+}
+
+export async function summarizeConversationActivity(
+  sessionFile: string,
+): Promise<ConversationActivitySummary> {
+  const { messages, streaming } = await parseConversationMessages(sessionFile);
+  const lastMsg = messages[messages.length - 1];
+  const isWorking = messages.length > 0 && (streaming || lastMsg?.role === 'user');
+  return { messages, streaming, isWorking };
 }
 
 // ─── Compact boundary offset cache ───────────────────────────────────────────

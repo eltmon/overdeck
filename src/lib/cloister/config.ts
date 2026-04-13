@@ -77,6 +77,8 @@ export interface SpecialistsConfig {
   merge_agent?: SpecialistConfig;
   review_agent?: SpecialistConfig;
   test_agent?: TestAgentConfig;
+  inspect_agent?: SpecialistConfig;
+  uat_agent?: SpecialistConfig;
 }
 
 /**
@@ -95,6 +97,8 @@ export interface ModelSelectionConfig {
     merge_agent: 'opus' | 'sonnet' | 'haiku';
     review_agent: 'opus' | 'sonnet' | 'haiku';
     test_agent: 'opus' | 'sonnet' | 'haiku';
+    inspect_agent?: 'opus' | 'sonnet' | 'haiku';
+    uat_agent?: 'opus' | 'sonnet' | 'haiku';
   };
 }
 
@@ -213,11 +217,19 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     },
     review_agent: {
       enabled: true,
-      auto_wake: false, // Only wake on explicit request
+      auto_wake: false, // Woken by the verification pipeline, not ad hoc polling
     },
     test_agent: {
-      enabled: false, // Not yet implemented
-      auto_wake: false,
+      enabled: true,
+      auto_wake: true,
+    },
+    inspect_agent: {
+      enabled: true,
+      auto_wake: false, // Triggered explicitly per bead via pan inspect
+    },
+    uat_agent: {
+      enabled: true,
+      auto_wake: true,
     },
   },
   model_selection: {
@@ -233,6 +245,8 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       merge_agent: 'sonnet',
       review_agent: 'sonnet',
       test_agent: 'haiku',
+      inspect_agent: 'sonnet',
+      uat_agent: 'sonnet',
     },
   },
   handoffs: {

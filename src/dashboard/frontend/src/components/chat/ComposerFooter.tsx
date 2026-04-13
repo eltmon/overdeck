@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, DEFAULT_MODEL, MODEL_EFFORT_SUPPORT } from './ModelPicker';
+import { ModelPicker, getDefaultConversationModel, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -70,7 +70,7 @@ interface ComposerFooterProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
-  const [model, setModel] = useState<string>(conversation.model ?? DEFAULT_MODEL);
+  const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');

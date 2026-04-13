@@ -1340,6 +1340,12 @@
   flex-shrink: 0;
 }
 
+.conversationWorkingSpinner {
+  flex-shrink: 0;
+  color: var(--mc-success);
+  animation: spin 1s linear infinite;
+}
+
 .conversationName {
   flex: 1;
   overflow: hidden;
@@ -1568,6 +1574,19 @@
   display: flex;
   align-items: center;
   gap: var(--mc-space-1);
+}
+
+.conversationSessionId {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  opacity: 0.5;
+  font-family: var(--mc-font-mono);
+  user-select: all;
+  flex: 0 1 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .copyLinkButton {
