@@ -1,35 +1,165 @@
-import { execSync, exec } from 'child_process';
+import { execSync, execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
-import { PANOPTICON_HOME } from './paths.js';
+import { tmpdir } from 'os';
+import { getPanopticonHome } from './paths.js';
+import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
+
+const execFileAsync = promisify(execFile);
+
+const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
+const MANAGED_TMUX_CONFIG_CONTENT = [
+  '# Panopticon-managed tmux config',
+  '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
+  'set -g mouse on',
+  '',
+].join('\n');
 
 /**
- * Log file for tmux sendKeys operations
- * This helps debug mysterious messages appearing in agent prompts
+ * Log file for tmux sendKeys operations.
+ * This helps debug mysterious messages appearing in agent prompts.
  */
-const SENDKEYS_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'sendkeys.jsonl');
+function getSendKeysLogFile(): string {
+  return join(getPanopticonHome(), 'logs', 'sendkeys.jsonl');
+}
 
-/**
- * Ensure log directory exists
- */
+function getTmuxDir(): string {
+  return join(getPanopticonHome(), 'tmux');
+}
+
+export function getManagedTmuxConfigPath(): string {
+  return join(getTmuxDir(), 'panopticon.tmux.conf');
+}
+
+export function getManagedTmuxSocketName(): string {
+  return MANAGED_TMUX_SOCKET_NAME;
+}
+
 function ensureLogDir(): void {
-  const logDir = join(PANOPTICON_HOME, 'logs');
+  const logDir = join(getPanopticonHome(), 'logs');
   if (!existsSync(logDir)) {
     mkdirSync(logDir, { recursive: true });
   }
 }
 
+function ensureManagedTmuxDirSync(): void {
+  const tmuxDir = getTmuxDir();
+  if (!existsSync(tmuxDir)) {
+    mkdirSync(tmuxDir, { recursive: true });
+  }
+}
+
+async function ensureManagedTmuxDirAsync(): Promise<void> {
+  await mkdir(getTmuxDir(), { recursive: true });
+}
+
+function ensureManagedTmuxConfigSync(): void {
+  ensureManagedTmuxDirSync();
+  writeFileSync(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
+}
+
+async function ensureManagedTmuxConfigAsync(): Promise<void> {
+  await ensureManagedTmuxDirAsync();
+  await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
+}
+
+export function getTmuxConfigMode(): TmuxConfigMode {
+  const { config } = loadConfig();
+  return config.tmux.configMode;
+}
+
+function getTmuxContextArgsForMode(mode: TmuxConfigMode): string[] {
+  if (mode === 'inherit-user') {
+    return [];
+  }
+
+  return ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath()];
+}
+
+function ensureTmuxContextPreparedSync(mode: TmuxConfigMode): void {
+  if (mode === 'managed') {
+    ensureManagedTmuxConfigSync();
+  }
+}
+
+async function ensureTmuxContextPreparedAsync(mode: TmuxConfigMode): Promise<void> {
+  if (mode === 'managed') {
+    await ensureManagedTmuxConfigAsync();
+  }
+}
+
+export function getTmuxBaseArgs(): string[] {
+  const mode = getTmuxConfigMode();
+  ensureTmuxContextPreparedSync(mode);
+  return getTmuxContextArgsForMode(mode);
+}
+
+export function buildTmuxArgs(args: string[]): string[] {
+  return [...getTmuxBaseArgs(), ...args];
+}
+
+export function getTmuxCommand(args: string[]): { command: string; args: string[] } {
+  return { command: 'tmux', args: buildTmuxArgs(args) };
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+export function buildTmuxCommandString(args: string[]): string {
+  const { command, args: commandArgs } = getTmuxCommand(args);
+  return [command, ...commandArgs.map(shellQuote)].join(' ');
+}
+
+async function tmuxExecAsync(args: string[], options?: Parameters<typeof execFileAsync>[2]) {
+  const mode = getTmuxConfigMode();
+  await ensureTmuxContextPreparedAsync(mode);
+  return execFileAsync('tmux', [...getTmuxContextArgsForMode(mode), ...args], options);
+}
+
+function tmuxExecSync(args: string[], options?: Parameters<typeof execFileSync>[2]) {
+  const mode = getTmuxConfigMode();
+  ensureTmuxContextPreparedSync(mode);
+  return execFileSync('tmux', [...getTmuxContextArgsForMode(mode), ...args], options);
+}
+
+function buildNewSessionArgs(
+  name: string,
+  cwd: string,
+  initialCommand?: string,
+  options?: { env?: Record<string, string>; width?: number; height?: number }
+): string[] {
+  const args = ['new-session', '-d', '-s', name, '-c', cwd];
+
+  if (options?.width !== undefined) {
+    args.push('-x', String(options.width));
+  }
+  if (options?.height !== undefined) {
+    args.push('-y', String(options.height));
+  }
+  if (options?.env) {
+    for (const [key, value] of Object.entries(options.env)) {
+      args.push('-e', `${key}=${value}`);
+    }
+  }
+  if (initialCommand) {
+    args.push(initialCommand);
+  }
+
+  return args;
+}
+
 /**
- * Log a sendKeys operation for debugging
+ * Log a sendKeys operation for debugging.
  */
 function logSendKeys(sessionName: string, keys: string, caller?: string): void {
   try {
     ensureLogDir();
 
-    // Get call stack to identify caller if not provided
     const stack = new Error().stack || '';
-    const stackLines = stack.split('\n').slice(3, 6); // Skip Error, logSendKeys, sendKeys
+    const stackLines = stack.split('\n').slice(3, 6);
     const callerInfo = caller || stackLines.map(l => l.trim()).join(' <- ');
 
     const entry = {
@@ -39,9 +169,10 @@ function logSendKeys(sessionName: string, keys: string, caller?: string): void {
       keysPreview: keys.length > 200 ? keys.slice(0, 200) + '...' : keys,
       caller: callerInfo,
       pid: process.pid,
+      tmuxConfigMode: getTmuxConfigMode(),
     };
 
-    appendFileSync(SENDKEYS_LOG_FILE, JSON.stringify(entry) + '\n', 'utf-8');
+    appendFileSync(getSendKeysLogFile(), JSON.stringify(entry) + '\n', 'utf-8');
   } catch {
     // Silently fail - logging should never break functionality
   }
@@ -56,9 +187,10 @@ export interface TmuxSession {
 
 export function listSessions(): TmuxSession[] {
   try {
-    const output = execSync('tmux list-sessions -F "#{session_name}|#{session_created}|#{session_attached}|#{session_windows}"', {
-      encoding: 'utf8',
-    });
+    const output = tmuxExecSync(
+      ['list-sessions', '-F', '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}'],
+      { encoding: 'utf8' }
+    ) as string;
 
     return output.trim().split('\n').filter(Boolean).map(line => {
       const [name, created, attached, windows] = line.split('|');
@@ -70,19 +202,37 @@ export function listSessions(): TmuxSession[] {
       };
     });
   } catch {
-    return []; // No sessions
+    return [];
+  }
+}
+
+export async function listSessionNamesAsync(): Promise<string[]> {
+  try {
+    const { stdout } = await tmuxExecAsync(['list-sessions', '-F', '#{session_name}'], { encoding: 'utf-8' });
+    const text = String(stdout);
+    return text.split('\n').map((line: string) => line.trim()).filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
 export function sessionExists(name: string): boolean {
   try {
-    execSync(`tmux has-session -t ${name} 2>/dev/null`);
+    tmuxExecSync(['has-session', '-t', name], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
   }
 }
 
+export async function sessionExistsAsync(name: string): Promise<boolean> {
+  try {
+    await tmuxExecAsync(['has-session', '-t', name], { encoding: 'utf-8' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function createSession(
   name: string,
@@ -90,55 +240,51 @@ export function createSession(
   initialCommand?: string,
   options?: { env?: Record<string, string> }
 ): void {
-  const escapedCwd = cwd.replace(/"/g, '\\"');
-
-  // Build environment variable flags for tmux
-  let envFlags = '';
-  if (options?.env) {
-    for (const [key, value] of Object.entries(options.env)) {
-      envFlags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
-    }
-  }
-
-  // For complex commands (with special chars), start session first then send command
   if (initialCommand && (initialCommand.includes('`') || initialCommand.includes('\n') || initialCommand.length > 500)) {
-    // Create session without command
-    execSync(`tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags}`);
-
-    // Small delay to let session initialize
+    tmuxExecSync(buildNewSessionArgs(name, cwd, undefined, options));
     execSync('sleep 0.5');
 
-    // Send the command in chunks if needed (tmux has buffer limits)
-    // First, write to a temp file and source it
-    const tmpFile = `/tmp/pan-cmd-${name}.sh`;
+    const tmpFile = join(tmpdir(), `pan-cmd-${name}.sh`);
     writeFileSync(tmpFile, initialCommand);
     chmodSync(tmpFile, '755');
 
-    // Execute the script
-    execSync(`tmux send-keys -t ${name} "bash ${tmpFile}"`);
-    execSync(`tmux send-keys -t ${name} C-m`);
-  } else if (initialCommand) {
-    // Simple command - use inline
-    const cmd = `tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags} "${initialCommand.replace(/"/g, '\\"')}"`;
-    execSync(cmd);
-  } else {
-    execSync(`tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags}`);
+    try {
+      tmuxExecSync(['send-keys', '-t', name, `bash ${tmpFile}`]);
+      tmuxExecSync(['send-keys', '-t', name, 'C-m']);
+    } finally {
+      try { unlinkSync(tmpFile); } catch {}
+    }
+    return;
   }
+
+  tmuxExecSync(buildNewSessionArgs(name, cwd, initialCommand, options));
+}
+
+export async function createSessionAsync(
+  name: string,
+  cwd: string,
+  initialCommand?: string,
+  options?: { env?: Record<string, string>; width?: number; height?: number }
+): Promise<void> {
+  await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
 }
 
 export function killSession(name: string): void {
-  execSync(`tmux kill-session -t ${name}`);
+  tmuxExecSync(['kill-session', '-t', name]);
 }
 
-const execAsync = promisify(exec);
+export async function killSessionAsync(name: string): Promise<void> {
+  await tmuxExecAsync(['kill-session', '-t', name], { encoding: 'utf-8' });
+}
 
-export async function sessionExistsAsync(name: string): Promise<boolean> {
-  try {
-    await execAsync(`tmux has-session -t ${name} 2>/dev/null`);
-    return true;
-  } catch {
-    return false;
-  }
+export async function setOptionAsync(target: string, option: string, value: string): Promise<void> {
+  await tmuxExecAsync(['set-option', '-t', target, option, value], { encoding: 'utf-8' });
+}
+
+export async function resizeWindowAsync(target: string, cols: number, rows: number): Promise<void> {
+  await tmuxExecAsync(['resize-window', '-t', target, '-x', String(cols), '-y', String(rows)], {
+    encoding: 'utf-8',
+  });
 }
 
 /**
@@ -149,20 +295,17 @@ export async function sessionExistsAsync(name: string): Promise<boolean> {
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  // Use a unique named buffer per call to prevent race conditions.
-  // The default (unnamed) paste buffer is global — concurrent load-buffer
-  // calls from different specialist wakes clobber each other.
   const bufferName = `pan-${process.pid}-${Date.now()}`;
-  const tmpFile = `/tmp/pan-sendkeys-${bufferName}.txt`;
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${bufferName}.txt`);
   try {
-    writeFileSync(tmpFile, keys);
-    await execAsync(`tmux load-buffer -b ${bufferName} ${tmpFile}`);
-    await execAsync(`tmux paste-buffer -b ${bufferName} -t ${sessionName} -d`);
+    await writeFile(tmpFile, keys);
+    await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName, '-d'], { encoding: 'utf-8' });
     await new Promise(r => setTimeout(r, 300));
-    await execAsync(`tmux send-keys -t ${sessionName} C-m`);
+    await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } finally {
-    try { unlinkSync(tmpFile); } catch {}
-    try { await execAsync(`tmux delete-buffer -b ${bufferName} 2>/dev/null`); } catch {}
+    try { await unlink(tmpFile); } catch {}
+    try { await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }); } catch {}
   }
 }
 
@@ -173,13 +316,13 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = `/tmp/pan-sendkeys-${process.pid}-${Date.now()}.txt`;
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
   try {
     writeFileSync(tmpFile, keys);
-    execSync(`tmux load-buffer ${tmpFile}`);
-    execSync(`tmux paste-buffer -t ${sessionName}`);
-    execSync(`sleep 0.3`);
-    execSync(`tmux send-keys -t ${sessionName} C-m`);
+    tmuxExecSync(['load-buffer', tmpFile]);
+    tmuxExecSync(['paste-buffer', '-t', sessionName]);
+    execSync('sleep 0.3');
+    tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
@@ -187,9 +330,9 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
 
 export function capturePane(sessionName: string, lines: number = 50): string {
   try {
-    return execSync(`tmux capture-pane -t ${sessionName} -p -S -${lines}`, {
+    return tmuxExecSync(['capture-pane', '-t', sessionName, '-p', '-S', `-${lines}`], {
       encoding: 'utf8',
-    });
+    }) as string;
   } catch {
     return '';
   }
@@ -199,12 +342,19 @@ export function capturePane(sessionName: string, lines: number = 50): string {
  * Capture tmux pane output (async, non-blocking).
  * MUST be used from the dashboard server and any async context.
  */
-export async function capturePaneAsync(sessionName: string, lines: number = 50): Promise<string> {
+export async function capturePaneAsync(
+  sessionName: string,
+  lines: number = 50,
+  options?: { escapeSequences?: boolean }
+): Promise<string> {
   try {
-    const { stdout } = await execAsync(`tmux capture-pane -t ${sessionName} -p -S -${lines}`, {
-      encoding: 'utf-8',
-    });
-    return stdout;
+    const args = ['capture-pane', '-t', sessionName, '-p'];
+    if (options?.escapeSequences) {
+      args.push('-e');
+    }
+    args.push('-S', `-${lines}`);
+    const { stdout } = await tmuxExecAsync(args, { encoding: 'utf-8' });
+    return String(stdout);
   } catch {
     return '';
   }
@@ -213,34 +363,23 @@ export async function capturePaneAsync(sessionName: string, lines: number = 50):
 /**
  * Wait for Claude Code to reach its interactive prompt (❯) in a tmux session.
  * Polls tmux output until the prompt appears or timeout is reached.
- *
- * @param sessionName - tmux session name
- * @param timeoutMs - maximum time to wait (default: 15s for fresh start, use 5s for already-running)
- * @returns true if prompt detected, false if timed out
  */
 export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
-  const POLL = 500;
+  const poll = 500;
   while (Date.now() - start < timeoutMs) {
     const output = await capturePaneAsync(sessionName, 10);
-    // Claude Code shows ❯ when ready for user input.
-    // Check that the LAST non-empty line contains ❯ (not a stale prompt from earlier output).
     const lines = output.split('\n').filter(l => l.trim());
     const lastLine = lines[lines.length - 1] || '';
     if (lastLine.includes('❯')) return true;
-    await new Promise(r => setTimeout(r, POLL));
+    await new Promise(r => setTimeout(r, poll));
   }
   return false;
 }
 
 /**
  * Verify that a message sent to Claude was actually received and processing started.
- * Compares tmux output before and after to detect new activity (tool calls, responses).
- *
- * @param sessionName - tmux session name
- * @param outputBefore - tmux output snapshot taken BEFORE sending the message
- * @param timeoutMs - maximum time to wait for activity (default: 10s)
- * @returns true if new activity detected, false if timed out
+ * Compares tmux output before and after to detect new activity.
  */
 export async function confirmDelivery(
   sessionName: string,
@@ -248,19 +387,17 @@ export async function confirmDelivery(
   timeoutMs: number = 10000,
 ): Promise<boolean> {
   const start = Date.now();
-  const POLL = 1000;
+  const poll = 1000;
   const beforeLineCount = outputBefore.split('\n').filter(l => l.trim()).length;
 
   while (Date.now() - start < timeoutMs) {
-    await new Promise(r => setTimeout(r, POLL));
+    await new Promise(r => setTimeout(r, poll));
     const after = await capturePaneAsync(sessionName, 50);
     const afterLines = after.split('\n').filter(l => l.trim());
     const afterLineCount = afterLines.length;
 
-    // Claude is processing if: new output lines appeared (tool calls: ●, results: ⎿, etc.)
     if (afterLineCount > beforeLineCount + 1) return true;
 
-    // Or if we can see activity markers in the new output
     const newOutput = afterLines.slice(beforeLineCount).join('\n');
     if (
       newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read') ||

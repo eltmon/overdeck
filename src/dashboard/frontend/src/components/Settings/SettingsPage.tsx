@@ -174,7 +174,7 @@ const AGENT_CATEGORIES: AgentCategory[] = [
       { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation', icon: Code, description: 'Write the code', implemented: true },
       { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing', icon: Beaker, description: 'Write & run tests', implemented: true },
       { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation', icon: FileText, description: 'Update docs', implemented: true },
-      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: false },
+      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: true },
     ],
   },
   {
@@ -237,6 +237,7 @@ const SETTINGS_SECTIONS = [
   { id: 'smart-selection', label: 'Smart Selection', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'openrouter', label: 'OpenRouter', icon: Globe },
+  { id: 'tmux', label: 'Terminal', icon: Terminal },
   { id: 'trackers', label: 'Tracker Keys', icon: GitBranch },
   { id: 'model-assignments', label: 'Model Assignments', icon: Brain },
   { id: 'maintenance', label: 'Maintenance', icon: Settings },
@@ -433,6 +434,16 @@ export function SettingsPage() {
       tracker_keys: {
         ...formData.tracker_keys,
         [tracker]: key || undefined,
+      },
+    });
+  };
+
+  const handleTmuxConfigModeChange = (configMode: 'managed' | 'inherit-user') => {
+    setFormData({
+      ...formData,
+      tmux: {
+        ...formData.tmux,
+        config_mode: configMode,
       },
     });
   };
@@ -982,6 +993,64 @@ export function SettingsPage() {
           onApiKeyChange={(key) => handleApiKeyChange('openrouter', key)}
           onToggleEnabled={() => handleProviderToggle('openrouter')}
         />
+      </section>
+
+      {/* Terminal */}
+      <section id="tmux" className="mb-12 scroll-mt-4">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          Terminal
+          <div className="h-px flex-1 bg-divider-strong" />
+        </h2>
+        <p className="text-content-muted text-sm mb-6">
+          Control whether Panopticon launches tmux in its own managed server with a Panopticon-owned config, or intentionally inherits your user tmux config.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <button
+            type="button"
+            onClick={() => handleTmuxConfigModeChange('managed')}
+            className={`text-left rounded-xl border p-5 transition-colors ${
+              (formData.tmux?.config_mode || 'managed') === 'managed'
+                ? 'border-blue-500 bg-blue-500/10'
+                : 'border-divider bg-surface-raised hover:border-divider-strong'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <div>
+                <div className="font-bold text-content">Managed tmux</div>
+                <div className="text-xs text-content-muted font-mono">Default</div>
+              </div>
+              {(formData.tmux?.config_mode || 'managed') === 'managed' && (
+                <div className="text-blue-400 text-xs font-semibold">Selected</div>
+              )}
+            </div>
+            <p className="text-sm text-content-muted">
+              Use Panopticon&apos;s own tmux socket and config file. This avoids depending on your dotfiles while preserving Panopticon&apos;s required mouse behavior.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTmuxConfigModeChange('inherit-user')}
+            className={`text-left rounded-xl border p-5 transition-colors ${
+              formData.tmux?.config_mode === 'inherit-user'
+                ? 'border-amber-500 bg-amber-500/10'
+                : 'border-divider bg-surface-raised hover:border-divider-strong'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <div>
+                <div className="font-bold text-content">Inherit user tmux</div>
+                <div className="text-xs text-content-muted font-mono">Advanced opt-out</div>
+              </div>
+              {formData.tmux?.config_mode === 'inherit-user' && (
+                <div className="text-amber-400 text-xs font-semibold">Selected</div>
+              )}
+            </div>
+            <p className="text-sm text-content-muted">
+              Use your existing tmux server/config behavior instead of Panopticon-managed tmux. Choose this only if you specifically want Panopticon to follow your personal tmux setup.
+            </p>
+          </button>
+        </div>
       </section>
 
       {/* Tracker API Keys */}
