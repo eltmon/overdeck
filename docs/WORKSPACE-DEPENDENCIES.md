@@ -98,9 +98,58 @@ Bun hoists all workspace dependencies to the root `node_modules/`. Per-workspace
 
 ### Container Image
 
-The container uses `node:22-alpine` with Bun installed system-wide. Node 22 is required because:
-- Bun's `.bun/` hoisted package layout uses module resolution features not available in Node 20
-- The `tsdown` build tool requires Node 22+ for its dynamic import resolution
+The container uses `node:22-alpine` with Bun installed system-wide.
+
+### Critical: Server Runs with Node 22 Built Dist — NEVER `bun run main.ts`
+
+The init service must **build** the dashboard server before the server service starts.
+The server service runs the **pre-built `dist/dashboard/server.js`** with Node 22, not
+`bun run main.ts` or `bun run dev`:
+
+```yaml
+# ✗ WRONG — causes two hard failures:
+command: sh -c "bun run dev"   # bun run main.ts
+
+# ✓ CORRECT — builds then runs with Node 22:
+# (in init service):  npm run build:dashboard:server
+# (in server service): node dist/dashboard/server.js
+```
+
+Two hard blockers for running the dashboard server under Bun in containers:
+
+1. **`@homebridge/node-pty-prebuilt-multiarch` native addon** — Bun's addon
+   compatibility layer causes the PTY to spawn but exit immediately with code 0,
+   breaking `/ws/terminal` for all agent terminal panels.
+
+2. **`Cannot find module 'effect/Context'` crash** — `@effect/platform-node-shared`
+   can resolve to a version that requires `effect/Context` (a subpath export), but
+   the installed `effect` package may be an older beta that lacks it. Bun source-mode
+   tries to resolve this at runtime; Node running the pre-built bundle never hits it
+   because the bundle inlines all effect code at build time.
+
+The init service command must include all three steps in order:
+```sh
+bun install &&
+npm rebuild better-sqlite3 &&  # native addon compat for Node 22
+cd packages/contracts && bun run build && cd ../.. &&
+npm run build:dashboard:server  # builds dist/dashboard/server.js
+```
+
+### Effect Version Pinning
+
+`package.json` has an override to pin `@effect/platform-node-shared` to the same
+version as `@effect/platform-bun` and `@effect/platform-node`. Without this, Bun
+can resolve the shared package to a newer version that requires a newer `effect`
+package, creating a broken symlink in the `container-node-modules` volume:
+
+```json
+"overrides": {
+  "@effect/platform-node-shared": "4.0.0-beta.43"
+}
+```
+
+If you upgrade `@effect/platform-bun` or `@effect/platform-node`, update this
+override to match.
 
 ---
 
