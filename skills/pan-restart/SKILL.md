@@ -1,54 +1,35 @@
 ---
 name: pan-restart
-description: Restart the Panopticon dashboard (frontend and API server)
+description: Restart the Panopticon dashboard using pan up (the only safe way)
 ---
 
 # Restart Panopticon Dashboard
 
-This skill restarts the Panopticon dashboard services.
+Restarts the Panopticon dashboard using `pan up`, which is the canonical restart method.
 
 ## Usage
 
-Run `/pan-restart` to restart both the frontend (port 3010) and API server (port 3011).
-
-## What It Does
-
-1. Kills any existing dashboard processes
-2. Starts `npm run dev` in the dashboard directory
-3. Waits for services to be ready
-4. Verifies both frontend and API are responding
+Run `/pan-restart` to restart the dashboard. `pan up` handles gracefully stopping the old
+instance (via port-based kill) and starting a new one.
 
 ## Execution
 
 ```bash
-# Kill existing processes
-pkill -f "node.*server\.js" 2>/dev/null
-pkill -f "bun.*server/main" 2>/dev/null
-pkill -f "vite.*dashboard" 2>/dev/null
-sleep 1
+# Build first if code was changed
+cd /home/eltmon/Projects/panopticon-cli && npm run build
 
-# Start dashboard
-cd /home/eltmon/projects/panopticon/src/dashboard
-nohup npm run dev > /tmp/panopticon-dashboard.log 2>&1 &
+# Restart via pan up — handles killing old process on ports 3010/3011 automatically
+pan up
 
-# Wait for startup
-sleep 3
-
-# Verify services
-echo "Checking frontend (port 3010)..."
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3010 && echo " OK" || echo " FAILED"
-
-echo "Checking API (port 3011)..."
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3011/api/health && echo " OK" || echo " FAILED"
-
-echo ""
-echo "Dashboard restarted. View at: http://localhost:3010"
+# Verify
+curl -s http://localhost:3011/api/health | head -1
 ```
 
-## Troubleshooting
+Expected output: `{"status":"ok"...}`
 
-If the dashboard fails to start:
+## Important Notes
 
-1. Check logs: `tail -50 /tmp/panopticon-dashboard.log`
-2. Check for port conflicts: `lsof -i :3010 -i :3011`
-3. Ensure dependencies are installed: `cd /home/eltmon/projects/panopticon/src/dashboard && npm install`
+- NEVER use `pkill -f "node.*server"` or similar — it can kill unrelated Node processes
+- NEVER use `npm run dev` — the dashboard must run under Node 22 via the built dist
+- Always run `npm run build` first if you changed dashboard server or CLI code
+- `pan up` is idempotent — it kills the old process first, then starts the new one

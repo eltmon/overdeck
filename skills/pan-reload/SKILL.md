@@ -4,7 +4,7 @@ Rebuild and restart the Panopticon dashboard after code changes.
 
 ## When to Use
 
-Use this skill after merging changes to panopticon-cli that affect:
+Use this skill after making changes to panopticon-cli that affect:
 - Dashboard frontend (`src/dashboard/frontend/`)
 - Dashboard server (`src/dashboard/server/`)
 - CLI commands (`src/cli/`)
@@ -14,12 +14,12 @@ Use this skill after merging changes to panopticon-cli that affect:
 
 1. **Build the project:**
 ```bash
-cd /home/eltmon/projects/panopticon && npm run build
+cd /home/eltmon/Projects/panopticon-cli && npm run build
 ```
 
 2. **Restart the dashboard:**
 ```bash
-/home/eltmon/projects/panopticon/scripts/restart-dashboard.sh
+pan up
 ```
 
 3. **Verify the dashboard is running:**
@@ -31,14 +31,12 @@ Expected output: `{"status":"ok"...}`
 
 ## Quick One-Liner
 
-For agents that need a single command:
 ```bash
-cd /home/eltmon/projects/panopticon && npm run build && ./scripts/restart-dashboard.sh
+cd /home/eltmon/Projects/panopticon-cli && npm run build && pan up
 ```
 
-## Troubleshooting
+## Important Notes
 
-If the dashboard fails to start:
-1. Check for port conflicts: `fuser 3010/tcp 3011/tcp`
-2. Kill stale processes: `fuser -k 3010/tcp 3011/tcp`
-3. Check logs: `tail -50 /tmp/dashboard.log`
+- `pan up` automatically kills the old process before starting the new one
+- NEVER use `pkill` or manual process killing — use `pan up` instead
+- The dashboard must run the built `dist/dashboard/server.js` under Node 22
