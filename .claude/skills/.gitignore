@@ -1,6 +1,9 @@
 # Panopticon-managed symlinks (not committed)
 beads
 beads-completion-check
+benchmark
+pan-dev
+workspace-add-repo
 beads-panopticon-guide
 benchmark
 bug-fix
