@@ -17,11 +17,10 @@
 
 import http from 'node:http';
 import { homedir } from 'node:os';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
+import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -51,10 +50,8 @@ function sendControl(ws: WebSocket, payload: unknown): void {
 }
 
 async function captureSnapshot(sessionName: string, cols: number, rows: number): Promise<string> {
-  const escapedTarget = JSON.stringify(sessionName);
-  await execAsync(`tmux resize-window -t ${escapedTarget} -x ${cols} -y ${rows} 2>/dev/null || true`);
-  const { stdout } = await execAsync(`tmux capture-pane -p -e -S -5000 -t ${escapedTarget}`);
-  return stdout;
+  await resizeWindowAsync(sessionName, cols, rows).catch(() => {});
+  return capturePaneAsync(sessionName, 5000, { escapeSequences: true });
 }
 
 /**
@@ -132,8 +129,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     // Check if tmux session exists and set up PTY (async)
     (async () => {
       try {
-        const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""');
-        const sessions = stdout.trim().split('\n').filter(Boolean);
+        const sessions = await listSessionNamesAsync();
         if (!sessions.includes(sessionName)) {
           ws.close(1008, `Session ${sessionName} not found`);
           return;
@@ -205,7 +201,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
             } catch {
               return;
             }
-            execAsync(`tmux resize-window -t ${JSON.stringify(sessionName)} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+            resizeWindowAsync(sessionName, parsed.cols, parsed.rows)
               .catch(() => {});
             for (const client of existingHub.clients) {
               sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });
@@ -264,7 +260,12 @@ export function setupTerminalWebSocket(server: http.Server): void {
       const startLocalPty = async () => {
         if (ptyStarted) return;
         try {
-          await execAsync(`tmux has-session -t ${JSON.stringify(sessionName)}`);
+          const exists = await sessionExistsAsync(sessionName);
+          if (!exists) {
+            console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+            ws.close(1000, 'session-not-found');
+            return;
+          }
         } catch {
           console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
           ws.close(1000, 'session-not-found');
@@ -273,7 +274,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
         ptyStarted = true;
         console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${hub.cols}x${hub.rows}`);
-        ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+        ptyProcess = pty.spawn('tmux', buildTmuxArgs(['attach-session', '-t', sessionName]), {
           name: 'xterm-256color',
           cols: hub.cols,
           rows: hub.rows,
@@ -326,7 +327,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           hub.rows = parsed.rows;
           if (ptyProcess) {
             ptyProcess.resize(parsed.cols, parsed.rows);
-            execAsync(`tmux resize-window -t ${JSON.stringify(sessionName)} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+            resizeWindowAsync(sessionName, parsed.cols, parsed.rows)
               .catch(() => {});
             for (const client of hub.clients) {
               sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });

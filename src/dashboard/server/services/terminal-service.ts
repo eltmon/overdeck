@@ -12,12 +12,9 @@
  */
 
 import { Cause, Effect, Layer, Queue, ServiceMap, Stream } from 'effect';
-import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
-import { promisify } from 'node:util';
 import { PanRpcError, TerminalOutput } from '@panopticon/contracts';
-
-const execAsync = promisify(exec);
+import { buildTmuxArgs, resizeWindowAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -113,13 +110,10 @@ class NodePtyProcess implements PtyProcess {
 async function waitForTmuxSession(sessionName: string, timeoutMs = 60000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    try {
-      await execAsync(`tmux has-session -t ${sessionName} 2>/dev/null`);
-      return; // Session exists
-    } catch {
-      // Not ready yet — wait and retry
-      await new Promise(r => setTimeout(r, 1000));
+    if (await sessionExistsAsync(sessionName)) {
+      return;
     }
+    await new Promise(r => setTimeout(r, 1000));
   }
   throw new Error(`Timed out waiting for tmux session ${sessionName} (${timeoutMs}ms)`);
 }
@@ -140,7 +134,7 @@ function spawnPtyImmediate(sessionName: string, cols: number, rows: number): Pty
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const BunGlobal = globalThis as any;
     let processHandle: BunPtyProcess | null = null;
-    const subprocess = BunGlobal.Bun.spawn(['tmux', 'attach-session', '-t', sessionName], {
+    const subprocess = BunGlobal.Bun.spawn(['tmux', ...buildTmuxArgs(['attach-session', '-t', sessionName])], {
       cwd,
       env,
       terminal: {
@@ -155,7 +149,7 @@ function spawnPtyImmediate(sessionName: string, cols: number, rows: number): Pty
     return processHandle;
   } else {
     if (!_nodePtyModule) throw new Error('node-pty not loaded — call getNodePty() first');
-    const proc = _nodePtyModule.spawn('tmux', ['attach-session', '-t', sessionName], {
+    const proc = _nodePtyModule.spawn('tmux', buildTmuxArgs(['attach-session', '-t', sessionName]), {
       name: 'xterm-256color',
       cols,
       rows,
@@ -233,12 +227,12 @@ export const TerminalServiceLive = Layer.effect(
         setTimeout(() => {
           if (!state.ptyProcess) return;
           try { proc.resize(cols - 1, rows); } catch { return; }
-          execAsync(`tmux resize-window -t ${state.sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
+          resizeWindowAsync(state.sessionName, cols - 1, rows)
             .then(() => new Promise<void>((r) => setTimeout(r, 50)))
             .then(() => {
               if (!state.ptyProcess) return;
               try { proc.resize(cols, rows); } catch { return; }
-              return execAsync(`tmux resize-window -t ${state.sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
+              return resizeWindowAsync(state.sessionName, cols, rows);
             })
             .catch(() => {});
         }, 200);
@@ -338,7 +332,7 @@ export const TerminalServiceLive = Layer.effect(
         if (state.ptyProcess) {
           try { state.ptyProcess.resize(cols, rows); } catch { return; /* PTY dead */ }
           yield* Effect.promise(() =>
-            execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`).catch(() => {}),
+            resizeWindowAsync(sessionName, cols, rows).catch(() => {}),
           );
         }
       });

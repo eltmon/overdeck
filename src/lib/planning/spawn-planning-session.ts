@@ -18,6 +18,13 @@ import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { getProviderForModel, getProviderEnv } from '../providers.js';
+import {
+  sessionExistsAsync,
+  createSessionAsync,
+  killSessionAsync,
+  setOptionAsync,
+  buildTmuxCommandString,
+} from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand } from '../agents.js';
@@ -111,15 +118,13 @@ export interface SpawnPlanningResult {
 
 async function ensureTmuxRunning(): Promise<void> {
   try {
-    await execAsync('tmux list-sessions 2>/dev/null', { encoding: 'utf-8' });
-  } catch {
-    // Tmux server not running, start it
-    try {
-      await execAsync('tmux new-session -d -s panopticon-init', { encoding: 'utf-8' });
+    const exists = await sessionExistsAsync('panopticon-init');
+    if (!exists) {
+      await createSessionAsync('panopticon-init', homedir(), undefined);
       console.log('Started tmux server');
-    } catch (startErr) {
-      console.error('Failed to start tmux server:', startErr);
     }
+  } catch (startErr) {
+    console.error('Failed to start tmux server:', startErr);
   }
   // Strip env vars from tmux global environment that should NOT leak into
   // agent sessions. The tmux server inherits the dashboard's process.env
@@ -132,7 +137,7 @@ async function ensureTmuxRunning(): Promise<void> {
   ];
   for (const envVar of varsToStrip) {
     try {
-      await execAsync(`tmux set-environment -g -u ${envVar} 2>/dev/null`, { encoding: 'utf-8' });
+      await execAsync(`${buildTmuxCommandString(['set-environment', '-g', '-u', envVar])} 2>/dev/null`, { encoding: 'utf-8' });
     } catch {
       // Variable wasn't set — fine
     }
@@ -348,7 +353,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(2, 'Preparing planning environment', '.planning/ directory structure');
 
     // Kill existing planning session if any
-    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    await killSessionAsync(sessionName).catch(() => {});
 
     // Create planning directory structure
     const planningDir = join(workspacePath, '.planning');
@@ -470,15 +475,16 @@ while true; do sleep 60; done
     progress(5, 'Launching planning session', sessionName);
 
     await ensureTmuxRunning();
-    await execAsync(
-      `TERM=xterm-256color tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`,
-      { encoding: 'utf-8' },
-    );
+    await createSessionAsync(sessionName, workspacePath, `bash '${launcherScript}'`, {
+      env: {
+        TERM: 'xterm-256color',
+      },
+    });
     // Protect the session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.
-    await execAsync(`tmux set-option -t ${sessionName} destroy-unattached off 2>/dev/null || true`, { encoding: 'utf-8' });
-    await execAsync(`tmux set-option -t ${sessionName} remain-on-exit on 2>/dev/null || true`, { encoding: 'utf-8' });
+    await setOptionAsync(sessionName, 'destroy-unattached', 'off');
+    await setOptionAsync(sessionName, 'remain-on-exit', 'on');
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the

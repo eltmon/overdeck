@@ -43,7 +43,14 @@ import {
   setFavorite,
   removeFavorite,
 } from '../../../lib/database/conversations-db.js';
-import { sendKeysAsync } from '../../../lib/tmux.js';
+import {
+  sendKeysAsync,
+  capturePaneAsync,
+  sessionExistsAsync,
+  killSessionAsync,
+  createSessionAsync,
+  setOptionAsync,
+} from '../../../lib/tmux.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -52,6 +59,7 @@ import {
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
+  summarizeConversationActivity,
 } from '../services/conversation-service.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
@@ -64,18 +72,10 @@ const execAsync = promisify(exec);
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    try {
-      const { stdout } = await execAsync(
-        `tmux capture-pane -t ${tmuxSession} -p 2>/dev/null`,
-        { encoding: 'utf-8' },
-      );
-      // Claude Code shows ❯ when ready for input
-      if (stdout.includes('❯')) {
-        console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
-        return;
-      }
-    } catch {
-      // Session might not exist yet
+    const output = await capturePaneAsync(tmuxSession, 200);
+    if (output.includes('❯')) {
+      console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
+      return;
     }
     await new Promise<void>((r) => setTimeout(r, 500));
   }
@@ -113,12 +113,7 @@ function sanitizeName(name: string): string {
 
 /** Check if a tmux session exists (async, non-blocking) */
 async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  try {
-    await execAsync(`tmux has-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
-    return true;
-  } catch {
-    return false;
-  }
+  return sessionExistsAsync(sessionName);
 }
 
 /**
@@ -326,17 +321,22 @@ while true; do sleep 60; done
 `, { mode: 0o755 });
 
   // Kill any stale session with the same name
-  await execAsync(`tmux kill-session -t ${tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+  try {
+    await killSessionAsync(tmuxSession);
+  } catch {
+    // ignore missing stale session
+  }
 
   // Spawn the session
-  await execAsync(
-    `TERM=xterm-256color tmux new-session -d -s ${tmuxSession} "bash '${launcherScript}'"`,
-    { encoding: 'utf-8' },
-  );
+  await createSessionAsync(tmuxSession, cwd, `bash '${launcherScript}'`, {
+    env: {
+      TERM: 'xterm-256color',
+    },
+  });
 
   // Keep session alive when clients disconnect
-  await execAsync(`tmux set-option -t ${tmuxSession} destroy-unattached off 2>/dev/null || true`, { encoding: 'utf-8' });
-  await execAsync(`tmux set-option -t ${tmuxSession} remain-on-exit on 2>/dev/null || true`, { encoding: 'utf-8' });
+  await setOptionAsync(tmuxSession, 'destroy-unattached', 'off');
+  await setOptionAsync(tmuxSession, 'remain-on-exit', 'on');
 }
 
 /**
@@ -416,7 +416,18 @@ const getConversationsRoute = HttpRouter.add(
               !conv.endedAt &&
               Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
             const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
-            return { ...conv, sessionAlive, isFavorited: favoritedNames.has(conv.name) };
+
+            let isWorking = false;
+            if (sessionAlive && conv.sessionFile) {
+              try {
+                const summary = await summarizeConversationActivity(conv.sessionFile);
+                isWorking = summary.isWorking;
+              } catch {
+                isWorking = false;
+              }
+            }
+
+            return { ...conv, sessionAlive, isWorking, isFavorited: favoritedNames.has(conv.name) };
           }),
         );
 
@@ -551,7 +562,7 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+        await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
 
         return jsonResponse({ success: true });
@@ -648,7 +659,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           : (conv.model ?? undefined);
 
         // Always kill the existing session first (if alive) so the model change takes effect
-        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+        await killSessionAsync(conv.tmuxSession).catch(() => {});
 
         // Persist the new model
         if (model) updateConversationModel(name, model);
@@ -845,7 +856,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         }
 
         // Kill tmux session if still alive
-        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+        await killSessionAsync(conv.tmuxSession).catch(() => {});
 
         // Mark as ended and archived
         markConversationEnded(name);
@@ -883,7 +894,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
         for (const conv of convs) {
           try {
             // Kill existing tmux session
-            await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+            await killSessionAsync(conv.tmuxSession).catch(() => {});
 
             // Re-spawn with stored model
             const oldSessionId = conv.sessionFile
