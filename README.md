@@ -31,6 +31,8 @@ npx panopticon-cli@latest install && pan up
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
+On install, Panopticon rebuilds native modules like `better-sqlite3` for your active Node.js version. If you switch Node versions later, run `npm rebuild better-sqlite3` before starting Panopticon again.
+
 See the [full documentation](https://panopticon-cli.com) for detailed setup, configuration, and usage guides.
 
 ---
