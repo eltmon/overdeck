@@ -23,6 +23,8 @@ import {
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
 } from '../../../lib/settings-api.js';
+import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
+import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 
@@ -118,6 +120,28 @@ const getOptimalDefaultsRoute = HttpRouter.add(
   httpHandler(Effect.try({
     try: () => jsonResponse(getOptimalDefaultsApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+// ─── Route: GET /api/settings/claude-auth ────────────────────────────────────
+
+const getClaudeAuthRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/claude-auth',
+  httpHandler(Effect.gen(function* () {
+    const status = yield* Effect.promise(() => getClaudeAuthStatus());
+    return jsonResponse(status);
+  })),
+);
+
+// ─── Route: GET /api/settings/openai-auth ────────────────────────────────────
+
+const getOpenAIAuthRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/openai-auth',
+  httpHandler(Effect.gen(function* () {
+    const status = yield* Effect.promise(() => getOpenAIAuthStatus());
+    return jsonResponse(status);
   })),
 );
 
@@ -452,6 +476,8 @@ export const settingsRouteLayer = Layer.mergeAll(
   getSettingsRoute,
   getAvailableModelsRoute,
   getOptimalDefaultsRoute,
+  getClaudeAuthRoute,
+  getOpenAIAuthRoute,
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
   putSettingsRoute,

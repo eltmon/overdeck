@@ -154,13 +154,27 @@ export function loadSettingsApi(): ApiSettingsConfig {
  * Save settings from API format (for PUT /api/settings)
  */
 export function saveSettingsApi(settings: ApiSettingsConfig): void {
+  const { config: currentConfig } = loadConfig();
+
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
     models: {
       providers: {
         anthropic: settings.models.providers.anthropic,
-        openai: settings.models.providers.openai,
-        google: settings.models.providers.google,
+        openai: currentConfig.providerAuth.openai || currentConfig.providerPlan.openai
+          ? {
+              enabled: settings.models.providers.openai,
+              auth: currentConfig.providerAuth.openai,
+              plan: currentConfig.providerPlan.openai,
+            }
+          : settings.models.providers.openai,
+        google: currentConfig.providerAuth.google || currentConfig.providerPlan.google
+          ? {
+              enabled: settings.models.providers.google,
+              auth: currentConfig.providerAuth.google,
+              plan: currentConfig.providerPlan.google,
+            }
+          : settings.models.providers.google,
         zai: settings.models.providers.minimax,
         kimi: settings.models.providers.kimi,
         openrouter: settings.models.providers.openrouter,
