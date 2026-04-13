@@ -839,10 +839,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
         )}
 
         {/* Start containers button */}
-        {workspace?.hasDocker && workspace.containers && Object.values(workspace.containers).some(c => !c.running) && (
+        {workspace?.hasDocker && workspace.containers && (Object.keys(workspace.containers).length === 0 || Object.values(workspace.containers).some(c => !c.running)) && (
           <div className="px-3 py-2 border-b border-divider">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-warning">{containersStarting ? 'Starting containers...' : 'Some containers stopped'}</span>
+              <span className="text-xs text-warning">{containersStarting ? 'Starting containers...' : Object.keys(workspace.containers).length === 0 ? 'Containers not started' : 'Some containers stopped'}</span>
               <button
                 onClick={() => startContainersMutation.mutate()}
                 disabled={startContainersMutation.isPending || containersStarting}

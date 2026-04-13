@@ -250,12 +250,26 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
 // ─── User message ─────────────────────────────────────────────────────────────
 
 function UserMessageRow({ message }: { message: ChatMessage }) {
+  const isPending = message.id.startsWith('optimistic-');
   return (
     <div className={styles.userMessageRow}>
-      <div className={styles.userMessageBubble}>
+      <div
+        className={styles.userMessageBubble}
+        style={isPending ? { opacity: 0.6 } : undefined}
+        title={isPending ? 'Pending — waiting for agent to process' : undefined}
+      >
         <p className={styles.userMessageText}>{message.text}</p>
         <span className={styles.messageTimestamp}>
-          {formatTimestamp(message.createdAt)}
+          {isPending ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <svg style={{ width: '10px', height: '10px', animation: 'spin 1.2s linear infinite' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 12a9 9 0 11-6.219-8.56" />
+              </svg>
+              Sending…
+            </span>
+          ) : (
+            formatTimestamp(message.createdAt)
+          )}
         </span>
       </div>
     </div>
