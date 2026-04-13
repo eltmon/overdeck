@@ -155,24 +155,26 @@ export function loadSettingsApi(): ApiSettingsConfig {
  */
 export function saveSettingsApi(settings: ApiSettingsConfig): void {
   const { config: currentConfig } = loadConfig();
+  const providerAuth = currentConfig.providerAuth ?? {};
+  const providerPlan = currentConfig.providerPlan ?? {};
 
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
     models: {
       providers: {
         anthropic: settings.models.providers.anthropic,
-        openai: currentConfig.providerAuth.openai || currentConfig.providerPlan.openai
+        openai: providerAuth.openai || providerPlan.openai
           ? {
               enabled: settings.models.providers.openai,
-              auth: currentConfig.providerAuth.openai,
-              plan: currentConfig.providerPlan.openai,
+              auth: providerAuth.openai,
+              plan: providerPlan.openai,
             }
           : settings.models.providers.openai,
-        google: currentConfig.providerAuth.google || currentConfig.providerPlan.google
+        google: providerAuth.google || providerPlan.google
           ? {
               enabled: settings.models.providers.google,
-              auth: currentConfig.providerAuth.google,
-              plan: currentConfig.providerPlan.google,
+              auth: providerAuth.google,
+              plan: providerPlan.google,
             }
           : settings.models.providers.google,
         zai: settings.models.providers.minimax,
