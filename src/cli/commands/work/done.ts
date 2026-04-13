@@ -267,6 +267,60 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const spinner = ora('Marking work as done...').start();
 
   try {
+    // Step 0: Rebase onto target branch + push.
+    //
+    // Absorbing the rebase into `pan work done` eliminates the multi-step
+    // orchestration burden that was causing agents to stop partway through
+    // the submit flow. An agent now has exactly one command to run; this
+    // step handles the fetch/rebase/push that agents previously had to
+    // perform manually before calling `pan work done`.
+    //
+    // Planning-artifact conflicts (`.planning/*`) are auto-resolved with
+    // `--ours`. Any other conflicts abort the rebase and surface a clear
+    // error; the agent must resolve them and re-run `pan work done`.
+    {
+      const { getAgentState } = await import('../../../lib/agents.js');
+      const rebaseAgentState = getAgentState(agentId);
+      const rebaseWorkspacePath = rebaseAgentState?.workspace;
+
+      if (rebaseWorkspacePath && existsSync(rebaseWorkspacePath)) {
+        const { ensureMergeSetForIssue } = await import('../../../lib/merge-set.js');
+        const { rebaseAndPushRepos } = await import('../../../lib/rebase-helper.js');
+        const preMergeSet = ensureMergeSetForIssue(issueId);
+
+        if (preMergeSet && preMergeSet.repos.length > 0) {
+          spinner.text = 'Rebasing onto target branch and pushing...';
+          const rebaseResult = await rebaseAndPushRepos(rebaseWorkspacePath, preMergeSet);
+
+          if (!rebaseResult.success) {
+            const failure = rebaseResult.firstFailure!;
+            spinner.fail(`Rebase failed in ${failure.repoKey}`);
+            console.error('');
+            if (failure.conflictFiles?.length) {
+              console.error(chalk.red(`Rebase conflicts in non-planning files:`));
+              for (const file of failure.conflictFiles) {
+                console.error(chalk.red(`  - ${file}`));
+              }
+              console.error('');
+              console.error(chalk.dim('Resolve the conflicts manually, commit, then re-run:'));
+              console.error(chalk.dim(`  pan work done ${issueId}`));
+            } else {
+              console.error(chalk.red(failure.message || 'Unknown rebase error'));
+            }
+            console.error('');
+            process.exit(1);
+          }
+
+          const rebased = rebaseResult.results.filter(r => r.outcome === 'rebased');
+          if (rebased.length > 0) {
+            console.log(chalk.green(`  ✓ Rebased and pushed ${rebased.length} repo(s)`));
+          } else {
+            console.log(chalk.dim('  Branch already current with target — pushed any local commits'));
+          }
+        }
+      }
+    }
+
     let trackerUpdated = false;
     let shadowModeActive = false;
     const isGitHubIssue = issueId.startsWith('PAN-');
