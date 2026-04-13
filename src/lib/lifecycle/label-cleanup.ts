@@ -224,6 +224,60 @@ export async function repairIncompletePostMergeLifecycle(): Promise<void> {
   }
 }
 
+/**
+ * Startup repair: detect GitHub issues that were manually closed (wontfix/won't-implement/etc.)
+ * but still have active Panopticon state (readyForMerge=true or mergeStatus=pending/queued).
+ *
+ * Clears readyForMerge and sets mergeStatus to 'failed' (or removes from awaiting-merge)
+ * so deacon stops sending merge reminders and the issue disappears from the Awaiting Merge page.
+ *
+ * Fire-and-forget — non-fatal, errors are logged.
+ */
+export async function repairClosedWontfixIssues(): Promise<void> {
+  try {
+    const { setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+
+    // Issues with active merge state but NOT yet merged — could be stale closed issues
+    const candidates = Object.values(statuses).filter(
+      s => s.readyForMerge === true && s.mergeStatus !== 'merged',
+    );
+    if (candidates.length === 0) return;
+
+    for (const s of candidates) {
+      const resolved = resolveGitHubIssue(s.issueId);
+      if (!resolved.isGitHub) continue;
+
+      try {
+        const { stdout } = await execAsync(
+          `gh issue view ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --json state --jq .state`,
+          { encoding: 'utf-8', timeout: 10000 },
+        );
+        // If the issue is CLOSED but not because of a Panopticon merge, clear the stale state
+        if (stdout.trim() !== 'CLOSED') continue;
+        if (s.mergeStatus === 'merged') continue; // Already handled by repairMergedLabels
+
+        console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} is CLOSED (non-merge) — clearing stale readyForMerge state`);
+        setReviewStatus(s.issueId, {
+          readyForMerge: false,
+          mergeStatus: 'failed',
+          mergeNotes: 'GitHub issue was closed externally (not via Panopticon merge flow)',
+        } as any);
+
+        // Remove in-review label if present
+        await execAsync(
+          `gh issue edit ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --remove-label "in-review" 2>/dev/null || true`,
+          { encoding: 'utf-8' },
+        );
+      } catch {
+        // non-fatal — best-effort
+      }
+    }
+  } catch (err) {
+    console.warn(`[label-cleanup] repairClosedWontfixIssues failed: ${err}`);
+  }
+}
+
 async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'label-cleanup:merged';
   try {
