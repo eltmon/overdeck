@@ -140,6 +140,14 @@ async function closeIssuePullRequest(issueId: string): Promise<string[]> {
       `gh pr close ${prNumber} --repo ${githubCheck.owner}/${githubCheck.repo} --comment "Canceled via Panopticon"`,
       { encoding: 'utf-8', timeout: 15000 },
     );
+    // Null out the stale prUrl in review-status so a subsequent re-review cycle
+    // creates a fresh PR instead of reusing the now-closed handle. Without this,
+    // the work-agent → review → test → merge pipeline would happily advance to
+    // readyForMerge=true pointing at a CLOSED PR (PAN-509 Run 5 symptom).
+    try {
+      const { setReviewStatus } = await import('../../../lib/review-status.js');
+      setReviewStatus(issueId.toUpperCase(), { prUrl: undefined });
+    } catch { /* non-fatal — validator catches this downstream */ }
     return [`Closed PR #${prNumber} on ${githubCheck.owner}/${githubCheck.repo}`];
   } catch (err: any) {
     return [`PR close warning: ${err.message}`];
