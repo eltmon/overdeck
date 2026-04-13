@@ -1232,7 +1232,13 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Check for orphaned reviewing status — no specialist (global or per-project) is actively reviewing this issue
       const reviewAgentActive = activeReviewSessions.has(issueId.toUpperCase());
       if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
-        if (latestTerminalReview) {
+        // Only restore terminal 'passed' states. Restoring 'failed'/'blocked' would replay
+        // stale review notes verbatim (deacon has no way to know whether the agent has
+        // pushed new commits that address those notes), creating the cycling-review illusion
+        // where every patrol tick appears to be a fresh review failure. For failed/blocked
+        // terminal states, fall through to reset=pending so the re-dispatch path below wakes
+        // a real review against the current code.
+        if (latestTerminalReview && latestTerminalReview.status === 'passed') {
           const reviewUpdate: Record<string, unknown> = {
             reviewStatus: latestTerminalReview.status,
             reviewNotes: latestTerminalReview.notes,
