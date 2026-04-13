@@ -83,6 +83,7 @@ interface OpenAIAuthStatus {
   lastRefresh: string | null;
   accessTokenExpiresAt: number | null;
   hasOpenAIApiKey: boolean;
+  bridgedFromCodex: boolean;
 }
 
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
@@ -724,8 +725,13 @@ export function SettingsPage() {
                 ) : openaiAuth.loggedIn ? (
                   <>
                     <p className="text-content-body text-sm mt-2">
-                      Local Codex/ChatGPT login detected. GPT work agents can use claudish subscription auth without an API key.
+                      Local Codex/ChatGPT login detected. GPT work agents route through the local CLIProxyAPI sidecar using your ChatGPT subscription — no API key required.
                     </p>
+                    {openaiAuth.bridgedFromCodex && (
+                      <p className="text-content-muted text-xs mt-2">
+                        Panopticon synced the local Codex login into the CLIProxyAPI sidecar&apos;s credential store so GPT models can launch correctly.
+                      </p>
+                    )}
                     {openaiAuth.accountId && (
                       <p className="text-content-muted text-xs mt-1">
                         Account: <code className="font-mono">{openaiAuth.accountId}</code>
@@ -745,7 +751,7 @@ export function SettingsPage() {
                     {openaiAuth.hasOpenAIApiKey && (
                       <p className="text-blue-300 text-xs mt-2 flex items-center gap-1.5">
                         <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>An OpenAI API key is also configured, but GPT agent launches will prefer the local subscription login while it is active.</span>
+                        <span>An OpenAI API key is also configured for direct key-based tools, but GPT agent launches stay on the local subscription login while it is active.</span>
                       </p>
                     )}
                   </>
@@ -850,7 +856,7 @@ export function SettingsPage() {
                               <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                               <div className="min-w-0">
                                 <div className="text-xs text-emerald-300 font-medium">
-                                  Using Codex subscription login via claudish
+                                  Using Codex subscription login via CLIProxyAPI sidecar
                                 </div>
                                 {hasConfiguredValue && (
                                   <div className="text-[11px] text-emerald-200/80 mt-0.5">

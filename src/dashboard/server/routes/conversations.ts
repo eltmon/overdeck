@@ -44,8 +44,11 @@ import {
   removeFavorite,
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
-import { getProviderForModel, getProviderEnv } from '../../../lib/providers.js';
-import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
+import { getProviderForModel } from '../../../lib/providers.js';
+import {
+  getAgentRuntimeBaseCommand,
+  getProviderExportsForModel,
+} from '../../../lib/agents.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
@@ -285,20 +288,15 @@ async function spawnConversationSession(
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
-  // Detect OpenRouter model and inject provider-specific env overrides
+  let runtimeCommand = 'claude --dangerously-skip-permissions';
   const providerEnvExports: string[] = [];
   if (model) {
     const provider = getProviderForModel(model);
+    runtimeCommand = getAgentRuntimeBaseCommand(model);
     if (provider.name !== 'anthropic') {
-      const { config } = loadYamlConfig();
-      const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
-      if (apiKey) {
-        const providerEnv = getProviderEnv(provider, apiKey);
-        for (const [key, val] of Object.entries(providerEnv)) {
-          providerEnvExports.push(`export ${key}="${val}"`);
-        }
-      } else {
-        throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
+      const providerExports = getProviderExportsForModel(model).trim();
+      if (providerExports) {
+        providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
       }
     }
   }
@@ -312,10 +310,8 @@ async function spawnConversationSession(
     ...providerEnvExports,
   ].join('\n');
 
-  const claudeArgs = [
-    '--dangerously-skip-permissions',
+  const sessionArgs = [
     resume ? `--resume "${claudeSessionId}"` : `--session-id "${claudeSessionId}"`,
-    ...(model ? [`--model "${model}"`] : []),
     ...(effort ? [`--effort "${effort}"`] : []),
   ].join(' ');
 
@@ -323,7 +319,7 @@ async function spawnConversationSession(
 ${envExports}
 cd "${cwd}"
 trap '' HUP
-claude ${claudeArgs}
+${runtimeCommand} ${sessionArgs}
 echo ""
 echo "Conversation session ended. Close this panel or click Resume to start a new session."
 while true; do sleep 60; done

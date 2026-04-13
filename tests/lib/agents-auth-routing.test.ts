@@ -33,6 +33,14 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
   getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
 }));
 
+vi.mock('../../src/lib/cliproxy.js', () => ({
+  getCliproxyClientEnv: () => ({
+    ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
+    ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
+  }),
+  startCliproxy: vi.fn(),
+}));
+
 import { getClaudishPrefix, getProviderEnvForModel } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
@@ -58,7 +66,7 @@ describe('agents auth routing', () => {
     }));
   });
 
-  it('prefers Codex subscription auth over an OpenAI API key when login is active', () => {
+  it('routes GPT models through the local cliproxy sidecar when Codex subscription login is active', () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
         apiKeys: { openai: 'sk-test-123' },
@@ -69,11 +77,14 @@ describe('agents auth routing', () => {
 
     const env = getProviderEnvForModel('gpt-5.4');
 
-    expect(mockGetProviderEnv).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'openai' }),
-      'subscription-oauth'
-    );
-    expect(env).toEqual({ AUTH_TOKEN: 'subscription-oauth' });
+    // Subscription path bypasses claudish-backed getProviderEnv entirely and
+    // instead injects ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN pointing at
+    // the local CLIProxyAPI sidecar.
+    expect(mockGetProviderEnv).not.toHaveBeenCalled();
+    expect(env).toEqual({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
+      ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
+    });
   });
 
   it('falls back to the OpenAI API key when no Codex subscription login exists', () => {

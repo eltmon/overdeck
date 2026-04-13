@@ -1,0 +1,368 @@
+/**
+ * cliproxy.ts
+ *
+ * Local CLIProxyAPI sidecar lifecycle. CLIProxyAPI (router-for-me/CLIProxyAPI)
+ * exposes an Anthropic-compatible `/v1/messages` endpoint backed by the
+ * OpenAI Responses WebSocket transport using ChatGPT subscription OAuth tokens.
+ *
+ * Panopticon runs cliproxy as a background sidecar so Claude Code can drive
+ * GPT models (via ANTHROPIC_BASE_URL) without needing an OpenAI API key.
+ *
+ * Responsibilities:
+ *   - Download + install the cliproxy binary from GitHub releases
+ *   - Maintain `~/.panopticon/cliproxy/config.yaml` + auth-dir
+ *   - Bridge `~/.codex/auth.json` into cliproxy's codex credential format
+ *   - Start / stop / supervise the process via a pidfile
+ */
+
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  statSync,
+} from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
+import { spawn, execSync } from 'child_process';
+import { PANOPTICON_HOME, BIN_DIR } from './paths.js';
+
+export const CLIPROXY_HOST = '127.0.0.1';
+export const CLIPROXY_PORT = 8317;
+export const CLIPROXY_AUTH_TOKEN = 'panopticon-local-cliproxy-key';
+export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
+
+const CLIPROXY_RELEASE_VERSION = 'v6.9.24';
+
+export function getCliproxyDir(): string {
+  return join(PANOPTICON_HOME, 'cliproxy');
+}
+
+export function getCliproxyBinary(): string {
+  return join(BIN_DIR, 'cliproxy');
+}
+
+export function getCliproxyConfigPath(): string {
+  return join(getCliproxyDir(), 'config.yaml');
+}
+
+export function getCliproxyAuthDir(): string {
+  return join(getCliproxyDir(), 'auth');
+}
+
+export function getCliproxyPidPath(): string {
+  return join(getCliproxyDir(), 'cliproxy.pid');
+}
+
+export function getCliproxyLogPath(): string {
+  return join(getCliproxyDir(), 'cliproxy.log');
+}
+
+function getCodexAuthPath(): string {
+  return join(homedir(), '.codex', 'auth.json');
+}
+
+function getCliproxyCodexCredPath(): string {
+  return join(getCliproxyAuthDir(), 'codex-primary.json');
+}
+
+function ensureDirs(): void {
+  for (const dir of [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()]) {
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  }
+}
+
+interface CodexAuthFile {
+  auth_mode?: unknown;
+  last_refresh?: unknown;
+  tokens?: {
+    id_token?: unknown;
+    access_token?: unknown;
+    refresh_token?: unknown;
+    account_id?: unknown;
+  };
+}
+
+interface CliproxyCodexCredentials {
+  access_token: string;
+  id_token: string;
+  refresh_token: string;
+  account_id: string;
+  last_refresh: string;
+  email: string;
+  type: 'codex';
+  expired: string;
+  disabled: boolean;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+    const decoded = Buffer.from(normalized + padding, 'base64').toString('utf8');
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read ~/.codex/auth.json and write cliproxy's credential file format into
+ * ~/.panopticon/cliproxy/auth/codex-primary.json. Returns true if the file
+ * was written (including "already up-to-date" writes), false if the source
+ * was missing or malformed.
+ */
+export function bridgeCodexAuthToCliproxy(): boolean {
+  const codexPath = getCodexAuthPath();
+  if (!existsSync(codexPath)) return false;
+
+  let raw: CodexAuthFile;
+  try {
+    raw = JSON.parse(readFileSync(codexPath, 'utf8')) as CodexAuthFile;
+  } catch {
+    return false;
+  }
+
+  const accessToken = typeof raw.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
+  const idToken = typeof raw.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
+  const refreshToken = typeof raw.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
+  const accountId = typeof raw.tokens?.account_id === 'string' ? raw.tokens.account_id : null;
+  const lastRefresh = typeof raw.last_refresh === 'string' ? raw.last_refresh : new Date().toISOString();
+
+  if (!accessToken || !idToken || !refreshToken || !accountId) return false;
+
+  const idClaims = decodeJwtPayload(idToken) ?? {};
+  const email = typeof idClaims.email === 'string' ? idClaims.email : '';
+  const accessClaims = decodeJwtPayload(accessToken) ?? {};
+  const expSec = typeof accessClaims.exp === 'number'
+    ? accessClaims.exp
+    : (typeof idClaims.exp === 'number' ? idClaims.exp : Math.floor(Date.now() / 1000) + 3600);
+  const expiredIso = new Date(expSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+  const creds: CliproxyCodexCredentials = {
+    access_token: accessToken,
+    id_token: idToken,
+    refresh_token: refreshToken,
+    account_id: accountId,
+    last_refresh: lastRefresh,
+    email,
+    type: 'codex',
+    expired: expiredIso,
+    disabled: false,
+  };
+
+  ensureDirs();
+  const target = getCliproxyCodexCredPath();
+
+  // Skip rewrite if content is byte-identical (avoids touching mtime every status poll).
+  const serialized = JSON.stringify(creds, null, 2) + '\n';
+  if (existsSync(target)) {
+    try {
+      const existing = readFileSync(target, 'utf8');
+      if (existing === serialized) return true;
+    } catch {
+      // fall through and overwrite
+    }
+  }
+
+  writeFileSync(target, serialized, { mode: 0o600 });
+  return true;
+}
+
+function ensureConfigFile(): void {
+  ensureDirs();
+  const configPath = getCliproxyConfigPath();
+  const authDir = getCliproxyAuthDir();
+
+  // Config is rewritten every time so upgrades can evolve the format safely.
+  const config = [
+    `host: "${CLIPROXY_HOST}"`,
+    `port: ${CLIPROXY_PORT}`,
+    `auth-dir: "${authDir}"`,
+    `api-keys:`,
+    `  - "${CLIPROXY_AUTH_TOKEN}"`,
+    `debug: false`,
+    '',
+  ].join('\n');
+
+  if (existsSync(configPath)) {
+    try {
+      if (readFileSync(configPath, 'utf8') === config) return;
+    } catch {
+      // overwrite
+    }
+  }
+  writeFileSync(configPath, config);
+}
+
+function detectPlatformAsset(): { archive: string; } | null {
+  const platform = process.platform;
+  const arch = process.arch;
+  const version = CLIPROXY_RELEASE_VERSION.replace(/^v/, '');
+  let os: string | null = null;
+  let cpu: string | null = null;
+
+  if (platform === 'linux') os = 'linux';
+  else if (platform === 'darwin') os = 'darwin';
+
+  if (arch === 'x64') cpu = 'amd64';
+  else if (arch === 'arm64') cpu = 'arm64';
+
+  if (!os || !cpu) return null;
+  return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.tar.gz` };
+}
+
+export function isCliproxyInstalled(): boolean {
+  const bin = getCliproxyBinary();
+  if (!existsSync(bin)) return false;
+  try {
+    const st = statSync(bin);
+    return st.isFile() && (st.mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Download + extract the cliproxy binary into ~/.panopticon/bin/cliproxy.
+ * Uses curl + tar because that's already a hard dep of pan install. Throws
+ * with a clear message on unsupported platforms.
+ */
+export function installCliproxy(force = false): void {
+  ensureDirs();
+  if (!force && isCliproxyInstalled()) return;
+
+  const asset = detectPlatformAsset();
+  if (!asset) {
+    throw new Error(
+      `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
+      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+    );
+  }
+
+  const url = `https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLIPROXY_RELEASE_VERSION}/${asset.archive}`;
+  const tmpDir = join(getCliproxyDir(), 'tmp');
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const archivePath = join(tmpDir, asset.archive);
+
+  execSync(`curl -sSL -o "${archivePath}" "${url}"`, { stdio: 'pipe' });
+  execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
+
+  // Release archives extract a binary named "cli-proxy-api" at the root of the tar
+  // (alongside README/LICENSE/config.example.yaml).
+  const extracted = join(tmpDir, 'cli-proxy-api');
+  if (!existsSync(extracted)) {
+    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+  }
+
+  const target = getCliproxyBinary();
+  execSync(`install -m 0755 "${extracted}" "${target}"`, { stdio: 'pipe' });
+  try {
+    execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+  } catch { /* non-fatal */ }
+}
+
+function readPidFile(): number | null {
+  const pidPath = getCliproxyPidPath();
+  if (!existsSync(pidPath)) return null;
+  try {
+    const pid = parseInt(readFileSync(pidPath, 'utf8').trim(), 10);
+    return Number.isFinite(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isCliproxyRunning(): boolean {
+  const pid = readPidFile();
+  if (pid && isProcessAlive(pid)) return true;
+  // Fallback: something may be listening on the port without our pidfile.
+  try {
+    const out = execSync(`lsof -ti:${CLIPROXY_PORT} 2>/dev/null || true`, { encoding: 'utf8' }).trim();
+    return out.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Start cliproxy in the background. Idempotent — returns immediately if an
+ * instance is already running. Ensures config + auth-dir + codex bridge are
+ * up-to-date before spawning.
+ */
+export function startCliproxy(): void {
+  ensureDirs();
+  ensureConfigFile();
+  // Best-effort bridge; if the user hasn't logged into Codex yet, cliproxy
+  // will still start but subscription auth won't be available until they do.
+  try { bridgeCodexAuthToCliproxy(); } catch { /* non-fatal */ }
+
+  if (isCliproxyRunning()) return;
+
+  if (!isCliproxyInstalled()) {
+    installCliproxy();
+  }
+
+  const bin = getCliproxyBinary();
+  const config = getCliproxyConfigPath();
+  const logPath = getCliproxyLogPath();
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { openSync } = require('fs') as typeof import('fs');
+  const logFd = openSync(logPath, 'a');
+
+  const child = spawn(bin, ['-config', config], {
+    detached: true,
+    stdio: ['ignore', logFd, logFd],
+    cwd: getCliproxyDir(),
+  });
+
+  if (!child.pid) {
+    throw new Error('Failed to spawn cliproxy');
+  }
+
+  writeFileSync(getCliproxyPidPath(), String(child.pid));
+  child.unref();
+}
+
+export function stopCliproxy(): void {
+  const pid = readPidFile();
+  if (pid && isProcessAlive(pid)) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
+  }
+  // Also clear anything else bound to the port (stale / manually-started instances).
+  try {
+    execSync(`lsof -ti:${CLIPROXY_PORT} 2>/dev/null | xargs -r kill 2>/dev/null || true`, { stdio: 'pipe' });
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (existsSync(getCliproxyPidPath())) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { unlinkSync } = require('fs') as typeof import('fs');
+      unlinkSync(getCliproxyPidPath());
+    }
+  } catch { /* ignore */ }
+}
+
+/**
+ * Env vars to inject into Claude Code (or any Anthropic-compatible client) so
+ * that it routes model calls through the local cliproxy sidecar.
+ */
+export function getCliproxyClientEnv(): Record<string, string> {
+  return {
+    ANTHROPIC_BASE_URL: CLIPROXY_BASE_URL,
+    ANTHROPIC_AUTH_TOKEN: CLIPROXY_AUTH_TOKEN,
+  };
+}

@@ -1,19 +1,22 @@
 /**
  * openai-auth.ts
  *
- * Reads Codex/ChatGPT local auth state from ~/.codex/auth.json so Panopticon
- * can surface subscription-login status in Settings and route GPT models
- * through claudish without requiring an API key.
+ * Reads Codex/ChatGPT local auth state and keeps a claudish-compatible Codex
+ * OAuth credential file in sync. claudish's cx@ provider only honors
+ * ~/.claudish/codex-oauth.json, while the local Codex CLI stores tokens in
+ * ~/.codex/auth.json. Panopticon bridges between the two so subscription auth
+ * works without falling back to an API key.
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { bridgeCodexAuthToCliproxy } from './cliproxy.js';
 
 export interface OpenAIAuthStatus {
-  /** True if the ~/.codex directory exists (Codex installed / initialized). */
+  /** True if Codex/claudish auth storage exists locally. */
   installed: boolean;
-  /** True if a ChatGPT/Codex OAuth session appears to be present. */
+  /** True if claudish-compatible Codex OAuth credentials are available. */
   loggedIn: boolean;
   /** True if the access token is expired, even if refresh may still succeed. */
   expired: boolean;
@@ -27,6 +30,8 @@ export interface OpenAIAuthStatus {
   accessTokenExpiresAt: number | null;
   /** True when an OpenAI API key is present in auth.json or env. */
   hasOpenAIApiKey: boolean;
+  /** True when Panopticon bridged ~/.codex/auth.json into claudish format. */
+  bridgedFromCodex: boolean;
 }
 
 interface RawAuthFile {
@@ -39,6 +44,21 @@ interface RawAuthFile {
     refresh_token?: unknown;
     account_id?: unknown;
   };
+}
+
+interface CodexOAuthCredentials {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  account_id?: string;
+}
+
+function getCodexAuthPath(): string {
+  return join(homedir(), '.codex', 'auth.json');
+}
+
+function getClaudishCodexPath(): string {
+  return join(homedir(), '.claudish', 'codex-oauth.json');
 }
 
 function decodeBase64Url(value: string): string | null {
@@ -71,10 +91,76 @@ function getJwtExpiry(token: string | null): number | null {
   return typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
 }
 
+function readClaudishCredentials(): CodexOAuthCredentials | null {
+  const credPath = getClaudishCodexPath();
+  if (!existsSync(credPath)) return null;
+
+  try {
+    const raw = JSON.parse(readFileSync(credPath, 'utf8')) as Partial<CodexOAuthCredentials>;
+    if (
+      typeof raw.access_token !== 'string'
+      || typeof raw.refresh_token !== 'string'
+      || typeof raw.expires_at !== 'number'
+    ) {
+      return null;
+    }
+
+    return {
+      access_token: raw.access_token,
+      refresh_token: raw.refresh_token,
+      expires_at: raw.expires_at,
+      account_id: typeof raw.account_id === 'string' ? raw.account_id : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function deriveClaudishCredentialsFromCodex(): CodexOAuthCredentials | null {
+  const authPath = getCodexAuthPath();
+  if (!existsSync(authPath)) return null;
+
+  try {
+    const raw = JSON.parse(readFileSync(authPath, 'utf8')) as RawAuthFile;
+    const accessToken = typeof raw.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
+    const refreshToken = typeof raw.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
+    const idToken = typeof raw.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
+    const accountId = typeof raw.tokens?.account_id === 'string' ? raw.tokens.account_id : undefined;
+    const expiresAt = getJwtExpiry(accessToken) ?? getJwtExpiry(idToken);
+
+    if (!accessToken || !refreshToken || !expiresAt) {
+      return null;
+    }
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      // Force claudish to refresh immediately on first cx@ use. The cached
+      // Codex access token may exist but still be rejected by the Codex
+      // responses backend; the refresh token is the more reliable bridge.
+      expires_at: 0,
+      account_id: accountId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function ensureClaudishCredentialsFile(credentials: CodexOAuthCredentials): void {
+  const credPath = getClaudishCodexPath();
+  const claudishDir = join(homedir(), '.claudish');
+  if (!existsSync(claudishDir)) {
+    mkdirSync(claudishDir, { recursive: true });
+  }
+
+  writeFileSync(credPath, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
+}
+
 export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
   const codexDir = join(homedir(), '.codex');
-  const authPath = join(codexDir, 'auth.json');
-  const installed = existsSync(codexDir);
+  const authPath = getCodexAuthPath();
+  const claudishCredPath = getClaudishCodexPath();
+  const installed = existsSync(codexDir) || existsSync(claudishCredPath);
 
   const defaultStatus: OpenAIAuthStatus = {
     installed,
@@ -85,38 +171,63 @@ export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
     lastRefresh: null,
     accessTokenExpiresAt: null,
     hasOpenAIApiKey: !!process.env.OPENAI_API_KEY,
+    bridgedFromCodex: false,
   };
 
-  if (!existsSync(authPath)) {
-    return defaultStatus;
+  let raw: RawAuthFile | null = null;
+  if (existsSync(authPath)) {
+    try {
+      raw = JSON.parse(readFileSync(authPath, 'utf8')) as RawAuthFile;
+    } catch {
+      raw = null;
+    }
   }
 
+  const authMode = typeof raw?.auth_mode === 'string' ? raw.auth_mode : null;
+  const lastRefresh = typeof raw?.last_refresh === 'string' ? raw.last_refresh : null;
+  const codexAccessToken = typeof raw?.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
+  const codexRefreshToken = typeof raw?.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
+  const codexIdToken = typeof raw?.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
+  const codexAccountId = typeof raw?.tokens?.account_id === 'string' ? raw.tokens.account_id : null;
+  const hasOpenAIApiKey = defaultStatus.hasOpenAIApiKey
+    || (typeof raw?.OPENAI_API_KEY === 'string' && raw.OPENAI_API_KEY.trim().length > 0);
+
+  let claudishCreds = readClaudishCredentials();
+  let bridgedFromCodex = false;
+
+  if (!claudishCreds) {
+    const derivedCreds = deriveClaudishCredentialsFromCodex();
+    if (derivedCreds) {
+      ensureClaudishCredentialsFile(derivedCreds);
+      claudishCreds = derivedCreds;
+      bridgedFromCodex = true;
+    }
+  }
+
+  // Also keep the CLIProxyAPI credential file in sync so GPT agents routed
+  // through the local cliproxy sidecar pick up fresh ChatGPT subscription
+  // tokens without a restart. Non-fatal if this fails.
   try {
-    const raw = JSON.parse(readFileSync(authPath, 'utf8')) as RawAuthFile;
-    const authMode = typeof raw.auth_mode === 'string' ? raw.auth_mode : null;
-    const lastRefresh = typeof raw.last_refresh === 'string' ? raw.last_refresh : null;
-    const accessToken = typeof raw.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
-    const refreshToken = typeof raw.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
-    const idToken = typeof raw.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
-    const accountId = typeof raw.tokens?.account_id === 'string' ? raw.tokens.account_id : null;
-    const accessTokenExpiresAt = getJwtExpiry(accessToken) ?? getJwtExpiry(idToken);
-    const expired = !!(accessTokenExpiresAt && accessTokenExpiresAt < Date.now());
-    const hasOpenAIApiKey = defaultStatus.hasOpenAIApiKey
-      || (typeof raw.OPENAI_API_KEY === 'string' && raw.OPENAI_API_KEY.trim().length > 0);
+    if (bridgeCodexAuthToCliproxy()) {
+      bridgedFromCodex = true;
+    }
+  } catch { /* non-fatal — cliproxy bridge is best-effort */ }
 
-    return {
-      installed,
-      loggedIn: authMode === 'chatgpt' && !!(refreshToken || accessToken || idToken),
-      expired,
-      authMode,
-      accountId,
-      lastRefresh,
-      accessTokenExpiresAt,
-      hasOpenAIApiKey,
-    };
-  } catch {
-    return defaultStatus;
-  }
+  const accessTokenExpiresAt = claudishCreds?.expires_at
+    ?? getJwtExpiry(codexAccessToken) ?? getJwtExpiry(codexIdToken);
+  const expired = !!(accessTokenExpiresAt && accessTokenExpiresAt < Date.now());
+
+  return {
+    installed,
+    loggedIn: !!(claudishCreds?.refresh_token),
+    expired,
+    authMode,
+    accountId: claudishCreds?.account_id ?? codexAccountId,
+    lastRefresh,
+    accessTokenExpiresAt,
+    hasOpenAIApiKey,
+    bridgedFromCodex,
+  };
 }
 
 export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
