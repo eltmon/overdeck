@@ -188,6 +188,14 @@ For each bug found during the operation:
 - **Friction points removed**: urgency-first priority ladder added to all flywheel docs and the all-up skill; Awaiting Merge now priority-sorted
 - **Still in pipeline**: PAN-645 (review→test→merge cycle; one failing test remaining); PAN-596 and PAN-662 (blocked on pre-existing failures that PAN-645 will fix once it merges)
 
+### 2026-04-13 — Run 8
+- **Issues inventoried**: 6 active PAN issues (PAN-509, PAN-544, PAN-611, PAN-457, PAN-540, PAN-653)
+- **Issues moved**: PAN-457 and PAN-653 planning → work agents started; PAN-611/PAN-544 feedback sent with CI fix instructions; PAN-509 told to run pan work done
+- **Bugs fixed**: 1 substrate bug
+  - `checkFailedMergeRetry()` retried CI check failures the same as transient failures (30min cooldown × 3 retries = 90min wasted per cycle). Fixed: detect "failing required checks" in mergeNotes, write feedback to work agent, saturate mergeRetryCount. Also fixed `checkPostReviewCommits` to reset mergeRetryCount=0 when HEAD advances, and added `mergeStatus !== 'failed'` defense-in-depth to rfm auto-computation (commit 0209bf1f)
+- **Friction points removed**: CI failure cycling loop broken for all current and future issues; planning agents stuck at "Planning complete" prompt now handled by direct complete-planning API call
+- **Still in pipeline**: PAN-544 (bun 1.3.12 lockfile fix needed), PAN-611 (gitignore negation needed), PAN-509 (fresh PR needed), PAN-457/PAN-653 just started, PAN-540 still planning
+
 ## How to Run This Operation
 
 ```bash
