@@ -28,10 +28,10 @@ function parseSpecialistSession(agentId: string): { projectKey: string; type: st
   return { projectKey: match[1], type: match[2] };
 }
 
-// Derive issueId for work agents: agent-pan-505 → PAN-505
-function deriveWorkAgentIssueId(agentId: string, agentIssueId?: string): string | null {
+// Derive issueId for work and planning agents: agent-pan-505 → PAN-505, planning-pan-503 → PAN-503
+export function deriveAgentIssueId(agentId: string, agentIssueId?: string): string | null {
   if (agentIssueId) return agentIssueId;
-  const match = agentId.match(/^agent-([a-z]+)-(\d+)$/i);
+  const match = agentId.match(/^(?:agent|planning)-([a-z]+)-(\d+)$/i);
   if (match) return `${match[1].toUpperCase()}-${match[2]}`;
   return null;
 }
@@ -84,8 +84,9 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     };
   }, [specialist, agentId, specialistIsRunning]);
 
-  // For work agents: derive from store or agentId pattern
-  const workAgentIssueId = specialist ? null : deriveWorkAgentIssueId(agentId, agent?.issueId);
+  // For work and planning agents: derive from store or agentId pattern
+  const isPlanningAgent = agent?.agentPhase === 'planning' || agentId.startsWith('planning-');
+  const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, agent?.issueId);
 
   const label = specialist
     ? `${specialist.projectKey} / ${specialist.type.replace('-agent', '')}`
@@ -128,6 +129,9 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
             ) : null
           ) : workAgentIssueId ? (
             <ActivityView issueId={workAgentIssueId} />
+          ) : isPlanningAgent ? (
+            // Planning agent with non-derivable issueId → fall back to raw terminal
+            <XTerminal sessionName={agentId} onDisconnect={() => setTerminalFailed(true)} />
           ) : (
             <div className="flex items-center justify-center h-full text-xs text-content-muted">
               No issue associated with this session
