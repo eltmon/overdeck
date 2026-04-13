@@ -35,9 +35,9 @@
 
 | Document | Description |
 |----------|-------------|
-| [CONFIGURATION.md](./CONFIGURATION.md) | Multi-model routing, API keys, presets, and provider configuration |
-| [WORK-TYPES.md](./WORK-TYPES.md) | 23 work type definitions for smart model selection |
-| [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md) | Optimal model assignments for different tasks |
+| [CONFIGURATION.md](./CONFIGURATION.md) | Capability-based model routing, provider auth, subscription vs API-key setup, overrides, and fallback behavior |
+| [WORK-TYPES.md](./WORK-TYPES.md) | Router-backed job settings: every work type, when it runs, and what each override controls |
+| [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md) | Practical guidance for choosing model families for implementation, review, planning, helpers, and CLI work |
 | [projects.mdx](../configuration/projects.mdx) | Project registry and configuration fields (tracker, issue_prefixes, progressive) |
 | [polyrepo.mdx](../configuration/polyrepo.mdx) | Multi-repository workspace management (links to progressive for 10+ repos) |
 | [progressive-polyrepo.mdx](../configuration/progressive-polyrepo.mdx) | Large-scale polyrepo with on-demand repo checkout |
@@ -120,7 +120,7 @@
 
 ### Configuration & Models
 - **"model routing"** / **"smart selection"** → CONFIGURATION.md, WORK-TYPES.md, MODEL_RECOMMENDATIONS.md
-- **"API keys"** / **"environment variables"** → CONFIGURATION.md
+- **"API keys"** / **"environment variables"** / **"subscription auth"** → CONFIGURATION.md
 - **"providers"** / **"Kimi"** / **"Anthropic"** → CONFIGURATION.md, TESTING-PROVIDERS.md
 - **"work types"** → WORK-TYPES.md
 - **"presets"** / **"overrides"** → CONFIGURATION.md
