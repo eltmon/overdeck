@@ -57,8 +57,7 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
 
   if (provider.name === 'openai') {
     const authStatus = getOpenAIAuthStatusSync();
-    const prefersSubscription = config.providerAuth?.openai === 'subscription' || (!apiKey && authStatus.loggedIn);
-    if (prefersSubscription && authStatus.loggedIn) {
+    if (authStatus.loggedIn) {
       return getProviderEnv(provider, 'subscription-oauth');
     }
   }
@@ -716,13 +715,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
   const providerEnv = getProviderEnvForModel(selectedModel);
 
-  // Determine auth mode for OpenAI from config (subscription vs api-key)
+  // Determine auth mode for OpenAI. A live Codex/ChatGPT login always wins.
   const yamlConfig = loadYamlConfig();
   const provider = getProviderForModel(selectedModel as ModelId);
   const openaiAuthStatus = getOpenAIAuthStatusSync();
-  const openaiApiKey = yamlConfig.config?.apiKeys.openai;
-  const openaiAuthMode = yamlConfig.config?.providerAuth?.['openai']
-    ?? (!openaiApiKey && openaiAuthStatus.loggedIn ? 'subscription' : 'api-key');
+  const openaiAuthMode = openaiAuthStatus.loggedIn
+    ? 'subscription'
+    : (yamlConfig.config?.providerAuth?.['openai'] ?? 'api-key');
   const effectiveAuthMode = provider.name === 'openai' ? openaiAuthMode : undefined;
 
   // Get claudish-prefixed model if needed (e.g. oai@gpt-5.4 or cx@o3)
