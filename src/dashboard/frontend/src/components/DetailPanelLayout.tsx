@@ -5,7 +5,7 @@ import { Panel, Group, Separator } from 'react-resizable-panels';
 import { useQuery } from '@tanstack/react-query';
 import { InspectorPanel } from './InspectorPanel';
 import { TerminalPanel } from './TerminalPanel';
-import { TerminalTabs, savePinState, loadPersistedPin } from './inspector/TerminalTabs';
+import { TerminalTabs, savePinState, loadPinState } from './inspector/TerminalTabs';
 import { MergedSummaryCard } from './inspector/MergedSummaryCard';
 import { usePipelinePhase } from './inspector/usePipelinePhase';
 import { Agent, Issue } from '../types';
@@ -100,9 +100,9 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
 
   // Pinned session state: null = auto-follow, string = pinned to that session
   const [pinnedSession, setPinnedSession] = useState<string | null>(() =>
-    loadPersistedPin(issueId),
+    loadPinState(issueId),
   );
-  const [pinned, setPinned] = useState(() => loadPersistedPin(issueId) !== null);
+  const [pinned, setPinned] = useState(() => loadPinState(issueId) !== null);
 
   // The currently displayed session: pinned overrides auto
   const selectedSession = pinned ? pinnedSession : activeSession;
@@ -246,7 +246,6 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             <div className="flex flex-col" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
               {availableTerminals.length > 0 && (
                 <TerminalTabs
-                  issueId={issueId}
                   tabs={availableTerminals}
                   selectedSession={selectedSession}
                   activePhase={phase}

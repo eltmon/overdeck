@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Pin, PinOff } from 'lucide-react';
 
 export type PipelinePhase =
@@ -24,7 +23,6 @@ export interface TerminalTab {
 }
 
 interface TerminalTabsProps {
-  issueId: string;
   tabs: TerminalTab[];
   /** The session name currently being displayed */
   selectedSession: string | null;
@@ -63,7 +61,7 @@ const textMuted = '#4a5568';
 const bgActive = '#1e2d47';
 const bgHover = '#1a2236';
 
-function loadPinState(issueId: string): string | null {
+export function loadPinState(issueId: string): string | null {
   try {
     return localStorage.getItem(`pan-terminal-pin-${issueId}`);
   } catch {
@@ -84,10 +82,6 @@ export function savePinState(issueId: string, sessionName: string | null): void 
   }
 }
 
-export function loadPersistedPin(issueId: string): string | null {
-  return loadPinState(issueId);
-}
-
 export function TerminalTabs({
   tabs,
   selectedSession,
@@ -96,15 +90,6 @@ export function TerminalTabs({
   onSelectSession,
   onTogglePin,
 }: TerminalTabsProps) {
-  // When auto-follow is on (not pinned), switch to the active tab automatically
-  useEffect(() => {
-    if (pinned) return;
-    const activeTab = tabs.find(t => t.isActive && !t.disabled);
-    if (activeTab && activeTab.sessionName !== selectedSession) {
-      onSelectSession(activeTab.sessionName);
-    }
-  }, [pinned, tabs, selectedSession, onSelectSession]);
-
   const phaseColors = PHASE_CHIP_COLORS[activePhase] ?? { bg: '#1e2d47', text: textSecondary };
   const phaseLabel = PHASE_LABELS[activePhase] ?? activePhase;
 
