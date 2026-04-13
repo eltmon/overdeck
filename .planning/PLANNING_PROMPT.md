@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-473
+# Planning Session: PAN-503
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -78,48 +78,38 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 
 
 ## Issue Details
-- **ID:** PAN-473
-- **Title:** Workspace detail: structured conversation view for stopped agents
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/473
+- **ID:** PAN-503
+- **Title:** Planning agent: use ActivityView (conversation-style) in workspace detail pane, keep XTerminal in planning dialog
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/503
 
 ## Description
 ## Summary
 
-When an agent stops running, the workspace detail panel shows raw terminal text in a `<pre>` tag (from `/api/agents/:id/output`). Replace this with the same structured conversation view used in Mission Control — message bubbles, tool calls, code blocks, timestamps.
+The planning agent currently shows only an XTerminal (raw tmux view) in both places it appears:
+1. The **planning dialog** (modal launched from the Spawn Planning Agent button)
+2. The **workspace detail pane** (InspectorPanel / agent detail view)
 
-## Current vs Target
+These two contexts have different needs and should use different views.
 
-| Aspect | Current (stopped agent) | Target |
-|--------|------------------------|--------|
-| Data source | Raw tmux capture / output.log | Parsed JSONL session file |
-| Rendering | `<pre>` monospace text | MessagesTimeline + ChatMarkdown |
-| Tool calls | Inline text noise | Collapsible work log groups |
-| User messages | Lost in terminal output | Right-aligned bubbles |
-| Timestamps | None | Per-message with duration |
+## Desired Behavior
 
-## Implementation
+### Planning dialog (modal)
+Keep the XTerminal tmux view as-is. When the user actively watches planning happen, the raw terminal is appropriate — it shows the agent working in real time with full fidelity.
 
-All building blocks already exist — this is a wiring exercise:
+### Workspace detail pane (InspectorPanel / agent card)
+Switch to the **ActivityView** (the structured conversation-style view used in Mission Control). This renders tool calls, responses, and agent messages as a readable conversation thread rather than raw terminal output.
 
-### 1. New endpoint: `GET /api/agents/:id/conversation`
-- Resolve JSONL path via `getAgentJsonlPath(agentId)` from `agent-enrichment.ts`
-- Call `parseConversationMessages(jsonlPath)` from `conversation-service.ts`
-- Return `{ messages, workLog, streaming, totalCost }`
-- ~30 lines
+**Why:** The workspace detail pane is used to review what the planning agent did — not to watch it live. ActivityView is much better for this: skimmable, structured, shows tool names and outputs clearly.
 
-### 2. Update TerminalPanel.tsx
-- When agent is stopped and JSONL data is available, render `<MessagesTimeline>` instead of `<pre>`
-- Fall back to raw text if no JSONL found (legacy agents without session tracking)
-- ~20 lines
+## What ActivityView Is
 
-### 3. No new components
-- Reuse `MessagesTimeline`, `ChatMarkdown`, `WorkLogGroup` from `src/dashboard/frontend/src/components/chat/`
+`src/dashboard/frontend/src/components/MissionControl/ActivityView/` — the conversation-style view used in Mission Control. Shows agent activity as a structured feed: tool invocations, results, assistant messages. Already works for work agents; needs to be wired to planning agent sessions too.
 
-## Files
-- `src/dashboard/server/routes/agents.ts` — add conversation endpoint
-- `src/dashboard/frontend/src/components/TerminalPanel.tsx` — swap rendering for stopped agents
-- `src/dashboard/server/services/conversation-service.ts` — already has `parseConversationMessages()`
-- `src/dashboard/server/services/agent-enrichment-service.ts` — already has `getAgentJsonlPath()`
+## Implementation Notes
+
+- Planning agent session ID is available on the workspace/issue state
+- ActivityView already fetches from `/api/agents/:id/activity` — planning agent just needs to be registered as an agent source
+- The split (dialog = terminal, detail pane = ActivityView) should be a conditional based on where the component is rendered, not a user toggle
 
 ---
 
@@ -173,10 +163,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-473: <issue title>"
+    "description": "Plan for PAN-503: <issue title>"
   },
   "plan": {
-    "id": "pan-473",
+    "id": "pan-503",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
@@ -185,7 +175,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/473", "label": "PAN-473", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/503", "label": "PAN-503", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -201,7 +191,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-473"
+          "issueLabel": "pan-503"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -223,7 +213,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-473")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-503")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
