@@ -3161,7 +3161,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const prResult = await ensurePRExists(issueId, { targetBranch: remoteTargetBranch });
       if (!prResult.prUrl) {
         const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
@@ -3191,13 +3191,14 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           remote: true,
         };
       } catch (remoteErr: any) {
+        const mergeErrorMessage = `Remote merge failed: ${remoteErr.message}`;
         console.error(`[merge] Remote merge failed for ${issueId}:`, remoteErr);
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: mergeErrorMessage });
         completePendingOperation(issueId, remoteErr.message);
         return {
           success: false,
           statusCode: 500,
-          error: `Remote merge failed: ${remoteErr.message}`,
+          error: mergeErrorMessage,
         };
       }
     }
@@ -3220,7 +3221,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       let mergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
       if (!mergeSet) {
         const error = `No merge set found for ${issueId}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
@@ -3231,7 +3232,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
       if (activeRepos.length === 0) {
         const error = `No changed repos are marked ready for coordinated merge in ${issueId}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
@@ -3239,7 +3240,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const agentId = `agent-${issueId.toLowerCase()}`;
       if (!sessionExists(agentId)) {
         const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
@@ -3277,8 +3278,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       upsertMergeSet(mergeSet);
 
       if (mergeResults.some(result => !result.success)) {
-        const error = `Polyrepo merge prerequisites failed for ${issueId}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        const failedDetails = mergeResults.filter(r => !r.success).map(r => `${r.repo}: ${r.message}`).join('; ');
+        const error = `Polyrepo merge prerequisites failed for ${issueId}: ${failedDetails}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error, repos: mergeResults };
       }
@@ -3415,7 +3417,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           updatedAt: new Date().toISOString(),
         };
         upsertMergeSet(mergeSet);
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error, repos: mergeResults };
       }
@@ -3453,7 +3455,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const prResult = await ensurePRExists(issueId, { cwd: workspacePath, branchName, targetBranch });
     if (!prResult.prUrl) {
       const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
-      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 400, error };
     }
@@ -3464,9 +3466,45 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const prNumber = githubPrRef ? String(githubPrRef.number) : undefined;
     if (primaryForge === 'github' && !prNumber) {
       const error = `Could not parse PR number from URL: ${artifactUrl}`;
-      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+      setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
       completePendingOperation(issueId, error);
       return { success: false, statusCode: 400, error };
+    }
+
+    // Step 1b: Validate that the PR is still OPEN before rebasing/merging.
+    // A cancel-flow or manual `gh pr close` can leave stale `prUrl` pointing at a
+    // CLOSED PR while Panopticon state still shows readyForMerge=true. Without this
+    // check, the rebase + merge pipeline runs against a dead PR and dies silently
+    // inside `gh pr merge` (see PAN-509 cancel-flow divergence).
+    if (githubPrRef) {
+      try {
+        const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
+        if (isGitHubAppConfigured()) {
+          const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
+          if (prState.state !== 'OPEN' && !prState.merged) {
+            const error = `PR #${githubPrRef.number} is ${prState.state} (not OPEN). Panopticon state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.`;
+            console.error(`[merge] ${error}`);
+            setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+            completePendingOperation(issueId, error);
+            return { success: false, statusCode: 409, error };
+          }
+          if (prState.merged) {
+            console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);
+            setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+            completePendingOperation(issueId, null);
+            const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
+            await postMergeLifecycle(issueId, projectPath, branchName);
+            return {
+              success: true,
+              statusCode: 200,
+              message: `PR #${githubPrRef.number} for ${issueId} was already merged`,
+              prUrl: prResult.prUrl,
+            };
+          }
+        }
+      } catch (prStateErr: any) {
+        console.warn(`[merge] Pre-merge PR state check failed for ${issueId}: ${prStateErr.message} — proceeding (check is best-effort)`);
+      }
     }
 
     // Step 2: Tell the WORK AGENT to rebase onto the target branch and push.
@@ -3635,19 +3673,24 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       });
       artifactMerged = true;
     } catch (prMergeErr: any) {
+      console.error(`[merge] Review artifact merge threw for ${issueId}:`, prMergeErr);
       try {
         const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
         if (githubPrRef && isGitHubAppConfigured()) {
           const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
           artifactMerged = prState.merged;
+          if (artifactMerged) {
+            console.log(`[merge] Race-detected: PR #${githubPrRef.number} for ${issueId} was already merged despite thrown error; proceeding`);
+          }
         }
-      } catch {
-        // Fall through to the original merge error below.
+      } catch (stateCheckErr: any) {
+        console.warn(`[merge] Post-error PR state check failed for ${issueId}: ${stateCheckErr.message}`);
       }
 
       if (!artifactMerged) {
         const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+        console.error(`[merge] ${error}`);
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error };
       }
@@ -3672,8 +3715,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       prUrl: prResult.prUrl,
     };
   } catch (error: any) {
-    console.error(`[merge] Error:`, error);
-    setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false });
+    const mergeErrorMessage = `Merge pipeline error: ${error.message}`;
+    console.error(`[merge] Error for ${issueId}:`, error);
+    setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: mergeErrorMessage });
     completePendingOperation(issueId, error.message);
     return { success: false, statusCode: 500, error: error.message };
   } finally {
