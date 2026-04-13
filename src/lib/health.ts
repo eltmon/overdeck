@@ -9,12 +9,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentState } from './agents.js';
-
-const execAsync = promisify(exec);
+import { capturePaneAsync, listSessionNamesAsync, sessionExistsAsync } from './tmux.js';
 
 // Deacon pattern defaults
 export const DEFAULT_PING_TIMEOUT_MS = 30 * 1000; // 30 seconds
@@ -84,12 +81,7 @@ export function saveAgentHealth(health: AgentHealth): void {
  * Check if agent's tmux session is alive
  */
 export async function isAgentAlive(agentId: string): Promise<boolean> {
-  try {
-    await execAsync(`tmux has-session -t "${agentId}" 2>/dev/null`, { encoding: 'utf-8' });
-    return true;
-  } catch {
-    return false;
-  }
+  return sessionExistsAsync(agentId);
 }
 
 /**
@@ -97,10 +89,7 @@ export async function isAgentAlive(agentId: string): Promise<boolean> {
  */
 export async function getAgentOutput(agentId: string, lines: number = 20): Promise<string | null> {
   try {
-    const { stdout: output } = await execAsync(
-      `tmux capture-pane -t "${agentId}" -p -S -${lines} 2>/dev/null`,
-      { encoding: 'utf-8', maxBuffer: 1024 * 1024 }
-    );
+    const output = await capturePaneAsync(agentId, lines);
     return output.trim();
   } catch {
     return null;
@@ -284,13 +273,7 @@ export async function runHealthCheck(
   // Get all agent sessions
   let sessions: string[] = [];
   try {
-    const { stdout: output } = await execAsync(
-      'tmux list-sessions -F "#{session_name}" 2>/dev/null || true',
-      { encoding: 'utf-8' }
-    );
-    sessions = output
-      .trim()
-      .split('\n')
+    sessions = (await listSessionNamesAsync())
       .filter((s) => s.startsWith('agent-'));
   } catch {}
 

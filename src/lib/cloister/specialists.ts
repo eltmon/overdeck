@@ -18,9 +18,10 @@ import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-pa
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import type { ModelId } from '../settings.js';
 import { loadConfig as loadYamlConfig } from '../config-yaml.js';
+import { loadCloisterConfig } from './config.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
-import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
+import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
 import { renderPrompt } from './prompts.js';
@@ -200,21 +201,35 @@ const DEFAULT_SPECIALISTS: SpecialistMetadata[] = [
   {
     name: 'merge-agent',
     displayName: 'Merge Agent',
-    description: 'PR merging and conflict resolution',
+    description: 'Final merge validation and handoff specialist',
     enabled: true,
-    autoWake: true,
+    autoWake: false,
   },
   {
     name: 'review-agent',
     displayName: 'Review Agent',
     description: 'Code review and quality checks',
     enabled: true,
-    autoWake: true,
+    autoWake: false,
   },
   {
     name: 'test-agent',
     displayName: 'Test Agent',
     description: 'Test execution and analysis',
+    enabled: true,
+    autoWake: true,
+  },
+  {
+    name: 'inspect-agent',
+    displayName: 'Inspect Agent',
+    description: 'Per-bead specification and diff inspection',
+    enabled: true,
+    autoWake: false,
+  },
+  {
+    name: 'uat-agent',
+    displayName: 'UAT Agent',
+    description: 'Browser-based user acceptance testing',
     enabled: true,
     autoWake: true,
   },
@@ -642,8 +657,8 @@ export async function spawnEphemeralSpecialist(
   // agent directory. Earlier ordering polluted metadata and left empty
   // "incomplete" log files when a concurrent dispatch was rejected.
   try {
-    const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', { encoding: 'utf-8' });
-    if (sessions.split('\n').map(s => s.trim()).includes(tmuxSession)) {
+    const sessions = await listSessionNamesAsync();
+    if (sessions.includes(tmuxSession)) {
       const { getAgentRuntimeState } = await import('../agents.js');
       const existingState = getAgentRuntimeState(tmuxSession);
       if (existingState?.state === 'active') {
@@ -666,7 +681,7 @@ export async function spawnEphemeralSpecialist(
       }
       // Stale or idle session — kill it (and any orphaned descendants) before spawning fresh
       console.log(`[specialist] Killing stale ${tmuxSession} session before respawn`);
-      await execAsync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' }).catch(() => {});
+      await killSessionAsync(tmuxSession).catch(() => {});
       // Belt-and-suspenders: terminate any orphaned launcher/script/claude trees
       // that previous broken pipelines left parented to the tmux server.
       await execAsync(
@@ -720,13 +735,36 @@ ${basePrompt}`;
 
   try {
     // Determine model for this specialist
-    let model = 'claude-sonnet-4-6'; // default
+    // Priority: cloister config specialist_models > work-type-router > default fallback
+    const fallbackModel = 'claude-sonnet-4-6';
+    let model: string | undefined;
+
     try {
-      const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
-      model = getModelId(workTypeId);
-    } catch (error) {
-      console.warn(`Warning: Could not resolve model for ${specialistType}, using default`);
+      const cloisterConfig = loadCloisterConfig();
+      const normalizedName = specialistType.replace(/-/g, '_');
+      const configuredModel = (cloisterConfig.model_selection?.specialist_models as any)?.[normalizedName] as string | undefined;
+      if (configuredModel) {
+        const modelMap: Record<string, string> = { opus: 'claude-opus-4-6', sonnet: 'claude-sonnet-4-6', haiku: 'claude-haiku-4-5' };
+        model = modelMap[configuredModel];
+        if (model) {
+          console.log(`[specialist] Using model "${model}" for ${specialistType} (from cloister config)`);
+        }
+      }
+    } catch {
+      // Config lookup failed, fall through to work-type-router
     }
+
+    if (!model) {
+      try {
+        const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
+        model = getModelId(workTypeId);
+        console.log(`[specialist] Using model "${model}" for ${specialistType} (from work-type-router)`);
+      } catch {
+        console.warn(`Warning: Could not resolve model for ${specialistType} via work-type-router, using default`);
+      }
+    }
+
+    model = model || fallbackModel;
 
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
     const providerEnv = getProviderEnvForModel(model);
@@ -819,9 +857,9 @@ exec script -qfaec "bash '${innerScript}'" "${logFilePath}"
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt — PAN-384)
     // Kill stale session first to prevent "duplicate session" error (PAN-430)
-    await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
+    await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "bash '${launcherScript}'"`,
+      `${buildTmuxCommandString(['new-session', '-d', '-s', tmuxSession, '-c', cwd])}${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
 
@@ -1049,6 +1087,51 @@ async function buildTaskPrompt(
       });
       break;
     }
+
+    case 'inspect-agent': {
+      const workspace = task.workspace || 'unknown';
+      const beadId = (task.context?.beadId as string | undefined) || 'unknown';
+      const checkpoint = (task.context?.checkpoint as string | undefined) || 'main';
+      const diffStats = (task.context?.diffStats as string | undefined) || '';
+      const beadDescription = (task.context?.beadDescription as string | undefined) || 'Bead description not available';
+      const diffBase = checkpoint;
+
+      prompt += renderPrompt({
+        name: 'inspect-agent',
+        vars: {
+          ISSUE_ID: task.issueId,
+          BEAD_ID: beadId,
+          WORKSPACE_PATH: workspace,
+          PROJECT_PATH: workspace,
+          CHECKPOINT: checkpoint,
+          DIFF_BASE: diffBase,
+          DIFF_STATS: diffStats,
+          BEAD_DESCRIPTION: beadDescription,
+        },
+      });
+      break;
+    }
+
+    case 'uat-agent': {
+      const workspace = task.workspace || 'unknown';
+      const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+      const frontendUrl = process.env.FRONTEND_URL || `http://localhost:5173`; // Vite default
+      const testTokenApi = process.env.TEST_TOKEN_API || 'myn_test_e2e'; // Default for MYN
+
+      prompt += renderPrompt({
+        name: 'uat-agent',
+        vars: {
+          ISSUE_ID: task.issueId,
+          WORKSPACE: workspace,
+          FRONTEND_URL: frontendUrl,
+          API_URL: apiUrl,
+          TEST_TOKEN_API: testTokenApi,
+          VIEWPORT_CONFIGS: 'desktop: 1920x1080, tablet: 768x1024, mobile: 375x667',
+        },
+      });
+      break;
+    }
   }
 
   prompt += `\n\nWhen you complete your task, report your findings and status.`;
@@ -1237,7 +1320,7 @@ export async function terminateSpecialist(
 
   try {
     // Kill tmux session
-    await execAsync(`tmux kill-session -t "${tmuxSession}"`);
+    await killSessionAsync(tmuxSession);
     console.log(`[specialist] Terminated ${projectKey}/${specialistType}`);
   } catch (error) {
     console.error(`[specialist] Failed to kill tmux session ${tmuxSession}:`, error);
@@ -1634,15 +1717,12 @@ export async function isRunning(name: SpecialistType, projectKey?: string): Prom
   const tmuxSession = getTmuxSessionName(name, projectKey);
 
   try {
-    await execAsync(`tmux has-session -t ${tmuxSession}`);
+    const exists = await sessionExistsAsync(tmuxSession);
+    if (!exists) return false;
     // Session exists — but check if the pane actually has a running process.
     // When Claude Code crashes, the pane's process exits but the tmux session persists,
     // making has-session return success even though nothing is running.
-    const { stdout } = await execAsync(
-      `tmux list-panes -t ${tmuxSession} -F "#{pane_pid}" 2>/dev/null`,
-      { encoding: 'utf-8' }
-    );
-    const panePid = stdout.trim();
+    const panePid = (await listPaneValuesAsync(tmuxSession, '#{pane_pid}'))[0]?.trim() ?? '';
     if (!panePid) return false;
     // Check if the pane's process has any child processes (Claude Code / bash)
     const { stdout: children } = await execAsync(
@@ -1831,9 +1911,9 @@ exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --mode
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt)
     // Kill stale session first to prevent "duplicate session" error (PAN-430)
-    await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
+    await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "bash '${launcherScript}'"`,
+      `${buildTmuxCommandString(['new-session', '-d', '-s', tmuxSession, '-c', cwd])}${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
 
@@ -1916,11 +1996,11 @@ async function resetSpecialist(name: SpecialistType): Promise<void> {
     // 1. Cancel any pending command with Ctrl+C and wait for Claude to return to idle.
     //    Do NOT send 'cd ~' here — that triggers LLM inference (2-5s) and creates a race:
     //    the task message arrives while Claude is still processing the cd command and gets lost.
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-c`, { encoding: 'utf-8' });
+    await execAsync(buildTmuxCommandString(['send-keys', '-t', tmuxSession, 'C-c']), { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // 2. Clear any partial input on the prompt line
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-u`, { encoding: 'utf-8' });
+    await execAsync(buildTmuxCommandString(['send-keys', '-t', tmuxSession, 'C-u']), { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 100));
   } catch (error) {
     console.error(`[specialist] Failed to reset ${name}:`, error);
@@ -2047,9 +2127,9 @@ export async function wakeSpecialist(
       const claudeCmd = `claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
-      await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
+      await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });
       await execAsync(
-        `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "${claudeCmd}"`,
+        `${buildTmuxCommandString(['new-session', '-d', '-s', tmuxSession, '-c', cwd])}${envFlags} "${claudeCmd}"`,
         { encoding: 'utf-8' }
       );
 

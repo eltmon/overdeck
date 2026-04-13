@@ -71,6 +71,7 @@ import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
+import { createSessionAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -186,7 +187,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       if (isRunning(name)) {
         const tmuxSession = getTmuxSessionName(name);
         const killResult = yield* Effect.promise(() =>
-          execAsync(`tmux kill-session -t "${tmuxSession}"`).then(() => true).catch(() => false),
+          killSessionAsync(tmuxSession).then(() => true).catch(() => false),
         );
         killed = killResult;
       }
@@ -720,9 +721,10 @@ const postSpecialistWakeRoute = HttpRouter.add(
         : `${specCmd.command} --dangerously-skip-permissions`;
 
     const cwd = homedir();
-    yield* Effect.promise(() => execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${specCmdWithArgs} --resume ${useSessionId}"`,
-      { encoding: 'utf-8' },
+    yield* Effect.promise(() => createSessionAsync(
+      tmuxSession,
+      cwd,
+      `${specCmdWithArgs} --resume ${useSessionId}`,
     ));
 
     recordWake(name as SpecialistType, useSessionId!);
@@ -1397,7 +1399,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
 
     const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const tmuxSession = getTmuxSessionName(type, project);
-    yield* Effect.promise(() => execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {}));
+    yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
     // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
@@ -1924,7 +1926,7 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
     // NOTE: try/catch does NOT work with yield* in Effect.gen — use .catch() in the Promise chain.
     const tmuxSession = `specialist-${projectKey}-${name}`;
     yield* Effect.promise(() =>
-      execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null`, { encoding: 'utf-8' })
+      killSessionAsync(tmuxSession)
         .catch(() => { /* no session to kill */ })
     );
 

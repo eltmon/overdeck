@@ -50,7 +50,7 @@ import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js'
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
-import { sessionExistsAsync } from '../../../lib/tmux.js';
+import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
@@ -456,10 +456,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     // Check if a work agent is already running
     const issueLowerForCheck = id.toLowerCase();
-    const { stdout: _tmuxSessions } = yield* Effect.promise(() =>
-      execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true').catch(() => ({ stdout: '' })),
-    );
-    const workAgentSession = _tmuxSessions.trim().split('\n').find((s: string) => s === `agent-${issueLowerForCheck}`);
+    const tmuxSessions = yield* Effect.promise(() => listSessionNamesAsync());
+    const workAgentSession = tmuxSessions.find((s: string) => s === `agent-${issueLowerForCheck}`);
     if (workAgentSession) {
       return jsonResponse({
         error: `Cannot start planning: work agent already running for ${id.toUpperCase()}`,
@@ -723,8 +721,8 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     }
 
     // Kill tmux sessions
-    yield* Effect.promise(() => execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' }));
-    yield* Effect.promise(() => execAsync(`tmux kill-session -t planning-${id.toLowerCase()} 2>/dev/null || true`, { encoding: 'utf-8' }));
+    yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
+    yield* Effect.promise(() => killSessionAsync(`planning-${id.toLowerCase()}`).catch(() => {}));
 
     // Clean up agent state files (non-fatal, so absorbed inside the promise)
     const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -857,9 +855,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     });
 
     if (!skipKill) {
-      yield* Effect.promise(() =>
-        execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' }).catch(() => {}),
-      );
+      yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
     }
 
     // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
@@ -1078,7 +1074,7 @@ const postIssueResetRoute = HttpRouter.add(
     yield* Effect.promise(async () => {
       for (const session of [`planning-${issueLower}`, `agent-${issueLower}`]) {
         try {
-          await execAsync(`tmux kill-session -t ${session} 2>/dev/null || true`);
+          await killSessionAsync(session);
           cleanupLog.push(`Killed local tmux: ${session}`);
         } catch { /* Session might not exist */ }
       }

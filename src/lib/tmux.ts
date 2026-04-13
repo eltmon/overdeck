@@ -206,6 +206,31 @@ export function listSessions(): TmuxSession[] {
   }
 }
 
+export async function listSessionsAsync(): Promise<TmuxSession[]> {
+  try {
+    const { stdout } = await tmuxExecAsync(
+      ['list-sessions', '-F', '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}'],
+      { encoding: 'utf8' },
+    );
+    const text = String(stdout);
+    return text.trim().split('\n').filter(Boolean).map((line: string) => {
+      const [name, created, attached, windows] = line.split('|');
+      return {
+        name,
+        created: new Date(parseInt(created) * 1000),
+        attached: attached === '1',
+        windows: parseInt(windows),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function listSessionNames(): string[] {
+  return listSessions().map((session) => session.name);
+}
+
 export async function listSessionNamesAsync(): Promise<string[]> {
   try {
     const { stdout } = await tmuxExecAsync(['list-sessions', '-F', '#{session_name}'], { encoding: 'utf-8' });
@@ -357,6 +382,24 @@ export async function capturePaneAsync(
     return String(stdout);
   } catch {
     return '';
+  }
+}
+
+export function listPaneValues(target: string, format: string): string[] {
+  try {
+    const output = tmuxExecSync(['list-panes', '-t', target, '-F', format], { encoding: 'utf8' }) as string;
+    return output.split('\n').map((line) => line.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export async function listPaneValuesAsync(target: string, format: string): Promise<string[]> {
+  try {
+    const { stdout } = await tmuxExecAsync(['list-panes', '-t', target, '-F', format], { encoding: 'utf-8' });
+    return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
+  } catch {
+    return [];
   }
 }
 

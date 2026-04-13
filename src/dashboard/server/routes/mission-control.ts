@@ -32,6 +32,7 @@ import { EventStoreService } from '../services/domain-services.js';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
+import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
@@ -157,11 +158,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
 
       let transcript = '';
       try {
-        const { stdout } = await execAsync(
-          `tmux capture-pane -t ${checkId} -p -S -500 2>/dev/null || echo ""`,
-          { encoding: 'utf-8', timeout: 5000 }
-        );
-        transcript = stdout.trim();
+        transcript = (await capturePaneAsync(checkId, 500)).trim();
       } catch { /* agent may not be running */ }
 
       if (!isPlanning && !transcript) {
@@ -289,11 +286,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         } else {
           const tmuxName = `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
           try {
-            const { stdout } = await execAsync(
-              `tmux capture-pane -t ${tmuxName} -p -S -100 2>/dev/null || echo ""`,
-              { encoding: 'utf-8', timeout: 5000 }
-            );
-            const output = stdout.trim();
+            const output = (await capturePaneAsync(tmuxName, 100)).trim();
             if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
               transcriptParts.push(`\n--- Live Output ---\n${output}`);
             } else if (output) {
@@ -945,13 +938,13 @@ async function fetchProjectTree(): Promise<unknown[]> {
   } catch { /* non-fatal */ }
 
   const [tmuxResult, closedIssuesResult] = await Promise.allSettled([
-    execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true'),
+    listSessionNamesAsync(),
     execAsync('gh issue list --repo eltmon/panopticon-cli --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"'),
   ]);
 
   const tmuxSessions = new Set<string>();
   if (tmuxResult.status === 'fulfilled') {
-    for (const line of tmuxResult.value.stdout.split('\n')) {
+    for (const line of tmuxResult.value) {
       const trimmed = line.trim();
       if (trimmed) tmuxSessions.add(trimmed);
     }

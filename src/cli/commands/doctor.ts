@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
+import { listSessionNames } from '../../lib/tmux.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import {
@@ -158,8 +159,7 @@ export async function doctorCommand(): Promise<void> {
 
   // Check tmux sessions
   try {
-    const sessions = execSync('tmux list-sessions 2>/dev/null || true', { encoding: 'utf-8' });
-    const agentSessions = sessions.split('\n').filter((s) => s.includes('agent-')).length;
+    const agentSessions = listSessionNames().filter((s) => s.includes('agent-')).length;
     checks.push({
       name: 'Running Agents',
       status: 'ok',

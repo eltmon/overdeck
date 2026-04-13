@@ -11,7 +11,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
-import { createSession, killSession, sessionExists } from './tmux.js';
+import { createSession, killSession, sendKeysAsync, sessionExists } from './tmux.js';
 import { getConvoyTemplate, getExecutionOrder, type ConvoyTemplate, type ConvoyAgent } from './convoy-templates.js';
 import { AGENTS_DIR } from './paths.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
@@ -260,11 +260,8 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
   // Wait a moment for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));
 
-  // Send prompt using tmux load-buffer and paste-buffer
-  await execAsync(`tmux load-buffer "${promptFile}"`);
-  await execAsync(`tmux paste-buffer -t ${agentState.tmuxSession}`);
-  await new Promise(resolve => setTimeout(resolve, 500));
-  await execAsync(`tmux send-keys -t ${agentState.tmuxSession} Enter`);
+  // Send prompt using the standard tmux delivery path
+  await sendKeysAsync(agentState.tmuxSession, prompt, `convoy ${role}`);
 
   // Update agent state
   agentState.status = 'running';

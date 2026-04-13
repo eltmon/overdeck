@@ -16,7 +16,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AGENTS_DIR } from '../paths.js';
-import { sessionExists } from '../tmux.js';
+import { killSessionAsync, sessionExists } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findWorkspacePath } from './archive-planning.js';
@@ -42,7 +42,7 @@ async function killTmuxSessions(issueLower: string): Promise<StepResult> {
   for (const session of patterns) {
     if (sessionExists(session)) {
       try {
-        await execAsync(`tmux kill-session -t ${session}`);
+        await killSessionAsync(session);
         killed++;
       } catch {
         // session may have died between check and kill

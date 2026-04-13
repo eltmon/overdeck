@@ -6,11 +6,8 @@
  * This drives the status dot update in the ConversationList UI.
  */
 
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { listConversations, markConversationEnded } from '../../../lib/database/conversations-db.js';
-
-const execAsync = promisify(exec);
+import { sessionExistsAsync } from '../../../lib/tmux.js';
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -18,12 +15,7 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Exported for testing. Checks whether a named tmux session exists. */
 export async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  try {
-    await execAsync(`tmux has-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
-    return true;
-  } catch {
-    return false;
-  }
+  return sessionExistsAsync(sessionName);
 }
 
 /**
