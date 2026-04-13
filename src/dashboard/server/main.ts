@@ -11,6 +11,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
@@ -23,6 +24,11 @@ import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 
 declare const Bun: unknown;
+
+// Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
+void initTrackerConfigCache().catch(err => {
+  console.log('[tracker-config] Warning: failed to cache .panopticon.env:', err.message);
+});
 
 // Start the shared IssueDataService — fire and forget.
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
