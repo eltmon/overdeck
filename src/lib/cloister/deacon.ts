@@ -2566,6 +2566,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
 
+  // Kill orphaned planning sessions whose issue has already progressed past planning.
+  // PAN-682 pattern: `planning-pan-<id>` tmux session survives hours after `complete-planning`
+  // because either (a) `skipKill=true` was set or (b) complete-planning was never invoked
+  // (work agent was started via a different path). If the corresponding work agent session
+  // `agent-pan-<id>` is alive, planning is definitively over — kill the planning session.
+  const planningCleanupActions = await cleanupOrphanedPlanningSessions();
+  actions.push(...planningCleanupActions);
+  for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
+
   // Detect new commits pushed after review passed — invalidate stale reviews
   const postReviewActions = await checkPostReviewCommits();
   actions.push(...postReviewActions);
@@ -2830,6 +2839,67 @@ function recoverOrphanedAgents(context?: string): string[] {
   if (actions.length > 0 && context) {
     console.log(`[deacon] ${context}: ${actions.length} orphaned agent(s) reset to stopped`);
   }
+  return actions;
+}
+
+/**
+ * Kill `planning-*` tmux sessions whose corresponding work agent (`agent-*`) is
+ * already alive — that's definitive evidence planning is over. Handles the PAN-682
+ * pattern where a planning session survives after `complete-planning` fails to
+ * kill it (skipKill=true path, or complete-planning never invoked because the
+ * work agent was started via a different code path).
+ */
+async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  let sessionList: string;
+  try {
+    const { stdout } = await execAsync(
+      `tmux list-sessions -F "#{session_name}" 2>/dev/null || true`,
+      { encoding: 'utf-8', timeout: 5000 }
+    );
+    sessionList = stdout;
+  } catch {
+    return actions;
+  }
+
+  const planningSessions = sessionList
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.startsWith('planning-'));
+
+  for (const planningSession of planningSessions) {
+    // planning-pan-596 → agent-pan-596
+    const workAgentSession = planningSession.replace(/^planning-/, 'agent-');
+    if (!sessionExists(workAgentSession)) continue;
+
+    try {
+      await execAsync(`tmux kill-session -t "${planningSession}" 2>/dev/null || true`, {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+    } catch { /* non-fatal */ }
+
+    // Mark planning agent state as stopped so the UI doesn't show a "running" pill.
+    try {
+      const stateFile = join(AGENTS_DIR, planningSession, 'state.json');
+      if (existsSync(stateFile)) {
+        const agentState = JSON.parse(readFileSync(stateFile, 'utf-8'));
+        if (agentState.status === 'running' || agentState.status === 'starting') {
+          agentState.status = 'stopped';
+          agentState.stoppedAt = new Date().toISOString();
+          writeFileSync(stateFile, JSON.stringify(agentState, null, 2));
+          if (agentStoppedNotifier) {
+            try { agentStoppedNotifier(planningSession); } catch { /* non-fatal */ }
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
+
+    const msg = `Killed orphaned ${planningSession} (work agent ${workAgentSession} is running)`;
+    actions.push(msg);
+    console.log(`[deacon] ${msg}`);
+  }
+
   return actions;
 }
 
