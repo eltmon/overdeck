@@ -119,10 +119,17 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
         // Un-pinning: clear pin from localStorage
         savePinState(issueId, null);
         setPinnedSession(null);
+      } else if (activeSession) {
+        // Engaging pin: capture the currently-displayed session and persist it
+        setPinnedSession(activeSession);
+        savePinState(issueId, activeSession);
+      } else {
+        // No active session to pin — no-op, stay in auto-follow mode
+        return prev;
       }
       return next;
     });
-  }, [issueId]);
+  }, [issueId, activeSession]);
 
 
   // Reset panel state when issue changes

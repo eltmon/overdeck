@@ -8,6 +8,9 @@ import type { PipelinePhaseResult } from '../inspector/usePipelinePhase';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
+// Hoist savePinState mock so the vi.mock factory below can reference it
+const mockSavePinState = vi.hoisted(() => vi.fn());
+
 vi.mock('react-resizable-panels', () => ({
   Group: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="panel-group">{children}</div>
@@ -27,10 +30,15 @@ vi.mock('../TerminalPanel', () => ({
 }));
 
 vi.mock('../inspector/TerminalTabs', () => ({
-  TerminalTabs: () => <div data-testid="terminal-tabs" />,
+  // Expose onTogglePin as a button so integration tests can fire the real handler
+  TerminalTabs: ({ onTogglePin }: { onTogglePin?: () => void; [k: string]: unknown }) => (
+    <div data-testid="terminal-tabs">
+      <button data-testid="pin-button" onClick={onTogglePin}>Pin</button>
+    </div>
+  ),
   // Use the real localStorage key so tests can pre-populate state
   loadPinState: (issueId: string) => localStorage.getItem(`pan-terminal-pin-${issueId}`),
-  savePinState: vi.fn(),
+  savePinState: mockSavePinState,
 }));
 
 vi.mock('../inspector/MergedSummaryCard', () => ({
@@ -253,6 +261,76 @@ describe('DetailPanelLayout', () => {
         expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', activeSessionB);
       });
       expect(screen.getByTestId('terminal-panel')).not.toHaveAttribute('data-session', sessionA);
+    });
+  });
+
+  describe('Issue 4 — Pin button in auto-mode captures active session', () => {
+    it('retains the displayed session and persists pin when clicking Pin in auto-mode', async () => {
+      const activeSession = 'work-agent-session-123';
+
+      mockPipelineResult = {
+        phase: 'working' as PipelinePhase,
+        activeSession,
+        availableTerminals: [
+          {
+            id: 'working',
+            label: 'Work',
+            sessionName: activeSession,
+            isActive: true,
+            disabled: false,
+          } satisfies TerminalTab,
+        ],
+        markSessionDead: vi.fn(),
+      };
+
+      renderLayout(makeAgent({ status: 'running' }));
+
+      // Initially in auto-follow mode: terminal shows the activeSession
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', activeSession);
+      });
+
+      // Click the Pin button — fires handleTogglePin in DetailPanelLayout
+      fireEvent.click(screen.getByTestId('pin-button'));
+
+      // (a) The displayed session must survive the pin toggle
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', activeSession);
+      });
+
+      // (b) savePinState must have been called with the active session
+      expect(mockSavePinState).toHaveBeenCalledWith('PAN-509', activeSession);
+    });
+
+    it('is a no-op when there is no active session to pin', async () => {
+      mockPipelineResult = {
+        phase: 'working' as PipelinePhase,
+        activeSession: null,
+        availableTerminals: [
+          {
+            id: 'working',
+            label: 'Work',
+            sessionName: 'some-dead-session',
+            isActive: false,
+            disabled: true,
+          } satisfies TerminalTab,
+        ],
+        markSessionDead: vi.fn(),
+      };
+
+      renderLayout(makeAgent({ status: 'stopped' }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-tabs')).toBeInTheDocument();
+      });
+
+      mockSavePinState.mockClear();
+
+      // Click Pin button when there is no active session — must be a no-op
+      fireEvent.click(screen.getByTestId('pin-button'));
+
+      // savePinState must NOT have been called
+      expect(mockSavePinState).not.toHaveBeenCalled();
     });
   });
 
