@@ -13,6 +13,8 @@ import { promisify } from 'util';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix } from '../issue-id.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { loadReviewStatuses } from '../review-status.js';
 
 const execAsync = promisify(exec);
 
@@ -71,6 +73,43 @@ async function cleanupLabelsGitHub(ctx: LifecycleContext): Promise<StepResult> {
     ]);
   } catch (err) {
     return stepFailed(step, `Label cleanup failed: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Startup repair: clean workflow labels for any GitHub issue that was merged
+ * (mergeStatus === 'merged') but still has in-review/in-progress/merge-agent labels.
+ *
+ * Handles cases where cleanupMergedLabels() failed silently during postMergeLifecycle
+ * (e.g., transient GitHub API error, label not yet created).
+ *
+ * Fire-and-forget — called at server startup, errors logged but non-fatal.
+ */
+export async function repairMergedLabels(): Promise<void> {
+  try {
+    const statuses = loadReviewStatuses();
+    const merged = Object.values(statuses).filter(s => s.mergeStatus === 'merged');
+    if (merged.length === 0) return;
+
+    for (const s of merged) {
+      const resolved = resolveGitHubIssue(s.issueId);
+      if (!resolved.isGitHub) continue;
+      try {
+        const ctx: LifecycleContext = {
+          issueId: s.issueId,
+          projectPath: '',
+          github: { owner: resolved.owner, repo: resolved.repo, number: resolved.number },
+        };
+        const result = await cleanupLabelsGitHub(ctx);
+        if (result.success && !result.skipped) {
+          console.log(`[label-cleanup] Repaired labels for merged ${s.issueId}`);
+        }
+      } catch {
+        // non-fatal — best-effort repair
+      }
+    }
+  } catch (err) {
+    console.warn(`[label-cleanup] repairMergedLabels failed: ${err}`);
   }
 }
 
