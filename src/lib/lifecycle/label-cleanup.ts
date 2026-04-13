@@ -249,26 +249,37 @@ export async function repairClosedWontfixIssues(): Promise<void> {
       if (!resolved.isGitHub) continue;
 
       try {
+        // Check both state AND labels — only act on issues with 'wontfix' label
+        // (GitHub's state_reason='completed' is ambiguous: it covers both intentional
+        // closures AND issues closed because a PR merged. We only want explicit wontfix.)
         const { stdout } = await execAsync(
-          `gh issue view ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --json state --jq .state`,
+          `gh issue view ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --json state,labels --jq '{state: .state, labels: [.labels[].name]}'`,
           { encoding: 'utf-8', timeout: 10000 },
         );
-        // If the issue is CLOSED but not because of a Panopticon merge, clear the stale state
-        if (stdout.trim() !== 'CLOSED') continue;
+        const parsed = JSON.parse(stdout.trim());
+        if (parsed.state !== 'CLOSED') continue;
         if (s.mergeStatus === 'merged') continue; // Already handled by repairMergedLabels
 
-        console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} is CLOSED (non-merge) — clearing stale readyForMerge state`);
+        // Only act on explicitly marked wontfix issues, not just any closed issue
+        const hasWontfixLabel = (parsed.labels as string[]).some(
+          (l: string) => l === 'wontfix' || l === 'won\'t fix' || l === 'not planned',
+        );
+        if (!hasWontfixLabel) continue;
+
+        console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} is CLOSED (wontfix) — clearing stale readyForMerge state`);
         setReviewStatus(s.issueId, {
           readyForMerge: false,
           mergeStatus: 'failed',
-          mergeNotes: 'GitHub issue was closed externally (not via Panopticon merge flow)',
+          mergeNotes: 'GitHub issue was closed as wontfix (not via Panopticon merge flow)',
         } as any);
 
-        // Remove in-review label if present
-        await execAsync(
-          `gh issue edit ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --remove-label "in-review" 2>/dev/null || true`,
-          { encoding: 'utf-8' },
-        );
+        // Remove workflow labels if present
+        for (const label of ['in-review', 'in-progress']) {
+          await execAsync(
+            `gh issue edit ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --remove-label "${label}" 2>/dev/null || true`,
+            { encoding: 'utf-8' },
+          );
+        }
       } catch {
         // non-fatal — best-effort
       }
