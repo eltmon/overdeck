@@ -113,6 +113,68 @@ export async function repairMergedLabels(): Promise<void> {
   }
 }
 
+/**
+ * Startup repair: detect GitHub PRs that are already merged on GitHub but whose
+ * internal review-status still shows mergeStatus != 'merged'.
+ *
+ * This handles the case where the post-merge verification fails AFTER gh pr merge
+ * already executed — the PR is merged on GitHub but Panopticon marks it as failed.
+ * On the next retry the merge agent would fail with "PR already merged", looping forever.
+ *
+ * Fix: detect these cases on startup, update internal state to merged, and trigger
+ * postMergeLifecycle to complete cleanup (labels, issue close, beads, etc.).
+ *
+ * Fire-and-forget — non-fatal, errors are logged.
+ */
+export async function repairAlreadyMergedPRs(): Promise<void> {
+  try {
+    const { setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+
+    // Issues that aren't yet marked as merged but have a PR URL
+    const candidates = Object.values(statuses).filter(
+      s => s.mergeStatus !== 'merged' && s.prUrl,
+    );
+    if (candidates.length === 0) return;
+
+    for (const s of candidates) {
+      const resolved = resolveGitHubIssue(s.issueId);
+      if (!resolved.isGitHub || !s.prUrl) continue;
+
+      // Extract PR number from prUrl (e.g. https://github.com/owner/repo/pull/671 → 671)
+      const prNumMatch = s.prUrl.match(/\/pull\/(\d+)$/);
+      if (!prNumMatch) continue;
+      const prNumber = prNumMatch[1];
+
+      try {
+        const { stdout } = await execAsync(
+          `gh pr view ${prNumber} --repo ${resolved.owner}/${resolved.repo} --json state --jq .state`,
+          { encoding: 'utf-8', timeout: 10000 },
+        );
+        if (stdout.trim() !== 'MERGED') continue;
+
+        // PR is already merged on GitHub — update internal state
+        console.log(`[label-cleanup] ${s.issueId} PR #${prNumber} already merged on GitHub — repairing internal state`);
+        setReviewStatus(s.issueId, { mergeStatus: 'merged' });
+
+        // Fire postMergeLifecycle to complete cleanup (labels, issue close, beads)
+        const { postMergeLifecycle } = await import('../cloister/merge-agent.js');
+        const { resolveProjectFromIssue } = await import('../projects.js');
+        const project = resolveProjectFromIssue(s.issueId);
+        const projectPath = project?.projectPath ?? '';
+        const sourceBranch = `feature/${s.issueId.toLowerCase()}`;
+        postMergeLifecycle(s.issueId, projectPath, sourceBranch).catch(err => {
+          console.warn(`[label-cleanup] postMergeLifecycle repair failed for ${s.issueId}: ${err}`);
+        });
+      } catch {
+        // non-fatal — best-effort
+      }
+    }
+  } catch (err) {
+    console.warn(`[label-cleanup] repairAlreadyMergedPRs failed: ${err}`);
+  }
+}
+
 async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'label-cleanup:merged';
   try {
