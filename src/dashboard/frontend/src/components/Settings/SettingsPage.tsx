@@ -742,6 +742,12 @@ export function SettingsPage() {
                         <span>The cached access token is stale, but Codex may still refresh it automatically on next use.</span>
                       </p>
                     )}
+                    {openaiAuth.hasOpenAIApiKey && (
+                      <p className="text-blue-300 text-xs mt-2 flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>An OpenAI API key is also configured, but GPT agent launches will prefer the local subscription login while it is active.</span>
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p className="text-content-muted text-sm mt-2">
@@ -839,26 +845,26 @@ export function SettingsPage() {
                       {provider.id === 'openai' && (
                         <div>
                           <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
-                          {openaiAuth?.loggedIn && !hasConfiguredValue ? (
+                          {openaiAuth?.loggedIn ? (
                             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                               <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                              <span className="text-xs text-emerald-300 font-medium">
-                                Using Codex subscription login via claudish
-                              </span>
-                            </div>
-                          ) : openaiAuth?.loggedIn && hasConfiguredValue ? (
-                            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                              <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                              <span className="text-xs text-blue-300">
-                                Codex subscription login is available, but an API key is also configured. Remove the key if you want GPT agents to rely only on the local login.
-                              </span>
+                              <div className="min-w-0">
+                                <div className="text-xs text-emerald-300 font-medium">
+                                  Using Codex subscription login via claudish
+                                </div>
+                                {hasConfiguredValue && (
+                                  <div className="text-[11px] text-emerald-200/80 mt-0.5">
+                                    Any saved OpenAI API key is kept only as a fallback for direct key-based tools. GPT agent launches prefer the subscription login.
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ) : null}
                         </div>
                       )}
                       <div className="relative">
                         <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">
-                          {provider.id === 'openai' && openaiAuth?.loggedIn ? 'API Key Override (Optional)' : 'API Key'}
+                          {provider.id === 'openai' && openaiAuth?.loggedIn ? 'API Key Fallback (Optional)' : 'API Key'}
                         </label>
                         {isEnvVarRef ? (
                           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
@@ -1353,7 +1359,7 @@ export function SettingsPage() {
                   {canUseSubscriptionLogin && !providerApiKey && (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
                       <p className="text-emerald-300 text-xs">
-                        Using local Codex subscription login. Model testing in this dialog still requires a direct API key.
+                        GPT agents use the local Codex subscription login. Model testing in this dialog still requires a direct API key.
                       </p>
                     </div>
                   )}
