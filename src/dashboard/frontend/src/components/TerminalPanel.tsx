@@ -55,6 +55,12 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
   const isPlanningAgent = agent.agentPhase === 'planning' || agent.id.startsWith('planning-');
   const planningIssueId = isPlanningAgent ? deriveAgentIssueId(agent.id, agent.issueId) : null;
 
+  // Only probe the work agent's session liveness when we're actually viewing it.
+  // Specialist sessions (sessionNameProp !== agent.id) stream their own tmux sessions
+  // independently — keying isStopped off agent.id when a specialist tab is selected would
+  // cause the work agent's fallback content to render in place of the specialist stream.
+  const isViewingWorkAgent = !sessionNameProp || sessionNameProp === agent.id;
+
   // Check if agent's tmux session is alive via a lightweight probe.
   // The store status can be stale after server restarts, so verify with the server.
   // Default to showing XTerminal (optimistic) — switch to raw log only if probe confirms dead.
@@ -67,10 +73,12 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
       return data.alive === true;
     },
     refetchInterval: 10000,
+    enabled: isViewingWorkAgent,
   });
 
-  // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined)
-  const isStopped = tmuxAlive === false;
+  // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined).
+  // Never true for specialist tabs — they manage their own session lifecycle via onSessionEnded.
+  const isStopped = isViewingWorkAgent && tmuxAlive === false;
 
   // Only fetch for stopped agents — running agents use XTerminal WebSocket
   const { data: output, refetch: refetchOutput } = useQuery({

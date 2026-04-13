@@ -148,8 +148,9 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
 
   const immediateResult = useMemo(
     () => derivePipelinePhase(input, deadSessions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [input.agent, input.reviewStatus, input.projectKey, input.issueId, deadSessions],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- input.agent narrowed to id+status;
+    // the full object reference changes on every parent render, which would reset the 1s debounce timer
+    [input.agent?.id, input.agent?.status, input.reviewStatus, input.projectKey, input.issueId, deadSessions],
   );
 
   useEffect(() => {

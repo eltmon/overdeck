@@ -124,11 +124,6 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     });
   }, [issueId]);
 
-  // When a new tab is clicked in TerminalTabs, engage pin
-  const handleTabSelect = useCallback((sessionName: string | null) => {
-    handleSelectSession(sessionName);
-    if (!pinned) setPinned(true);
-  }, [handleSelectSession, pinned]);
 
   // Reset panel state when issue changes
   useEffect(() => {
@@ -255,7 +250,8 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                 />
               )}
               <div className="flex-1 min-h-0">
-                {phase === 'merged' ? (
+                {/* Show merged summary unless the user has pinned a specific session to view */}
+                {phase === 'merged' && !(pinned && pinnedSession) ? (
                   <MergedSummaryCard
                     mergedAt={reviewStatus?.updatedAt ?? new Date().toISOString()}
                     prUrl={workspaceData?.mrUrl ?? null}
@@ -264,7 +260,10 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                       availableTerminals.some(t => t.id === 'merging' && !t.disabled)
                         ? () => {
                             const mergeTab = availableTerminals.find(t => t.id === 'merging');
-                            if (mergeTab?.sessionName) handleTabSelect(mergeTab.sessionName);
+                            if (mergeTab?.sessionName) {
+                              handleSelectSession(mergeTab.sessionName);
+                              setPinned(true);
+                            }
                           }
                         : null
                     }

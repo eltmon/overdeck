@@ -174,3 +174,40 @@ describe('TerminalPanel — stopped agent content rendering', () => {
     });
   });
 });
+
+describe('TerminalPanel — specialist session (sessionName prop)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders XTerminal for a specialist session even when the work agent tmux session is dead', async () => {
+    // Work agent is dead (tmuxAlive: false) but we are viewing a specialist tab
+    const fetch = makeFetch({
+      tmuxAlive: false,
+      conversationMessages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    });
+    global.fetch = fetch;
+    const client = makeQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalPanel
+          agent={makeAgent({ status: 'stopped' })}
+          onClose={() => {}}
+          sessionName="specialist-panopticon-review-agent"
+          title="Review"
+        />
+      </QueryClientProvider>,
+    );
+
+    // isViewingWorkAgent=false → isStopped=false → XTerminal shown, not fallback
+    expect(screen.getByTestId('xterm')).toBeInTheDocument();
+    expect(screen.queryByTestId('messages-timeline')).not.toBeInTheDocument();
+    expect(screen.queryByText('No saved output available.')).not.toBeInTheDocument();
+
+    // The tmux-alive probe must NOT fire for the work agent while viewing a specialist session
+    expect(fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/tmux-alive'),
+      expect.anything(),
+    );
+  });
+});
