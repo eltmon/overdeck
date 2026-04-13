@@ -56,8 +56,8 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
-  // Fetch review status here so both InspectorPanel badge and TerminalTabs use the same data
-  const { data: reviewStatus } = useQuery<ReviewStatus>({
+  // Fetch review status here — single owner; passed as prop to InspectorPanel to avoid duplicate queries
+  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
     queryKey: ['review-status', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/review-status`);
@@ -225,6 +225,8 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                 issueUrl={issueUrl}
                 issue={issue}
                 phase={phase}
+                reviewStatus={reviewStatus}
+                reviewStatusLoading={reviewStatusLoading}
                 onClose={onClose}
                 onOpenTerminal={openTerminal}
               />
@@ -293,6 +295,8 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             issueUrl={issueUrl}
             issue={issue}
             phase={phase}
+            reviewStatus={reviewStatus}
+            reviewStatusLoading={reviewStatusLoading}
             onClose={onClose}
             onOpenTerminal={agent ? openTerminal : undefined}
           />

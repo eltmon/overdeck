@@ -221,6 +221,34 @@ describe('derivePipelinePhase precedence table', () => {
       const { phase } = derivePipelinePhase(input);
       expect(phase).toBe('review-feedback');
     });
+
+    it('returns review-feedback when review is blocked (backend writes blocked on rejection)', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'blocked' }),
+      });
+      const { phase, activeSession } = derivePipelinePhase(input);
+      expect(phase).toBe('review-feedback');
+      expect(activeSession).toBe('agent-abc');
+    });
+
+    it('returns review-feedback when review blocked and agent is starting', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'starting' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'blocked' }),
+      });
+      const { phase } = derivePipelinePhase(input);
+      expect(phase).toBe('review-feedback');
+    });
+
+    it('does NOT return review-feedback when review blocked but agent is stopped', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'stopped' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'blocked' }),
+      });
+      const { phase } = derivePipelinePhase(input);
+      expect(phase).not.toBe('review-feedback');
+    });
   });
 
   describe('working phase', () => {

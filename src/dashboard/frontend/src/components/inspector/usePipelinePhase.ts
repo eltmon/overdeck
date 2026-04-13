@@ -60,7 +60,7 @@ export function derivePipelinePhase(
   } else if (rs === 'reviewing') {
     phase = 'reviewing';
     activeSession = deadSessions.has(reviewSession) ? null : reviewSession;
-  } else if (rs === 'failed' && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+  } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
     phase = 'review-feedback';
     activeSession = workSession;
   } else if (agent?.status === 'healthy' || agent?.status === 'starting') {

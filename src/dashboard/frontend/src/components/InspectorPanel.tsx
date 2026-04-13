@@ -113,11 +113,15 @@ export interface InspectorPanelProps {
   issue?: Issue;
   /** Current pipeline phase — passed from parent (DetailPanelLayout) via usePipelinePhase */
   phase?: PipelinePhase | string;
+  /** Review status — hoisted to DetailPanelLayout to avoid duplicate queries */
+  reviewStatus?: ReviewStatus;
+  /** Loading state for reviewStatus */
+  reviewStatusLoading?: boolean;
   onClose: () => void;
   onOpenTerminal?: () => void;
 }
 
-export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, onClose, onOpenTerminal }: InspectorPanelProps) {
+export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [copied, setCopied] = useState(false);
@@ -172,15 +176,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, onClose
     refetchInterval: (workspaceCreating || containersStarting) ? 5000 : 30000,
   });
 
-  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
-    queryKey: ['review-status', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/review/${issueId}/status`);
-      if (!res.ok) throw new Error('Failed to fetch review status');
-      return res.json();
-    },
-    refetchInterval: 30000,
-  });
+  // reviewStatus and reviewStatusLoading are hoisted to DetailPanelLayout to avoid
+  // duplicate queries — they share react-query cache key ['review-status', issueId]
+  const reviewStatus = reviewStatusProp;
+  const reviewStatusLoading = reviewStatusLoadingProp ?? false;
 
   const { data: prdContent } = useQuery({
     queryKey: ['prd', issueId],
