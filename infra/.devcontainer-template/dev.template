@@ -65,7 +65,7 @@ case "${1:-help}" in
     while [ $ELAPSED -lt $MAX_WAIT ]; do
       # Check Frontend (Vite dev server)
       if [ "$FE_READY" = false ]; then
-        if docker exec ${COMPOSE_PROJECT_NAME}-frontend-1 curl -sf -o /dev/null "http://localhost:5173" 2>/dev/null; then
+        if docker exec ${COMPOSE_PROJECT_NAME}-frontend-1 curl -sf -o /dev/null "http://localhost:3010" 2>/dev/null; then
           echo "  Frontend: ready"
           FE_READY=true
         fi

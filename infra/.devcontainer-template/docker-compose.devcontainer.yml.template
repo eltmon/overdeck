@@ -19,9 +19,8 @@ services:
       - devnet
       - panopticon
 
-  # Init service: runs npm install once for all workspaces
+  # Init service: runs npm install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
-  # Also verifies critical deps resolve to prevent Vite CPU runaway
   init:
     build:
       context: .
@@ -32,8 +31,12 @@ services:
       sh -c "
         echo 'Installing dependencies...' ;
         bun install ;
-        echo 'Building workspace packages...' &&
+        echo 'Rebuilding native Node.js addons...' &&
+        npm rebuild better-sqlite3 2>&1 &&
+        echo 'Building contracts...' &&
         cd packages/contracts && bun run build 2>&1 && cd ../.. &&
+        echo 'Building dashboard server...' &&
+        npm run build:dashboard:server &&
         echo 'Init complete'
       "
     volumes:
@@ -82,16 +85,17 @@ services:
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.tls=true"
       - "traefik.http.services.pan-fe-{{FEATURE_FOLDER}}.loadbalancer.server.port=3010"
 
-  # Backend API server (with watch mode)
-  # NOTE: Server imports from ../../lib/ which needs root node_modules
-  # We mount the entire project and shadow only dashboard node_modules
+  # Backend API server — runs pre-built dist with Node 22
+  # NEVER run with bun: node-pty native addon breaks under bun's compat layer,
+  # and circular ESM deps in the source cause tsx mode to fail.
+  # The init service builds dist/dashboard/server.js before this starts.
   server:
     build:
       context: .
       dockerfile: Dockerfile
     user: node
-    working_dir: /workspaces/panopticon/src/dashboard/server
-    command: sh -c "bun run dev"
+    working_dir: /workspaces/panopticon
+    command: sh -c "node dist/dashboard/server.js"
     depends_on:
       init:
         condition: service_completed_successfully
