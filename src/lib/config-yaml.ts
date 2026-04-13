@@ -49,6 +49,13 @@ export interface ShadowConfig {
   };
 }
 
+export type TmuxConfigMode = 'managed' | 'inherit-user';
+
+export interface TmuxConfig {
+  /** Whether Panopticon uses its own tmux server/config or inherits the user's tmux config */
+  config_mode?: TmuxConfigMode;
+}
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -100,6 +107,9 @@ export interface YamlConfig {
   /** Shadow mode configuration */
   shadow?: ShadowConfig;
 
+  /** tmux runtime configuration */
+  tmux?: TmuxConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -131,6 +141,11 @@ export interface NormalizedShadowConfig {
  * Normalized configuration (after loading and merging)
  */
 export interface NormalizedConfig {
+  /** tmux runtime configuration */
+  tmux: {
+    configMode: TmuxConfigMode;
+  };
+
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;
 
@@ -205,6 +220,9 @@ export interface ConfigLoadResult {
  * Default configuration (used when no config files exist)
  */
 const DEFAULT_CONFIG: NormalizedConfig = {
+  tmux: {
+    configMode: 'managed',
+  },
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   apiKeys: {},
   providerAuth: {},
@@ -371,6 +389,9 @@ function mergeShadowConfig(
 function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
+    tmux: {
+      ...DEFAULT_CONFIG.tmux,
+    },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
@@ -464,6 +485,11 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       } else if (providers.openrouter !== undefined) {
         explicitlyDisabled.add('openrouter');
       }
+    }
+
+    // Merge tmux configuration
+    if (config.tmux?.config_mode) {
+      result.tmux.configMode = config.tmux.config_mode;
     }
 
     // Merge OpenRouter favorites

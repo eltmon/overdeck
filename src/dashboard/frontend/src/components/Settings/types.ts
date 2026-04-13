@@ -25,6 +25,7 @@ export type WorkTypeId =
   | 'convoy:security-reviewer'
   | 'convoy:performance-reviewer'
   | 'convoy:correctness-reviewer'
+  | 'convoy:requirements-reviewer'
   | 'convoy:synthesis-agent'
   // Planning
   | 'planning-agent'
@@ -50,6 +51,7 @@ export interface ModelsConfig {
   providers: ProvidersConfig;
   overrides: Partial<Record<WorkTypeId, ModelId>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
+  default_conversation_model?: ModelId;
 }
 
 export interface ApiKeysConfig {
@@ -80,6 +82,9 @@ export interface SettingsConfig {
   openrouter?: {
     favorites?: string[];
   };
+  tmux?: {
+    config_mode?: 'managed' | 'inherit-user';
+  };
   tracker_keys?: TrackerKeysConfig;
   deprecation_warnings?: DeprecationWarning[];
 }
@@ -104,6 +109,8 @@ export type WorkTypeCategory =
   | 'specialist'
   | 'convoy'
   | 'subagent'
+  | 'pre-work'
+  | 'workflow'
   | 'cli';
 
 export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
@@ -118,11 +125,14 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'specialist-review-agent', category: 'specialist', displayName: 'Review Agent' },
     { id: 'specialist-test-agent', category: 'specialist', displayName: 'Test Agent' },
     { id: 'specialist-merge-agent', category: 'specialist', displayName: 'Merge Agent' },
+    { id: 'specialist-inspect-agent', category: 'specialist', displayName: 'Inspect Agent' },
+    { id: 'specialist-uat-agent', category: 'specialist', displayName: 'UAT Agent' },
   ],
   'convoy': [
     { id: 'convoy:security-reviewer', category: 'convoy', displayName: 'Security Reviewer' },
     { id: 'convoy:performance-reviewer', category: 'convoy', displayName: 'Performance Reviewer' },
     { id: 'convoy:correctness-reviewer', category: 'convoy', displayName: 'Correctness Reviewer' },
+    { id: 'convoy:requirements-reviewer', category: 'convoy', displayName: 'Requirements Reviewer' },
     { id: 'convoy:synthesis-agent', category: 'convoy', displayName: 'Synthesis Agent' },
   ],
   'subagent': [
@@ -130,6 +140,12 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'subagent:plan', category: 'subagent', displayName: 'Plan' },
     { id: 'subagent:bash', category: 'subagent', displayName: 'Bash' },
     { id: 'subagent:general-purpose', category: 'subagent', displayName: 'General Purpose' },
+  ],
+  'pre-work': [
+    { id: 'planning-agent', category: 'pre-work', displayName: 'Planning Agent' },
+  ],
+  'workflow': [
+    { id: 'status-review', category: 'workflow', displayName: 'Status Review' },
   ],
   'cli': [
     { id: 'cli:interactive', category: 'cli', displayName: 'Interactive' },

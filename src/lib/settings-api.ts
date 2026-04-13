@@ -37,11 +37,14 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'specialist-review-agent': 'claude-opus-4-6',
     'specialist-test-agent': 'claude-sonnet-4-6',
     'specialist-merge-agent': 'claude-sonnet-4-6',
+    'specialist-inspect-agent': 'claude-sonnet-4-6',
+    'specialist-uat-agent': 'claude-sonnet-4-6',
 
     // Convoy reviewers - mixed based on criticality
     'convoy:security-reviewer': 'claude-opus-4-6', // SAFETY CRITICAL
     'convoy:performance-reviewer': 'claude-sonnet-4-6',
     'convoy:correctness-reviewer': 'claude-sonnet-4-6',
+    'convoy:requirements-reviewer': 'claude-sonnet-4-6',
     'convoy:synthesis-agent': 'claude-sonnet-4-6',
 
     // Subagents - speed-optimized (Haiku 2x faster, 1/3 cost)
@@ -49,6 +52,9 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'subagent:plan': 'claude-haiku-4-5',
     'subagent:bash': 'claude-haiku-4-5',
     'subagent:general-purpose': 'claude-sonnet-4-6',
+
+    // Workflow jobs
+    'status-review': 'claude-sonnet-4-6',
 
     // CLI modes - speed for quick, quality for interactive
     'cli:interactive': 'claude-sonnet-4-6',
@@ -89,6 +95,7 @@ export interface ApiSettingsConfig {
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
     gemini_thinking_level?: number;
+    default_conversation_model?: ModelId;
   };
   api_keys: {
     openai?: string;
@@ -100,6 +107,9 @@ export interface ApiSettingsConfig {
   };
   openrouter?: {
     favorites?: string[];
+  };
+  tmux?: {
+    config_mode?: 'managed' | 'inherit-user';
   };
   tracker_keys?: {
     linear?: string;
@@ -115,6 +125,16 @@ export interface ApiSettingsConfig {
  *
  * Also detects deprecated model IDs in current overrides and returns warnings.
  */
+export function getDefaultConversationModelApi(): ModelId {
+  const { config } = loadConfig();
+
+  if (config.enabledProviders.has('openai')) {
+    return resolveModelId('gpt-5.4');
+  }
+
+  return resolveModelId('claude-sonnet-4-6');
+}
+
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
@@ -143,10 +163,14 @@ export function loadSettingsApi(): ApiSettingsConfig {
       },
       overrides: config.overrides,
       gemini_thinking_level: config.geminiThinkingLevel,
+      default_conversation_model: getDefaultConversationModelApi(),
     },
     api_keys: config.apiKeys,
     openrouter: {
       favorites: config.openrouterFavorites,
+    },
+    tmux: {
+      config_mode: config.tmux.configMode,
     },
     tracker_keys: config.trackerKeys,
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
@@ -197,6 +221,7 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
       openrouter: settings.api_keys.openrouter,
     },
     openrouter: settings.openrouter,
+    tmux: settings.tmux,
     tracker_keys: settings.tracker_keys,
   };
 
@@ -237,6 +262,10 @@ export function updateSettingsApi(updates: Partial<ApiSettingsConfig>): ApiSetti
     openrouter: {
       ...current.openrouter,
       ...updates.openrouter,
+    },
+    tmux: {
+      ...current.tmux,
+      ...updates.tmux,
     },
     tracker_keys: {
       ...current.tracker_keys,
