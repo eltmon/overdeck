@@ -254,7 +254,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         case 'minimax': {
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'minimax-m2.7') : 'minimax-m2.7';
           try {
-            const resp = await fetch('https://api.minimax.chat/coding/messages', {
+            const resp = await fetch('https://api.minimax.io/anthropic/v1/messages', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
@@ -414,7 +414,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'minimax': {
           try {
-            const resp = await fetch('https://api.minimax.chat/coding/models', {
+            const resp = await fetch('https://api.minimax.io/anthropic/v1/models', {
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
             });
             if (resp.ok) {

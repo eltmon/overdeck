@@ -269,10 +269,11 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
-        scrollback: 5000,  // Local scroll buffer; server-side blackout prevents flash on reconnect
+        scrollback: 0,  // tmux is the source of truth for history; local scrollback duplicates content
         convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
+        macOptionClickForcesSelection: true,
         theme: {
           background: '#1a1a2e',
           foreground: '#eaeaea',
@@ -333,11 +334,18 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Do NOT intercept wheel events — let them pass through to xterm.js and tmux.
-      // With tmux mouse mode enabled, wheel events trigger tmux copy-mode scrollback,
-      // which is the only way to scroll history while Claude Code's TUI (alternate
-      // screen buffer) is active. xterm.js's scrollLines() does nothing in alternate
-      // buffer mode.
+      // Keep drag selection in the browser/xterm layer, but map wheel scrolling
+      // to tmux history explicitly so alternate-screen Claude sessions still scroll.
+      term.attachCustomWheelEventHandler((event: WheelEvent) => {
+        if (event.deltaY === 0) return false;
+        event.preventDefault();
+        event.stopPropagation();
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          const direction = event.deltaY < 0 ? '\u001b[1;2A' : '\u001b[1;2B';
+          wsRef.current.send(direction);
+        }
+        return false;
+      });
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
@@ -413,12 +421,9 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
       // Use write callback to know when this write completes
       term.write(data, () => {
-        // Smart auto-scroll: only snap to bottom if user hasn't scrolled up
-        const buf = term!.buffer.active;
-        const isAtBottom = buf.viewportY >= buf.length - term!.rows;
-        if (isAtBottom) {
-          term!.scrollToBottom();
-        }
+        // With tmux-managed history, keep the viewport pinned to the live bottom.
+        // Local xterm scrollback is disabled, so scrolling is delegated to tmux.
+        term!.scrollToBottom();
 
         isWriting = false;
         // Process next item in queue

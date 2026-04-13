@@ -29,9 +29,13 @@ vi.mock('@xterm/xterm', () => ({
     constructor() {
       (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
     }
+    wheelHandler: ((event: WheelEvent) => boolean) | null = null;
     onData(): { dispose(): void } { return { dispose() {} }; }
     onSelectionChange(): { dispose(): void } { return { dispose() {} }; }
     onResize(): { dispose(): void } { return { dispose() {} }; }
+    attachCustomWheelEventHandler = vi.fn((handler: (event: WheelEvent) => boolean) => {
+      this.wheelHandler = handler;
+    });
     getSelection(): string { return ''; }
     hasSelection(): boolean { return false; }
   },
