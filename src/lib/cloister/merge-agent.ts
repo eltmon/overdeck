@@ -336,6 +336,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   _completedPostMerge.add(issueId);
 
   console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Issue moved to Done — awaiting close-out.`);
+  announceMerge('completed', issueId);
   logActivity('merge_complete', `Merged ${issueId}. Issue moved to Done — awaiting close-out.`);
 }
 
@@ -609,6 +610,33 @@ function logActivity(action: string, details: string, issueId?: string): void {
 }
 
 /**
+ * Voice-worthy merge milestone announcement. Messages start with one of three
+ * distinctive prefixes ("Merge started", "Merge completed", "Merge failed") so
+ * pan-tts can filter merge-agent chatter and speak only these three events.
+ *
+ * Do not change these prefixes without updating the pan-tts filter
+ * (~/Projects/pan-tts/src/pan_tts/__main__.py — ALLOWED_MERGE_PREFIXES).
+ */
+function announceMerge(
+  status: 'started' | 'completed' | 'failed',
+  issueId: string,
+  extra?: string,
+): void {
+  const prefix = status === 'started'
+    ? 'Merge started'
+    : status === 'completed'
+      ? 'Merge completed'
+      : 'Merge failed';
+  const tail = extra ? `. ${extra}` : '';
+  emitActivityEntry({
+    source: 'merge-agent',
+    level: status === 'failed' ? 'error' : 'success',
+    message: `${prefix} for ${issueId}${tail}`,
+    issueId,
+  });
+}
+
+/**
  * Capture tmux output and look for result markers (async)
  */
 async function captureTmuxOutput(sessionName: string): Promise<string> {
@@ -681,6 +709,7 @@ export async function spawnMergeAgentForBranches(
   options?: { skipDoneReport?: boolean }
 ): Promise<MergeResult> {
   console.log(`[merge-agent] Waking specialist for merge of ${sourceBranch} into ${targetBranch}`);
+  announceMerge('started', issueId);
   logActivity('merge_attempt', `Waking specialist for merge: ${sourceBranch} -> ${targetBranch}`);
 
   // Pre-flight checks (quick validation before waking specialist)
@@ -897,6 +926,7 @@ export async function spawnMergeAgentForBranches(
 
   if (!wakeResult.success) {
     console.error(`[merge-agent] Failed to wake specialist: ${wakeResult.message}`);
+    announceMerge('failed', issueId, 'Could not wake specialist');
     logActivity('merge_error', `Failed to wake specialist: ${wakeResult.message}`);
     return {
       success: false,
@@ -988,6 +1018,7 @@ export async function spawnMergeAgentForBranches(
                 if (failedRequired.length > 0) {
                   const failedNames = failedRequired.map(g => g.name).join(', ');
                   console.log(`[merge-agent] ✗ Quality gates failed: ${failedNames}`);
+                  announceMerge('failed', issueId, 'Quality gates failed');
                   logActivity('merge_quality_gate_fail', `Quality gates failed for ${issueId}: ${failedNames}`);
 
                   const revertSuccess = await autoRevertMerge(projectPath);
@@ -1026,6 +1057,7 @@ export async function spawnMergeAgentForBranches(
               } else {
                 // Validation failed - auto-revert
                 console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
+                announceMerge('failed', issueId, 'Post-merge validation failed');
                 logActivity('merge_validation_fail', `Validation failed: ${validationResult.failures.map(f => f.type).join(', ')}`);
 
                 // Revert to ORIG_HEAD (set by git at merge time)
@@ -1082,6 +1114,7 @@ export async function spawnMergeAgentForBranches(
       // Check if merge-agent is still running
       if (!(await isRunning('merge-agent', mergeProjectKey ?? undefined))) {
         console.error(`[merge-agent] Specialist stopped unexpectedly — checking for stranded merge commit`);
+        announceMerge('failed', issueId, 'Specialist stopped unexpectedly');
         logActivity('merge_error', 'Specialist stopped unexpectedly');
 
         // Salvage: if the specialist merged locally but died before pushing, push it ourselves
@@ -1102,6 +1135,7 @@ export async function spawnMergeAgentForBranches(
 
   // Timeout — same salvage check
   console.error(`[merge-agent] Timeout waiting for merge completion — checking for stranded merge commit`);
+  announceMerge('failed', issueId, 'Specialist timed out');
   logActivity('merge_timeout', 'Timeout waiting for specialist to complete merge');
 
   const salvageResult = await salvageStrandedMerge(projectPath, targetBranch, headBefore, issueId, logActivity);

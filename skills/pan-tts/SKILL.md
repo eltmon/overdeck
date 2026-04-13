@@ -1,11 +1,14 @@
 ---
 name: pan-tts
-description: Optional local text-to-speech sidecar that speaks Panopticon activity log entries through Qwen3-TTS (or any local TTS engine). Subscribes to the public /events/stream SSE feed; no pan-core dependency.
+description: Optional local text-to-speech sidecar that speaks Panopticon activity log entries through Qwen3-TTS (or any local TTS engine). Subscribes to the public /events/stream SSE feed; no pan-core dependency. Also exposes an ad-hoc speak helper (scripts/say.sh) so agents can announce one-off messages on demand.
 triggers:
   - pan tts
   - panopticon tts
   - text to speech
   - read activity log
+  - speak this
+  - say out loud
+  - announce
 allowed-tools:
   - Bash
   - Read
@@ -89,6 +92,22 @@ systemctl --user enable --now pan-tts.service
 ```
 
 A `pan-tts.service` unit template lives at `~/Projects/pan-tts/systemd/pan-tts.service` — `User=` and `WorkingDirectory=` are pre-filled for this machine.
+
+## Ad-Hoc Speak (For Agents)
+
+The skill bundles `scripts/say.sh` for one-off utterances — agents can use this to announce build completions, merge outcomes, or attention requests without routing through the dashboard event store:
+
+```bash
+./scripts/say.sh "Build is green, ready for review."
+./scripts/say.sh "Pan 672 merged to main."
+```
+
+The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`). It returns immediately after queuing — audio plays asynchronously through the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
+
+Use this sparingly — the SSE-subscribed sidecar already speaks every activity entry. Ad-hoc speak is for:
+- Announcements that don't warrant a dashboard activity entry (local test runs, meta-commentary)
+- Pulling the user's attention during long-running work
+- Testing the audio path after a restart
 
 ## Verifying It
 
