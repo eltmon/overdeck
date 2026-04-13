@@ -34,3 +34,4 @@ None
 - **[2026-04-12T23:00Z] Addressed code review BLOCK: fixed double-commit race (committingRef), stabilized callbacks (draftTitleRef), added 25 new tests across ConversationList.test.tsx and ConversationPanel.test.tsx, fixed pre-existing shadow-state.test.ts flakiness; all 204 test files pass (2756 tests); pushed commit c76dd114**
 - **[2026-04-13T12:02Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/013-review-agent-changes-requested.md`
 - **[2026-04-13T12:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/014-review-agent-changes-requested.md`
+- **[2026-04-13T12:21Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/015-review-agent-changes-requested.md`
