@@ -126,6 +126,9 @@ For each bug found during the operation:
 
 ## Known Recurring Issues
 
+- Docker UAT server container crashes with `Cannot find module 'effect/Context'` — devcontainer was running `bun run main.ts` (source mode) instead of `node dist/dashboard/server.js`. Fix: init service now builds the server (`npm run build:dashboard:server`); server service runs Node 22 with the pre-built dist. Also added `overrides: {"@effect/platform-node-shared": "4.0.0-beta.43"}` to package.json to prevent bun from creating a broken symlink to a version not in the bun cache. (fixed: commit 5fe32f09)
+
+
 - `complete-planning` race condition with `start-agent` (fixed: checks for running work agent)
 - `postMergeLifecycle` infinite rebuild loop (fixed: `skipDeploy` option)
 - Ghost agents after crash (fixed: `recoverOrphanedAgents` in deacon startup)
