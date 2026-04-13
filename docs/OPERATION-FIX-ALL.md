@@ -146,6 +146,18 @@ For each bug found during the operation:
 
 ## Flywheel Run Log
 
+### 2026-04-13 — Run 4
+- **Issues inventoried**: 7 PAN issues (PAN-457, PAN-509, PAN-540, PAN-544, PAN-596, PAN-611, PAN-653). Active planning agents: PAN-457, PAN-540, PAN-596, PAN-653.
+- **Issues moved to Awaiting Merge**: 0 (PAN-544 has `readyForMerge:true`/`mergeStatus:pending` — awaiting user UAT)
+- **Bugs fixed**: 4 substrate bugs
+  1. Startup repairs for post-merge lifecycle gaps — added `repairAlreadyMergedPRs()`, `repairIncompletePostMergeLifecycle()`, `repairClosedWontfixIssues()` to `label-cleanup.ts` and wired all 4 repairs in `main.ts` (commits 4624409c, 983e0b39, eedd29fd, 51030f53). Recovered PAN-670 (PR merged but state stuck) and PAN-645 (issue open after merge)
+  2. `repairClosedWontfixIssues` first version too aggressive — fired on ANY closed issue, incorrectly clearing PAN-544's state (its GitHub issue was closed as "completed" not wontfix). Fixed to only fire when issue has explicit `wontfix`/`won't fix`/`not planned` label (commit 51030f53)
+  3. PAN-509 stuck at review circuit breaker (7/7 auto-requeues) despite all 3 flagged dead-code issues being fixed — reset via `POST /api/workspaces/PAN-509/reset-review` with `rerun:true`
+  4. MIN-661 planning agent running on a MYN issue in the Panopticon pipeline (wrong tracker) — killed session, cancelled MIN-661 on Linear, closed PAN-22, created PAN-687 as proper backlog issue
+- **State restored manually**: PAN-544 `readyForMerge:true`, `mergeStatus:pending` after erroneous `repairClosedWontfixIssues` cleared it
+- **Main dirt cleared**: `scripts/record-cost-event.js` comment leaked from feature branches; restored via `git restore`
+- **Still in pipeline**: PAN-509 (review re-triggered after circuit breaker reset); PAN-544 (awaiting user UAT); PAN-596 (work agent actively fixing review feedback); PAN-611 (work agent resolving merge conflicts after review); PAN-457, PAN-540, PAN-653 (active planning)
+
 ### 2026-04-12 — Run 3
 - **Issues inventoried**: 9 PAN issues (PAN-473, PAN-503, PAN-509, PAN-596, PAN-611, PAN-645, PAN-647, PAN-662, PAN-670). All work agents at idle after rate-limit reset.
 - **Issues moved to Awaiting Merge**: 0 (all needed fixes before review could proceed)
