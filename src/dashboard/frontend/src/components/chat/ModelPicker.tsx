@@ -84,6 +84,14 @@ export function loadStoredModel(): string {
   return DEFAULT_MODEL;
 }
 
+export function saveStoredModel(modelId: string): void {
+  try {
+    localStorage.setItem(MODEL_STORAGE_KEY, modelId);
+  } catch {
+    // Ignore
+  }
+}
+
 function formatCost(costPer1M: number): string {
   if (costPer1M === 0) return 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;

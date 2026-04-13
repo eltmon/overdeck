@@ -13,7 +13,7 @@ import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, DEFAULT_MODEL, MODEL_EFFORT_SUPPORT } from './ModelPicker';
+import { ModelPicker, DEFAULT_MODEL, MODEL_EFFORT_SUPPORT, loadStoredModel, saveStoredModel } from './ModelPicker';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -47,7 +47,7 @@ interface DraftConversationPanelProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function DraftConversationPanel({ onPromoted }: DraftConversationPanelProps) {
-  const [model, setModel] = useState<string>(DEFAULT_MODEL);
+  const [model, setModel] = useState<string>(loadStoredModel);
   const [effortLevels, setEffortLevels] = useState<readonly string[]>(
     () => MODEL_EFFORT_SUPPORT[DEFAULT_MODEL as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
   );
@@ -73,6 +73,7 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   function handleModelChange(newModel: string, levels: readonly string[]) {
     setModel(newModel);
     setEffortLevels(levels);
+    saveStoredModel(newModel);
   }
 
   const handleSubmit = useCallback(async () => {
