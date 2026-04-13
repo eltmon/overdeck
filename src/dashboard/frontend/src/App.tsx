@@ -32,6 +32,7 @@ import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
+import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 
 interface TrackerStatusItem {
   type: string;
@@ -74,11 +75,33 @@ function getTabFromPath(): Tab {
   return PATH_TO_TAB[path] || 'kanban';
 }
 
+export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
+  const view = new URLSearchParams(search).get('view');
+  return view === 'terminal' ? 'terminal' : 'conversation';
+}
+
 /** Extract conversation ID from /conv/:id path, or null if not matching. */
-function getConvIdFromPath(): string | null {
-  const path = window.location.pathname;
+export function getConvIdFromPath(path = window.location.pathname): string | null {
   const match = path.match(/^\/conv\/(\d+)$/);
   return match ? match[1] : null;
+}
+
+export function getConversationRouteState() {
+  return {
+    tab: getTabFromPath(),
+    convId: getConvIdFromPath(),
+    viewMode: getConversationViewModeFromSearch(),
+  };
+}
+
+export function buildConversationUrl(id: string | null, viewMode: ConversationViewMode = 'conversation'): string {
+  if (!id) return '/command-deck';
+  const params = new URLSearchParams();
+  if (viewMode === 'terminal') {
+    params.set('view', 'terminal');
+  }
+  const query = params.toString();
+  return query ? `/conv/${id}?${query}` : `/conv/${id}`;
 }
 
 async function fetchBackendHealth(): Promise<{ version: string }> {
@@ -123,7 +146,7 @@ export default function App() {
     );
   }
 
-  const [activeTab, setActiveTabState] = useState<Tab>(getTabFromPath);
+  const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
   const [selectedAgent, setSelectedAgentState] = useState<string | null>(() => {
     const hash = window.location.hash;
     if (hash.startsWith('#agent=')) return decodeURIComponent(hash.slice(7));
@@ -149,24 +172,22 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // Conversation deep-link state (/conv/:id)
-  const [selectedConvId, setSelectedConvIdState] = useState<string | null>(getConvIdFromPath);
-  const setSelectedConvId = useCallback((id: string | null) => {
+  // Conversation deep-link state (/conv/:id?view=terminal)
+  const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => getConversationRouteState().convId);
+  const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
+    () => getConversationRouteState().viewMode,
+  );
+  const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
     setSelectedConvIdState(id);
-    if (id) {
-      window.history.replaceState(null, '', `/conv/${id}`);
-    } else {
-      window.history.replaceState(null, '', '/command-deck');
-    }
+    setConversationViewModeState(id ? viewMode : 'conversation');
+    window.history.replaceState(null, '', buildConversationUrl(id, viewMode));
   }, []);
-  // Sync conversation deep-link on popstate (browser back/forward)
-  useEffect(() => {
-    const onPopState = () => {
-      setSelectedConvId(getConvIdFromPath());
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [setSelectedConvId]);
+  const setSelectedConvId = useCallback((id: string | null) => {
+    setConversationRoute(id, id ? 'conversation' : 'conversation');
+  }, [setConversationRoute]);
+  const setConversationViewMode = useCallback((viewMode: ConversationViewMode) => {
+    setConversationRoute(selectedConvId, viewMode);
+  }, [selectedConvId, setConversationRoute]);
 
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
@@ -215,7 +236,10 @@ export default function App() {
   // Handle browser back/forward
   useEffect(() => {
     const onPopState = () => {
-      setActiveTabState(getTabFromPath());
+      const routeState = getConversationRouteState();
+      setActiveTabState(routeState.tab);
+      setSelectedConvIdState(routeState.convId);
+      setConversationViewModeState(routeState.viewMode);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -451,7 +475,13 @@ export default function App() {
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
-              <MissionControl issues={issues} convId={selectedConvId} onConvIdChange={setSelectedConvId} />
+              <MissionControl
+                issues={issues}
+                convId={selectedConvId}
+                conversationViewMode={conversationViewMode}
+                onConvIdChange={setSelectedConvId}
+                onConversationViewModeChange={setConversationViewMode}
+              />
             </div>
           )}
         {activeTab === 'kanban' && (
