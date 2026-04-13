@@ -3,13 +3,31 @@
  *
  * Extracted from server/index.ts for reuse by IssueDataService.
  * Priority: config.yaml (Settings page) > ~/.panopticon.env > environment variables
+ *
+ * NOTE: .panopticon.env content is cached at startup to avoid blocking FS reads
+ * during request handling (PAN-70 type issue). See initTrackerConfigCache().
  */
 
 import { readFileSync, existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { loadProjectsConfig, getIssuePrefix } from '../../../lib/projects.js';
+
+// ─── In-memory cache (populated at startup) ───────────────────────────────────
+let cachedEnvContent: string | null = null;
+
+export async function initTrackerConfigCache(): Promise<void> {
+  try {
+    const envFile = join(homedir(), '.panopticon.env');
+    if (existsSync(envFile)) {
+      cachedEnvContent = await readFile(envFile, 'utf-8');
+    }
+  } catch {
+    // If read fails, leave cache as null; functions will fallback to env vars
+  }
+}
 
 // GitHub configuration
 export interface GitHubConfig {
@@ -36,11 +54,9 @@ export function getLinearApiKey(): string | null {
     if (yamlConfig.config.trackerKeys.linear) return yamlConfig.config.trackerKeys.linear;
   } catch { /* ignore */ }
 
-  // 2. Check ~/.panopticon.env
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
+  // 2. Check cached ~/.panopticon.env (populated at startup to avoid blocking FS read)
+  if (cachedEnvContent) {
+    const match = cachedEnvContent.match(/LINEAR_API_KEY=(.+)/);
     if (match) return match[1].trim();
   }
 
@@ -64,19 +80,17 @@ export function getRallyConfig(): RallyConfig | null {
     if (yamlConfig.config.trackerKeys.rally) apiKey = yamlConfig.config.trackerKeys.rally;
   } catch { /* ignore */ }
 
-  // 2. Check ~/.panopticon.env (also get server/workspace/project from here)
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
+  // 2. Check cached ~/.panopticon.env (also get server/workspace/project from here)
+  if (cachedEnvContent) {
     if (!apiKey) {
-      const apiKeyMatch = content.match(/RALLY_API_KEY=(.+)/);
+      const apiKeyMatch = cachedEnvContent.match(/RALLY_API_KEY=(.+)/);
       if (apiKeyMatch) apiKey = apiKeyMatch[1].trim();
     }
-    const serverMatch = content.match(/RALLY_SERVER=(.+)/);
+    const serverMatch = cachedEnvContent.match(/RALLY_SERVER=(.+)/);
     server = serverMatch?.[1].trim();
-    const workspaceMatch = content.match(/RALLY_WORKSPACE=(.+)/);
+    const workspaceMatch = cachedEnvContent.match(/RALLY_WORKSPACE=(.+)/);
     workspace = workspaceMatch?.[1].trim();
-    const projectMatch = content.match(/RALLY_PROJECT=(.+)/);
+    const projectMatch = cachedEnvContent.match(/RALLY_PROJECT=(.+)/);
     project = projectMatch?.[1].trim();
   }
 
@@ -128,16 +142,14 @@ export function getGitHubConfig(): GitHubConfig | null {
     if (yamlConfig.config.trackerKeys.github) token = yamlConfig.config.trackerKeys.github;
   } catch { /* ignore */ }
 
-  // 2. Check ~/.panopticon.env (also get repos from here)
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
+  // 2. Check cached ~/.panopticon.env (also get repos from here)
+  if (cachedEnvContent) {
     if (!token) {
-      const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
+      const tokenMatch = cachedEnvContent.match(/GITHUB_TOKEN=(.+)/);
       if (tokenMatch) token = tokenMatch[1].trim();
     }
 
-    const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
+    const reposMatch = cachedEnvContent.match(/GITHUB_REPOS=(.+)/);
     if (reposMatch) {
       repos = reposMatch[1].trim().split(',').map(r => {
         const [repoPath, prefix] = r.trim().split(':');
