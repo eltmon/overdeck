@@ -83,6 +83,7 @@ export interface ApiSettingsConfig {
       openai: boolean;
       google: boolean;
       minimax: boolean;
+      zai: boolean;
       kimi: boolean;
       openrouter: boolean;
     };
@@ -93,6 +94,7 @@ export interface ApiSettingsConfig {
     openai?: string;
     google?: string;
     minimax?: string;
+    zai?: string;
     kimi?: string;
     openrouter?: string;
   };
@@ -135,6 +137,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
         minimax: config.enabledProviders.has('minimax'),
+        zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
@@ -177,14 +180,22 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
               plan: providerPlan.google,
             }
           : settings.models.providers.google,
-        zai: settings.models.providers.minimax,
+        minimax: settings.models.providers.minimax,
+        zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
     },
-    api_keys: settings.api_keys,
+    api_keys: {
+      openai: settings.api_keys.openai,
+      google: settings.api_keys.google,
+      minimax: settings.api_keys.minimax,
+      zai: settings.api_keys.zai,
+      kimi: settings.api_keys.kimi,
+      openrouter: settings.api_keys.openrouter,
+    },
     openrouter: settings.openrouter,
     tracker_keys: settings.tracker_keys,
   };
@@ -308,6 +319,7 @@ export function getAvailableModelsApi(): {
   openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
@@ -316,6 +328,7 @@ export function getAvailableModelsApi(): {
     openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
@@ -323,6 +336,7 @@ export function getAvailableModelsApi(): {
     openai: [],
     google: [],
     minimax: [],
+    zai: [],
     kimi: [],
     openrouter: [],
   };
@@ -345,6 +359,9 @@ export function getAvailableModelsApi(): {
       case 'minimax':
         result.minimax.push(entry);
         break;
+      case 'zai':
+        result.zai.push(entry);
+        break;
       case 'openrouter':
         result.openrouter.push(entry);
         break;
@@ -365,6 +382,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         openai: false,
         google: false,
         minimax: false,
+        zai: false,
         kimi: true, // Kimi K2.5 used for implementation work agent
         openrouter: false,
       },

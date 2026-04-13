@@ -1,7 +1,7 @@
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'openrouter';
 
 export type WorkTypeId =
   // Issue agent phases
@@ -40,6 +40,7 @@ export interface ProvidersConfig {
   anthropic: boolean; // Always true (required)
   openai: boolean;
   google: boolean;
+  minimax: boolean;
   zai: boolean;
   kimi: boolean;
   openrouter: boolean;
@@ -54,6 +55,7 @@ export interface ModelsConfig {
 export interface ApiKeysConfig {
   openai?: string;
   google?: string;
+  minimax?: string;
   zai?: string;
   kimi?: string;
   openrouter?: string;
@@ -86,7 +88,7 @@ export interface AvailableModels {
   anthropic: string[];
   openai: string[];
   google: string[];
-  zai: string[];
+  minimax: string[];
   kimi: string[];
 }
 

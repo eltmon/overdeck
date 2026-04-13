@@ -41,6 +41,7 @@ describe('settings-api', () => {
       expect(settings.models.providers.openai).toBe(true);
       expect(settings.models.providers.google).toBe(false);
       expect(settings.models.providers.minimax).toBe(false);
+      expect(settings.models.providers.zai).toBe(false);
       expect(settings.models.providers.kimi).toBe(false);
       expect(settings.models.gemini_thinking_level).toBe(3);
     });
@@ -59,7 +60,9 @@ describe('settings-api', () => {
           openai: true,
           google: false,
           minimax: false,
+          zai: false,
           kimi: false,
+          openrouter: false,
         },
         overrides: {},
         gemini_thinking_level: 3,
@@ -135,6 +138,7 @@ describe('settings-api', () => {
       expect(models.openai).toBeDefined();
       expect(models.google).toBeDefined();
       expect(models.minimax).toBeDefined();
+      expect(models.zai).toBeDefined();
       expect(models.kimi).toBeDefined();
 
       // Each model should have id and name properties
@@ -172,14 +176,18 @@ describe('settings-api', () => {
             anthropic: true,
             openai: true,
             google: false,
-            minimax: false,
+            minimax: true,
+            zai: true,
             kimi: false,
+            openrouter: false,
           },
           overrides: {},
           gemini_thinking_level: 4,
         },
         api_keys: {
           openai: 'sk-test-123',
+          minimax: 'minimax-test-123',
+          zai: 'zai-test-123',
         },
       };
 
@@ -195,7 +203,11 @@ describe('settings-api', () => {
       // Note: preset was removed from the API
             expect(yamlContent).toContain('anthropic: true');
       expect(yamlContent).toContain('openai: true');
+      expect(yamlContent).toContain('minimax: true');
+      expect(yamlContent).toContain('zai: true');
       expect(yamlContent).toContain('openai: sk-test-123');
+      expect(yamlContent).toContain('minimax: minimax-test-123');
+      expect(yamlContent).toContain('zai: zai-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
     });
   });

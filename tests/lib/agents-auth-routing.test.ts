@@ -41,7 +41,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { getClaudishPrefix, getProviderEnvForModel } from '../../src/lib/agents.js';
+import { getClaudishPrefix, getProviderEnvForModel, getAgentRuntimeBaseCommand } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -56,9 +56,12 @@ describe('agents auth routing', () => {
 
     mockGetProviderForModel.mockImplementation((model: string) => {
       if (model.startsWith('gpt-') || model === 'o3' || model === 'o4-mini') {
-        return { name: 'openai', displayName: 'OpenAI', authType: 'env' };
+        return { name: 'openai', displayName: 'OpenAI', compatibility: 'claudish', authType: 'env' };
       }
-      return { name: 'anthropic', displayName: 'Anthropic', authType: 'env' };
+      if (model.startsWith('minimax-')) {
+        return { name: 'minimax', displayName: 'MiniMax', compatibility: 'direct', authType: 'static' };
+      }
+      return { name: 'anthropic', displayName: 'Anthropic', compatibility: 'direct', authType: 'env' };
     });
 
     mockGetProviderEnv.mockImplementation((_provider, authToken: string) => ({
@@ -107,5 +110,11 @@ describe('agents auth routing', () => {
 
   it('uses cx@ prefix for GPT models routed through subscription auth', () => {
     expect(getClaudishPrefix('gpt-5.4', 'subscription')).toBe('cx@gpt-5.4');
+  });
+
+  it('launches MiniMax models directly through claude instead of claudish', () => {
+    expect(getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
+      'claude --dangerously-skip-permissions --model minimax-m2.7'
+    );
   });
 });

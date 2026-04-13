@@ -77,10 +77,17 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best-value implementation model, 256K context' },
     ],
   },
-  zai: {
-    name: 'Zhipu (GLM)',
+  minimax: {
+    name: 'MiniMax',
     models: [
-      { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Globe, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Direct-compatible large-context alternative' },
+      { id: 'minimax-m2.7' as ModelId, name: 'MiniMax M2.7', icon: Globe, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Anthropic-compatible coding model with strong value' },
+      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'MiniMax M2.7 Highspeed', icon: Zap, tier: 'fast', capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'fast'], description: 'Same MiniMax quality tier with higher throughput' },
+    ],
+  },
+  zai: {
+    name: 'Z.AI',
+    models: [
+      { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Globe, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI direct provider for GLM 5.1' },
     ],
   },
 };
@@ -193,8 +200,14 @@ export function getModelById(id: ModelId): ModelDef | undefined {
     return models.find(m => m.id === 'kimi-k2.5');
   }
 
-  // GLM / Z.AI models
-  if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
+  // MiniMax models
+  if (idLower.includes('minimax')) {
+    if (idLower.includes('highspeed')) return models.find(m => m.id === 'minimax-m2.7-highspeed');
+    return models.find(m => m.id === 'minimax-m2.7');
+  }
+
+  // Z.AI models
+  if (idLower.includes('glm') || idLower.includes('zai')) {
     return models.find(m => m.id === 'glm-5.1');
   }
 
