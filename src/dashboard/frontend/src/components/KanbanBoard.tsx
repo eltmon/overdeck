@@ -2554,6 +2554,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Blocked
               </span>
             )}
+            {/* Compacting badge — shown when agent is compressing context */}
+            {isRunning && activeAgent?.runtimeState === 'compacting' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-violet-900/60 text-violet-300 border border-violet-500/40 animate-pulse"
+                title="Agent is compressing its context window — messages sent now will be processed after compaction"
+              >
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Compacting
+              </span>
+            )}
             {/* Idle badge — time-based health indicator. Shows when agent hasn't been active for 30+ min */}
             {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && agent?.resolution !== 'abandoned' && (
               <span
