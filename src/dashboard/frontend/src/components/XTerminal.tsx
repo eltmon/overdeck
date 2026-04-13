@@ -106,12 +106,17 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   }, []);
 
   const sendResizeIfNeeded = useCallback(() => {
-    // First, fit the terminal to its container so xterm.js renders at the right size
+    // Fit the terminal to its container so xterm.js renders at the right size.
+    // Skip while the user has an active selection — fit() can call term.resize()
+    // which clears the selection mid-drag (a1a91528 broke this).
+    const term = terminalInstance.current;
     const fit = fitAddon.current;
-    try {
-      fit?.fit();
-    } catch {
-      // fit() can throw if terminal isn't attached yet
+    if (term && !term.hasSelection()) {
+      try {
+        fit?.fit();
+      } catch {
+        // fit() can throw if terminal isn't attached yet
+      }
     }
 
     const ws = wsRef.current;
