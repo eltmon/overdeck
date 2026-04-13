@@ -79,7 +79,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   });
 
   const projectKey = issue?.project?.id;
-  const { phase, availableTerminals, markSessionDead } = usePipelinePhase({
+  const { phase, activeSession, availableTerminals, markSessionDead } = usePipelinePhase({
     issueId,
     agent,
     reviewStatus,
@@ -105,8 +105,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const [pinned, setPinned] = useState(() => loadPersistedPin(issueId) !== null);
 
   // The currently displayed session: pinned overrides auto
-  const activePhaseSession = availableTerminals.find(t => t.isActive && !t.disabled)?.sessionName ?? null;
-  const selectedSession = pinned ? pinnedSession : activePhaseSession;
+  const selectedSession = pinned ? pinnedSession : activeSession;
 
   const handleSelectSession = useCallback((sessionName: string | null) => {
     setPinnedSession(sessionName);

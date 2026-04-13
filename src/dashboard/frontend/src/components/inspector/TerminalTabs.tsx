@@ -4,7 +4,6 @@ import { Pin, PinOff } from 'lucide-react';
 export type PipelinePhase =
   | 'planning'
   | 'working'
-  | 'verifying'
   | 'reviewing'
   | 'review-feedback'
   | 'testing'
@@ -38,20 +37,18 @@ interface TerminalTabsProps {
 }
 
 export const PHASE_CHIP_COLORS: Record<string, { bg: string; text: string }> = {
-  planning:        { bg: '#1e3a5f', text: '#60a5fa' },
-  working:         { bg: '#1a3a1a', text: '#4ade80' },
-  verifying:       { bg: '#2d2a14', text: '#fbbf24' },
-  reviewing:       { bg: '#2d1a3a', text: '#c084fc' },
+  planning:          { bg: '#1e3a5f', text: '#60a5fa' },
+  working:           { bg: '#1a3a1a', text: '#4ade80' },
+  reviewing:         { bg: '#2d1a3a', text: '#c084fc' },
   'review-feedback': { bg: '#3a1a1a', text: '#f87171' },
-  testing:         { bg: '#1a2d3a', text: '#38bdf8' },
-  merging:         { bg: '#2d2014', text: '#fb923c' },
-  merged:          { bg: '#1a3a2d', text: '#34d399' },
+  testing:           { bg: '#1a2d3a', text: '#38bdf8' },
+  merging:           { bg: '#2d2014', text: '#fb923c' },
+  merged:            { bg: '#1a3a2d', text: '#34d399' },
 };
 
 export const PHASE_LABELS: Record<string, string> = {
   planning:          'Planning',
   working:           'Working',
-  verifying:         'Verifying',
   reviewing:         'Reviewing',
   'review-feedback': 'Review Feedback',
   testing:           'Testing',

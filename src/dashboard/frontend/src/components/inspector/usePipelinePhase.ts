@@ -22,7 +22,8 @@ export interface PipelinePhaseResult {
  * Pure function — unit-testable without React.
  *
  * Precedence (first match wins):
- *   merging → testing → reviewing → verifying → working → planning → merged
+ *   merging (queued|merging|verifying mergeStatus) → merged → testing → reviewing
+ *   → review-feedback → working → planning
  */
 export function derivePipelinePhase(
   input: PipelinePhaseInput,
