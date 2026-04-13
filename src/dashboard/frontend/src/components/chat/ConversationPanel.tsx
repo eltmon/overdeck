@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2 } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
+import { updateConversationTitle } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker } from './ModelPicker';
@@ -41,6 +42,11 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || 'claude-opus-4-6');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const draftTitleRef = useRef('');
+  const committingRef = useRef(false);
   const queryClient = useQueryClient();
 
   // Sync the picker when the backing conversation's model changes (e.g. after a
@@ -81,6 +87,40 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
     },
   });
+
+  const renameMutation = useMutation({
+    mutationFn: (title: string) => updateConversationTitle(conversation.name, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
+  const startEditingTitle = useCallback(() => {
+    committingRef.current = false;
+    const initial = conversation.title ?? conversation.name;
+    draftTitleRef.current = initial;
+    setDraftTitle(initial);
+    setEditingTitle(true);
+    setTimeout(() => {
+      titleInputRef.current?.select();
+    }, 0);
+  }, [conversation.title, conversation.name]);
+
+  const commitTitleRename = useCallback(() => {
+    if (committingRef.current) return;
+    committingRef.current = true;
+    const trimmed = draftTitleRef.current.trim();
+    const original = conversation.title ?? conversation.name;
+    setEditingTitle(false);
+    if (trimmed && trimmed !== original) {
+      renameMutation.mutate(trimmed);
+    }
+  }, [conversation.title, conversation.name, renameMutation]);
+
+  const cancelTitleEditing = useCallback(() => {
+    setEditingTitle(false);
+    setDraftTitle('');
+  }, []);
 
   const handleResume = useCallback(() => {
     resumeMutation.mutate();
@@ -127,7 +167,32 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
               className={styles.spinnerIcon}
             />
           )}
-          {conversation.title ?? conversation.name}
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              className={styles.conversationTitleInput}
+              value={draftTitle}
+              onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitTitleRename();
+                if (e.key === 'Escape') cancelTitleEditing();
+              }}
+              onBlur={commitTitleRename}
+              aria-label={`Rename ${conversation.name}`}
+            />
+          ) : (
+            <>
+              {conversation.title ?? conversation.name}
+              <button
+                className={styles.conversationTitleEditBtn}
+                onClick={startEditingTitle}
+                title="Rename conversation"
+                aria-label={`Rename ${conversation.name}`}
+              >
+                <Pencil size={12} />
+              </button>
+            </>
+          )}
         </span>
         <span className={styles.conversationTerminalStatus}>
           <Circle

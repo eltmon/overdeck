@@ -92,13 +92,6 @@ const SLASH_COMMANDS: SlashCommand[] = [
     insert: '/cancel',
     category: 'AI CLI',
   },
-  {
-    id: 'all-up',
-    label: '/all-up',
-    description: 'Run the Fix-All flywheel: pan-oversee every PAN issue, fix substrate bugs at root cause, surface merge-ready issues on the Awaiting Merge page',
-    insert: '/all-up',
-    category: 'AI CLI',
-  },
 
   // ─── Core System ─────────────────────────────────────────────────────────────
   { id: 'pan-up', label: 'pan up', description: 'Start dashboard and Traefik', insert: 'pan up', category: 'Core' },
@@ -113,7 +106,6 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-skills', label: 'pan skills', description: 'List and manage skills', insert: 'pan skills', category: 'Core' },
   { id: 'pan-migrate-config', label: 'pan migrate-config', description: 'Migrate settings.json to config.yaml', insert: 'pan migrate-config', category: 'Core' },
   { id: 'pan-test-run', label: 'pan test run', description: 'Run tests', insert: 'pan test run ', category: 'Core' },
-  { id: 'pan-plan-finalize', label: 'pan plan-finalize', description: 'Finalize a planning session: create beads from vBRIEF and write completion marker', insert: 'pan plan-finalize', category: 'Core' },
 
   // ─── Work (Agent Management) ─────────────────────────────────────────────────
   { id: 'pan-work-issue', label: 'pan work issue', description: 'Spawn agent for an issue', insert: 'pan work issue ', category: 'Work' },
@@ -223,7 +215,6 @@ function ComposerPlugin({
 }: InnerPluginProps) {
   const [editor] = useLexicalComposerContext();
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTextRef = useRef<string>('');
 
   // Register Enter key handler.
   // NOTE: We do NOT check `disabled` here — the submit handler owns that check.
@@ -246,28 +237,36 @@ function ComposerPlugin({
     );
   }, [editor, onCommandKeyDown]);
 
-  // Debounced draft persistence + slash menu trigger.
-  // Detecting '/' here (instead of via a keydown listener on the root element)
-  // ensures the menu opens regardless of focus/selection timing — including
-  // when '/' is the very first character typed in an empty editor.
+  // Register / key handler to trigger slash menu
+  useEffect(() => {
+    const root = editor.getRootElement();
+    if (!root) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target === root || root.contains(target)) {
+          onSlashKey();
+        }
+      }
+    };
+
+    root.addEventListener('keydown', handleKeyDown);
+    return () => root.removeEventListener('keydown', handleKeyDown);
+  }, [editor, onSlashKey]);
+
+  // Debounced draft persistence
   const handleChange = useCallback(() => {
     editor.read(() => {
       const text = $getRoot().getTextContent();
-      const prev = lastTextRef.current;
-      lastTextRef.current = text;
       onTextChange(text);
-
-      // Trigger slash menu when a new '/' character is appended at the end
-      if (text.length > prev.length && text.endsWith('/')) {
-        onSlashKey();
-      }
 
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
       draftTimerRef.current = setTimeout(() => {
         saveDraft(conversationName, text);
       }, 300);
     });
-  }, [editor, conversationName, onTextChange, onSlashKey]);
+  }, [editor, conversationName, onTextChange]);
 
   return <OnChangePlugin onChange={handleChange} />;
 }
@@ -337,7 +336,9 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
   useEffect(() => {
     if (menuRef.current) {
       const selected = menuRef.current.querySelector('[aria-selected="true"]');
-      selected?.scrollIntoView?.({ block: 'nearest' });
+      if (selected && typeof (selected as HTMLElement).scrollIntoView === 'function') {
+        (selected as HTMLElement).scrollIntoView({ block: 'nearest' });
+      }
     }
   }, [selectedIndex]);
 
@@ -428,30 +429,8 @@ export function ComposerPromptEditor({
     (t: string) => {
       setText(t);
       onChange?.(t);
-
-      // Derive slash menu filter from text content (chars after the last '/').
-      // This lets typed characters appear naturally in the editor while the
-      // menu filters live as the user types.
-      if (isSlashMenuOpen) {
-        const slashIdx = t.lastIndexOf('/');
-        if (slashIdx === -1) {
-          // User backspaced past the '/' — close the menu
-          setIsSlashMenuOpen(false);
-          setSelectedIndex(0);
-        } else {
-          const newFilter = t.slice(slashIdx + 1);
-          // If the filter contains a space or newline, the user has moved on — close
-          if (/[\s]/.test(newFilter)) {
-            setIsSlashMenuOpen(false);
-            setSelectedIndex(0);
-          } else {
-            setFilterText(newFilter);
-            setSelectedIndex(0);
-          }
-        }
-      }
     },
-    [onChange, isSlashMenuOpen],
+    [onChange],
   );
 
   const handleSlashKey = useCallback(() => {
@@ -494,10 +473,7 @@ export function ComposerPromptEditor({
     setSelectedIndex(0);
   }, []);
 
-  // Handle keyboard navigation in slash menu.
-  // Only intercepts navigation/selection keys — character keys flow through
-  // to the Lexical editor so they appear in the input, and the filter is
-  // derived from the editor's text content in handleChange above.
+  // Handle keyboard navigation in slash menu
   useEffect(() => {
     if (!isSlashMenuOpen) return;
 
@@ -526,14 +502,27 @@ export function ComposerPromptEditor({
         e.preventDefault();
         e.stopPropagation();
         handleSlashClose();
-      } else if (e.key === 'Tab') {
+      } else if (e.key === 'Backspace') {
         e.preventDefault();
         e.stopPropagation();
-        if (filtered.length > 0 && filtered[selectedIndex]) {
-          handleSlashSelect(filtered[selectedIndex]);
-        }
+        setFilterText((prev) => {
+          if (prev.length === 0) {
+            // No filter text left — close the menu
+            handleSlashClose();
+            return prev;
+          }
+          return prev.slice(0, -1);
+        });
+      } else if (e.key === 'Tab') {
+        // Let Tab close the menu naturally
+        handleSlashClose();
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Capture typed characters into the filter — prevent them from reaching the editor
+        e.preventDefault();
+        e.stopPropagation();
+        setFilterText((prev) => prev + e.key);
+        setSelectedIndex(0);
       }
-      // All other keys (characters, Backspace, etc.) flow through to Lexical
     };
 
     // Use capture phase so we intercept before Lexical's keydown handler

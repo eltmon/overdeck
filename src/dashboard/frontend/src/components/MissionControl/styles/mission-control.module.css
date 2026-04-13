@@ -1445,6 +1445,47 @@
   color: var(--mc-text-primary);
 }
 
+.conversationItem:hover .conversationEditBtn {
+  opacity: 1;
+}
+
+.conversationEditBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.conversationEditBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
+.conversationNameInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-accent);
+  border-radius: var(--mc-radius-sm);
+  color: var(--mc-text-primary);
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-xs);
+  padding: 1px 4px;
+  outline: none;
+}
+
 /* Archive button in orphaned conversation state */
 .conversationArchiveBtnLarge {
   padding: var(--mc-space-2) var(--mc-space-4);
@@ -1544,6 +1585,43 @@
 .copyLinkButton:hover {
   color: var(--mc-text-primary);
   background: var(--mc-bg-hover);
+}
+
+.conversationTitleEditBtn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.conversationTerminalTitle:hover .conversationTitleEditBtn {
+  opacity: 1;
+}
+
+.conversationTitleEditBtn:hover {
+  color: var(--mc-text-primary);
+  background: var(--mc-bg-hover);
+}
+
+.conversationTitleInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-accent);
+  border-radius: var(--mc-radius-sm);
+  color: var(--mc-text-primary);
+  font-size: var(--mc-font-size-sm);
+  font-weight: 600;
+  font-family: var(--mc-font-family);
+  padding: 2px 6px;
+  outline: none;
 }
 
 .conversationTerminalBody {

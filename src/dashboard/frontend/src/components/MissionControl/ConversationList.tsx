@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X, Star } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -94,6 +94,15 @@ async function stopConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to stop conversation');
 }
 
+export async function updateConversationTitle(name: string, title: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error('Failed to update conversation title');
+}
+
 async function favoriteConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/favorite`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to favorite conversation');
@@ -145,6 +154,11 @@ interface ConversationListProps {
 
 export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const draftTitleRef = useRef('');
+  const committingRef = useRef(false);
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
   const queryClient = useQueryClient();
@@ -176,6 +190,13 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     },
   });
 
+  const renameMutation = useMutation({
+    mutationFn: ({ name, title }: { name: string; title: string }) => updateConversationTitle(name, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
   const favoriteMutation = useMutation({
     mutationFn: ({ name, favorited }: { name: string; favorited: boolean }) =>
       favorited ? unfavoriteConversation(name) : favoriteConversation(name),
@@ -194,6 +215,34 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
+
+  const startEditing = useCallback((conv: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    committingRef.current = false;
+    const initial = conv.title ?? conv.name;
+    draftTitleRef.current = initial;
+    setEditingName(conv.name);
+    setDraftTitle(initial);
+    setTimeout(() => {
+      editInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const commitRename = useCallback((name: string, originalTitle: string) => {
+    if (committingRef.current) return;
+    committingRef.current = true;
+    const trimmed = draftTitleRef.current.trim();
+    setEditingName(null);
+    if (trimmed && trimmed !== originalTitle) {
+      renameMutation.mutate({ name, title: trimmed });
+    }
+  }, [renameMutation]);
+
+  const cancelEditing = useCallback(() => {
+    setEditingName(null);
+    setDraftTitle('');
+  }, []);
+
 
   const handleCopyLink = useCallback((convId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -323,7 +372,24 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
                   }}
                 />
-                <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+                {editingName === conv.name ? (
+                  <input
+                    ref={editInputRef}
+                    className={styles.conversationNameInput}
+                    value={draftTitle}
+                    onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
+                    onClick={e => e.stopPropagation()}
+                    onKeyDown={e => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter') commitRename(conv.name, conv.title ?? conv.name);
+                      if (e.key === 'Escape') cancelEditing();
+                    }}
+                    onBlur={() => commitRename(conv.name, conv.title ?? conv.name)}
+                    aria-label={`Rename ${conv.name}`}
+                  />
+                ) : (
+                  <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+                )}
                 {conv.lastAttachedAt && (
                   <time
                     className={styles.conversationTime}
@@ -339,6 +405,18 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
                   </span>
                 )}
+                {/* Rename button */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={styles.conversationEditBtn}
+                  onClick={e => startEditing(conv, e)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') startEditing(conv, e as unknown as React.MouseEvent); }}
+                  title="Rename conversation"
+                  aria-label={`Rename ${conv.name}`}
+                >
+                  <Pencil size={11} />
+                </span>
                 {/* Star / favorite button */}
                 <span
                   role="button"
