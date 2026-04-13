@@ -38,9 +38,10 @@ See the [full documentation](https://panopticon-cli.com) for detailed setup, con
 ## Why Panopticon?
 
 - **Stop babysitting agents.** Spawn them from a dashboard, monitor progress in real time, and let specialists handle code review, testing, and merging.
-- **Use the right model for the job.** Opus for planning, Kimi for implementation, Haiku for quick commands — automatic routing based on task type and capabilities.
+- **Use the right model for the job.** Opus for planning, GPT-5.4 or Kimi for implementation, Haiku for quick commands — automatic routing based on task type and capabilities.
 - **Work survives across sessions.** PRDs, state files, beads, and skills persist context so agents don't start from zero every time.
 - **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI.
+- **Tune routing without hand-editing prompts.** The Settings page lets you enable model families and set per-job overrides for work agents and specialists.
 
 ---
 
@@ -75,7 +76,7 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 | **PRD-Driven Workflow** | Opus writes a PRD before implementation starts; agents are blocked without one |
 | **70+ Universal Skills** | Pre-built skills ship out of the box, auto-synced on every `pan up` — one SKILL.md works across all AI tools |
 | **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all from one dashboard |
-| **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, Zhipu — route by task type, capability, and budget |
+| **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, MiniMax, and OpenRouter — route by task type, capability, and budget |
 | **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via Fly.io) |
 | **Convoys** | Run parallel agents on related issues with automatic synthesis |
 | **5 Specialist Agents** | Review, test, inspect, UAT, and merge — fully automated quality pipeline |
@@ -116,7 +117,7 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 | Tool | Support |
 |:-----|:--------|
 | **Claude Code** | Full support — agent runtime, hooks, skills |
-| **Codex** | Skills sync |
+| **Codex** | Skills sync and OpenAI subscription login for GPT work agents |
 | **Cursor** | Skills sync |
 | **Gemini CLI** | Skills sync |
 | **Google Antigravity** | Skills sync |
