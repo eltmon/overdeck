@@ -50,6 +50,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   google: 'Google',
+  minimax: 'MiniMax',
   zai: 'Z.AI',
   kimi: 'Kimi',
   openrouter: 'OpenRouter',

@@ -195,6 +195,8 @@ describe('configuration precedence in router', () => {
         apiKeys: {
           openai: 'test-openai-key',
           google: 'test-google-key',
+          minimax: 'test-minimax-key',
+          zai: 'test-zai-key',
         },
       });
 
@@ -203,6 +205,8 @@ describe('configuration precedence in router', () => {
 
       expect(apiKeys.openai).toBe('test-openai-key');
       expect(apiKeys.google).toBe('test-google-key');
+      expect(apiKeys.minimax).toBe('test-minimax-key');
+      expect(apiKeys.zai).toBe('test-zai-key');
     });
 
     it('should expose enabled providers', () => {
@@ -216,6 +220,7 @@ describe('configuration precedence in router', () => {
       expect(providers.has('anthropic')).toBe(true);
       expect(providers.has('openai')).toBe(true);
       expect(providers.has('google')).toBe(true);
+      expect(providers.has('minimax')).toBe(false);
       expect(providers.has('zai')).toBe(false);
     });
   });

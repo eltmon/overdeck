@@ -60,6 +60,7 @@ export interface YamlConfig {
       anthropic?: ProviderConfig | boolean;
       openai?: ProviderConfig | boolean;
       google?: ProviderConfig | boolean;
+      minimax?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
@@ -82,8 +83,10 @@ export interface YamlConfig {
   api_keys?: {
     openai?: string;
     google?: string;
+    minimax?: string;
     zai?: string;
     kimi?: string;
+    openrouter?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -136,6 +139,7 @@ export interface NormalizedConfig {
     openai?: string;
     google?: string;
     minimax?: string;
+    zai?: string;
     kimi?: string;
     openrouter?: string;
   };
@@ -417,15 +421,26 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
         explicitlyDisabled.add('google');
       }
 
-      // MiniMax (zai in YAML config, minimax internally)
-      const minimax = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+      // MiniMax
+      const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
       if (minimax.enabled) {
         result.enabledProviders.add('minimax');
         if (minimax.api_key) {
           result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
         }
-      } else if (providers.zai !== undefined) {
+      } else if (providers.minimax !== undefined) {
         explicitlyDisabled.add('minimax');
+      }
+
+      // Z.AI
+      const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+      if (zai.enabled) {
+        result.enabledProviders.add('zai');
+        if (zai.api_key) {
+          result.apiKeys.zai = resolveEnvVar(zai.api_key);
+        }
+      } else if (providers.zai !== undefined) {
+        explicitlyDisabled.add('zai');
       }
 
       // Kimi
@@ -471,10 +486,16 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
           result.enabledProviders.add('google');
         }
       }
-      if (config.api_keys.zai) {
-        result.apiKeys.minimax = resolveEnvVar(config.api_keys.zai);
+      if (config.api_keys.minimax) {
+        result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
         if (!explicitlyDisabled.has('minimax')) {
           result.enabledProviders.add('minimax');
+        }
+      }
+      if (config.api_keys.zai) {
+        result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
+        if (!explicitlyDisabled.has('zai')) {
+          result.enabledProviders.add('zai');
         }
       }
       if (config.api_keys.kimi) {
@@ -651,10 +672,16 @@ export function loadConfig(): ConfigLoadResult {
       config.enabledProviders.add('google');
     }
   }
-  if (process.env.ZAI_API_KEY && !config.apiKeys.minimax) {
-    config.apiKeys.minimax = process.env.ZAI_API_KEY;
+  if (process.env.MINIMAX_API_KEY && !config.apiKeys.minimax) {
+    config.apiKeys.minimax = process.env.MINIMAX_API_KEY;
     if (!explicitlyDisabled.has('minimax')) {
       config.enabledProviders.add('minimax');
+    }
+  }
+  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
+    config.apiKeys.zai = process.env.ZAI_API_KEY;
+    if (!explicitlyDisabled.has('zai')) {
+      config.enabledProviders.add('zai');
     }
   }
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {

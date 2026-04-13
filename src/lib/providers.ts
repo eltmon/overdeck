@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel } from './settings.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'openrouter';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'openrouter';
 
 /**
  * Provider compatibility types
@@ -97,6 +97,16 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     description: 'Anthropic-compatible API via MiniMax API',
   },
 
+  zai: {
+    name: 'zai',
+    displayName: 'Z.AI',
+    compatibility: 'direct',
+    baseUrl: 'https://api.z.ai/api/anthropic',
+    models: ['glm-5.1'],
+    tested: true,
+    description: 'Anthropic-compatible API via Z.AI GLM 5.1',
+  },
+
   openrouter: {
     name: 'openrouter',
     displayName: 'OpenRouter',
@@ -140,6 +150,11 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // Check Kimi models
   if (['kimi-k2.5'].includes(modelId)) {
     return PROVIDERS.kimi;
+  }
+
+  // Check Z.AI models
+  if (['glm-5.1'].includes(modelId)) {
+    return PROVIDERS.zai;
   }
 
   // Default to Anthropic if unknown
@@ -203,8 +218,8 @@ export function getProviderEnv(
       }
     }
 
-    // MiniMax recommends longer timeout
-    if (provider.name === 'minimax') {
+    // MiniMax and Z.AI recommend longer timeouts
+    if (provider.name === 'minimax' || provider.name === 'zai') {
       env.API_TIMEOUT_MS = '300000';
     }
 

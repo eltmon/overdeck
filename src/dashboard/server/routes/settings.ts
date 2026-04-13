@@ -42,7 +42,7 @@ const readJsonBody = Effect.gen(function* () {
 });
 
 /** Determine provider from model ID */
-function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'zai' {
+function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'zai' {
   if (modelId.startsWith('claude-')) return 'anthropic';
   if (
     modelId.startsWith('gpt-')
@@ -53,6 +53,7 @@ function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google'
   ) return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
+  if (modelId.startsWith('minimax-')) return 'minimax';
   if (modelId.startsWith('glm-')) return 'zai';
   return 'anthropic'; // default
 }
@@ -81,13 +82,11 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'kimi-k2': { apiModel: 'moonshot-v1-8k' },
   'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
   'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' },
+  // MiniMax models
+  'minimax-m2.7': { apiModel: 'minimax-m2.7' },
+  'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
   // Z.AI models
-  'glm-4.7': { apiModel: 'glm-4' },
-  'glm-4.7-flash': { apiModel: 'glm-4-flash' },
-  'glm-4-plus': { apiModel: 'glm-4' },
-  'glm-4-air': { apiModel: 'glm-4-air' },
-  'glm-4-flash': { apiModel: 'glm-4-flash' },
-  'glm-4-long': { apiModel: 'glm-4-long' },
+  'glm-5.1': { apiModel: 'glm-5.1' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -252,12 +251,39 @@ const postTestApiKeyRoute = HttpRouter.add(
           break;
         }
 
+        case 'minimax': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'minimax-m2.7') : 'minimax-m2.7';
+          try {
+            const resp = await fetch('https://api.minimax.chat/coding/messages', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+            });
+            latencyMs = Date.now() - startTime;
+            if (resp.ok) {
+              const data = await resp.json() as { content?: Array<{ text?: string }> };
+              response = data.content?.[0]?.text?.trim() || '';
+              success = response.includes(expectedAnswer);
+              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
         case 'zai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4.7-flash') : 'glm-4.7-flash';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-5.1') : 'glm-5.1';
           try {
             const resp = await fetch('https://api.z.ai/api/anthropic/v1/messages', {
               method: 'POST',
-              headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
             });
             latencyMs = Date.now() - startTime;
@@ -301,7 +327,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
-    if (!['openai', 'google', 'zai'].includes(provider)) {
+    if (!['openai', 'google', 'minimax', 'zai'].includes(provider)) {
       return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -359,15 +385,37 @@ const postValidateApiKeyRoute = HttpRouter.add(
           break;
         }
 
-        case 'zai': {
+        case 'minimax': {
           try {
-            const resp = await fetch('https://api.z.ai/api/anthropic/v1/models', {
-              headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+            const resp = await fetch('https://api.minimax.chat/coding/models', {
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
             });
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['glm-4.7', 'glm-4.7-flash'];
+              models = data.data?.map(m => m.id) || ['minimax-m2.7', 'minimax-m2.7-highspeed'];
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
+        case 'zai': {
+          try {
+            const resp = await fetch('https://api.z.ai/api/anthropic/v1/models', {
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data?: Array<{ id: string }> };
+              valid = true;
+              models = data.data?.map(m => m.id) || ['glm-5.1'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {

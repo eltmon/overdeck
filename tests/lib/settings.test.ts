@@ -73,10 +73,12 @@ describe('settings', () => {
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
       const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
 
@@ -89,6 +91,7 @@ describe('settings', () => {
         // Restore env vars
         if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
         if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
       }
@@ -128,10 +131,12 @@ describe('settings', () => {
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
       const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
 
@@ -149,6 +154,7 @@ describe('settings', () => {
         // Restore env vars
         if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
         if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
       }
@@ -160,10 +166,12 @@ describe('settings', () => {
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
       const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
 
@@ -181,6 +189,7 @@ describe('settings', () => {
         // Restore env vars
         if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
         if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
       }
@@ -223,10 +232,12 @@ describe('settings', () => {
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
       const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
 
@@ -244,6 +255,7 @@ describe('settings', () => {
         // Restore env vars
         if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
         if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
       }

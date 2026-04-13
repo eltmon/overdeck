@@ -46,7 +46,7 @@ export function getLaunchModelForModel(model: string): string {
 
 export function getAgentRuntimeBaseCommand(model: string): string {
   const provider = getProviderForModel(model);
-  if (provider.name === 'anthropic') {
+  if (provider.compatibility === 'direct') {
     return `claude --dangerously-skip-permissions --model ${model}`;
   }
 

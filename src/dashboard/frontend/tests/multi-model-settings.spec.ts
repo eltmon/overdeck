@@ -45,7 +45,7 @@ interface SettingsConfig {
   api_keys: {
     openai?: string;
     google?: string;
-    zai?: string;
+    minimax?: string;
   };
 }
 

@@ -148,7 +148,8 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
   { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
   { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', icon: Brain, placeholder: 'minimax-...' },
+  { id: 'zai', name: 'Z.AI', icon: Brain, placeholder: '... or $ZAI_API_KEY' },
 ];
 
 // Tracker definitions
