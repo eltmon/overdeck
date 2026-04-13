@@ -4,7 +4,7 @@
     "created": "2026-04-12T15:16:48Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-596: Allow editing a conversation title",
-    "updated": "2026-04-12T17:57:13.649Z"
+    "updated": "2026-04-13T01:09:44.226Z"
   },
   "plan": {
     "id": "pan-596",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "c6bd4f00-02fe-4b96-8e70-9a3ce2b14c8b",
     "author": "agent:claude-opus-4-6",
-    "sequence": 17,
+    "sequence": 21,
     "created": "2026-04-12T15:16:48Z",
-    "updated": "2026-04-12T17:57:13.649Z",
+    "updated": "2026-04-13T01:09:44.226Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/596",
@@ -75,7 +75,7 @@
             "completed": "2026-04-12T17:57:13.649Z"
           }
         ],
-        "completed": "2026-04-12T17:57:13.649Z"
+        "completed": "2026-04-13T01:09:44.226Z"
       },
       {
         "id": "sidebar-rename",
@@ -128,7 +128,7 @@
             "completed": "2026-04-12T17:57:13.648Z"
           }
         ],
-        "completed": "2026-04-12T17:57:13.648Z"
+        "completed": "2026-04-13T01:09:44.226Z"
       },
       {
         "id": "panel-rename",
@@ -172,7 +172,7 @@
             "completed": "2026-04-12T17:57:13.648Z"
           }
         ],
-        "completed": "2026-04-12T17:57:13.647Z"
+        "completed": "2026-04-13T01:09:44.225Z"
       },
       {
         "id": "manual-source-verify",
@@ -207,7 +207,7 @@
             "completed": "2026-04-12T17:57:13.649Z"
           }
         ],
-        "completed": "2026-04-12T17:57:13.648Z"
+        "completed": "2026-04-13T01:09:44.226Z"
       }
     ],
     "edges": [
