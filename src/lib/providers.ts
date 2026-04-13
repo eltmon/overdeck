@@ -210,11 +210,23 @@ export function getProviderEnv(
 
     return env;
   } else {
-    // Claudish providers still route through the local proxy.
-    return {
-      ANTHROPIC_BASE_URL: 'http://localhost:3456',
-      ANTHROPIC_AUTH_TOKEN: 'router-managed',
-    };
+    // Claudish-backed providers are launched via the `claudish` wrapper, not
+    // through a long-lived localhost proxy. For subscription/OAuth-backed
+    // models no extra env is required; for direct API-key mode, pass the
+    // provider-native key env that claudish expects.
+    if (apiKey === 'subscription-oauth') {
+      return {};
+    }
+
+    if (provider.name === 'openai') {
+      return { OPENAI_API_KEY: apiKey };
+    }
+
+    if (provider.name === 'google') {
+      return { GEMINI_API_KEY: apiKey };
+    }
+
+    return {};
   }
 }
 

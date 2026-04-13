@@ -22,6 +22,37 @@ import { findProjectByPath, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
+function getProviderAuthMode(model: string): string | undefined {
+  const provider = getProviderForModel(model);
+  if (provider.name === 'openai') {
+    const { config } = loadYamlConfig();
+    return getOpenAIAuthStatusSync().loggedIn
+      ? 'subscription'
+      : (config.providerAuth?.openai ?? 'api-key');
+  }
+
+  if (provider.name === 'google') {
+    const { config } = loadYamlConfig();
+    return config.providerAuth?.google;
+  }
+
+  return undefined;
+}
+
+export function getLaunchModelForModel(model: string): string {
+  return getClaudishPrefix(model, getProviderAuthMode(model));
+}
+
+export function getAgentRuntimeBaseCommand(model: string): string {
+  const provider = getProviderForModel(model);
+  const routedModel = getLaunchModelForModel(model);
+  if (provider.name === 'anthropic') {
+    return `claude --dangerously-skip-permissions --model ${routedModel}`;
+  }
+
+  return `claudish -i --model ${routedModel} --dangerously-skip-permissions`;
+}
+
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
 const AGENT_PREFIXES = ['agent-', 'planning-'];
 
@@ -716,16 +747,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const providerEnv = getProviderEnvForModel(selectedModel);
 
   // Determine auth mode for OpenAI. A live Codex/ChatGPT login always wins.
-  const yamlConfig = loadYamlConfig();
   const provider = getProviderForModel(selectedModel as ModelId);
-  const openaiAuthStatus = getOpenAIAuthStatusSync();
-  const openaiAuthMode = openaiAuthStatus.loggedIn
-    ? 'subscription'
-    : (yamlConfig.config?.providerAuth?.['openai'] ?? 'api-key');
-  const effectiveAuthMode = provider.name === 'openai' ? openaiAuthMode : undefined;
-
-  // Get claudish-prefixed model if needed (e.g. oai@gpt-5.4 or cx@o3)
-  const claudishModel = getClaudishPrefix(selectedModel, effectiveAuthMode);
 
   // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
   // so Claude Code can refresh short-lived tokens dynamically.
@@ -745,7 +767,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
   const launcherContent = `#!/bin/bash
 export CI=1
-${providerExports}claude --dangerously-skip-permissions --model ${claudishModel}
+${providerExports}${getAgentRuntimeBaseCommand(state.model)}
 `;
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
@@ -1011,7 +1033,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     if (sessionExists(normalizedId)) {
       try { killSession(normalizedId); } catch { /* ignore */ }
     }
-    const claudeCmd = `claude --dangerously-skip-permissions --model ${agentState.model || 'claude-sonnet-4-6'} "You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working."`;
+    const claudeCmd = `${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')} "You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working."`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
@@ -1273,7 +1295,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const claudeCmd = `${getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
