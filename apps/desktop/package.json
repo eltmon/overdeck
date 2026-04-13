@@ -12,8 +12,8 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "dist:linux": "electron-builder --linux AppImage",
-    "dist:mac": "electron-builder --mac dmg --universal",
+    "dist:linux": "electron-builder --linux AppImage --publish never",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never",
     "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3"
   },
   "dependencies": {
