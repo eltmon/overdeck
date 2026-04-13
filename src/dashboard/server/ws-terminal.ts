@@ -22,8 +22,6 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
 
-const execAsync = promisify(exec);
-
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
   | { type: 'ready' }

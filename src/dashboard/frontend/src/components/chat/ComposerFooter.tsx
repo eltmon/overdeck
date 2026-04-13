@@ -16,7 +16,8 @@ import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, getDefaultConversationModel, MODEL_EFFORT_SUPPORT } from './ModelPicker';
+import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredModel } from './ModelPicker';
+import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -82,6 +83,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   // Send /model command to tmux when model is changed on an active conversation
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
+    saveStoredModel(newModel);
     if (conversation.sessionAlive) {
       void sendConversationMessage(conversation.name, `/model ${newModel}`).catch((err: unknown) => {
         console.error('[ComposerFooter] Failed to send /model:', err);

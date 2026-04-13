@@ -606,7 +606,7 @@ const postAgentMessageRoute = HttpRouter.add(
     }
 
     if (isRemote && vmName) {
-      const { sendToRemoteAgent } = await import('../../../lib/remote/remote-agents.js');
+      const { sendToRemoteAgent } = yield* Effect.promise(() => import('../../../lib/remote/remote-agents.js'));
       yield* Effect.promise(() => sendToRemoteAgent(id, vmName, message));
       return jsonResponse({ success: true, remote: true });
     } else {

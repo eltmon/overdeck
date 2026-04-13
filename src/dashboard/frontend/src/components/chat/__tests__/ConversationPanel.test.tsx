@@ -118,7 +118,7 @@ describe('ConversationPanel rename flow', () => {
 
   it('falls back to conversation name when title is null', () => {
     renderPanel({ ...mockConversation, title: null });
-    expect(screen.getByText('test-conv')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename test-conv' })).toBeInTheDocument();
     fireEvent.click(screen.getByTitle('Rename conversation'));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     expect(input).toHaveValue('test-conv');
