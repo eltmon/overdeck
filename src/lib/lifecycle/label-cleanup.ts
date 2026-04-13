@@ -305,8 +305,12 @@ export async function repairClosedPRs(): Promise<void> {
     const { setReviewStatus } = await import('../review-status.js');
     const statuses = loadReviewStatuses();
 
+    // Don't restrict to readyForMerge — the Run 6 triggerMerge validator already
+    // flips readyForMerge=false when it refuses to merge against a CLOSED PR, so
+    // those issues sit in `mergeStatus=failed` with a stale prUrl. Sweep any issue
+    // with a prUrl that isn't marked merged; GitHub is the source of truth.
     const candidates = Object.values(statuses).filter(
-      s => s.readyForMerge === true && s.mergeStatus !== 'merged' && s.prUrl,
+      s => s.mergeStatus !== 'merged' && s.prUrl,
     );
     if (candidates.length === 0) return;
 
