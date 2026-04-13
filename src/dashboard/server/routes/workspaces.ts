@@ -3488,6 +3488,20 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
             completePendingOperation(issueId, error);
             return { success: false, statusCode: 409, error };
           }
+          // Defense-in-depth: refuse to merge when required CI checks are failing on the
+          // PR's current HEAD. Without this gate, we attempt a rebase and `gh pr merge`
+          // against a branch whose CI is red; branch protection blocks the merge and we
+          // get a generic error. Surface the real blocker (failing CI) up-front so the
+          // work-agent can fix it instead of us churning the queue. See PAN-611/PAN-544
+          // (Run 7): feature branches had gitignored source + stale bun.lock; local
+          // verification passed but CI failed — the divergence was invisible until merge.
+          if (prState.checksFailed && !prState.merged) {
+            const error = `GitHub PR #${githubPrRef.number} has failing required checks on HEAD ${prState.headSha.slice(0, 8)}. Fix CI before merging — see ${prState.url || 'the PR page'} for details.`;
+            console.error(`[merge] ${error}`);
+            setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+            completePendingOperation(issueId, error);
+            return { success: false, statusCode: 409, error };
+          }
           if (prState.merged) {
             console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);
             setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
