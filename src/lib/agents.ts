@@ -16,6 +16,7 @@ import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCred
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatusSync } from './openai-auth.js';
+import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix } from './projects.js';
@@ -45,11 +46,19 @@ export function getLaunchModelForModel(model: string): string {
 
 export function getAgentRuntimeBaseCommand(model: string): string {
   const provider = getProviderForModel(model);
-  const routedModel = getLaunchModelForModel(model);
   if (provider.name === 'anthropic') {
-    return `claude --dangerously-skip-permissions --model ${routedModel}`;
+    return `claude --dangerously-skip-permissions --model ${model}`;
   }
 
+  // OpenAI subscription → local CLIProxyAPI sidecar exposes an
+  // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
+  // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
+  // The provider env vars are injected separately by getProviderEnvForModel.
+  if (provider.name === 'openai' && getProviderAuthMode(model) === 'subscription') {
+    return `claude --dangerously-skip-permissions --model ${model}`;
+  }
+
+  const routedModel = getLaunchModelForModel(model);
   return `claudish -i --model ${routedModel} --dangerously-skip-permissions`;
 }
 
@@ -89,7 +98,10 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
   if (provider.name === 'openai') {
     const authStatus = getOpenAIAuthStatusSync();
     if (authStatus.loggedIn) {
-      return getProviderEnv(provider, 'subscription-oauth');
+      // Route through the local CLIProxyAPI sidecar using the user's
+      // ChatGPT subscription OAuth tokens. Claude Code sees a normal
+      // Anthropic-compatible endpoint and never needs an API key.
+      return getCliproxyClientEnv();
     }
   }
 
@@ -98,7 +110,7 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
   }
 
   if (provider.name === 'openai' && getOpenAIAuthStatusSync().loggedIn) {
-    return getProviderEnv(provider, 'subscription-oauth');
+    return getCliproxyClientEnv();
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
@@ -679,6 +691,25 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Determine model based on configuration
   const selectedModel = determineModel(options);
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
+
+  // When routing a GPT agent through ChatGPT subscription auth, the local
+  // CLIProxyAPI sidecar MUST already be running. We only check — never
+  // install/start from here, because spawnAgent is reachable from dashboard
+  // route handlers where blocking on curl/tar would freeze the event loop
+  // (see PAN-70 / PAN-446 — no blocking I/O in server code).
+  if (
+    getProviderForModel(selectedModel).name === 'openai'
+    && getProviderAuthMode(selectedModel) === 'subscription'
+  ) {
+    const { isCliproxyRunning } = await import('./cliproxy.js');
+    if (!isCliproxyRunning()) {
+      throw new Error(
+        'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
+        + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
+        + 'dashboard) before spawning a GPT agent.',
+      );
+    }
+  }
 
   // Create state
   const state: AgentState = {

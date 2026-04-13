@@ -482,6 +482,19 @@ program
       });
     }
 
+    // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
+    // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
+    // sidecar still comes up and will pick up credentials once they log in.
+    try {
+      const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
+      console.log(chalk.dim('\nStarting CLIProxyAPI sidecar (GPT subscription router)...'));
+      startCliproxy();
+      console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
+    } catch (error: any) {
+      console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
+      console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
+    }
+
     // Start TLDR daemon on project root (if Python3 and venv available)
     try {
       const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
@@ -559,6 +572,18 @@ program
           console.log(chalk.yellow('⚠ Failed to stop Traefik'));
         }
       }
+    }
+
+    // Stop CLIProxyAPI sidecar
+    try {
+      const { stopCliproxy, isCliproxyRunning } = await import('../lib/cliproxy.js');
+      if (isCliproxyRunning()) {
+        console.log(chalk.dim('Stopping CLIProxyAPI sidecar...'));
+        stopCliproxy();
+        console.log(chalk.green('✓ CLIProxyAPI stopped'));
+      }
+    } catch {
+      // Non-fatal — cliproxy may not be installed/running
     }
 
     // Stop TLDR daemon on project root
