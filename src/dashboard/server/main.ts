@@ -116,9 +116,10 @@ clearStuckMergeStatuses();
 fixStuckReadyForMerge();
 // Repair workflow labels for any GitHub issue that merged but still has in-review label (PAN-676).
 // Also detect PRs already merged on GitHub with incorrect internal state (PAN-670 pattern).
-import('../../lib/lifecycle/label-cleanup.js').then(({ repairMergedLabels, repairAlreadyMergedPRs }) => {
+import('../../lib/lifecycle/label-cleanup.js').then(({ repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle }) => {
   repairMergedLabels().catch(err => console.warn('[panopticon] repairMergedLabels failed:', err));
   repairAlreadyMergedPRs().catch(err => console.warn('[panopticon] repairAlreadyMergedPRs failed:', err));
+  repairIncompletePostMergeLifecycle().catch(err => console.warn('[panopticon] repairIncompletePostMergeLifecycle failed:', err));
 });
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were

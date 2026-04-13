@@ -175,6 +175,55 @@ export async function repairAlreadyMergedPRs(): Promise<void> {
   }
 }
 
+/**
+ * Startup repair: fire postMergeLifecycle(skipDeploy) for GitHub issues that are marked
+ * as merged internally but whose GitHub issue is still OPEN.
+ *
+ * Handles cases where postMergeLifecycle ran but the close-issue step failed silently
+ * (e.g., transient GitHub API error, circuit-breaker trip, server crash mid-cleanup).
+ *
+ * Fire-and-forget — non-fatal, errors are logged.
+ */
+export async function repairIncompletePostMergeLifecycle(): Promise<void> {
+  try {
+    const statuses = loadReviewStatuses();
+
+    // Issues already marked as merged internally
+    const candidates = Object.values(statuses).filter(
+      s => s.mergeStatus === 'merged' && s.prUrl,
+    );
+    if (candidates.length === 0) return;
+
+    for (const s of candidates) {
+      const resolved = resolveGitHubIssue(s.issueId);
+      if (!resolved.isGitHub) continue;
+
+      try {
+        const { stdout } = await execAsync(
+          `gh issue view ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --json state --jq .state`,
+          { encoding: 'utf-8', timeout: 10000 },
+        );
+        if (stdout.trim() !== 'OPEN') continue;
+
+        // Issue is still open — re-run cleanup with skipDeploy to avoid rebuilding
+        console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} still open after merge — repairing`);
+        const { postMergeLifecycle } = await import('../cloister/merge-agent.js');
+        const { resolveProjectFromIssue } = await import('../projects.js');
+        const project = resolveProjectFromIssue(s.issueId);
+        const projectPath = project?.projectPath ?? '';
+        const sourceBranch = `feature/${s.issueId.toLowerCase()}`;
+        postMergeLifecycle(s.issueId, projectPath, sourceBranch, { skipDeploy: true }).catch(err => {
+          console.warn(`[label-cleanup] postMergeLifecycle re-run failed for ${s.issueId}: ${err}`);
+        });
+      } catch {
+        // non-fatal — best-effort
+      }
+    }
+  } catch (err) {
+    console.warn(`[label-cleanup] repairIncompletePostMergeLifecycle failed: ${err}`);
+  }
+}
+
 async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'label-cleanup:merged';
   try {
