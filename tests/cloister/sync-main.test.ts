@@ -51,9 +51,23 @@ vi.mock('child_process', () => {
       .catch((err) => callback(err, '', ''));
   }
 
-  (exec as any)[kCustom] = execMock;
+  function execFile(file: string, argsOrOptionsOrCb: any, optionsOrCb?: any, maybeCallback?: any) {
+    const callback = typeof argsOrOptionsOrCb === 'function'
+      ? argsOrOptionsOrCb
+      : typeof optionsOrCb === 'function'
+        ? optionsOrCb
+        : maybeCallback;
+    const args = Array.isArray(argsOrOptionsOrCb) ? argsOrOptionsOrCb.join(' ') : '';
+    const cmd = args ? `${file} ${args}` : file;
+    execMock(cmd, typeof optionsOrCb === 'object' ? optionsOrCb : typeof argsOrOptionsOrCb === 'object' ? argsOrOptionsOrCb : undefined)
+      .then(({ stdout }) => callback(null, stdout, ''))
+      .catch((err) => callback(err, '', ''));
+  }
 
-  return { exec, spawn: vi.fn() };
+  (exec as any)[kCustom] = execMock;
+  (execFile as any)[kCustom] = execMock;
+
+  return { exec, execFile, spawn: vi.fn() };
 });
 
 vi.mock('fs', async (importOriginal) => {
