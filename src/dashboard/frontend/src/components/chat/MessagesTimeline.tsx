@@ -402,9 +402,13 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
         )}
       </div>
       {showResult && entry.result && (
-        <pre className={styles.workLogResult}>
-          {entry.result}
-        </pre>
+        isTerminal ? (
+          <pre className={styles.workLogResult}>{entry.result}</pre>
+        ) : (
+          <div className={styles.workLogResult}>
+            <ChatMarkdown text={entry.result} />
+          </div>
+        )
       )}
     </div>
   );

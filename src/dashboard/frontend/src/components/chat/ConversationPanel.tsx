@@ -6,7 +6,7 @@ import type { Conversation } from '../MissionControl/ConversationList';
 import { updateConversationTitle } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
-import { ModelPicker } from './ModelPicker';
+import { ModelPicker, saveStoredModel } from './ModelPicker';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
@@ -82,7 +82,8 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model }),
       }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); }),
-    onSuccess: () => {
+    onSuccess: (_, model) => {
+      saveStoredModel(model);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
     },

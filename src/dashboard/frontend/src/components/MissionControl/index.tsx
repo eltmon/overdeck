@@ -8,7 +8,7 @@ import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
-import { ModelPicker } from '../chat/ModelPicker';
+import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
 import type { Issue } from '../../types';
@@ -65,7 +65,7 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
-  const [sidebarModel, setSidebarModel] = useState<string>('claude-sonnet-4-6');
+  const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
   const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -269,6 +269,7 @@ export function MissionControl({ issues = [], convId, onConvIdChange }: MissionC
                     value={sidebarModel}
                     onChange={(modelId) => {
                       setSidebarModel(modelId);
+                      saveStoredModel(modelId);
                     }}
                   />
                   <button
