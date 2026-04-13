@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { XTerminal } from './XTerminal';
+import { MessagesTimeline } from './chat/MessagesTimeline';
+import type { ConversationResponse } from '@panopticon/contracts';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -28,6 +30,12 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
+async function fetchConversation(agentId: string): Promise<ConversationResponse> {
+  const res = await fetch(`/api/agents/${agentId}/conversation`);
+  if (!res.ok) throw new Error('Failed to fetch conversation');
+  return res.json();
+}
+
 export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
   const terminalRef = useRef<HTMLPreElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -50,12 +58,25 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
   // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined)
   const isStopped = tmuxAlive === false;
 
-  // Only poll output for stopped agents — running agents use XTerminal WebSocket
-  const { data: output, refetch } = useQuery({
+  // Only fetch for stopped agents — running agents use XTerminal WebSocket
+  const { data: output, refetch: refetchOutput } = useQuery({
     queryKey: ['agent-output', agent.id],
     queryFn: () => fetchOutput(agent.id),
     enabled: isStopped,
   });
+
+  const { data: conversation, refetch: refetchConversation } = useQuery({
+    queryKey: ['agent-conversation', agent.id],
+    queryFn: () => fetchConversation(agent.id),
+    enabled: isStopped,
+  });
+
+  const hasConversation = (conversation?.messages.length ?? 0) > 0;
+
+  const refetch = () => {
+    void refetchOutput();
+    void refetchConversation();
+  };
 
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
@@ -85,7 +106,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : agent.id}
+          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : agent.id}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -121,6 +142,15 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
 
       {/* Content */}
       {isStopped ? (
+        hasConversation ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MessagesTimeline
+              messages={conversation!.messages}
+              workLog={conversation!.workLog}
+              streaming={false}
+            />
+          </div>
+        ) : (
         <pre
           ref={terminalRef}
           onScroll={handleScroll}
@@ -130,6 +160,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
           {output || 'No saved output available.'}
           <div ref={bottomRef} />
         </pre>
+        )
       ) : (
         <div className="flex-1 min-h-0">
           <XTerminal sessionName={agent.id} />
