@@ -249,3 +249,31 @@ export function canReplaceTitle(conv: Conversation): boolean {
   // If AI already set it, don't replace again
   return false;
 }
+
+// ─── Favorites (PAN-662) ──────────────────────────────────────────────────────
+
+export type FavoriteType = 'conversation';
+
+/** Return all item IDs that are favorited for the given type. */
+export function listFavoritedIds(type: FavoriteType): string[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(`SELECT item_id FROM favorites WHERE type = ?`)
+    .all(type) as Array<{ item_id: string }>;
+  return rows.map((r) => r.item_id);
+}
+
+/** Add a favorite. Idempotent — does nothing if already favorited. */
+export function setFavorite(type: FavoriteType, itemId: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `INSERT OR IGNORE INTO favorites (type, item_id, created_at) VALUES (?, ?, ?)`,
+  ).run(type, itemId, new Date().toISOString());
+}
+
+/** Remove a favorite. Idempotent — does nothing if not favorited. */
+export function removeFavorite(type: FavoriteType, itemId: string): void {
+  const db = getDatabase();
+  db.prepare(`DELETE FROM favorites WHERE type = ? AND item_id = ?`).run(type, itemId);
+}
+

@@ -461,6 +461,18 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
 
+    -- ===== Favorites (PAN-662: conversation favorites) =====
+    CREATE TABLE IF NOT EXISTS favorites (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      type       TEXT NOT NULL,  -- 'conversation'
+      item_id    TEXT NOT NULL,  -- conversation name
+      created_at TEXT NOT NULL,
+      UNIQUE(type, item_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_favorites_type
+      ON favorites(type);
+
     -- ===== Merge Queue (PAN-632: persistent merge serialization) =====
     CREATE TABLE IF NOT EXISTS merge_queue (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -515,7 +527,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
   `);
-	db.pragma(`user_version = 16`);
+	db.pragma(`user_version = 17`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -523,7 +535,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 16) return;
+	if (currentVersion === 17) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -698,7 +710,18 @@ function runMigrations(db) {
 			db.prepare(`UPDATE conversations SET session_file = ? WHERE id = ?`).run(correctedPath, conversation.id);
 		}
 	}
-	db.pragma(`user_version = 16`);
+	if (currentVersion < 17) db.exec(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        type       TEXT NOT NULL,
+        item_id    TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(type, item_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_favorites_type
+        ON favorites(type);
+    `);
+	db.pragma(`user_version = 17`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

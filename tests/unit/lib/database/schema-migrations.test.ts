@@ -72,7 +72,31 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-1') as { session_file: string };
     expect(row.session_file).toBe(correctedPath);
-    expect(db.pragma('user_version', { simple: true })).toBe(16);
+    expect(db.pragma('user_version', { simple: true })).toBe(17);
+  });
+
+  it('v16 → v17: creates favorites table and idx_favorites_type index', () => {
+    // Start at v16 with a fully-initialised schema (minus favorites)
+    initSchema(db);
+    db.pragma('user_version = 16');
+    // Drop the favorites table that initSchema created so we can verify the migration re-creates it
+    db.exec('DROP TABLE IF EXISTS favorites');
+
+    runMigrations(db);
+
+    // favorites table must exist
+    const table = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='favorites'`)
+      .get() as { name: string } | undefined;
+    expect(table?.name).toBe('favorites');
+
+    // idx_favorites_type index must exist
+    const index = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_favorites_type'`)
+      .get() as { name: string } | undefined;
+    expect(index?.name).toBe('idx_favorites_type');
+
+    expect(db.pragma('user_version', { simple: true })).toBe(17);
   });
 
   it('leaves session_file unchanged when the corrected transcript is missing', () => {
@@ -101,6 +125,6 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-2') as { session_file: string };
     expect(row.session_file).toBe(stalePath);
-    expect(db.pragma('user_version', { simple: true })).toBe(16);
+    expect(db.pragma('user_version', { simple: true })).toBe(17);
   });
 });

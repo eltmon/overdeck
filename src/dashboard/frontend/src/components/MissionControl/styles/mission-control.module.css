@@ -1123,8 +1123,102 @@
   color: var(--mc-accent);
 }
 
+/* Wrapper around controls + list */
+.conversationListWrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Controls bar: tabs + sort */
+.conversationControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-4);
+  border-bottom: 1px solid var(--mc-border);
+  gap: var(--mc-space-2);
+  flex-shrink: 0;
+}
+
+/* All / Favorites tab bar */
+.convTabBar {
+  display: flex;
+  gap: 2px;
+}
+
+.convTab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.convTab:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-secondary);
+}
+
+.convTabActive {
+  background: var(--mc-bg-selected);
+  color: var(--mc-text-primary);
+  font-weight: 500;
+}
+
+.convTabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--mc-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Sort dropdown */
+.convSortSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 2px 20px 2px 6px;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-sm);
+  background: var(--mc-bg-secondary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 5px center;
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-family);
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  min-width: 96px;
+}
+
+.convSortSelect:hover {
+  border-color: var(--mc-border-strong);
+  color: var(--mc-text-secondary);
+}
+
+.convSortSelect:focus {
+  border-color: var(--mc-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
 .conversationList {
   padding: var(--mc-space-1) 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .conversationAddForm {
@@ -1272,6 +1366,50 @@
   transition: opacity 0.1s, background 0.1s, color 0.1s;
   flex-shrink: 0;
   padding: 0;
+}
+
+/* Last-accessed timestamp */
+.conversationTime {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  opacity: 0.6;
+  white-space: nowrap;
+  font-family: var(--mc-font-family);
+  letter-spacing: 0;
+}
+
+/* Star / favorite button */
+.conversationStarBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.conversationItem:hover .conversationStarBtn {
+  opacity: 1;
+}
+
+.conversationStarBtnActive {
+  opacity: 1 !important;
+  color: var(--mc-accent);
+}
+
+.conversationStarBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-accent);
 }
 
 .conversationArchiveBtn:hover {

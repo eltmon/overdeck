@@ -1,6 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Star } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useNow } from '../../hooks/useNow';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -16,6 +19,7 @@ export interface Conversation {
   endedAt: string | null;
   lastAttachedAt: string | null;
   sessionAlive: boolean;
+  isFavorited?: boolean;
   /** Absolute path to the Claude Code JSONL session file. Null until discovered. */
   sessionFile?: string | null;
   /** Human-readable title, auto-set from first message. Null until first message sent. */
@@ -35,6 +39,43 @@ export interface Conversation {
 /** Marker that we're in draft mode — no session spawned yet. */
 export type DraftSession = true;
 
+// ─── Sort types ───────────────────────────────────────────────────────────────
+
+export type SortOption = 'lastActivity' | 'lastAccessed' | 'created' | 'alphabetical';
+type ListTab = 'all' | 'favorites';
+
+const SORT_LABELS: Record<SortOption, string> = {
+  lastActivity: 'Last activity',
+  lastAccessed: 'Last accessed',
+  created: 'Created',
+  alphabetical: 'Alphabetical',
+};
+
+const SORT_STORAGE_KEY = 'mc-conv-sort';
+const TAB_STORAGE_KEY = 'mc-conv-tab';
+
+function loadSort(): SortOption {
+  try {
+    const v = localStorage.getItem(SORT_STORAGE_KEY);
+    if (v === 'lastActivity' || v === 'lastAccessed' || v === 'created' || v === 'alphabetical') {
+      return v;
+    }
+  } catch {
+    // ignore
+  }
+  return 'lastActivity';
+}
+
+function loadTab(): ListTab {
+  try {
+    const v = localStorage.getItem(TAB_STORAGE_KEY);
+    if (v === 'favorites') return 'favorites';
+  } catch {
+    // ignore
+  }
+  return 'all';
+}
+
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -42,8 +83,6 @@ async function fetchConversations(): Promise<Conversation[]> {
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json();
 }
-
-// No spawn API call — draft mode just shows the composer. Session is spawned on first message.
 
 async function archiveConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
@@ -53,6 +92,46 @@ async function archiveConversation(name: string): Promise<void> {
 async function stopConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/stop`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to stop conversation');
+}
+
+async function favoriteConversation(name: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/favorite`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to favorite conversation');
+}
+
+async function unfavoriteConversation(name: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/favorite`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to unfavorite conversation');
+}
+
+// ─── Sorting helpers ──────────────────────────────────────────────────────────
+
+export function getSortKey(conv: Conversation, sort: SortOption): string | number {
+  switch (sort) {
+    case 'lastActivity':
+      return conv.lastAttachedAt ?? conv.createdAt;
+    case 'lastAccessed':
+      return conv.lastAttachedAt ?? '';
+    case 'created':
+      return conv.createdAt;
+    case 'alphabetical':
+      return (conv.title ?? conv.name).toLowerCase();
+  }
+}
+
+export function sortConversations(convs: Conversation[], sort: SortOption): Conversation[] {
+  return [...convs].sort((a, b) => {
+    const ka = getSortKey(a, sort);
+    const kb = getSortKey(b, sort);
+    if (sort === 'alphabetical') {
+      return (ka as string).localeCompare(kb as string);
+    }
+    // Descending for dates (newest first), empty string sorts to end
+    if (!ka && !kb) return 0;
+    if (!ka) return 1;
+    if (!kb) return -1;
+    return (kb as string).localeCompare(ka as string);
+  });
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -66,7 +145,10 @@ interface ConversationListProps {
 
 export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [sort, setSort] = useState<SortOption>(loadSort);
+  const [tab, setTab] = useState<ListTab>(loadTab);
   const queryClient = useQueryClient();
+  const now = useNow(60_000);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
@@ -94,6 +176,25 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     },
   });
 
+  const favoriteMutation = useMutation({
+    mutationFn: ({ name, favorited }: { name: string; favorited: boolean }) =>
+      favorited ? unfavoriteConversation(name) : favoriteConversation(name),
+    onMutate: async ({ name, favorited }) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
+      const prev = queryClient.getQueryData<Conversation[]>(['conversations']);
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === name ? { ...c, isFavorited: !favorited } : c)) ?? [],
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['conversations'], ctx.prev);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
   const handleCopyLink = useCallback((convId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `${window.location.origin}/conv/${convId}`;
@@ -102,6 +203,39 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
       setTimeout(() => setCopiedId(null), 2000);
     });
   }, []);
+
+  const handleSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = e.target.value as SortOption;
+    setSort(v);
+    try { localStorage.setItem(SORT_STORAGE_KEY, v); } catch { /* ignore */ }
+  }, []);
+
+  const handleTabChange = useCallback((t: ListTab) => {
+    setTab(t);
+    try { localStorage.setItem(TAB_STORAGE_KEY, t); } catch { /* ignore */ }
+  }, []);
+
+  // ── Sorted + grouped list ────────────────────────────────────────────────────
+  const displayConversations = useMemo(() => {
+    let filtered = conversations;
+
+    // Favorites tab filter
+    if (tab === 'favorites') {
+      filtered = filtered.filter((c) => c.isFavorited);
+    }
+
+    // Sort within each group
+    const active = sortConversations(
+      filtered.filter((c) => c.sessionAlive),
+      sort,
+    );
+    const inactive = sortConversations(
+      filtered.filter((c) => !c.sessionAlive),
+      sort,
+    );
+
+    return [...active, ...inactive];
+  }, [conversations, sort, tab]);
 
   if (isLoading) {
     return (
@@ -112,70 +246,152 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     );
   }
 
-  if (conversations.length === 0) {
-    return <div className={styles.conversationEmpty}>No conversations yet</div>;
-  }
+  const favCount = conversations.filter((c) => c.isFavorited).length;
 
   return (
-    <div className={styles.conversationList}>
-      {conversations.map(conv => (
-        <button
-          key={conv.id}
-          className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''}`}
-          onClick={() => onSelectConversation(conv.name)}
-          title={conv.name}
+    <div className={styles.conversationListWrapper}>
+      {/* Controls bar: All/Favorites tabs + sort */}
+      <div className={styles.conversationControls}>
+        <div className={styles.convTabBar}>
+          <button
+            className={`${styles.convTab} ${tab === 'all' ? styles.convTabActive : ''}`}
+            onClick={() => handleTabChange('all')}
+          >
+            All
+          </button>
+          <button
+            className={`${styles.convTab} ${tab === 'favorites' ? styles.convTabActive : ''}`}
+            onClick={() => handleTabChange('favorites')}
+          >
+            Favorites
+            {favCount > 0 && <span className={styles.convTabCount}>{favCount}</span>}
+          </button>
+        </div>
+        <select
+          className={styles.convSortSelect}
+          value={sort}
+          onChange={handleSortChange}
+          aria-label="Sort conversations"
+          title="Sort conversations"
         >
-          {conv.sessionAlive && (
-            <span
-              role="button"
-              tabIndex={0}
-              className={styles.conversationStopBtn}
-              onClick={e => { e.stopPropagation(); if (!stopMutation.isPending) stopMutation.mutate(conv.name); }}
-              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !stopMutation.isPending) { e.stopPropagation(); stopMutation.mutate(conv.name); } }}
-              title="Stop agent"
-              aria-label={`Stop agent for ${conv.name}`}
-            >
-              <X size={11} />
-            </span>
-          )}
-          <Circle
-            size={7}
-            className={styles.conversationDot}
-            style={{
-              fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-              color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-            }}
-          />
-          <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
-          {conv.totalCost !== undefined && conv.totalCost > 0 && (
-            <span className={styles.featureCost}>
-              {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
-            </span>
-          )}
-          <span
-            role="button"
-            tabIndex={0}
-            className={styles.conversationArchiveBtn}
-            onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
-            title="Archive conversation"
-            aria-label={`Archive ${conv.name}`}
-          >
-            <Archive size={11} />
-          </span>
-          <span
-            role="button"
-            tabIndex={0}
-            className={styles.conversationCopyBtn}
-            onClick={e => handleCopyLink(conv.id, e)}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCopyLink(conv.id, e as unknown as React.MouseEvent); } }}
-            title="Copy link to conversation"
-            aria-label={`Copy link to ${conv.name}`}
-          >
-            {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
-          </span>
-        </button>
-      ))}
+          {(Object.keys(SORT_LABELS) as SortOption[]).map((opt) => (
+            <option key={opt} value={opt}>{SORT_LABELS[opt]}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* List */}
+      {displayConversations.length === 0 ? (
+        <div className={styles.conversationEmpty}>
+          {tab === 'favorites'
+            ? 'No favorites yet — hover a conversation and click ★ to star it.'
+            : 'No conversations yet'}
+        </div>
+      ) : (
+        <div className={styles.conversationList}>
+          <AnimatePresence initial={false}>
+            {displayConversations.map((conv) => (
+              <motion.button
+                key={conv.id}
+                layout
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''}`}
+                onClick={() => onSelectConversation(conv.name)}
+                title={conv.name}
+              >
+                {conv.sessionAlive && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={styles.conversationStopBtn}
+                    onClick={e => { e.stopPropagation(); if (!stopMutation.isPending) stopMutation.mutate(conv.name); }}
+                    onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !stopMutation.isPending) { e.stopPropagation(); stopMutation.mutate(conv.name); } }}
+                    title="Stop agent"
+                    aria-label={`Stop agent for ${conv.name}`}
+                  >
+                    <X size={11} />
+                  </span>
+                )}
+                <Circle
+                  size={7}
+                  className={styles.conversationDot}
+                  style={{
+                    fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+                    color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+                  }}
+                />
+                <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+                {conv.lastAttachedAt && (
+                  <time
+                    className={styles.conversationTime}
+                    dateTime={conv.lastAttachedAt}
+                    title={new Date(conv.lastAttachedAt).toLocaleString()}
+                    aria-label={`Last accessed ${formatRelativeTime(conv.lastAttachedAt, now)}`}
+                  >
+                    {formatRelativeTime(conv.lastAttachedAt, now)}
+                  </time>
+                )}
+                {conv.totalCost !== undefined && conv.totalCost > 0 && (
+                  <span className={styles.featureCost}>
+                    {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
+                  </span>
+                )}
+                {/* Star / favorite button */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={`${styles.conversationStarBtn} ${conv.isFavorited ? styles.conversationStarBtnActive : ''}`}
+                  onClick={e => {
+                    e.stopPropagation();
+                    favoriteMutation.mutate({ name: conv.name, favorited: !!conv.isFavorited });
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
+                      e.stopPropagation();
+                      favoriteMutation.mutate({ name: conv.name, favorited: !!conv.isFavorited });
+                    }
+                  }}
+                  title={conv.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={conv.isFavorited ? `Unfavorite ${conv.title ?? conv.name}` : `Favorite ${conv.title ?? conv.name}`}
+                  aria-pressed={conv.isFavorited}
+                >
+                  <Star
+                    size={11}
+                    style={{
+                      fill: conv.isFavorited ? 'currentColor' : 'none',
+                    }}
+                  />
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={styles.conversationArchiveBtn}
+                  onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
+                  title="Archive conversation"
+                  aria-label={`Archive ${conv.name}`}
+                >
+                  <Archive size={11} />
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={styles.conversationCopyBtn}
+                  onClick={e => handleCopyLink(conv.id, e)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCopyLink(conv.id, e as unknown as React.MouseEvent); } }}
+                  title="Copy link to conversation"
+                  aria-label={`Copy link to ${conv.name}`}
+                >
+                  {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
+                </span>
+              </motion.button>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
