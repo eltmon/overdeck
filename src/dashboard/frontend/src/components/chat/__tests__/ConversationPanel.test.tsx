@@ -79,11 +79,19 @@ function makeClient() {
   return client;
 }
 
-function renderPanel(conversation = mockConversation) {
+function renderPanel(
+  conversation = mockConversation,
+  props: Partial<React.ComponentProps<typeof ConversationPanel>> = {},
+) {
   const client = makeClient();
   render(
     <QueryClientProvider client={client}>
-      <ConversationPanel conversation={conversation} onArchived={() => {}} />
+      <ConversationPanel
+        conversation={conversation}
+        viewMode="conversation"
+        onArchived={() => {}}
+        {...props}
+      />
     </QueryClientProvider>,
   );
   return client;
@@ -235,5 +243,18 @@ describe('ConversationPanel rename flow', () => {
     });
     expect(updateConversationTitle).toHaveBeenNthCalledWith(1, 'test-conv', 'First');
     expect(updateConversationTitle).toHaveBeenNthCalledWith(2, 'test-conv', 'Second');
+  });
+
+  it('renders terminal mode from props and reports toggle changes upward', () => {
+    const onViewModeChange = vi.fn();
+    renderPanel({ ...mockConversation, sessionAlive: true }, {
+      viewMode: 'terminal',
+      onViewModeChange,
+    });
+
+    expect(screen.getByRole('button', { name: 'Terminal' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation' }));
+
+    expect(onViewModeChange).toHaveBeenCalledWith('conversation');
   });
 });

@@ -148,12 +148,17 @@ export function ConversationPanel({
   }, [onViewModeChange]);
 
   const handleCopyLink = useCallback(() => {
-    const url = `${window.location.origin}/conv/${conversation.id}`;
+    const params = new URLSearchParams();
+    if (viewMode === 'terminal') {
+      params.set('view', 'terminal');
+    }
+    const query = params.toString();
+    const url = `${window.location.origin}/conv/${conversation.id}${query ? `?${query}` : ''}`;
     void navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, [conversation.id]);
+  }, [conversation.id, viewMode]);
 
   const showTerminal = conversation.sessionAlive || resumed;
 

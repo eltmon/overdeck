@@ -259,6 +259,29 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     // Create terminal instance if it doesn't exist, otherwise reuse
     let term = terminalInstance.current;
     let fit = fitAddon.current;
+    const handleForcedSelectionMouseDown = (event: MouseEvent) => {
+      if (!event.isTrusted) return;
+      if (event.button !== 0) return;
+      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      event.stopPropagation();
+      const synthetic = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        button: event.button,
+        buttons: event.buttons,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        screenX: event.screenX,
+        screenY: event.screenY,
+        detail: event.detail,
+        shiftKey: true,
+      });
+      target.dispatchEvent(synthetic);
+    };
 
     if (!term) {
       term = new Terminal({
@@ -274,6 +297,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         scrollOnUserInput: true,
         allowProposedApi: true,
         macOptionClickForcesSelection: true,
+        rightClickSelectsWord: false,
         theme: {
           background: '#1a1a2e',
           foreground: '#eaeaea',
@@ -334,18 +358,15 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
-      // Keep drag selection in the browser/xterm layer, but map wheel scrolling
-      // to tmux history explicitly so alternate-screen Claude sessions still scroll.
-      term.attachCustomWheelEventHandler((event: WheelEvent) => {
-        if (event.deltaY === 0) return false;
-        event.preventDefault();
-        event.stopPropagation();
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const direction = event.deltaY < 0 ? '\u001b[1;2A' : '\u001b[1;2B';
-          wsRef.current.send(direction);
-        }
-        return false;
-      });
+      // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
+      // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
+      // drag-selection disappear. Re-dispatch primary-button mousedown with shiftKey
+      // so xterm enters selection mode while leaving wheel scrolling untouched.
+      terminalRef.current.addEventListener('mousedown', handleForcedSelectionMouseDown, true);
+
+      // Do NOT intercept wheel events — let them pass through to xterm.js and tmux.
+      // Claude/tmux mouse mode is currently the only working path for wheel-driven
+      // history in alternate-screen sessions.
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
@@ -541,6 +562,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
       setShouldReconnect(false);
       readyForLiveData.current = false;
       if (reconnectTimer.current) {

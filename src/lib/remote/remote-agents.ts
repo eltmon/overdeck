@@ -19,11 +19,7 @@ const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/panopticon.tmux.conf`;
 const REMOTE_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
-  '# Keep tmux mouse tracking off so browser/xterm selection still works.',
-  '# Wheel-driven history is provided via explicit key bindings from XTerminal.',
-  'set -g mouse off',
-  'bind -n S-Up if-shell -F "#{pane_in_mode}" "send-keys -X -N 3 scroll-up" "copy-mode -e; send-keys -X -N 3 scroll-up"',
-  'bind -n S-Down if-shell -F "#{pane_in_mode}" "send-keys -X -N 3 scroll-down" "select-pane -t ="',
+  'set -g mouse on',
   '',
 ].join('\n');
 
