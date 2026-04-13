@@ -1,234 +1,235 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-12T22:42:28Z",
+    "created": "2026-04-12T15:16:48Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-503: Planning agent: use ActivityView (conversation-style) in workspace detail pane, keep XTerminal in planning dialog",
-    "updated": "2026-04-12T22:53:11.272Z"
+    "description": "Plan for PAN-596: Allow editing a conversation title",
+    "updated": "2026-04-13T01:09:44.226Z"
   },
   "plan": {
-    "id": "pan-503",
-    "title": "Planning agent: use ActivityView in workspace detail pane, keep XTerminal in planning dialog",
+    "id": "pan-596",
+    "title": "Allow editing a conversation title",
     "status": "approved",
-    "uid": "b95a7175-7a61-44de-8c06-0622bc65dd91",
+    "uid": "c6bd4f00-02fe-4b96-8e70-9a3ce2b14c8b",
     "author": "agent:claude-opus-4-6",
-    "sequence": 18,
-    "created": "2026-04-12T22:42:28Z",
-    "updated": "2026-04-12T22:53:11.272Z",
+    "sequence": 21,
+    "created": "2026-04-12T15:16:48Z",
+    "updated": "2026-04-13T01:09:44.226Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/503",
-        "label": "PAN-503",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/596",
+        "label": "PAN-596",
         "type": "issue"
       }
     ],
     "tags": [
-      "dashboard",
       "frontend",
-      "planning-agent",
-      "activity-view"
+      "dashboard",
+      "mission-control",
+      "conversations"
     ],
     "narratives": {
-      "Problem": "Planning agent output is shown as a raw XTerminal in both the planning dialog and the workspace/agent detail pane. The detail pane is a review context where ActivityView (the conversation-style view used for work agents) would be much more readable. The live-watch PlanDialog is where raw terminal fidelity belongs.",
-      "Proposal": "Route planning agents through ActivityView in TerminalPanel (workspace detail pane) and in AgentOutputPanel's Activity view (Agents tab). Keep PlanDialog unchanged so live planning still uses XTerminal. The split is conditional by render site — no user toggle. The backend /api/command-deck/activity/:issueId endpoint and ActivityView component already support planning sections; the only changes needed are the two agent-hosting shell components plus tests."
+      "Problem": "Conversation titles can only be renamed via curl. Backend PATCH /api/conversations/:name already exists and marks title_source='manual', but there is no UI.",
+      "Proposal": "Add inline rename UI in the ConversationList sidebar rows and the ConversationPanel header. Pencil icon button toggles an input; Enter saves, Esc cancels, blur saves. React-query mutation invalidates ['conversations'] for instant UI update. No backend changes."
     },
     "items": [
       {
-        "id": "agent-output-panel-planning",
-        "title": "Extend AgentOutputPanel to route planning agents to ActivityView",
+        "id": "api-helper",
+        "title": "Add updateConversationTitle API helper and mutation hook",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-12T22:42:28Z",
+        "created": "2026-04-12T15:16:48Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-503"
+          "issueLabel": "pan-596"
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/AgentOutputPanel.tsx, generalize deriveWorkAgentIssueId so it also matches the planning-<prefix>-<n> pattern and rename it to deriveAgentIssueId (or equivalent). Planning agents selected in the Agents tab must render <ActivityView issueId=... /> in the Activity view, with XTerminal remaining available in the Terminal view. Do not change the existing work-agent or specialist branches."
+          "Action": "In src/dashboard/frontend/src/components/MissionControl/ConversationList.tsx add an exported async helper updateConversationTitle(name, title) that calls PATCH /api/conversations/:name with JSON body { title }, encoding name via encodeURIComponent. Add a useMutation wiring in both ConversationList and ConversationPanel that invalidates queryKey ['conversations'] on success."
         },
         "subItems": [
           {
-            "id": "agent-output-panel-planning.ac1",
-            "title": "Selecting a planning agent (id starting with 'planning-') in the Agents tab renders ActivityView with the derived issueId in Activity view",
+            "id": "api-helper.ac1",
+            "title": "PATCH /api/conversations/:name is called with { title: trimmed } and encoded name",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.272Z"
+            "completed": "2026-04-12T17:57:13.649Z"
           },
           {
-            "id": "agent-output-panel-planning.ac2",
-            "title": "Selecting the same planning agent and switching to Terminal view still renders XTerminal against the planning session id",
+            "id": "api-helper.ac2",
+            "title": "Successful rename invalidates the conversations query so UI updates immediately",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.272Z"
+            "completed": "2026-04-12T17:57:13.649Z"
           },
           {
-            "id": "agent-output-panel-planning.ac3",
-            "title": "Work-agent and specialist behavior in AgentOutputPanel is unchanged (existing tests pass without modification to work/specialist cases)",
+            "id": "api-helper.ac3",
+            "title": "Empty/whitespace title does not call the API; original title is restored",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.272Z"
-          },
-          {
-            "id": "agent-output-panel-planning.ac4",
-            "title": "A planning agent whose issueId cannot be derived still renders the XTerminal fallback rather than the 'No issue associated' placeholder",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:53:11.272Z"
+            "completed": "2026-04-12T17:57:13.649Z"
           }
         ],
-        "completed": "2026-04-12T22:53:11.272Z"
+        "completed": "2026-04-13T01:09:44.226Z"
       },
       {
-        "id": "terminal-panel-planning",
-        "title": "Render ActivityView instead of XTerminal for planning agents in TerminalPanel",
+        "id": "sidebar-rename",
+        "title": "Inline rename UI in ConversationList sidebar rows",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-12T22:42:28Z",
+        "created": "2026-04-12T15:16:48Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-503"
+          "issueLabel": "pan-596"
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/TerminalPanel.tsx, detect planning agents (agentPhase === 'planning' or id starts with 'planning-'). When detected and an issueId is resolvable, render <ActivityView issueId=... /> in place of <XTerminal /> and hide the 'pop out terminal' button for that case. Non-planning agents (work agents, specialists) must be untouched. Do not drop the existing tmux-alive probe behavior for non-planning agents."
+          "Action": "In ConversationList.tsx add a pencil icon button (lucide-react Pencil) beside the existing Archive/Copy/Stop actions. Clicking it (stopPropagation) puts the row into edit mode: replace the .conversationName span with an <input> autofocused and text-selected. Enter saves, Esc cancels, blur saves. Add matching styles in styles/mission-control.module.css for .conversationEditBtn and .conversationNameInput."
         },
         "subItems": [
           {
-            "id": "terminal-panel-planning.ac1",
-            "title": "When TerminalPanel receives a planning-phase agent, ActivityView is rendered and no XTerminal is mounted",
+            "id": "sidebar-rename.ac1",
+            "title": "Pencil icon button visible on each conversation row with aria-label 'Rename <name>'",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           },
           {
-            "id": "terminal-panel-planning.ac2",
-            "title": "When TerminalPanel receives a work agent or specialist, XTerminal (live) or raw last-output (stopped) is rendered exactly as before",
+            "id": "sidebar-rename.ac2",
+            "title": "Clicking pencil does not select the conversation; clicking input does not either",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           },
           {
-            "id": "terminal-panel-planning.ac3",
-            "title": "The 'Pop out terminal' button is hidden for planning agents (no raw terminal to pop out) but continues to appear for running non-planning agents",
+            "id": "sidebar-rename.ac3",
+            "title": "Enter saves and exits edit mode; Esc cancels and reverts; blur saves if non-empty",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           },
           {
-            "id": "terminal-panel-planning.ac4",
-            "title": "The DetailPanelLayout continues to call TerminalPanel unchanged — no new prop is required for the planning conditional",
+            "id": "sidebar-rename.ac4",
+            "title": "Input autofocuses and pre-selects the current title when entering edit mode",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           }
         ],
-        "completed": "2026-04-12T22:53:11.271Z"
+        "completed": "2026-04-13T01:09:44.226Z"
       },
       {
-        "id": "plan-dialog-untouched",
-        "title": "Verify PlanDialog continues to render XTerminal for live planning",
-        "status": "completed",
-        "priority": "low",
-        "created": "2026-04-12T22:42:28Z",
-        "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-503"
-        },
-        "narrative": {
-          "Action": "Confirm via code read and a manual dashboard smoke check that src/dashboard/frontend/src/components/PlanDialog.tsx still mounts XTerminal (not ActivityView) when the planning session is running. This is a verification task, not a code change."
-        },
-        "subItems": [
-          {
-            "id": "plan-dialog-untouched.ac1",
-            "title": "PlanDialog.tsx imports XTerminal and renders it in the active planning branch — no diff is introduced in this file",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:53:11.272Z"
-          },
-          {
-            "id": "plan-dialog-untouched.ac2",
-            "title": "Manual smoke: opening the Plan dialog for a running planning session still shows the live tmux terminal view",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-12T22:53:11.272Z"
-          }
-        ],
-        "completed": "2026-04-12T22:53:11.272Z"
-      },
-      {
-        "id": "tests-planning-activity",
-        "title": "Add/extend frontend tests for planning-agent ActivityView routing",
+        "id": "panel-rename",
+        "title": "Inline rename UI in ConversationPanel header",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-12T22:42:28Z",
+        "created": "2026-04-12T15:16:48Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-503"
+          "issueLabel": "pan-596"
         },
         "narrative": {
-          "Action": "Cover the two new conditionals with Vitest + React Testing Library. For TerminalPanel: a test asserting a planning-phase agent mounts ActivityView (mock the /api/command-deck/activity/:issueId fetch) and does NOT mount XTerminal. For AgentOutputPanel: a test asserting a planning-<prefix>-<n> agentId resolves to the correct issueId and Activity view renders ActivityView. Follow existing mocking patterns in StandaloneTerminal.test.tsx and InspectorPanel.test.tsx. Run npm run typecheck, npm run lint, and npm test at workspace root before signalling done."
+          "Action": "In src/dashboard/frontend/src/components/chat/ConversationPanel.tsx add a pencil icon button next to the title at line 120 ({conversation.title ?? conversation.name}). Import the updateConversationTitle helper from ConversationList. Wire a useMutation that invalidates ['conversations']. Same Enter/Esc/blur behavior. Add styles in the chat module CSS."
         },
         "subItems": [
           {
-            "id": "tests-planning-activity.ac1",
-            "title": "New or updated TerminalPanel test verifies ActivityView is rendered for a planning-phase agent and XTerminal is not",
+            "id": "panel-rename.ac1",
+            "title": "Pencil button next to the panel title; click enters edit mode with autofocused input",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           },
           {
-            "id": "tests-planning-activity.ac2",
-            "title": "New or updated AgentOutputPanel test verifies planning-<prefix>-<n> agentId produces a non-null derived issueId and renders ActivityView in the default (Activity) view mode",
+            "id": "panel-rename.ac2",
+            "title": "Enter/Esc/blur behavior matches the sidebar implementation",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           },
           {
-            "id": "tests-planning-activity.ac3",
-            "title": "npm run typecheck, npm run lint, and npm test all pass at the workspace root",
+            "id": "panel-rename.ac3",
+            "title": "After save, both the panel header and the sidebar row reflect the new title without manual refresh",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-12T22:53:11.271Z"
+            "completed": "2026-04-12T17:57:13.648Z"
           }
         ],
-        "completed": "2026-04-12T22:53:11.270Z"
+        "completed": "2026-04-13T01:09:44.225Z"
+      },
+      {
+        "id": "manual-source-verify",
+        "title": "Verify title_source transitions to 'manual' and blocks AI override",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-12T15:16:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-596"
+        },
+        "narrative": {
+          "Action": "Manually verify: create a conversation, let AI generate a title (title_source='ai'), rename via the new UI, confirm the DB row is updated to title_source='manual' and that subsequent generateAiTitle calls in src/dashboard/server/routes/conversations.ts do not overwrite the manual title. No backend code changes needed — this is a verification task."
+        },
+        "subItems": [
+          {
+            "id": "manual-source-verify.ac1",
+            "title": "After user rename, conversations.title_source column equals 'manual' in SQLite",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T17:57:13.649Z"
+          },
+          {
+            "id": "manual-source-verify.ac2",
+            "title": "Subsequent AI title generation for the same conversation is a no-op (confirmed via logs or code path)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-12T17:57:13.649Z"
+          }
+        ],
+        "completed": "2026-04-13T01:09:44.226Z"
       }
     ],
     "edges": [
       {
-        "from": "agent-output-panel-planning",
-        "to": "tests-planning-activity",
+        "from": "api-helper",
+        "to": "sidebar-rename",
         "type": "blocks"
       },
       {
-        "from": "terminal-panel-planning",
-        "to": "tests-planning-activity",
+        "from": "api-helper",
+        "to": "panel-rename",
         "type": "blocks"
+      },
+      {
+        "from": "sidebar-rename",
+        "to": "manual-source-verify",
+        "type": "informs"
+      },
+      {
+        "from": "panel-rename",
+        "to": "manual-source-verify",
+        "type": "informs"
       }
     ]
   }
