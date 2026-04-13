@@ -25,9 +25,3 @@ Object.defineProperty(window, 'matchMedia', {
 // Tests only check React UI elements (settings panel etc), not terminal content.
 Terminal.prototype.open = () => {};
 
-// jsdom doesn't implement Element.scrollIntoView, so any effect that scrolls a
-// highlighted item into view (e.g. ComposerPromptEditor's SlashMenu) throws
-// "selected?.scrollIntoView is not a function" during commit. Polyfill as a no-op.
-if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => {};
-}

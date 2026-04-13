@@ -23,14 +23,14 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('../../../../src/lib/paths.js', () => ({
-  AGENTS_DIR: join(tmpdir(), 'panopticon-test-agents'),
-  PANOPTICON_HOME: join(tmpdir(), 'panopticon-test-home'),
-  PROJECT_PRDS_SUBDIR: 'prds',
-  PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
-  PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
-  PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
-}));
+vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/paths.js')>();
+  return {
+    ...actual,
+    AGENTS_DIR: join(tmpdir(), 'panopticon-test-agents'),
+    PANOPTICON_HOME: join(tmpdir(), 'panopticon-test-home'),
+  };
+});
 
 vi.mock('../../../../src/lib/shadow-state.js', () => ({
   removeShadowState: vi.fn().mockReturnValue({ success: true }),

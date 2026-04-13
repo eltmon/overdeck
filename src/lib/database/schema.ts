@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 /**
  * Initialize the complete database schema.
@@ -190,6 +190,18 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
+
+    -- ===== Favorites (PAN-662: conversation favorites) =====
+    CREATE TABLE IF NOT EXISTS favorites (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      type       TEXT NOT NULL,  -- 'conversation' or 'project'
+      item_id    TEXT NOT NULL,  -- conversation name or project path
+      created_at TEXT NOT NULL,
+      UNIQUE(type, item_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_favorites_type
+      ON favorites(type);
 
     -- ===== Merge Queue (PAN-632: persistent merge serialization) =====
     CREATE TABLE IF NOT EXISTS merge_queue (
@@ -520,6 +532,21 @@ export function runMigrations(db: Database.Database): void {
         conversation.id
       );
     }
+  }
+
+  // v16 → v17: add favorites table (PAN-662: conversation favorites)
+  if (currentVersion < 17) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        type       TEXT NOT NULL,
+        item_id    TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(type, item_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_favorites_type
+        ON favorites(type);
+    `);
   }
 
   // After all migrations, set the version

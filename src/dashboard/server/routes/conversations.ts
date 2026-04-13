@@ -39,6 +39,9 @@ import {
   updateConversationModel,
   archiveConversation,
   canReplaceTitle,
+  listFavoritedIds,
+  setFavorite,
+  removeFavorite,
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
 import { getProviderForModel, getProviderEnv } from '../../../lib/providers.js';
@@ -404,6 +407,7 @@ const getConversationsRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
     try {
         const conversations = listConversations();
+        const favoritedNames = new Set(listFavoritedIds('conversation'));
 
         // Enrich with live tmux status
         // Grace period: treat recently-created active conversations as alive (tmux may not have
@@ -416,7 +420,7 @@ const getConversationsRoute = HttpRouter.add(
               !conv.endedAt &&
               Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
             const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
-            return { ...conv, sessionAlive };
+            return { ...conv, sessionAlive, isFavorited: favoritedNames.has(conv.name) };
           }),
         );
 
@@ -917,6 +921,50 @@ const postConversationRestartAllRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/favorite ───────────────────────────
+
+const postConversationFavoriteRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/favorite',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = decodeURIComponent(params['name'] ?? '');
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        setFavorite('conversation', name);
+        return jsonResponse({ favorited: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to favorite conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: DELETE /api/conversations/:name/favorite ─────────────────────────
+
+const deleteConversationFavoriteRoute = HttpRouter.add(
+  'DELETE',
+  '/api/conversations/:name/favorite',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = decodeURIComponent(params['name'] ?? '');
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        removeFavorite('conversation', name);
+        return jsonResponse({ favorited: false });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to unfavorite conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -931,6 +979,8 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationArchiveRoute,
   getConversationMessagesRoute,
   postConversationMessageRoute,
+  postConversationFavoriteRoute,
+  deleteConversationFavoriteRoute,
 );
 
 export default conversationsRouteLayer;
