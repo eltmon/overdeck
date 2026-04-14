@@ -1042,15 +1042,45 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     return;
   }
 
-  // Check if agent is stopped — auto-restart to deliver feedback (PAN-367)
-  // IMPORTANT: restart even if the tmux session still exists. Planning/work sessions use
-  // `remain-on-exit on` so the shell persists after the agent process exits. sessionExists()
-  // returns true for a dead shell, which used to bypass the restart and silently drop the
-  // feedback message into a defunct terminal. If state.status === 'stopped', the process
-  // is gone regardless of shell presence — we must restart.
+  // Check if agent is stopped — auto-resume to deliver feedback (PAN-367 / PAN-705)
+  //
+  // IMPORTANT: We delegate to resumeAgent() so we pick up the saved Claude session id
+  // (`claude --resume <id>`) instead of fresh-launching with a new, empty session.
+  // The previous implementation of this branch called `getAgentRuntimeBaseCommand(model)`
+  // and passed an inline "You are resuming work" prompt as a positional argument,
+  // which booted Claude Code in a fresh session (ctx 0%) with no memory of the
+  // prior conversation, destroying agent continuity every time feedback arrived.
+  //
+  // We also restart when the tmux session still exists. Planning/work sessions use
+  // `remain-on-exit on` so the shell persists after the agent process exits, and
+  // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
+  // session before re-creating it.
   const agentState = getAgentState(normalizedId);
   if (agentState && agentState.status === 'stopped') {
-    console.log(`[agents] Auto-restarting stopped agent ${normalizedId} to deliver feedback (session exists: ${sessionExists(normalizedId)})`);
+    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${sessionExists(normalizedId)})`);
+
+    const resumeResult = await resumeAgent(normalizedId, message);
+
+    // Save to mail queue regardless so the agent can re-read feedback if needed
+    const mailDir = join(getAgentDir(normalizedId), 'mail');
+    mkdirSync(mailDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    writeFileSync(
+      join(mailDir, `${timestamp}.md`),
+      `# Message\n\n${message}\n`
+    );
+
+    if (resumeResult.success) {
+      console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
+      return;
+    }
+
+    // Resume failed — most commonly because no saved session id exists (never recorded
+    // a claudeSessionId via the heartbeat hook). Fall back to a fresh launch so feedback
+    // is not silently dropped. This path intentionally mirrors spawnAgent's launcher
+    // (provider exports + unset of leaked env vars) so the fallback doesn't inherit
+    // stale ANTHROPIC_BASE_URL / OPENAI_API_KEY from the parent process.
+    console.warn(`[agents] Resume failed for ${normalizedId}: ${resumeResult.error} — falling back to fresh launch`);
 
     const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
@@ -1063,14 +1093,18 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     }
 
     clearReadySignal(normalizedId);
-    // If the session still exists (remain-on-exit dead shell), kill it so createSession
-    // doesn't fail with "duplicate session". The agent state is 'stopped' so the process
-    // has already exited — it's safe to reclaim the session name.
     if (sessionExists(normalizedId)) {
       try { killSession(normalizedId); } catch { /* ignore */ }
     }
-    const claudeCmd = `${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')} "You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working."`;
-    createSession(normalizedId, agentState.workspace, claudeCmd, {
+
+    const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
+    const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
+    const fallbackContent = `#!/bin/bash
+export CI=1
+${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')}
+`;
+    writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
+    createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
@@ -1084,23 +1118,15 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     agentState.lastActivity = new Date().toISOString();
     saveAgentState(agentState);
 
-    // Wait for ready, then deliver the message
     const ready = await waitForReadySignal(normalizedId, 30);
+    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
-      await sendKeysAsync(normalizedId, message);
-      console.log(`[agents] Restarted ${normalizedId} and delivered feedback`);
+      await sendKeysAsync(normalizedId, resumePrompt);
+      console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
-      console.warn(`[agents] Restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
+      console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
     }
 
-    // Save to mail queue regardless
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
     return;
   }
 
@@ -1221,8 +1247,20 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       }
     }
 
-    // Create new tmux session with resume command
-    const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
+    // Create new tmux session with resume command.
+    // Write a launcher.sh that unsets any leaked provider env vars (ANTHROPIC_BASE_URL,
+    // ANTHROPIC_AUTH_TOKEN, etc — see PAN-705) and then execs claude --resume. tmux's
+    // `-e KEY=VALUE` flag can only SET env, not UNSET — so env cleanup must happen
+    // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
+    const model = agentState.model || 'claude-sonnet-4-6';
+    const providerExports = getProviderExportsForModel(model);
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    const launcherContent = `#!/bin/bash
+export CI=1
+${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permissions
+`;
+    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    const claudeCmd = `bash ${launcherScript}`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
