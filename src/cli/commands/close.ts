@@ -9,8 +9,8 @@ import chalk from 'chalk';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { closeOut, type WorkflowResult } from '../../../lib/lifecycle/index.js';
-import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam } from '../../../lib/projects.js';
+import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
+import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam } from '../../lib/projects.js';
 
 interface CloseOutOptions {
   force?: boolean;

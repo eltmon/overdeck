@@ -5,10 +5,10 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { LinearClient } from '@linear/sdk';
-import { reopenWorkspaceState } from '../../../lib/reopen.js';
-import { getLinearApiKey } from '../../../lib/shadow-utils.js';
-import { getTrackerContext } from '../../../lib/cloister/work-agent-prompt.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { reopenWorkspaceState } from '../../lib/reopen.js';
+import { getLinearApiKey } from '../../lib/shadow-utils.js';
+import { getTrackerContext } from '../../lib/cloister/work-agent-prompt.js';
+import { resolveProjectFromIssue } from '../../lib/projects.js';
 
 interface ReopenOptions {
   json?: boolean;
@@ -313,7 +313,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
 
     // Check if agent is currently running and suggest appropriate next step
     try {
-      const { getAgentState } = await import('../../../lib/agents.js');
+      const { getAgentState } = await import('../../lib/agents.js');
       const agentId = `agent-${id.toLowerCase()}`;
       const agentState = getAgentState(agentId);
       const agentRunning = agentState?.status === 'running' || agentState?.status === 'starting';

@@ -1,18 +1,18 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { saveAgentRuntimeState } from '../../../lib/agents.js';
+import { saveAgentRuntimeState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { AGENTS_DIR } from '../../../lib/paths.js';
-import { getVBriefACStatus, syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
-import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
-import { updateShadowState } from '../../../lib/shadow-state.js';
-import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
-import { getLinearApiKey } from '../../../lib/shadow-utils.js';
-import { extractNumber } from '../../../lib/issue-id.js';
+import { AGENTS_DIR } from '../../lib/paths.js';
+import { getVBriefACStatus, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
+import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
+import { updateShadowState } from '../../lib/shadow-state.js';
+import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
+import { getLinearApiKey } from '../../lib/shadow-utils.js';
+import { extractNumber } from '../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -139,7 +139,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
-    const { getAgentState } = await import('../../../lib/agents.js');
+    const { getAgentState } = await import('../../lib/agents.js');
     const agentState = getAgentState(agentId);
     const workspacePath = agentState?.workspace;
 
@@ -279,13 +279,13 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // `--ours`. Any other conflicts abort the rebase and surface a clear
     // error; the agent must resolve them and re-run `pan work done`.
     {
-      const { getAgentState } = await import('../../../lib/agents.js');
+      const { getAgentState } = await import('../../lib/agents.js');
       const rebaseAgentState = getAgentState(agentId);
       const rebaseWorkspacePath = rebaseAgentState?.workspace;
 
       if (rebaseWorkspacePath && existsSync(rebaseWorkspacePath)) {
-        const { ensureMergeSetForIssue } = await import('../../../lib/merge-set.js');
-        const { rebaseAndPushRepos } = await import('../../../lib/rebase-helper.js');
+        const { ensureMergeSetForIssue } = await import('../../lib/merge-set.js');
+        const { rebaseAndPushRepos } = await import('../../lib/rebase-helper.js');
         const preMergeSet = ensureMergeSetForIssue(issueId);
 
         if (preMergeSet && preMergeSet.repos.length > 0) {
@@ -358,7 +358,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
 
     // Step 2: Create review artifacts immediately and persist merge-set state.
-    const { getAgentState, saveAgentState } = await import('../../../lib/agents.js');
+    const { getAgentState, saveAgentState } = await import('../../lib/agents.js');
     const existingState = getAgentState(agentId);
     const workspacePath = existingState?.workspace;
 
@@ -367,8 +367,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
 
     spinner.text = 'Creating review artifacts...';
-    const { createReviewArtifactsForIssue } = await import('../../../lib/review-artifacts.js');
-    const { setReviewStatus } = await import('../../../lib/review-status.js');
+    const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
+    const { setReviewStatus } = await import('../../lib/review-status.js');
     const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
     const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
     if (primaryArtifact?.artifactUrl) {
@@ -425,7 +425,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
     // Auto-trigger review & test (respecting circuit breaker)
     try {
-      const { getDashboardApiUrl } = await import('../../../lib/config.js');
+      const { getDashboardApiUrl } = await import('../../lib/config.js');
       const dashboardUrl = getDashboardApiUrl();
 
       // Check if dashboard is running

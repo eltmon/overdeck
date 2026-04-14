@@ -1,17 +1,17 @@
 import chalk from 'chalk';
-import { getIssuePrefix } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+import { getIssuePrefix } from '../../lib/projects.js';
+import { extractPrefix } from '../../lib/issue-id.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, rmSync, readFileSync, readdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { stopAgent, getAgentState } from '../../../lib/agents.js';
-import { sessionExists, killSession } from '../../../lib/tmux.js';
-import { createFlyProviderFromConfig } from '../../../lib/remote/index.js';
-import { killRemoteAgent } from '../../../lib/remote/remote-agents.js';
-import { loadConfig } from '../../../lib/config.js';
-import { loadWorkspaceMetadata, deleteWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
+import { stopAgent, getAgentState } from '../../lib/agents.js';
+import { sessionExists, killSession } from '../../lib/tmux.js';
+import { createFlyProviderFromConfig } from '../../lib/remote/index.js';
+import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
+import { loadConfig } from '../../lib/config.js';
+import { loadWorkspaceMetadata, deleteWorkspaceMetadata } from '../../lib/remote/workspace-metadata.js';
 
 const execAsync = promisify(exec);
 

@@ -42,6 +42,12 @@ import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { resumeCommand } from './commands/resume.js';
 import { recoverCommand } from './commands/recover.js';
+import { syncMainCommand } from './commands/sync-main.js';
+import { doneCommand } from './commands/done.js';
+import { approveCommand } from './commands/approve.js';
+import { reopenCommand } from './commands/reopen.js';
+import { wipeCommand } from './commands/wipe.js';
+import { closeOutCommand } from './commands/close.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -131,6 +137,44 @@ program
   .option('--all', 'Auto-recover all crashed agents')
   .option('--json', 'Output as JSON')
   .action(recoverCommand);
+
+program
+  .command('sync-main <id>')
+  .description('Merge latest main into workspace feature branch')
+  .action(syncMainCommand);
+
+program
+  .command('done <id>')
+  .description('Mark work complete, move to review')
+  .option('-c, --comment <message>', 'Comment for the tracker')
+  .option('--json', 'Output as JSON')
+  .action(doneCommand);
+
+program
+  .command('approve <id>')
+  .description('Approve agent work, merge MR, update tracker')
+  .option('--json', 'Output as JSON')
+  .action(approveCommand);
+
+program
+  .command('reopen <id>')
+  .description('Re-open issue for rework (resets specialist state)')
+  .option('--reason <reason>', 'Reason for reopening')
+  .option('--force', 'Skip confirmation prompt')
+  .action(reopenCommand);
+
+program
+  .command('wipe <id>')
+  .description('Destructive: reset all state for an issue. Confirms.')
+  .option('--force', 'Skip confirmation')
+  .action(wipeCommand);
+
+program
+  .command('close <id>')
+  .description('Verify, clean up, and close issue on tracker')
+  .option('--force', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action((id, options) => closeOutCommand(id, options));
 
 program
   .command('start <id>')

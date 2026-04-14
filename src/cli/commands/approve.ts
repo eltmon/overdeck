@@ -1,13 +1,13 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { getAgentState, saveAgentState } from '../../../lib/agents.js';
+import { getAgentState, saveAgentState } from '../../lib/agents.js';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
-import { AGENTS_DIR } from '../../../lib/paths.js';
-import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
-import { markAsSynced } from '../../../lib/shadow-state.js';
-import { getLinearApiKey } from '../../../lib/shadow-utils.js';
+import { AGENTS_DIR } from '../../lib/paths.js';
+import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
+import { markAsSynced } from '../../lib/shadow-state.js';
+import { getLinearApiKey } from '../../lib/shadow-utils.js';
 
 interface ApproveOptions {
   merge?: boolean;
