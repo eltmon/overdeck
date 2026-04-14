@@ -15,9 +15,9 @@ import { registerDbCommands } from '../db.js';
 import { registerBeadsCommands } from '../beads.js';
 import { registerConfigCommand } from '../config.js';
 import { setupHooksCommand } from '../setup/hooks.js';
-import { tldrCommand } from '../work/tldr.js';
-import { hookCommand } from '../work/hook.js';
-import { listStatesCommand, cleanupStatesCommand } from '../work/linear-states.js';
+import { tldrCommand } from './tldr-handler.js';
+import { hookCommand } from './fpp-handler.js';
+import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
 
 export function registerAdminCommands(program: Command): void {

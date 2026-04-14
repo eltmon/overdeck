@@ -1,9 +1,9 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
-import { listRunningAgents, getAgentDir } from '../../../lib/agents.js';
-import { isShadowed, getShadowState } from '../../../lib/shadow-state.js';
-import { getTldrMetrics, getTldrDaemonService } from '../../../lib/tldr-daemon.js';
+import { listRunningAgents, getAgentDir } from '../../lib/agents.js';
+import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
+import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
 
 interface StatusOptions {
   json?: boolean;

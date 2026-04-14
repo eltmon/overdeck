@@ -36,7 +36,7 @@ import { syncCommand } from './commands/sync.js';
 import { restoreCommand } from './commands/restore.js';
 import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
-import { statusCommand } from './commands/work/status.js';
+import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
