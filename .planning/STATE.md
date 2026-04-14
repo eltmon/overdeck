@@ -47,11 +47,11 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-njd: Replace hardcoded legacy command strings in frontend
 - [ ] panopticon-cli-9kq: Update kanban card + inspector panel action labels
 - [ ] panopticon-cli-y4k: First-launch upgrade announcement banner
-- [x] panopticon-cli-i3m: Updated USAGE.md and INDEX.md (commit: pending)
+- [x] panopticon-cli-i3m: Updated USAGE.md and INDEX.md (commit: 84e61770)
 - [ ] panopticon-cli-mjv: Update doc references in all PRDs
 - [ ] panopticon-cli-auj: Update hook scripts and installed shell aliases
 - [ ] panopticon-cli-302: pan doctor: flag legacy invocations
-- [ ] panopticon-cli-oo1: Plain-text fixture test for pan --help
+- [x] panopticon-cli-oo1: Plain-text fixture test for pan --help (commit: pending)
 - [ ] panopticon-cli-xqq: Umbrella /pan skill with dispatch
 - [ ] panopticon-cli-fqg: Rename skills to match new CLI verbs
 - [ ] panopticon-cli-8y6: Skill template

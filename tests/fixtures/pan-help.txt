@@ -1,0 +1,38 @@
+Usage: pan [options] [command]
+
+Multi-agent orchestration for AI coding assistants
+
+Options:
+  -V, --version                output the version number
+  -h, --help                   display help for command
+
+Commands:
+  init                         Initialize Panopticon (~/.panopticon/)
+  sync [options]               Sync skills/agents/rules to devroot
+  restore [timestamp]          Restore from backup
+  backup                       Manage backups
+  skills [options]             List and manage skills
+  plan-finalize [options]      Finalize a planning session: create beads from
+                               vBRIEF plan and write completion marker
+  work                         Agent and work management
+  workspace                    Workspace management
+  test                         Test running and management
+  admin                        Plumbing commands: watchdog, specialists, infra,
+                               db, config, and more
+  convoy                       Multi-agent convoy orchestration
+  install [options]            Install Panopticon prerequisites
+  inspect [options] <issueId>  Request inspection of a completed bead before
+                               proceeding to the next
+  status [options]             Show running agents (shorthand for work status)
+  up [options]                 Start dashboard (and Traefik if enabled)
+  down [options]               Stop dashboard (and Traefik if enabled)
+  project                      Project registry for multi-project workspace
+                               support
+  doctor                       Check system health and dependencies
+  update [options]             Update Panopticon to latest version
+  cost                         Track and report AI usage costs
+  sync-costs                   Import cost events from per-project WAL files
+                               (alias for: pan cost sync)
+  serve [options]              Start the dashboard server and open it in the
+                               default browser (npx launcher)
+  help [command]               display help for command
