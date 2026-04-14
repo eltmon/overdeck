@@ -14,6 +14,7 @@ import { registerRemoteCommands } from '../remote/index.js';
 import { registerDbCommands } from '../db.js';
 import { registerBeadsCommands } from '../beads.js';
 import { registerConfigCommand } from '../config.js';
+import { setupHooksCommand } from '../setup/hooks.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -37,4 +38,14 @@ export function registerAdminCommands(program: Command): void {
 
   // pan admin config — configuration management
   registerConfigCommand(admin);
+
+  // pan admin hooks — Claude Code hooks management
+  const hooks = admin
+    .command('hooks')
+    .description('Manage Claude Code heartbeat hooks');
+
+  hooks
+    .command('install')
+    .description('Configure heartbeat hooks in settings.json')
+    .action(setupHooksCommand);
 }

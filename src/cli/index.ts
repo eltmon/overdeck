@@ -41,17 +41,11 @@ import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
-import { registerSetupCommands } from './commands/setup/index.js';
-import { registerSpecialistsCommands } from './commands/specialists/index.js';
 import { registerConvoyCommands } from './commands/convoy/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
-import { registerDbCommands } from './commands/db.js';
-import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
-import { registerRemoteCommands } from './commands/remote/index.js';
-import { registerConfigCommand } from './commands/config.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
@@ -122,29 +116,11 @@ registerTestCommands(program);
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
 
-// Register specialists commands (pan specialists list, wake, queue, reset)
-registerSpecialistsCommands(program);
-
 // Register convoy commands (pan convoy start, status, list, stop)
 registerConvoyCommands(program);
 
-// Register setup commands (pan setup hooks, etc.)
-registerSetupCommands(program);
-
 // Register install command
 registerInstallCommand(program);
-
-// Register db commands (pan db snapshot, pan db seed, etc.)
-registerDbCommands(program);
-
-// Register beads commands (pan beads compact, pan beads stats)
-registerBeadsCommands(program);
-
-// Register remote commands (pan remote status, init, resources, setup)
-registerRemoteCommands(program);
-
-// Register config commands (pan config shadow)
-registerConfigCommand(program);
 
 // Register inspect command (pan inspect <issueId> --bead <beadId>)
 registerInspectCommand(program);
