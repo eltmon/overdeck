@@ -7,6 +7,8 @@ import App, {
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
+  parseConversationViewModes,
+  serializeConversationViewModes,
 } from './App';
 
 vi.mock('./components/KanbanBoard', () => ({ KanbanBoard: () => null }));
@@ -89,18 +91,32 @@ describe('conversation route helpers', () => {
     expect(getConvIdFromPath('/command-deck')).toBeNull();
   });
 
-  it('builds per-conversation URLs without persisting conversation mode globally', () => {
-    expect(buildConversationUrl('123', 'terminal')).toBe('/conv/123?view=terminal');
-    expect(buildConversationUrl('123', 'conversation')).toBe('/conv/123');
+  it('serializes and parses per-conversation terminal view memory', () => {
+    expect(serializeConversationViewModes({ '161': 'terminal', '200': 'conversation', '99': 'terminal' }))
+      .toBe('99:terminal,161:terminal');
+    expect(parseConversationViewModes('?views=99:terminal,161:terminal')).toEqual({
+      '99': 'terminal',
+      '161': 'terminal',
+    });
+  });
+
+  it('builds per-conversation URLs with remembered view state', () => {
+    expect(buildConversationUrl('123', 'terminal')).toBe('/conv/123?view=terminal&views=123%3Aterminal');
+    expect(buildConversationUrl('123', 'conversation', { '123': 'terminal', '161': 'terminal' }))
+      .toBe('/conv/123?views=161%3Aterminal');
     expect(buildConversationUrl(null, 'terminal')).toBe('/command-deck');
   });
 
   it('reads combined conversation route state from the current URL', () => {
-    window.history.replaceState(null, '', '/conv/55?view=terminal');
+    window.history.replaceState(null, '', '/conv/55?view=terminal&views=55:terminal,161:terminal');
     expect(getConversationRouteState()).toEqual({
       tab: 'command-deck',
       convId: '55',
       viewMode: 'terminal',
+      viewModes: {
+        '55': 'terminal',
+        '161': 'terminal',
+      },
     });
   });
 });
@@ -146,10 +162,18 @@ describe('App conversation view routing', () => {
     renderApp();
     fireEvent.click(screen.getByText('Terminal'));
     expect(window.location.pathname).toBe('/conv/77');
-    expect(window.location.search).toBe('?view=terminal');
+    expect(window.location.search).toBe('?view=terminal&views=77%3Aterminal');
 
     fireEvent.click(screen.getByText('Conversation'));
     expect(window.location.pathname).toBe('/conv/77');
     expect(window.location.search).toBe('');
+  });
+
+  it('restores a remembered terminal view when returning to a conversation', () => {
+    window.history.replaceState(null, '', '/conv/161?views=77:terminal,161:terminal');
+    renderApp();
+
+    expect(screen.getByTestId('view-mode')).toHaveTextContent('terminal');
+    expect(window.location.search).toBe('?views=77:terminal,161:terminal');
   });
 });
