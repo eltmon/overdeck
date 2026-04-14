@@ -2,10 +2,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { join, dirname } from 'path';
-import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
-import { createShadowState } from '../../../lib/shadow-state.js';
-import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
-import { getLinearApiKey } from '../../../lib/shadow-utils.js';
+import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
+import { createShadowState } from '../../lib/shadow-state.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../lib/tracker-utils.js';
+import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import {
   findPRDFiles,
   analyzeComplexity,
@@ -14,7 +14,7 @@ import {
   type PlanTask,
   type DiscoveryDecision,
   type ComplexityAnalysis,
-} from '../../../lib/planning/plan-utils.js';
+} from '../../lib/planning/plan-utils.js';
 
 interface PlanOptions {
   output?: string;
@@ -209,7 +209,7 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
     if (trackerType === 'github' && ghResolution.isGitHub) {
       // Fetch from GitHub
       spinner.text = 'Fetching issue from GitHub...';
-      const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+      const { loadConfig: loadYamlConfig } = await import('../../lib/config-yaml.js');
       const yamlConfig = loadYamlConfig();
       const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
       if (!token) {
@@ -237,12 +237,12 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
     } else if (trackerType === 'rally') {
       // Fetch from Rally using the tracker factory
       spinner.text = 'Fetching issue from Rally...';
-      const { createTracker } = await import('../../../lib/tracker/factory.js');
-      const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+      const { createTracker } = await import('../../lib/tracker/factory.js');
+      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
 
       const project = resolveProjectFromIssue(id);
       const rallyProject = project
-        ? (await import('../../../lib/projects.js')).getProject(project.projectKey)?.rally_project
+        ? (await import('../../lib/projects.js')).getProject(project.projectKey)?.rally_project
         : undefined;
 
       try {

@@ -23,13 +23,13 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [x] panopticon-cli-dfb: pan kill <id> (commit: 5320e057)
 - [x] panopticon-cli-vwd: pan resume <id> (commit: efbe3f91)
 - [x] panopticon-cli-agh: pan recover <id> (commit: 2532a087)
-- [x] panopticon-cli-a0u: pan sync-main <id> (commit: pending)
-- [x] panopticon-cli-a01: pan done <id> (commit: pending)
-- [x] panopticon-cli-5ul: pan approve <id> (commit: pending)
-- [x] panopticon-cli-50h: pan reopen <id> (commit: pending)
-- [x] panopticon-cli-hw3: pan wipe <id> (commit: pending)
-- [x] panopticon-cli-jcn: pan close <id> (commit: pending)
-- [ ] panopticon-cli-6fs: pan plan / pan plan finalize
+- [x] panopticon-cli-a0u: pan sync-main <id> (commit: ae4b4ba5)
+- [x] panopticon-cli-a01: pan done <id> (commit: ae4b4ba5)
+- [x] panopticon-cli-5ul: pan approve <id> (commit: ae4b4ba5)
+- [x] panopticon-cli-50h: pan reopen <id> (commit: ae4b4ba5)
+- [x] panopticon-cli-hw3: pan wipe <id> (commit: ae4b4ba5)
+- [x] panopticon-cli-jcn: pan close <id> (commit: ae4b4ba5)
+- [x] panopticon-cli-6fs: pan plan / pan plan finalize (commit: pending)
 - [ ] panopticon-cli-7n3: pan review
 - [ ] panopticon-cli-2mf: pan show <id>
 - [ ] panopticon-cli-pei: pan issues

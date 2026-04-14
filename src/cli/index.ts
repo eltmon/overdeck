@@ -48,6 +48,7 @@ import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
+import { planCommand } from './commands/plan.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -107,9 +108,21 @@ program
   .option('--json', 'Output as JSON')
   .action(skillsCommand);
 
-program
-  .command('plan-finalize')
-  .description('Finalize a planning session: create beads from vBRIEF plan and write completion marker')
+// pan plan <id> and pan plan finalize <id>
+const planCmd = program
+  .command('plan')
+  .description('Create execution plan for an issue, or finalize an existing plan');
+
+planCmd
+  .command('<id>')
+  .description('Create interactive execution plan for an issue')
+  .option('--model <model>', 'Model to use for planning')
+  .option('--dry-run', 'Preview plan without creating it')
+  .action(planCommand);
+
+planCmd
+  .command('finalize')
+  .description('Materialize plan into beads, write completion marker')
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
