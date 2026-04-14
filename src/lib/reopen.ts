@@ -1,7 +1,7 @@
 /**
  * Shared workspace state reset logic for issue reopen.
  *
- * Called by both the CLI `pan work reopen` command and the dashboard
+ * Called by both the CLI `pan reopen` command and the dashboard
  * `POST /api/issues/:id/reopen` endpoint to ensure consistent behavior.
  */
 

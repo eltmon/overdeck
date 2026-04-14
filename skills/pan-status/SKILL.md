@@ -1,6 +1,6 @@
 ---
 name: pan-status
-description: Check running agents, workspaces, and system health
+description: "pan status — show running agents overview and system health"
 triggers:
   - panopticon status
   - check agents
@@ -33,10 +33,10 @@ This skill guides you through checking the status of all Panopticon components, 
 pan status
 
 # Full agent status with details
-pan work status
+pan status
 
 # Verbose output with resource usage
-pan work status --verbose
+pan status --verbose
 
 # Check system health
 pan doctor
@@ -52,7 +52,7 @@ pan workspace list
 ```bash
 pan status
 # or
-pan work status
+pan status
 ```
 
 **Output includes:**
@@ -168,7 +168,7 @@ Status: All systems operational
 
 ```bash
 # Show detailed status for one agent
-pan work status PAN-3
+pan status PAN-3
 
 # Attach to agent's tmux session (Ctrl+b d to detach)
 tmux attach -t agent-PAN-3
@@ -197,7 +197,7 @@ docker ps | grep panopticon
 
 ```bash
 # Verbose status with CPU/memory
-pan work status --verbose
+pan status --verbose
 
 # Check Docker resources
 docker stats
@@ -217,9 +217,9 @@ free -h
 |-------|---------|--------|
 | **running** | Agent actively working | Normal - no action needed |
 | **idle** | Agent waiting for input/task | May need message or new task |
-| **completed** | Agent finished work | Review with `pan work pending` |
-| **crashed** | Agent encountered error | Check logs, use `pan work recover` |
-| **blocked** | Agent stuck or waiting | Send message with `pan work tell` |
+| **completed** | Agent finished work | Review with `pan review pending` |
+| **crashed** | Agent encountered error | Check logs, use `pan recover` |
+| **blocked** | Agent stuck or waiting | Send message with `pan tell` |
 
 ### Workspace States
 
@@ -227,7 +227,7 @@ free -h
 |-------|---------|--------|
 | **active** | Workspace in use, containers running | Normal - no action needed |
 | **idle** | Workspace exists but no agent | May want to destroy or spawn agent |
-| **stopped** | Containers stopped | Restart with `pan work issue` |
+| **stopped** | Containers stopped | Restart with `pan start` |
 | **error** | Workspace in error state | Check Docker, may need to destroy |
 
 ### Service States
@@ -300,14 +300,14 @@ pan down && pan up
 cat ~/.panopticon/logs/agent-<id>.log
 
 # Try to recover
-pan work recover <id>
+pan recover <id>
 
 # Attach to session to see error
 tmux attach -t agent-<id>
 
 # If unrecoverable, kill and restart
-pan work kill <id>
-pan work issue <id>
+pan kill <id>
+pan start <id>
 ```
 
 ### Workspace shows wrong status
@@ -419,7 +419,7 @@ Regular health check checklist:
 - [ ] Run `pan status` - check all agents are in expected state
 - [ ] Run `pan doctor` - verify system health
 - [ ] Check dashboard at http://localhost:3001
-- [ ] Review `pan work pending` for completed work
+- [ ] Review `pan review pending` for completed work
 - [ ] Check disk usage: `df -h ~/panopticon/workspaces/`
 - [ ] Review logs for errors: `grep ERROR ~/.panopticon/logs/*.log`
 - [ ] Check Docker containers: `docker ps`
@@ -464,12 +464,12 @@ Based on status:
 - Monitor periodically
 
 **If agents are idle:**
-- Send new tasks: `pan work tell <id> "Next task..."`
-- Approve completed work: `pan work approve <id>`
+- Send new tasks: `pan tell <id> "Next task..."`
+- Approve completed work: `pan approve <id>`
 
 **If agents crashed:**
 - Use `/session-health` skill
-- Try `pan work recover <id>`
+- Try `pan recover <id>`
 - Check logs and fix issues
 
 **If resources are low:**
@@ -490,4 +490,4 @@ Based on status:
 - Dashboard: http://localhost:3001
 - Run `pan status --help` for more options
 - Run `pan doctor` for system health
-- Use `pan work status --verbose` for detailed info
+- Use `pan status --verbose` for detailed info

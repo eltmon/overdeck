@@ -28,6 +28,7 @@ import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
+import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAnnouncement';
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -486,6 +487,9 @@ export default function App() {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Upgrade Announcement — shown once after upgrading to 0.7.0 */}
+        <UpgradeAnnouncement />
+
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (
           <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0">

@@ -204,7 +204,7 @@ This dialog captures user input, displays the vBRIEF plan structure, and manages
 ### Linear / GitHub: Single-Level vBRIEF
 
 1. Human writes PRD in `docs/prds/active/` (optional but recommended)
-2. `pan work plan <issue-id>` triggers Opus planning
+2. `pan plan <issue-id>` triggers Opus planning
 3. Opus reads PRD + issue + codebase → produces `plan.vbrief.json`
 4. vBRIEF items with acceptance criteria are validated against schema
 5. Beads are created from vBRIEF items (one bead per actionable item)
@@ -214,7 +214,7 @@ This dialog captures user input, displays the vBRIEF plan structure, and manages
 
 #### Phase 1: Feature Planning
 
-When `pan work plan` targets a Rally Feature (`PortfolioItem/Feature`):
+When `pan plan` targets a Rally Feature (`PortfolioItem/Feature`):
 
 1. Human writes PRD for the feature (optional but recommended)
 2. Opus fetches the Feature and all child User Stories from Rally
@@ -348,7 +348,7 @@ Acceptance criteria (`subItems` with `metadata.kind: "acceptance_criterion"`) fl
 | **Test agent** | Maps test results to AC, flags untested criteria |
 | **Verification gate** | Hard-gates on all AC subItems completed |
 | **Merge agent** | Final AC validation before merge |
-| **pan work done** | Blocks completion on incomplete AC |
+| **pan done** | Blocks completion on incomplete AC |
 
 The shared utilities in `src/lib/vbrief/acceptance-criteria.ts` provide:
 - `extractAcceptanceCriteria()` — reads plan and returns AC with parent context

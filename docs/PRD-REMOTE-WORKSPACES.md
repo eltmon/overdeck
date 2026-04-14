@@ -3,7 +3,7 @@
 > *"Your laptop is a thin client. The cloud does the heavy lifting."*
 
 **Implementation:** PAN-125
-**Status:** Partial - infrastructure complete, `pan work issue` integration missing
+**Status:** Partial - infrastructure complete, `pan start` integration missing
 
 ## Overview
 
@@ -576,7 +576,7 @@ Panopticon automatically syncs credentials from your local macOS machine to remo
 - Before spawning planning agents (dashboard "Plan" button)
 - Before spawning work agents (dashboard "Start Agent" button)
 - When using `pan workspace sync-auth <issue-id>` CLI command
-- When using `pan work issue` to start remote work
+- When using `pan start` to start remote work
 
 **Manual sync (if needed):**
 ```bash

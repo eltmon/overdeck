@@ -173,6 +173,51 @@ export async function doctorCommand(): Promise<void> {
     });
   }
 
+  // Check for legacy command invocations in shell rc files (PAN-705)
+  const legacyPatterns = [
+    'pan work ',
+    'pan plan-finalize',
+    'pan setup hooks',
+    'pan sync-costs',
+    'pan cloister ',
+    'pan specialists ',
+    'pan migrate-config',
+  ];
+  const shellRcFiles = [
+    join(homedir(), '.bashrc'),
+    join(homedir(), '.bash_profile'),
+    join(homedir(), '.zshrc'),
+    join(homedir(), '.profile'),
+    join(homedir(), '.bash_aliases'),
+  ].filter(existsSync);
+
+  const legacyFound: string[] = [];
+  for (const rcFile of shellRcFiles) {
+    try {
+      const content = readFileSync(rcFile, 'utf-8');
+      for (const pattern of legacyPatterns) {
+        if (content.includes(pattern)) {
+          legacyFound.push(`${rcFile.replace(homedir(), '~')} contains "${pattern}"`);
+        }
+      }
+    } catch { /* ignore unreadable files */ }
+  }
+
+  if (legacyFound.length === 0) {
+    checks.push({
+      name: 'Legacy Command Aliases',
+      status: 'ok',
+      message: 'No legacy pan work/* aliases found in shell config',
+    });
+  } else {
+    checks.push({
+      name: 'Legacy Command Aliases',
+      status: 'warn',
+      message: `Found ${legacyFound.length} legacy command reference(s) in shell config`,
+      fix: `Update the following to use 0.7.0 commands (see pan --help or QUICK-REFERENCE.md):\n  ${legacyFound.join('\n  ')}`,
+    });
+  }
+
   // Print results
   const icons = {
     ok: chalk.green('\u2713'),

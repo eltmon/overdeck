@@ -11,14 +11,14 @@
 When an issue is reopened after being marked Done, the workspace state is stale:
 - Review/test/merge status still shows "Passed" in the dashboard
 - STATE.md still says "Implementation complete"
-- Restarting the agent causes it to immediately re-complete (reads STATE.md → "done" → `pan work done`)
+- Restarting the agent causes it to immediately re-complete (reads STATE.md → "done" → `pan done`)
 - No workflow exists to reset these states for re-work
 
 PAN-253 partially addresses this by injecting "ISSUE REOPENED" warnings into the work agent prompt, but the specialist states and STATE.md are never actually reset.
 
 ## Solution Overview
 
-Extend the **existing** `pan work reopen` command and `POST /api/issues/:id/reopen` endpoint to also:
+Extend the **existing** `pan reopen` command and `POST /api/issues/:id/reopen` endpoint to also:
 1. Reset specialist states (review, test, merge) to pending
 2. Append a "Reopened" section to STATE.md with context
 3. Fetch and inject latest tracker comments
@@ -29,7 +29,7 @@ Extend the **existing** `pan work reopen` command and `POST /api/issues/:id/reop
 ## Architecture Decisions
 
 ### D1: Extend existing command, not create new
-The `pan work reopen` command already exists at `src/cli/commands/work/reopen.ts`. We extend it rather than creating a parallel command. The dashboard endpoint at `POST /api/issues/:id/reopen` is also extended.
+The `pan reopen` command already exists at `src/cli/commands/work/reopen.ts`. We extend it rather than creating a parallel command. The dashboard endpoint at `POST /api/issues/:id/reopen` is also extended.
 
 ### D2: Transition to "In Progress", not Backlog
 Current behavior transitions to Backlog and re-runs planning. New behavior transitions to In Progress — the agent resumes with the existing plan, guided by tracker comments and the Reopened section in STATE.md.
@@ -63,7 +63,7 @@ If the issue is sitting in a specialist queue (review-agent, test-agent, merge-a
 - Documentation updates (USAGE.md, SPECIALIST_WORKFLOW.md)
 
 ### Out of Scope
-- Full re-planning on reopen (user can manually `pan work plan` if needed)
+- Full re-planning on reopen (user can manually `pan plan` if needed)
 - Automatic agent restart after reopen (user starts agent manually)
 - Rally tracker support (Linear and GitHub only)
 - Automated detection of "incomplete work" patterns
@@ -78,7 +78,7 @@ If the issue is sitting in a specialist queue (review-agent, test-agent, merge-a
 | `src/lib/reopen.ts` | **NEW** — shared `reopenWorkspaceState()` function |
 | `src/dashboard/frontend/src/components/WorkspacePanel.tsx` | Add "Reopen" button |
 | `skills/pan-reopen/SKILL.md` | **NEW** — `/reopen` skill definition |
-| `docs/USAGE.md` | Document `pan work reopen` command |
+| `docs/USAGE.md` | Document `pan reopen` command |
 | `docs/SPECIALIST_WORKFLOW.md` | Document reopen flow in specialist context |
 
 ## Implementation Plan
@@ -115,11 +115,11 @@ Modify `src/dashboard/frontend/src/components/WorkspacePanel.tsx` to:
 ### Task 5: Create /reopen skill (simple)
 Create `skills/pan-reopen/SKILL.md` with:
 - Trigger patterns for agent/supervisor use
-- Instructions to call `pan work reopen <ID>` or the API endpoint
+- Instructions to call `pan reopen <ID>` or the API endpoint
 - Context about when reopening is appropriate
 
 ### Task 6: Update documentation (simple)
-- `docs/USAGE.md`: Add `pan work reopen` to commands reference
+- `docs/USAGE.md`: Add `pan reopen` to commands reference
 - `docs/SPECIALIST_WORKFLOW.md`: Document the reopen flow and how it affects specialists
 
 ### Task 7: Tests (medium)

@@ -109,6 +109,23 @@ export function normalizeIssueId(issueId: string): string {
 }
 
 /**
+ * Resolve an issue ID from either a raw issue ID or an agent session name.
+ *
+ * CLI commands accept both "PAN-123" and "agent-pan-123" as input.
+ * This function strips the "agent-" prefix if present and returns the
+ * canonical uppercase issue ID.
+ *
+ * Examples:
+ *   resolveIssueId("PAN-123")       → "PAN-123"
+ *   resolveIssueId("pan-123")       → "PAN-123"
+ *   resolveIssueId("agent-pan-123") → "PAN-123"
+ */
+export function resolveIssueId(input: string): string {
+  const stripped = input.replace(/^agent-/i, '');
+  return stripped.toUpperCase();
+}
+
+/**
  * Extract prefix from a standard format issue ID (PREFIX-NUMBER).
  * Returns null for non-standard formats like Rally IDs.
  * Use extractPrefix() for unified handling of all formats.

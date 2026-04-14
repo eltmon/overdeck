@@ -338,6 +338,6 @@ export async function setupHooksCommand(): Promise<void> {
   } else {
     console.log('');
   }
-  console.log(chalk.dim('When you run agents via `pan work issue`, they will report'));
+  console.log(chalk.dim('When you run agents via `pan start`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
 }

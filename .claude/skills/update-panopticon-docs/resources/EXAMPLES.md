@@ -284,7 +284,7 @@ What are the implications?
    ```markdown
    ## Commands
 
-   ### `pan work issue`
+   ### `pan start`
 
    Create workspace and spawn agent for an issue.
    ```

@@ -57,6 +57,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build
+        run: npm run build
+
       - name: Lint
         run: npm run lint
 

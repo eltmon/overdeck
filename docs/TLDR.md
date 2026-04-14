@@ -56,7 +56,7 @@ Each daemon is a background process managing a TLDR index for its directory. Sta
 | `pan workspace create` | Creates venv, copies `.tldr/` from main, starts workspace daemon, triggers background warm |
 | Agent spawn | Health-checks workspace daemon, starts it if not running |
 | 10 code file edits | Post-edit hook triggers background re-warm |
-| `pan work approve` (merge) | Merge-agent calls `notifyTldrDaemon()` to re-warm main |
+| `pan approve` (merge) | Merge-agent calls `notifyTldrDaemon()` to re-warm main |
 | `pan tldr warm` | Manual trigger |
 
 ### Index Sharing (Copy-on-Create)
@@ -318,7 +318,7 @@ Two full agent lifecycles were run with TLDR active to validate end-to-end behav
 - Multiple .tsx component files → summaries provided
 
 **Issues found:**
-1. Agent initially investigated pre-existing XTerminal test error instead of its task. Redirected via `pan work tell`.
+1. Agent initially investigated pre-existing XTerminal test error instead of its task. Redirected via `pan tell`.
 2. Agent tried `pan approve` (blocked by PAN-222 guard — working correctly).
 3. Test-agent compared feature (vitest 1.6.1) vs main (vitest 4.0.18), producing a false positive regression. **Infrastructure issue**: test-agent should use consistent test environment.
 

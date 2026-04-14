@@ -56,7 +56,7 @@ describe('linear-states', () => {
       process.env.HOME = tempDir;
 
       // Should be able to import without error about missing API key
-      const mod = await import('../../../../src/cli/commands/work/linear-states.js');
+      const mod = await import('../../../../src/cli/commands/admin/tracker-handler.js');
       expect(mod).toBeDefined();
       expect(mod.listStatesCommand).toBeDefined();
       expect(mod.cleanupStatesCommand).toBeDefined();
@@ -67,7 +67,7 @@ describe('linear-states', () => {
       process.env.HOME = tempDir;
       writeFileSync(join(tempDir, '.panopticon.env'), 'LINEAR_API_KEY=file-api-key\n');
 
-      const mod = await import('../../../../src/cli/commands/work/linear-states.js');
+      const mod = await import('../../../../src/cli/commands/admin/tracker-handler.js');
       expect(mod).toBeDefined();
       expect(mod.listStatesCommand).toBeDefined();
     });
@@ -79,7 +79,7 @@ describe('linear-states', () => {
       process.env.LINEAR_API_KEY = 'test-key';
       process.env.HOME = tempDir;
 
-      const { cleanupStatesCommand } = await import('../../../../src/cli/commands/work/linear-states.js');
+      const { cleanupStatesCommand } = await import('../../../../src/cli/commands/admin/tracker-handler.js');
       await cleanupStatesCommand({ team: 'TEST', state: 'Planning', dryRun: true });
 
       expect(mockLog).toHaveBeenCalledWith(expect.stringContaining('Dry run mode'));
@@ -91,7 +91,7 @@ describe('linear-states', () => {
       process.env.LINEAR_API_KEY = 'test-key';
       process.env.HOME = tempDir;
 
-      const { cleanupStatesCommand } = await import('../../../../src/cli/commands/work/linear-states.js');
+      const { cleanupStatesCommand } = await import('../../../../src/cli/commands/admin/tracker-handler.js');
 
       // This will fail with fake API key
       try {
@@ -108,7 +108,7 @@ describe('linear-states', () => {
       process.env.LINEAR_API_KEY = 'test-key';
       process.env.HOME = tempDir;
 
-      const { cleanupStatesCommand } = await import('../../../../src/cli/commands/work/linear-states.js');
+      const { cleanupStatesCommand } = await import('../../../../src/cli/commands/admin/tracker-handler.js');
 
       try {
         await cleanupStatesCommand({ team: 'TEST', state: 'CustomState' });

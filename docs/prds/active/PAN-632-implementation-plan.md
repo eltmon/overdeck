@@ -38,7 +38,7 @@ Exit criteria:
 
 ## Slice 2: Review Artifact Creation
 
-Goal: move review artifact creation to `pan work done`.
+Goal: move review artifact creation to `pan done`.
 
 Deliverables:
 

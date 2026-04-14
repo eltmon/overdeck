@@ -9,6 +9,8 @@
 | Document | Description |
 |----------|-------------|
 | [README.md](../README.md) | Project overview, installation, and quickstart guide |
+| [QUICK-REFERENCE.md](./QUICK-REFERENCE.md) | Command taxonomy cheat sheet — all `pan` commands, organized by bucket (lifecycle, observation, nouns, system, admin) plus the legacy→new migration table |
+| [USAGE.md](./USAGE.md) | Detailed CLI usage examples |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Contribution guidelines and development setup |
 
 ---

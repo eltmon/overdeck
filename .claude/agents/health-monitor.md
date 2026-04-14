@@ -298,7 +298,7 @@ Reading configuration...
 1. Attach to session: `tmux attach -t agent-PAN-3`
 2. Check what agent is doing
 3. Send Ctrl+C to interrupt
-4. Or kill and restart: `pan work kill PAN-3 && pan work issue PAN-3`
+4. Or kill and restart: `pan kill PAN-3 && pan start PAN-3`
 
 ---
 
@@ -322,7 +322,7 @@ Retrying in 30 seconds...
 **Diagnosis:** Agent making too many API calls too quickly.
 
 **Recommended Intervention:**
-1. Kill agent: `pan work kill PAN-4`
+1. Kill agent: `pan kill PAN-4`
 2. Wait 10 minutes for rate limit to reset
 3. Restart with rate limiting: Configure API client with backoff
 4. Or manually complete the task
@@ -347,7 +347,7 @@ Retrying in 30 seconds...
 
 **Next Steps:**
 1. Review changes: `cd workspace-PAN-5 && git diff`
-2. Approve work: `pan work approve PAN-5`
+2. Approve work: `pan approve PAN-5`
 
 ---
 

@@ -134,10 +134,10 @@ describe('ActionsSection', () => {
       <ActionsSection
         {...defaultProps}
         agent={makeAgent({ status: 'stopped' })}
-        lifecycle={makeLifecycle({ reason: 'Use pan work resume PAN-331 first.' })}
+        lifecycle={makeLifecycle({ reason: 'Use pan resume PAN-331 first.' })}
       />
     );
-    expect(screen.getByText('Use pan work resume PAN-331 first.')).toBeInTheDocument();
+    expect(screen.getByText('Use pan resume PAN-331 first.')).toBeInTheDocument();
   });
 
   it('calls onStartAgent when Start Agent clicked', () => {

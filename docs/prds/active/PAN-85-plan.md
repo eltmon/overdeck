@@ -73,7 +73,7 @@ export interface AgentState {
 ### 5. Status Marking: **Add 'completed' Status**
 - Add `'completed'` to AgentState status union type
 - Mark agents completed via:
-  - `pan work done` command
+  - `pan done` command
   - When Linear issue moves to "Done" (if auto-tracking enabled)
   - Explicit API call from dashboard
 
@@ -157,7 +157,7 @@ export interface AgentState {
 - Logs what was deleted
 - Difficulty: **simple**
 
-**Task 4.2**: Mark agents completed via `pan work done`
+**Task 4.2**: Mark agents completed via `pan done`
 - File: `src/cli/commands/work/done.ts`
 - After marking Linear issue as done, update agent state to 'completed'
 - Difficulty: **simple**
@@ -183,7 +183,7 @@ export interface AgentState {
 - [ ] Cost queries use by-issue.json cache (<100ms)
 - [ ] Cost data remains accessible after agent cleanup
 - [ ] Config: `CLEANUP_AGENT_DAYS` in `~/.panopticon.env`
-- [ ] Completed agents marked via `pan work done`
+- [ ] Completed agents marked via `pan done`
 - [ ] Tests cover cleanup logic and patterns
 
 ## Risk Analysis

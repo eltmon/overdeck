@@ -18,11 +18,15 @@ vi.mock('../chat/MessagesTimeline', () => ({
   ),
 }));
 
-vi.mock('lucide-react', () => ({
-  X: () => <span data-testid="icon-x" />,
-  RefreshCw: () => <span data-testid="icon-refresh" />,
-  ExternalLink: () => <span data-testid="icon-external" />,
-}));
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+  return {
+    ...actual,
+    X: () => <span data-testid="icon-x" />,
+    RefreshCw: () => <span data-testid="icon-refresh" />,
+    ExternalLink: () => <span data-testid="icon-external" />,
+  };
+});
 
 // ─── Import under test ────────────────────────────────────────────────────────
 

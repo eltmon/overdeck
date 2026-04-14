@@ -1,6 +1,6 @@
 ---
 name: pan-reopen
-description: Reopen a completed issue for re-work. Resets specialist states, removes from queues, and prepares workspace for a new implementation cycle.
+description: "pan reopen <id> — reopen a completed issue, resetting specialist state for a new implementation cycle"
 triggers:
   - reopen issue
   - reopen PAN-
@@ -34,11 +34,11 @@ Use this skill when an issue needs to be re-worked after being marked done, when
 
 ### Via CLI (recommended for agents/supervisors)
 ```bash
-pan work reopen PAN-123
+pan reopen PAN-123
 # With explicit reason:
-pan work reopen PAN-123 --reason "Post-merge regression in auth flow"
+pan reopen PAN-123 --reason "Post-merge regression in auth flow"
 # Skip confirmation prompt:
-pan work reopen PAN-123 --force
+pan reopen PAN-123 --force
 ```
 
 ### Via Dashboard API
@@ -56,10 +56,10 @@ Click the **Reopen** button in the WorkspacePanel (visible when review/test has 
 1. The issue is now "In Progress" in the tracker
 2. Specialist states are all `pending`
 3. STATE.md has a new "Reopened" section with context and tracker comments
-4. Start the agent normally: `pan work PAN-123`
+4. Start the agent normally: `pan start PAN-123`
 
 The agent will read STATE.md, see the "Reopened" section, and resume work based on the tracker context rather than fast-pathing to done.
 
-## Do NOT Use `pan work done` Until Re-Work Is Complete
+## Do NOT Use `pan done` Until Re-Work Is Complete
 
-After reopening, the agent must complete the requested changes, pass tests, and go through review again before signaling `pan work done`.
+After reopening, the agent must complete the requested changes, pass tests, and go through review again before signaling `pan done`.

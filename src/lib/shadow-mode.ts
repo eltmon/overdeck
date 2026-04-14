@@ -47,7 +47,7 @@ export interface ShadowModeResult {
  *
  * Per-tracker configuration is checked after the global setting.
  */
-export function resolveShadowMode(options: ShadowModeOptions = {}): ShadowModeResult {
+export async function resolveShadowMode(options: ShadowModeOptions = {}): Promise<ShadowModeResult> {
   const { cliFlag, issueId, trackerType } = options;
 
   // 1. CLI flag takes highest priority
@@ -60,7 +60,7 @@ export function resolveShadowMode(options: ShadowModeOptions = {}): ShadowModeRe
   }
 
   // 2. Check if issue already has shadow state
-  if (issueId && isShadowed(issueId)) {
+  if (issueId && (await isShadowed(issueId))) {
     return {
       enabled: true,
       source: 'existing',
@@ -103,8 +103,8 @@ export function resolveShadowMode(options: ShadowModeOptions = {}): ShadowModeRe
  * Simple boolean check for shadow mode
  * Convenience function that just returns whether shadow mode is enabled
  */
-export function isShadowModeEnabled(options: ShadowModeOptions = {}): boolean {
-  return resolveShadowMode(options).enabled;
+export async function isShadowModeEnabled(options: ShadowModeOptions = {}): Promise<boolean> {
+  return (await resolveShadowMode(options)).enabled;
 }
 
 /**
@@ -122,11 +122,11 @@ export function isShadowModeEnabled(options: ShadowModeOptions = {}): boolean {
  * }
  * ```
  */
-export function shouldSkipTrackerUpdate(
+export async function shouldSkipTrackerUpdate(
   issueId: string,
   cliFlag?: boolean,
   trackerType: TrackerType = 'linear'
-): boolean {
+): Promise<boolean> {
   return isShadowModeEnabled({
     cliFlag,
     issueId,
@@ -137,8 +137,8 @@ export function shouldSkipTrackerUpdate(
 /**
  * Get shadow mode status message for display
  */
-export function getShadowModeStatus(options: ShadowModeOptions = {}): string {
-  const result = resolveShadowMode(options);
+export async function getShadowModeStatus(options: ShadowModeOptions = {}): Promise<string> {
+  const result = await resolveShadowMode(options);
 
   if (!result.enabled) {
     return 'Shadow mode: disabled';
@@ -176,18 +176,18 @@ export function hasProjectShadowConfig(): boolean {
 /**
  * Get a summary of shadow mode configuration
  */
-export function getShadowModeSummary(): {
+export async function getShadowModeSummary(): Promise<{
   globalEnabled: boolean;
   perTracker: Record<TrackerType, boolean>;
   envSet: boolean;
   pendingSyncCount: number;
-} {
+}> {
   const { config } = loadConfig();
 
   return {
     globalEnabled: config.shadow.enabled,
     perTracker: config.shadow.trackers,
     envSet: process.env.SHADOW_MODE !== undefined,
-    pendingSyncCount: getPendingSyncCount(),
+    pendingSyncCount: await getPendingSyncCount(),
   };
 }

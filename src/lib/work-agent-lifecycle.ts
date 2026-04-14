@@ -43,10 +43,10 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
 
   if (hasLiveTmuxSession) {
     recommendedAction = 'none';
-    reason = `Agent ${agentId} is already running. Use 'pan work tell' to message it.`;
+    reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan work resume ${agentOrIssueId}' to continue it or 'pan work reset-session ${agentOrIssueId}' before starting fresh.`;
+    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it or 'pan review reset --session ${agentOrIssueId}' before starting fresh.`;
   } else if (agentState && !hasSavedSession && isStopped) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;

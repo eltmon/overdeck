@@ -1,9 +1,9 @@
 /**
- * Rebase-onto-target helper for `pan work done`.
+ * Rebase-onto-target helper for `pan done`.
  *
  * Before creating review artifacts (PRs), rebase each repo in the merge set
  * onto its target branch and push. This absorbs the rebase step into
- * `pan work done` so work agents don't have to orchestrate rebase → push →
+ * `pan done` so work agents don't have to orchestrate rebase → push →
  * submit as a multi-step task that they sometimes drop partway.
  *
  * Conflict handling:

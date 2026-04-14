@@ -113,7 +113,7 @@ Check browser developer tools:
 
 **On PASS:**
 ```bash
-pan work tell <issueId> "UAT PASSED:
+pan tell <issueId> "UAT PASSED:
 
 All requirements verified ✓
 Visual quality audit passed ✓
@@ -130,7 +130,7 @@ curl -X POST <apiUrl>/api/specialists/done \
 
 **On BLOCKED:**
 ```bash
-pan work tell <issueId> "UAT BLOCKED:
+pan tell <issueId> "UAT BLOCKED:
 
 FAILURES:
 1. [SMOKE] CORS error: X-App-Version header blocked on POST /api/v1/customers/generate-magic-link
@@ -140,7 +140,7 @@ FAILURES:
 3. [VISUAL] Text overlaps composer button at 768px width
    Screenshot: 08-tablet-overlap.png
 
-Fix these issues. The agent must fix and signal pan work done again."
+Fix these issues. The agent must fix and signal pan done again."
 
 curl -X POST <apiUrl>/api/specialists/done \
   -H "Content-Type: application/json" \

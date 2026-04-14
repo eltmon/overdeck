@@ -1,53 +1,86 @@
 ---
 specialist: verification-gate
-issueId: PAN-596
+issueId: PAN-705
 outcome: failed
-timestamp: 2026-04-12T17:59:55Z
+timestamp: 2026-04-14T15:44:26Z
 ---
 
-VERIFICATION FAILED for PAN-596 (attempt 1/10):
+VERIFICATION FAILED for PAN-705 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (76796ms):
+Verification FAILED at test (136260ms):
 
-t.tsx > SlashMenu filter > is case-insensitive when filtering
-TypeError: selected?.scrollIntoView is not a function
- ❯ src/components/chat/ComposerPromptEditor.tsx:339:17
-    337|     if (menuRef.current) {
-    338|       const selected = menuRef.current.querySelector('[aria-selected="…
-    339|       selected?.scrollIntoView({ block: 'nearest' });
-       |                 ^
-    340|     }
-    341|   }, [selectedIndex]);
- ❯ commitHookEffectListMount ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:23189:26
- ❯ commitPassiveMountOnFiber ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:24970:11
- ❯ commitPassiveMountEffects_complete ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:24930:9
- ❯ commitPassiveMountEffects_begin ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:24917:7
- ❯ commitPassiveMountEffects ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:24905:3
- ❯ flushPassiveEffectsImpl ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27078:3
- ❯ flushPassiveEffects ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27023:14
- ❯ ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26808:9
- ❯ flushActQueue ../../../node_modules/.bun/react@18.3.1/node_modules/react/cjs/react.development.js:2667:24
+ons[0]).toMatch(/attempt 2\/5/);
+    278|   });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
 
-npm error Lifecycle script `test` failed with error:
-npm error code 1
-npm error path /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-596/src/dashboard/frontend
-npm error workspace panopticon-dashboard@0.1.0
-npm error location /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-596/src/dashboard/frontend
-npm error command failed
-npm error command sh -c vitest run
+ FAIL |root|  tests/lib/cloister/pan-464-container-health.test.ts > checkWorkspaceContainerHealth > (d) marks gaveUp and alerts agent after max restarts exceeded
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/lib/cloister/pan-464-container-health.test.ts:295:56
+    293|     const actions = await checkWorkspaceContainerHealth();
+    294| 
+    295|     expect(actions.some(a => a.includes('giving up'))).toBe(true);
+       |                                                        ^
+    296|     const state = readState();
+    297|     expect(state.containerRestarts![CONTAINER].gaveUp).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL |root|  tests/lib/cloister/pan-464-container-health.test.ts > checkWorkspaceContainerHealth > (e) resets burst counter when first restart was >30 min ago
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/lib/cloister/pan-464-container-health.test.ts:335:21
+    333| 
+    334|     // Burst reset → fresh restart as attempt 1
+    335|     expect(actions).toHaveLength(1);
+       |                     ^
+    336|     expect(actions[0]).toMatch(/attempt 1\/5/);
+    337|     const state = readState();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL |root|  tests/lib/cloister/pan-464-container-health.test.ts > checkWorkspaceContainerHealth > (g) alerts agent when docker restart itself fails
+AssertionError: expected "spy" to be called with arguments: [ 'agent-pan-464', …(2) ]
+
+Received: 
 
 
-## REQUIRED: Fix the failing check BEFORE resubmitting
+
+Number of calls: 0
+
+ ❯ tests/lib/cloister/pan-464-container-health.test.ts:419:31
+    417| 
+    418|     expect(actions).toHaveLength(0); // no successful restart
+    419|     expect(mockSendKeysAsync).toHaveBeenCalledWith(
+       |                               ^
+    420|       AGENT_ID,
+    421|       expect.stringContaining('restart failed'),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+
+
+## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill
 
 1. Read the error output above carefully
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
-4. Commit and push ALL changes
-5. ONLY THEN resubmit:
-curl -X POST http://localhost:3011/api/workspaces/PAN-596/request-review -H "Content-Type: application/json" -d '{}'
+4. Commit every change
+5. Invoke the /rebase-and-submit skill for PAN-705 — this is an atomic task that runs pan work done (which handles rebase + push + re-submit internally)
 
-Do NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.
+Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan work done has completed successfully.

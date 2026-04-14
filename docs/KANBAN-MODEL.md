@@ -98,7 +98,7 @@ The work agent has completed implementation and created a PR. The specialist pip
 
 ### Done
 
-Merged and **moved to Done on the tracker by the merge agent**. The PRD moves to `docs/prds/completed/`. The issue appears in the Done column, where the human can run the **Close-Out Ceremony** (dashboard button or `pan work close-out`) to archive workspace artifacts, clean up agent state, and apply the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
+Merged and **moved to Done on the tracker by the merge agent**. The PRD moves to `docs/prds/completed/`. The issue appears in the Done column, where the human can run the **Close-Out Ceremony** (dashboard button or `pan close`) to archive workspace artifacts, clean up agent state, and apply the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
 
 ### Close-Out Ceremony
 
@@ -115,7 +115,7 @@ The close-out ceremony is the final human-gated step in the issue lifecycle. It 
 
 **Invocation:**
 - **Dashboard**: Click "Close Out" on a Done card
-- **CLI**: `pan work close-out PAN-XXX` (or `MIN-XXX` for Linear)
+- **CLI**: `pan close PAN-XXX` (or `MIN-XXX` for Linear)
 
 If a hard-fail step fails, the ceremony aborts and the issue stays open.
 

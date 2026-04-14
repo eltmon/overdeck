@@ -102,6 +102,25 @@ function getProviderEnvForModel(model: string): Record<string, string> {
 }
 
 /**
+ * Shell fragment that unsets every provider-routing env var a parent tmux server
+ * may have leaked into its child sessions. The panopticon tmux server is long-lived
+ * and inherits whatever env existed when it was spawned — so fresh Anthropic-model
+ * agents can still see a stale ANTHROPIC_BASE_URL pointing at cliproxy, which
+ * responds with "unknown provider for model claude-*" (PAN-705). Every launcher
+ * script must run this before exec'ing claude.
+ */
+const PROVIDER_ENV_UNSETS = [
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_AUTH_TOKEN',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'API_TIMEOUT_MS',
+  'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+];
+const PROVIDER_UNSET_LINES = PROVIDER_ENV_UNSETS.map(k => `unset ${k}`).join('\n');
+const PROVIDER_UNSET_CMD = `unset ${PROVIDER_ENV_UNSETS.join(' ')}`;
+
+/**
  * Build tmux -e flags for environment variables
  */
 function buildTmuxEnvFlags(env: Record<string, string>): string {
@@ -827,6 +846,7 @@ ${basePrompt}`;
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
+${PROVIDER_UNSET_LINES}
 export CI=1
 export PANOPTICON_AGENT_ID="${tmuxSession}"
 export PANOPTICON_ISSUE_ID="${task.issueId}"
@@ -1897,6 +1917,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     const newSessionId = randomUUID();
     writeFileSync(launcherScript, `#!/bin/bash
 cd "${cwd}"
+${PROVIDER_UNSET_LINES}
 prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --model ${model} "$prompt"
 `, { mode: 0o755 });
@@ -2124,7 +2145,7 @@ export async function wakeSpecialist(
       // signatures, making resumed sessions permanently fail (PAN-612).
       const effectiveSessionId = sessionId || randomUUID();
       if (!sessionId) setSessionId(name, effectiveSessionId);
-      const claudeCmd = `claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      const claudeCmd = `${PROVIDER_UNSET_CMD}; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });

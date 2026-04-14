@@ -10,7 +10,7 @@ vi.mock('../../../../lib/database/conversations-db.js', () => ({
 }));
 
 // Mock node:child_process so no real tmux processes are spawned
-vi.mock('node:child_process', () => ({ exec: vi.fn() }));
+vi.mock('node:child_process', () => ({ exec: vi.fn(), execFile: vi.fn() }));
 vi.mock('node:util', () => ({ promisify: vi.fn((fn: unknown) => fn) }));
 
 describe('ConversationLifecycleService — pollConversations', () => {

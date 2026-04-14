@@ -57,7 +57,7 @@ export function TldrServiceStatus() {
         <div className="flex items-center gap-2 text-content-subtle">
           <XCircle className="w-4 h-4" />
           <span className="text-sm">TLDR not configured</span>
-          <span className="text-xs text-content-muted ml-auto">Run pan setup to enable</span>
+          <span className="text-xs text-content-muted ml-auto">Run pan admin tldr start to enable</span>
         </div>
       </div>
     );

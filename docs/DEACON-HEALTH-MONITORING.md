@@ -8,7 +8,7 @@ The Deacon is Panopticon's health monitor, running as part of the dashboard serv
 |-----------|----------------|-----------|--------|-------------|
 | **Extended Thinking** | Agent stuck in Claude's thinking loop | 10 min | Esc → Ctrl+C → Kill+Respawn | 3 then kill |
 | **Dead-End Agent** | Review blocked or tests failed, agent idle | 5 min idle | Nudge with feedback + requeue | 7 requeues |
-| **First-Completion** | Agent idle with commits but never called `pan work done` | 10 min idle | Nudge to call done | Every 15 min |
+| **First-Completion** | Agent idle with commits but never called `pan done` | 10 min idle | Nudge to call done | Every 15 min |
 | **Resolution Patrol** | Agent evidence shows done/stuck (from enrichment) | 2+ nudges (done) or 3+ (stuck) | Auto-complete or poke | Per resolution |
 | **Orphaned Agents** | status=running but no tmux session | Immediate | Reset to stopped | N/A |
 | **Dead Planning Sessions** | Planning tmux with remain-on-exit, process dead | Immediate | Kill session + reset | N/A |
@@ -39,14 +39,14 @@ The Deacon is Panopticon's health monitor, running as part of the dashboard serv
 - **File:** `src/lib/cloister/deacon.ts:1762-1902`
 - **Criteria:** Agent idle 10+ min, has git commits on feature branch, but no completion marker
 - **Hard gates:** Must NOT have review-status entry, must NOT have feedback files
-- **Action:** Nudge: "run `pan work done <issue>`"
+- **Action:** Nudge: "run `pan done <issue>`"
 - **Cooldown:** 15 minutes
 
 ### Resolution-Based Patrol (`patrolWorkAgentResolutions`)
 - **File:** `src/lib/cloister/deacon.ts:1911-1978`
 - **Source:** `resolution` field in `runtime.json`, computed by the Agent Enrichment Service
 - **States:**
-  - `done` with count ≥ 2 → auto-complete via `pan work done`
+  - `done` with count ≥ 2 → auto-complete via `pan done`
   - `stuck` with count ≥ 3 → send poke message
   - `working`, `completed`, `needs_input`, `unclear` → skip
 

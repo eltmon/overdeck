@@ -14,7 +14,7 @@ Implementation complete. All 15 beads closed. 56 tests passing.
 6. **test-agent.md/ts** — Added {{acceptanceCriteria}} conditional block and variable substitution
 7. **merge-agent.md** — Added Step 5: Pre-Merge AC Validation
 8. **verification-runner.ts** — Added vbrief-ac gate after quality gates
-9. **done.ts** — Added Check 3: AC completion check to pan work done pre-flight
+9. **done.ts** — Added Check 3: AC completion check to pan done pre-flight
 10. **work-complete SKILL.md** — Added Step 4: Verify Acceptance Criteria
 
 ### Part 2: Documentation Alignment

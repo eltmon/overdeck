@@ -85,7 +85,7 @@ npm install -g panopticon-cli && pan install && pan up
 
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
-- **Beads CLI (`bd`)** - For persistent task tracking (auto-installed, upgrade with `pan beads upgrade`). Requires `bd init --prefix <project-name>` once per project root after installation.
+- **Beads CLI (`bd`)** - For persistent task tracking (auto-installed, upgrade with `pan admin beads upgrade`). Requires `bd init --prefix <project-name>` once per project root after installation.
 - **Google Stitch MCP** - For AI-powered UI design integration
 
 ### Platform Support
@@ -312,24 +312,24 @@ pan tell agent-pan-123 "Your message"
 pan kill agent-pan-123
 ```
 
-### Work Commands
+### Issue Lifecycle Commands
 
 ```bash
 # Start work agent for an issue
-pan work PAN-123
+pan start PAN-123
 
 # Reopen a completed issue for re-work
 # Resets specialist states, removes from queues, updates STATE.md
-pan work reopen PAN-123
+pan reopen PAN-123
 
 # Reopen with an explicit reason
-pan work reopen PAN-123 --reason "Post-merge regression in auth flow"
+pan reopen PAN-123 --reason "Post-regression in auth flow"
 
 # Reopen without confirmation prompt (e.g. in CI or scripts)
-pan work reopen PAN-123 --force
+pan reopen PAN-123 --force
 
 # Signal that work is complete and ready for review
-pan work done PAN-123 -c "Brief summary of changes"
+pan done PAN-123 -c "Brief summary of changes"
 ```
 
 ### Project Commands

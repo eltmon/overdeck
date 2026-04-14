@@ -94,7 +94,7 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
     console.log(chalk.dim(`  Run ID:  ${result.runId}`));
     console.log('');
     console.log(chalk.yellow('The inspect specialist is reviewing your bead.'));
-    console.log(chalk.yellow('Wait for the result — it will be delivered to your session via pan work tell.'));
+    console.log(chalk.yellow('Wait for the result — it will be delivered to your session via pan tell.'));
   } else {
     console.error(chalk.red(`✗ Failed to spawn inspect specialist: ${result.message}`));
     if (result.error) {
