@@ -41,7 +41,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { getClaudishPrefix, getProviderEnvForModel, getAgentRuntimeBaseCommand } from '../../src/lib/agents.js';
+import { getClaudishPrefix, getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -115,6 +115,40 @@ describe('agents auth routing', () => {
   it('launches MiniMax models directly through claude instead of claudish', () => {
     expect(getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
       'claude --dangerously-skip-permissions --model minimax-m2.7'
+    );
+  });
+
+  it('clears stale provider env before exporting Anthropic settings', () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false });
+
+    expect(getProviderExportsForModel('claude-sonnet-4-6')).toBe(
+      [
+        'unset ANTHROPIC_BASE_URL',
+        'unset ANTHROPIC_AUTH_TOKEN',
+        'unset OPENAI_API_KEY',
+        'unset GEMINI_API_KEY',
+        'unset API_TIMEOUT_MS',
+        'unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+        '',
+      ].join('\n')
+    );
+  });
+
+  it('replaces stale Anthropic routing env with cliproxy exports for GPT subscription launches', () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+    expect(getProviderExportsForModel('gpt-5.4')).toBe(
+      [
+        'unset ANTHROPIC_BASE_URL',
+        'unset ANTHROPIC_AUTH_TOKEN',
+        'unset OPENAI_API_KEY',
+        'unset GEMINI_API_KEY',
+        'unset API_TIMEOUT_MS',
+        'unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+        'export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"',
+        'export ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key"',
+        '',
+      ].join('\n')
     );
   });
 });
