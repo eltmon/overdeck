@@ -36,8 +36,8 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-5z3: Delete pan work command group
 - [ ] panopticon-cli-oyb: pan admin migrate-config
 - [x] panopticon-cli-f04: pan admin tldr (commit: ee1a4652)
-- [x] panopticon-cli-rg8: pan admin fpp (commit: pending)
-- [ ] panopticon-cli-q15: pan admin tracker
+- [x] panopticon-cli-rg8: pan admin fpp (commit: 02af5fa2)
+- [x] panopticon-cli-q15: pan admin tracker (commit: pending)
 - [ ] panopticon-cli-ej8: Rename /api/work/* lifecycle routes to /api/issues/*
 - [ ] panopticon-cli-64h: Create /api/review/* routes
 - [ ] panopticon-cli-ub1: Create /api/show/* observation routes

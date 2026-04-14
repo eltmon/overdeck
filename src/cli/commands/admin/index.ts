@@ -17,6 +17,7 @@ import { registerConfigCommand } from '../config.js';
 import { setupHooksCommand } from '../setup/hooks.js';
 import { tldrCommand } from '../work/tldr.js';
 import { hookCommand } from '../work/hook.js';
+import { listStatesCommand, cleanupStatesCommand } from '../work/linear-states.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -68,4 +69,23 @@ export function registerAdminCommands(program: Command): void {
     .action((action, idOrMessage, options) => {
       hookCommand(action || 'help', idOrMessage?.join(' '), options);
     });
+
+  // pan admin tracker — tracker-specific operations
+  const tracker = admin
+    .command('tracker')
+    .description('Tracker-specific operations (Linear, GitHub, etc.)');
+
+  tracker
+    .command('linear-states')
+    .description('Manage Linear workflow states')
+    .option('-t, --team <team>', 'Team key (default: MIN)')
+    .action((options) => listStatesCommand(options));
+
+  tracker
+    .command('linear-cleanup')
+    .description('Archive old Linear custom states')
+    .option('-t, --team <team>', 'Team key (default: MIN)')
+    .option('-s, --state <state>', 'State name to archive (default: Planning)')
+    .option('--dry-run', 'Show what would be archived without making changes')
+    .action((options) => cleanupStatesCommand(options));
 }
