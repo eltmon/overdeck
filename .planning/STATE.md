@@ -59,7 +59,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-naa: Curate 8-10 flat shortcut skills
 - [ ] panopticon-cli-t1p: pan sync deletes legacy skill files
 - [ ] panopticon-cli-gsq: Plain-text fixture test for synced skill set
-- [ ] panopticon-cli-cf4: CHANGELOG entry with full migration table
+- [x] panopticon-cli-cf4: CHANGELOG entry with full migration table (commit: pending)
 
 ## Key Decisions
 - D1: PRD exists at docs/prds/planned/pan-command-taxonomy-reorg.md, active copy at docs/prds/active/pan-705/
