@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-14T13:00:56Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-705: Command taxonomy reorganization: clean up pan's command surface"
+    "description": "Plan for PAN-705: Command taxonomy reorganization: clean up pan's command surface",
+    "updated": "2026-04-14T15:32:15.189Z"
   },
   "plan": {
     "id": "pan-705",
@@ -11,9 +12,9 @@
     "status": "approved",
     "uid": "e02b0fb7-f844-480d-9d3c-0275c0b34e4c",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 255,
     "created": "2026-04-14T13:00:56Z",
-    "updated": "2026-04-14T13:00:56Z",
+    "updated": "2026-04-14T15:32:15.189Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
@@ -47,7 +48,7 @@
       {
         "id": "p1-commit-prd",
         "title": "Commit PRD and quick-reference docs",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -62,33 +63,37 @@
           {
             "id": "p1-commit-prd.ac1",
             "title": "docs/prds/planned/pan-command-taxonomy-reorg.md is tracked in git",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.489Z"
           },
           {
             "id": "p1-commit-prd.ac2",
             "title": "docs/QUICK-REFERENCE.md is tracked in git",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.490Z"
           },
           {
             "id": "p1-commit-prd.ac3",
             "title": "docs/INDEX.md links to docs/QUICK-REFERENCE.md",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.490Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.188Z"
       },
       {
         "id": "p1-resolve-issue-id",
         "title": "Shared resolveIssueId() helper",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -103,33 +108,37 @@
           {
             "id": "p1-resolve-issue-id.ac1",
             "title": "Helper exported from src/cli/lib/resolve-issue-id.ts with unit tests",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.493Z"
           },
           {
             "id": "p1-resolve-issue-id.ac2",
             "title": "Helper handles lowercase, uppercase, and numeric-only forms",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.494Z"
           },
           {
             "id": "p1-resolve-issue-id.ac3",
             "title": "Errors with a clear message when the input cannot be resolved to a known tracker prefix",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.494Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.189Z"
       },
       {
         "id": "p2-show",
         "title": "pan show <id> — unified observation command",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -144,49 +153,55 @@
           {
             "id": "p2-show.ac1",
             "title": "'pan show <id>' default view is ≤ 25 lines and covers shadow, specialist, heartbeat, and cv",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.455Z"
           },
           {
             "id": "p2-show.ac2",
             "title": "Each of --cv, --context, --health, --shadow scopes the output to that subsection",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.456Z"
           },
           {
             "id": "p2-show.ac3",
             "title": "--json emits stable machine-readable output for scripting",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.456Z"
           },
           {
             "id": "p2-show.ac4",
             "title": "Delegates to existing shadow/cv/context/health handlers (no copy-pasted logic)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.457Z"
           },
           {
             "id": "p2-show.ac5",
             "title": "Unit/integration test covers default view and each flag",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.457Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.177Z"
       },
       {
         "id": "p2-review",
         "title": "pan review — pending/request/reset subcommands",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -201,41 +216,46 @@
           {
             "id": "p2-review.ac1",
             "title": "'pan review pending' matches 'pan work pending' output 1:1",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.459Z"
           },
           {
             "id": "p2-review.ac2",
             "title": "'pan review request <id>' triggers the same re-review flow as 'pan work request-review'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.459Z"
           },
           {
             "id": "p2-review.ac3",
             "title": "'pan review reset <id>' resets review cycles; --session also clears Claude session",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.460Z"
           },
           {
             "id": "p2-review.ac4",
             "title": "Integration test covers each subcommand and the --session flag",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.460Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.178Z"
       },
       {
         "id": "p2-issues",
         "title": "pan issues — merged list + triage",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -250,33 +270,37 @@
           {
             "id": "p2-issues.ac1",
             "title": "'pan issues' lists work across configured trackers (matches 'pan work list')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.453Z"
           },
           {
             "id": "p2-issues.ac2",
             "title": "Triage mode is reachable via a single documented invocation (flag or subcommand)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.454Z"
           },
           {
             "id": "p2-issues.ac3",
             "title": "Integration test covers both modes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.454Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.176Z"
       },
       {
         "id": "p2-plan",
         "title": "pan plan / pan plan finalize",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -291,33 +315,37 @@
           {
             "id": "p2-plan.ac1",
             "title": "'pan plan <id>' creates a plan identical to the legacy 'pan work plan <id>'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.449Z"
           },
           {
             "id": "p2-plan.ac2",
             "title": "'pan plan finalize <id>' finalizes identical to legacy 'pan plan-finalize <id>'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.449Z"
           },
           {
             "id": "p2-plan.ac3",
             "title": "Legacy top-level 'pan plan-finalize' is removed in the same commit that adds 'plan finalize'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.450Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.175Z"
       },
       {
         "id": "p3-start",
         "title": "pan start <id> (promoted from 'pan work issue')",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -332,25 +360,28 @@
           {
             "id": "p3-start.ac1",
             "title": "'pan start <id>' creates workspace and spawns agent identical to legacy 'pan work issue'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.452Z"
           },
           {
             "id": "p3-start.ac2",
             "title": "src/cli/commands/work/issue.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.452Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.176Z"
       },
       {
         "id": "p3-tell",
         "title": "pan tell <id> <msg>",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -365,25 +396,28 @@
           {
             "id": "p3-tell.ac1",
             "title": "'pan tell <id> <msg>' sends a message to a running agent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.445Z"
           },
           {
             "id": "p3-tell.ac2",
             "title": "src/cli/commands/work/tell.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.446Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.173Z"
       },
       {
         "id": "p3-resume",
         "title": "pan resume <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -398,25 +432,28 @@
           {
             "id": "p3-resume.ac1",
             "title": "'pan resume <id>' resumes from a saved Claude session",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.447Z"
           },
           {
             "id": "p3-resume.ac2",
             "title": "src/cli/commands/work/resume.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.448Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.174Z"
       },
       {
         "id": "p3-recover",
         "title": "pan recover <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -431,25 +468,28 @@
           {
             "id": "p3-recover.ac1",
             "title": "'pan recover <id>' recovers a crashed agent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.444Z"
           },
           {
             "id": "p3-recover.ac2",
             "title": "src/cli/commands/work/recover.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.444Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.173Z"
       },
       {
         "id": "p3-kill",
         "title": "pan kill <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -464,33 +504,37 @@
           {
             "id": "p3-kill.ac1",
             "title": "'pan kill <id>' stops the agent with workspace preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.441Z"
           },
           {
             "id": "p3-kill.ac2",
             "title": "Confirmation prompt preserved from legacy behavior",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.442Z"
           },
           {
             "id": "p3-kill.ac3",
             "title": "src/cli/commands/work/kill.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.442Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.172Z"
       },
       {
         "id": "p3-sync-main",
         "title": "pan sync-main <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -505,25 +549,28 @@
           {
             "id": "p3-sync-main.ac1",
             "title": "'pan sync-main <id>' merges main into the workspace branch",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.440Z"
           },
           {
             "id": "p3-sync-main.ac2",
             "title": "src/cli/commands/work/sync-main.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.440Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.171Z"
       },
       {
         "id": "p3-done",
         "title": "pan done <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -538,25 +585,28 @@
           {
             "id": "p3-done.ac1",
             "title": "'pan done <id>' marks work complete identical to 'pan work done'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.437Z"
           },
           {
             "id": "p3-done.ac2",
             "title": "src/cli/commands/work/done.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.438Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.171Z"
       },
       {
         "id": "p3-approve",
         "title": "pan approve <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -571,33 +621,37 @@
           {
             "id": "p3-approve.ac1",
             "title": "'pan approve <id>' approves and merges identical to 'pan work approve'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.433Z"
           },
           {
             "id": "p3-approve.ac2",
             "title": "Confirmation prompt preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.434Z"
           },
           {
             "id": "p3-approve.ac3",
             "title": "src/cli/commands/work/approve.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.434Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.169Z"
       },
       {
         "id": "p3-reopen",
         "title": "pan reopen <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -612,25 +666,28 @@
           {
             "id": "p3-reopen.ac1",
             "title": "'pan reopen <id>' resets specialist state and re-opens the issue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.432Z"
           },
           {
             "id": "p3-reopen.ac2",
             "title": "src/cli/commands/work/reopen.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.432Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.168Z"
       },
       {
         "id": "p3-wipe",
         "title": "pan wipe <id>",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -645,33 +702,37 @@
           {
             "id": "p3-wipe.ac1",
             "title": "'pan wipe <id>' resets all state identical to 'pan work wipe'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.435Z"
           },
           {
             "id": "p3-wipe.ac2",
             "title": "Destructive confirmation prompt preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.436Z"
           },
           {
             "id": "p3-wipe.ac3",
             "title": "src/cli/commands/work/wipe.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.436Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.169Z"
       },
       {
         "id": "p3-close",
         "title": "pan close <id> (from 'pan work close-out')",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -686,25 +747,28 @@
           {
             "id": "p3-close.ac1",
             "title": "'pan close <id>' closes the issue identical to 'pan work close-out'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.428Z"
           },
           {
             "id": "p3-close.ac2",
             "title": "src/cli/commands/work/close-out.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.429Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.166Z"
       },
       {
         "id": "p3-delete-work-group",
         "title": "Delete 'pan work' command group entirely",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -719,33 +783,37 @@
           {
             "id": "p3-delete-work-group.ac1",
             "title": "'pan work' is not a registered command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.392Z"
           },
           {
             "id": "p3-delete-work-group.ac2",
             "title": "'git grep -n 'pan work '' in src/ returns no hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.393Z"
           },
           {
             "id": "p3-delete-work-group.ac3",
             "title": "src/cli/commands/work/ directory is deleted (except files that moved to admin in Phase 4, which are handled there)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.393Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.152Z"
       },
       {
         "id": "p4-admin-group",
         "title": "Create 'pan admin' top-level command group",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -760,25 +828,28 @@
           {
             "id": "p4-admin-group.ac1",
             "title": "'pan admin --help' lists the admin namespace and its eventual subgroups",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.491Z"
           },
           {
             "id": "p4-admin-group.ac2",
             "title": "registerAdminCommands() is called from src/cli/index.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.492Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.189Z"
       },
       {
         "id": "p4-admin-cloister",
         "title": "pan admin cloister",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -793,25 +864,28 @@
           {
             "id": "p4-admin-cloister.ac1",
             "title": "'pan admin cloister {status,start,stop,emergency-stop}' work identical to legacy top-level",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.426Z"
           },
           {
             "id": "p4-admin-cloister.ac2",
             "title": "'pan cloister' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.427Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.166Z"
       },
       {
         "id": "p4-admin-specialists",
         "title": "pan admin specialists",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -826,25 +900,28 @@
           {
             "id": "p4-admin-specialists.ac1",
             "title": "'pan admin specialists {list,wake,queue,reset,clear-queue,done,logs,cleanup-logs}' all work",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.430Z"
           },
           {
             "id": "p4-admin-specialists.ac2",
             "title": "'pan specialists' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.430Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.167Z"
       },
       {
         "id": "p4-admin-remote",
         "title": "pan admin remote",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -859,25 +936,28 @@
           {
             "id": "p4-admin-remote.ac1",
             "title": "'pan admin remote {status,init,resources,setup}' all work",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.422Z"
           },
           {
             "id": "p4-admin-remote.ac2",
             "title": "'pan remote' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.423Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.164Z"
       },
       {
         "id": "p4-admin-db",
         "title": "pan admin db",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -892,25 +972,28 @@
           {
             "id": "p4-admin-db.ac1",
             "title": "'pan admin db {snapshot,seed,status,clean,config}' all work",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.424Z"
           },
           {
             "id": "p4-admin-db.ac2",
             "title": "'pan db' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.425Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.165Z"
       },
       {
         "id": "p4-admin-beads",
         "title": "pan admin beads",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -925,25 +1008,28 @@
           {
             "id": "p4-admin-beads.ac1",
             "title": "'pan admin beads {compact,stats,upgrade}' all work",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.416Z"
           },
           {
             "id": "p4-admin-beads.ac2",
             "title": "'pan beads' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.417Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.162Z"
       },
       {
         "id": "p4-admin-tracker",
         "title": "pan admin tracker (linear-states, linear-cleanup)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -958,33 +1044,37 @@
           {
             "id": "p4-admin-tracker.ac1",
             "title": "'pan admin tracker linear-states' lists and manages Linear workflow states",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.420Z"
           },
           {
             "id": "p4-admin-tracker.ac2",
             "title": "'pan admin tracker linear-cleanup' archives old Linear custom states",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.421Z"
           },
           {
             "id": "p4-admin-tracker.ac3",
             "title": "src/cli/commands/work/linear-states.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.421Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.164Z"
       },
       {
         "id": "p4-admin-config",
         "title": "pan admin config",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -999,41 +1089,46 @@
           {
             "id": "p4-admin-config.ac1",
             "title": "'pan admin config shadow' works identical to legacy 'pan config shadow'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.418Z"
           },
           {
             "id": "p4-admin-config.ac2",
             "title": "'pan admin config edit' opens ~/.panopticon/config.yaml in $EDITOR",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.418Z"
           },
           {
             "id": "p4-admin-config.ac3",
             "title": "'pan admin config show' prints the resolved config",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.419Z"
           },
           {
             "id": "p4-admin-config.ac4",
             "title": "'pan config' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.419Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.163Z"
       },
       {
         "id": "p4-admin-hooks",
         "title": "pan admin hooks (from 'pan setup hooks')",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1048,33 +1143,37 @@
           {
             "id": "p4-admin-hooks.ac1",
             "title": "'pan admin hooks install' configures heartbeat hooks in settings.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.410Z"
           },
           {
             "id": "p4-admin-hooks.ac2",
             "title": "'pan admin hooks status' reports hook installation state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.411Z"
           },
           {
             "id": "p4-admin-hooks.ac3",
             "title": "'pan setup hooks' no longer exists",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.411Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.160Z"
       },
       {
         "id": "p4-admin-tldr",
         "title": "pan admin tldr (from 'pan work tldr')",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1089,25 +1188,28 @@
           {
             "id": "p4-admin-tldr.ac1",
             "title": "'pan admin tldr {status,start,stop,warm}' all work",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.412Z"
           },
           {
             "id": "p4-admin-tldr.ac2",
             "title": "src/cli/commands/work/tldr.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.413Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.161Z"
       },
       {
         "id": "p4-admin-fpp",
         "title": "pan admin fpp (from 'pan work hook')",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1122,25 +1224,28 @@
           {
             "id": "p4-admin-fpp.ac1",
             "title": "'pan admin fpp {check,push,pop,clear,mail}' all work",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.414Z"
           },
           {
             "id": "p4-admin-fpp.ac2",
             "title": "src/cli/commands/work/hook.ts is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.414Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.161Z"
       },
       {
         "id": "p4-admin-migrate-config",
         "title": "pan admin migrate-config",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1155,25 +1260,28 @@
           {
             "id": "p4-admin-migrate-config.ac1",
             "title": "'pan admin migrate-config' works with all existing flags (--force, --preview, --no-backup, --delete-legacy)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.409Z"
           },
           {
             "id": "p4-admin-migrate-config.ac2",
             "title": "'pan migrate-config' is no longer a registered top-level command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.409Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.159Z"
       },
       {
         "id": "p45-contracts",
         "title": "Update packages/contracts RPC types for new routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1188,33 +1296,37 @@
           {
             "id": "p45-contracts.ac1",
             "title": "packages/contracts/ exports new procedure names matching the CLI taxonomy",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.482Z"
           },
           {
             "id": "p45-contracts.ac2",
             "title": "Effect RPC group in ws-rpc.ts matches new names",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.483Z"
           },
           {
             "id": "p45-contracts.ac3",
             "title": "'npm run typecheck' passes at workspace root after contracts rebuild",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.484Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.186Z"
       },
       {
         "id": "p45-route-issues",
         "title": "Rename /api/work/* lifecycle routes to /api/issues/*",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1229,33 +1341,37 @@
           {
             "id": "p45-route-issues.ac1",
             "title": "All lifecycle routes respond at /api/issues/*",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.407Z"
           },
           {
             "id": "p45-route-issues.ac2",
             "title": "No handler code was duplicated — pure routing rename",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.407Z"
           },
           {
             "id": "p45-route-issues.ac3",
             "title": "Corresponding integration tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.408Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.158Z"
       },
       {
         "id": "p45-route-review",
         "title": "Create /api/review/* routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1270,25 +1386,28 @@
           {
             "id": "p45-route-review.ac1",
             "title": "Review routes respond at /api/review/{pending,request,reset}",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.405Z"
           },
           {
             "id": "p45-route-review.ac2",
             "title": "Integration tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.405Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.157Z"
       },
       {
         "id": "p45-route-show",
         "title": "Create /api/show/* observation routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1303,25 +1422,28 @@
           {
             "id": "p45-route-show.ac1",
             "title": "Show routes respond at /api/show/* with the same payloads as before",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.403Z"
           },
           {
             "id": "p45-route-show.ac2",
             "title": "Integration tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.403Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.156Z"
       },
       {
         "id": "p45-route-admin",
         "title": "Create /api/admin/* plumbing routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1336,33 +1458,37 @@
           {
             "id": "p45-route-admin.ac1",
             "title": "Admin routes respond under /api/admin/*",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.398Z"
           },
           {
             "id": "p45-route-admin.ac2",
             "title": "All /api/work/* routes are fully removed from the router (verified by grep)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.399Z"
           },
           {
             "id": "p45-route-admin.ac3",
             "title": "Integration tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.399Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.155Z"
       },
       {
         "id": "p45-frontend-client",
         "title": "Update frontend RPC client and Zustand store",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1377,33 +1503,37 @@
           {
             "id": "p45-frontend-client.ac1",
             "title": "Frontend calls /api/issues/*, /api/review/*, /api/show/*, /api/admin/* — no /api/work/* hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.389Z"
           },
           {
             "id": "p45-frontend-client.ac2",
             "title": "'npm run typecheck' passes in src/dashboard/frontend",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.390Z"
           },
           {
             "id": "p45-frontend-client.ac3",
             "title": "Frontend unit tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.390Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.152Z"
       },
       {
         "id": "p45-frontend-strings",
         "title": "Replace hardcoded legacy command strings in frontend",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1418,33 +1548,37 @@
           {
             "id": "p45-frontend-strings.ac1",
             "title": "'git grep -n 'pan work ' src/dashboard/frontend/' returns no hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.487Z"
           },
           {
             "id": "p45-frontend-strings.ac2",
             "title": "'git grep -n 'pan plan-finalize' src/dashboard/frontend/' returns no hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.487Z"
           },
           {
             "id": "p45-frontend-strings.ac3",
             "title": "'git grep -n 'pan cloister\\|pan specialists\\|pan beads\\|pan db \\|pan remote \\|pan config ' src/dashboard/frontend/' returns no hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.488Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.187Z"
       },
       {
         "id": "p45-kanban-inspector",
         "title": "Update kanban card + inspector panel action labels",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1459,25 +1593,28 @@
           {
             "id": "p45-kanban-inspector.ac1",
             "title": "Kanban action buttons use new verb labels",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.485Z"
           },
           {
             "id": "p45-kanban-inspector.ac2",
             "title": "Inspector panel action labels and tooltips reference new verbs",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.485Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.186Z"
       },
       {
         "id": "p45-announcement",
         "title": "First-launch upgrade announcement banner",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1492,41 +1629,46 @@
           {
             "id": "p45-announcement.ac1",
             "title": "Banner renders the full migration table from QUICK-REFERENCE.md on first visit",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.479Z"
           },
           {
             "id": "p45-announcement.ac2",
             "title": "Dismiss button hides the banner and writes a dismissal key to localStorage",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.480Z"
           },
           {
             "id": "p45-announcement.ac3",
             "title": "After dismissal, the banner does not reappear on page reload",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.480Z"
           },
           {
             "id": "p45-announcement.ac4",
             "title": "Component has frontend unit tests covering render + dismiss",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.481Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.185Z"
       },
       {
         "id": "p5-docs-usage",
         "title": "Update docs/USAGE.md and docs/INDEX.md for new taxonomy",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1541,25 +1683,28 @@
           {
             "id": "p5-docs-usage.ac1",
             "title": "docs/USAGE.md uses only new verbs; no legacy paths",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.385Z"
           },
           {
             "id": "p5-docs-usage.ac2",
             "title": "docs/INDEX.md lists pan admin and links to QUICK-REFERENCE.md",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.386Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.150Z"
       },
       {
         "id": "p5-docs-prds",
         "title": "Update doc references in all PRDs and active plans",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1574,17 +1719,19 @@
           {
             "id": "p5-docs-prds.ac1",
             "title": "'rg -n 'pan work |pan cloister |pan specialists |pan plan-finalize|pan beads |pan db |pan remote |pan migrate-config|pan sync-costs|pan config shadow|pan setup hooks' docs/ --glob '!docs/prds/planned/pan-command-taxonomy-reorg.md' --glob '!docs/QUICK-REFERENCE.md'' returns zero hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.478Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.184Z"
       },
       {
         "id": "p5-hook-scripts",
         "title": "Update hook scripts and installed shell aliases",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1599,17 +1746,19 @@
           {
             "id": "p5-hook-scripts.ac1",
             "title": "No legacy 'pan work' / 'pan cloister' / 'pan plan-finalize' invocations remain in scripts/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.477Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.184Z"
       },
       {
         "id": "p5-snapshot-help",
         "title": "Plain-text fixture test for 'pan --help'",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1624,41 +1773,46 @@
           {
             "id": "p5-snapshot-help.ac1",
             "title": "tests/fixtures/pan-help.txt exists and matches current 'pan --help' byte-for-byte",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.387Z"
           },
           {
             "id": "p5-snapshot-help.ac2",
             "title": "Vitest test asserts equality; UPDATE_FIXTURES=1 rewrites the fixture",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.387Z"
           },
           {
             "id": "p5-snapshot-help.ac3",
             "title": "No '.snap' files added; test uses plain-text fixture only",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.388Z"
           },
           {
             "id": "p5-snapshot-help.ac4",
             "title": "Test file comment documents the UPDATE_FIXTURES workflow",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.388Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.151Z"
       },
       {
         "id": "p5-doctor-legacy",
         "title": "pan doctor: flag legacy invocations in user shell rc",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1673,33 +1827,37 @@
           {
             "id": "p5-doctor-legacy.ac1",
             "title": "'pan doctor' warns on legacy invocations in shell rc files and shows the replacement",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.468Z"
           },
           {
             "id": "p5-doctor-legacy.ac2",
             "title": "Doctor does NOT modify rc files — warning only",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.468Z"
           },
           {
             "id": "p5-doctor-legacy.ac3",
             "title": "Test covers rc file scanning with fixture rc files",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.469Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.181Z"
       },
       {
         "id": "p55-verb-template",
         "title": "Skill template at .claude/skills/_template/pan-verb-skill.md",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1714,33 +1872,37 @@
           {
             "id": "p55-verb-template.ac1",
             "title": ".claude/skills/_template/pan-verb-skill.md exists with name/description placeholders and standard body",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.470Z"
           },
           {
             "id": "p55-verb-template.ac2",
             "title": "'pan sync' does not distribute files under .claude/skills/_template/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.471Z"
           },
           {
             "id": "p55-verb-template.ac3",
             "title": "Template is referenced from STATE.md / CONTRIBUTING for future skill authors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.471Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.182Z"
       },
       {
         "id": "p55-umbrella",
         "title": "Umbrella /pan skill with dispatch",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1755,65 +1917,73 @@
           {
             "id": "p55-umbrella.ac1",
             "title": "'/pan' (bare) prints the embedded six-bucket taxonomy cheat sheet without any Bash tool invocation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.473Z"
           },
           {
             "id": "p55-umbrella.ac2",
             "title": "'/pan start PAN-415' results in 'pan start PAN-415' being executed via the Bash tool and its output returned",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.473Z"
           },
           {
             "id": "p55-umbrella.ac3",
             "title": "'/pan admin cloister status' dispatches the nested subcommand correctly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.474Z"
           },
           {
             "id": "p55-umbrella.ac4",
             "title": "Destructive verbs (wipe/kill/close/approve) echo the intended command and require confirmation before Bash call",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.474Z"
           },
           {
             "id": "p55-umbrella.ac5",
             "title": "Shell metacharacters (;, |, &&, $ (), backticks) in args are refused — skill instructs user to run directly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.475Z"
           },
           {
             "id": "p55-umbrella.ac6",
             "title": "Unknown verb prints the cheat sheet plus nearest-match suggestion — no blind 'pan <gibberish>' invocation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.475Z"
           },
           {
             "id": "p55-umbrella.ac7",
             "title": "Taxonomy cheat sheet is embedded in SKILL.md, not fetched from filesystem at runtime",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.476Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.183Z"
       },
       {
         "id": "p55-rename-skills",
         "title": "Rename skills to match new CLI verbs 1:1",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1828,41 +1998,46 @@
           {
             "id": "p55-rename-skills.ac1",
             "title": "No skill directory is named pan-work-*",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.465Z"
           },
           {
             "id": "p55-rename-skills.ac2",
             "title": "pan-plan-finalize directory no longer exists; pan-plan skill handles finalize subcommand",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.466Z"
           },
           {
             "id": "p55-rename-skills.ac3",
             "title": "All plumbing skills are named pan-admin-* (cloister, tldr, rescue, beads, db, remote, specialists, etc.)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.466Z"
           },
           {
             "id": "p55-rename-skills.ac4",
             "title": "Each skill's frontmatter name: field matches its new directory name",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.467Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.180Z"
       },
       {
         "id": "p55-flat-shortcuts",
         "title": "Curate 8–10 flat shortcut skills",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1877,33 +2052,37 @@
           {
             "id": "p55-flat-shortcuts.ac1",
             "title": "Exactly these skill dirs are at the top level: pan, pan-status, pan-plan, pan-start, pan-show, pan-review, pan-done, pan-approve, pan-close, pan-issues",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.401Z"
           },
           {
             "id": "p55-flat-shortcuts.ac2",
             "title": "All other pan-* skills have the pan-admin-* prefix",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.401Z"
           },
           {
             "id": "p55-flat-shortcuts.ac3",
             "title": "Each shortcut skill extends the template and includes verb-specific examples",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.401Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.156Z"
       },
       {
         "id": "p55-descriptions",
         "title": "Rewrite every skill description CLI-first",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1918,25 +2097,28 @@
           {
             "id": "p55-descriptions.ac1",
             "title": "Every skill frontmatter description begins with 'pan <verb>' followed by ' — ' and a short explanation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.394Z"
           },
           {
             "id": "p55-descriptions.ac2",
             "title": "Lint/test script validates the description format for all pan-* skills",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.395Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.153Z"
       },
       {
         "id": "p55-sync-cleanup",
         "title": "pan sync deletes legacy skill files on upgrade",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1951,33 +2133,37 @@
           {
             "id": "p55-sync-cleanup.ac1",
             "title": "pan sync removes legacy skill directories from ~/.claude/skills/ on next run",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.396Z"
           },
           {
             "id": "p55-sync-cleanup.ac2",
             "title": "Deletion uses an explicit allow/deny list (not 'anything not in current set'), logged to stdout",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.397Z"
           },
           {
             "id": "p55-sync-cleanup.ac3",
             "title": "Unit test covers the cleanup path with a fixture skill dir containing legacy + new",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.397Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.154Z"
       },
       {
         "id": "p55-snapshot-skills",
         "title": "Plain-text fixture test for synced skill set",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -1992,33 +2178,37 @@
           {
             "id": "p55-snapshot-skills.ac1",
             "title": "tests/fixtures/synced-skills.txt lists all distributed skill dir names sorted one per line",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.383Z"
           },
           {
             "id": "p55-snapshot-skills.ac2",
             "title": "Vitest test asserts equality; UPDATE_FIXTURES=1 rewrites the fixture",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.384Z"
           },
           {
             "id": "p55-snapshot-skills.ac3",
             "title": "Fixture contains no pan-work-*, pan-plan-finalize, or any legacy name",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.384Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.149Z"
       },
       {
         "id": "p6-changelog",
         "title": "CHANGELOG entry with full migration table",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -2033,33 +2223,37 @@
           {
             "id": "p6-changelog.ac1",
             "title": "CHANGELOG.md has an entry for the next minor version describing the reorg as a breaking change",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.381Z"
           },
           {
             "id": "p6-changelog.ac2",
             "title": "Entry embeds the full migration table (not just a link)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.381Z"
           },
           {
             "id": "p6-changelog.ac3",
             "title": "Entry mentions 'pan doctor' for detecting legacy invocations in shell rc",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.382Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.148Z"
       },
       {
         "id": "p6-version-bump",
         "title": "Bump minor version in package.json",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -2074,25 +2268,28 @@
           {
             "id": "p6-version-bump.ac1",
             "title": "Root package.json minor version is bumped",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.464Z"
           },
           {
             "id": "p6-version-bump.ac2",
             "title": "packages/contracts/package.json version matches",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.464Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.179Z"
       },
       {
         "id": "p6-move-prd",
         "title": "Move PRD from planned/ to active/",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-14T13:00:56Z",
         "metadata": {
@@ -2107,28 +2304,32 @@
           {
             "id": "p6-move-prd.ac1",
             "title": "PRD file lives under docs/prds/active/pan-705/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.462Z"
           },
           {
             "id": "p6-move-prd.ac2",
             "title": "docs/QUICK-REFERENCE.md link to the PRD is updated to the active path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.462Z"
           },
           {
             "id": "p6-move-prd.ac3",
             "title": "'rg -n 'prds/planned/pan-command-taxonomy-reorg' docs/' returns zero hits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-14T15:32:10.463Z"
           }
-        ]
+        ],
+        "completed": "2026-04-14T15:32:15.179Z"
       }
     ],
     "edges": [
