@@ -40,6 +40,7 @@ import { statusCommand } from './commands/work/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
+import { resumeCommand } from './commands/resume.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -117,6 +118,11 @@ program
   .description('Stop running agent (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
+
+program
+  .command('resume <id>')
+  .description('Resume from saved Claude session')
+  .action(resumeCommand);
 
 program
   .command('start <id>')

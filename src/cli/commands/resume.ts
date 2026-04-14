@@ -1,6 +1,6 @@
 import chalk from 'chalk';
-import { resumeAgent } from '../../../lib/agents.js';
-import { assertCanResumeSession } from '../../../lib/work-agent-lifecycle.js';
+import { resumeAgent } from '../../lib/agents.js';
+import { assertCanResumeSession } from '../../lib/work-agent-lifecycle.js';
 
 export async function resumeCommand(id: string): Promise<void> {
   let lifecycle;
