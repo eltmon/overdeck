@@ -150,7 +150,7 @@ Check if agent exists and resume or spawn:
 
 ```bash
 # If agent state exists and has a session ID — resume
-pan work resume PAN-{ID}
+pan resume PAN-{ID}
 
 # If no agent state — spawn fresh
 curl -s -X POST http://localhost:3011/api/agents \
@@ -192,18 +192,18 @@ curl -s http://localhost:3011/api/agents/agent-pan-{ID}/activity | jq '.[-3:]'
 
 **If stuck:** Poke the agent or send a message:
 ```bash
-pan work tell PAN-{ID} "Are you stuck? Please continue working on the task."
+pan tell PAN-{ID} "Are you stuck? Please continue working on the task."
 ```
 
 ### Phase 3: Watch for Completion Signal
 
-The agent should eventually run `pan work done PAN-{ID}`. Watch for:
+The agent should eventually run `pan done PAN-{ID}`. Watch for:
 
 ```bash
 # Check if completed marker exists
 ls -la ~/.panopticon/agents/agent-pan-{ID}/completed 2>/dev/null
 
-# Check review status (set by `pan work done`)
+# Check review status (set by `pan done`)
 curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 ```
 
@@ -213,7 +213,7 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 - GitHub issue has "In Review" label or status
 
 **Common failures at this stage:**
-- Agent doesn't call `pan work done` — it just stops
+- Agent doesn't call `pan done` — it just stops
 - Agent calls it but dashboard doesn't process it (API error)
 - Review isn't auto-triggered after completion
 
@@ -273,7 +273,7 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '.autoR
 The work agent should:
 1. Read the feedback
 2. Fix the issues
-3. Run `pan work request-review PAN-{ID} -m "Fixed: ..."`
+3. Run `pan review request PAN-{ID} -m "Fixed: ..."`
 
 **If feedback not delivered:** This is a code bug to fix. Check:
 - `send-feedback-to-agent` skill
@@ -319,7 +319,7 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 
 At this point, the user can click "Approve & Merge" in the dashboard or run:
 ```bash
-pan work approve PAN-{ID}
+pan approve PAN-{ID}
 ```
 
 ## Intervention Protocol

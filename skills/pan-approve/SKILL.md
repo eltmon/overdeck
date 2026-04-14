@@ -37,7 +37,7 @@ This skill guides you through reviewing and approving work completed by an auton
 
 ```bash
 # Check agent status
-pan work status
+pan status
 
 # View the workspace
 cd /path/to/workspace
@@ -89,7 +89,7 @@ Or use the Linear MCP tool to update the issue:
 
 ```bash
 # Stop the agent if still running
-pan work kill ISSUE-123
+pan kill ISSUE-123
 
 # Optionally remove the workspace
 rm -rf /path/to/workspace
@@ -103,7 +103,7 @@ rm -rf /path/to/workspace
 
 ```bash
 # One-liner to approve and merge (if using pan CLI)
-pan work approve ISSUE-123
+pan approve ISSUE-123
 ```
 
 ## Troubleshooting
@@ -120,13 +120,13 @@ git rebase --continue
 **Tests failing:**
 ```bash
 # Send feedback to agent
-pan work tell ISSUE-123 "Tests are failing: [error details]. Please fix."
+pan tell ISSUE-123 "Tests are failing: [error details]. Please fix."
 ```
 
 **Missing changes:**
 ```bash
 # Send additional requirements
-pan work tell ISSUE-123 "Also need to add: [requirements]"
+pan tell ISSUE-123 "Also need to add: [requirements]"
 ```
 
 ## Related Skills

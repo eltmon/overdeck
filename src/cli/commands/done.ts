@@ -448,7 +448,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         const reviewReq = () => new Promise<any>((resolve, reject) => {
           const postData = JSON.stringify({});
           const req = http.request(
-            `${dashboardUrl}/api/workspaces/${issueId}/review`,
+            `${dashboardUrl}/api/review/${issueId}/trigger`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
             (res) => {
               let data = '';
@@ -479,7 +479,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           const resetReq = () => new Promise<any>((resolve, reject) => {
             const postData = JSON.stringify({});
             const req = http.request(
-              `${dashboardUrl}/api/workspaces/${issueId}/reset-review`,
+              `${dashboardUrl}/api/review/${issueId}/reset`,
               { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
               (res) => {
                 let data = '';

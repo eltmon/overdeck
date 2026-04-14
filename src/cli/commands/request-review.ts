@@ -34,7 +34,7 @@ export async function requestReviewCommand(
   console.log(chalk.dim(`Requesting re-review for ${issueId}...`));
 
   try {
-    const response = await fetch(`${DASHBOARD_URL}/api/workspaces/${issueId}/request-review`, {
+    const response = await fetch(`${DASHBOARD_URL}/api/review/${issueId}/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: options.message }),

@@ -61,7 +61,7 @@ Before stopping, see what's currently running:
 pan status
 
 # Check running agents
-pan work status
+pan status
 
 # Check dashboard and API processes
 ps aux | grep panopticon
@@ -75,16 +75,16 @@ If agents are running, consider what to do with them:
 
 ```bash
 # Check for agents
-pan work status
+pan status
 
 # Option 1: Let them finish
 # Wait for agents to complete their work
 
 # Option 2: Send message to agents
-pan work tell <id> "Saving work before shutdown"
+pan tell <id> "Saving work before shutdown"
 
 # Option 3: Stop agents explicitly
-pan work kill <id>
+pan kill <id>
 ```
 
 ### Step 3: Stop Services
@@ -402,9 +402,9 @@ pan doctor
 
 Before shutting down:
 
-- [ ] Check for running agents: `pan work status`
+- [ ] Check for running agents: `pan status`
 - [ ] Save any pending work
-- [ ] Stop or notify agents: `pan work tell <id> "Shutting down"`
+- [ ] Stop or notify agents: `pan tell <id> "Shutting down"`
 - [ ] Run graceful shutdown: `pan down`
 - [ ] Verify ports are free: `lsof -i :3001 :3002`
 - [ ] Check no orphaned processes: `ps aux | grep panopticon`

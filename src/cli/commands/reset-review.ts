@@ -17,7 +17,7 @@ export async function resetReviewCommand(id: string): Promise<void> {
   console.log(chalk.dim(`Resetting review cycles for ${issueId}...`));
 
   try {
-    const response = await fetch(`${DASHBOARD_URL}/api/workspaces/${issueId}/reset-review`, {
+    const response = await fetch(`${DASHBOARD_URL}/api/review/${issueId}/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });

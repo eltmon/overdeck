@@ -30,7 +30,7 @@ This skill guides you through gracefully stopping a running autonomous agent and
 
 ```bash
 # Using pan CLI
-pan work kill ISSUE-123
+pan kill ISSUE-123
 
 # Or directly via tmux
 tmux kill-session -t agent-ISSUE-123
@@ -44,7 +44,7 @@ Before killing, understand what the agent is doing:
 
 ```bash
 # List running agents
-pan work status
+pan status
 
 # Or via tmux
 tmux list-sessions | grep agent
@@ -58,8 +58,8 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -30
 Give the agent a chance to save state:
 
 ```bash
-# Send shutdown message (ALWAYS use pan work tell, NOT raw tmux)
-pan work tell ISSUE-123 "Please save your progress to STATE.md and stop working."
+# Send shutdown message (ALWAYS use pan tell, NOT raw tmux)
+pan tell ISSUE-123 "Please save your progress to STATE.md and stop working."
 
 # Wait for acknowledgment
 sleep 10
@@ -69,7 +69,7 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -10
 tmux kill-session -t agent-ISSUE-123
 ```
 
-**WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan work tell` which handles this correctly.
+**WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan tell` which handles this correctly.
 
 ### 3. Immediate Stop (If Needed)
 
@@ -130,7 +130,7 @@ git stash  # Save uncommitted changes
 
 Options for the work:
 
-1. **Resume later** - Use `pan work issue ISSUE-123` to spawn a new agent
+1. **Resume later** - Use `pan start ISSUE-123` to spawn a new agent
 2. **Do it yourself** - Work in the existing workspace manually
 3. **Abandon** - Remove the workspace if work is no longer needed
 
