@@ -9,6 +9,7 @@
 
 import { Command } from 'commander';
 import { registerCloisterCommands } from '../cloister/index.js';
+import { registerSpecialistsCommands } from '../specialists/index.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -17,4 +18,7 @@ export function registerAdminCommands(program: Command): void {
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);
+
+  // pan admin specialists — review/test/merge agents
+  registerSpecialistsCommands(admin);
 }

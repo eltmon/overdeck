@@ -11,12 +11,12 @@ Working through beads systematically. Starting with setup/foundational beads bef
 
 ## Remaining Work
 - [x] panopticon-cli-9m0: Bumped version to 0.7.0 (commit: 1fca6f9f)
-- [x] panopticon-cli-asp: Created pan admin group with cloister commands (commit: pending)
+- [x] panopticon-cli-asp: Created pan admin group with cloister commands (commit: fffac536)
 - [ ] panopticon-cli-6f6: pan admin beads
 - [ ] panopticon-cli-d76: pan admin config
 - [ ] panopticon-cli-44j: pan admin remote
 - [ ] panopticon-cli-73x: pan admin db
-- [ ] panopticon-cli-rgr: pan admin specialists
+- [x] panopticon-cli-rgr: pan admin specialists (commit: pending)
 - [ ] panopticon-cli-1sd: pan admin hooks
 - [ ] panopticon-cli-f1v: pan start <id>
 - [ ] panopticon-cli-u7y: pan tell <id>
