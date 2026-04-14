@@ -150,6 +150,14 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, []);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
+  const dedupedVirtualItems = (() => {
+    const seen = new Set<number>();
+    return virtualItems.filter((item) => {
+      if (seen.has(item.index)) return false;
+      seen.add(item.index);
+      return true;
+    });
+  })();
 
   return (
     <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -165,13 +173,13 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           <div
             style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
           >
-            {virtualItems.map((virtualItem) => {
+            {dedupedVirtualItems.map((virtualItem) => {
               const row = virtualRows[virtualItem.index]!;
               return (
                 <div
-                  key={virtualItem.key}
+                  key={row.id}
                   data-index={virtualItem.index}
-                  ref={(el) => { if (el) rowVirtualizer.measureElement(el); }}
+                  ref={rowVirtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
