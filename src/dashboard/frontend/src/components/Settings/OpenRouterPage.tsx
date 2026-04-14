@@ -12,6 +12,12 @@ interface OpenRouterModelsResponse {
   favorites: string[];
 }
 
+interface SaveOpenRouterKeyResponse {
+  success: boolean;
+  apiKey?: string;
+  message: string;
+}
+
 async function fetchOpenRouterModels(): Promise<OpenRouterModelsResponse> {
   const res = await fetch('/api/settings/openrouter/models');
   if (!res.ok) throw new Error('Failed to fetch OpenRouter models');
@@ -25,6 +31,16 @@ async function saveFavorites(favorites: string[]): Promise<void> {
     body: JSON.stringify({ favorites }),
   });
   if (!res.ok) throw new Error('Failed to save favorites');
+}
+
+async function saveApiKey(apiKey: string): Promise<SaveOpenRouterKeyResponse> {
+  const res = await fetch('/api/settings/openrouter/api-key', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey }),
+  });
+  if (!res.ok) throw new Error('Failed to save OpenRouter API key');
+  return res.json();
 }
 
 async function testApiKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
@@ -45,6 +61,7 @@ interface OpenRouterPageProps {
   /** Whether OpenRouter provider is enabled */
   enabled: boolean;
   onApiKeyChange: (key: string) => void;
+  onApiKeySaved: (key: string) => void;
   onToggleEnabled: () => void;
 }
 
@@ -54,6 +71,7 @@ export function OpenRouterPage({
   apiKey,
   enabled,
   onApiKeyChange,
+  onApiKeySaved,
   onToggleEnabled,
 }: OpenRouterPageProps) {
   const queryClient = useQueryClient();
@@ -75,6 +93,20 @@ export function OpenRouterPage({
     },
     onError: () => {
       toast.error('Failed to save favorites');
+    },
+  });
+
+  const saveKeyMutation = useMutation({
+    mutationFn: saveApiKey,
+    onSuccess: (result) => {
+      const savedKey = result.apiKey ?? keyInput.trim();
+      onApiKeySaved(savedKey);
+      setKeyInput(savedKey);
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      toast.success(result.message);
+    },
+    onError: () => {
+      toast.error('Failed to save OpenRouter API key');
     },
   });
 
@@ -102,6 +134,12 @@ export function OpenRouterPage({
     setKeyStatus('idle');
     setKeyError(undefined);
     onApiKeyChange(v);
+  };
+
+  const handleSaveKey = () => {
+    const trimmedKey = keyInput.trim();
+    if (!trimmedKey) return;
+    saveKeyMutation.mutate(trimmedKey);
   };
 
   const handleToggleFavorite = (modelId: string) => {
@@ -185,6 +223,14 @@ export function OpenRouterPage({
             ) : null}
             Test Key
           </button>
+          <button
+            onClick={handleSaveKey}
+            disabled={!keyInput.trim() || saveKeyMutation.isPending}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium bg-primary hover:opacity-90 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            {saveKeyMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+            Save Key
+          </button>
         </div>
         {keyStatus === 'valid' && (
           <p className="text-xs text-success flex items-center gap-1">
@@ -200,6 +246,9 @@ export function OpenRouterPage({
           Get your API key at{' '}
           <span className="text-primary font-mono">openrouter.ai/settings/keys</span>
           {' '}— free tier available, no credit card required
+        </p>
+        <p className="text-xs text-text-muted">
+          Saving here updates the key immediately for new OpenRouter conversations. Already running OpenRouter sessions must be resumed or restarted to pick up the new key.
         </p>
       </div>
 

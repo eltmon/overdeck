@@ -22,6 +22,7 @@ import {
   getOptimalDefaultsApi,
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
+  updateProviderApiKey,
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
@@ -557,6 +558,34 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: PUT /api/settings/openrouter/api-key ─────────────────────────────
+
+const putOpenRouterApiKeyRoute = HttpRouter.add(
+  'PUT',
+  '/api/settings/openrouter/api-key',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { apiKey } = body as { apiKey?: unknown };
+
+    if (apiKey !== undefined && typeof apiKey !== 'string') {
+      return jsonResponse({ error: 'apiKey must be a string when provided' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      try {
+        const settings = await updateProviderApiKey('openrouter', apiKey?.trim() || undefined);
+        return jsonResponse({
+          success: true,
+          apiKey: settings.api_keys.openrouter,
+          message: 'OpenRouter API key saved',
+        });
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : String(err));
+      }
+    });
+  })),
+);
+
 // ─── Route: POST /api/settings/openrouter/test-key ───────────────────────────
 
 const postOpenRouterTestKeyRoute = HttpRouter.add(
@@ -589,6 +618,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   putSettingsRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
+  putOpenRouterApiKeyRoute,
   postOpenRouterTestKeyRoute,
 );
 
