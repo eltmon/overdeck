@@ -95,7 +95,7 @@ bd close <beadId> --reason="Implemented X"
 # Request inspection before starting next bead
 pan inspect <issueId> --bead <beadId>
 
-# Wait for result — delivered via pan work tell
+# Wait for result — delivered via pan tell
 # INSPECTION PASSED → proceed to next bead
 # INSPECTION BLOCKED → fix issues, then re-request
 ```
@@ -182,7 +182,7 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
    b. Commits .planning/ artifacts to git
    c. Archives PLANNING_PROMPT.md → PLANNING_PROMPT.md.archived (PAN-250)
    d. Determines phase: .planning/ exists → 'implementation', otherwise → 'exploration'
-   e. Spawns work agent via `pan work issue <ID> --phase implementation`
+   e. Spawns work agent via `pan start <ID> --phase implementation`
 
 4. Work agent reads .planning/STATE.md and implements remaining work
 ```
@@ -205,7 +205,7 @@ Each vBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"
 4. **Test agent**: maps test results to AC, flags untested criteria
 5. **Verification gate**: hard-gates on all AC subItems completed
 6. **Merge agent**: final AC validation before merge
-7. **pan work done**: blocks completion if AC are incomplete (skippable with `--force`)
+7. **pan done**: blocks completion if AC are incomplete (skippable with `--force`)
 
 ### Handling Pre-Existing PRDs
 
@@ -513,7 +513,7 @@ auto_wake = true
 3. **Use appropriate priority**: Don't mark everything as urgent
 4. **Include context**: Add relevant information in the context field
 5. **Exit after submission**: Let specialists handle review/merge
-6. **Use `pan work done` not `pan approve`**: `pan work done <ISSUE-ID>` is the agent completion command (run via Bash). `pan approve` is supervisor-only.
+6. **Use `pan done` not `pan approve`**: `pan done <ISSUE-ID>` is the agent completion command (run via Bash). `pan approve` is supervisor-only.
 
 ### For Specialist Configuration
 
@@ -604,7 +604,7 @@ When the circuit breaker fires, the human should:
 ### Full Review Flow
 
 ```
-Agent runs `pan work done` (Bash command)
+Agent runs `pan done` (Bash command)
   → Verification gate runs quality_gates from projects.yaml (typecheck, lint, test)
     → FAIL → feedback sent to agent's tmux session, completion NOT marked as processed (agent retries)
     → PASS → wake review-agent
@@ -634,7 +634,7 @@ The verification gate (PAN-174) runs between agent completion and review-agent w
 
 **Only `'failed'` blocks `readyForMerge`.** `'pending'` means "this cycle's gate hasn't run yet" — it is reset to `pending` at the start of each review cycle by `request-review`, and is not a signal of failure. This is enforced in `verificationSatisfied()` in `review-status.ts` and aligned in `normalizeReviewStatus()`.
 
-A second verification gate also runs **post-rebase in the merge queue** (before the GitHub merge). This gate uses the same `quality_gates` but runs in the workspace state after rebase, not after the original `pan work done`. Its failure sends feedback to the work agent and pauses the merge; the queue advances to the next issue.
+A second verification gate also runs **post-rebase in the merge queue** (before the GitHub merge). This gate uses the same `quality_gates` but runs in the workspace state after rebase, not after the original `pan done`. Its failure sends feedback to the work agent and pauses the merge; the queue advances to the next issue.
 
 ### Activity Log
 
@@ -702,7 +702,7 @@ The merge-agent also handles syncing active workspaces with the latest `main` br
 
 ### How It Works
 
-1. **User clicks "Sync with Main"** in the dashboard (Board view → workspace detail → ACTIONS section) or runs `pan work sync-main <ISSUE-ID>`
+1. **User clicks "Sync with Main"** in the dashboard (Board view → workspace detail → ACTIONS section) or runs `pan sync-main <ISSUE-ID>`
 2. **Auto-commit**: Any uncommitted changes in the workspace are automatically committed (`WIP: auto-commit before sync with main`) with post-commit verification
 3. **Fetch + merge**: `git fetch origin main` followed by `git merge origin/main`
 4. **Clean merge**: If no conflicts, returns immediately with commit count and changed files
@@ -733,7 +733,7 @@ Response (error):
 ### CLI
 
 ```bash
-pan work sync-main PAN-143
+pan sync-main PAN-143
 ```
 
 ## Prompt Templates
@@ -817,7 +817,7 @@ When an issue is closed or marked done but needs additional work, use the reopen
 
 ### What Reopen Resets
 
-The `pan work reopen <ID>` command (and the dashboard Reopen button) performs these actions atomically:
+The `pan reopen <ID>` command (and the dashboard Reopen button) performs these actions atomically:
 
 1. **Tracker transition** — moves the issue to "In Progress" (not Backlog)
 2. **Specialist states** — resets `reviewStatus`, `testStatus`, `mergeStatus` to `pending`
