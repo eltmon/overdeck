@@ -5,7 +5,7 @@ import {
   formatCV,
   startWork,
   completeWork,
-} from '../../../lib/cv.js';
+} from '../../lib/cv.js';
 
 interface CVOptions {
   json?: boolean;

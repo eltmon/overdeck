@@ -12,10 +12,10 @@ import {
   readMaterialized,
   estimateTokens,
   AgentStateContext,
-} from '../../../lib/context.js';
+} from '../../lib/context.js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { AGENTS_DIR } from '../../../lib/paths.js';
+import { AGENTS_DIR } from '../../lib/paths.js';
 
 interface ContextOptions {
   json?: boolean;

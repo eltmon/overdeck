@@ -9,9 +9,9 @@ import ora from 'ora';
 import {
   getShadowState,
   updateTrackerStatusCache,
-} from '../../../lib/shadow-state.js';
-import type { IssueState } from '../../../lib/tracker/interface.js';
-import { getLinearApiKey, isLinearIssue, formatState } from '../../../lib/shadow-utils.js';
+} from '../../lib/shadow-state.js';
+import type { IssueState } from '../../lib/tracker/interface.js';
+import { getLinearApiKey, isLinearIssue, formatState } from '../../lib/shadow-utils.js';
 
 interface RefreshOptions {
   json?: boolean;

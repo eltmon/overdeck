@@ -9,8 +9,8 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { getShadowState, needsSync, getUnsyncedHistory } from '../../../lib/shadow-state.js';
-import { formatState, formatDate } from '../../../lib/shadow-utils.js';
+import { getShadowState, needsSync, getUnsyncedHistory } from '../../lib/shadow-state.js';
+import { formatState, formatDate } from '../../lib/shadow-utils.js';
 
 export async function shadowCommand(id: string): Promise<void> {
   const spinner = ora(`Fetching shadow state for ${id}...`).start();

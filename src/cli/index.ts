@@ -49,6 +49,7 @@ import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
 import { planCommand } from './commands/plan.js';
+import { showCommand } from './commands/show.js';
 import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
@@ -111,6 +112,17 @@ program
   .description('List and manage skills')
   .option('--json', 'Output as JSON')
   .action(skillsCommand);
+
+// pan show <id> — unified observation
+program
+  .command('show <id>')
+  .description('Unified lens: shadow state, CV, context, health for one issue')
+  .option('--shadow', 'Shadow state details only')
+  .option('--cv', 'Agent work history only')
+  .option('--context', 'Context engineering state only')
+  .option('--health', 'Health + heartbeat only')
+  .option('--json', 'Output as JSON')
+  .action(showCommand);
 
 // pan review — pending, request, reset
 const review = program

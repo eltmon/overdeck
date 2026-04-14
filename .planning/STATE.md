@@ -31,7 +31,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [x] panopticon-cli-jcn: pan close <id> (commit: ae4b4ba5)
 - [x] panopticon-cli-6fs: pan plan / pan plan finalize (commit: pending)
 - [x] panopticon-cli-7n3: pan review (commit: pending)
-- [ ] panopticon-cli-2mf: pan show <id>
+- [x] panopticon-cli-2mf: pan show <id> (commit: pending)
 - [ ] panopticon-cli-pei: pan issues
 - [x] panopticon-cli-5z3: Deleted pan work command group (commit: e307e22a)
 - [x] panopticon-cli-oyb: pan admin migrate-config (commit: fb273e21)

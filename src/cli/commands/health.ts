@@ -11,8 +11,8 @@ import {
   DEFAULT_COOLDOWN_MS,
   DEFAULT_CHECK_INTERVAL_MS,
   type HealthConfig,
-} from '../../../lib/health.js';
-import { listRunningAgents } from '../../../lib/agents.js';
+} from '../../lib/health.js';
+import { listRunningAgents } from '../../lib/agents.js';
 
 interface HealthOptions {
   json?: boolean;
