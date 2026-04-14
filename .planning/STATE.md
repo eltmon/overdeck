@@ -94,3 +94,5 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - **[2026-04-14T21:30Z] merge-agent → CI-FAILURE** — `.planning/feedback/025-merge-agent-ci-failure.md`
 - **[2026-04-14T21:32Z] merge-agent → CI-FAILURE** — `.planning/feedback/026-merge-agent-ci-failure.md`
 - **[2026-04-14T21:34Z] merge-agent → CI-FAILURE** — `.planning/feedback/027-merge-agent-ci-failure.md`
+- **[2026-04-14T21:36Z] merge-agent → CI-FAILURE** — `.planning/feedback/028-merge-agent-ci-failure.md`
+- **[2026-04-14T21:38Z] merge-agent → CI-FAILURE** — `.planning/feedback/029-merge-agent-ci-failure.md`
