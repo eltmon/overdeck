@@ -120,12 +120,21 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
  * Get bash export lines for provider env vars (for use in launcher scripts).
  * Returns empty string for Anthropic models.
  */
+const PROVIDER_ENV_KEYS = [
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_AUTH_TOKEN',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'API_TIMEOUT_MS',
+  'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+] as const;
+
 export function getProviderExportsForModel(model: string): string {
   const envVars = getProviderEnvForModel(model);
-  if (Object.keys(envVars).length === 0) return '';
-  return Object.entries(envVars)
-    .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
-    .join('\n') + '\n';
+  const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
+  const exportLines = Object.entries(envVars)
+    .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
+  return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
 
 /**
