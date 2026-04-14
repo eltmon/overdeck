@@ -22,8 +22,8 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [x] panopticon-cli-u7y: pan tell <id> (commit: 150cffe5)
 - [x] panopticon-cli-dfb: pan kill <id> (commit: 5320e057)
 - [x] panopticon-cli-vwd: pan resume <id> (commit: efbe3f91)
-- [x] panopticon-cli-agh: pan recover <id> (commit: pending)
-- [ ] panopticon-cli-a0u: pan sync-main <id>
+- [x] panopticon-cli-agh: pan recover <id> (commit: 2532a087)
+- [x] panopticon-cli-a0u: pan sync-main <id> (commit: pending)
 - [ ] panopticon-cli-a01: pan done <id>
 - [ ] panopticon-cli-5ul: pan approve <id>
 - [ ] panopticon-cli-50h: pan reopen <id>
