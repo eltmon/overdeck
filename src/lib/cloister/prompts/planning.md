@@ -112,6 +112,41 @@ Use AskUserQuestion tool to ask contextual questions:
 - What does "done" look like?
 - Are there edge cases we need to handle?
 
+### Playwright Isolation
+
+If the issue will require browser-based verification, encode that expectation clearly in STATE.md and acceptance criteria:
+- Playwright/browser verification must use an isolated browser instance/profile.
+- Agents must not depend on another agent's Playwright session or shared browser state.
+- Any required login/setup should be reproducible inside the isolated session.
+
+### Task Granularity — Decompose Aggressively
+
+**Default to the smallest bead you can defend.** Your job is to produce a *lot* of small, independently reviewable beads — not a handful of large ones.
+
+A well-sized bead has all of these properties:
+- **One focused change.** One command added, one file moved, one collapsed handler, one rename batch. If you need the word "and" in the title, it's probably two beads.
+- **Independently reviewable.** A reviewer can verify the acceptance criteria by reading the diff for this bead alone, without cross-referencing others.
+- **Independently mergeable.** Landing this bead on its own leaves the tree in a working state. If it can only ship as part of a set, it's a sub-step inside a larger bead, not a bead itself.
+- **Testable in isolation.** The acceptance criteria name a specific behavior you can exercise after this bead and no others.
+
+**When a PRD has phases, phases are NOT bead boundaries.** Phases are organizational scaffolding for humans reading the PRD. A single phase will typically decompose into many beads. For example, a phase that says "rename 10 commands" is 10 beads (or 10 sub-items under one rename bead), not 1.
+
+**Concrete heuristics:**
+- One collapsed command = one bead. (`pan show`, `pan review`, `pan issues`, `pan plan finalize` → four beads, not one.)
+- One renamed verb = one bead, unless several renames are mechanically identical and land in the same file — then they can be sub-items under one bead.
+- One admin group moved under a new namespace = one bead per group.
+- One distributed-skill rename batch = one bead per logical group (lifecycle shortcuts, admin namespace, umbrella skill, description rewrite sweep). Not one bead for "rename all skills."
+- One snapshot test = one bead.
+- One doc migration = one bead (per doc or per logical doc cluster, not one bead for "update all docs").
+
+**When in doubt, split.** The cost of too-small beads is mild (more rows to track); the cost of too-large beads is severe (reviewers can't reason about them, work agents deliver partial results, specialists can't pinpoint which acceptance criterion failed, and the `inspect` specialist can't verify mid-implementation). Err on the side of more beads.
+
+**What this does NOT mean:**
+- It does NOT mean ship partial features. CLAUDE.md's "Deliver Complete Features" rule still applies: every bead's acceptance criteria must be fully met before it's marked done, and every bead in the plan must ship before the issue itself is marked done. Decomposition is about *reviewability and verifiability*, not about scope reduction.
+- It does NOT mean creating beads for trivia that doesn't need tracking (e.g. "update one line in a comment"). If the acceptance criterion fits inside another bead's existing scope and tests, absorb it as a sub-item instead of inflating the bead count.
+
+If the user ever asks "should this be one bead or many?", the answer is almost always "many" unless you can point to a specific reason the work is genuinely indivisible (e.g. a single atomic rename that touches N call sites in one commit).
+
 ### Difficulty Estimation
 
 For each sub-task, estimate difficulty using this rubric:
