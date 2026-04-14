@@ -46,14 +46,6 @@ import { showRouteLayer } from './routes/show.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { emitActivityEntry } from '../../lib/activity-logger.js';
 
-// ─── Runtime detection ────────────────────────────────────────────────────────
-
-declare const Bun: unknown;
-
-function isBunRuntime(): boolean {
-  return typeof Bun !== 'undefined';
-}
-
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
 const HttpServerLive = Layer.unwrap(
