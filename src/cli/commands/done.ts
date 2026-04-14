@@ -12,7 +12,7 @@ import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
-import { extractNumber } from '../../lib/issue-id.js';
+import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -134,7 +134,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
-  const issueId = id.replace(/^agent-/i, '').toUpperCase();
+  const issueId = resolveIssueId(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
 
   // Pre-flight completion checks (unless --force)

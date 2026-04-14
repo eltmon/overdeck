@@ -3,6 +3,7 @@ import { stopAgent, getAgentState } from '../../lib/agents.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
+import { resolveIssueId } from '../../lib/issue-id.js';
 
 interface KillOptions {
   force?: boolean;
@@ -10,10 +11,8 @@ interface KillOptions {
 
 export async function killCommand(id: string, options: KillOptions): Promise<void> {
   // Support "agent-xxx" prefix, or just the issue ID
-  let agentId = id;
-  if (!id.startsWith('agent-')) {
-    agentId = `agent-${id.toLowerCase()}`;
-  }
+  const issueId = resolveIssueId(id);
+  const agentId = `agent-${issueId.toLowerCase()}`;
 
   // Check if exists
   const state = getAgentState(agentId) as any;

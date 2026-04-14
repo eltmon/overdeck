@@ -3,13 +3,12 @@ import { existsSync, unlinkSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getAgentState, getAgentDir, getAgentRuntimeFile, getLatestSessionId } from '../../lib/agents.js';
 import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
+import { resolveIssueId } from '../../lib/issue-id.js';
 
 export async function resetSessionCommand(id: string): Promise<void> {
   // Support "agent-xxx" prefix, or just the issue ID
-  let agentId = id;
-  if (!id.startsWith('agent-')) {
-    agentId = `agent-${id.toLowerCase()}`;
-  }
+  const issueId = resolveIssueId(id);
+  const agentId = `agent-${issueId.toLowerCase()}`;
 
   const state = getAgentState(agentId);
   if (!state) {
