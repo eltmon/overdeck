@@ -18,7 +18,6 @@ import { HttpRouter } from 'effect/unstable/http';
 import { getShadowState } from '../../../lib/shadow-state.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-;
 
 // ─── Route: GET /api/show/:issueId ────────────────────────────────────────────
 

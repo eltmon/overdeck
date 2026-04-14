@@ -24,7 +24,7 @@ Merges the latest `main` branch into a workspace's feature branch. Uses `git mer
 pan sync-main PAN-XXX
 
 # Or via the dashboard API
-curl -X POST http://localhost:3011/api/workspaces/PAN-XXX/sync-main
+curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 ```
 
 ## What It Does
