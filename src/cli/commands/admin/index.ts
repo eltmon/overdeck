@@ -12,6 +12,7 @@ import { registerCloisterCommands } from '../cloister/index.js';
 import { registerSpecialistsCommands } from '../specialists/index.js';
 import { registerRemoteCommands } from '../remote/index.js';
 import { registerDbCommands } from '../db.js';
+import { registerBeadsCommands } from '../beads.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -29,4 +30,7 @@ export function registerAdminCommands(program: Command): void {
 
   // pan admin db — database seeding
   registerDbCommands(admin);
+
+  // pan admin beads — beads CLI management
+  registerBeadsCommands(admin);
 }
