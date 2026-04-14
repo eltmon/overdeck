@@ -150,6 +150,48 @@ export function migrateStalePersonalContent(): MigrationResult {
   return result;
 }
 
+/**
+ * Remove legacy skill directories from ~/.claude/skills/ that were renamed or deleted
+ * in the 0.7.0 command taxonomy reorganization. Safe to call on every sync — if the
+ * skills are already gone, it's a no-op.
+ */
+export function removeLegacySkills070(): string[] {
+  // Skills renamed or removed in 0.7.0:
+  // pan-issue → pan-start
+  // pan-plan-finalize → deleted (subcommand of pan plan)
+  // pan-setup → pan-admin-hooks
+  // pan-rescue → pan-admin-cloister
+  // pan-tldr → pan-admin-tldr
+  // pan-config → pan-admin-config
+  // pan-tracker → pan-admin-tracker
+  const LEGACY_SKILL_NAMES = [
+    'pan-issue',
+    'pan-plan-finalize',
+    'pan-setup',
+    'pan-rescue',
+    'pan-tldr',
+    'pan-config',
+    'pan-tracker',
+  ];
+
+  const removed: string[] = [];
+  const skillsTarget = SYNC_TARGET.skills;
+  if (!existsSync(skillsTarget)) return removed;
+
+  for (const name of LEGACY_SKILL_NAMES) {
+    const targetPath = join(skillsTarget, name);
+    if (existsSync(targetPath)) {
+      try {
+        rmSync(targetPath, { recursive: true, force: true });
+        removed.push(name);
+      } catch {
+        // Non-fatal — skip if removal fails
+      }
+    }
+  }
+  return removed;
+}
+
 export interface RefreshCacheResult {
   skills: { copied: number; total: number };
   agents: { copied: number; total: number };

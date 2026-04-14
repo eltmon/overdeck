@@ -7,7 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, refreshCache, migrateStalePersonalContent, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
+import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
@@ -145,6 +145,12 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     if (migration.preservedUserContent.length > 0) {
       console.log(chalk.dim(`  Preserved ${migration.preservedUserContent.length} user-created item(s)`));
     }
+  }
+
+  // 0.7.0 upgrade: remove renamed/deleted legacy skills from ~/.claude/skills/
+  const removedLegacy = removeLegacySkills070();
+  if (removedLegacy.length > 0) {
+    console.log(chalk.dim(`Removed ${removedLegacy.length} legacy skill(s) from upgrade to 0.7.0: ${removedLegacy.join(', ')}`));
   }
 
   const config = loadConfig();
