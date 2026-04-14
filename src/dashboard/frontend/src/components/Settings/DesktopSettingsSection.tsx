@@ -63,7 +63,7 @@ const NOTIFICATION_LABELS: Record<NotificationEventType, { label: string; descri
   inputNeeded:   { label: 'Input Needed', description: 'Agent is waiting for your decision' },
   stuckAgents:   { label: 'Stuck Agents', description: 'Agent has been idle too long' },
   mergeFailures: { label: 'Merge Failures', description: 'Merge specialist encountered an error' },
-  workComplete:  { label: 'Work Complete', description: 'Agent finished and called pan work done' },
+  workComplete:  { label: 'Work Complete', description: 'Agent finished and called pan done' },
   planningDone:  { label: 'Planning Done', description: 'Planning session completed' },
   mergeReady:    { label: 'Merge Ready', description: 'PR is ready for your approval' },
 };

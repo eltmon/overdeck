@@ -2521,7 +2521,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             }) && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
-                title="Agent evidence shows work is complete — waiting for agent to call pan work done"
+                title="Agent evidence shows work is complete — waiting for agent to call pan done"
               >
                 <CheckCircle className="w-3 h-3" />
                 Done
