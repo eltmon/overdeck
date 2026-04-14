@@ -132,8 +132,7 @@ export async function runVerificationForIssue(
             verificationMaxCycles: VERIFICATION_MAX_CYCLES,
           });
 
-          const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-          const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Resolve merge conflicts with ${syncTargetBranch} BEFORE resubmitting\n\nThe target branch advanced since you started working. Your branch has merge conflicts that must be resolved.\n\n1. Run: git fetch origin ${syncTargetBranch} && git merge origin/${syncTargetBranch}\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT resubmit until all conflicts are resolved and tests pass.`;
+          const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Resolve merge conflicts with ${syncTargetBranch} BEFORE resubmitting\n\nThe target branch advanced since you started working. Your branch has merge conflicts that must be resolved.\n\n1. Run: git fetch origin ${syncTargetBranch} && git merge origin/${syncTargetBranch}\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved ${syncTargetBranch} conflicts"\n\nDo NOT resubmit until all conflicts are resolved and tests pass.`;
 
           try {
             const fileResult = await writeFeedbackFile({
@@ -290,8 +289,7 @@ export async function runVerificationForIssue(
         verificationMaxCycles: VERIFICATION_MAX_CYCLES,
       });
 
-      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Update plan.vbrief.json subItem statuses to 'completed'\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT resubmit until all AC are completed.`;
+      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Update plan.vbrief.json subItem statuses to 'completed'\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
 
       try {
         const fileResult = await writeFeedbackFile({

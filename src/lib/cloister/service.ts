@@ -651,7 +651,7 @@ export class CloisterService {
           const result = await new Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }>((resolve) => {
             const postData = JSON.stringify({});
             const req = http.request(
-              `${this.getDashboardApiUrl()}/api/workspaces/${issueId}/review`,
+              `${this.getDashboardApiUrl()}/api/review/${issueId}/trigger`,
               { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
               (res) => {
                 let data = '';

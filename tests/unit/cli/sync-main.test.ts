@@ -56,7 +56,7 @@ describe('syncMainCommand', () => {
     vi.unstubAllGlobals();
   });
 
-  it('calls POST /api/workspaces/:issueId/sync-main with uppercase issueId', async () => {
+  it('calls POST /api/issues/:issueId/sync-main with uppercase issueId', async () => {
     const fetchMock = mockFetch(200, { success: true, alreadyUpToDate: true, message: 'Already up to date with main' });
 
     await syncMainCommand('pan-242');
