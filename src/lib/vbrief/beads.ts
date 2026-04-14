@@ -6,7 +6,7 @@
  * shell commands with a deterministic, programmatic conversion.
  */
 
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
@@ -16,6 +16,7 @@ import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface CreateBeadsResult {
   success: boolean;
@@ -38,7 +39,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 
   // Verify bd CLI is available
   try {
-    await execAsync('which bd', { encoding: 'utf-8' });
+    await execFileAsync('which', ['bd'], { encoding: 'utf-8', timeout: 5000 });
   } catch {
     return { success: false, created: [], errors: ['bd (beads) CLI not found in PATH'], beadIds };
   }
@@ -60,8 +61,8 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     } else if (!existsSync(beadsDir)) {
       // No main .beads/ and no local .beads/ — fall back to bd init
       try {
-        await execAsync('bd init', { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
-        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
+        await execFileAsync('bd', ['init'], { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] Initialized beads database in ${workspacePath}`);
       } catch (initErr: any) {
         return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
@@ -84,7 +85,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
   try {
-    await execAsync('bd list --json --limit 0', {
+    await execFileAsync('bd', ['list', '--json', '--limit', '0'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
     });
   } catch (connectErr: any) {
@@ -108,10 +109,10 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 
       console.log(`[beads] Database unreachable (${connectCategory}) — auto-running bd init --prefix ${prefix}`);
       try {
-        await execAsync(`bd init --prefix ${prefix}`, {
+        await execFileAsync('bd', ['init', '--prefix', prefix], {
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
         });
-        await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
+        await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
         console.log(`[beads] bd init succeeded for prefix ${prefix}`);
       } catch (initErr: any) {
         // Init failed — return early with a specific error so callers know exactly what happened
@@ -127,8 +128,9 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   // Idempotency: clear any existing beads for this issue before creating new ones.
   // Re-planning means "the old plan was invalid" — start fresh.
   try {
-    const { stdout: existingJson } = await execAsync(
-      `bd list --json -l "${issueLabel}" --status all --limit 0`,
+    const { stdout: existingJson } = await execFileAsync(
+      'bd',
+      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
       { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
     );
     const existingBeads = JSON.parse(existingJson || '[]');
@@ -136,7 +138,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
       const ids = existingBeads.map((b: any) => b.id).filter(Boolean);
       for (const id of ids) {
         try {
-          await execAsync(`bd delete ${id} --force`, { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
+          await execFileAsync('bd', ['delete', id, '--force'], { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
         } catch {
           // Individual delete failure is non-fatal
         }
@@ -202,8 +204,17 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     ? sortedIds
     : plan.items.map(i => i.id);
 
-  // Create beads in dependency order
-  for (const itemId of orderedIds) {
+  // Create beads in dependency order.
+  //
+  // IMPORTANT: We use execFile (argv array), NOT exec (shell string).
+  // Plan titles/descriptions are arbitrary prose that can contain backticks,
+  // $, quotes, pipes, newlines, etc. Building a shell command string and trying
+  // to escape those is a losing game — one missed edge case and we end up
+  // executing user content as shell code, or hanging on an unclosed quote.
+  // execFile passes each arg directly to bd via execve, so no shell ever sees
+  // it and the content is treated as literal bytes.
+  for (let i = 0; i < orderedIds.length; i++) {
+    const itemId = orderedIds[i];
     const item = itemById.get(itemId);
     if (!item) continue;
 
@@ -212,40 +223,34 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     const issueLabel = item.metadata?.issueLabel ?? plan.id.toLowerCase();
     const phase = item.metadata?.phase;
 
+    const labels = [issueLabel, `difficulty:${difficulty}`];
+    if (phase !== undefined) labels.push(`phase-${phase}`);
+    const labelStr = labels.join(',');
+
+    const actionText = item.narrative?.Action ?? '';
+    const acLines = (item.subItems ?? [])
+      .filter(s => s.metadata?.kind === 'acceptance_criterion')
+      .map(s => `- AC: ${s.title}`)
+      .join('\n');
+    const description = [actionText, acLines].filter(Boolean).join('\n');
+
+    const blockingDeps = [...(blockers.get(itemId) ?? [])].map(blockerId => {
+      const beadId = beadIds.get(blockerId);
+      return beadId ? `blocks:${beadId}` : null;
+    }).filter((d): d is string => d !== null);
+
+    const args = ['create', fullTitle, '--type', 'task', '--silent', '-l', labelStr];
+    if (description) args.push('-d', description);
+    if (blockingDeps.length > 0) args.push('--deps', blockingDeps.join(','));
+
+    console.log(`[beads] (${i + 1}/${orderedIds.length}) creating "${item.title}"`);
+
     try {
-      // Build labels
-      const labels = [issueLabel, `difficulty:${difficulty}`];
-      if (phase !== undefined) labels.push(`phase-${phase}`);
-      const labelStr = labels.join(',');
-
-      // Build description from narrative Action + acceptance criteria
-      const actionText = item.narrative?.Action ?? '';
-      const acLines = (item.subItems ?? [])
-        .filter(s => s.metadata?.kind === 'acceptance_criterion')
-        .map(s => `- AC: ${s.title}`)
-        .join('\n');
-      const description = [actionText, acLines].filter(Boolean).join('\n');
-
-      // Build deps from blocking edges (blockers that have been created)
-      const blockingDeps = [...(blockers.get(itemId) ?? [])].map(blockerId => {
-        const beadId = beadIds.get(blockerId);
-        return beadId ? `blocks:${beadId}` : null;
-      }).filter((d): d is string => d !== null);
-
-      // Assemble bd create command
-      const escapedTitle = fullTitle.replace(/"/g, '\\"');
-      let cmd = `bd create "${escapedTitle}" --type task --silent -l "${labelStr}"`;
-
-      if (description) {
-        const escapedDesc = description.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-        cmd += ` -d "${escapedDesc}"`;
-      }
-
-      if (blockingDeps.length > 0) {
-        cmd += ` --deps "${blockingDeps.join(',')}"`;
-      }
-
-      const { stdout } = await execAsync(cmd, { encoding: 'utf-8', cwd: workspacePath });
+      const { stdout } = await execFileAsync('bd', args, {
+        encoding: 'utf-8',
+        cwd: workspacePath,
+        timeout: 30000,
+      });
       const beadId = stdout.trim();
 
       if (beadId) {
@@ -256,8 +261,13 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
         created.push(fullTitle);
       }
     } catch (error: any) {
-      const errMsg = error.stderr?.toString() || error.message || String(error);
-      errors.push(`Failed to create "${item.title}": ${errMsg.split('\n')[0]}`);
+      // killed === true means execFile hit the timeout — surface that specifically
+      // so hangs don't look like generic failures.
+      const timedOut = error?.killed === true || /ETIMEDOUT/i.test(String(error?.code ?? ''));
+      const errMsg = error?.stderr?.toString() || error?.message || String(error);
+      const prefix = timedOut ? 'timed out after 30s' : errMsg.split('\n')[0];
+      errors.push(`Failed to create "${item.title}": ${prefix}`);
+      console.warn(`[beads] (${i + 1}/${orderedIds.length}) FAILED "${item.title}": ${prefix}`);
     }
   }
 
