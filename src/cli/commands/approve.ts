@@ -9,12 +9,6 @@ import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { markAsSynced } from '../../lib/shadow-state.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 
-interface ApproveOptions {
-  merge?: boolean;
-  noLinear?: boolean;
-  shadow?: boolean;
-}
-
 function checkGhCli(): boolean {
   try {
     execSync('which gh', { stdio: 'pipe' });
@@ -96,7 +90,7 @@ async function updateLinearStatus(apiKey: string, issueIdentifier: string): Prom
   }
 }
 
-export async function approveCommand(id: string, options: ApproveOptions = {}): Promise<void> {
+export async function approveCommand(id: string): Promise<void> {
   const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
 
   // Agent guard: pan approve is a supervisor-only command.
@@ -125,34 +119,32 @@ export async function approveCommand(id: string, options: ApproveOptions = {}): 
     let prMerged = false;
     let linearUpdated = false;
 
-    // Step 1: Find and merge PR if requested
-    if (options.merge !== false) {
-      if (!checkGhCli()) {
-        spinner.warn('gh CLI not found - skipping PR merge');
-        console.log(chalk.dim('  Install: https://cli.github.com/'));
-      } else {
-        spinner.text = 'Looking for PR...';
-        const pr = findPRForBranch(workspace);
+    // Step 1: Find and merge PR
+    if (!checkGhCli()) {
+      spinner.warn('gh CLI not found - skipping PR merge');
+      console.log(chalk.dim('  Install: https://cli.github.com/'));
+    } else {
+      spinner.text = 'Looking for PR...';
+      const pr = findPRForBranch(workspace);
 
-        if (pr) {
-          spinner.text = `Merging PR #${pr.number}...`;
-          const result = mergePR(workspace, pr.number);
+      if (pr) {
+        spinner.text = `Merging PR #${pr.number}...`;
+        const result = mergePR(workspace, pr.number);
 
-          if (result.success) {
-            prMerged = true;
-            console.log(chalk.green(`  ✓ Merged PR #${pr.number}`));
-          } else {
-            console.log(chalk.yellow(`  ⚠ Failed to merge: ${result.error}`));
-            console.log(chalk.dim(`    Merge manually: gh pr merge ${pr.number} --squash`));
-          }
+        if (result.success) {
+          prMerged = true;
+          console.log(chalk.green(`  ✓ Merged PR #${pr.number}`));
         } else {
-          console.log(chalk.dim('  No PR found for this branch'));
+          console.log(chalk.yellow(`  ⚠ Failed to merge: ${result.error}`));
+          console.log(chalk.dim(`    Merge manually: gh pr merge ${pr.number} --squash`));
         }
+      } else {
+        console.log(chalk.dim('  No PR found for this branch'));
       }
     }
 
     // Step 2: Update status (either tracker or shadow)
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(state.issueId, options.shadow);
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(state.issueId);
 
     if (skipTrackerUpdate) {
       spinner.text = 'Marking shadow state as synced...';
@@ -162,7 +154,7 @@ export async function approveCommand(id: string, options: ApproveOptions = {}): 
       } else {
         console.log(chalk.yellow(`  ⚠ Failed to update shadow state: ${syncResult.error}`));
       }
-    } else if (options.noLinear !== true) {
+    } else {
       const apiKey = getLinearApiKey();
       if (apiKey) {
         spinner.text = 'Updating Linear status...';

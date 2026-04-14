@@ -18,8 +18,6 @@ const execAsync = promisify(exec);
 
 interface DoneOptions {
   comment?: string;
-  noLinear?: boolean;
-  shadow?: boolean;
   force?: boolean;
 }
 
@@ -351,7 +349,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const isGitHubIssue = issueId.startsWith('PAN-');
 
     // Step 1: Update status (either tracker or shadow)
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId, options.shadow);
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId);
 
     if (skipTrackerUpdate) {
       shadowModeActive = true;
@@ -367,7 +365,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       } else {
         console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
       }
-    } else if (options.noLinear !== true) {
+    } else {
       const apiKey = getLinearApiKey();
       if (apiKey) {
         spinner.text = 'Updating Linear to In Review...';

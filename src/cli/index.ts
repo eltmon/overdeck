@@ -157,6 +157,7 @@ review
 review
   .command('request <id>')
   .description('Request re-review after fixing feedback')
+  .option('-m, --message <text>', 'Message describing the fixes applied')
   .action(requestReviewCommand);
 
 review
@@ -216,6 +217,7 @@ program
   .command('done <id>')
   .description('Mark work complete, move to review')
   .option('-c, --comment <message>', 'Comment for the tracker')
+  .option('--force', 'Skip pre-flight completion checks')
   .option('--json', 'Output as JSON')
   .action(doneCommand);
 
