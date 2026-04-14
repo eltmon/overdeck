@@ -280,8 +280,9 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       const command = createSessionCall[2]; // 3rd param is the command
       // Command is either direct --resume or a launcher script wrapping it
       if (command.startsWith('bash ')) {
-        // Launcher script path — read it and verify contents
-        const launcherPath = command.replace(/^bash "/, '').replace(/"$/, '');
+        // Launcher script path — read it and verify contents.
+        // Handles both `bash /path` (unquoted) and `bash "/path"` (quoted).
+        const launcherPath = command.replace(/^bash\s+"?/, '').replace(/"$/, '').trim();
         const launcherContent = readFileSync(launcherPath, 'utf-8');
         expect(launcherContent).toContain('--resume');
         expect(launcherContent).toContain(sessionId);
