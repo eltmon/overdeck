@@ -3,26 +3,32 @@ import { httpHandler } from './http-handler.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
- * Implements all /api/workspaces/* endpoints from the Express server:
+ * Workspaces + lifecycle + review HTTP routes.
+ *
+ * Workspace data endpoints (/api/workspaces/):
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
  *   GET    /api/workspaces/:issueId/clean/preview
  *   POST   /api/workspaces/:issueId/clean
  *   POST   /api/workspaces/:issueId/containerize
- *   POST   /api/workspaces/:issueId/start
  *   POST   /api/workspaces/:issueId/containers/:containerName/:action
  *   POST   /api/workspaces/:issueId/refresh-db
- *   GET    /api/workspaces/:issueId/review-status
- *   POST   /api/workspaces/:issueId/review-status
- *   POST   /api/workspaces/:issueId/review
- *   POST   /api/workspaces/:issueId/request-review
- *   POST   /api/workspaces/:issueId/reset-review
- *   POST   /api/workspaces/:issueId/sync-main
- *   POST   /api/workspaces/:issueId/merge
- *   POST   /api/workspaces/:issueId/approve
- *   DELETE /api/workspaces/:issueId/pending
  *   GET    /api/workspaces/:issueId/tldr
+ *
+ * Lifecycle endpoints (/api/issues/):
+ *   POST   /api/issues/:issueId/start
+ *   POST   /api/issues/:issueId/sync-main
+ *   POST   /api/issues/:issueId/approve
+ *   POST   /api/issues/:issueId/merge
+ *
+ * Review endpoints (/api/review/):
+ *   GET    /api/review/:issueId/status
+ *   POST   /api/review/:issueId/status
+ *   POST   /api/review/:issueId/trigger
+ *   POST   /api/review/:issueId/request
+ *   POST   /api/review/:issueId/reset
+ *   DELETE /api/review/:issueId/pending
  */
 
 import { exec, spawn } from 'node:child_process';
@@ -1286,11 +1292,11 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/start ───────────────────────────────
+// ─── Route: POST /api/issues/:issueId/start ───────────────────────────────
 
 const postWorkspaceStartRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/start',
+  '/api/issues/:issueId/start',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -1935,11 +1941,11 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: GET /api/workspaces/:issueId/review-status ───────────────────────
+// ─── Route: GET /api/review/:issueId/status ───────────────────────
 
 const getWorkspaceReviewStatusRoute = HttpRouter.add(
   'GET',
-  '/api/workspaces/:issueId/review-status',
+  '/api/review/:issueId/status',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -1986,11 +1992,11 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/review-status ──────────────────────
+// ─── Route: POST /api/review/:issueId/status ──────────────────────
 
 const postWorkspaceReviewStatusRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/review-status',
+  '/api/review/:issueId/status',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -2198,11 +2204,11 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/review ─────────────────────────────
+// ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
 
 const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/review',
+  '/api/review/:issueId/trigger',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -2489,11 +2495,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/request-review ─────────────────────
+// ─── Route: POST /api/review/:issueId/request ─────────────────────
 
 const postWorkspaceRequestReviewRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/request-review',
+  '/api/review/:issueId/request',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -2764,11 +2770,11 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/reset-review ───────────────────────
+// ─── Route: POST /api/review/:issueId/reset ───────────────────────
 
 const postWorkspaceResetReviewRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/reset-review',
+  '/api/review/:issueId/reset',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -2923,11 +2929,11 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/sync-main ──────────────────────────
+// ─── Route: POST /api/issues/:issueId/sync-main ──────────────────────────
 
 const postWorkspaceSyncMainRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/sync-main',
+  '/api/issues/:issueId/sync-main',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -3733,11 +3739,11 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
 setMergeQueueTriggerHandler(triggerMerge);
 
-// ─── Route: POST /api/workspaces/:issueId/merge ───────────────────────────────
+// ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
 
 const postWorkspaceMergeRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/merge',
+  '/api/issues/:issueId/merge',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -3756,11 +3762,11 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/approve ────────────────────────────
+// ─── Route: POST /api/issues/:issueId/approve ────────────────────────────
 
 const postWorkspaceApproveRoute = HttpRouter.add(
   'POST',
-  '/api/workspaces/:issueId/approve',
+  '/api/issues/:issueId/approve',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
@@ -4045,11 +4051,11 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
   }))
 );
 
-// ─── Route: DELETE /api/workspaces/:issueId/pending ──────────────────────────
+// ─── Route: DELETE /api/review/:issueId/pending ──────────────────────────
 
 const deleteWorkspacePendingRoute = HttpRouter.add(
   'DELETE',
-  '/api/workspaces/:issueId/pending',
+  '/api/review/:issueId/pending',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';

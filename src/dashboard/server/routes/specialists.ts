@@ -549,12 +549,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
             if (sessionExists(workAgentId)) {
               // Agent is running — send rebase instructions directly
-              const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
+              const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
               await messageAgent(workAgentId, rebaseMsg);
               console.log(`[specialists/done] Sent rebase instructions to ${workAgentId}`);
             } else {
               // Agent is stopped — start fresh (don't resume, sessions may be corrupted: PAN-612)
-              console.log(`[specialists/done] Work agent ${workAgentId} not running — will need manual restart or next pan work issue dispatch`);
+              console.log(`[specialists/done] Work agent ${workAgentId} not running — will need manual restart or next pan start dispatch`);
             }
           } catch (err: any) {
             console.warn(`[specialists/done] Failed to send rebase feedback to work agent: ${err.message}`);
@@ -572,7 +572,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const { messageAgent } = await import('../../../lib/agents.js');
 
           if (sessionExists(workAgentId)) {
-            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/workspaces/${normalizedIssueId}/request-review -H "Content-Type: application/json" -d "{}"`;
+            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"`;
             await messageAgent(workAgentId, reviewMsg);
             console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
           }

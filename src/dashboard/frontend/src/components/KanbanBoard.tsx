@@ -2886,7 +2886,7 @@ function ResetPipelineButton({
         })) {
           setIsPending(true);
           try {
-            const res = await fetch(`/api/workspaces/${issue.identifier}/reset-review`, {
+            const res = await fetch(`/api/review/${issue.identifier}/reset`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ rerun: true }),
@@ -2926,7 +2926,7 @@ function MergeIssueButton({
 
   const mergeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issue.identifier}/merge`, {
+      const res = await fetch(`/api/issues/${issue.identifier}/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

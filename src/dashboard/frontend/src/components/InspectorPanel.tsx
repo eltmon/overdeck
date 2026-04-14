@@ -172,7 +172,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
   const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
     queryKey: ['review-status', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/review-status`);
+      const res = await fetch(`/api/review/${issueId}/status`);
       if (!res.ok) throw new Error('Failed to fetch review status');
       return res.json();
     },
@@ -262,7 +262,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const startContainersMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/start`, {
+      const res = await fetch(`/api/issues/${issueId}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -319,8 +319,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
   const reviewMutation = useMutation({
     mutationFn: async () => {
       const url = forceReviewRef.current
-        ? `/api/workspaces/${issueId}/review?force=true`
-        : `/api/workspaces/${issueId}/review`;
+        ? `/api/review/${issueId}/trigger?force=true`
+        : `/api/review/${issueId}/trigger`;
       forceReviewRef.current = false;
       const res = await fetch(url, {
         method: 'POST',
@@ -343,7 +343,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const mergeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/merge`, {
+      const res = await fetch(`/api/issues/${issueId}/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -405,7 +405,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const resetReviewMutation = useMutation({
     mutationFn: async (options?: { rerun?: boolean }) => {
-      const res = await fetch(`/api/workspaces/${issueId}/reset-review`, {
+      const res = await fetch(`/api/review/${issueId}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rerun: options?.rerun ?? false }),
@@ -443,7 +443,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/pending`, { method: 'DELETE' });
+      const res = await fetch(`/api/review/${issueId}/pending`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to dismiss');
       return res.json();
     },
@@ -470,7 +470,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const syncMainMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/sync-main`, {
+      const res = await fetch(`/api/issues/${issueId}/sync-main`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

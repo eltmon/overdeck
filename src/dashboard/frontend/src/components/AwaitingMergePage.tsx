@@ -3,7 +3,7 @@
  *
  * Lists every issue with `readyForMerge: true` and offers two actions per row:
  *   1. Open the workspace's frontendUrl in a new tab so the user can UAT.
- *   2. POST to /api/workspaces/:id/merge once UAT passes.
+ *   2. POST to /api/issues/:id/merge once UAT passes.
  *
  * This is the only page the user needs to look at while `/all-up` runs the
  * Fix-All flywheel. See FIX-ALL-PRD.md.
@@ -29,7 +29,7 @@ async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
 }
 
 async function mergeIssue(issueId: string): Promise<unknown> {
-  const res = await fetch(`/api/workspaces/${issueId}/merge`, {
+  const res = await fetch(`/api/issues/${issueId}/merge`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
