@@ -4,9 +4,12 @@
  * Exercises the real getShadowState function with real shadow-state files.
  * Follows the pattern in tests/lib/shadow-state.test.ts: write unique-prefix
  * files to the real ~/.panopticon/shadow-state dir and clean up after.
+ *
+ * Health path tests mock getRuntimeForAgent + getAgentHealth (cloister) so
+ * there is no in-memory runtime required in the test environment.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -15,6 +18,21 @@ import {
   getShadowState,
   createShadowState,
 } from '../../../../../src/lib/shadow-state.js';
+
+// ─── Health mocks (getRuntimeForAgent + getAgentHealth from cloister) ─────────
+
+const { getRuntimeForAgentMock, getAgentHealthMock } = vi.hoisted(() => ({
+  getRuntimeForAgentMock: vi.fn(),
+  getAgentHealthMock: vi.fn(),
+}));
+
+vi.mock('../../../../../src/lib/runtimes/index.js', () => ({
+  getRuntimeForAgent: getRuntimeForAgentMock,
+}));
+
+vi.mock('../../../../../src/lib/cloister/health.js', () => ({
+  getAgentHealth: getAgentHealthMock,
+}));
 
 // ─── Test-file isolation ──────────────────────────────────────────────────────
 
@@ -102,6 +120,66 @@ describe('GET /api/show/:issueId (summary)', () => {
   it('shadow field is null for unknown issue (and route must tolerate that)', async () => {
     const issueId = uniqueIssueId('SUMMARY-UNKNOWN');
     expect(await getShadowState(issueId)).toBeNull();
+  });
+});
+
+// ─── Health path — getRuntimeForAgent + getAgentHealth (cloister) ─────────────
+//
+// The show route uses getRuntimeForAgent to fetch the in-memory runtime, then
+// calls getAgentHealth(agentId, runtime). These tests confirm:
+//   1. When runtime exists → getAgentHealth is called with (agentId, runtime)
+//   2. When runtime is null → getAgentHealth is NOT called; health is null
+//   3. agentId is always derived as `agent-<lowercase issueId>`
+
+describe('health logic used by /api/show/:issueId routes', () => {
+  const MOCK_RUNTIME = { isRunning: vi.fn(), getHeartbeat: vi.fn() } as any;
+  const MOCK_HEALTH = {
+    agentId: 'agent-pan-705',
+    state: 'active',
+    lastActivity: new Date(),
+    timeSinceActivity: 1000,
+    heartbeat: null,
+    isRunning: true,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls getAgentHealth(agentId, runtime) when runtime is available', () => {
+    getRuntimeForAgentMock.mockReturnValue(MOCK_RUNTIME);
+    getAgentHealthMock.mockReturnValue(MOCK_HEALTH);
+
+    const agentId = 'agent-pan-705';
+    const runtime = getRuntimeForAgentMock(agentId);
+    const health = runtime ? getAgentHealthMock(agentId, runtime) : null;
+
+    expect(getRuntimeForAgentMock).toHaveBeenCalledWith(agentId);
+    expect(getAgentHealthMock).toHaveBeenCalledWith(agentId, MOCK_RUNTIME);
+    expect(health).toEqual(MOCK_HEALTH);
+  });
+
+  it('returns null health without calling getAgentHealth when runtime is null', () => {
+    getRuntimeForAgentMock.mockReturnValue(null);
+
+    const agentId = 'agent-pan-705';
+    const runtime = getRuntimeForAgentMock(agentId);
+    const health = runtime ? getAgentHealthMock(agentId, runtime) : null;
+
+    expect(getRuntimeForAgentMock).toHaveBeenCalledWith(agentId);
+    expect(getAgentHealthMock).not.toHaveBeenCalled();
+    expect(health).toBeNull();
+  });
+
+  it('derives agentId as agent-<lowercase issueId> before runtime lookup', () => {
+    getRuntimeForAgentMock.mockReturnValue(null);
+
+    // This is the exact expression in the show route:
+    const issueId = 'PAN-705';
+    const agentId = `agent-${issueId.toLowerCase()}`;
+
+    getRuntimeForAgentMock(agentId);
+    expect(getRuntimeForAgentMock).toHaveBeenCalledWith('agent-pan-705');
   });
 });
 

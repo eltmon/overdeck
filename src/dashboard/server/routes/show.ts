@@ -14,6 +14,7 @@ import { HttpRouter } from 'effect/unstable/http';
 
 import { getShadowState } from '../../../lib/shadow-state.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
+import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 
 // ─── Route: GET /api/show/:issueId ────────────────────────────────────────────
 
@@ -26,7 +27,8 @@ const getShowRoute = HttpRouter.add(
 
     const shadowState = yield* Effect.promise(() => getShadowState(issueId));
     const agentId = `agent-${issueId.toLowerCase()}`;
-    const health = yield* Effect.promise(() => getAgentHealth(agentId).catch(() => null));
+    const runtime = getRuntimeForAgent(agentId);
+    const health = runtime ? getAgentHealth(agentId, runtime) : null;
 
     return jsonResponse({
       issueId,
@@ -62,10 +64,15 @@ const getShowHealthRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const agentId = `agent-${issueId.toLowerCase()}`;
-
-    const health = yield* Effect.promise(() => getAgentHealth(agentId).catch((err) => ({
-      error: err.message,
-    })));
+    const runtime = getRuntimeForAgent(agentId);
+    let health: ReturnType<typeof getAgentHealth> | { error: string } | null = null;
+    if (runtime) {
+      try {
+        health = getAgentHealth(agentId, runtime);
+      } catch (err: any) {
+        health = { error: err.message };
+      }
+    }
 
     return jsonResponse({ issueId, agentId, health });
   }))
