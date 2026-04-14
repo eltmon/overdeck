@@ -1,6 +1,6 @@
 ---
 name: pan-plan
-description: Interactive planning workflow with AI-assisted discovery
+description: "pan plan <id> — create an execution plan (vBRIEF) for an issue before starting"
 triggers:
   - plan issue
   - create plan
@@ -52,13 +52,13 @@ Panopticon's planning workflow:
 
 ```bash
 # Start planning session for an issue
-pan work plan PAN-3
+pan plan PAN-3
 
 # Plan with specific focus
-pan work plan PAN-3 --focus security
+pan plan PAN-3 --focus security
 
 # Plan with time limit
-pan work plan PAN-3 --timeout 10m
+pan plan PAN-3 --timeout 10m
 ```
 
 ## Planning Workflow
@@ -66,7 +66,7 @@ pan work plan PAN-3 --timeout 10m
 ### Step 1: Start Planning Session
 
 ```bash
-pan work plan PAN-3
+pan plan PAN-3
 ```
 
 **What happens:**
@@ -202,7 +202,7 @@ cat ~/panopticon/planning/PAN-3/PLANNING.md
 **Option A: Approve plan**
 ```bash
 # Accept the plan and create workspace
-pan work issue PAN-3 --with-plan
+pan start PAN-3 --with-plan
 
 # This will:
 # 1. Create implementation workspace
@@ -213,7 +213,7 @@ pan work issue PAN-3 --with-plan
 **Option B: Revise plan**
 ```bash
 # Send feedback to planning agent
-pan work tell PAN-3-planning "Consider using refresh tokens"
+pan tell PAN-3-planning "Consider using refresh tokens"
 
 # Agent will update plan based on feedback
 # Review updated plan and approve when ready
@@ -222,14 +222,14 @@ pan work tell PAN-3-planning "Consider using refresh tokens"
 **Option C: Reject and plan manually**
 ```bash
 # Exit planning session
-pan work kill PAN-3-planning
+pan kill PAN-3-planning
 
 # Create plan manually
 mkdir -p ~/panopticon/planning/PAN-3/
 vim ~/panopticon/planning/PAN-3/PLANNING.md
 
 # Then create workspace with manual plan
-pan work issue PAN-3
+pan start PAN-3
 ```
 
 ## Advanced Planning
@@ -238,39 +238,39 @@ pan work issue PAN-3
 
 ```bash
 # Plan with reference to related issues
-pan work plan PAN-3 --context "PAN-1,PAN-2"
+pan plan PAN-3 --context "PAN-1,PAN-2"
 
 # Plan with specific files to focus on
-pan work plan PAN-3 --files "src/auth/**"
+pan plan PAN-3 --files "src/auth/**"
 
 # Plan with architectural constraints
-pan work plan PAN-3 --constraints "Must use existing AuthService"
+pan plan PAN-3 --constraints "Must use existing AuthService"
 ```
 
 ### Planning Focus Areas
 
 ```bash
 # Focus on security
-pan work plan PAN-3 --focus security
+pan plan PAN-3 --focus security
 
 # Focus on performance
-pan work plan PAN-3 --focus performance
+pan plan PAN-3 --focus performance
 
 # Focus on testing
-pan work plan PAN-3 --focus testing
+pan plan PAN-3 --focus testing
 
 # Focus on architecture
-pan work plan PAN-3 --focus architecture
+pan plan PAN-3 --focus architecture
 ```
 
 ### Iterative Planning
 
 ```bash
 # Create high-level plan first
-pan work plan PAN-3 --depth overview
+pan plan PAN-3 --depth overview
 
 # Review and then create detailed plan
-pan work plan PAN-3 --depth detailed
+pan plan PAN-3 --depth detailed
 ```
 
 ## Dashboard Planning Interface
@@ -309,8 +309,8 @@ The dashboard provides rich planning UI:
 **Provide context:**
 ```bash
 # When starting planning session, add context
-pan work tell PAN-3-planning "This is for the mobile app, not web"
-pan work tell PAN-3-planning "User prefers GraphQL over REST"
+pan tell PAN-3-planning "This is for the mobile app, not web"
+pan tell PAN-3-planning "User prefers GraphQL over REST"
 ```
 
 **Answer questions thoughtfully:**
@@ -333,17 +333,17 @@ pan work tell PAN-3-planning "User prefers GraphQL over REST"
 Don't settle for first plan:
 ```bash
 # Request refinement
-pan work tell PAN-3-planning "Simplify the auth middleware approach"
+pan tell PAN-3-planning "Simplify the auth middleware approach"
 
 # Ask for alternatives
-pan work tell PAN-3-planning "What if we used OAuth instead?"
+pan tell PAN-3-planning "What if we used OAuth instead?"
 ```
 
 ## Troubleshooting
 
 ### Planning session won't start
 
-**Problem:** `pan work plan` fails or hangs
+**Problem:** `pan plan` fails or hangs
 
 **Solutions:**
 ```bash
@@ -354,10 +354,10 @@ which tmux
 mkdir -p ~/.panopticon/planning/
 
 # Check issue exists in tracker
-pan work list | grep PAN-3
+pan issues | grep PAN-3
 
 # Try with verbose output
-pan work plan PAN-3 --verbose
+pan plan PAN-3 --verbose
 ```
 
 ### Agent isn't asking questions
@@ -369,7 +369,7 @@ pan work plan PAN-3 --verbose
 - Agent only asks when clarification needed
 - You can proactively send context:
   ```bash
-  pan work tell PAN-3-planning "Please ask questions about approach"
+  pan tell PAN-3-planning "Please ask questions about approach"
   ```
 
 ### Plan is too high-level
@@ -379,10 +379,10 @@ pan work plan PAN-3 --verbose
 **Solutions:**
 ```bash
 # Request more detail
-pan work tell PAN-3-planning "Please add more specific implementation steps"
+pan tell PAN-3-planning "Please add more specific implementation steps"
 
 # Specify depth
-pan work plan PAN-3 --depth detailed
+pan plan PAN-3 --depth detailed
 ```
 
 ### Plan is too detailed
@@ -392,10 +392,10 @@ pan work plan PAN-3 --depth detailed
 **Solutions:**
 ```bash
 # Request overview
-pan work tell PAN-3-planning "Focus on high-level architecture, less detail"
+pan tell PAN-3-planning "Focus on high-level architecture, less detail"
 
 # Or start with overview depth
-pan work plan PAN-3 --depth overview
+pan plan PAN-3 --depth overview
 ```
 
 ### Can't view plan in dashboard
@@ -422,11 +422,11 @@ For epics with multiple sub-issues:
 
 ```bash
 # Plan parent issue
-pan work plan EPIC-1
+pan plan EPIC-1
 
 # Plan child issues with context from parent
-pan work plan PAN-3 --context EPIC-1
-pan work plan PAN-4 --context EPIC-1
+pan plan PAN-3 --context EPIC-1
+pan plan PAN-4 --context EPIC-1
 ```
 
 ### Collaborative Planning
@@ -435,7 +435,7 @@ Multiple team members reviewing plan:
 
 ```bash
 # Planning agent creates plan
-pan work plan PAN-3
+pan plan PAN-3
 
 # Team reviews in dashboard
 # Click "Request Changes" in UI
@@ -450,7 +450,7 @@ For unfamiliar domains:
 
 ```bash
 # Start planning with research focus
-pan work plan PAN-3 --research
+pan plan PAN-3 --research
 
 # Agent will:
 # - Search for documentation
@@ -487,7 +487,7 @@ Once plan is approved:
 
 ```bash
 # Create workspace with plan
-pan work issue PAN-3 --with-plan
+pan start PAN-3 --with-plan
 
 # Implementation agent will have:
 # - Full plan as context
@@ -518,4 +518,4 @@ Read file_path="PLANNING.md"
 - Planning sessions are read-only (no code changes)
 - Plans saved in `~/.panopticon/planning/<issue-id>/PLANNING.md`
 - Dashboard planning UI: http://localhost:3001/planning/<issue-id>
-- Run `pan work plan --help` for more options
+- Run `pan plan --help` for more options

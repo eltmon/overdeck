@@ -6,6 +6,7 @@ import {
   normalizeIssueId,
   extractStandardPrefix,
   extractStandardNumber,
+  resolveIssueId,
 } from '../../src/lib/issue-id.js';
 
 describe('parseIssueId', () => {
@@ -242,5 +243,44 @@ describe('extractStandardNumber', () => {
 
   it('returns null for invalid format', () => {
     expect(extractStandardNumber('notanid')).toBeNull();
+  });
+});
+
+describe('resolveIssueId', () => {
+  it('uppercases a bare issue id', () => {
+    expect(resolveIssueId('pan-123')).toBe('PAN-123');
+  });
+
+  it('leaves an already-uppercase id unchanged', () => {
+    expect(resolveIssueId('PAN-123')).toBe('PAN-123');
+  });
+
+  it('strips the "agent-" prefix and uppercases', () => {
+    expect(resolveIssueId('agent-pan-123')).toBe('PAN-123');
+  });
+
+  it('strips the "agent-" prefix case-insensitively', () => {
+    expect(resolveIssueId('Agent-Pan-456')).toBe('PAN-456');
+    expect(resolveIssueId('AGENT-pan-789')).toBe('PAN-789');
+  });
+
+  it('does not strip non-leading "agent-" occurrences', () => {
+    // "agent-" that isn't at the start stays put (then gets uppercased)
+    expect(resolveIssueId('pan-agent-123')).toBe('PAN-AGENT-123');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(resolveIssueId('')).toBe('');
+  });
+
+  it('uppercases a prefix-less identifier', () => {
+    // Rally-style IDs have no dash — still uppercased, not rejected
+    expect(resolveIssueId('f29698')).toBe('F29698');
+  });
+
+  it('strips only one leading agent- token, not repeated prefixes', () => {
+    // The regex matches a single /^agent-/ (anchored, non-greedy by default).
+    // A double-prefix leaves the inner "agent-" intact, then uppercases.
+    expect(resolveIssueId('agent-agent-pan-1')).toBe('AGENT-PAN-1');
   });
 });

@@ -218,7 +218,7 @@ claude --model gemini-3-pro-preview "What is 2+2?"
 
 **Test 1: Spawn agent with Anthropic (control)**
 ```bash
-pan work issue PAN-999 --model claude-sonnet-4-5
+pan start PAN-999 --model claude-sonnet-4-5
 # Verify: Agent spawns normally
 # Verify: No custom env vars set
 ```
@@ -227,7 +227,7 @@ pan work issue PAN-999 --model claude-sonnet-4-5
 ```bash
 # Configure settings.json with Kimi API key
 # Set review_agent to use claude-sonnet-4-5 (will use Kimi endpoint)
-pan work issue PAN-998
+pan start PAN-998
 
 # Verify in agent state:
 # - ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
@@ -239,7 +239,7 @@ pan work issue PAN-998
 ```bash
 # Configure settings.json with GLM API key
 # Set review_agent to use glm-4.7
-pan work issue PAN-997
+pan start PAN-997
 
 # Verify in agent state:
 # - ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
@@ -253,7 +253,7 @@ pan work issue PAN-997
 # Configure settings.json with OpenAI API key
 # Ensure router is running
 # Set review_agent to use gpt-4o
-pan work issue PAN-996
+pan start PAN-996
 
 # Verify in agent state:
 # - ANTHROPIC_BASE_URL=http://localhost:8000

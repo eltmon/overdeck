@@ -20,6 +20,7 @@ const { execAsyncMock, spawnMock, mockApi } = vi.hoisted(() => {
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
   spawn: spawnMock,
 }));
 vi.mock('util', () => ({

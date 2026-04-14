@@ -1,6 +1,6 @@
 ---
 name: pan-projects
-description: Add, remove, and manage Panopticon-managed projects
+description: "pan project <subcommand> — add, remove, and manage Panopticon-monitored projects"
 triggers:
   - pan projects
   - add project
@@ -168,7 +168,7 @@ GITHUB_LOCAL_PATHS=owner/myrepo=/path/to/project
 pan project list
 
 # Check issues can be fetched
-pan work list
+pan issues
 
 # Create a test workspace
 pan workspace create ISSUE-1
@@ -206,7 +206,7 @@ services:
 
 ### 3. Panopticon Integration
 
-When you run `pan work issue ISSUE-1`, Panopticon will:
+When you run `pan start ISSUE-1`, Panopticon will:
 1. Create a workspace (git worktree)
 2. Detect the `dev` script
 3. Offer to start containers for the workspace

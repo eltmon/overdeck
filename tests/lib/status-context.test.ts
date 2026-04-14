@@ -9,7 +9,7 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-import { readContextPercent } from '../../src/cli/commands/work/status.js';
+import { readContextPercent } from '../../src/cli/commands/status.js';
 
 const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
 const TEST_PREFIX = 'test-ctx-pan232';

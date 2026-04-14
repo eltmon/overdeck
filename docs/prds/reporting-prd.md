@@ -142,7 +142,7 @@ export function linkSessionToIssue(sessionId: string, issueId: string): void;
 
 #### 3.1 Linking Mechanism
 
-When `pan work issue` spawns an agent:
+When `pan start` spawns an agent:
 1. Record the Claude Code session ID in agent state
 2. Store mapping in `~/.panopticon/session-map.json`
 

@@ -56,7 +56,7 @@ If auto-fix doesn't work:
 
 3. **Restart the agent fresh**:
    ```bash
-   pan work issue PROJ-123
+   pan start PROJ-123
    ```
 
 ## Thresholds

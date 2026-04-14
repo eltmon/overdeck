@@ -150,11 +150,11 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -50
 # - Long-running commands
 # - Error messages
 
-# Try sending a message (ALWAYS use pan work tell, NOT raw tmux)
-pan work tell ISSUE-123 "What is your current status?"
+# Try sending a message (ALWAYS use pan tell, NOT raw tmux)
+pan tell ISSUE-123 "What is your current status?"
 ```
 
-**WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan work tell` which handles this correctly.
+**WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan tell` which handles this correctly.
 
 ### Agent crashed
 
@@ -167,7 +167,7 @@ cd /path/to/workspaces/ISSUE-123
 cat .planning/STATE.md
 
 # Resume with new agent
-pan work issue ISSUE-123
+pan start ISSUE-123
 ```
 
 ### Multiple agents for same issue

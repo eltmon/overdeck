@@ -1,6 +1,6 @@
 ---
 name: pan-sync-main
-description: Sync latest main into a workspace's feature branch via git merge. Use when a hotfix has been merged to main and active workspaces need to pick up the changes.
+description: "pan sync-main <id> — merge latest main into the feature branch for an active workspace"
 triggers:
   - sync with main
   - sync main into workspace
@@ -21,10 +21,10 @@ Merges the latest `main` branch into a workspace's feature branch. Uses `git mer
 
 ```bash
 # CLI command
-pan work sync-main PAN-XXX
+pan sync-main PAN-XXX
 
 # Or via the dashboard API
-curl -X POST http://localhost:3011/api/workspaces/PAN-XXX/sync-main
+curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 ```
 
 ## What It Does
@@ -57,7 +57,7 @@ curl -X POST http://localhost:3011/api/workspaces/PAN-XXX/sync-main
 
 ```bash
 # Sync PAN-123 workspace with latest main
-pan work sync-main PAN-123
+pan sync-main PAN-123
 
 # Output on success:
 # ✓ Synced 3 commit(s) from main
@@ -82,6 +82,6 @@ The "Sync with Main" button appears in the workspace detail panel:
 
 ## Related Commands
 
-- `pan work approve <id>` — Review and merge to main
-- `pan work request-review <id>` — Trigger review pipeline
-- `pan work tell <id> "<message>"` — Send message to agent
+- `pan approve <id>` — Review and merge to main
+- `pan review request <id>` — Trigger review pipeline
+- `pan tell <id> "<message>"` — Send message to agent

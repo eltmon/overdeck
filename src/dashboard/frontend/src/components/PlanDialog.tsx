@@ -237,7 +237,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
   // Planning state — drives the "tasks need generation" callout in the footer.
   // Polled while the planning step is open so the callout vanishes the moment
-  // beads exist (whether the agent ran pan plan-finalize or the user clicked
+  // beads exist (whether the agent ran pan plan finalize or the user clicked
   // Generate Tasks here).
   const planningStateQuery = useQuery({
     queryKey: ['planning-state', issue.identifier],
@@ -975,7 +975,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         <Square className="w-4 h-4" />
                         Stop
                       </button>
-                      {/* Done appears only when the planning agent has written .planning/.planning-complete via `pan plan-finalize`. Tmux liveness is not consulted — Stop kills the session, Done finalizes the plan. */}
+                      {/* Done appears only when the planning agent has written .planning/.planning-complete via `pan plan finalize`. Tmux liveness is not consulted — Stop kills the session, Done finalizes the plan. */}
                       {(statusQuery.data && statusQuery.data.hasCompletionMarker) && (
                         <button
                           onClick={() => {

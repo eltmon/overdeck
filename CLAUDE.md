@@ -41,7 +41,7 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 
 **Unless explicitly asked to break work into phases, deliver the entire feature in a single issue.** A feature is idempotent — partial delivery provides zero value to the end user.
 
-- A PRD may describe phases for organizational clarity, but the agent MUST implement ALL phases before calling `pan work done`.
+- A PRD may describe phases for organizational clarity, but the agent MUST implement ALL phases before calling `pan done`.
 - Do not merge a subset of a feature and call it done. If the issue says "redesign the kanban board", that means ALL aspects of the redesign — not just the easy parts.
 - "Large refactor" is not an excuse to ship incomplete work. The size of the change is the size of the change.
 - If a feature genuinely cannot be completed in one session (e.g., token limits), the agent should document exactly what remains and NOT signal completion. The issue stays open until ALL work is done.
@@ -91,7 +91,7 @@ resolve to the main repo's stale build instead of the worktree's version).
 nearly instant (~2s). It correctly resolves `@panopticon/contracts` to the worktree's local
 `packages/contracts/` via Bun workspace resolution.
 
-**Quality gates** (must pass before `pan work done`):
+**Quality gates** (must pass before `pan done`):
 - `npm run typecheck` — TypeScript strict mode
 - `npm run lint` — ESLint
 - `npm test` — Vitest (root + frontend)

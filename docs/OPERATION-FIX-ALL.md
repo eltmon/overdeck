@@ -14,7 +14,7 @@ infrastructure bug** preventing the autonomous pipeline from working end-to-end.
 
 3. **Manual intervention only for broken state recovery.** After fixing a bug, you may need to manually unstick agents left in a broken state BY that bug. But the fix comes first.
 
-4. **Monitor ALL the way through.** Each issue should flow: In Progress → agent works → `pan work done` → verification → review specialist → test specialist → Done (merge-ready). Watch the full lifecycle.
+4. **Monitor ALL the way through.** Each issue should flow: In Progress → agent works → `pan done` → verification → review specialist → test specialist → Done (merge-ready). Watch the full lifecycle.
 
 5. **Every column, every tag, every state must be correct.** Wrong column = bug in status management. Wrong tag = bug in label sync. Fix the code, not the data.
 
@@ -78,7 +78,7 @@ For each class of problem, investigate root cause and fix the code:
 - **Done column empty**: Fix store selector over-filtering
 - **Review stuck at pending**: Fix specialist dispatch/wake logic
 - **Status reverts**: Fix race conditions in complete-planning, start-agent, etc.
-- **Agents at idle prompt**: Check if `pan work done` flow or context compaction is failing
+- **Agents at idle prompt**: Check if `pan done` flow or context compaction is failing
 
 ### Phase 3: Rebuild, Commit & Restart
 
@@ -92,7 +92,7 @@ After each code fix:
 ### Phase 4: Monitor Through Completion
 
 After bugs are fixed, monitor each issue through the full pipeline:
-- Agent completes work → calls `pan work done`
+- Agent completes work → calls `pan done`
 - Verification gate runs (typecheck, lint, test)
 - Review specialist wakes and reviews
 - Test specialist runs after review passes
@@ -190,7 +190,7 @@ For each bug found during the operation:
 
 ### 2026-04-13 — Run 8
 - **Issues inventoried**: 6 active PAN issues (PAN-509, PAN-544, PAN-611, PAN-457, PAN-540, PAN-653)
-- **Issues moved**: PAN-457 and PAN-653 planning → work agents started; PAN-611/PAN-544 feedback sent with CI fix instructions; PAN-509 told to run pan work done
+- **Issues moved**: PAN-457 and PAN-653 planning → work agents started; PAN-611/PAN-544 feedback sent with CI fix instructions; PAN-509 told to run pan done
 - **Bugs fixed**: 1 substrate bug
   - `checkFailedMergeRetry()` retried CI check failures the same as transient failures (30min cooldown × 3 retries = 90min wasted per cycle). Fixed: detect "failing required checks" in mergeNotes, write feedback to work agent, saturate mergeRetryCount. Also fixed `checkPostReviewCommits` to reset mergeRetryCount=0 when HEAD advances, and added `mergeStatus !== 'failed'` defense-in-depth to rfm auto-computation (commit 0209bf1f)
 - **Friction points removed**: CI failure cycling loop broken for all current and future issues; planning agents stuck at "Planning complete" prompt now handled by direct complete-planning API call

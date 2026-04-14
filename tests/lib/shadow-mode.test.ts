@@ -65,21 +65,21 @@ describe('shadow-mode', () => {
   });
 
   describe('resolveShadowMode', () => {
-    it('should return cli source when cliFlag is provided', () => {
-      const result = resolveShadowMode({ cliFlag: true });
+    it('should return cli source when cliFlag is provided', async () => {
+      const result = await resolveShadowMode({ cliFlag: true });
       expect(result.enabled).toBe(true);
       expect(result.source).toBe('cli');
 
-      const result2 = resolveShadowMode({ cliFlag: false });
+      const result2 = await resolveShadowMode({ cliFlag: false });
       expect(result2.enabled).toBe(false);
       expect(result2.source).toBe('cli');
     });
 
-    it('should return existing source when issue is already shadowed', () => {
+    it('should return existing source when issue is already shadowed', async () => {
       const id = getUniqueId('existing');
-      createShadowState(id, 'open');
+      await createShadowState(id, 'open');
 
-      const result = resolveShadowMode({ issueId: id });
+      const result = await resolveShadowMode({ issueId: id });
 
       expect(result.enabled).toBe(true);
       expect(result.source).toBe('existing');
@@ -87,79 +87,77 @@ describe('shadow-mode', () => {
       removeShadowState(id);
     });
 
-    it('should return default when no config is set', () => {
-      const result = resolveShadowMode({ issueId: getUniqueId('notshadowed') });
+    it('should return default when no config is set', async () => {
+      const result = await resolveShadowMode({ issueId: getUniqueId('notshadowed') });
       expect(result.source).toBe('default');
     });
 
-    it('should respect tracker type overrides', () => {
-      const result = resolveShadowMode({ trackerType: 'linear' });
+    it('should respect tracker type overrides', async () => {
+      const result = await resolveShadowMode({ trackerType: 'linear' });
       expect(result.trackerType).toBe('linear');
     });
   });
 
   describe('isShadowModeEnabled', () => {
-    it('should return true when cliFlag is true', () => {
-      expect(isShadowModeEnabled({ cliFlag: true })).toBe(true);
+    it('should return true when cliFlag is true', async () => {
+      expect(await isShadowModeEnabled({ cliFlag: true })).toBe(true);
     });
 
-    it('should return false when cliFlag is false', () => {
-      expect(isShadowModeEnabled({ cliFlag: false })).toBe(false);
+    it('should return false when cliFlag is false', async () => {
+      expect(await isShadowModeEnabled({ cliFlag: false })).toBe(false);
     });
 
-    it('should return true for shadowed issues', () => {
+    it('should return true for shadowed issues', async () => {
       const id = getUniqueId('enabled');
-      createShadowState(id, 'open');
+      await createShadowState(id, 'open');
 
-      expect(isShadowModeEnabled({ issueId: id })).toBe(true);
+      expect(await isShadowModeEnabled({ issueId: id })).toBe(true);
 
       removeShadowState(id);
     });
   });
 
   describe('shouldSkipTrackerUpdate', () => {
-    it('should return true when cliFlag is true', () => {
-      expect(shouldSkipTrackerUpdate(getUniqueId('skip'), true)).toBe(true);
+    it('should return true when cliFlag is true', async () => {
+      expect(await shouldSkipTrackerUpdate(getUniqueId('skip'), true)).toBe(true);
     });
 
-    it('should return false when cliFlag is false', () => {
-      expect(shouldSkipTrackerUpdate(getUniqueId('noskip'), false)).toBe(false);
+    it('should return false when cliFlag is false', async () => {
+      expect(await shouldSkipTrackerUpdate(getUniqueId('noskip'), false)).toBe(false);
     });
 
-    it('should use default tracker type when not specified', () => {
-      const result = shouldSkipTrackerUpdate(getUniqueId('default'), undefined);
-      // Default should be false unless env/config says otherwise
+    it('should use default tracker type when not specified', async () => {
+      const result = await shouldSkipTrackerUpdate(getUniqueId('default'), undefined);
       expect(typeof result).toBe('boolean');
     });
 
-    it('should respect tracker type parameter', () => {
-      // Test with different tracker types
-      expect(typeof shouldSkipTrackerUpdate(getUniqueId('github'), undefined, 'github')).toBe('boolean');
-      expect(typeof shouldSkipTrackerUpdate(getUniqueId('gitlab'), undefined, 'gitlab')).toBe('boolean');
+    it('should respect tracker type parameter', async () => {
+      expect(typeof (await shouldSkipTrackerUpdate(getUniqueId('github'), undefined, 'github'))).toBe('boolean');
+      expect(typeof (await shouldSkipTrackerUpdate(getUniqueId('gitlab'), undefined, 'gitlab'))).toBe('boolean');
     });
   });
 
   describe('getShadowModeStatus', () => {
-    it('should return disabled message when shadow mode is off', () => {
-      const status = getShadowModeStatus({ cliFlag: false });
+    it('should return disabled message when shadow mode is off', async () => {
+      const status = await getShadowModeStatus({ cliFlag: false });
       expect(status).toContain('disabled');
     });
 
-    it('should return enabled message with source when shadow mode is on', () => {
-      const status = getShadowModeStatus({ cliFlag: true });
+    it('should return enabled message with source when shadow mode is on', async () => {
+      const status = await getShadowModeStatus({ cliFlag: true });
       expect(status).toContain('enabled');
       expect(status).toContain('CLI flag');
     });
 
-    it('should include tracker type when provided', () => {
-      const status = getShadowModeStatus({ cliFlag: true, trackerType: 'linear' });
+    it('should include tracker type when provided', async () => {
+      const status = await getShadowModeStatus({ cliFlag: true, trackerType: 'linear' });
       expect(status).toContain('linear');
     });
   });
 
   describe('getShadowModeSummary', () => {
-    it('should return summary object with expected keys', () => {
-      const summary = getShadowModeSummary();
+    it('should return summary object with expected keys', async () => {
+      const summary = await getShadowModeSummary();
 
       expect(summary).toHaveProperty('globalEnabled');
       expect(summary).toHaveProperty('perTracker');
@@ -172,10 +170,10 @@ describe('shadow-mode', () => {
       expect(typeof summary.pendingSyncCount).toBe('number');
     });
 
-    it('should detect environment variable', () => {
+    it('should detect environment variable', async () => {
       process.env.SHADOW_MODE = 'true';
 
-      const summary = getShadowModeSummary();
+      const summary = await getShadowModeSummary();
       expect(summary.envSet).toBe(true);
 
       delete process.env.SHADOW_MODE;

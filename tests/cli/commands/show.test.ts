@@ -1,0 +1,200 @@
+/**
+ * Tests for `pan show <id>` unified observation command.
+ *
+ * --shadow, --cv, --context, --health each delegate to the full sub-command
+ * for detail views. The default path builds a compact combined summary
+ * directly from the underlying library functions (no sub-command delegation)
+ * so the output stays ≤ 25 lines.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const {
+  shadowMock, cvMock, contextMock, healthMock,
+  getShadowStateMock, getAgentHealthMock, getAgentCVMock,
+} = vi.hoisted(() => ({
+  shadowMock: vi.fn().mockResolvedValue(undefined),
+  cvMock: vi.fn().mockResolvedValue(undefined),
+  contextMock: vi.fn().mockResolvedValue(undefined),
+  healthMock: vi.fn().mockResolvedValue(undefined),
+  getShadowStateMock: vi.fn(),
+  getAgentHealthMock: vi.fn(),
+  getAgentCVMock: vi.fn(),
+}));
+
+vi.mock('../../../src/cli/commands/shadow.js', () => ({
+  shadowCommand: shadowMock,
+}));
+vi.mock('../../../src/cli/commands/cv.js', () => ({
+  cvCommand: cvMock,
+}));
+vi.mock('../../../src/cli/commands/context.js', () => ({
+  contextCommand: contextMock,
+}));
+vi.mock('../../../src/cli/commands/health.js', () => ({
+  healthCommand: healthMock,
+}));
+
+vi.mock('../../../src/lib/shadow-state.js', () => ({
+  getShadowState: getShadowStateMock,
+}));
+vi.mock('../../../src/lib/health.js', () => ({
+  getAgentHealth: getAgentHealthMock,
+}));
+vi.mock('../../../src/lib/cv.js', () => ({
+  getAgentCV: getAgentCVMock,
+}));
+
+import { showCommand } from '../../../src/cli/commands/show.js';
+
+describe('showCommand', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reasonable defaults for the compact-default-path tests; individual tests
+    // can override via mockReturnValue / mockResolvedValue.
+    getShadowStateMock.mockResolvedValue(null);
+    getAgentHealthMock.mockReturnValue({
+      agentId: 'agent-pan-6',
+      status: 'healthy',
+      consecutiveFailures: 0,
+      forceKillCount: 0,
+      recoveryCount: 0,
+      inCooldown: false,
+    });
+    getAgentCVMock.mockReturnValue({
+      agentId: 'agent-pan-6',
+      createdAt: new Date().toISOString(),
+      lastActive: new Date().toISOString(),
+      runtime: 'claude',
+      model: 'sonnet',
+      stats: {
+        totalIssues: 0,
+        successCount: 0,
+        failureCount: 0,
+        abandonedCount: 0,
+        avgDuration: 0,
+        successRate: 0,
+      },
+      skillsUsed: [],
+      recentWork: [],
+    });
+  });
+
+  describe('flag delegation', () => {
+    it('--shadow: delegates exclusively to shadowCommand', async () => {
+      await showCommand('PAN-1', { shadow: true });
+      expect(shadowMock).toHaveBeenCalledWith('PAN-1');
+      expect(cvMock).not.toHaveBeenCalled();
+      expect(contextMock).not.toHaveBeenCalled();
+      expect(healthMock).not.toHaveBeenCalled();
+    });
+
+    it('--cv: delegates exclusively to cvCommand', async () => {
+      await showCommand('PAN-2', { cv: true });
+      expect(cvMock).toHaveBeenCalledWith('PAN-2', { json: undefined });
+      expect(shadowMock).not.toHaveBeenCalled();
+      expect(contextMock).not.toHaveBeenCalled();
+      expect(healthMock).not.toHaveBeenCalled();
+    });
+
+    it('--context: delegates exclusively to contextCommand', async () => {
+      await showCommand('PAN-3', { context: true });
+      expect(contextMock).toHaveBeenCalledWith('state', 'PAN-3', undefined, { json: undefined });
+      expect(shadowMock).not.toHaveBeenCalled();
+      expect(cvMock).not.toHaveBeenCalled();
+      expect(healthMock).not.toHaveBeenCalled();
+    });
+
+    it('--health: delegates exclusively to healthCommand', async () => {
+      await showCommand('PAN-4', { health: true });
+      expect(healthMock).toHaveBeenCalledWith('check', 'PAN-4', { json: undefined });
+      expect(shadowMock).not.toHaveBeenCalled();
+      expect(cvMock).not.toHaveBeenCalled();
+      expect(contextMock).not.toHaveBeenCalled();
+    });
+
+    it('propagates --json to each delegate view', async () => {
+      await showCommand('PAN-5', { cv: true, json: true });
+      expect(cvMock).toHaveBeenCalledWith('PAN-5', { json: true });
+    });
+  });
+
+  describe('default path (no flags) — compact summary', () => {
+    it('does NOT delegate to the full sub-commands', async () => {
+      await showCommand('PAN-6');
+
+      // The default path must build a compact view directly; calling the
+      // full sub-handlers would blow past the 25-line budget.
+      expect(shadowMock).not.toHaveBeenCalled();
+      expect(cvMock).not.toHaveBeenCalled();
+      expect(contextMock).not.toHaveBeenCalled();
+      expect(healthMock).not.toHaveBeenCalled();
+    });
+
+    it('reads from the shadow-state, health, and cv lib modules directly', async () => {
+      await showCommand('PAN-6');
+      expect(getShadowStateMock).toHaveBeenCalledWith('PAN-6');
+      expect(getAgentHealthMock).toHaveBeenCalledWith('agent-pan-6');
+      expect(getAgentCVMock).toHaveBeenCalledWith('agent-pan-6');
+    });
+
+    it('output stays at or below 25 lines (PRD compact-summary requirement)', async () => {
+      // Populate every field so the summary is in its longest form — shadow
+      // present + healthy + stats + 3 recent work entries.
+      const now = new Date().toISOString();
+      getShadowStateMock.mockResolvedValue({
+        issueId: 'PAN-6',
+        shadowStatus: 'in_progress',
+        trackerStatus: 'open',
+        trackerStatusUpdatedAt: now,
+        shadowedAt: now,
+        history: [],
+      });
+      getAgentCVMock.mockReturnValue({
+        agentId: 'agent-pan-6',
+        createdAt: now,
+        lastActive: now,
+        runtime: 'claude',
+        model: 'sonnet',
+        stats: {
+          totalIssues: 12,
+          successCount: 10,
+          failureCount: 2,
+          abandonedCount: 0,
+          avgDuration: 15,
+          successRate: 0.83,
+        },
+        skillsUsed: ['Read', 'Edit'],
+        recentWork: [
+          { issueId: 'PAN-100', startedAt: now, completedAt: now, outcome: 'success' },
+          { issueId: 'PAN-101', startedAt: now, completedAt: now, outcome: 'failed' },
+          { issueId: 'PAN-102', startedAt: now, completedAt: now, outcome: 'abandoned' },
+        ],
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-6');
+      const lineCount = logSpy.mock.calls.length;
+      logSpy.mockRestore();
+      expect(lineCount).toBeLessThanOrEqual(25);
+    });
+
+    it('--json short-circuits to a single JSON payload (no human-formatted lines)', async () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await showCommand('PAN-8', { json: true });
+
+      // Capture call state BEFORE restoring — mockRestore clears call history.
+      const calls = logSpy.mock.calls.slice();
+      logSpy.mockRestore();
+
+      expect(calls).toHaveLength(1);
+      const payload = JSON.parse(calls[0][0]);
+      expect(payload.issueId).toBe('PAN-8');
+      expect(payload.agentId).toBe('agent-pan-8');
+      expect(payload).toHaveProperty('shadow');
+      expect(payload).toHaveProperty('health');
+      expect(payload).toHaveProperty('cv');
+    });
+  });
+});

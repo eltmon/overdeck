@@ -7,7 +7,8 @@
  * Storage Location: ~/.panopticon/shadow-state/
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFile, writeFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { IssueState } from './tracker/interface.js';
@@ -25,7 +26,7 @@ export interface ShadowHistoryEntry {
   to: IssueState;
   /** When the transition occurred */
   at: string;
-  /** Command that triggered the transition (e.g., "pan work plan", "dashboard") */
+  /** Command that triggered the transition (e.g., "pan plan", "dashboard") */
   by: string;
   /** Whether this transition was synced to the tracker */
   syncedToTracker: boolean;
@@ -92,10 +93,15 @@ function getShadowStatePath(issueId: string): string {
 }
 
 /**
- * Get shadow state for an issue
+ * Get shadow state for an issue.
+ *
+ * Async — uses `fs/promises.readFile` so it doesn't block the Node.js event
+ * loop. This is mandated by the CLAUDE.md no-blocking-calls rule (PAN-70,
+ * PAN-446); do not re-introduce a sync readFileSync path.
+ *
  * @returns ShadowState or null if not shadowed
  */
-export function getShadowState(issueId: string): ShadowState | null {
+export async function getShadowState(issueId: string): Promise<ShadowState | null> {
   const filePath = getShadowStatePath(issueId);
 
   if (!existsSync(filePath)) {
@@ -103,7 +109,7 @@ export function getShadowState(issueId: string): ShadowState | null {
   }
 
   try {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = await readFile(filePath, 'utf-8');
     return JSON.parse(content) as ShadowState;
   } catch (error) {
     console.error(`Error reading shadow state for ${issueId}:`, error);
@@ -114,18 +120,18 @@ export function getShadowState(issueId: string): ShadowState | null {
 /**
  * Check if an issue is in shadow mode
  */
-export function isShadowed(issueId: string): boolean {
-  return getShadowState(issueId) !== null;
+export async function isShadowed(issueId: string): Promise<boolean> {
+  return (await getShadowState(issueId)) !== null;
 }
 
 /**
  * Create a new shadow state for an issue
  */
-export function createShadowState(
+export async function createShadowState(
   issueId: string,
   initialTrackerStatus: IssueState = 'open',
   triggeredBy: string = 'unknown'
-): ShadowState {
+): Promise<ShadowState> {
   ensureShadowStateDir();
 
   const now = new Date().toISOString();
@@ -140,7 +146,7 @@ export function createShadowState(
   };
 
   const filePath = getShadowStatePath(issueId);
-  writeFileSync(filePath, JSON.stringify(shadowState, null, 2), 'utf-8');
+  await writeFile(filePath, JSON.stringify(shadowState, null, 2), 'utf-8');
 
   return shadowState;
 }
@@ -148,15 +154,15 @@ export function createShadowState(
 /**
  * Update shadow state for an issue
  */
-export function updateShadowState(
+export async function updateShadowState(
   issueId: string,
   newStatus: IssueState,
   triggeredBy: string,
   targetCanonicalState?: CanonicalState
-): ShadowState {
+): Promise<ShadowState> {
   ensureShadowStateDir();
 
-  let state = getShadowState(issueId);
+  let state = await getShadowState(issueId);
 
   // Create new shadow state if it doesn't exist
   if (!state) {
@@ -191,7 +197,7 @@ export function updateShadowState(
   }
 
   const filePath = getShadowStatePath(issueId);
-  writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
+  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
 
   return state;
 }
@@ -199,11 +205,11 @@ export function updateShadowState(
 /**
  * Update tracker status cache (refresh from tracker)
  */
-export function updateTrackerStatusCache(
+export async function updateTrackerStatusCache(
   issueId: string,
   trackerStatus: IssueState
-): ShadowState {
-  const state = getShadowState(issueId);
+): Promise<ShadowState> {
+  const state = await getShadowState(issueId);
 
   if (!state) {
     throw new Error(`Cannot update tracker status: ${issueId} is not in shadow mode`);
@@ -213,7 +219,7 @@ export function updateTrackerStatusCache(
   state.trackerStatusUpdatedAt = new Date().toISOString();
 
   const filePath = getShadowStatePath(issueId);
-  writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
+  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
 
   return state;
 }
@@ -222,12 +228,12 @@ export function updateTrackerStatusCache(
  * Sync shadow state to tracker (mark as synced)
  * This is called after successfully updating the tracker
  */
-export function markAsSynced(
+export async function markAsSynced(
   issueId: string,
   syncedState: IssueState,
   previousTrackerState?: IssueState
-): SyncResult {
-  const state = getShadowState(issueId);
+): Promise<SyncResult> {
+  const state = await getShadowState(issueId);
 
   if (!state) {
     return {
@@ -253,7 +259,7 @@ export function markAsSynced(
   state.trackerStatusUpdatedAt = now;
 
   const filePath = getShadowStatePath(issueId);
-  writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
+  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
 
   return {
     success: true,
@@ -266,19 +272,19 @@ export function markAsSynced(
 /**
  * List all shadowed issues
  */
-export function listShadowedIssues(): ShadowState[] {
+export async function listShadowedIssues(): Promise<ShadowState[]> {
   if (!existsSync(SHADOW_STATE_DIR)) {
     return [];
   }
 
-  const files = readdirSync(SHADOW_STATE_DIR);
+  const files = await readdir(SHADOW_STATE_DIR);
   const states: ShadowState[] = [];
 
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
 
     try {
-      const content = readFileSync(join(SHADOW_STATE_DIR, file), 'utf-8');
+      const content = await readFile(join(SHADOW_STATE_DIR, file), 'utf-8');
       const state = JSON.parse(content) as ShadowState;
       states.push(state);
     } catch (error) {
@@ -330,16 +336,16 @@ export function removeShadowState(
  * Get the display status for an issue
  * Returns shadow status with tracker status info if in shadow mode
  */
-export function getDisplayStatus(
+export async function getDisplayStatus(
   issueId: string,
   trackerStatus: IssueState
-): {
+): Promise<{
   status: IssueState;
   isShadowed: boolean;
   trackerStatus?: IssueState;
   outOfSync?: boolean;
-} {
-  const state = getShadowState(issueId);
+}> {
+  const state = await getShadowState(issueId);
 
   if (!state) {
     return {
@@ -360,8 +366,8 @@ export function getDisplayStatus(
  * Check if an issue needs to be synced to tracker
  * (shadow status differs from tracker status)
  */
-export function needsSync(issueId: string): boolean {
-  const state = getShadowState(issueId);
+export async function needsSync(issueId: string): Promise<boolean> {
+  const state = await getShadowState(issueId);
 
   if (!state) {
     return false;
@@ -373,8 +379,8 @@ export function needsSync(issueId: string): boolean {
 /**
  * Get unsynced history entries for an issue
  */
-export function getUnsyncedHistory(issueId: string): ShadowHistoryEntry[] {
-  const state = getShadowState(issueId);
+export async function getUnsyncedHistory(issueId: string): Promise<ShadowHistoryEntry[]> {
+  const state = await getShadowState(issueId);
 
   if (!state) {
     return [];
@@ -386,8 +392,9 @@ export function getUnsyncedHistory(issueId: string): ShadowHistoryEntry[] {
 /**
  * Get the count of issues that need sync
  */
-export function getPendingSyncCount(): number {
-  return listShadowedIssues().filter(state =>
+export async function getPendingSyncCount(): Promise<number> {
+  const states = await listShadowedIssues();
+  return states.filter(state =>
     state.shadowStatus !== state.trackerStatus
   ).length;
 }

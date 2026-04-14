@@ -1,6 +1,6 @@
 ---
 name: pan-up
-description: Start Panopticon dashboard and services
+description: "pan up — start the Panopticon dashboard (Node 22, port 3010)"
 triggers:
   - start panopticon
   - start dashboard
@@ -437,8 +437,8 @@ After services are running:
 
 1. **Access dashboard**: http://localhost:3001
 2. **Check agent status**: `pan status`
-3. **List issues**: `pan work list`
-4. **Create workspace**: `pan work issue <id>`
+3. **List issues**: `pan issues`
+4. **Create workspace**: `pan start <id>`
 5. **Monitor in dashboard**: Click on agent in UI
 
 ## Related Skills

@@ -36,22 +36,33 @@ import { syncCommand } from './commands/sync.js';
 import { restoreCommand } from './commands/restore.js';
 import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
-import { registerWorkCommands, statusCommand } from './commands/work/index.js';
+import { statusCommand } from './commands/status.js';
+import { issueCommand as startCommand } from './commands/start.js';
+import { tellCommand } from './commands/tell.js';
+import { killCommand } from './commands/kill.js';
+import { resumeCommand } from './commands/resume.js';
+import { recoverCommand } from './commands/recover.js';
+import { syncMainCommand } from './commands/sync-main.js';
+import { doneCommand } from './commands/done.js';
+import { approveCommand } from './commands/approve.js';
+import { reopenCommand } from './commands/reopen.js';
+import { wipeCommand } from './commands/wipe.js';
+import { closeOutCommand } from './commands/close.js';
+import { planCommand } from './commands/plan.js';
+import { showCommand } from './commands/show.js';
+import { listCommand as issuesCommand } from './commands/issues.js';
+import { triageCommand } from './commands/triage.js';
+import { pendingCommand } from './commands/pending.js';
+import { requestReviewCommand } from './commands/request-review.js';
+import { reviewResetAction } from './actions/review-reset.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
-import { registerCloisterCommands } from './commands/cloister/index.js';
-import { registerSetupCommands } from './commands/setup/index.js';
-import { registerSpecialistsCommands } from './commands/specialists/index.js';
+import { registerAdminCommands } from './commands/admin/index.js';
 import { registerConvoyCommands } from './commands/convoy/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
-import { registerDbCommands } from './commands/db.js';
-import { registerBeadsCommands } from './commands/beads.js';
-import { migrateConfigCommand } from './commands/migrate-config.js';
-import { registerRemoteCommands } from './commands/remote/index.js';
-import { registerConfigCommand } from './commands/config.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
@@ -103,15 +114,153 @@ program
   .option('--json', 'Output as JSON')
   .action(skillsCommand);
 
+// pan issues — list and triage work
 program
-  .command('plan-finalize')
-  .description('Finalize a planning session: create beads from vBRIEF plan and write completion marker')
+  .command('issues')
+  .description('List and triage work across configured trackers')
+  .option('--all', 'Include closed issues')
+  .option('--mine', 'Show only my assigned issues')
+  .option('--json', 'Output as JSON')
+  .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
+  .option('--all-trackers', 'Query all configured trackers')
+  .option('--shadow-only', 'Show only shadowed issues')
+  .option('--triage', 'Show triage queue')
+  .action((options) => {
+    if (options.triage) {
+      triageCommand(undefined, options);
+    } else {
+      issuesCommand(options);
+    }
+  });
+
+// pan show <id> — unified observation
+program
+  .command('show <id>')
+  .description('Unified lens: shadow state, CV, context, health for one issue')
+  .option('--shadow', 'Shadow state details only')
+  .option('--cv', 'Agent work history only')
+  .option('--context', 'Context engineering state only')
+  .option('--health', 'Health + heartbeat only')
+  .option('--json', 'Output as JSON')
+  .action(showCommand);
+
+// pan review — pending, request, reset
+const review = program
+  .command('review')
+  .description('Review-loop management: pending items, request re-review, reset cycles');
+
+review
+  .command('pending')
+  .description('List completed work awaiting review')
+  .action(pendingCommand);
+
+review
+  .command('request <id>')
+  .description('Request re-review after fixing feedback')
+  .option('-m, --message <text>', 'Message describing the fixes applied')
+  .action(requestReviewCommand);
+
+review
+  .command('reset <id>')
+  .description('Reset review/test/merge cycles (human override)')
+  .option('--session', 'Also clear saved Claude session')
+  .action(reviewResetAction);
+
+// pan plan <id> and pan plan finalize <id>
+const planCmd = program
+  .command('plan')
+  .description('Create execution plan for an issue, or finalize an existing plan');
+
+planCmd
+  .argument('<id>', 'issue ID to plan for')
+  .option('-o, --output <path>', 'Write the plan JSON to a file')
+  .option('--json', 'Emit plan as JSON (in addition to the interactive flow)')
+  .option('--skip-discovery', 'Skip the interactive discovery phase')
+  .option('--force', 'Create the plan even when the issue is not marked as complex')
+  .option('--shadow', 'Track status locally in shadow mode instead of updating the tracker')
+  .action(planCommand);
+
+planCmd
+  .command('finalize')
+  .description('Materialize plan into beads, write completion marker')
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
 
-// Register work commands (pan work issue, pan work status, etc.)
-registerWorkCommands(program);
+// Lifecycle verbs: pan start, pan tell, pan kill, pan resume, pan recover, pan sync-main, pan done, pan approve, pan reopen, pan wipe, pan close
+program
+  .command('tell <id> <message>')
+  .description('Send message to running agent')
+  .action(tellCommand);
+
+program
+  .command('kill <id>')
+  .description('Stop running agent (workspace preserved)')
+  .option('--force', 'Force kill without confirmation')
+  .action(killCommand);
+
+program
+  .command('resume <id>')
+  .description('Resume from saved Claude session')
+  .action(resumeCommand);
+
+program
+  .command('recover [id]')
+  .description('Recover crashed or stopped agent')
+  .option('--all', 'Auto-recover all crashed agents')
+  .option('--json', 'Output as JSON')
+  .action(recoverCommand);
+
+program
+  .command('sync-main <id>')
+  .description('Merge latest main into workspace feature branch')
+  .action(syncMainCommand);
+
+program
+  .command('done <id>')
+  .description('Mark work complete, move to review')
+  .option('-c, --comment <message>', 'Comment for the tracker')
+  .option('--force', 'Skip pre-flight completion checks')
+  .option('--json', 'Output as JSON')
+  .action(doneCommand);
+
+program
+  .command('approve <id>')
+  .description('Approve agent work, merge MR, update tracker')
+  .option('--json', 'Output as JSON')
+  .action(approveCommand);
+
+program
+  .command('reopen <id>')
+  .description('Re-open issue for rework (resets specialist state)')
+  .option('--reason <reason>', 'Reason for reopening')
+  .option('--force', 'Skip confirmation prompt')
+  .action(reopenCommand);
+
+program
+  .command('wipe <id>')
+  .description('Destructive: reset all state for an issue. Confirms.')
+  .option('--force', 'Skip confirmation')
+  .action(wipeCommand);
+
+program
+  .command('close <id>')
+  .description('Verify, clean up, and close issue on tracker')
+  .option('--force', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action((id, options) => closeOutCommand(id, options));
+
+program
+  .command('start <id>')
+  .description('Create workspace and spawn agent for an issue')
+  .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--dry-run', 'Show what would be created')
+  .option('--shadow', 'Enable shadow mode')
+  .option('--no-shadow', 'Disable shadow mode')
+  .option('--remote', 'Use remote workspace (Fly.io)')
+  .option('--local', 'Use local workspace (explicit override)')
+  .option('--phase <phase>', 'Work phase for model routing')
+  .action(startCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
@@ -119,50 +268,22 @@ registerWorkspaceCommands(program);
 // Register test commands (pan test run, pan test list)
 registerTestCommands(program);
 
-// Register cloister commands (pan cloister status, pan cloister start, etc.)
-registerCloisterCommands(program);
-
-// Register specialists commands (pan specialists list, wake, queue, reset)
-registerSpecialistsCommands(program);
+// Register admin commands (pan admin cloister, pan admin specialists, etc.)
+registerAdminCommands(program);
 
 // Register convoy commands (pan convoy start, status, list, stop)
 registerConvoyCommands(program);
 
-// Register setup commands (pan setup hooks, etc.)
-registerSetupCommands(program);
-
 // Register install command
 registerInstallCommand(program);
-
-// Register db commands (pan db snapshot, pan db seed, etc.)
-registerDbCommands(program);
-
-// Register beads commands (pan beads compact, pan beads stats)
-registerBeadsCommands(program);
-
-// Register remote commands (pan remote status, init, resources, setup)
-registerRemoteCommands(program);
-
-// Register config commands (pan config shadow)
-registerConfigCommand(program);
 
 // Register inspect command (pan inspect <issueId> --bead <beadId>)
 registerInspectCommand(program);
 
-// Config migration
-program
-  .command('migrate-config')
-  .description('Migrate from settings.json to config.yaml')
-  .option('--force', 'Force migration even if config.yaml exists')
-  .option('--preview', 'Preview migration without applying changes')
-  .option('--no-backup', 'Do not back up settings.json')
-  .option('--delete-legacy', 'Delete settings.json after migration')
-  .action(migrateConfigCommand);
-
-// Shorthand: pan status = pan work status
+// Shorthand: pan status = pan status
 program
   .command('status')
-  .description('Show running agents (shorthand for work status)')
+  .description('Show running agents')
   .option('--json', 'Output as JSON')
   .option('--tldr', 'Show TLDR index health across all workspaces')
   .option('--context', 'Show context window usage % for each agent')
@@ -659,15 +780,6 @@ program
 
 // Cost tracking commands (pan cost today, pan cost sync, etc.)
 program.addCommand(createCostCommand());
-
-// Alias: pan sync-costs → pan cost sync
-program
-  .command('sync-costs')
-  .description('Import cost events from per-project WAL files (alias for: pan cost sync)')
-  .action(async () => {
-    // Forward to subcommand — avoids duplicating logic
-    await program.parseAsync(['cost', 'sync'], { from: 'user' });
-  });
 
 // ─── npx panopticon — server + browser launcher ───────────────────────────────
 // Low-friction entry point: no Electron required.

@@ -168,7 +168,7 @@ export function buildResumePrompt(
     instructionsBlock = '1. Read the pending feedback files listed above and address them\n2. Verify STATE.md is accurate, update if needed\n3. Continue with the per-bead workflow';
   } else if (ctx.stateStatus?.toLowerCase().includes('ready for merge') ||
              ctx.stateStatus?.toLowerCase().includes('implementation complete')) {
-    instructionsBlock = `1. Re-read \`.planning/STATE.md\` to verify status\n2. Run \`bd list -l ${issueLower}\` to check for unclosed beads\n3. If all work is truly done, run \`pan work done\`\n4. If there is remaining work, update STATE.md and continue`;
+    instructionsBlock = `1. Re-read \`.planning/STATE.md\` to verify status\n2. Run \`bd list -l ${issueLower}\` to check for unclosed beads\n3. If all work is truly done, run \`pan done\`\n4. If there is remaining work, update STATE.md and continue`;
   } else {
     instructionsBlock = `1. Re-read \`.planning/STATE.md\` to verify it matches reality\n2. Run \`bd ready -l ${issueLower}\` to find the next unblocked bead\n3. Continue with the per-bead workflow (implement → commit → update STATE.md → bd close → wait for inspection)`;
   }

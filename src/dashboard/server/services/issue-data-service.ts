@@ -97,6 +97,9 @@ export class IssueDataService {
   private linearLastFullRefresh = 0;
   private started = false;
   private shadowStateModule: any = null;
+  /** In-memory snapshot of shadow states, refreshed asynchronously. The hot
+   * path (`getIssues`) reads from this map — no disk I/O on every request. */
+  private shadowStatesCache: Map<string, any> = new Map();
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
@@ -213,29 +216,23 @@ export class IssueDataService {
       ...this.trackers.rally.lastFetchedIssues,
     ];
 
-    // Merge shadow state (module is pre-loaded by ensureShadowStateLoaded)
+    // Merge shadow state from the in-memory cache. The cache is refreshed
+    // asynchronously by `refreshShadowStatesCache()` — we never hit disk here,
+    // keeping `getIssues()` (a hot path) off the event-loop-blocking path.
     try {
-      if (this.shadowStateModule) {
-        const shadowStates = this.shadowStateModule.listShadowedIssues();
-        const shadowMap = new Map<string, any>();
-        for (const state of shadowStates) {
-          shadowMap.set(state.issueId.toLowerCase(), state);
+      allIssues = allIssues.map(issue => {
+        const shadowState = this.shadowStatesCache.get(issue.identifier.toLowerCase());
+        if (shadowState) {
+          return {
+            ...issue,
+            shadowStatus: shadowState.shadowStatus,
+            targetCanonicalState: shadowState.targetCanonicalState,
+            shadowedAt: shadowState.shadowedAt,
+            shadowTrackerStatus: shadowState.trackerStatus,
+          };
         }
-
-        allIssues = allIssues.map(issue => {
-          const shadowState = shadowMap.get(issue.identifier.toLowerCase());
-          if (shadowState) {
-            return {
-              ...issue,
-              shadowStatus: shadowState.shadowStatus,
-              targetCanonicalState: shadowState.targetCanonicalState,
-              shadowedAt: shadowState.shadowedAt,
-              shadowTrackerStatus: shadowState.trackerStatus,
-            };
-          }
-          return { ...issue, shadowStatus: null, targetCanonicalState: null };
-        });
-      }
+        return { ...issue, shadowStatus: null, targetCanonicalState: null };
+      });
     } catch (e) {
       allIssues = allIssues.map(issue => ({ ...issue, shadowStatus: null }));
     }
@@ -400,8 +397,29 @@ export class IssueDataService {
     if (this.shadowStateModule) return;
     try {
       this.shadowStateModule = await import('../../../lib/shadow-state.js');
+      await this.refreshShadowStatesCache();
     } catch {
       // Shadow state not available — issues will work without it
+    }
+  }
+
+  /**
+   * Populate the in-memory shadow-state cache by reading all shadow files
+   * off the event loop (via fs/promises). Call after any write that may
+   * have changed shadow state for any issue.
+   */
+  async refreshShadowStatesCache(): Promise<void> {
+    if (!this.shadowStateModule) return;
+    try {
+      const states: Array<{ issueId: string; [k: string]: any }> =
+        await this.shadowStateModule.listShadowedIssues();
+      const next = new Map<string, any>();
+      for (const state of states) {
+        next.set(state.issueId.toLowerCase(), state);
+      }
+      this.shadowStatesCache = next;
+    } catch {
+      // Non-fatal — keep the previous cache
     }
   }
 

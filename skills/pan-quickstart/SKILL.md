@@ -138,7 +138,7 @@ pan project list
 pan doctor
 
 # Test tracker connection
-pan work list
+pan issues
 ```
 
 ### Step 4: Start Services (1 minute)
@@ -163,13 +163,13 @@ pan status
 #### List Available Issues
 ```bash
 # See issues from your tracker
-pan work list
+pan issues
 ```
 
 #### Create Workspace and Spawn Agent
 ```bash
 # Replace PAN-3 with your issue ID
-pan work issue PAN-3
+pan start PAN-3
 ```
 
 **What happens:**
@@ -192,7 +192,7 @@ pan status
 #### Interact with Agent
 ```bash
 # Send message to agent
-pan work tell PAN-3 "Check if tests pass"
+pan tell PAN-3 "Check if tests pass"
 
 # View agent's work
 # Attach to tmux session (Ctrl+b d to detach)
@@ -204,7 +204,7 @@ tmux attach -t agent-PAN-3
 #### Check Pending Work
 ```bash
 # See completed work awaiting review
-pan work pending
+pan review pending
 ```
 
 #### Review in Dashboard
@@ -216,7 +216,7 @@ pan work pending
 #### Approve and Merge
 ```bash
 # Approve work, merge MR, update tracker
-pan work approve PAN-3
+pan approve PAN-3
 ```
 
 **What happens:**
@@ -267,17 +267,17 @@ pan project add "$PROJECT_PATH"
 pan up
 
 # 8. List issues
-pan work list
+pan issues
 
 # 9. Create first workspace (manual step - prompt user)
 echo "Create your first workspace:"
 read -p "Issue ID (e.g., PAN-3): " ISSUE_ID
-pan work issue "$ISSUE_ID"
+pan start "$ISSUE_ID"
 
 echo "=== Quick Start Complete! ==="
 echo "Dashboard: http://localhost:3001"
 echo "Monitor agent: pan status"
-echo "Send message: pan work tell $ISSUE_ID \"your message\""
+echo "Send message: pan tell $ISSUE_ID \"your message\""
 ```
 
 ## Time Estimate
@@ -323,7 +323,7 @@ DASHBOARD_PORT=4001 API_PORT=4002 pan up
 
 ### Issue tracker not configured
 
-**Problem:** `pan work list` returns empty or errors
+**Problem:** `pan issues` returns empty or errors
 
 **Solution:**
 ```bash
@@ -340,7 +340,7 @@ curl -X POST https://api.linear.app/graphql \
 
 ### Agent session not starting
 
-**Problem:** `pan work issue` completes but no tmux session
+**Problem:** `pan start` completes but no tmux session
 
 **Solution:**
 ```bash
@@ -379,7 +379,7 @@ After completing this quick start, you have:
 - Create custom skills for your team's processes
 
 ### Advanced Features
-- **Planning sessions**: `pan work plan <id>` before spawning agent
+- **Planning sessions**: `pan plan <id>` before spawning agent
 - **Multiple agents**: Run agents in parallel for different issues
 - **Custom templates**: Create Docker templates for your stack
 - **State mapping**: Map Linear states to git branches
@@ -430,11 +430,11 @@ If you encounter issues:
 
 - [ ] `pan --help` works
 - [ ] `pan doctor` shows all green checkmarks
-- [ ] `pan work list` shows issues from your tracker
+- [ ] `pan issues` shows issues from your tracker
 - [ ] Dashboard accessible at http://localhost:3001
-- [ ] Created first workspace with `pan work issue`
+- [ ] Created first workspace with `pan start`
 - [ ] Agent running in tmux session
-- [ ] Can send messages to agent with `pan work tell`
-- [ ] Understand how to approve work with `pan work approve`
+- [ ] Can send messages to agent with `pan tell`
+- [ ] Understand how to approve work with `pan approve`
 
 **Congratulations!** You're now ready to use Panopticon for multi-agent development workflows.

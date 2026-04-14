@@ -387,7 +387,7 @@ export interface VBriefACStatus {
  * allCompleted flag. Returns null if no plan exists or no AC are found
  * (legacy workspace compatibility).
  *
- * Used by: verification gate, pan work done, merge agent, prompt injection.
+ * Used by: verification gate, pan done, merge agent, prompt injection.
  */
 export function getVBriefACStatus(workspacePath: string): VBriefACStatus | null {
   const doc = readWorkspacePlan(workspacePath);

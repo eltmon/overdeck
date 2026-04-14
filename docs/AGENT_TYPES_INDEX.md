@@ -16,7 +16,7 @@ These are the **actual runtime agent types** in the current codebase.
 
 | Type | Category | Status | Spawn / trigger | Prompt source | Model routing | User-facing surface |
 |---|---|---|---|---|---|---|
-| `planning-agent` | primary | Active | `src/lib/planning/spawn-planning-session.ts` via `pan work plan` / dashboard planning start | `src/lib/cloister/prompts/planning.md` via `buildPlanningPrompt()` | `planning-agent` | CLI + dashboard |
+| `planning-agent` | primary | Active | `src/lib/planning/spawn-planning-session.ts` via `pan plan` / dashboard planning start | `src/lib/cloister/prompts/planning.md` via `buildPlanningPrompt()` | `planning-agent` | CLI + dashboard |
 | `work-agent` | primary | Active | `src/dashboard/server/services/agent-spawner.ts` -> `src/lib/agents.ts` | `src/lib/cloister/prompts/work.md` plus phase-specific work-agent prompt building | `issue-agent:<phase>` | CLI + dashboard |
 | `review-agent` | specialist | Active | spawned by `spawnEphemeralSpecialist()` from Cloister verification/handoff pipeline | `src/lib/cloister/prompts/review.md` via `buildTaskPrompt()` | `specialist-review-agent` + `cloister.toml` specialist override | automatic / specialist tooling |
 | `test-agent` | specialist | Active | spawned by verification pipeline after review | `src/lib/cloister/prompts/test.md` via `buildTestAgentPromptContent()` | `specialist-test-agent` + `cloister.toml` specialist override | automatic / specialist tooling |
@@ -42,13 +42,13 @@ Canonical specialist registry metadata:
 ## Planning flow
 - `planning-agent`
   - spawn path: `src/lib/planning/spawn-planning-session.ts`
-  - entrypoints: CLI `pan work plan`, dashboard planning start
+  - entrypoints: CLI `pan plan`, dashboard planning start
   - prompt builder: `buildPlanningPrompt()`
 
 ## Implementation flow
 - `work-agent`
   - spawn path: `src/dashboard/server/services/agent-spawner.ts` -> `spawnAgent()` in `src/lib/agents.ts`
-  - entrypoints: CLI `pan work issue`, dashboard start agent
+  - entrypoints: CLI `pan start`, dashboard start agent
   - routing path: explicit work type or `issue-agent:<phase>`
 
 ## Per-bead verification flow

@@ -76,7 +76,7 @@ The desktop app sends native OS notifications for key agent events. Each event t
 | Input Needed | On | Agent is waiting for your decision |
 | Stuck Agents | On | Agent has been idle too long |
 | Merge Failures | On | Merge specialist encountered an error |
-| Work Complete | On | Agent finished and called `pan work done` |
+| Work Complete | On | Agent finished and called `pan done` |
 | Planning Done | Off | Planning session completed |
 | Merge Ready | On | PR is ready for your approval |
 

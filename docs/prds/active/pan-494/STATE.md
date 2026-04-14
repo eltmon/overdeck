@@ -1,8 +1,8 @@
-# PAN-494: pan work issue fails if workspace doesn't exist
+# PAN-494: pan start fails if workspace doesn't exist
 
 ## Problem
 
-`pan work issue <id>` errors out when no workspace exists, telling the user to manually run `pan workspace create` first. This is inconsistent with the dashboard's `POST /api/agents` endpoint, which auto-creates workspaces transparently. Users expect `pan work issue` to be a single command that handles everything.
+`pan start <id>` errors out when no workspace exists, telling the user to manually run `pan workspace create` first. This is inconsistent with the dashboard's `POST /api/agents` endpoint, which auto-creates workspaces transparently. Users expect `pan start` to be a single command that handles everything.
 
 ## Root Cause
 
@@ -25,7 +25,7 @@ Replace the error block in `issue.ts:543-555` with auto-creation logic:
 
 ## Scope
 
-- **In scope:** Auto-create workspace in CLI `pan work issue` when missing
+- **In scope:** Auto-create workspace in CLI `pan start` when missing
 - **Out of scope:** Beads validation/auto-init (handled downstream), remote workspace auto-creation
 
 ## Files Modified

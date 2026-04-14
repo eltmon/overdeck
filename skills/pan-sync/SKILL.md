@@ -1,6 +1,6 @@
 ---
 name: pan-sync
-description: Sync Panopticon skills to Claude Code and other AI tools
+description: "pan sync — sync skills and agents from devroot to ~/.claude/"
 triggers:
   - pan sync
   - sync skills

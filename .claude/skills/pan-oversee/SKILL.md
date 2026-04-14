@@ -1,6 +1,6 @@
 ---
 name: pan-oversee
-description: Actively supervise an agent through the full work lifecycle, fixing infrastructure issues as they arise
+description: Test the Panopticon framework by supervising an agent through the full lifecycle, identifying and filing every bug encountered
 triggers:
   - oversee issue
   - oversee agent
@@ -17,15 +17,35 @@ allowed-tools:
   - Task
 ---
 
-# Pan Oversee — Active Agent Supervision
+# Pan Oversee — Panopticon Framework Testing
 
 ## Purpose
 
-Actively supervise an agent working on an issue through the **entire lifecycle**:
+**This skill exists to test the Panopticon framework itself.** The issue being overseen is a test payload — the real goal is exercising the full agent lifecycle pipeline and identifying every bug, glitch, and rough edge along the way.
+
+Supervise an agent working on an issue through the **entire lifecycle**:
 `spawn/resume → work → completion → review → feedback loop → test → merge-ready`
 
-This is NOT passive monitoring — you actively watch for breakdowns at each stage
-and fix the underlying Panopticon infrastructure code when something fails.
+This is NOT passive monitoring. You are actively:
+- **Watching for bugs at every stage** — dashboard rendering, agent spawning, workspace creation, beads lifecycle, specialist handoffs, status transitions, terminal output, API responses
+- **Documenting everything** — no bug is too small. If something flickers, logs a warning, shows stale data, or doesn't match expected state, that's a finding
+- **Fixing infrastructure bugs** when they block progress, then continuing the test
+- **Filing or updating GitHub issues** (PAN-XXX) for every bug found
+
+## Bug Tracking During Oversight
+
+Maintain a running bug log throughout the session. For each finding:
+
+1. **Note it immediately** — don't wait until the end. Capture the symptom, what you expected, and what actually happened.
+2. **Check for existing issues** — `gh issue list --search "keyword"` before filing duplicates
+3. **File new issues or update existing ones** — include reproduction context from this oversight run
+4. **Categorize severity:**
+   - **Blocker** — stops the pipeline, had to fix inline to continue
+   - **Bug** — incorrect behavior but pipeline continued
+   - **Cosmetic** — dashboard display issue, misleading status, stale data
+   - **Observation** — not clearly a bug but worth investigating
+
+At the end of the oversight session, **report a summary** to the user of all findings: what was filed, what was updated, what was fixed inline, and what needs follow-up.
 
 ## Usage
 
@@ -69,7 +89,7 @@ COMPLETED=$(ls ~/.panopticon/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
 echo "Completed: ${COMPLETED:-NO}"
 
 # 6. Review/test/merge status?
-REVIEW_STATUS=$(curl -s http://localhost:3011/api/workspaces/$ISSUE_ID/review-status 2>/dev/null)
+REVIEW_STATUS=$(curl -s http://localhost:3011/api/review/$ISSUE_ID/status 2>/dev/null)
 echo "Review status: $REVIEW_STATUS"
 
 # 7. Specialist activity?
@@ -130,7 +150,7 @@ Check if agent exists and resume or spawn:
 
 ```bash
 # If agent state exists and has a session ID — resume
-pan work resume PAN-{ID}
+pan resume PAN-{ID}
 
 # If no agent state — spawn fresh
 curl -s -X POST http://localhost:3011/api/agents \
@@ -172,19 +192,19 @@ curl -s http://localhost:3011/api/agents/agent-pan-{ID}/activity | jq '.[-3:]'
 
 **If stuck:** Poke the agent or send a message:
 ```bash
-pan work tell PAN-{ID} "Are you stuck? Please continue working on the task."
+pan tell PAN-{ID} "Are you stuck? Please continue working on the task."
 ```
 
 ### Phase 3: Watch for Completion Signal
 
-The agent should eventually run `pan work done PAN-{ID}`. Watch for:
+The agent should eventually run `pan done PAN-{ID}`. Watch for:
 
 ```bash
 # Check if completed marker exists
 ls -la ~/.panopticon/agents/agent-pan-{ID}/completed 2>/dev/null
 
-# Check review status (set by `pan work done`)
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
+# Check review status (set by `pan done`)
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
 ```
 
 **Expected state after completion:**
@@ -193,14 +213,14 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 - GitHub issue has "In Review" label or status
 
 **Common failures at this stage:**
-- Agent doesn't call `pan work done` — it just stops
+- Agent doesn't call `pan done` — it just stops
 - Agent calls it but dashboard doesn't process it (API error)
 - Review isn't auto-triggered after completion
 
 **If review not triggered:**
 ```bash
 # Manually trigger review
-curl -s -X POST http://localhost:3011/api/workspaces/PAN-{ID}/review
+curl -s -X POST http://localhost:3011/api/review/PAN-{ID}/trigger
 ```
 
 ### Phase 4: Monitor Review Agent
@@ -215,7 +235,7 @@ curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "revie
 tmux capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
 
 # Check review status progression
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '{reviewStatus, reviewNotes}'
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{reviewStatus, reviewNotes}'
 ```
 
 **Expected outcomes:**
@@ -235,7 +255,7 @@ curl -s -X POST http://localhost:3011/api/specialists/review-agent/wake
 
 # Or reset and re-trigger
 curl -s -X POST http://localhost:3011/api/specialists/review-agent/reset
-curl -s -X POST http://localhost:3011/api/workspaces/PAN-{ID}/review
+curl -s -X POST http://localhost:3011/api/review/PAN-{ID}/trigger
 ```
 
 ### Phase 5: Monitor Feedback Loop (if review failed)
@@ -247,13 +267,13 @@ If review returned feedback, the work agent should receive it and fix issues:
 tmux capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
 
 # Check auto-requeue count (circuit breaker: max 3)
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '.autoRequeueCount'
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '.autoRequeueCount'
 ```
 
 The work agent should:
 1. Read the feedback
 2. Fix the issues
-3. Run `pan work request-review PAN-{ID} -m "Fixed: ..."`
+3. Run `pan review request PAN-{ID} -m "Fixed: ..."`
 
 **If feedback not delivered:** This is a code bug to fix. Check:
 - `send-feedback-to-agent` skill
@@ -266,7 +286,7 @@ After review passes, test-agent should run:
 
 ```bash
 # Check test status
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '{testStatus, testNotes}'
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{testStatus, testNotes}'
 
 # Watch test agent
 tmux capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
@@ -285,7 +305,7 @@ After tests pass:
 
 ```bash
 # Final status check
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
 ```
 
 **Expected final state:**
@@ -299,19 +319,34 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 
 At this point, the user can click "Approve & Merge" in the dashboard or run:
 ```bash
-pan work approve PAN-{ID}
+pan approve PAN-{ID}
 ```
 
 ## Intervention Protocol
 
 When you find a bug in the Panopticon infrastructure:
 
-1. **Stop the agent** (if it's actively hitting the bug)
-2. **Identify the root cause** in the source code
-3. **Fix the code** — edit the relevant file(s)
-4. **Rebuild if needed** — `npx tsup` or restart dashboard
-5. **Resume/restart the agent** to continue from where it left off
+1. **Log the finding** — add to your running bug list with symptom, expected behavior, and actual behavior
+2. **Check for existing issues** — `gh issue list --state open --search "keyword"` to avoid duplicates
+3. **File or update a GitHub issue** — include context from this oversight run
+4. **Assess: blocker or not?**
+   - **If blocker:** Stop the agent, fix the code, rebuild (`npx tsup` or restart dashboard), resume the agent, continue testing
+   - **If not blocker:** Log it, file the issue, keep going — don't derail the test run for non-blocking bugs
+5. **After fixing a blocker**, verify the fix actually works by continuing through the same pipeline stage
 6. **Continue monitoring** from the current phase
+
+### What Counts as a Bug
+
+Be thorough. All of these are findings worth logging:
+- Dashboard shows wrong status, stale data, or flickers
+- Agent state file says one thing, dashboard shows another
+- Beads not created, duplicated, or disappearing
+- Specialist doesn't wake up or takes too long
+- Terminal output garbled or missing
+- API returns unexpected response
+- Status transition skipped or out of order
+- Workspace in inconsistent state (e.g., directory exists but no git worktree)
+- Any error in server logs, even if the pipeline recovers
 
 ## Key API Endpoints
 
@@ -321,10 +356,10 @@ When you find a bug in the Panopticon infrastructure:
 | `/api/agents` | GET | List all agents |
 | `/api/agents/:id/output` | GET | Agent terminal output |
 | `/api/agents/:id/activity` | GET | Agent activity log |
-| `/api/workspaces/:id/review-status` | GET | Review/test/merge status |
-| `/api/workspaces/:id/review` | POST | Trigger review |
-| `/api/workspaces/:id/request-review` | POST | Re-request review |
-| `/api/workspaces/:id/approve` | POST | Approve & merge |
+| `/api/review/:id/status` | GET | Review/test/merge status |
+| `/api/review/:id/trigger` | POST | Trigger review |
+| `/api/review/:id/request` | POST | Re-request review |
+| `/api/issues/:id/approve` | POST | Approve & merge |
 | `/api/specialists` | GET | List specialists |
 | `/api/specialists/:name/wake` | POST | Wake specialist |
 | `/api/cloister/status` | GET | Cloister status |

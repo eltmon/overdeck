@@ -41,23 +41,23 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 | `pan install` | Install prerequisites (Node.js, Docker, etc.) | `pan install` |
 | `pan up` | Start dashboard and services | `pan up` |
 | `pan down` | Stop dashboard and services | `pan down` |
-| `pan status` | Show running agents (shorthand for `pan work status`) | `pan status` |
+| `pan status` | Show running agents (shorthand for `pan status`) | `pan status` |
 | `pan doctor` | Check system health and dependencies | `pan doctor` |
 
 ### Work Management
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan work issue <id>` | Create workspace and spawn agent for issue | `pan work issue PAN-3` |
-| `pan work plan <id>` | Create execution plan before spawning agent | `pan work plan PAN-5` |
-| `pan work status` | Show all running agents | `pan work status` |
-| `pan work tell <id> <msg>` | Send message to running agent | `pan work tell PAN-3 "Check tests"` |
-| `pan work kill <id>` | Stop a running agent | `pan work kill PAN-3` |
-| `pan work pending` | Show completed work awaiting review | `pan work pending` |
-| `pan work approve <id>` | Approve work, merge MR, update tracker | `pan work approve PAN-3` |
-| `pan work list` | List issues from configured trackers | `pan work list` |
-| `pan work recover <id>` | Recover crashed agent | `pan work recover PAN-3` |
-| `pan work health check` | Check agent health | `pan work health check` |
+| `pan start <id>` | Create workspace and spawn agent for issue | `pan start PAN-3` |
+| `pan plan <id>` | Create execution plan before spawning agent | `pan plan PAN-5` |
+| `pan status` | Show all running agents | `pan status` |
+| `pan tell <id> <msg>` | Send message to running agent | `pan tell PAN-3 "Check tests"` |
+| `pan kill <id>` | Stop a running agent | `pan kill PAN-3` |
+| `pan review pending` | Show completed work awaiting review | `pan review pending` |
+| `pan approve <id>` | Approve work, merge MR, update tracker | `pan approve PAN-3` |
+| `pan issues` | List issues from configured trackers | `pan issues` |
+| `pan recover <id>` | Recover crashed agent | `pan recover PAN-3` |
+| `pan health check` | Check agent health | `pan health check` |
 
 ### Workspace Management
 
@@ -148,20 +148,20 @@ pan doctor
 ### Working on an Issue
 ```bash
 # 1. Optionally create a plan first
-pan work plan PAN-3
+pan plan PAN-3
 
 # 2. Create workspace and spawn agent
-pan work issue PAN-3
+pan start PAN-3
 
 # 3. Monitor agent status
-pan work status
+pan status
 
 # 4. Send message to agent if needed
-pan work tell PAN-3 "Run the tests"
+pan tell PAN-3 "Run the tests"
 
 # 5. When done, review and approve
-pan work pending
-pan work approve PAN-3
+pan review pending
+pan approve PAN-3
 ```
 
 ### Managing Workspaces
@@ -206,7 +206,7 @@ Access the dashboard at: **http://localhost:3001** (after running `pan up`)
 **Solution:** Check ports 3001/3002 aren't in use, run `pan doctor` to verify dependencies
 
 **Problem:** Agent appears stuck
-**Solution:** Use `/session-health` skill, or `pan work recover <id>`
+**Solution:** Use `/session-health` skill, or `pan recover <id>`
 
 **Problem:** Workspace containers won't start
 **Solution:** Check Docker daemon is running, verify port conflicts with `pan workspace list`
@@ -219,7 +219,7 @@ Access the dashboard at: **http://localhost:3001** (after running `pan up`)
 - **New users**: Use `/pan-quickstart` skill for guided onboarding
 - **Configuration**: Use `/pan-setup` skill to configure trackers and projects
 - **Docker setup**: Use `/pan-docker` skill for Docker template configuration
-- **Create your first workspace**: `pan work issue <your-issue-id>`
+- **Create your first workspace**: `pan start <your-issue-id>`
 
 ## Related Skills
 

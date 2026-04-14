@@ -2521,7 +2521,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             }) && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
-                title="Agent evidence shows work is complete — waiting for agent to call pan work done"
+                title="Agent evidence shows work is complete — waiting for agent to call pan done"
               >
                 <CheckCircle className="w-3 h-3" />
                 Done
@@ -2886,7 +2886,7 @@ function ResetPipelineButton({
         })) {
           setIsPending(true);
           try {
-            const res = await fetch(`/api/workspaces/${issue.identifier}/reset-review`, {
+            const res = await fetch(`/api/review/${issue.identifier}/reset`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ rerun: true }),
@@ -2926,7 +2926,7 @@ function MergeIssueButton({
 
   const mergeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issue.identifier}/merge`, {
+      const res = await fetch(`/api/issues/${issue.identifier}/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

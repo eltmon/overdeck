@@ -29,7 +29,7 @@ export interface ReviewArtifactCreationResult {
 
 /**
  * Build the PR/MR body from the workspace planning artifacts.
- * Shared by both `pan work done` and dashboard review startup.
+ * Shared by both `pan done` and dashboard review startup.
  */
 export async function buildRichReviewArtifactBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];

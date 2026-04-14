@@ -39,7 +39,8 @@ vi.mock('./components/skeletons/AgentListSkeleton', () => ({ AgentListSkeleton: 
 vi.mock('./components/skeletons/GodViewSkeleton', () => ({ GodViewSkeleton: () => null }));
 vi.mock('./components/DetailPanelLayout', () => ({ DetailPanelLayout: () => null }));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
-vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null }));
+vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null }));
+vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { info: vi.fn() } }));
 vi.mock('./lib/store', () => ({
   useDashboardStore: vi.fn(() => []),

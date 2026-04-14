@@ -105,8 +105,8 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
     }
 
     // Current shadowed issues
-    const shadowedIssues = listShadowedIssues();
-    const pendingSync = getPendingSyncCount();
+    const shadowedIssues = await listShadowedIssues();
+    const pendingSync = await getPendingSyncCount();
 
     if (shadowedIssues.length > 0) {
       console.log(chalk.bold(`\nShadowed issues: ${shadowedIssues.length}`));

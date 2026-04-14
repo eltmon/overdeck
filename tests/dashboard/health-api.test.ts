@@ -1,22 +1,47 @@
 /**
  * Tests for dashboard health API filtering
+ *
+ * sessionExistsAsync is mocked because it uses the managed tmux socket
+ * (-L panopticon), which is separate from the default socket. Tests that
+ * previously created real tmux sessions on the default socket would always
+ * see them as missing when checked on the managed socket (CI / managed mode).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { execSync } from 'child_process';
+
+// ─── Controlled session set (replaces real tmux calls) ───────────────────────
+
+const { activeSessions } = vi.hoisted(() => ({
+  activeSessions: new Set<string>(),
+}));
+
+vi.mock('../../src/lib/tmux.js', () => ({
+  sessionExistsAsync: vi.fn(async (name: string) => activeSessions.has(name)),
+  capturePaneAsync: vi.fn(async () => ''),
+  getTmuxConfigMode: vi.fn(() => 'inherit-user'),
+  getManagedTmuxSocketName: vi.fn(() => 'panopticon'),
+  getManagedTmuxConfigPath: vi.fn(() => '/tmp/panopticon.tmux.conf'),
+  getTmuxBaseArgs: vi.fn(() => []),
+  buildTmuxArgs: vi.fn((args: string[]) => args),
+  getTmuxCommand: vi.fn((args: string[]) => ({ command: 'tmux', args })),
+  buildTmuxCommandString: vi.fn((args: string[]) => ['tmux', ...args].join(' ')),
+}));
+
 import { determineHealthStatusAsync } from '../../src/dashboard/lib/health-filtering.js';
 
 let testDir: string;
 
 beforeEach(() => {
+  activeSessions.clear();
   testDir = mkdtempSync(join(tmpdir(), 'health-api-test-'));
   mkdirSync(join(testDir, '.panopticon', 'agents'), { recursive: true });
 });
 
 afterEach(() => {
+  activeSessions.clear();
   rmSync(testDir, { recursive: true, force: true });
 });
 
@@ -36,22 +61,13 @@ function createAgent(name: string, status?: string, lastActivity?: string): stri
   return agentDir;
 }
 
-// Helper to create tmux session
+// Helpers that register/deregister in the mock set (no real tmux calls)
 function createTmuxSession(name: string): void {
-  try {
-    execSync(`tmux new-session -d -s "${name}" "sleep 3600"`, { stdio: 'ignore' });
-  } catch {
-    // Session might already exist
-  }
+  activeSessions.add(name);
 }
 
-// Helper to kill tmux session
 function killTmuxSession(name: string): void {
-  try {
-    execSync(`tmux kill-session -t "${name}"`, { stdio: 'ignore' });
-  } catch {
-    // Session might not exist
-  }
+  activeSessions.delete(name);
 }
 
 describe('health-api', () => {

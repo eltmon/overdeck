@@ -69,10 +69,9 @@ describe('Cloister Configuration', () => {
       expect(DEFAULT_CLOISTER_CONFIG.specialists?.review_agent?.auto_wake).toBe(false);
     });
 
-    it('should disable test agent by default', () => {
-      // Test agent not yet implemented, so disabled
-      expect(DEFAULT_CLOISTER_CONFIG.specialists?.test_agent?.enabled).toBe(false);
-      expect(DEFAULT_CLOISTER_CONFIG.specialists?.test_agent?.auto_wake).toBe(false);
+    it('should enable test agent by default', () => {
+      expect(DEFAULT_CLOISTER_CONFIG.specialists?.test_agent?.enabled).toBe(true);
+      expect(DEFAULT_CLOISTER_CONFIG.specialists?.test_agent?.auto_wake).toBe(true);
     });
 
     it('should have notification placeholders', () => {

@@ -42,15 +42,9 @@ import { metricsRouteLayer } from './routes/metrics.js'
 import { miscRouteLayer } from './routes/misc.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
+import { showRouteLayer } from './routes/show.js';
+import { adminRouteLayer } from './routes/admin.js';
 import { emitActivityEntry } from '../../lib/activity-logger.js';
-
-// ─── Runtime detection ────────────────────────────────────────────────────────
-
-declare const Bun: unknown;
-
-function isBunRuntime(): boolean {
-  return typeof Bun !== 'undefined';
-}
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
@@ -194,6 +188,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   miscRouteLayer,
   conversationsRouteLayer,
   eventsRouteLayer,
+  showRouteLayer,
+  adminRouteLayer,
   staticRouteLayer,
 );
 

@@ -89,7 +89,7 @@ COMPLETED=$(ls ~/.panopticon/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
 echo "Completed: ${COMPLETED:-NO}"
 
 # 6. Review/test/merge status?
-REVIEW_STATUS=$(curl -s http://localhost:3011/api/workspaces/$ISSUE_ID/review-status 2>/dev/null)
+REVIEW_STATUS=$(curl -s http://localhost:3011/api/review/$ISSUE_ID/status 2>/dev/null)
 echo "Review status: $REVIEW_STATUS"
 
 # 7. Specialist activity?
@@ -150,7 +150,7 @@ Check if agent exists and resume or spawn:
 
 ```bash
 # If agent state exists and has a session ID — resume
-pan work resume PAN-{ID}
+pan resume PAN-{ID}
 
 # If no agent state — spawn fresh
 curl -s -X POST http://localhost:3011/api/agents \
@@ -192,19 +192,19 @@ curl -s http://localhost:3011/api/agents/agent-pan-{ID}/activity | jq '.[-3:]'
 
 **If stuck:** Poke the agent or send a message:
 ```bash
-pan work tell PAN-{ID} "Are you stuck? Please continue working on the task."
+pan tell PAN-{ID} "Are you stuck? Please continue working on the task."
 ```
 
 ### Phase 3: Watch for Completion Signal
 
-The agent should eventually run `pan work done PAN-{ID}`. Watch for:
+The agent should eventually run `pan done PAN-{ID}`. Watch for:
 
 ```bash
 # Check if completed marker exists
 ls -la ~/.panopticon/agents/agent-pan-{ID}/completed 2>/dev/null
 
-# Check review status (set by `pan work done`)
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
+# Check review status (set by `pan done`)
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
 ```
 
 **Expected state after completion:**
@@ -213,14 +213,14 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 - GitHub issue has "In Review" label or status
 
 **Common failures at this stage:**
-- Agent doesn't call `pan work done` — it just stops
+- Agent doesn't call `pan done` — it just stops
 - Agent calls it but dashboard doesn't process it (API error)
 - Review isn't auto-triggered after completion
 
 **If review not triggered:**
 ```bash
 # Manually trigger review
-curl -s -X POST http://localhost:3011/api/workspaces/PAN-{ID}/review
+curl -s -X POST http://localhost:3011/api/review/PAN-{ID}/trigger
 ```
 
 ### Phase 4: Monitor Review Agent
@@ -235,7 +235,7 @@ curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "revie
 tmux capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
 
 # Check review status progression
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '{reviewStatus, reviewNotes}'
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{reviewStatus, reviewNotes}'
 ```
 
 **Expected outcomes:**
@@ -255,7 +255,7 @@ curl -s -X POST http://localhost:3011/api/specialists/review-agent/wake
 
 # Or reset and re-trigger
 curl -s -X POST http://localhost:3011/api/specialists/review-agent/reset
-curl -s -X POST http://localhost:3011/api/workspaces/PAN-{ID}/review
+curl -s -X POST http://localhost:3011/api/review/PAN-{ID}/trigger
 ```
 
 ### Phase 5: Monitor Feedback Loop (if review failed)
@@ -267,13 +267,13 @@ If review returned feedback, the work agent should receive it and fix issues:
 tmux capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
 
 # Check auto-requeue count (circuit breaker: max 3)
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '.autoRequeueCount'
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '.autoRequeueCount'
 ```
 
 The work agent should:
 1. Read the feedback
 2. Fix the issues
-3. Run `pan work request-review PAN-{ID} -m "Fixed: ..."`
+3. Run `pan review request PAN-{ID} -m "Fixed: ..."`
 
 **If feedback not delivered:** This is a code bug to fix. Check:
 - `send-feedback-to-agent` skill
@@ -286,7 +286,7 @@ After review passes, test-agent should run:
 
 ```bash
 # Check test status
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq '{testStatus, testNotes}'
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{testStatus, testNotes}'
 
 # Watch test agent
 tmux capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
@@ -305,7 +305,7 @@ After tests pass:
 
 ```bash
 # Final status check
-curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
+curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
 ```
 
 **Expected final state:**
@@ -319,7 +319,7 @@ curl -s http://localhost:3011/api/workspaces/PAN-{ID}/review-status | jq .
 
 At this point, the user can click "Approve & Merge" in the dashboard or run:
 ```bash
-pan work approve PAN-{ID}
+pan approve PAN-{ID}
 ```
 
 ## Intervention Protocol
@@ -356,10 +356,10 @@ Be thorough. All of these are findings worth logging:
 | `/api/agents` | GET | List all agents |
 | `/api/agents/:id/output` | GET | Agent terminal output |
 | `/api/agents/:id/activity` | GET | Agent activity log |
-| `/api/workspaces/:id/review-status` | GET | Review/test/merge status |
-| `/api/workspaces/:id/review` | POST | Trigger review |
-| `/api/workspaces/:id/request-review` | POST | Re-request review |
-| `/api/workspaces/:id/approve` | POST | Approve & merge |
+| `/api/review/:id/status` | GET | Review/test/merge status |
+| `/api/review/:id/trigger` | POST | Trigger review |
+| `/api/review/:id/request` | POST | Re-request review |
+| `/api/issues/:id/approve` | POST | Approve & merge |
 | `/api/specialists` | GET | List specialists |
 | `/api/specialists/:name/wake` | POST | Wake specialist |
 | `/api/cloister/status` | GET | Cloister status |

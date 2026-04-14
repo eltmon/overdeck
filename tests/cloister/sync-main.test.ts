@@ -35,6 +35,23 @@ vi.mock('../../src/lib/git-utils.js', () => ({
   cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
 }));
 
+// Hoist tmux mock so factory can reference it
+const tmuxCapturePaneAsyncMock = vi.hoisted(() => vi.fn<[string], Promise<string>>().mockResolvedValue(''));
+
+vi.mock('../../src/lib/tmux.js', () => ({
+  capturePaneAsync: tmuxCapturePaneAsyncMock,
+  sessionExists: vi.fn().mockReturnValue(true),
+  sessionExistsAsync: vi.fn().mockResolvedValue(true),
+  sendKeysAsync: vi.fn().mockResolvedValue(undefined),
+  listSessionNamesAsync: vi.fn().mockResolvedValue(['specialist-merge-agent']),
+  buildTmuxCommandString: vi.fn().mockReturnValue(''),
+  createSessionAsync: vi.fn().mockResolvedValue(undefined),
+  killSession: vi.fn(),
+  killSessionAsync: vi.fn().mockResolvedValue(undefined),
+  listPaneValues: vi.fn().mockReturnValue([]),
+  listPaneValuesAsync: vi.fn().mockResolvedValue([]),
+}));
+
 // Hoist the exec mock so it is available inside vi.mock factory
 const execMock = vi.hoisted(() =>
   vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
@@ -65,7 +82,14 @@ vi.mock('child_process', () => {
   }
 
   (exec as any)[kCustom] = execMock;
-  (execFile as any)[kCustom] = execMock;
+  // execFile's promisified form is called as (file, args, opts). Translate
+  // that to the {cmd, opts} shape execMock expects, so test mocks that match
+  // on `cmd.includes('tmux capture-pane')` still resolve correctly for the
+  // async tmux helpers in src/lib/tmux.ts.
+  (execFile as any)[kCustom] = (file: string, args?: string[], opts?: any) => {
+    const cmd = Array.isArray(args) && args.length > 0 ? `${file} ${args.join(' ')}` : file;
+    return execMock(cmd, opts);
+  };
 
   return { exec, execFile, spawn: vi.fn() };
 });
@@ -290,13 +314,24 @@ describe('syncMainIntoWorkspace', () => {
     });
   });
 
-  // These tests exercise the real 5-second polling loop in merge-agent.ts
-  // (POLL_INTERVAL = 5000). Default 10s test timeout is too tight under load;
-  // bump to 20s so the gate doesn't flake when the host is busy.
+  // These tests exercise the polling loop in merge-agent.ts. Set
+  // PANOPTICON_TEST_POLL_MS=10 so the loop doesn't wait the real 5-second
+  // interval (which otherwise drives the 20s timeout into flake territory).
   describe('conflict handling — agent delegation', () => {
+    beforeEach(() => {
+      process.env.PANOPTICON_TEST_POLL_MS = '10';
+    });
+    afterEach(() => {
+      delete process.env.PANOPTICON_TEST_POLL_MS;
+    });
+
     it('wakes merge-agent specialist when git merge has conflicts', { timeout: 20000 }, async () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: true, message: 'woken' } as any);
+
+      tmuxCapturePaneAsyncMock.mockResolvedValue(
+        'MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\nNOTES: resolved\n'
+      );
 
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
@@ -309,8 +344,6 @@ describe('syncMainIntoWorkspace', () => {
         }
         if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
-        // tmux output with MERGE_RESULT after first poll
-        if (cmd.includes('tmux capture-pane')) return { stdout: 'MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\nNOTES: resolved\n', stderr: '' };
         if (cmd.includes('git diff --check')) return { stdout: '', stderr: '' };
         if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git log ORIG_HEAD..HEAD --oneline')) return { stdout: 'merge123 Merge branch main\n', stderr: '' };
@@ -332,6 +365,10 @@ describe('syncMainIntoWorkspace', () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: true, message: 'woken' } as any);
 
+      tmuxCapturePaneAsyncMock.mockResolvedValue(
+        'MERGE_RESULT: FAILURE\nFAILED_FILES: src/foo.ts\nREASON: Irreconcilable conflict\n'
+      );
+
       let mergeAbortCalled = false;
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
@@ -344,10 +381,6 @@ describe('syncMainIntoWorkspace', () => {
         }
         if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
-        if (cmd.includes('tmux capture-pane')) return {
-          stdout: 'MERGE_RESULT: FAILURE\nFAILED_FILES: src/foo.ts\nREASON: Irreconcilable conflict\n',
-          stderr: '',
-        };
         if (cmd.includes('git merge --abort')) { mergeAbortCalled = true; return { stdout: '', stderr: '' }; }
         return { stdout: '', stderr: '' };
       });
@@ -390,6 +423,8 @@ describe('syncMainIntoWorkspace', () => {
       const wakeSpecialistMock = vi.mocked(wakeSpecialist);
       wakeSpecialistMock.mockResolvedValue({ success: true, message: 'woken' } as any);
 
+      tmuxCapturePaneAsyncMock.mockResolvedValue('MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\n');
+
       let mergeAbortCalled = false;
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
@@ -401,7 +436,6 @@ describe('syncMainIntoWorkspace', () => {
         }
         if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
-        if (cmd.includes('tmux capture-pane')) return { stdout: 'MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\n', stderr: '' };
         // git diff --check reports remaining markers
         if (cmd.includes('git diff --check')) return {
           stdout: 'src/foo.ts:15: leftover conflict marker\n',
@@ -424,6 +458,8 @@ describe('syncMainIntoWorkspace', () => {
       const spawnMock = vi.mocked(spawnEphemeralSpecialist);
       spawnMock.mockResolvedValueOnce({ success: true, message: 'spawned', tmuxSession: 'specialist-pan-merge-agent' });
 
+      tmuxCapturePaneAsyncMock.mockResolvedValue('MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\n');
+
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
         if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
@@ -434,7 +470,6 @@ describe('syncMainIntoWorkspace', () => {
         }
         if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
-        if (cmd.includes('tmux capture-pane')) return { stdout: 'MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\n', stderr: '' };
         if (cmd.includes('git diff --check')) return { stdout: '', stderr: '' };
         if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git log ORIG_HEAD..HEAD --oneline')) return { stdout: 'abc123 merge commit\n', stderr: '' };
