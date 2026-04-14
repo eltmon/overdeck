@@ -11,6 +11,7 @@ const { mockExecAsync } = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 
 vi.mock('util', async (importOriginal) => {
@@ -131,12 +132,14 @@ describe('createBeadsFromVBrief', () => {
 
     const result = await createBeadsFromVBrief(WORKSPACE_DIR);
 
-    // bd init must have been called with the correct prefix
+    // bd init must have been called with the correct prefix.
+    // execFile form: mockExecAsync('bd', ['init', '--prefix', 'pan-init'], opts)
     const initCall = mockExecAsync.mock.calls.find(
-      ([cmd]: [string]) => typeof cmd === 'string' && cmd.includes('bd init --prefix'),
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'init' && args.includes('--prefix'),
     );
     expect(initCall).toBeDefined();
-    expect(initCall![0]).toContain('pan-init');
+    expect(initCall![1]).toContain('pan-init');
 
     expect(result.success).toBe(true);
     expect(result.created).toContain('PAN-INIT: Setup task');
@@ -180,12 +183,14 @@ describe('createBeadsFromVBrief', () => {
 
     const result = await createBeadsFromVBrief(WORKSPACE_DIR);
 
+    // execFile form: mockExecAsync('bd', ['delete', '<id>', '--force'], opts)
     const deleteCalls = mockExecAsync.mock.calls.filter(
-      ([cmd]: [string]) => typeof cmd === 'string' && cmd.includes('bd delete'),
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'delete',
     );
     expect(deleteCalls).toHaveLength(2);
-    expect(deleteCalls[0][0]).toContain('stale-bead-42');
-    expect(deleteCalls[1][0]).toContain('stale-bead-43');
+    expect(deleteCalls[0][1]).toContain('stale-bead-42');
+    expect(deleteCalls[1][1]).toContain('stale-bead-43');
 
     expect(result.success).toBe(true);
     expect(result.created).toContain('PAN-IDEM: Rebuilt task');
