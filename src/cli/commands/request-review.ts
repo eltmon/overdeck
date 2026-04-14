@@ -1,5 +1,5 @@
 /**
- * pan work request-review <id> [message]
+ * pan review request <id> [message]
  *
  * Request a re-review after fixing feedback.
  * Used by agents to automatically queue for re-review (circuit breaker: max 7)

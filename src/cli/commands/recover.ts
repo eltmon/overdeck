@@ -96,7 +96,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
     console.log('');
     console.log(chalk.dim('Commands:'));
     console.log(`  Attach:  tmux attach -t ${state.id}`);
-    console.log(`  Message: pan work tell ${state.issueId} "your message"`);
+    console.log(`  Message: pan tell ${state.issueId} "your message"`);
 
   } catch (error: any) {
     spinner.fail(error.message);

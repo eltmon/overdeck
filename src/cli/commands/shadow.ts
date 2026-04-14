@@ -1,5 +1,5 @@
 /**
- * pan work shadow - Display shadow state details for an issue
+ * pan show - Display shadow state details for an issue
  *
  * Shows shadow state information including:
  * - Shadow status vs tracker status
@@ -20,7 +20,7 @@ export async function shadowCommand(id: string): Promise<void> {
 
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
-    console.log(chalk.dim('Use --shadow flag when running pan work issue/plan/done to enable shadow mode'));
+    console.log(chalk.dim('Use --shadow flag when running pan start/plan/done to enable shadow mode'));
     process.exit(1);
   }
 
@@ -69,7 +69,7 @@ export async function shadowCommand(id: string): Promise<void> {
 
     if (unsyncedEntries.length > 0) {
       console.log(chalk.yellow(`⚠ ${unsyncedEntries.length} transition(s) pending sync to tracker`));
-      console.log(chalk.dim(`   Run: pan work sync ${issueId}`));
+      console.log(chalk.dim(`   Run: pan show ${issueId}`));
       console.log('');
     }
   } else {
@@ -79,7 +79,7 @@ export async function shadowCommand(id: string): Promise<void> {
 
   // Display actions
   console.log(chalk.bold('Actions:'));
-  console.log(`  Sync to tracker:   pan work sync ${issueId}`);
-  console.log(`  Refresh from tracker: pan work refresh ${issueId}`);
+  console.log(`  Sync to tracker:   pan show ${issueId}`);
+  console.log(`  Refresh from tracker: pan show ${issueId}`);
   console.log('');
 }

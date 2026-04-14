@@ -300,7 +300,7 @@ export function setReviewStatus(
 
         const statusType = update.reviewStatus === 'blocked' ? 'REVIEW BLOCKED' : 'TESTS FAILED';
         const notes = update.reviewNotes || update.testNotes || 'No details provided.';
-        const msg = `SPECIALIST FEEDBACK: ${statusType} for ${issueId}.\n\n${notes}\n\nFix the issues, then run: pan work done ${issueId}`;
+        const msg = `SPECIALIST FEEDBACK: ${statusType} for ${issueId}.\n\n${notes}\n\nFix the issues, then run: pan done ${issueId}`;
 
         const { messageAgent } = await import('./agents.js');
         await messageAgent(agentSession, msg);

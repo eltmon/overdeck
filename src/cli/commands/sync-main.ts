@@ -1,5 +1,5 @@
 /**
- * pan work sync-main <id>
+ * pan sync-main <id>
  *
  * Sync the latest main branch into a workspace's feature branch.
  * Uses git merge (not rebase) and delegates conflict resolution to the merge-agent.

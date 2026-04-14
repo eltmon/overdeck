@@ -25,7 +25,7 @@ export interface ShadowHistoryEntry {
   to: IssueState;
   /** When the transition occurred */
   at: string;
-  /** Command that triggered the transition (e.g., "pan work plan", "dashboard") */
+  /** Command that triggered the transition (e.g., "pan plan", "dashboard") */
   by: string;
   /** Whether this transition was synced to the tracker */
   syncedToTracker: boolean;

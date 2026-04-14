@@ -240,7 +240,7 @@ async function handleRemoteWorkspace(
     console.log('');
     console.log(chalk.bold('To create a local workspace instead:'));
     console.log(`  ${chalk.cyan(`pan workspace ${issueId} --local`)}`);
-    console.log(`  ${chalk.cyan(`pan work issue ${issueId} --local`)}`);
+    console.log(`  ${chalk.cyan(`pan start ${issueId} --local`)}`);
     process.exit(1);
   }
 
@@ -267,7 +267,7 @@ async function handleRemoteWorkspace(
   if (isRunning) {
     spinner.fail(`Agent ${agentId} already running on remote VM`);
     console.log('');
-    console.log(chalk.dim(`Use 'pan work tell ${issueId} "message"' to send commands`));
+    console.log(chalk.dim(`Use 'pan tell ${issueId} "message"' to send commands`));
     process.exit(1);
   }
 
@@ -315,8 +315,8 @@ async function handleRemoteWorkspace(
     const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId, options.shadow);
 
     if (skipTrackerUpdate) {
-      createShadowState(issueId, 'open', 'pan work issue');
-      updateShadowState(issueId, 'in_progress', 'pan work issue');
+      createShadowState(issueId, 'open', 'pan start');
+      updateShadowState(issueId, 'in_progress', 'pan start');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     } else if (isGitHubIssue(issueId)) {
       // GitHub issue — add in-progress label
@@ -367,8 +367,8 @@ async function handleRemoteWorkspace(
     console.log('');
     console.log(chalk.dim('Commands:'));
     console.log(`  SSH:      pan workspace ssh ${issueId}`);
-    console.log(`  Message:  pan work tell ${issueId} "your message"`);
-    console.log(`  Kill:     pan work kill ${issueId}`);
+    console.log(`  Message:  pan tell ${issueId} "your message"`);
+    console.log(`  Kill:     pan kill ${issueId}`);
 
   } catch (error: any) {
     spinner.fail(`Failed to spawn remote agent: ${error.message}`);
@@ -688,7 +688,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
             console.log('');
             console.log(chalk.bold('To re-run planning:'));
-            console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+            console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
             process.exit(1);
           }
         } catch (recoveryErr: any) {
@@ -696,7 +696,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
           console.log('');
           console.log(chalk.bold('To re-run planning:'));
-          console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+          console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
           process.exit(1);
         }
       }
@@ -723,8 +723,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     if (skipTrackerUpdate) {
       // Create shadow state instead of updating tracker
-      createShadowState(id, 'open', 'pan work issue');
-      updateShadowState(id, 'in_progress', 'pan work issue');
+      createShadowState(id, 'open', 'pan start');
+      updateShadowState(id, 'in_progress', 'pan start');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     }
     // Note: tracker transition for local agents is handled by spawnAgent() → transitionIssueToInProgress()
@@ -749,8 +749,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log('');
     console.log(chalk.dim('Commands:'));
     console.log(`  Attach:   tmux attach -t ${agent.id}`);
-    console.log(`  Message:  pan work tell ${id} "your message"`);
-    console.log(`  Kill:     pan work kill ${id}`);
+    console.log(`  Message:  pan tell ${id} "your message"`);
+    console.log(`  Kill:     pan kill ${id}`);
 
   } catch (error: any) {
     spinner.fail(error.message);

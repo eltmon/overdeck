@@ -1,5 +1,5 @@
 /**
- * pan work refresh - Refresh tracker status cache
+ * pan show - Refresh tracker status cache
  *
  * Fetches current status from tracker and updates the shadow state cache.
  */
@@ -71,7 +71,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
 
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
-    console.log(chalk.dim('Use --shadow flag when running pan work issue/plan/done to enable shadow mode'));
+    console.log(chalk.dim('Use --shadow flag when running pan start/plan/done to enable shadow mode'));
     process.exit(1);
   }
 
@@ -124,8 +124,8 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
     console.log('');
     console.log(chalk.yellow('⚠ Status mismatch detected'));
     console.log(chalk.dim('  Shadow state differs from tracker state'));
-    console.log(chalk.dim(`  Run: pan work sync ${issueId}  (to push shadow → tracker)`));
-    console.log(chalk.dim(`  Or:  pan work shadow ${issueId} (to review history)`));
+    console.log(chalk.dim(`  Run: pan show ${issueId}  (to push shadow → tracker)`));
+    console.log(chalk.dim(`  Or:  pan show ${issueId} (to review history)`));
   } else {
     console.log('');
     console.log(chalk.green('✓ Shadow state is in sync with tracker'));

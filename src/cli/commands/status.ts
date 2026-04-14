@@ -54,7 +54,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   if (agents.length === 0) {
     console.log(chalk.dim('No running agents.'));
-    console.log(chalk.dim('Use "pan work issue <id>" to spawn one.'));
+    console.log(chalk.dim('Use "pan start <id>" to spawn one.'));
     return;
   }
 

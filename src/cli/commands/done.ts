@@ -133,7 +133,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 }
 
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
-  // Support both "pan work done MIN-123" and "pan work done agent-min-123"
+  // Support both "pan done MIN-123" and "pan done agent-min-123"
   const issueId = id.replace(/^agent-/i, '').toUpperCase();
   const agentId = `agent-${issueId.toLowerCase()}`;
 
@@ -256,7 +256,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           console.error(line);
         }
         console.error('');
-        console.error(chalk.dim(`  Fix these issues, then run 'pan work done ${issueId}' again.`));
+        console.error(chalk.dim(`  Fix these issues, then run 'pan done ${issueId}' again.`));
         console.error(chalk.dim('  Use --force to skip checks.'));
         console.error('');
         process.exit(1);
@@ -269,15 +269,15 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   try {
     // Step 0: Rebase onto target branch + push.
     //
-    // Absorbing the rebase into `pan work done` eliminates the multi-step
+    // Absorbing the rebase into `pan done` eliminates the multi-step
     // orchestration burden that was causing agents to stop partway through
     // the submit flow. An agent now has exactly one command to run; this
     // step handles the fetch/rebase/push that agents previously had to
-    // perform manually before calling `pan work done`.
+    // perform manually before calling `pan done`.
     //
     // Planning-artifact conflicts (`.planning/*`) are auto-resolved with
     // `--ours`. Any other conflicts abort the rebase and surface a clear
-    // error; the agent must resolve them and re-run `pan work done`.
+    // error; the agent must resolve them and re-run `pan done`.
     {
       const { getAgentState } = await import('../../lib/agents.js');
       const rebaseAgentState = getAgentState(agentId);
@@ -303,7 +303,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
               }
               console.error('');
               console.error(chalk.dim('Resolve the conflicts manually, commit, then re-run:'));
-              console.error(chalk.dim(`  pan work done ${issueId}`));
+              console.error(chalk.dim(`  pan done ${issueId}`));
             } else {
               console.error(chalk.red(failure.message || 'Unknown rebase error'));
             }
@@ -331,7 +331,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (skipTrackerUpdate) {
       shadowModeActive = true;
       spinner.text = 'Updating shadow state...';
-      updateShadowState(issueId, 'closed', 'pan work done');
+      updateShadowState(issueId, 'closed', 'pan done');
       console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
     } else if (isGitHubIssue) {
       // GitHub issue - update labels
@@ -420,7 +420,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     console.log('');
 
     console.log(chalk.dim('Ready for review. When approved, run:'));
-    console.log(chalk.dim(`  pan work approve ${issueId}`));
+    console.log(chalk.dim(`  pan approve ${issueId}`));
     console.log('');
 
     // Auto-trigger review & test (respecting circuit breaker)

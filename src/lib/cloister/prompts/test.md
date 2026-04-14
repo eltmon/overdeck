@@ -109,7 +109,7 @@ curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
   -d '{"testStatus":"failed","testNotes":"[describe NEW failures only — specify which suite/repo]"}' | jq .
 ```
 
-Then use `pan work tell {{ISSUE_ID}} "..."` to notify the issue agent of NEW failures only.
+Then use `pan tell {{ISSUE_ID}} "..."` to notify the issue agent of NEW failures only.
 
 **VERIFICATION:** After running curl, confirm you see valid JSON output with the updated status. If you get an error or empty response, the update FAILED — report this.
 

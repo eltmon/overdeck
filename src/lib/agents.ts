@@ -691,7 +691,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Check if already running
   if (sessionExists(agentId)) {
-    throw new Error(`Agent ${agentId} already running. Use 'pan work tell' to message it.`);
+    throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
   // Initialize hook for this agent (FPP support)
@@ -1405,7 +1405,7 @@ function generateRecoveryPrompt(state: AgentState): string {
     '## Recovery Steps',
     '1. Check beads for context: `bd show ' + state.issueId + '`',
     '2. Review recent git commits: `git log --oneline -10`',
-    '3. Check hook for pending work: `pan work hook check`',
+    '3. Check hook for pending work: `pan admin fpp check`',
     '4. Resume from last known state',
     '',
     '## FPP Reminder',
@@ -1486,15 +1486,15 @@ function checkAndSetupHooks(): void {
     console.log('Configuring Panopticon heartbeat hooks...');
     // Note: This runs during spawn which is now async, so we can use execAsync
     // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
-    exec('pan setup hooks', (error: Error | null) => {
+    exec('pan admin hooks install', (error: Error | null) => {
       if (error) {
-        console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
+        console.warn('⚠ Failed to auto-configure hooks. Run `pan admin hooks install` manually.');
       } else {
         console.log('✓ Heartbeat hooks configured');
       }
     });
   } catch (error) {
-    console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
+    console.warn('⚠ Failed to auto-configure hooks. Run `pan admin hooks install` manually.');
   }
 }
 

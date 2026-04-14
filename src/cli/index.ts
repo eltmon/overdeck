@@ -284,7 +284,7 @@ registerInstallCommand(program);
 // Register inspect command (pan inspect <issueId> --bead <beadId>)
 registerInspectCommand(program);
 
-// Shorthand: pan status = pan work status
+// Shorthand: pan status = pan status
 program
   .command('status')
   .description('Show running agents (shorthand for work status)')

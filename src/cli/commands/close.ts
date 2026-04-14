@@ -1,5 +1,5 @@
 /**
- * pan work close-out <id> — Human-gated close-out ceremony for completed issues.
+ * pan close <id> — Human-gated close-out ceremony for completed issues.
  *
  * Verifies merge, archives artifacts, cleans up workspace/agent state,
  * closes the issue on the tracker, and applies the `closed-out` label.

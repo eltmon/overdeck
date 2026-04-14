@@ -21,7 +21,7 @@ export async function resetSessionCommand(id: string): Promise<void> {
 
   // Refuse if running
   if (lifecycle.hasLiveTmuxSession) {
-    console.log(chalk.red(`Agent ${agentId} is running. Stop it first with: pan work kill ${id}`));
+    console.log(chalk.red(`Agent ${agentId} is running. Stop it first with: pan kill ${id}`));
     process.exit(1);
   }
 

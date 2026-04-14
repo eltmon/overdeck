@@ -1391,7 +1391,7 @@ const postIssueReopenRoute = HttpRouter.add(
     // Reset specialist pipeline state, post-merge state, and agent markers (all non-fatal)
     yield* Effect.promise(async () => {
       // Reset specialist pipeline state, remove from queues, and update STATE.md
-      // via reopenWorkspaceState (shared logic with `pan work reopen` CLI command)
+      // via reopenWorkspaceState (shared logic with `pan reopen` CLI command)
       try {
         const teamPrefix = extractTeamPrefix(id);
         const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
@@ -1487,7 +1487,7 @@ const postIssueReopenRoute = HttpRouter.add(
       newState,
       resetSummary: null,
       agentRunning: false,
-      nextStep: `Start an agent: pan work issue ${id}`,
+      nextStep: `Start an agent: pan start ${id}`,
     });
   })),
 );

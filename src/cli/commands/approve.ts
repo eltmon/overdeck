@@ -100,12 +100,12 @@ export async function approveCommand(id: string, options: ApproveOptions = {}): 
   const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
 
   // Agent guard: pan approve is a supervisor-only command.
-  // Agents must use `pan work done` to signal completion — approval is for humans only.
+  // Agents must use `pan done` to signal completion — approval is for humans only.
   // This guard uses process.exit(1) rather than return so the agent sees a clear failure.
   const callingAgentId = process.env.PANOPTICON_AGENT_ID;
   if (callingAgentId) {
     console.error(chalk.red('ERROR: pan approve is a supervisor-only command.'));
-    console.error(chalk.red(`Agents MUST use: pan work done <issue-id> -c "summary"`));
+    console.error(chalk.red(`Agents MUST use: pan done <issue-id> -c "summary"`));
     console.error(chalk.dim(`You are running as agent: ${callingAgentId}`));
     process.exit(1);
   }
@@ -114,7 +114,7 @@ export async function approveCommand(id: string, options: ApproveOptions = {}): 
 
   if (!state) {
     console.log(chalk.yellow(`Agent ${agentId} not found.`));
-    console.log(chalk.dim('Run "pan work status" to see running agents.'));
+    console.log(chalk.dim('Run "pan status" to see running agents.'));
     return;
   }
 

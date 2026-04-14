@@ -369,7 +369,7 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
 
       if (skipAnswer.skip) {
         console.log('');
-        console.log(chalk.cyan(`Run: pan work issue ${id}`));
+        console.log(chalk.cyan(`Run: pan start ${id}`));
         console.log('');
         return;
       }
@@ -449,14 +449,14 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
     const skipTrackerUpdate = shouldSkipTrackerUpdate(id, options.shadow);
     if (skipTrackerUpdate) {
       // Create shadow state for the issue
-      createShadowState(id, 'open', 'pan work plan');
+      createShadowState(id, 'open', 'pan plan');
       console.log(chalk.cyan('👻 Shadow mode enabled: status will be tracked locally'));
       console.log('');
     }
 
     console.log(chalk.bold('Next steps:'));
     console.log(`  1. Review ${chalk.cyan('.planning/STATE.md')}`);
-    console.log(`  2. Run ${chalk.cyan(`pan work issue ${id}`)} to spawn agent`);
+    console.log(`  2. Run ${chalk.cyan(`pan start ${id}`)} to spawn agent`);
     console.log(`  3. Agent will use ${chalk.cyan('bd ready')} to get tasks`);
     console.log('');
 

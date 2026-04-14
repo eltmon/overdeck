@@ -36,5 +36,5 @@ export async function pendingCommand(): Promise<void> {
     console.log('');
   }
 
-  console.log(chalk.dim('Run "pan work approve <id>" to approve and merge.'));
+  console.log(chalk.dim('Run "pan approve <id>" to approve and merge.'));
 }

@@ -42,7 +42,7 @@ export async function contextCommand(
 
       if (!state) {
         console.log(chalk.dim('No state found for agent.'));
-        console.log(chalk.dim('Initialize with: pan work context init <agent-id> <issue-id>'));
+        console.log(chalk.dim('Initialize with: pan show --context init <agent-id> <issue-id>'));
         return;
       }
 
@@ -102,7 +102,7 @@ export async function contextCommand(
 
       if (!checkpoint) {
         console.log(chalk.red('Checkpoint message required'));
-        console.log(chalk.dim('Usage: pan work context checkpoint "message" ["resume point"]'));
+        console.log(chalk.dim('Usage: pan show --context checkpoint "message" ["resume point"]'));
         return;
       }
 
@@ -198,7 +198,7 @@ export async function contextCommand(
       const target = arg1;
 
       if (!target) {
-        console.log(chalk.dim('Usage: pan work context tokens <file-or-text>'));
+        console.log(chalk.dim('Usage: pan show --context tokens <file-or-text>'));
         return;
       }
 
@@ -215,13 +215,13 @@ export async function contextCommand(
     default:
       console.log(chalk.bold('Context Commands:'));
       console.log('');
-      console.log(`  ${chalk.cyan('pan work context state [agent-id]')}     - Show current state`);
-      console.log(`  ${chalk.cyan('pan work context init <agent> <issue>')} - Initialize state`);
-      console.log(`  ${chalk.cyan('pan work context checkpoint "msg"')}     - Save checkpoint`);
-      console.log(`  ${chalk.cyan('pan work context summary [title]')}      - Add work summary`);
-      console.log(`  ${chalk.cyan('pan work context history [pattern]')}    - Search history`);
-      console.log(`  ${chalk.cyan('pan work context materialize [file]')}   - List/read outputs`);
-      console.log(`  ${chalk.cyan('pan work context tokens <file>')}        - Estimate token count`);
+      console.log(`  ${chalk.cyan('pan show --context state [agent-id]')}     - Show current state`);
+      console.log(`  ${chalk.cyan('pan show --context init <agent> <issue>')} - Initialize state`);
+      console.log(`  ${chalk.cyan('pan show --context checkpoint "msg"')}     - Save checkpoint`);
+      console.log(`  ${chalk.cyan('pan show --context summary [title]')}      - Add work summary`);
+      console.log(`  ${chalk.cyan('pan show --context history [pattern]')}    - Search history`);
+      console.log(`  ${chalk.cyan('pan show --context materialize [file]')}   - List/read outputs`);
+      console.log(`  ${chalk.cyan('pan show --context tokens <file>')}        - Estimate token count`);
       console.log('');
   }
 }

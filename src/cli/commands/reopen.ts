@@ -323,12 +323,12 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
         console.log(`  pan tell ${id} "Issue reopened. <describe what needs to change>"`);
       } else {
         console.log(chalk.dim('Start the agent to resume implementation:'));
-        console.log(`  pan work issue ${id}`);
+        console.log(`  pan start ${id}`);
       }
     } catch {
       // Fallback if agent state check fails
       console.log(chalk.dim('Start the agent to resume implementation:'));
-      console.log(`  pan work issue ${id}`);
+      console.log(`  pan start ${id}`);
     }
     console.log('');
   } catch (error: unknown) {

@@ -594,7 +594,7 @@ export class CloisterService {
 
   /**
    * Scan for agent completion markers and auto-trigger review.
-   * This is the fallback for when `pan work done` fails to reach the dashboard via HTTP.
+   * This is the fallback for when `pan done` fails to reach the dashboard via HTTP.
    */
   private async checkCompletionMarkers(): Promise<void> {
     try {
@@ -632,8 +632,8 @@ export class CloisterService {
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
 
-        // Skip if review is already in progress or passed — `pan work done` already triggered it.
-        // This completion marker scan is only a fallback for when the HTTP call from `pan work done` fails.
+        // Skip if review is already in progress or passed — `pan done` already triggered it.
+        // This completion marker scan is only a fallback for when the HTTP call from `pan done` fails.
         const { getReviewStatus } = await import('../review-status.js');
         const existingReview = getReviewStatus(issueId);
         if (existingReview && ['reviewing', 'passed'].includes(existingReview.reviewStatus || '')) {
@@ -1095,7 +1095,7 @@ export class CloisterService {
           const trigger = triggers[0];
 
           // task_complete triggers with a specialist name (e.g. 'test-agent') as suggestedModel
-          // are handled by the `pan work done` → completion marker → specialist pipeline flow.
+          // are handled by the `pan done` → completion marker → specialist pipeline flow.
           // Do NOT perform a model-swap handoff here — it passes the specialist name as a model ID
           // which is invalid and causes the agent to respawn with an unusable model.
           const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'inspect-agent', 'uat-agent'];

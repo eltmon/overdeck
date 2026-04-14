@@ -103,16 +103,16 @@ After your inspection, you MUST do both steps:
 
 ### Step 1: Send feedback to the agent (ALWAYS do this first)
 
-**Use `pan work tell` — it handles Enter key correctly.**
+**Use `pan tell` — it handles Enter key correctly.**
 
 **If PASSED:**
 ```bash
-pan work tell {{issueId}} "INSPECTION PASSED for bead {{beadId}}. Proceed to next bead."
+pan tell {{issueId}} "INSPECTION PASSED for bead {{beadId}}. Proceed to next bead."
 ```
 
 **If BLOCKED:**
 ```bash
-pan work tell {{issueId}} "INSPECTION BLOCKED for bead {{beadId}}:
+pan tell {{issueId}} "INSPECTION BLOCKED for bead {{beadId}}:
 
 VIOLATIONS:
 1. [file:line] - Description of violation

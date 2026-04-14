@@ -129,7 +129,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
   // Check if agent already exists
   if (await remoteSessionExists(fly, vmName, agentId)) {
-    throw new Error(`Agent ${agentId} already running on ${vmName}. Use 'pan work tell' to message it.`);
+    throw new Error(`Agent ${agentId} already running on ${vmName}. Use 'pan tell' to message it.`);
   }
 
   // Create agent state

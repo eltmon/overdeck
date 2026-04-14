@@ -92,7 +92,7 @@ export async function healthCommand(
       // Ping a specific agent
       if (!arg) {
         console.log(chalk.red('Agent ID required'));
-        console.log(chalk.dim('Usage: pan work health ping <agent-id>'));
+        console.log(chalk.dim('Usage: pan show --health ping <agent-id>'));
         return;
       }
 
@@ -115,7 +115,7 @@ export async function healthCommand(
       // Force recovery of a specific agent
       if (!arg) {
         console.log(chalk.red('Agent ID required'));
-        console.log(chalk.dim('Usage: pan work health recover <agent-id>'));
+        console.log(chalk.dim('Usage: pan show --health recover <agent-id>'));
         return;
       }
 
@@ -182,11 +182,11 @@ export async function healthCommand(
     default:
       console.log(chalk.bold('Health Monitoring Commands:'));
       console.log('');
-      console.log(`  ${chalk.cyan('pan work health check')}         - Run single health check`);
-      console.log(`  ${chalk.cyan('pan work health status')}        - Show all agent health`);
-      console.log(`  ${chalk.cyan('pan work health ping <id>')}     - Ping specific agent`);
-      console.log(`  ${chalk.cyan('pan work health recover <id>')}  - Force recover agent`);
-      console.log(`  ${chalk.cyan('pan work health daemon')}        - Start health daemon`);
+      console.log(`  ${chalk.cyan('pan show --health check')}         - Run single health check`);
+      console.log(`  ${chalk.cyan('pan show --health status')}        - Show all agent health`);
+      console.log(`  ${chalk.cyan('pan show --health ping <id>')}     - Ping specific agent`);
+      console.log(`  ${chalk.cyan('pan show --health recover <id>')}  - Force recover agent`);
+      console.log(`  ${chalk.cyan('pan show --health daemon')}        - Start health daemon`);
       console.log('');
       console.log(chalk.bold('Options:'));
       console.log(`  ${chalk.dim('--json')}               Output as JSON`);

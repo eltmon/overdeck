@@ -70,7 +70,7 @@ curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
   -H "Content-Type: application/json" \
   -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to {{DIFF_BASE}} (already merged or stale)"}' | jq .
 
-pan work tell {{ISSUE_ID}} "Review complete: branch has 0 diff from {{DIFF_BASE}} — already merged or stale. Marking as passed."
+pan tell {{ISSUE_ID}} "Review complete: branch has 0 diff from {{DIFF_BASE}} — already merged or stale. Marking as passed."
 ```
 
 Then STOP — you are done.
@@ -174,10 +174,10 @@ curl -s -X POST {{API_URL}}/api/specialists/test-agent/queue \
   -d '{"issueId":"{{ISSUE_ID}}","workspace":"{{WORKSPACE}}","branch":"{{BRANCH}}"}' | jq .
 ```
 
-**Step 2** — Send feedback to the work agent via `pan work tell`. The work agent cannot see your review — they only know what's wrong if you tell them directly.
+**Step 2** — Send feedback to the work agent via `pan tell`. The work agent cannot see your review — they only know what's wrong if you tell them directly.
 
 ```bash
-pan work tell {{ISSUE_ID}} "CODE REVIEW BLOCKED for {{ISSUE_ID}}:
+pan tell {{ISSUE_ID}} "CODE REVIEW BLOCKED for {{ISSUE_ID}}:
 
 CRITICAL ISSUES:
 1. [file:line] — description
@@ -190,7 +190,7 @@ REQUIRED ACTIONS:
 Reply when fixes complete."
 ```
 
-Use `pan work tell` rather than raw `tmux send-keys` — it handles Enter and escaping correctly.
+Use `pan tell` rather than raw `tmux send-keys` — it handles Enter and escaping correctly.
 
 ## Never Close GitHub Issues
 

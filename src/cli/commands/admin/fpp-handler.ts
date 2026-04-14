@@ -62,7 +62,7 @@ export async function hookCommand(
 
     case 'push': {
       if (!idOrMessage) {
-        console.log(chalk.red('Usage: pan work hook push <agent-id> <message>'));
+        console.log(chalk.red('Usage: pan admin fpp push <agent-id> <message>'));
         process.exit(1);
       }
 
@@ -87,7 +87,7 @@ export async function hookCommand(
 
     case 'pop': {
       if (!idOrMessage) {
-        console.log(chalk.red('Usage: pan work hook pop <item-id>'));
+        console.log(chalk.red('Usage: pan admin fpp pop <item-id>'));
         process.exit(1);
       }
 
@@ -108,7 +108,7 @@ export async function hookCommand(
 
     case 'mail': {
       if (!idOrMessage) {
-        console.log(chalk.red('Usage: pan work hook mail <agent-id> <message>'));
+        console.log(chalk.red('Usage: pan admin fpp mail <agent-id> <message>'));
         process.exit(1);
       }
 
@@ -145,11 +145,11 @@ export async function hookCommand(
     default:
       console.log(chalk.bold('Hook Commands:'));
       console.log('');
-      console.log(`  ${chalk.cyan('pan work hook check [agent-id]')}  - Check for pending work`);
-      console.log(`  ${chalk.cyan('pan work hook push <agent-id> <msg>')}  - Push task to hook`);
-      console.log(`  ${chalk.cyan('pan work hook pop <item-id>')}  - Remove completed item`);
-      console.log(`  ${chalk.cyan('pan work hook clear [agent-id]')}  - Clear all hook items`);
-      console.log(`  ${chalk.cyan('pan work hook mail <agent-id> <msg>')}  - Send mail to agent`);
-      console.log(`  ${chalk.cyan('pan work hook fpp [agent-id]')}  - Generate FPP prompt`);
+      console.log(`  ${chalk.cyan('pan admin fpp check [agent-id]')}  - Check for pending work`);
+      console.log(`  ${chalk.cyan('pan admin fpp push <agent-id> <msg>')}  - Push task to hook`);
+      console.log(`  ${chalk.cyan('pan admin fpp pop <item-id>')}  - Remove completed item`);
+      console.log(`  ${chalk.cyan('pan admin fpp clear [agent-id]')}  - Clear all hook items`);
+      console.log(`  ${chalk.cyan('pan admin fpp mail <agent-id> <msg>')}  - Send mail to agent`);
+      console.log(`  ${chalk.cyan('pan admin fpp fpp [agent-id]')}  - Generate FPP prompt`);
   }
 }

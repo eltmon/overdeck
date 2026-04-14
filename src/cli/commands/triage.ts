@@ -222,8 +222,8 @@ repo = "your-repo"
 
     console.log('');
     console.log(chalk.bold('Commands:'));
-    console.log(`  ${chalk.dim(`Create ${primaryType} issue:`)} pan work triage <id> --create`);
-    console.log(`  ${chalk.dim('Dismiss from queue:')}  pan work triage <id> --dismiss "reason"`);
+    console.log(`  ${chalk.dim(`Create ${primaryType} issue:`)} pan issues <id> --create`);
+    console.log(`  ${chalk.dim('Dismiss from queue:')}  pan issues <id> --dismiss "reason"`);
     console.log('');
 
   } catch (error: any) {

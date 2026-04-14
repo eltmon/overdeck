@@ -1,5 +1,5 @@
 /**
- * pan work reset-review <id>
+ * pan review reset <id>
  *
  * Human-initiated full pipeline reset. Clears all specialist states,
  * resets the circuit breaker, and re-triggers the review pipeline.

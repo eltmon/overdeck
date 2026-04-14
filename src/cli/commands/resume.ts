@@ -15,8 +15,8 @@ export async function resumeCommand(id: string): Promise<void> {
   if (!result.success) {
     console.error(chalk.red(result.error || `Failed to resume ${lifecycle.agentId}`));
     if ((result.error || '').includes('No saved session ID')) {
-      console.log(chalk.dim(`Use 'pan work issue ${id}' to start a fresh session in the existing workspace.`));
-      console.log(chalk.dim(`If the saved metadata is stale, run 'pan work reset-session ${id}' first.`));
+      console.log(chalk.dim(`Use 'pan start ${id}' to start a fresh session in the existing workspace.`));
+      console.log(chalk.dim(`If the saved metadata is stale, run 'pan review reset --session ${id}' first.`));
     }
     process.exit(1);
   }

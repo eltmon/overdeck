@@ -1195,7 +1195,7 @@ const postAgentsRoute = HttpRouter.add(
     if (!hasPrd && !hasDraftPrd && !workspaceExists) {
       return jsonResponse({
         error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
-        hint: 'Use "pan work plan" to create a PRD draft, then start work.',
+        hint: 'Use "pan plan" to create a PRD draft, then start work.',
         issueId,
       }, { status: 422 });
     }
@@ -1431,7 +1431,7 @@ const postAgentsRoute = HttpRouter.add(
         .catch(() => { /* No existing session — good */ })
     );
 
-    // Spawn pan work issue command
+    // Spawn pan start command
     const spawnPanCommand = (args: string[], cwd?: string): string => {
       const activityId = `activity-${Date.now()}`;
       const child = spawn('pan', args, {
@@ -1593,7 +1593,7 @@ const postAgentsRoute = HttpRouter.add(
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
-    // and pan work issue calling saveAgentState(), during which the workspace detail
+    // and pan start calling saveAgentState(), during which the workspace detail
     // panel shows the stale planning-<id> session and "No saved output available."
     const earlyAgentId = agentSessionName; // e.g. "agent-pan-488"
     const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);

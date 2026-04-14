@@ -50,7 +50,7 @@ export async function cvCommand(agentId?: string, options: CVOptions = {}): Prom
     }
 
     console.log('');
-    console.log(chalk.dim(`Use: pan work cv <agent-id> for details`));
+    console.log(chalk.dim(`Use: pan show --cv <agent-id> for details`));
     return;
   }
 
