@@ -219,13 +219,8 @@ export async function listCommand(options: ListOptions): Promise<void> {
       return;
     }
 
-    for (const { tracker, issues } of allIssues) {
-      console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} issues)\n`));
-      displayIssues(issues, tracker);
-    }
-
-    // Filter for shadow-only if requested
     if (options.shadowOnly) {
+      // Render only the shadow-only subset — the full list is suppressed.
       const filteredIssues = allIssues.map(({ tracker, issues }) => ({
         tracker,
         issues: issues.filter(issue => isShadowed(issue.ref))
@@ -238,6 +233,11 @@ export async function listCommand(options: ListOptions): Promise<void> {
           console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} shadowed issues)\n`));
           displayIssues(issues, tracker);
         }
+      }
+    } else {
+      for (const { tracker, issues } of allIssues) {
+        console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} issues)\n`));
+        displayIssues(issues, tracker);
       }
     }
 

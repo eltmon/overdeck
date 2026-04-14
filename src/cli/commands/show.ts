@@ -43,4 +43,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
 
   // Default: run all views in order for a compact summary
   await shadowCommand(id);
+  await cvCommand(id, { json });
+  await healthCommand('check', id, { json });
+  await contextCommand('state', id, undefined, { json });
 }

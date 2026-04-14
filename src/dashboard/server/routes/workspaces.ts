@@ -4143,6 +4143,104 @@ const getMergeQueueRoute = HttpRouter.add(
   })),
 );
 
+// ─── Backward-compat aliases for 0.7.0 route rename ───────────────────────────
+//
+// PAN-705 renamed several routes from /api/workspaces/:issueId/... to
+// /api/issues/:issueId/... or /api/review/:issueId/... . The specialists on
+// dashboards built from main still POST to the old paths, so we keep the old
+// paths alive as aliases that forward to the new handlers via internal fetch.
+// Remove these aliases in a follow-up once all specialist code has migrated.
+
+function forwardAlias(method: 'GET' | 'POST', newPath: (issueId: string) => string) {
+  return httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+    const url = `http://localhost:${apiPort}${newPath(issueId)}`;
+    let body: string | undefined;
+    if (method === 'POST') {
+      try {
+        body = yield* readJsonBody.pipe(Effect.map((obj) => JSON.stringify(obj)));
+      } catch {
+        body = '{}';
+      }
+    }
+    try {
+      const res = yield* Effect.promise(() => fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: method === 'POST' ? body : undefined,
+      }));
+      const text = yield* Effect.promise(() => res.text());
+      try {
+        const data = JSON.parse(text);
+        return jsonResponse(data, { status: res.status });
+      } catch {
+        return jsonResponse({ raw: text }, { status: res.status });
+      }
+    } catch (err: any) {
+      return jsonResponse(
+        { error: `Alias forward failed: ${err.message}` },
+        { status: 500 }
+      );
+    }
+  }));
+}
+
+const getWorkspaceReviewStatusAliasRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/review-status',
+  forwardAlias('GET', (id) => `/api/review/${id}/status`),
+);
+
+const postWorkspaceReviewStatusAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/review-status',
+  forwardAlias('POST', (id) => `/api/review/${id}/status`),
+);
+
+const postWorkspaceApproveAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/approve',
+  forwardAlias('POST', (id) => `/api/issues/${id}/approve`),
+);
+
+const postWorkspaceMergeAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/merge',
+  forwardAlias('POST', (id) => `/api/issues/${id}/merge`),
+);
+
+const postWorkspaceReviewAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/review',
+  forwardAlias('POST', (id) => `/api/review/${id}/trigger`),
+);
+
+const postWorkspaceRequestReviewAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/request-review',
+  forwardAlias('POST', (id) => `/api/review/${id}/request`),
+);
+
+const postWorkspaceResetReviewAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/reset-review',
+  forwardAlias('POST', (id) => `/api/review/${id}/reset`),
+);
+
+const postWorkspaceSyncMainAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/sync-main',
+  forwardAlias('POST', (id) => `/api/issues/${id}/sync-main`),
+);
+
+const postWorkspaceStartAliasRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/start',
+  forwardAlias('POST', (id) => `/api/issues/${id}/start`),
+);
+
 export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
@@ -4165,6 +4263,16 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceTldrRoute,
   postWorkspaceRefreshTokenRoute,
   getMergeQueueRoute,
+  // Backward-compat aliases for 0.7.0 route rename
+  getWorkspaceReviewStatusAliasRoute,
+  postWorkspaceReviewStatusAliasRoute,
+  postWorkspaceApproveAliasRoute,
+  postWorkspaceMergeAliasRoute,
+  postWorkspaceReviewAliasRoute,
+  postWorkspaceRequestReviewAliasRoute,
+  postWorkspaceResetReviewAliasRoute,
+  postWorkspaceSyncMainAliasRoute,
+  postWorkspaceStartAliasRoute,
 );
 
 export default workspacesRouteLayer;
