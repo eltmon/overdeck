@@ -171,8 +171,7 @@ const planCmd = program
   .description('Create execution plan for an issue, or finalize an existing plan');
 
 planCmd
-  .command('<id>')
-  .description('Create interactive execution plan for an issue')
+  .argument('<id>', 'issue ID to plan for')
   .option('--model <model>', 'Model to use for planning')
   .option('--dry-run', 'Preview plan without creating it')
   .action(planCommand);

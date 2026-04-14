@@ -18,7 +18,7 @@ import { HttpRouter } from 'effect/unstable/http';
 import { getShadowState } from '../../../lib/shadow-state.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+;
 
 // ─── Route: GET /api/show/:issueId ────────────────────────────────────────────
 
@@ -85,7 +85,6 @@ const getShowTldrRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const project = resolveProjectFromIssue(issueId);
     const projectPath = project?.path ?? process.cwd();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);

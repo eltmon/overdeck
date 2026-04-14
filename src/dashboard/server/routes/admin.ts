@@ -5,7 +5,6 @@ import { httpHandler } from './http-handler.js';
  *
  * Implements /api/admin/* endpoints mirroring the `pan admin` CLI namespace:
  *   GET  /api/admin/tldr/:issueId     — TLDR daemon status for a workspace
- *   GET  /api/admin/fpp/:issueId      — FPP hook stack for an issue
  */
 
 import { existsSync } from 'node:fs';
