@@ -17,7 +17,7 @@ Commands:
                                for one issue
   review                       Review-loop management: pending items, request
                                re-review, reset cycles
-  plan                         Create execution plan for an issue, or finalize
+  plan [options] <id>          Create execution plan for an issue, or finalize
                                an existing plan
   tell <id> <message>          Send message to running agent
   kill [options] <id>          Stop running agent (workspace preserved)
