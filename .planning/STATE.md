@@ -47,7 +47,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-njd: Replace hardcoded legacy command strings in frontend
 - [ ] panopticon-cli-9kq: Update kanban card + inspector panel action labels
 - [ ] panopticon-cli-y4k: First-launch upgrade announcement banner
-- [ ] panopticon-cli-i3m: Update docs/USAGE.md and docs/INDEX.md
+- [x] panopticon-cli-i3m: Updated USAGE.md and INDEX.md (commit: pending)
 - [ ] panopticon-cli-mjv: Update doc references in all PRDs
 - [ ] panopticon-cli-auj: Update hook scripts and installed shell aliases
 - [ ] panopticon-cli-302: pan doctor: flag legacy invocations
@@ -59,7 +59,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-naa: Curate 8-10 flat shortcut skills
 - [ ] panopticon-cli-t1p: pan sync deletes legacy skill files
 - [ ] panopticon-cli-gsq: Plain-text fixture test for synced skill set
-- [x] panopticon-cli-cf4: CHANGELOG entry with full migration table (commit: pending)
+- [x] panopticon-cli-cf4: CHANGELOG entry with full migration table (commit: b38c071d)
 
 ## Key Decisions
 - D1: PRD exists at docs/prds/planned/pan-command-taxonomy-reorg.md, active copy at docs/prds/active/pan-705/
