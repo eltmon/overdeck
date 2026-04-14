@@ -13,12 +13,12 @@ import { tmpdir } from 'os';
 
 describe('formatComments', () => {
   it('returns "No comments" when list is empty', async () => {
-    const { formatComments } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { formatComments } = await import('../../../../src/cli/commands/reopen.js');
     expect(formatComments([])).toBe('No comments');
   });
 
   it('formats a single comment with author and truncated body', async () => {
-    const { formatComments } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { formatComments } = await import('../../../../src/cli/commands/reopen.js');
     const result = formatComments([
       {
         id: '1',
@@ -32,7 +32,7 @@ describe('formatComments', () => {
   });
 
   it('truncates body longer than 200 characters', async () => {
-    const { formatComments } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { formatComments } = await import('../../../../src/cli/commands/reopen.js');
     const longBody = 'A'.repeat(300);
     const result = formatComments([
       { id: '1', body: longBody, author: 'Bob', createdAt: '2026-01-15T10:00:00Z' },
@@ -43,7 +43,7 @@ describe('formatComments', () => {
   });
 
   it('sorts comments by createdAt ascending', async () => {
-    const { formatComments } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { formatComments } = await import('../../../../src/cli/commands/reopen.js');
     const result = formatComments([
       { id: '2', body: 'Second comment', author: 'Bob', createdAt: '2026-02-01T10:00:00Z' },
       { id: '1', body: 'First comment', author: 'Alice', createdAt: '2026-01-01T10:00:00Z' },
@@ -54,7 +54,7 @@ describe('formatComments', () => {
   });
 
   it('indents multiline comment bodies', async () => {
-    const { formatComments } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { formatComments } = await import('../../../../src/cli/commands/reopen.js');
     const result = formatComments([
       { id: '1', body: 'Line one\nLine two', author: 'Alice', createdAt: '2026-01-15T10:00:00Z' },
     ]);
@@ -75,14 +75,14 @@ describe('findLocalWorkspace', () => {
   });
 
   it('returns null when no workspace exists', async () => {
-    const { findLocalWorkspace } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { findLocalWorkspace } = await import('../../../../src/cli/commands/reopen.js');
     // Use a definitely-nonexistent issue ID
     const result = findLocalWorkspace('ZZZ-99999', tempDir);
     expect(result).toBeNull();
   });
 
   it('finds workspace when feature-<id> dir exists under workspaces/', async () => {
-    const { findLocalWorkspace } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { findLocalWorkspace } = await import('../../../../src/cli/commands/reopen.js');
 
     const wsPath = join(tempDir, 'workspaces', 'feature-zzz-42');
     mkdirSync(wsPath, { recursive: true });
@@ -92,7 +92,7 @@ describe('findLocalWorkspace', () => {
   });
 
   it('searches up multiple directory levels', async () => {
-    const { findLocalWorkspace } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { findLocalWorkspace } = await import('../../../../src/cli/commands/reopen.js');
 
     // Workspace is in tempDir/workspaces/feature-zzz-43
     const wsPath = join(tempDir, 'workspaces', 'feature-zzz-43');
@@ -107,7 +107,7 @@ describe('findLocalWorkspace', () => {
   });
 
   it('normalizes issue ID to lowercase for path lookup', async () => {
-    const { findLocalWorkspace } = await import('../../../../src/cli/commands/work/reopen.js');
+    const { findLocalWorkspace } = await import('../../../../src/cli/commands/reopen.js');
 
     const wsPath = join(tempDir, 'workspaces', 'feature-zzz-44');
     mkdirSync(wsPath, { recursive: true });
