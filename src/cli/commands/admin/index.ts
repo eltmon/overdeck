@@ -13,6 +13,7 @@ import { registerSpecialistsCommands } from '../specialists/index.js';
 import { registerRemoteCommands } from '../remote/index.js';
 import { registerDbCommands } from '../db.js';
 import { registerBeadsCommands } from '../beads.js';
+import { registerConfigCommand } from '../config.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -33,4 +34,7 @@ export function registerAdminCommands(program: Command): void {
 
   // pan admin beads — beads CLI management
   registerBeadsCommands(admin);
+
+  // pan admin config — configuration management
+  registerConfigCommand(admin);
 }
