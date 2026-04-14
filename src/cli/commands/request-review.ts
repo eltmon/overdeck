@@ -6,7 +6,7 @@
  */
 
 import chalk from 'chalk';
-import { getDashboardApiUrl } from '../../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 

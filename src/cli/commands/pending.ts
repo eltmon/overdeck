@@ -1,8 +1,8 @@
 import chalk from 'chalk';
-import { listRunningAgents } from '../../../lib/agents.js';
+import { listRunningAgents } from '../../lib/agents.js';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { AGENTS_DIR } from '../../../lib/paths.js';
+import { AGENTS_DIR } from '../../lib/paths.js';
 
 export async function pendingCommand(): Promise<void> {
   // Find agents with completed work (status file or convention)

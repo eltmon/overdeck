@@ -1,8 +1,8 @@
 import chalk from 'chalk';
 import { existsSync, unlinkSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getAgentState, getAgentDir, getAgentRuntimeFile, getLatestSessionId } from '../../../lib/agents.js';
-import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { getAgentState, getAgentDir, getAgentRuntimeFile, getLatestSessionId } from '../../lib/agents.js';
+import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 
 export async function resetSessionCommand(id: string): Promise<void> {
   // Support "agent-xxx" prefix, or just the issue ID

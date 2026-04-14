@@ -49,6 +49,10 @@ import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
 import { planCommand } from './commands/plan.js';
+import { pendingCommand } from './commands/pending.js';
+import { requestReviewCommand } from './commands/request-review.js';
+import { resetReviewCommand } from './commands/reset-review.js';
+import { resetSessionCommand } from './commands/reset-session.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -107,6 +111,34 @@ program
   .description('List and manage skills')
   .option('--json', 'Output as JSON')
   .action(skillsCommand);
+
+// pan review — pending, request, reset
+const review = program
+  .command('review')
+  .description('Review-loop management: pending items, request re-review, reset cycles');
+
+review
+  .command('pending')
+  .description('List completed work awaiting review')
+  .action(pendingCommand);
+
+review
+  .command('request <id>')
+  .description('Request re-review after fixing feedback')
+  .action(requestReviewCommand);
+
+review
+  .command('reset <id>')
+  .description('Reset review/test/merge cycles (human override)')
+  .option('--session', 'Also clear saved Claude session')
+  .option('--cycles', 'Reset review cycle counter')
+  .action((id, options) => {
+    if (options.session) {
+      resetSessionCommand(id);
+    } else {
+      resetReviewCommand(id);
+    }
+  });
 
 // pan plan <id> and pan plan finalize <id>
 const planCmd = program
