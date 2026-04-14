@@ -67,3 +67,5 @@ Working through beads systematically. Starting with setup/foundational beads bef
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-14T15:43Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-14T15:44Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
