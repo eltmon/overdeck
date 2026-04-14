@@ -33,7 +33,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-7n3: pan review
 - [ ] panopticon-cli-2mf: pan show <id>
 - [ ] panopticon-cli-pei: pan issues
-- [ ] panopticon-cli-5z3: Delete pan work command group
+- [x] panopticon-cli-5z3: Deleted pan work command group (commit: pending)
 - [x] panopticon-cli-oyb: pan admin migrate-config (commit: fb273e21)
 - [x] panopticon-cli-f04: pan admin tldr (commit: ee1a4652)
 - [x] panopticon-cli-rg8: pan admin fpp (commit: 02af5fa2)
@@ -51,7 +51,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-mjv: Update doc references in all PRDs
 - [ ] panopticon-cli-auj: Update hook scripts and installed shell aliases
 - [ ] panopticon-cli-302: pan doctor: flag legacy invocations
-- [x] panopticon-cli-oo1: Plain-text fixture test for pan --help (commit: pending)
+- [x] panopticon-cli-oo1: Plain-text fixture test for pan --help (commit: 1f3b4e09)
 - [ ] panopticon-cli-xqq: Umbrella /pan skill with dispatch
 - [ ] panopticon-cli-fqg: Rename skills to match new CLI verbs
 - [ ] panopticon-cli-8y6: Skill template

@@ -36,7 +36,7 @@ import { syncCommand } from './commands/sync.js';
 import { restoreCommand } from './commands/restore.js';
 import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
-import { registerWorkCommands, statusCommand } from './commands/work/index.js';
+import { statusCommand } from './commands/work/status.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -102,9 +102,6 @@ program
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
-
-// Register work commands (pan work issue, pan work status, etc.)
-registerWorkCommands(program);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);

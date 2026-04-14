@@ -14,7 +14,6 @@ Commands:
   skills [options]             List and manage skills
   plan-finalize [options]      Finalize a planning session: create beads from
                                vBRIEF plan and write completion marker
-  work                         Agent and work management
   workspace                    Workspace management
   test                         Test running and management
   admin                        Plumbing commands: watchdog, specialists, infra,
