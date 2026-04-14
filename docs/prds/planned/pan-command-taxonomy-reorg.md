@@ -102,6 +102,28 @@ Full detail in [QUICK-REFERENCE.md](../../QUICK-REFERENCE.md). Summary:
 
 **Exit criteria:** `pan --help` shows ~28 top-level names. Plumbing is under `pan admin`.
 
+### Phase 4.5 — Dashboard alignment
+
+The dashboard is the other user-facing surface and must stay in lockstep with the CLI. Leaving it behind means users see "pan work …" hints in the UI while the CLI speaks the new verbs. Fix it all in this issue, not as a follow-up.
+
+**HTTP routes:**
+
+14a. Rename backend HTTP routes in `src/dashboard/server/routes/` to match the new verbs. `/api/work/*` → split into `/api/issues/*` (for lifecycle verbs like start/done/approve/close/reopen/wipe/tell/kill/resume/recover/sync-main/inspect), `/api/review/*` (pending/request/reset), `/api/show/*` (unified observation), and `/api/admin/*` (plumbing endpoints). Route handlers stay the same — this is a URL-level rename plus router wiring, not a logic change.
+14b. Update `packages/contracts/` RPC types and the Effect RPC group definitions in `src/dashboard/server/ws-rpc.ts` to match the new verb names. Contract changes propagate to the frontend via the generated client.
+14c. Update the frontend RPC client in `src/dashboard/frontend/src/` (Zustand store, `WsTransport.ts`, `EventRouter.tsx`) to call the renamed routes and subscribe to the renamed event names.
+14d. Update integration tests in `src/dashboard/server/services/__tests__/` that hit the old route paths.
+
+**UI strings:**
+
+14e. Grep the frontend for hardcoded `pan work ...`, `pan cloister ...`, `pan plan-finalize`, etc. in shell hint components, copy-to-clipboard snippets, empty-state help text, onboarding flows, and the inspector panel. Replace with new verbs.
+14f. Update kanban card action labels and inspector panel actions that trigger backend routes to use the new verb names in their UI copy and tooltips.
+
+**First-launch announcement** (moved here from Phase 6):
+
+14g. Add a one-time upgrade announcement banner on first dashboard launch after upgrade. Renders the migration table from QUICK-REFERENCE.md inline, dismissible, persisted to localStorage. Implemented as a component under `src/dashboard/frontend/src/components/upgrade-announcement/`.
+
+**Exit criteria:** All `/api/work/*` routes removed. No frontend grep hits for legacy command strings. Dashboard integration tests green. First-launch announcement renders and dismisses correctly. `pan up && open https://pan.localhost` shows the announcement on first visit after upgrade.
+
 ### Phase 5 — Docs and tests
 
 15. Update every doc in `docs/` that references an old command path. Priority order: `USAGE.md`, `INDEX.md`, all `PRD-*.md`, all `prds/active/*.md`.
@@ -146,7 +168,7 @@ The distributed skills (`pan sync` writes ~60 into `~/.claude/skills/`) are the 
 
 20. Bump minor version (this is a breaking change to command surface, but we're pre-1.0 so minor is fine).
 21. CHANGELOG entry with the full migration table.
-22. Announcement in dashboard on first launch after upgrade ("command surface has been reorganized — see `pan --help` or visit /docs/quick-reference").
+22. Verify the dashboard first-launch announcement from Phase 4.5 renders correctly after upgrade.
 
 ---
 
@@ -171,11 +193,11 @@ The distributed skills (`pan sync` writes ~60 into `~/.claude/skills/`) are the 
 
 ## Out of scope
 
-- Dashboard UI changes. The dashboard can keep its current command invocations; it'll migrate alongside Phase 3.
-- Renaming `pan` itself or any alternative binary names.
-- Changing the config file format.
-- Changing how issue ids are parsed (see separate `flexible-tracker-id-resolution` PRD).
-- Translating the CLI to a TUI or interactive shell.
+- **Renaming the `pan` binary itself** or introducing alternative binary names.
+- **Changing the config file format** (`~/.panopticon/config.yaml` schema stays as-is).
+- **Changing how issue ids are parsed.** Deferred to the separate [`flexible-tracker-id-resolution`](./flexible-tracker-id-resolution.md) PRD, which addresses Rally-style dash-less IDs.
+- **Translating the CLI to a TUI or interactive shell.**
+- **Re-architecting the dashboard.** The dashboard UI *is* in scope (see Phase 4.5) for renaming routes, updating command strings, and adding the first-launch announcement — but component-level redesign, layout changes, or new views are not part of this issue.
 
 ---
 
@@ -188,6 +210,12 @@ The distributed skills (`pan sync` writes ~60 into `~/.claude/skills/`) are the 
 - [ ] All `docs/` files updated; no ripgrep hits for legacy paths in `docs/`
 - [ ] Snapshot test locks `pan --help` output
 - [ ] `pan doctor` flags legacy invocations in user shell rc
+- [ ] All `/api/work/*` HTTP routes removed; backend routes match new verbs (`/api/issues/*`, `/api/review/*`, `/api/show/*`, `/api/admin/*`)
+- [ ] `packages/contracts/` and frontend RPC client updated to new route names
+- [ ] Dashboard integration tests green
+- [ ] No frontend grep hits for legacy command strings (`pan work`, `pan cloister`, `pan plan-finalize`, etc.)
+- [ ] Kanban card actions and inspector panel use new verb names in UI copy
+- [ ] First-launch upgrade announcement renders migration table and persists dismissal to localStorage
 - [ ] Umbrella `/pan` skill exists and dispatches subcommands (`/pan start PAN-415` works)
 - [ ] All distributed skills renamed to match new CLI verbs 1:1
 - [ ] ~8–10 flat shortcut skills; long-tail admin skills reachable only via umbrella
