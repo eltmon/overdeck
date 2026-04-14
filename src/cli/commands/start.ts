@@ -7,11 +7,11 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 
 const execAsync = promisify(exec);
-import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
-import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../../lib/projects.js';
-import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
-import { isGitHubIssue, resolveGitHubIssue } from '../../../lib/tracker-utils.js';
-import { getLinearApiKey } from '../../../lib/shadow-utils.js';
+import { spawnAgent, type SpawnOptions } from '../../lib/agents.js';
+import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
+import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
+import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { getLinearApiKey } from '../../lib/shadow-utils.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -56,22 +56,22 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
   }
 }
 
-import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../../lib/shadow-mode.js';
-import { createShadowState, updateShadowState } from '../../../lib/shadow-state.js';
-import { loadConfig } from '../../../lib/config.js';
+import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../lib/shadow-mode.js';
+import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
+import { loadConfig } from '../../lib/config.js';
 import {
   loadWorkspaceMetadata,
   findRemoteWorkspaceMetadata,
-} from '../../../lib/remote/workspace-metadata.js';
+} from '../../lib/remote/workspace-metadata.js';
 import {
   spawnRemoteAgent,
   isRemoteAgentRunning,
   createFlyProviderFromConfig,
-} from '../../../lib/remote/index.js';
-import { isRemoteAvailable } from '../../../lib/remote/index.js';
-import type { RemoteWorkspaceMetadata } from '../../../lib/remote/interface.js';
-import type { SpawnRemoteAgentOptions } from '../../../lib/remote/remote-agents.js';
-import { assertCanStartFresh } from '../../../lib/work-agent-lifecycle.js';
+} from '../../lib/remote/index.js';
+import { isRemoteAvailable } from '../../lib/remote/index.js';
+import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
+import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
+import { assertCanStartFresh } from '../../lib/work-agent-lifecycle.js';
 
 interface IssueOptions {
   model: string;
@@ -251,7 +251,7 @@ async function handleRemoteWorkspace(
   if (!remoteMetadata) {
     spinner.text = 'Remote workspace not found, creating...';
     try {
-      const { createRemoteWorkspace } = await import('../../../lib/remote-workspace.js');
+      const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
       remoteMetadata = await createRemoteWorkspace(issueId, { spinner });
     } catch (error: any) {
       spinner.fail(`Failed to create remote workspace: ${error.message}`);
@@ -323,7 +323,7 @@ async function handleRemoteWorkspace(
       const gh = resolveGitHubIssue(issueId);
       if (gh.isGitHub) {
         try {
-          const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+          const { loadConfig: loadYamlConfig } = await import('../../lib/config-yaml.js');
           const yamlConfig = loadYamlConfig();
           const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
           if (token) {
@@ -404,7 +404,7 @@ async function ensureRemoteWorkspace(
   }
 
   // Import workspace creation logic
-  const { createRemoteWorkspace } = await import('../../../lib/remote-workspace.js');
+  const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
 
   try {
     const metadata = await createRemoteWorkspace(issueId);
@@ -447,7 +447,7 @@ import {
   getTrackerContext,
   readPlanningContext,
   readBeadsTasks,
-} from '../../../lib/cloister/work-agent-prompt.js';
+} from '../../lib/cloister/work-agent-prompt.js';
 
 /**
  * Check whether a workspace has beads tasks (planning must create them before work begins).
@@ -674,7 +674,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         // Planning was done but no beads — attempt auto-recovery from vBRIEF (matches dashboard agents.ts path)
         spinner.text = `No beads found — attempting recovery from vBRIEF plan...`;
         try {
-          const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
+          const { createBeadsFromVBrief } = await import('../../lib/vbrief/beads.js');
           const recovery = await createBeadsFromVBrief(workspace);
           if (recovery.created.length > 0) {
             spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);

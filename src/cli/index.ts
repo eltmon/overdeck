@@ -37,6 +37,7 @@ import { restoreCommand } from './commands/restore.js';
 import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/work/status.js';
+import { issueCommand as startCommand } from './commands/start.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -102,6 +103,19 @@ program
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
+
+// Lifecycle verb: pan start <id>
+program
+  .command('start <id>')
+  .description('Create workspace and spawn agent for an issue')
+  .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--dry-run', 'Show what would be created')
+  .option('--shadow', 'Enable shadow mode')
+  .option('--no-shadow', 'Disable shadow mode')
+  .option('--remote', 'Use remote workspace (Fly.io)')
+  .option('--local', 'Use local workspace (explicit override)')
+  .option('--phase <phase>', 'Work phase for model routing')
+  .action(startCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);

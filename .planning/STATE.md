@@ -18,7 +18,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [x] panopticon-cli-73x: pan admin db (commit: 22be7e87)
 - [x] panopticon-cli-rgr: pan admin specialists (commit: ef060f73)
 - [x] panopticon-cli-1sd: pan admin hooks install (commit: 9d2b2fc4)
-- [ ] panopticon-cli-f1v: pan start <id>
+- [x] panopticon-cli-f1v: pan start <id> (commit: pending)
 - [ ] panopticon-cli-u7y: pan tell <id>
 - [ ] panopticon-cli-dfb: pan kill <id>
 - [ ] panopticon-cli-vwd: pan resume <id>
@@ -33,7 +33,7 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [ ] panopticon-cli-7n3: pan review
 - [ ] panopticon-cli-2mf: pan show <id>
 - [ ] panopticon-cli-pei: pan issues
-- [x] panopticon-cli-5z3: Deleted pan work command group (commit: pending)
+- [x] panopticon-cli-5z3: Deleted pan work command group (commit: e307e22a)
 - [x] panopticon-cli-oyb: pan admin migrate-config (commit: fb273e21)
 - [x] panopticon-cli-f04: pan admin tldr (commit: ee1a4652)
 - [x] panopticon-cli-rg8: pan admin fpp (commit: 02af5fa2)
