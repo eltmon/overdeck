@@ -165,6 +165,20 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         // beads CLI not installed or not a beads workspace — skip check
       }
 
+      // Auto-commit planning artifacts before the uncommitted-changes check.
+      // plan.vbrief.json can be modified by a previous invocation of `pan done`
+      // (vBRIEF sync) and left dirty if that run failed. Commit it so Check 2
+      // doesn't block on workspace-internal state that this command manages.
+      try {
+        const { stdout: preDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
+        if (preDirty.trim()) {
+          await execAsync('git add .planning/', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts" --allow-empty-message', { cwd: workspacePath }).catch(() =>
+            execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath })
+          );
+        }
+      } catch { /* non-fatal */ }
+
       // Check 2: Uncommitted changes
       // Detect polyrepo (subdirs with .git) vs monorepo (top-level .git)
       const hasTopLevelGit = existsSync(join(workspacePath, '.git'));
@@ -231,6 +245,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         // Non-fatal — sync failure shouldn't block completion check
       }
 
+      // Commit any planning artifacts dirtied by the vBRIEF sync above.
+      // This ensures both Check 2 (uncommitted changes) and Step 0 (rebase)
+      // see a clean working tree.
+      try {
+        const { stdout: afterSyncDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
+        if (afterSyncDirty.trim()) {
+          await execAsync('git add .planning/', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+        }
+      } catch { /* non-fatal */ }
+
       // Check 3: vBRIEF acceptance criteria completion
       try {
         const acStatus = getVBriefACStatus(workspacePath);
@@ -263,17 +288,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
   }
-
-  // Auto-commit planning artifacts updated by vBRIEF sync above.
-  // plan.vbrief.json is written during the AC check; it must be committed
-  // before git rebase is called or rebase will abort with "unstaged changes".
-  try {
-    const { stdout: planDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
-    if (planDirty.trim()) {
-      await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
-      await execAsync('git diff --cached --quiet .planning/plan.vbrief.json || git commit -m "chore: sync vBRIEF AC status"', { cwd: workspacePath });
-    }
-  } catch { /* non-fatal — if this fails the rebase error will surface clearly */ }
 
   const spinner = ora('Marking work as done...').start();
 
