@@ -7,7 +7,7 @@ Panopticon's long-term value depends on the quality of its agents — their prom
 1. **Retrospection is manual.** After an issue merges, nothing captures what went well or badly in a structured way. Insight lives in Edward's head until it fades.
 2. **Skill refinement is episodic.** Skills get added/updated when someone remembers to write one. There's no continuous mechanism — no guarantee that the pattern you saw yesterday becomes the skill everyone benefits from tomorrow.
 3. **Substrate fixes dominate flywheel runs.** The current `/all-up` flywheel is excellent at fixing Panopticon bugs, but bugs are bounded (eventually they run out). Skill improvement is unbounded — there's always more nuance to encode — but it's not currently in the loop.
-4. **Skill audiences are undifferentiated.** `work-complete`, `rebase-and-submit`, and `pan-workflow` are meant for autonomous work agents. `pan-issue`, `pan-approve`, and `all-up` are meant for human operators. `pan sync` treats them identically, pushing all 80 skills to every Claude Code session regardless of audience. No frontmatter field, no directory split, no enforcement.
+4. **Skill audiences are undifferentiated.** `work-complete` and `rebase-and-submit` are meant for autonomous work agents. `pan-approve` and `all-up` are meant for human operators. `pan sync` treats them identically, pushing all 80 skills to every Claude Code session regardless of audience. No frontmatter field, no directory split, no enforcement.
 5. **Approval friction halts the flywheel.** When `/all-up` edits a skill file directly, Claude Code prompts the user for approval. The session blocks until answered. This is incompatible with an autonomous always-running flywheel.
 6. **Q&A state is invisible.** Planning agents in discovery Q&A and flywheel sessions waiting on approval both look "stuck" to deacon, which can trigger incorrect interventions or loss of context.
 
@@ -26,6 +26,72 @@ Build an end-to-end self-improvement system where every completed issue feeds a 
 - **Every improvement is public**: `docs/FLYWHEEL-REPORT.md` is an append-only, user-facing changelog of how Panopticon is teaching itself. Rendered at `panopticon-cli.com/flywheel` as a living marketing artifact.
 
 Ship all of this in one epic. No phased rollout.
+
+---
+
+## Dependencies — aligned with PAN-705 (Command Taxonomy Reorg)
+
+[PAN-705](https://github.com/eltmon/panopticon-cli/issues/705) lands **before** this epic and reshapes three surfaces PAN-709 touches: the CLI command tree, the `~/.claude/skills/` set, and dashboard HTTP routes. PAN-709 assumes PAN-705's end-state and layers on top of it. Five alignment rules:
+
+### 1. Ordering is fixed
+
+**PAN-705 must merge before PAN-709 starts planning.** If PAN-705 slips, PAN-709 waits — do not start planning against the legacy command surface. The planner pulls the latest `docs/QUICK-REFERENCE.md` from main before generating the vBRIEF and verifies every command referenced in the PRD still exists under its new name.
+
+### 2. Skill naming — operator vs. agent split
+
+PAN-705 renames operator skills to match CLI verbs 1:1 (`pan-start`, `pan-show`, `pan-review`, `pan-done`, `pan-approve`, `pan-close`, `pan-issues`, `pan-plan`, `pan-status`) and hides long-tail admin skills under the `/pan` umbrella. PAN-709 introduces a new category — **agent-audience skills** — that doesn't fit this rule because they're not CLI commands at all, they're reference knowledge for autonomous agents.
+
+**Naming conventions by audience:**
+
+| Audience | Naming convention | Example | Description format |
+|----------|-------------------|---------|--------------------|
+| `operator` | Match CLI verb 1:1 (PAN-705 rule) | `pan-approve` | `"pan approve <id> — merge a ready-for-merge issue"` (lead with literal CLI) |
+| `agent` | Workflow or pattern name (no `pan-` prefix) | `retro-workflow`, `recover-from-rebase-conflict` | `"Triggered when <condition>. Use to <action>."` (lead with trigger context — agents don't type CLI verbs) |
+| `both` | CLI verb if it's a CLI command both sides invoke | `pan-sync` | Operator-style description |
+
+**Agent skills are NOT registered under the `/pan` umbrella.** They're not slash commands — they're loaded into workspace `CLAUDE.md` by `pan sync` at workspace creation. The slash menu only shows operator skills.
+
+### 3. `pan sync` — two changes, one codebase
+
+PAN-705 already changes `pan sync` to delete legacy skill files on upgrade (clean slate). PAN-709 layers **audience-aware distribution** on top of that cleaned-up state:
+
+1. Clean-slate delete (PAN-705 behavior — unchanged by PAN-709)
+2. Read each skill's `audience` field
+3. Route by audience:
+   - `operator` → `~/.claude/skills/<name>/`
+   - `agent` → workspace CLAUDE.md injection only (not `~/.claude/skills/`)
+   - `both` → both locations
+
+The implementation of #2 and #3 happens in the same `pan sync` code module PAN-705 modified. The PAN-709 work agent inherits PAN-705's edits and extends them — it does not conflict with or duplicate them.
+
+### 4. Dashboard API routes follow PAN-705 conventions
+
+PAN-705 renames `/api/work/*` → `/api/issues/*`, `/api/review/*`, `/api/show/*`, `/api/admin/*`. PAN-709 adds new API routes for the flywheel subsystem; these follow the same pattern from the start — **no `/api/work/flywheel/*` or legacy-shaped paths.**
+
+PAN-709's new routes:
+- `/api/flywheel/retros` — list retros
+- `/api/flywheel/retros/:issueId` — fetch a single retro
+- `/api/flywheel/report` — fetch FLYWHEEL-REPORT.md content (rendered)
+- `/api/flywheel/daemon/status` — autonomous daemon state (for dashboard banner)
+- `/api/admin/skills/audit` — PAN-709's audit command endpoint (under `/api/admin/` per PAN-705)
+
+### 5. Audience backfill runs AFTER PAN-705's rename
+
+PAN-709 proposes a one-time backfill issue that audits every existing skill and adds the `audience` field. **This backfill runs after PAN-705's rename completes**, so the audit sees the new canonical names (`pan-start`, `pan-show`, …) rather than legacy names (`pan-work-done`, `pan-issue`, …). Sequencing:
+
+1. PAN-705 merges → skill renames applied via `pan sync` clean-slate delete + rewrite
+2. PAN-709 starts → adds audience field to frontmatter schema, updates `pan sync` to respect it (default `operator` for missing)
+3. PAN-709 files the backfill as its own `flywheel-change` issue → agent walks `skills/`, classifies each, commits the audience field
+4. Retro-agent and synthesis step enforce audience field on any *new* skills proposed after backfill
+
+### 6. Operator-skill description format for any new operator skills PAN-709 adds
+
+If PAN-709's retro process proposes a new operator-audience skill, it **must** follow PAN-705's description format: `"pan <verb> <args> — one-line what it does"`. The retro-agent's prompt enforces this; the review agent's skill-lint validates it. Agent-audience skills follow a different convention (see table above) and are exempt from this rule.
+
+### What PAN-709 does NOT depend on
+
+- PAN-705's Phase 4.5 dashboard alignment does not block PAN-709. If PAN-705 lands the CLI changes but the dashboard renames slip into a follow-up, PAN-709 can still proceed; its new `/api/flywheel/*` routes use the new convention independently of whether `/api/work/*` is fully removed yet.
+- PAN-705's first-launch upgrade announcement is independent of PAN-709.
 
 ---
 
