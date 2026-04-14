@@ -428,6 +428,16 @@ export function SettingsPage() {
     });
   };
 
+  const handleOpenRouterKeySaved = (key: string) => {
+    setFormData((current) => current ? {
+      ...current,
+      api_keys: {
+        ...current.api_keys,
+        openrouter: key || undefined,
+      },
+    } : current);
+  };
+
   const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
     setFormData({
       ...formData,
@@ -991,6 +1001,7 @@ export function SettingsPage() {
           apiKey={formData.api_keys.openrouter}
           enabled={!!formData.models.providers.openrouter}
           onApiKeyChange={(key) => handleApiKeyChange('openrouter', key)}
+          onApiKeySaved={handleOpenRouterKeySaved}
           onToggleEnabled={() => handleProviderToggle('openrouter')}
         />
       </section>

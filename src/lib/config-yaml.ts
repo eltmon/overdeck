@@ -530,6 +530,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
           result.enabledProviders.add('kimi');
         }
       }
+      if (config.api_keys.openrouter) {
+        result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
+        if (!explicitlyDisabled.has('openrouter')) {
+          result.enabledProviders.add('openrouter');
+        }
+      }
     }
 
     // Merge overrides

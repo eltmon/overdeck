@@ -286,6 +286,17 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
   return merged;
 }
 
+export async function updateProviderApiKey(
+  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'openrouter',
+  apiKey?: string
+): Promise<ApiSettingsConfig> {
+  return updateSettingsApi({
+    api_keys: {
+      [provider]: apiKey,
+    },
+  });
+}
+
 /**
  * Validation result with errors and warnings
  */
