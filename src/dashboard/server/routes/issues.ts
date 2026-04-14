@@ -1524,6 +1524,9 @@ const postIssueMoveStatusRoute = HttpRouter.add(
     const shadowResult = yield* Effect.promise(() => updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus));
 
     const issueDataService = getIssueDataService();
+    // Refresh the in-memory shadow-state cache so subsequent getIssues() calls
+    // see this drag-drop change without hitting the disk.
+    yield* Effect.promise(() => issueDataService.refreshShadowStatesCache());
     const issueSource = issueDataService.getIssueSource(id);
     const githubCheck = isGitHubIssue(id);
 

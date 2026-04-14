@@ -144,11 +144,11 @@ export async function approveCommand(id: string): Promise<void> {
     }
 
     // Step 2: Update status (either tracker or shadow)
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(state.issueId);
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(state.issueId);
 
     if (skipTrackerUpdate) {
       spinner.text = 'Marking shadow state as synced...';
-      const syncResult = markAsSynced(state.issueId, 'closed');
+      const syncResult = await markAsSynced(state.issueId, 'closed');
       if (syncResult.success) {
         console.log(chalk.cyan(`  👻 Shadow mode: marked as synced`));
       } else {

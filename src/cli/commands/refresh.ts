@@ -67,7 +67,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   const spinner = ora(`Refreshing tracker status for ${id}...`).start();
 
   const issueId = id.toUpperCase();
-  const state = getShadowState(issueId);
+  const state = await getShadowState(issueId);
 
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
@@ -99,7 +99,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   }
 
   // Update the cache
-  updateTrackerStatusCache(issueId, result.state!);
+  await updateTrackerStatusCache(issueId, result.state!);
 
   spinner.succeed(`Refreshed tracker status for ${issueId}`);
 

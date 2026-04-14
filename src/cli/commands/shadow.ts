@@ -16,7 +16,7 @@ export async function shadowCommand(id: string): Promise<void> {
   const spinner = ora(`Fetching shadow state for ${id}...`).start();
 
   const issueId = id.toUpperCase();
-  const state = getShadowState(issueId);
+  const state = await getShadowState(issueId);
 
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
@@ -44,7 +44,7 @@ export async function shadowCommand(id: string): Promise<void> {
   }
 
   // Show sync status
-  const needsSyncFlag = needsSync(issueId);
+  const needsSyncFlag = await needsSync(issueId);
   console.log(`  Sync Status:    ${needsSyncFlag ? chalk.yellow('⚠ Out of sync') : chalk.green('✓ In sync')}`);
   console.log('');
 
@@ -53,7 +53,7 @@ export async function shadowCommand(id: string): Promise<void> {
     console.log(chalk.bold('History:'));
     console.log('');
 
-    const unsyncedEntries = getUnsyncedHistory(issueId);
+    const unsyncedEntries = await getUnsyncedHistory(issueId);
 
     for (const entry of state.history) {
       const syncIndicator = entry.syncedToTracker ? chalk.green('✓') : chalk.yellow('○');

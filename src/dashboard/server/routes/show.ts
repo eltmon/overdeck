@@ -24,7 +24,7 @@ const getShowRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const shadowState = getShadowState(issueId);
+    const shadowState = yield* Effect.promise(() => getShadowState(issueId));
     const agentId = `agent-${issueId.toLowerCase()}`;
     const health = yield* Effect.promise(() => getAgentHealth(agentId).catch(() => null));
 
@@ -45,7 +45,7 @@ const getShowShadowRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const shadowState = getShadowState(issueId);
+    const shadowState = yield* Effect.promise(() => getShadowState(issueId));
     if (!shadowState) {
       return jsonResponse({ error: 'No shadow state found' }, { status: 404 });
     }

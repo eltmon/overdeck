@@ -109,11 +109,16 @@ function getConfiguredTrackers(): TrackerType[] {
 /**
  * Display issues in a formatted way
  */
-function displayIssues(issues: Issue[], trackerName: string): void {
+async function displayIssues(issues: Issue[], trackerName: string): Promise<void> {
   if (issues.length === 0) {
     console.log(chalk.dim(`  No issues found in ${trackerName}`));
     return;
   }
+
+  // Pre-compute shadowed refs in one batch so the render loop stays sync.
+  const shadowedRefs = new Set<string>();
+  const shadowChecks = await Promise.all(issues.map(async i => [i.ref, await isShadowed(i.ref)] as const));
+  for (const [ref, shadowed] of shadowChecks) if (shadowed) shadowedRefs.add(ref);
 
   // Group by state
   const byState: Record<string, Issue[]> = {};
@@ -137,7 +142,7 @@ function displayIssues(issues: Issue[], trackerName: string): void {
       const priorityLabel = issue.priority ? PRIORITY_LABELS[issue.priority] || '' : '';
       const assigneeStr = issue.assignee ? chalk.dim(` @${issue.assignee.split(' ')[0]}`) : '';
       const priorityStr = issue.priority && issue.priority < 3 ? ` ${priorityLabel}` : '';
-      const shadowIndicator = isShadowed(issue.ref) ? chalk.cyan('👻 ') : '';
+      const shadowIndicator = shadowedRefs.has(issue.ref) ? chalk.cyan('👻 ') : '';
 
       console.log(`    ${shadowIndicator}${chalk.cyan(issue.ref)} ${issue.title}${assigneeStr}${priorityStr}`);
     }
@@ -221,23 +226,26 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
     if (options.shadowOnly) {
       // Render only the shadow-only subset — the full list is suppressed.
-      const filteredIssues = allIssues.map(({ tracker, issues }) => ({
-        tracker,
-        issues: issues.filter(issue => isShadowed(issue.ref))
-      })).filter(({ issues }) => issues.length > 0);
+      const filteredIssues = await Promise.all(
+        allIssues.map(async ({ tracker, issues }) => {
+          const shadowChecks = await Promise.all(issues.map(i => isShadowed(i.ref)));
+          return { tracker, issues: issues.filter((_, idx) => shadowChecks[idx]) };
+        })
+      );
+      const nonEmpty = filteredIssues.filter(({ issues }) => issues.length > 0);
 
-      if (filteredIssues.length === 0) {
+      if (nonEmpty.length === 0) {
         console.log(chalk.dim('\nNo shadowed issues found.'));
       } else {
-        for (const { tracker, issues } of filteredIssues) {
+        for (const { tracker, issues } of nonEmpty) {
           console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} shadowed issues)\n`));
-          displayIssues(issues, tracker);
+          await displayIssues(issues, tracker);
         }
       }
     } else {
       for (const { tracker, issues } of allIssues) {
         console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} issues)\n`));
-        displayIssues(issues, tracker);
+        await displayIssues(issues, tracker);
       }
     }
 
@@ -252,7 +260,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     }
 
     // Show shadow mode info
-    const pendingSync = getPendingSyncCount();
+    const pendingSync = await getPendingSyncCount();
     if (pendingSync > 0) {
       console.log(chalk.cyan(`👻 ${pendingSync} shadowed issue(s) pending sync`));
     }

@@ -312,11 +312,11 @@ async function handleRemoteWorkspace(
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 
     // Handle shadow mode
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId, options.shadow);
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(issueId, options.shadow);
 
     if (skipTrackerUpdate) {
-      createShadowState(issueId, 'open', 'pan start');
-      updateShadowState(issueId, 'in_progress', 'pan start');
+      await createShadowState(issueId, 'open', 'pan start');
+      await updateShadowState(issueId, 'in_progress', 'pan start');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     } else if (isGitHubIssue(issueId)) {
       // GitHub issue — add in-progress label
@@ -719,12 +719,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     // Check shadow mode
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(id, options.shadow);
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(id, options.shadow);
 
     if (skipTrackerUpdate) {
       // Create shadow state instead of updating tracker
-      createShadowState(id, 'open', 'pan start');
-      updateShadowState(id, 'in_progress', 'pan start');
+      await createShadowState(id, 'open', 'pan start');
+      await updateShadowState(id, 'in_progress', 'pan start');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     }
     // Note: tracker transition for local agents is handled by spawnAgent() → transitionIssueToInProgress()

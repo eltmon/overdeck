@@ -446,10 +446,10 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
     }
 
     // Check shadow mode
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(id, options.shadow);
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(id, options.shadow);
     if (skipTrackerUpdate) {
       // Create shadow state for the issue
-      createShadowState(id, 'open', 'pan plan');
+      await createShadowState(id, 'open', 'pan plan');
       console.log(chalk.cyan('👻 Shadow mode enabled: status will be tracked locally'));
       console.log('');
     }

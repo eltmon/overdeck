@@ -349,12 +349,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const isGitHubIssue = issueId.startsWith('PAN-');
 
     // Step 1: Update status (either tracker or shadow)
-    const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId);
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(issueId);
 
     if (skipTrackerUpdate) {
       shadowModeActive = true;
       spinner.text = 'Updating shadow state...';
-      updateShadowState(issueId, 'closed', 'pan done');
+      await updateShadowState(issueId, 'closed', 'pan done');
       console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
     } else if (isGitHubIssue) {
       // GitHub issue - update labels
