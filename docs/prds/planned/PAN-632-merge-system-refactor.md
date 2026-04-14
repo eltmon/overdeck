@@ -27,7 +27,7 @@ If a rebase is required and the work agent cannot complete it, the merge blocks.
 
 ### 2. Review artifacts are created at work completion
 
-`pan work done` must create the review artifacts immediately.
+`pan done` must create the review artifacts immediately.
 
 - Monorepo: one PR
 - Polyrepo: one PR/MR per affected repo
@@ -99,8 +99,8 @@ The intended design must not assume every repo merges to `main`.
 
 1. The work agent finishes implementation in the workspace.
 2. The work agent commits and pushes every affected branch.
-3. The work agent runs `pan work done`.
-4. `pan work done` creates the review artifact set immediately.
+3. The work agent runs `pan done`.
+4. `pan done` creates the review artifact set immediately.
 
 For monorepo:
 
@@ -211,9 +211,9 @@ If we later add a post-rebase review step, it must be narrowly scoped to conflic
 
 ## Implementation Areas
 
-### 1. Review Artifact Creation at `pan work done`
+### 1. Review Artifact Creation at `pan done`
 
-`pan work done` must create the review artifacts immediately after push.
+`pan done` must create the review artifacts immediately after push.
 
 Needed outcomes:
 
@@ -297,7 +297,7 @@ That manifest must be rich enough for release orchestration to understand:
 
 ## Acceptance Criteria
 
-1. `pan work done` creates the full review artifact set immediately.
+1. `pan done` creates the full review artifact set immediately.
 2. The work agent is the only actor allowed to perform rebases and conflict resolution.
 3. The server does not perform code-changing git operations during merge orchestration.
 4. An issue is `readyForMerge` only when every required repo in the merge set has passed required gates.

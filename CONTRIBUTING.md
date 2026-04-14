@@ -153,7 +153,7 @@ The deployed server reads from `dist/` — changes in `src/` have no effect unti
 
 ### Branch naming
 
-Branches are created automatically by `pan work issue <PAN-XXX>` — you don't name them manually. The branch is always:
+Branches are created automatically by `pan start <PAN-XXX>` — you don't name them manually. The branch is always:
 
 ```
 feature/pan-<number>
@@ -170,7 +170,7 @@ git checkout -b feature/pan-<number>
 ```
 1. Create feature branch from latest main
 2. Make changes, commit using conventional commits (see below)
-3. Push branch and signal completion: pan work done PAN-xxx
+3. Push branch and signal completion: pan done PAN-xxx
    └─ Creates GitHub PR automatically (gh pr create)
 4. Review agent runs automated code review, posts GitHub PR review
 5. Test agent runs test suite
@@ -436,7 +436,7 @@ Understanding the full lifecycle helps you contribute to the right layer.
 Issue Created
      │
      ▼
-pan work issue <PAN-XXX>
+pan start <PAN-XXX>
      │
      ├─ Fetches issue details from tracker
      ├─ Creates git worktree at workspaces/feature-pan-xxx/
@@ -454,12 +454,12 @@ pan work issue <PAN-XXX>
           ├─ git add <files> && git commit
           ├─ Update STATE.md
           ├─ bd close <id>             → triggers Inspect Specialist
-          └─ WAIT for inspection result (via pan work tell)
+          └─ WAIT for inspection result (via pan tell)
                │
                ├─ INSPECTION PASSED → next bead
                └─ INSPECTION BLOCKED → fix and re-close
           │
-          └─ All beads done → pan work done <PAN-XXX>
+          └─ All beads done → pan done <PAN-XXX>
                │
                ├─ Pushes feature branch
                ├─ Creates GitHub PR (gh pr create)
@@ -527,7 +527,7 @@ git fetch origin main && git rebase origin/main
 cat .planning/STATE.md
 
 # 3. If STATE.md says "Implementation Complete" — you're done
-pan work done PAN-xxx -c "Work already complete from previous session"
+pan done PAN-xxx -c "Work already complete from previous session"
 ```
 
 ### Build before deploy
@@ -562,7 +562,7 @@ git add <specific files>
 git commit -m "feat(scope): description (PAN-xxx)"
 # Update STATE.md BEFORE closing
 bd close <id> --reason="what you did"
-# WAIT — inspect specialist fires automatically, result arrives via pan work tell
+# WAIT — inspect specialist fires automatically, result arrives via pan tell
 ```
 
 Do not batch beads. One bead = one commit = one `bd close`. The inspect specialist verifies each diff individually. Batching causes rejection.
@@ -575,12 +575,12 @@ git add <specific files>
 git commit -m "feat: description (PAN-xxx)"
 git push -u origin $(git branch --show-current)
 git status                                       # Must show clean working tree
-pan work done PAN-xxx -c "Brief summary"         # MANDATORY — triggers review pipeline
+pan done PAN-xxx -c "Brief summary"         # MANDATORY — triggers review pipeline
 ```
 
-`pan work done` must be run as a Bash command (via the Bash tool), not typed at the Claude Code interactive prompt. **Ending your turn without calling `pan work done` leaves the issue permanently stuck in "In Progress."**
+`pan done` must be run as a Bash command (via the Bash tool), not typed at the Claude Code interactive prompt. **Ending your turn without calling `pan done` leaves the issue permanently stuck in "In Progress."**
 
-**Do NOT call `pan approve`.** That is a supervisor-only command for humans. Agents always use `pan work done`.
+**Do NOT call `pan approve`.** That is a supervisor-only command for humans. Agents always use `pan done`.
 
 ### Infrastructure bugs you find while working
 
@@ -608,7 +608,7 @@ These properties must be preserved across all changes. A change that would viola
 | `execSync` is never used in server-reachable modules | Blocks the event loop, stalls all concurrent requests. |
 | SQLite is the authoritative read source for review status | JSON is a legacy fallback. Read logic prefers SQLite; write logic writes both. |
 | `git restore .` is called after `git worktree add` | Fresh worktrees have phantom deletions for files on the feature branch not on main. Without this, `git rebase` fails immediately. |
-| `pan work done` is the agent's mandatory completion signal | It triggers the review pipeline. Agents that stop without calling it leave the issue permanently stuck. |
+| `pan done` is the agent's mandatory completion signal | It triggers the review pipeline. Agents that stop without calling it leave the issue permanently stuck. |
 | Merge requires human action | The Merge button in the dashboard is the only sanctioned merge path. No automated process merges without human intent. |
 | `postMergeLifecycle` idempotency guards are never removed | Without guards, the lifecycle loop re-fires indefinitely. The incident burned 24,626 Linear API calls (PAN-328). |
 | Docker containers are stopped after merge | Orphaned Docker networks exhaust the bridge pool (~31 max). Without cleanup, new workspaces can't be created. |

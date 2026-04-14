@@ -148,7 +148,7 @@ When shadow mode ends, you can replay the suppressed updates or simply let the n
 
 **Per-run (CLI flag):**
 ```bash
-pan work issue MIN-123 --shadow
+pan start MIN-123 --shadow
 ```
 
 **Per-project (config file):**
@@ -167,7 +167,7 @@ shadow:
 
 **Environment variable:**
 ```bash
-SHADOW_MODE=true pan work issue MIN-123
+SHADOW_MODE=true pan start MIN-123
 ```
 
 **Per-tracker override:**

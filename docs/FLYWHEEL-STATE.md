@@ -13,7 +13,7 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 |-------|-------|----------------------|---------------|------------|-------|
 | PAN-544 | merge blocked by CI | `bun install --frozen-lockfile` fails on CI: local bun 1.3.11 vs CI bun 1.3.12 lockfile mismatch. Feedback written (005-merge-agent-ci-failure.md) + tmux tell sent. New deacon fix will intercept next merge failure and route to work agent instead of retrying. | 0 | 2 | Work agent needs to upgrade bun to 1.3.12 + regenerate bun.lock |
 | PAN-611 | feedback sent — awaiting agent fix | `.gitignore:42` (`src/lib/**/*.js`) excludes caveman JS source files. CI's `cp` step fails on clean checkout. Feedback written (014-merge-agent-ci-failure-details.md) + tmux tell sent. Merge retry cycle broken by Run 8 fix. | 0 | 0 | Work agent must add `!src/lib/caveman/*.js` negation to .gitignore |
-| PAN-509 | pending review — awaiting dispatch | prUrl cleared by repairClosedPRs (Run 7). reviewStatus=pending but deacon re-dispatch gate blocks because `hasPassedReview=true`. Work agent told to run `pan work done PAN-509`. | 0 | 1 | Work agent needs to call pan work done to create fresh PR |
+| PAN-509 | pending review — awaiting dispatch | prUrl cleared by repairClosedPRs (Run 7). reviewStatus=pending but deacon re-dispatch gate blocks because `hasPassedReview=true`. Work agent told to run `pan done PAN-509`. | 0 | 1 | Work agent needs to call pan done to create fresh PR |
 | PAN-457 | in progress | Just started — work agent launched 2026-04-13 | 0 | 0 | Planning complete, work agent started |
 | PAN-540 | planning | Active planning session (planning-pan-540 attached) | 0 | 0 | Planning still in progress |
 | PAN-653 | in progress | Just started — work agent launched 2026-04-13 | 0 | 0 | Planning complete, work agent started |
@@ -36,7 +36,7 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 
 ### PAN-509 — Post-repair review re-dispatch blocked (1 run — agent has feedback)
 - **Pattern**: `repairClosedPRs` cleared prUrl and set reviewStatus=pending. But deacon re-dispatch gate checks `!hasPassedReview` which is false (history has passed entries) AND `status.prUrl` which is null. Re-dispatch blocked.
-- **Workaround**: work agent told to run `pan work done` to create fresh PR. This bypasses the deacon re-dispatch gate.
+- **Workaround**: work agent told to run `pan done` to create fresh PR. This bypasses the deacon re-dispatch gate.
 - **Potential substrate fix**: deacon re-dispatch should handle the case where prUrl is null AND the issue has passed reviews before — it should be eligible for re-dispatch.
 - **Runs Stuck**: 1
 
@@ -55,9 +55,9 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | Verification gate lacks `bun install --frozen-lockfile` | Lockfile drift invisible until GitHub CI catches it | Run 7 | No | **FIXED Run 7** (config update to panopticon-cli quality_gates) |
 | No GitHub check-status gate in `triggerMerge()` | Merge pipeline churns against red PRs | Run 7 | No | **FIXED Run 7** (40f5fe0e) |
 | `checkFailedMergeRetry` retries CI failures indefinitely | CI check failures cycle until circuit breaker trips (3×30min=90min wasted) | Run 8 | No | **FIXED Run 8** (0209bf1f — detect "failing required checks" in mergeNotes, write feedback, saturate circuit breaker) |
-| Deacon re-dispatch gate blocked for issues with prior passed reviews | When prUrl cleared (e.g. repairClosedPRs), deacon won't re-dispatch because hasPassedReview=true | Run 8 | No | **NEW** — mitigation: tell work agent to run pan work done. Proper fix: deacon should re-dispatch when prUrl is null regardless of history. |
+| Deacon re-dispatch gate blocked for issues with prior passed reviews | When prUrl cleared (e.g. repairClosedPRs), deacon won't re-dispatch because hasPassedReview=true | Run 8 | No | **NEW** — mitigation: tell work agent to run pan done. Proper fix: deacon should re-dispatch when prUrl is null regardless of history. |
 | Verification gate runs on dirty workspace, not clean-committed state | Gitignored files or uncommitted changes make local build pass while CI fails | Run 7 | No | Ongoing — mitigated by check-status gate |
-| Review circuit breaker can't self-reset | Manual `pan work reset-review` after 7 requeues | Run 4 | No | Ongoing |
+| Review circuit breaker can't self-reset | Manual `pan review reset` after 7 requeues | Run 4 | No | Ongoing |
 | Verification bypass at 3 failures masks root causes | Bypass hides test failures | Run 5 | No | Ongoing |
 
 ---
@@ -85,7 +85,7 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | Desired Capability | Why Needed | Priority | Status |
 |-------------------|-----------|----------|--------|
 | Clean-checkout verification gate | Gate currently runs on dirty workspace, missing gitignore/uncommitted bugs | High | Run 7 — mitigated but not fixed. Needs `git stash push -u` + run + `git stash pop` or worktree sandbox. |
-| Deacon re-dispatch for null-prUrl issues with passed history | Issues cleared by repairClosedPRs can't re-dispatch via deacon | Medium | **NEW Run 8** — workaround: tell agent to run pan work done |
+| Deacon re-dispatch for null-prUrl issues with passed history | Issues cleared by repairClosedPRs can't re-dispatch via deacon | Medium | **NEW Run 8** — workaround: tell agent to run pan done |
 | Cycle-aware work-agent escalation | PAN-611 cycled 3 runs; system should page operator after N stuck runs | Medium | Ongoing |
 | PR-state validator in `/review` and `/request-review` | Additional defense layer at review submission time | Medium | Partially addressed |
 | Holistic dead-code detection in review | Review finds dead code piecemeal | High | Ongoing |
@@ -114,7 +114,7 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 - **PAN-653** → Planning complete → work agent started (2026-04-13)
 - **PAN-611** → Cycling loop broken. Feedback written explaining gitignore fix needed. Work agent notified.
 - **PAN-544** → Feedback written (bun 1.3.12 lockfile fix). Work agent notified. Merge cycling will stop after next failed attempt.
-- **PAN-509** → Work agent told to run `pan work done` to create fresh PR (deacon re-dispatch blocked by hasPassedReview gate).
+- **PAN-509** → Work agent told to run `pan done` to create fresh PR (deacon re-dispatch blocked by hasPassedReview gate).
 
 **Awaiting Merge (PAN scope)**: None currently ready (PAN-544 rfm=True but will fail CI; PAN-369-TEST is test artifact).
 
@@ -122,7 +122,7 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 
 **Next-run priorities**:
 1. Verify PAN-611/PAN-544 work agents pushed CI fixes → watch merge pipeline complete.
-2. Verify PAN-509 work agent ran `pan work done` and is in review pipeline.
+2. Verify PAN-509 work agent ran `pan done` and is in review pipeline.
 3. PAN-457/PAN-653 work agents progressing through implementation.
 4. Consider fixing deacon re-dispatch gate for null-prUrl issues with passed history (medium priority).
 5. Design clean-checkout verification gate (structural fix for local-vs-CI divergence).

@@ -89,7 +89,7 @@ Run the project's compile/lint commands:
 ```bash
 # 1. Store the checkpoint (current HEAD becomes the baseline for next inspection)
 # 2. Send feedback to the agent
-pan work tell <issueId> "INSPECTION PASSED for bead <beadId>. Proceed to next bead."
+pan tell <issueId> "INSPECTION PASSED for bead <beadId>. Proceed to next bead."
 
 # 3. Signal completion
 curl -X POST <apiUrl>/api/specialists/done \
@@ -100,7 +100,7 @@ curl -X POST <apiUrl>/api/specialists/done \
 **On BLOCKED:**
 ```bash
 # 1. Send specific feedback to the agent
-pan work tell <issueId> "INSPECTION BLOCKED for bead <beadId>:
+pan tell <issueId> "INSPECTION BLOCKED for bead <beadId>:
 
 VIOLATIONS:
 1. [KaiaRuntime.ts:17] Imports ChatContext — bead specifies ChatService.ts

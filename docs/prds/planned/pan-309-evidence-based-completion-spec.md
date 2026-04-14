@@ -2,13 +2,13 @@
 
 ## Problem Statement
 
-When a work agent finishes implementation but doesn't call `pan work done`, the system has no reliable fallback. The current `work-agent-stop-hook` asks Haiku to classify 80 lines of terminal output, which is inherently unreliable.
+When a work agent finishes implementation but doesn't call `pan done`, the system has no reliable fallback. The current `work-agent-stop-hook` asks Haiku to classify 80 lines of terminal output, which is inherently unreliable.
 
 **Incident**: MIN-758 completed a full rebrand across the entire stack (backend, frontend, skills, plugin). STATE.md said COMPLETE. Branch was pushed with commits. The stop-hook classified it as UNCLEAR 3 times. Linear stayed at "In Planning". The review pipeline never triggered. The work sat idle until a human noticed.
 
 ### Root Cause
 
-The system relies on agents to self-report completion via `pan work done`, with no evidence-based fallback when they don't.
+The system relies on agents to self-report completion via `pan done`, with no evidence-based fallback when they don't.
 
 ### Additional Gaps
 
@@ -40,7 +40,7 @@ Before calling the LLM, check hard evidence:
 | No | No | — | Fall through to LLM |
 
 When classified as `FORGOT_COMPLETION`:
-- Send nudge: "Your STATE.md indicates work is complete. Please run `pan work done <ISSUE>`"
+- Send nudge: "Your STATE.md indicates work is complete. Please run `pan done <ISSUE>`"
 - Write `resolution: done` to `runtime.json`
 
 When LLM returns `UNCLEAR` and this is the 2nd+ time:
@@ -73,7 +73,7 @@ Add `resolution` field to `~/.panopticon/agents/<id>/runtime.json`:
 | `done` | Evidence says complete, nudging agent | Stop-hook (evidence check) |
 | `needs_input` | Agent hit a blocker, needs human | Stop-hook (LLM or evidence) |
 | `stuck` | UNCLEAR 2+ times, no progress evidence | Stop-hook (escalation) |
-| `completed` | Agent called `pan work done` | CLI done command |
+| `completed` | Agent called `pan done` | CLI done command |
 
 `resolutionCount` tracks how many times the same resolution was set (for escalation logic).
 
@@ -105,7 +105,7 @@ Extend Deacon's patrol loop (currently 60s for specialists) to also check work a
 For each running work agent:
   1. Read runtime.json → check resolution
   2. If resolution === 'done' and resolutionCount >= 2:
-     → Auto-complete: run `pan work done <ISSUE>` programmatically
+     → Auto-complete: run `pan done <ISSUE>` programmatically
      → Log: "Deacon auto-completed <ISSUE> after 2 failed nudges"
   3. If resolution === 'stuck' and resolutionCount >= 3:
      → Auto-poke: send message to agent via tmux
@@ -148,15 +148,15 @@ Read from `runtime.json` in the agent directory.
 2. Stop-hook fires, checks STATE.md → says COMPLETE, branch pushed → `FORGOT_COMPLETION`
 3. Writes `resolution: done` to runtime.json
 4. Kanban shows green DONE badge
-5. Auto-nudge: "run `pan work done MIN-758`"
+5. Auto-nudge: "run `pan done MIN-758`"
 6. If nudge fails, Deacon sees `resolution: done` + `resolutionCount: 2` on next patrol
-7. Deacon auto-runs `pan work done MIN-758`
+7. Deacon auto-runs `pan done MIN-758`
 8. Linear moves to "In Review", review-agent picks it up
 9. Total delay: ~2 minutes instead of infinite
 
 ## Non-Goals
 
 - No changes to the specialist pipeline itself (review/test/merge already work)
-- No changes to `pan work done` command (it already handles Linear + completion markers)
+- No changes to `pan done` command (it already handles Linear + completion markers)
 - No auto-restart of stuck agents (just poke + badge — human decides whether to restart)
 - No changes to health thresholds (time-based health and lifecycle resolution are orthogonal)

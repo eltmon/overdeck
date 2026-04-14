@@ -30,7 +30,7 @@ Panopticon has **7 active agent types** across two categories:
 - **Default Model:** `claude-sonnet-4-6` (routed via work-type-router based on phase)
 - **Model Selection:** `determineModel()` in agents.ts uses work-type-router
 - **Spawning:**
-  - Entry point: CLI `pan work issue <ID> [--phase <phase>]` or Dashboard POST `/api/agents`
+  - Entry point: CLI `pan start <ID> [--phase <phase>]` or Dashboard POST `/api/agents`
   - Location: `src/dashboard/server/services/agent-spawner.ts` line 127 (`startWork()`)
   - With explicit agentType option in StartWorkOptions
 - **Lifecycle:** Long-running, resumable (--resume), manual start/stop
@@ -43,7 +43,7 @@ Panopticon has **7 active agent types** across two categories:
 - **Default Model:** `claude-opus-4-6`
 - **Model Selection:** Via work-type-router as `planning-agent` WorkTypeId
 - **Spawning:**
-  - Entry point: CLI `pan work plan <ID>` or Dashboard POST `/api/issues/:id/start-planning`
+  - Entry point: CLI `pan plan <ID>` or Dashboard POST `/api/issues/:id/start-planning`
   - Location: `src/lib/planning/spawn-planning-session.ts` line ~100+
   - Function: `spawnPlanningSession()`
 - **Lifecycle:** Long-running, user-initiated, user stops when ready (via "Start Agent" button)
@@ -403,8 +403,8 @@ User starts issue
 - [ ] Update README or main docs with pointer to these guides
 
 ### Integration Verification
-- [ ] Manual test: pan work plan <issue> → verify planning prompt loads
-- [ ] Manual test: pan work issue <issue> → verify work prompt loads  
+- [ ] Manual test: pan plan <issue> → verify planning prompt loads
+- [ ] Manual test: pan start <issue> → verify work prompt loads  
 - [ ] Manual test: trigger review-agent → verify review.md loads
 - [ ] Manual test: trigger test-agent → verify test.md loads
 - [ ] Manual test: trigger merge-agent → verify merge.md loads

@@ -1,20 +1,24 @@
 /**
  * pan show <id> — unified observation command
  *
- * Default: compact summary (shadow state, current specialist, last heartbeat,
- * most recent CV entries). ≤ 25 lines.
+ * Default: compact summary (shadow state, health, recent CV entries) —
+ * guaranteed to fit in ≤ 25 lines so it stays skimmable.
  *
- * Flags scope the output to specific views:
+ * Flags scope the output to specific views (full detail):
  *   --shadow    Shadow state details
  *   --cv        Agent work history (CV)
  *   --context   Context engineering state
  *   --health    Health + heartbeat only
  */
 
+import chalk from 'chalk';
 import { shadowCommand } from './shadow.js';
 import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
+import { getShadowState } from '../../lib/shadow-state.js';
+import { getAgentHealth } from '../../lib/health.js';
+import { getAgentCV } from '../../lib/cv.js';
 
 interface ShowOptions {
   shadow?: boolean;
@@ -24,26 +28,105 @@ interface ShowOptions {
   json?: boolean;
 }
 
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return 'never';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'unknown';
+  const diffMs = Date.now() - then;
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 48) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
   const { shadow, cv, context, health, json } = options;
 
-  // If a specific flag is set, delegate exclusively to that view
-  if (shadow) {
-    return shadowCommand(id);
-  }
-  if (cv) {
-    return cvCommand(id, { json });
-  }
-  if (context) {
-    return contextCommand('state', id, undefined, { json });
-  }
-  if (health) {
-    return healthCommand('check', id, { json });
+  // Scoped views delegate to the full sub-commands
+  if (shadow) return shadowCommand(id);
+  if (cv) return cvCommand(id, { json });
+  if (context) return contextCommand('state', id, undefined, { json });
+  if (health) return healthCommand('check', id, { json });
+
+  // Default: compact combined summary (≤ 25 lines).
+  const issueId = id.toUpperCase();
+  const agentId = `agent-${issueId.toLowerCase()}`;
+
+  const shadowState = await getShadowState(issueId);
+  const healthData = (() => {
+    try { return getAgentHealth(agentId); } catch { return null; }
+  })();
+  const cvData = getAgentCV(agentId);
+
+  if (json) {
+    console.log(JSON.stringify({
+      issueId,
+      agentId,
+      shadow: shadowState,
+      health: healthData,
+      cv: cvData,
+    }, null, 2));
+    return;
   }
 
-  // Default: run all views in order for a compact summary
-  await shadowCommand(id);
-  await cvCommand(id, { json });
-  await healthCommand('check', id, { json });
-  await contextCommand('state', id, undefined, { json });
+  console.log('');
+  console.log(chalk.bold.cyan(issueId));
+
+  // Shadow line
+  if (shadowState) {
+    const driftMarker = shadowState.shadowStatus !== shadowState.trackerStatus
+      ? chalk.yellow(` (tracker: ${shadowState.trackerStatus})`)
+      : '';
+    console.log(`  ${chalk.dim('shadow')}   ${shadowState.shadowStatus}${driftMarker}  ${chalk.dim('·')} shadowed ${relativeTime(shadowState.shadowedAt)}`);
+  } else {
+    console.log(`  ${chalk.dim('shadow')}   ${chalk.dim('(not shadowed)')}`);
+  }
+
+  // Health line
+  if (healthData) {
+    const statusText = healthData.status;
+    const statusColor = statusText === 'healthy'
+      ? chalk.green
+      : statusText === 'warning'
+        ? chalk.yellow
+        : chalk.red;
+    const beat = healthData.lastPing ?? healthData.lastActivity;
+    console.log(`  ${chalk.dim('health')}   ${statusColor(statusText)}  ${chalk.dim('·')} last activity ${relativeTime(beat)}`);
+  } else {
+    console.log(`  ${chalk.dim('health')}   ${chalk.dim('(no agent state)')}`);
+  }
+
+  // CV line (stats summary)
+  const stats = cvData.stats;
+  if (stats.totalIssues > 0) {
+    const successPct = (stats.successRate * 100).toFixed(0);
+    const avg = stats.avgDuration > 0 ? `${stats.avgDuration}m avg` : '—';
+    console.log(`  ${chalk.dim('cv    ')}   ${stats.totalIssues} completed  ${chalk.dim('·')} ${successPct}% success  ${chalk.dim('·')} ${avg}`);
+  } else {
+    console.log(`  ${chalk.dim('cv    ')}   ${chalk.dim('(no work history)')}`);
+  }
+
+  // Recent CV entries (up to 3)
+  const recent = cvData.recentWork?.slice(-3).reverse() ?? [];
+  if (recent.length > 0) {
+    console.log('');
+    console.log(chalk.dim('  recent:'));
+    for (const entry of recent) {
+      const outcome = entry.outcome ?? 'unknown';
+      const outcomeColor = outcome === 'success'
+        ? chalk.green
+        : outcome === 'failed' || outcome === 'abandoned'
+          ? chalk.red
+          : chalk.dim;
+      const label = (entry.issueId ?? '(unknown)').slice(0, 60);
+      console.log(`    ${outcomeColor(outcome.padEnd(11))} ${chalk.dim(relativeTime(entry.completedAt).padEnd(8))} ${label}`);
+    }
+  }
+
+  console.log('');
+  console.log(chalk.dim(`  use --shadow, --cv, --health, or --context for full detail`));
+  console.log('');
 }

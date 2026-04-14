@@ -200,7 +200,7 @@ Panopticon provides **two first-class interfaces** to the same underlying system
 │   Option A: CLI-Only                Option B: AI Co-Mayor                │
 │   ─────────────────────             ───────────────────────              │
 │                                                                          │
-│   $ pan work issue MIN-648          Human + Claude Code in project root  │
+│   $ pan start MIN-648          Human + Claude Code in project root  │
 │   $ pan status                      /work-issue MIN-648                  │
 │   $ pan workspace list              /pan:status                          │
 │                                                                          │
@@ -333,7 +333,7 @@ Commands are Claude Code specific (slash commands), but the **underlying operati
 
 ```bash
 # CLI equivalent of /work-issue MIN-648
-pan work issue MIN-648
+pan start MIN-648
 
 # CLI equivalent of /work-status
 pan status

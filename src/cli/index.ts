@@ -173,8 +173,11 @@ const planCmd = program
 
 planCmd
   .argument('<id>', 'issue ID to plan for')
-  .option('--model <model>', 'Model to use for planning')
-  .option('--dry-run', 'Preview plan without creating it')
+  .option('-o, --output <path>', 'Write the plan JSON to a file')
+  .option('--json', 'Emit plan as JSON (in addition to the interactive flow)')
+  .option('--skip-discovery', 'Skip the interactive discovery phase')
+  .option('--force', 'Create the plan even when the issue is not marked as complex')
+  .option('--shadow', 'Track status locally in shadow mode instead of updating the tracker')
   .action(planCommand);
 
 planCmd

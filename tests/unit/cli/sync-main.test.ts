@@ -1,5 +1,5 @@
 /**
- * Tests for pan work sync-main CLI command (PAN-242)
+ * Tests for pan sync-main CLI command (PAN-242)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
