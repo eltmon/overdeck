@@ -83,3 +83,4 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - **[2026-04-14T19:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/014-review-agent-changes-requested.md`
 - **[2026-04-14T19:42Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/015-review-agent-changes-requested.md`
 - **[2026-04-14T19:56Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
+- **[2026-04-14T20:19Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/017-review-agent-changes-requested.md`
