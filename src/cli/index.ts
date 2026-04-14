@@ -41,6 +41,7 @@ import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { resumeCommand } from './commands/resume.js';
+import { recoverCommand } from './commands/recover.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -123,6 +124,13 @@ program
   .command('resume <id>')
   .description('Resume from saved Claude session')
   .action(resumeCommand);
+
+program
+  .command('recover [id]')
+  .description('Recover crashed or stopped agent')
+  .option('--all', 'Auto-recover all crashed agents')
+  .option('--json', 'Output as JSON')
+  .action(recoverCommand);
 
 program
   .command('start <id>')

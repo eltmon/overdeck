@@ -4,7 +4,7 @@ import {
   detectCrashedAgents,
   recoverAgent,
   autoRecoverAgents,
-} from '../../../lib/agents.js';
+} from '../../lib/agents.js';
 
 interface RecoverOptions {
   all?: boolean;
