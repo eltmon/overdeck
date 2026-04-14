@@ -45,7 +45,6 @@ import { registerConvoyCommands } from './commands/convoy/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
-import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
@@ -124,16 +123,6 @@ registerInstallCommand(program);
 
 // Register inspect command (pan inspect <issueId> --bead <beadId>)
 registerInspectCommand(program);
-
-// Config migration
-program
-  .command('migrate-config')
-  .description('Migrate from settings.json to config.yaml')
-  .option('--force', 'Force migration even if config.yaml exists')
-  .option('--preview', 'Preview migration without applying changes')
-  .option('--no-backup', 'Do not back up settings.json')
-  .option('--delete-legacy', 'Delete settings.json after migration')
-  .action(migrateConfigCommand);
 
 // Shorthand: pan status = pan work status
 program

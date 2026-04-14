@@ -18,6 +18,7 @@ import { setupHooksCommand } from '../setup/hooks.js';
 import { tldrCommand } from '../work/tldr.js';
 import { hookCommand } from '../work/hook.js';
 import { listStatesCommand, cleanupStatesCommand } from '../work/linear-states.js';
+import { migrateConfigCommand } from '../migrate-config.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -88,4 +89,14 @@ export function registerAdminCommands(program: Command): void {
     .option('-s, --state <state>', 'State name to archive (default: Planning)')
     .option('--dry-run', 'Show what would be archived without making changes')
     .action((options) => cleanupStatesCommand(options));
+
+  // pan admin migrate-config — one-time settings.json → config.yaml migration
+  admin
+    .command('migrate-config')
+    .description('One-time migration from settings.json to config.yaml')
+    .option('--force', 'Force migration even if config.yaml exists')
+    .option('--preview', 'Preview migration without applying changes')
+    .option('--no-backup', 'Do not back up settings.json')
+    .option('--delete-legacy', 'Delete settings.json after migration')
+    .action(migrateConfigCommand);
 }
