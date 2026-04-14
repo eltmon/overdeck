@@ -5,7 +5,7 @@ import { SETTINGS_FILE } from './paths.js';
 export type AnthropicModel = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel = 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'gpt-5.4-pro' | 'o3' | 'o4-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-3.1-flash-lite-preview';
-export type KimiModel = 'kimi-k2.5';
+export type KimiModel = 'kimi-k2.5' | 'K2.6-code-preview';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
 export type ZAIModel = 'glm-5.1';
 export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel;
@@ -219,7 +219,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
-    ? ['kimi-k2.5']
+    ? ['kimi-k2.5', 'K2.6-code-preview']
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax

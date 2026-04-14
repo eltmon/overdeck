@@ -296,13 +296,10 @@ async function spawnConversationSession(
   let runtimeCommand = 'claude --dangerously-skip-permissions';
   const providerEnvExports: string[] = [];
   if (model) {
-    const provider = getProviderForModel(model);
     runtimeCommand = getAgentRuntimeBaseCommand(model);
-    if (provider.name !== 'anthropic') {
-      const providerExports = getProviderExportsForModel(model).trim();
-      if (providerExports) {
-        providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
-      }
+    const providerExports = getProviderExportsForModel(model).trim();
+    if (providerExports) {
+      providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
     }
   }
 
@@ -811,25 +808,34 @@ const postConversationMessageRoute = HttpRouter.add(
 
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
 
+export function patchConversationTitle(
+  name: string,
+  body: Record<string, unknown>,
+): { status: number; body: { success: true } | { error: string } } {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return { status: 404, body: { error: 'Conversation not found' } };
+  }
+
+  if (typeof body.title === 'string' && body.title.trim()) {
+    // User explicitly renamed → mark as 'manual' so AI won't auto-replace
+    updateConversationTitle(name, body.title.trim(), 'manual');
+  }
+
+  return { status: 200, body: { success: true } };
+}
+
 const patchConversationRoute = HttpRouter.add(
   'PATCH',
   '/api/conversations/:name',
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    const req = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        const body = await req.json as { title?: string };
-        if (typeof body.title === 'string' && body.title.trim()) {
-          // User explicitly renamed → mark as 'manual' so AI won't auto-replace
-          updateConversationTitle(name, body.title.trim(), 'manual');
-        }
-        return jsonResponse({ success: true });
+        const result = patchConversationTitle(name, body);
+        return jsonResponse(result.body, { status: result.status });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to update conversation: ' + msg }, { status: 500 });

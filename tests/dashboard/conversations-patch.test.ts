@@ -1,13 +1,13 @@
 /**
  * Unit tests for the PATCH /api/conversations/:name route behavior.
  *
- * The route handler calls getConversationByName, then updateConversationTitle
- * with title_source='manual'. These tests verify that contract using the real
- * SQLite DB layer (same pattern as conversations-db.test.ts).
+ * These tests exercise the extracted route logic used by the real PATCH handler,
+ * so broken request-body parsing cannot silently regress while a simulated copy
+ * of the handler still passes.
  *
  * Business rules under test:
  *   - Unknown conversation name → 404 (handler skips update)
- *   - Empty or whitespace-only title → update is skipped (no API call)
+ *   - Empty or whitespace-only title → update is skipped
  *   - Valid title → stored with title_source='manual'
  *   - title_source='manual' blocks AI auto-overwrite (canReplaceTitle=false)
  */
@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { patchConversationTitle } from '../../src/dashboard/server/routes/conversations.js';
 
 let TEST_HOME: string;
 
@@ -36,40 +37,11 @@ afterEach(async () => {
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
-// ─── Helpers that mirror the PATCH route handler logic ────────────────────────
-
-/**
- * Mirrors the PATCH /api/conversations/:name handler:
- *   1. Look up conversation — return 404 payload if not found
- *   2. Skip update if title is empty / whitespace-only
- *   3. Call updateConversationTitle(name, trimmed, 'manual')
- *   4. Return success payload
- */
-async function simulatePatchHandler(
-  name: string,
-  body: { title?: unknown },
-): Promise<{ status: number; body: unknown }> {
-  const { getConversationByName, updateConversationTitle } = await import(
-    '../../src/lib/database/conversations-db.js'
-  );
-
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return { status: 404, body: { error: 'Conversation not found' } };
-  }
-
-  if (typeof body.title === 'string' && body.title.trim()) {
-    updateConversationTitle(name, body.title.trim(), 'manual');
-  }
-
-  return { status: 200, body: { success: true } };
-}
-
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('PATCH /api/conversations/:name', () => {
   it('returns 404 when the conversation does not exist', async () => {
-    const result = await simulatePatchHandler('no-such-conv', { title: 'New Title' });
+    const result = await patchConversationTitle('no-such-conv', { title: 'New Title' });
     expect(result.status).toBe(404);
     expect(result.body).toMatchObject({ error: 'Conversation not found' });
   });
@@ -80,7 +52,7 @@ describe('PATCH /api/conversations/:name', () => {
     );
     createConversation({ name: 'my-conv', tmuxSession: 'my-sess', cwd: '/home/user' });
 
-    const result = await simulatePatchHandler('my-conv', { title: 'My New Title' });
+    const result = await patchConversationTitle('my-conv', { title: 'My New Title' });
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ success: true });
@@ -96,7 +68,7 @@ describe('PATCH /api/conversations/:name', () => {
     );
     createConversation({ name: 'trim-conv', tmuxSession: 'trim-sess', cwd: '/home/user' });
 
-    await simulatePatchHandler('trim-conv', { title: '  Trimmed Title  ' });
+    await patchConversationTitle('trim-conv', { title: '  Trimmed Title  ' });
 
     const updated = getConversationByName('trim-conv')!;
     expect(updated.title).toBe('Trimmed Title');
@@ -114,7 +86,7 @@ describe('PATCH /api/conversations/:name', () => {
       titleSource: 'auto',
     });
 
-    await simulatePatchHandler('empty-conv', { title: '' });
+    await patchConversationTitle('empty-conv', { title: '' });
 
     const unchanged = getConversationByName('empty-conv')!;
     expect(unchanged.title).toBe('Original'); // not modified
@@ -133,7 +105,7 @@ describe('PATCH /api/conversations/:name', () => {
       titleSource: 'auto',
     });
 
-    await simulatePatchHandler('ws-conv', { title: '   ' });
+    await patchConversationTitle('ws-conv', { title: '   ' });
 
     const unchanged = getConversationByName('ws-conv')!;
     expect(unchanged.title).toBe('Original');
@@ -152,7 +124,7 @@ describe('PATCH /api/conversations/:name', () => {
       titleSource: 'auto',
     });
 
-    await simulatePatchHandler('no-title-conv', {});
+    await patchConversationTitle('no-title-conv', {});
 
     const unchanged = getConversationByName('no-title-conv')!;
     expect(unchanged.title).toBe('Original');
@@ -174,7 +146,7 @@ describe('PATCH /api/conversations/:name', () => {
     expect(canReplaceTitle(getConversationByName('ai-conv')!)).toBe(true);
 
     // After the PATCH route updates with 'manual' source
-    await simulatePatchHandler('ai-conv', { title: 'User Chosen Title' });
+    await patchConversationTitle('ai-conv', { title: 'User Chosen Title' });
 
     // AI must no longer overwrite it
     expect(canReplaceTitle(getConversationByName('ai-conv')!)).toBe(false);

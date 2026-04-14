@@ -438,6 +438,28 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration.',
   },
 
+  'K2.6-code-preview': {
+    model: 'K2.6-code-preview',
+    provider: 'kimi',
+    displayName: 'K2.6-code-preview',
+    costPer1MTokens: 1.6,
+    contextWindow: 256000,
+    skills: {
+      'code-generation': 92,
+      'code-review': 90,
+      debugging: 90,
+      planning: 88,
+      documentation: 88,
+      testing: 88,
+      security: 82,
+      performance: 85,
+      synthesis: 92,
+      speed: 75,
+      'context-length': 98,
+    },
+    notes: 'Kimi coding preview model.',
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // MINIMAX MODELS
   // ═══════════════════════════════════════════════════════════════════════════

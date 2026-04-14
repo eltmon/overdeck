@@ -52,6 +52,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Kimi models
   'kimi-k2.5': 'kimi',
+  'K2.6-code-preview': 'kimi',
 
   // MiniMax models
   'minimax-m2.7': 'minimax',
@@ -99,6 +100,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Kimi → Anthropic
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
+  'K2.6-code-preview': 'claude-sonnet-4-6',
 
   // MiniMax → Anthropic
   'minimax-m2.7': 'claude-sonnet-4-6', // Near-Opus performance → Sonnet
