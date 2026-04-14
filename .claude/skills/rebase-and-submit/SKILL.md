@@ -26,7 +26,7 @@ This is the atomic "I'm done with my changes, get me into review" skill for work
 
 If you are unsure which applies, check `.planning/feedback/`. If it contains any files that describe failures you have just addressed, you are in the re-review case — use `pan review request`.
 
-**NEVER** try to trigger the review pipeline by curling dashboard APIs (`/api/review/...`, `/api/workspaces/.../review`, etc.). Those endpoints are internal and will 404 or ignore you. The CLI commands above are the only supported way.
+**NEVER** try to trigger the review pipeline by curling dashboard APIs (`/api/review/...`, `/api/workspaces/.../review`, etc.). Those routes are for specialist/system use only, not for direct agent invocation. The CLI commands above are the only supported way.
 
 ## When to use this skill
 
@@ -89,7 +89,7 @@ You do NOT need to run `git fetch`, `git rebase`, `git push`, `gh pr create`, or
 
 ## What NOT to do
 
-- **Do NOT** `curl` any `/api/review/...`, `/api/workspaces/.../review`, or other dashboard endpoint to trigger review. Those are not supported entry points.
+- **Do NOT** `curl` any `/api/review/...`, `/api/workspaces/.../review`, or other dashboard endpoint to trigger review. Those routes are for specialist/system use only — use the CLI commands instead.
 - **Do NOT** run `git rebase` manually before calling the submit command. It handles rebase.
 - **Do NOT** run `gh pr create` or `glab mr create` manually.
 - **Do NOT** stop after rebasing or pushing. The full chain must run.

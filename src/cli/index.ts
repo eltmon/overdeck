@@ -280,7 +280,7 @@ registerInspectCommand(program);
 // Shorthand: pan status = pan status
 program
   .command('status')
-  .description('Show running agents (shorthand for work status)')
+  .description('Show running agents')
   .option('--json', 'Output as JSON')
   .option('--tldr', 'Show TLDR index health across all workspaces')
   .option('--context', 'Show context window usage % for each agent')
