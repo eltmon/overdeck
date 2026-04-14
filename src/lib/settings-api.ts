@@ -11,6 +11,7 @@ import { loadConfig, getGlobalConfigPath, YamlConfig } from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import { reloadGlobalRouter } from './work-type-router.js';
 
 /**
  * Optimal model defaults based on research (see docs/MODEL_RECOMMENDATIONS.md)
@@ -233,6 +234,13 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
   });
 
   writeFileSync(getGlobalConfigPath(), yamlContent, 'utf-8');
+
+  // Reload the global work-type router so in-memory overrides reflect the
+  // freshly-written config. Without this, planning-agent / specialist overrides
+  // saved via PUT /api/settings don't take effect until the dashboard restarts,
+  // and smart-model-selector fallback can pick an unexpected model (e.g. a
+  // non-Anthropic top scorer that the runtime can't resolve).
+  reloadGlobalRouter();
 }
 
 /**
