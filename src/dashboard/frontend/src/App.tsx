@@ -80,6 +80,32 @@ export function getConversationViewModeFromSearch(search = window.location.searc
   return view === 'terminal' ? 'terminal' : 'conversation';
 }
 
+export type ConversationViewModeMap = Record<string, ConversationViewMode>;
+
+export function parseConversationViewModes(search = window.location.search): ConversationViewModeMap {
+  const raw = new URLSearchParams(search).get('views');
+  if (!raw) return {};
+
+  return raw
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(Boolean)
+    .reduce<ConversationViewModeMap>((acc, entry) => {
+      const [id, mode] = entry.split(':');
+      if (!id) return acc;
+      acc[id] = mode === 'terminal' ? 'terminal' : 'conversation';
+      return acc;
+    }, {});
+}
+
+export function serializeConversationViewModes(viewModes: ConversationViewModeMap): string {
+  return Object.entries(viewModes)
+    .filter(([, mode]) => mode === 'terminal')
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([id, mode]) => `${id}:${mode}`)
+    .join(',');
+}
+
 /** Extract conversation ID from /conv/:id path, or null if not matching. */
 export function getConvIdFromPath(path = window.location.pathname): string | null {
   const match = path.match(/^\/conv\/(\d+)$/);
@@ -87,18 +113,47 @@ export function getConvIdFromPath(path = window.location.pathname): string | nul
 }
 
 export function getConversationRouteState() {
+  const convId = getConvIdFromPath();
+  const viewModes = parseConversationViewModes();
+  const explicitViewMode = getConversationViewModeFromSearch();
+  const viewMode = convId
+    ? explicitViewMode === 'terminal'
+      ? 'terminal'
+      : viewModes[convId] ?? 'conversation'
+    : 'conversation';
+
+  if (convId && explicitViewMode === 'terminal') {
+    viewModes[convId] = 'terminal';
+  }
+
   return {
     tab: getTabFromPath(),
-    convId: getConvIdFromPath(),
-    viewMode: getConversationViewModeFromSearch(),
+    convId,
+    viewMode,
+    viewModes,
   };
 }
 
-export function buildConversationUrl(id: string | null, viewMode: ConversationViewMode = 'conversation'): string {
+export function buildConversationUrl(
+  id: string | null,
+  viewMode: ConversationViewMode = 'conversation',
+  viewModes: ConversationViewModeMap = {},
+): string {
   if (!id) return '/command-deck';
+  const nextViewModes = { ...viewModes };
+  if (viewMode === 'terminal') {
+    nextViewModes[id] = 'terminal';
+  } else {
+    delete nextViewModes[id];
+  }
+
   const params = new URLSearchParams();
   if (viewMode === 'terminal') {
     params.set('view', 'terminal');
+  }
+  const serialized = serializeConversationViewModes(nextViewModes);
+  if (serialized) {
+    params.set('views', serialized);
   }
   const query = params.toString();
   return query ? `/conv/${id}?${query}` : `/conv/${id}`;
@@ -172,22 +227,33 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // Conversation deep-link state (/conv/:id?view=terminal)
-  const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => getConversationRouteState().convId);
+  // Conversation deep-link state (/conv/:id?view=terminal&views=161:terminal)
+  const initialConversationRoute = getConversationRouteState();
+  const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
-    () => getConversationRouteState().viewMode,
+    () => initialConversationRoute.viewMode,
+  );
+  const [conversationViewModes, setConversationViewModes] = useState<ConversationViewModeMap>(
+    () => initialConversationRoute.viewModes,
   );
   const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
     setSelectedConvIdState(id);
     setConversationViewModeState(id ? viewMode : 'conversation');
-    window.history.replaceState(null, '', buildConversationUrl(id, viewMode));
+    setConversationViewModes((current) => {
+      const next = { ...current };
+      if (id && viewMode === 'terminal') {
+        next[id] = 'terminal';
+      } else if (id) {
+        delete next[id];
+      }
+      window.history.replaceState(null, '', buildConversationUrl(id, viewMode, current));
+      return next;
+    });
   }, []);
   const setSelectedConvId = useCallback((id: string | null) => {
-    const nextViewMode = id && id === selectedConvId
-      ? conversationViewMode
-      : 'conversation';
+    const nextViewMode = id ? (conversationViewModes[id] ?? 'conversation') : 'conversation';
     setConversationRoute(id, nextViewMode);
-  }, [conversationViewMode, selectedConvId, setConversationRoute]);
+  }, [conversationViewModes, setConversationRoute]);
   const setConversationViewMode = useCallback((viewMode: ConversationViewMode) => {
     setConversationRoute(selectedConvId, viewMode);
   }, [selectedConvId, setConversationRoute]);
@@ -243,6 +309,7 @@ export default function App() {
       setActiveTabState(routeState.tab);
       setSelectedConvIdState(routeState.convId);
       setConversationViewModeState(routeState.viewMode);
+      setConversationViewModes(routeState.viewModes);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
