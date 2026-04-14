@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Bot, Wrench, Zap } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import { toolNameToPhase, getPhaseLabel } from '../../lib/workingPhase';
+import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -163,32 +163,34 @@ const PHASE_ICONS = {
   file:       FileCode,
   search:     Search,
   web:        Globe,
-  agent:      Bot,
+  agent:      Loader2,
   tool:       Wrench,
   processing: Loader2,
 } as const;
 
 function WorkingSpinner({
   size,
-  className,
   currentTool,
   'aria-label': ariaLabel,
 }: {
   size: number;
-  className: string;
   currentTool: string | null;
   'aria-label'?: string;
 }) {
   const phase = currentTool ? toolNameToPhase(currentTool) : 'thinking';
   const Icon = PHASE_ICONS[phase];
   const label = getPhaseLabel(phase);
+  const iconClass = isSpinnerPhase(phase)
+    ? styles.conversationWorkingSpinner
+    : styles.conversationWorkingPulse;
   return (
-    <Icon
-      size={size}
-      className={className}
-      title={label}
-      aria-label={ariaLabel ?? label}
-    />
+    <span title={label} style={{ display: 'contents' }}>
+      <Icon
+        size={size}
+        className={iconClass}
+        aria-label={ariaLabel ?? label}
+      />
+    </span>
   );
 }
 
@@ -409,7 +411,6 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                 {conv.isWorking ? (
                   <WorkingSpinner
                     size={12}
-                    className={styles.conversationWorkingSpinner}
                     currentTool={conv.currentTool ?? null}
                     aria-label={`Agent working in ${conv.name}`}
                   />

@@ -1346,6 +1346,13 @@
   animation: spin 1s linear infinite;
 }
 
+/* Tool-call waiting state in sidebar — pulse instead of spin */
+.conversationWorkingPulse {
+  flex-shrink: 0;
+  color: var(--mc-success);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 .conversationName {
   flex: 1;
   overflow: hidden;
@@ -1564,6 +1571,13 @@
 
 .spinnerIcon {
   animation: spin 1s linear infinite;
+  flex-shrink: 0;
+  color: var(--mc-accent);
+}
+
+/* Tool-call waiting state — pulse instead of spin */
+.pulseIcon {
+  animation: pulse 1.5s ease-in-out infinite;
   flex-shrink: 0;
   color: var(--mc-accent);
 }
@@ -1808,10 +1822,25 @@
   word-break: break-word;
 }
 
-/* Assistant message — left-aligned */
+/* Assistant message — left-aligned with bot avatar */
 .assistantMessageRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   padding: 2px 0;
   max-width: 100%;
+}
+
+.assistantMessageAvatar {
+  flex-shrink: 0;
+  margin-top: 3px; /* align with first line of text */
+  color: var(--mc-accent);
+  opacity: 0.7;
+}
+
+.assistantMessageContent {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Message timestamp (T3Code: text-[10px] text-muted-foreground/30) */

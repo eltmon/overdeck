@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parse } from 'yaml';
+import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
 import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 
@@ -416,6 +417,20 @@ with open(path, "w") as f:
     });
     const settingsB64 = Buffer.from(settings).toString('base64');
     await this.ssh(vmName, `echo '${settingsB64}' | base64 -d > ~/.claude/settings.json`);
+
+    const localMcpPath = join(homedir(), '.claude', 'mcp.json');
+    if (existsSync(localMcpPath)) {
+      try {
+        const localMcpConfig = JSON.parse(readFileSync(localMcpPath, 'utf-8'));
+        const remoteMcpConfig = getIsolatedPlaywrightMcpConfig(localMcpConfig);
+        if (remoteMcpConfig) {
+          const mcpB64 = Buffer.from(JSON.stringify(remoteMcpConfig, null, 2) + '\n').toString('base64');
+          await this.ssh(vmName, `echo '${mcpB64}' | base64 -d > ~/.claude/mcp.json`);
+        }
+      } catch {
+        // Non-fatal: remote Claude Code can still run without local MCP mirroring
+      }
+    }
   }
 
   /** Copy essential skills from local ~/.panopticon/skills/ to remote VM */

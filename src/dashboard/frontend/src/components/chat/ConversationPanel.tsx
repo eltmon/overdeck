@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Bot, Wrench, Zap } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { updateConversationTitle } from '../MissionControl/ConversationList';
@@ -9,7 +9,7 @@ import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ const PHASE_ICONS = {
   file:       FileCode,
   search:     Search,
   web:        Globe,
-  agent:      Bot,
+  agent:      Loader2,
   tool:       Wrench,
   processing: Loader2,
 } as const;
@@ -100,6 +100,7 @@ export function ConversationPanel({
   const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
   const workingLabel = getPhaseLabel(workingPhase, pendingEntry);
   const WorkingIcon = PHASE_ICONS[workingPhase];
+  const workingIconClass = isSpinnerPhase(workingPhase) ? styles.spinnerIcon : styles.pulseIcon;
 
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(conversation.name, selectedModel),
@@ -203,12 +204,13 @@ export function ConversationPanel({
       <div className={styles.conversationTerminalHeader}>
         <span className={styles.conversationTerminalTitle}>
           {isWorking && (
-            <WorkingIcon
-              size={14}
-              className={styles.spinnerIcon}
-              title={workingLabel}
-              aria-label={workingLabel}
-            />
+            <span title={workingLabel} style={{ display: 'contents' }}>
+              <WorkingIcon
+                size={14}
+                className={workingIconClass}
+                aria-label={workingLabel}
+              />
+            </span>
           )}
           {editingTitle ? (
             <input

@@ -499,21 +499,22 @@ const putSettingsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
 
-    return yield* Effect.try({
-      try: () => {
+    return yield* Effect.promise(async () => {
+      try {
         const newSettings = body as Parameters<typeof validateSettingsApi>[0];
         const validation = validateSettingsApi(newSettings);
         if (!validation.valid) {
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
-        saveSettingsApi(newSettings);
+        await saveSettingsApi(newSettings);
         return jsonResponse({
           success: true,
           message: 'Settings saved to config.yaml',
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         });
-      },
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : String(err));
+      }
     });
   })),
 );
@@ -545,12 +546,13 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
     }
 
     const modelIds = favorites.filter((f): f is string => typeof f === 'string');
-    return yield* Effect.try({
-      try: () => {
-        saveOpenRouterFavorites(modelIds);
+    return yield* Effect.promise(async () => {
+      try {
+        await saveOpenRouterFavorites(modelIds);
         return jsonResponse({ success: true, favorites: modelIds });
-      },
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : String(err));
+      }
     });
   })),
 );

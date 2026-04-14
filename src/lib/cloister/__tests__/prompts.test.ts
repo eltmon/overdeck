@@ -216,6 +216,47 @@ optional:
       expect(local).toBe('local-only');
       expect(remote).toBe('remote-only');
     });
+
+    it('renders Playwright isolation guidance in the uat-agent prompt', () => {
+      const out = renderPrompt({
+        name: 'uat-agent',
+        vars: {
+          ISSUE_ID: 'PAN-611',
+          WORKSPACE: '/workspace',
+          FRONTEND_URL: 'https://pan.localhost',
+          API_URL: 'https://pan.localhost/api',
+          TEST_TOKEN_API: 'test-key',
+        },
+      });
+
+      expect(out).toContain('## Playwright Isolation');
+      expect(out).toContain('isolated Playwright browser instance/profile');
+      expect(out).toContain("Never rely on another agent's browser session");
+    });
+
+    it('renders Playwright isolation guidance in the work prompt', () => {
+      const out = renderPrompt({
+        name: 'work',
+        vars: {
+          ISSUE_ID: 'PAN-611',
+          ISSUE_ID_LOWER: 'pan-611',
+          WORKSPACE_PATH: '/workspace',
+          LOCAL: true,
+          REMOTE: false,
+          PROJECT_ROOT: '/project',
+          BEADS_TASKS: '',
+          STITCH_DESIGNS: '',
+          POLYREPO_CONTEXT: '',
+          PENDING_FEEDBACK: '',
+          NEW_TRACKER_CONTEXT: '',
+          TLDR_AVAILABLE: false,
+        },
+      });
+
+      expect(out).toContain('## Playwright Isolation');
+      expect(out).toContain('isolated browser instance/profile');
+      expect(out).toContain("Never rely on another agent's browser session");
+    });
   });
 
   describe('fail-loud validation', () => {

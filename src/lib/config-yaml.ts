@@ -476,7 +476,7 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       }
 
       // OpenRouter
-      const openrouter = normalizeProviderConfig(providers.openrouter);
+      const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
       if (openrouter.enabled) {
         result.enabledProviders.add('openrouter');
         if (openrouter.api_key) {

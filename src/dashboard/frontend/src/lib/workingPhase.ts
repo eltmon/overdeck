@@ -147,6 +147,14 @@ export function getPhaseLabel(phase: WorkingPhase, entry?: WorkLogEntry): string
 
 // ─── Pending entry helper ─────────────────────────────────────────────────────
 
+/**
+ * True for phases where the agent itself is actively computing (use a spinner).
+ * False for phases where the agent dispatched something and is waiting (use a pulse).
+ */
+export function isSpinnerPhase(phase: WorkingPhase): boolean {
+  return phase === 'thinking' || phase === 'processing' || phase === 'agent';
+}
+
 /** Returns the most recent pending tool log entry (no result yet), if any. */
 export function getPendingToolEntry(workLog: WorkLogEntry[]): WorkLogEntry | undefined {
   for (let i = workLog.length - 1; i >= 0; i--) {

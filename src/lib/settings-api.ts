@@ -5,7 +5,7 @@
  * Converts between YAML config format and frontend API format.
  */
 
-import { writeFileSync } from 'fs';
+import { writeFile } from 'fs/promises';
 import yaml from 'js-yaml';
 import { loadConfig, getGlobalConfigPath, YamlConfig } from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
@@ -181,7 +181,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
 /**
  * Save settings from API format (for PUT /api/settings)
  */
-export function saveSettingsApi(settings: ApiSettingsConfig): void {
+export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfig();
   const providerAuth = currentConfig.providerAuth ?? {};
   const providerPlan = currentConfig.providerPlan ?? {};
@@ -233,7 +233,7 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
     noRefs: true,
   });
 
-  writeFileSync(getGlobalConfigPath(), yamlContent, 'utf-8');
+  await writeFile(getGlobalConfigPath(), yamlContent, 'utf-8');
 
   // Reload the global work-type router so in-memory overrides reflect the
   // freshly-written config. Without this, planning-agent / specialist overrides
@@ -246,7 +246,7 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
 /**
  * Update specific settings (partial update)
  */
-export function updateSettingsApi(updates: Partial<ApiSettingsConfig>): ApiSettingsConfig {
+export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
   const current = loadSettingsApi();
 
   // Merge updates
@@ -282,7 +282,7 @@ export function updateSettingsApi(updates: Partial<ApiSettingsConfig>): ApiSetti
   };
 
   // Save and return
-  saveSettingsApi(merged);
+  await saveSettingsApi(merged);
   return merged;
 }
 
@@ -434,9 +434,9 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
 /**
  * Save OpenRouter favorites to config.yaml
  */
-export function saveOpenRouterFavorites(favorites: string[]): void {
+export async function saveOpenRouterFavorites(favorites: string[]): Promise<void> {
   const current = loadSettingsApi();
-  saveSettingsApi({
+  await saveSettingsApi({
     ...current,
     openrouter: { ...current.openrouter, favorites },
   });

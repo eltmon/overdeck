@@ -16,6 +16,10 @@ vi.mock('../../src/lib/config-yaml.js', () => ({
       },
       overrides: {},
       geminiThinkingLevel: 3,
+      tmux: {
+        configMode: 'managed',
+      },
+      trackerKeys: {},
     },
     migration: null,
   })),
@@ -28,6 +32,15 @@ vi.mock('fs', async () => {
   return {
     ...actual,
     writeFileSync: vi.fn(),
+  };
+});
+
+// Mock fs/promises module for async file operations
+vi.mock('fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
+  return {
+    ...actual,
+    writeFile: vi.fn(),
   };
 });
 
@@ -169,7 +182,7 @@ describe('settings-api', () => {
 
   describe('saveSettingsApi', () => {
     it('should convert ApiSettingsConfig to YAML format', async () => {
-      const { writeFileSync } = await import('fs');
+      const { writeFile } = await import('fs/promises');
       const settings: ApiSettingsConfig = {
         models: {
           providers: {
@@ -192,13 +205,14 @@ describe('settings-api', () => {
       };
 
       // Should not throw
-      expect(() => saveSettingsApi(settings)).not.toThrow();
+      await saveSettingsApi(settings);
 
-      // Verify writeFileSync was called
-      expect(writeFileSync).toHaveBeenCalled();
+      // Verify writeFile was called
+      expect(writeFile).toHaveBeenCalled();
 
       // Verify the YAML content contains expected fields
-      const callArgs = vi.mocked(writeFileSync).mock.calls[0];
+      const { writeFile: mockedWriteFile } = await import('fs/promises');
+      const callArgs = vi.mocked(mockedWriteFile).mock.calls[0];
       const yamlContent = callArgs[1] as string;
       // Note: preset was removed from the API
             expect(yamlContent).toContain('anthropic: true');

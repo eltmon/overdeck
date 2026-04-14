@@ -127,6 +127,13 @@ Verify the application didn't introduce errors during testing.
    - Time to interactive <3s
    - Largest contentful paint <2.5s
 
+## Playwright Isolation
+
+- Use an isolated Playwright browser instance/profile for this verification.
+- Never rely on another agent's browser session, shared cookies, tabs, or profile state.
+- Recreate authentication/setup inside your own isolated browser context.
+- If you hit shared-browser contention, treat it as a tooling/config problem to report, not a reason to skip verification.
+
 ## Handling Playwright (Browser Automation)
 
 You have access to Playwright for browser automation. Example commands:

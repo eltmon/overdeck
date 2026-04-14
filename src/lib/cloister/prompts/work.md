@@ -58,6 +58,13 @@ Start by reading the STATE.md file to understand the plan, then begin implementa
 If no STATE.md exists, check the issue tracker for requirements.
 {{/REMOTE}}
 
+## Playwright Isolation
+
+- When you use Playwright MCP for browser verification, use an isolated browser instance/profile.
+- Never rely on another agent's browser session, cookies, tabs, zoom level, or shared profile state.
+- If you need authenticated/browser state, recreate it inside your own isolated session.
+- If Playwright reports browser/profile contention, treat it as a tooling/config bug to fix — do not skip UI verification.
+
 {{#TLDR_AVAILABLE}}
 ## TLDR: Token-Efficient Code Analysis
 
