@@ -657,9 +657,9 @@ The REST `GET /api/activity` endpoint provides a bootstrap fallback for the Acti
 
 | Endpoint | Purpose | Counter Effect |
 |----------|---------|---------------|
-| `POST /api/workspaces/:id/request-review` | Agent re-review request | Increments (max 3) |
-| `POST /api/workspaces/:id/review` | Human-initiated review | Resets to 0 |
-| `GET /api/workspaces/:id/review-status` | Status including `autoRequeueCount` | Read-only |
+| `POST /api/review/:id/request` | Agent re-review request | Increments (max 3) |
+| `POST /api/review/:id/trigger` | Human-initiated review | Resets to 0 |
+| `GET /api/review/:id/status` | Status including `autoRequeueCount` | Read-only |
 
 ## Troubleshooting
 
@@ -718,7 +718,7 @@ The merge-agent also handles syncing active workspaces with the latest `main` br
 ### API
 
 ```
-POST /api/workspaces/:issueId/sync-main
+POST /api/issues/:issueId/sync-main
 
 Response (success):
 { "success": true, "commitCount": 49, "changedFiles": [...], "message": "Synced 49 commit(s) from main" }

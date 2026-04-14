@@ -778,15 +778,6 @@ program
 // Cost tracking commands (pan cost today, pan cost sync, etc.)
 program.addCommand(createCostCommand());
 
-// Alias: pan sync-costs → pan cost sync
-program
-  .command('sync-costs')
-  .description('Import cost events from per-project WAL files (alias for: pan cost sync)')
-  .action(async () => {
-    // Forward to subcommand — avoids duplicating logic
-    await program.parseAsync(['cost', 'sync'], { from: 'user' });
-  });
-
 // ─── npx panopticon — server + browser launcher ───────────────────────────────
 // Low-friction entry point: no Electron required.
 // Starts the dashboard server and opens the browser to the dashboard URL.

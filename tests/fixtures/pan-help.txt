@@ -48,8 +48,6 @@ Commands:
   doctor                       Check system health and dependencies
   update [options]             Update Panopticon to latest version
   cost                         Track and report AI usage costs
-  sync-costs                   Import cost events from per-project WAL files
-                               (alias for: pan cost sync)
   serve [options]              Start the dashboard server and open it in the
                                default browser (npx launcher)
   help [command]               display help for command
