@@ -15,6 +15,7 @@ import { registerDbCommands } from '../db.js';
 import { registerBeadsCommands } from '../beads.js';
 import { registerConfigCommand } from '../config.js';
 import { setupHooksCommand } from '../setup/hooks.js';
+import { tldrCommand } from '../work/tldr.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -48,4 +49,13 @@ export function registerAdminCommands(program: Command): void {
     .command('install')
     .description('Configure heartbeat hooks in settings.json')
     .action(setupHooksCommand);
+
+  // pan admin tldr — TLDR daemon management
+  admin
+    .command('tldr [action] [workspace]')
+    .description('TLDR daemon: status, start, stop, warm')
+    .option('--json', 'Output as JSON')
+    .action((action, workspace, options) => {
+      tldrCommand(action || 'status', workspace, options);
+    });
 }
