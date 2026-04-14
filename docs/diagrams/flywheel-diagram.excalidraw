@@ -1,0 +1,673 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "n1",
+      "type": "ellipse",
+      "x": 585,
+      "y": 60,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#a5d8ff",
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Read STATE.md"
+      },
+      "fontSize": 16,
+      "createdAt": "2026-04-14T15:00:03.163Z",
+      "updatedAt": "2026-04-14T15:00:03.163Z",
+      "version": 1
+    },
+    {
+      "id": "n2",
+      "type": "ellipse",
+      "x": 870,
+      "y": 185,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#b2f2bb",
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Inventory & Triage"
+      },
+      "fontSize": 16,
+      "createdAt": "2026-04-14T15:00:03.163Z",
+      "updatedAt": "2026-04-14T15:00:03.163Z",
+      "version": 1
+    },
+    {
+      "id": "n3",
+      "type": "ellipse",
+      "x": 980,
+      "y": 415,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#b2f2bb",
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Diagnose Root Cause"
+      },
+      "fontSize": 15,
+      "createdAt": "2026-04-14T15:00:03.163Z",
+      "updatedAt": "2026-04-14T15:00:03.163Z",
+      "version": 1
+    },
+    {
+      "id": "n4",
+      "type": "ellipse",
+      "x": 870,
+      "y": 645,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#ffd8a8",
+      "strokeColor": "#e8590c",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Fix Substrate"
+      },
+      "fontSize": 16,
+      "createdAt": "2026-04-14T15:00:03.163Z",
+      "updatedAt": "2026-04-14T15:00:03.163Z",
+      "version": 1
+    },
+    {
+      "id": "n5",
+      "type": "ellipse",
+      "x": 585,
+      "y": 755,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#b2f2bb",
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Build, Commit & Push"
+      },
+      "fontSize": 15,
+      "createdAt": "2026-04-14T15:00:03.163Z",
+      "updatedAt": "2026-04-14T15:00:03.163Z",
+      "version": 1
+    },
+    {
+      "id": "n6",
+      "type": "ellipse",
+      "x": 295,
+      "y": 645,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#b2f2bb",
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Drive Pipeline"
+      },
+      "fontSize": 16,
+      "createdAt": "2026-04-14T15:00:03.163Z",
+      "updatedAt": "2026-04-14T15:00:03.163Z",
+      "version": 1
+    },
+    {
+      "id": "n7",
+      "type": "ellipse",
+      "x": 185,
+      "y": 415,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#99e9f2",
+      "strokeColor": "#0c8599",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "Awaiting Merge"
+      },
+      "fontSize": 16,
+      "createdAt": "2026-04-14T15:00:03.164Z",
+      "updatedAt": "2026-04-14T15:00:03.164Z",
+      "version": 1
+    },
+    {
+      "id": "n8",
+      "type": "ellipse",
+      "x": 295,
+      "y": 185,
+      "width": 230,
+      "height": 75,
+      "backgroundColor": "#eebefa",
+      "strokeColor": "#9c36b5",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "label": {
+        "text": "User UAT & Merge"
+      },
+      "fontSize": 16,
+      "createdAt": "2026-04-14T15:00:03.164Z",
+      "updatedAt": "2026-04-14T15:00:03.164Z",
+      "version": 1
+    },
+    {
+      "id": "center-box",
+      "type": "rectangle",
+      "x": 610,
+      "y": 370,
+      "width": 185,
+      "height": 130,
+      "backgroundColor": "#fff9db",
+      "strokeColor": "#f08c00",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "createdAt": "2026-04-14T15:00:03.164Z",
+      "updatedAt": "2026-04-14T15:00:03.164Z",
+      "version": 1
+    },
+    {
+      "id": "center-title",
+      "type": "text",
+      "x": 620,
+      "y": 383,
+      "width": 165,
+      "height": 30,
+      "strokeColor": "#e67700",
+      "text": "FIX-ALL",
+      "fontSize": 24,
+      "fontFamily": 1,
+      "createdAt": "2026-04-14T15:00:03.170Z",
+      "updatedAt": "2026-04-14T15:00:03.170Z",
+      "version": 1
+    },
+    {
+      "id": "center-sub1",
+      "type": "text",
+      "x": 614,
+      "y": 412,
+      "width": 175,
+      "height": 26,
+      "strokeColor": "#e67700",
+      "text": "FLYWHEEL",
+      "fontSize": 22,
+      "fontFamily": 1,
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "center-div",
+      "type": "text",
+      "x": 622,
+      "y": 440,
+      "width": 165,
+      "height": 16,
+      "strokeColor": "#adb5bd",
+      "text": "─────────────",
+      "fontSize": 12,
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "center-desc1",
+      "type": "text",
+      "x": 618,
+      "y": 458,
+      "width": 173,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "Substrate improves",
+      "fontSize": 13,
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "center-desc2",
+      "type": "text",
+      "x": 625,
+      "y": 477,
+      "width": 165,
+      "height": 18,
+      "strokeColor": "#868e96",
+      "text": "with each revolution",
+      "fontSize": 13,
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrminqnycj3r0i",
+      "type": "arrow",
+      "x": 810.2509818480196,
+      "y": 118.85853036581499,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          64.49803630396082,
+          82.28293926837004
+        ]
+      ],
+      "start": {
+        "id": "n1"
+      },
+      "end": {
+        "id": "n2"
+      },
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrmzl83qzub0il",
+      "type": "arrow",
+      "x": 1035.1467229938282,
+      "y": 264.3125014956367,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          9.706554012343531,
+          146.3749970087266
+        ]
+      ],
+      "start": {
+        "id": "n2"
+      },
+      "end": {
+        "id": "n3"
+      },
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrmfgo74apoxck",
+      "type": "arrow",
+      "x": 1044.8532770061718,
+      "y": 494.3125014956367,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -9.706554012343531,
+          146.37499700872667
+        ]
+      ],
+      "start": {
+        "id": "n3"
+      },
+      "end": {
+        "id": "n4"
+      },
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrmo75l1fl3d9n",
+      "type": "arrow",
+      "x": 872.5376680044616,
+      "y": 702.1026087896049,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -60.07533600892316,
+          70.79478242079017
+        ]
+      ],
+      "start": {
+        "id": "n4"
+      },
+      "end": {
+        "id": "n5"
+      },
+      "createdAt": "2026-04-14T15:00:03.171Z",
+      "updatedAt": "2026-04-14T15:00:03.171Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrm6d2gtk26raq",
+      "type": "arrow",
+      "x": 587.127914604152,
+      "y": 773.2502027405261,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -64.25582920830402,
+          -71.50040548105221
+        ]
+      ],
+      "start": {
+        "id": "n5"
+      },
+      "end": {
+        "id": "n6"
+      },
+      "createdAt": "2026-04-14T15:00:03.172Z",
+      "updatedAt": "2026-04-14T15:00:03.172Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrmybnqw1xgg9m",
+      "type": "arrow",
+      "x": 359.8532770061718,
+      "y": 640.6874985043634,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -9.706554012343645,
+          -146.37499700872667
+        ]
+      ],
+      "start": {
+        "id": "n6"
+      },
+      "end": {
+        "id": "n7"
+      },
+      "createdAt": "2026-04-14T15:00:03.172Z",
+      "updatedAt": "2026-04-14T15:00:03.172Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrmbvumb8b724h",
+      "type": "arrow",
+      "x": 350.1467229938282,
+      "y": 410.6874985043633,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          9.706554012343645,
+          -146.3749970087266
+        ]
+      ],
+      "start": {
+        "id": "n7"
+      },
+      "end": {
+        "id": "n8"
+      },
+      "createdAt": "2026-04-14T15:00:03.172Z",
+      "updatedAt": "2026-04-14T15:00:03.172Z",
+      "version": 1
+    },
+    {
+      "id": "mnyqzzrm8bmvb1x2kfw",
+      "type": "arrow",
+      "x": 520.7041977751048,
+      "y": 201.4902558929887,
+      "strokeWidth": 2,
+      "roughness": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          68.59160444979034,
+          -82.98051178597741
+        ]
+      ],
+      "start": {
+        "id": "n8"
+      },
+      "end": {
+        "id": "n1"
+      },
+      "createdAt": "2026-04-14T15:00:03.172Z",
+      "updatedAt": "2026-04-14T15:00:03.172Z",
+      "version": 1
+    },
+    {
+      "id": "title",
+      "type": "text",
+      "x": 480,
+      "y": 10,
+      "width": 450,
+      "height": 40,
+      "strokeColor": "#1e1e1e",
+      "text": "The Fix-All Flywheel — How Panopticon Compounds Over Time",
+      "fontSize": 20,
+      "fontFamily": 9,
+      "createdAt": "2026-04-14T15:02:17.781Z",
+      "updatedAt": "2026-04-14T15:30:32.729Z",
+      "version": 3
+    },
+    {
+      "id": "ann1-box",
+      "type": "rectangle",
+      "x": 1130,
+      "y": 185,
+      "width": 185,
+      "height": 60,
+      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "label": {
+        "text": "P0 → P1 → P2\npriority ladder"
+      },
+      "fontSize": 13,
+      "createdAt": "2026-04-14T15:02:17.781Z",
+      "updatedAt": "2026-04-14T15:02:17.781Z",
+      "version": 1
+    },
+    {
+      "id": "ann1-arrow",
+      "type": "arrow",
+      "x": 1122.0505581407017,
+      "y": 218.81903599759212,
+      "strokeColor": "#868e96",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -14.15841415082241,
+          1.5993601339058614
+        ]
+      ],
+      "start": {
+        "id": "ann1-box"
+      },
+      "end": {
+        "id": "n2"
+      },
+      "endArrowhead": "arrow",
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    },
+    {
+      "id": "ann2-box",
+      "type": "rectangle",
+      "x": 1130,
+      "y": 640,
+      "width": 185,
+      "height": 60,
+      "backgroundColor": "#fff4e6",
+      "strokeColor": "#e8590c",
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "label": {
+        "text": "Root cause only\nno bandaids"
+      },
+      "fontSize": 13,
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    },
+    {
+      "id": "ann2-arrow",
+      "type": "arrow",
+      "x": 1122.1372974608469,
+      "y": 676.3441950125568,
+      "strokeColor": "#e8590c",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -14.433544548455075,
+          2.709074785414259
+        ]
+      ],
+      "start": {
+        "id": "ann2-box"
+      },
+      "end": {
+        "id": "n4"
+      },
+      "endArrowhead": "arrow",
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    },
+    {
+      "id": "ann3-box",
+      "type": "rectangle",
+      "x": 45,
+      "y": 185,
+      "width": 185,
+      "height": 60,
+      "backgroundColor": "#f3d9fa",
+      "strokeColor": "#9c36b5",
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "label": {
+        "text": "Humans own\nship / no-ship"
+      },
+      "fontSize": 13,
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    },
+    {
+      "id": "ann3-arrow",
+      "type": "arrow",
+      "x": 237.98549308831798,
+      "y": 218.02743166639627,
+      "strokeColor": "#9c36b5",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          49.07254603244837,
+          2.9592888310305057
+        ]
+      ],
+      "start": {
+        "id": "ann3-box"
+      },
+      "end": {
+        "id": "n8"
+      },
+      "endArrowhead": "arrow",
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    },
+    {
+      "id": "ann4-box",
+      "type": "rectangle",
+      "x": 45,
+      "y": 640,
+      "width": 185,
+      "height": 60,
+      "backgroundColor": "#d0ebff",
+      "strokeColor": "#1971c2",
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "label": {
+        "text": "main always clean\nbefore & after"
+      },
+      "fontSize": 13,
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    },
+    {
+      "id": "ann4-arrow",
+      "type": "arrow",
+      "x": 237.95997708471702,
+      "y": 675.0423468999492,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          49.20084672106816,
+          4.94004893380486
+        ]
+      ],
+      "start": {
+        "id": "ann4-box"
+      },
+      "end": {
+        "id": "n6"
+      },
+      "endArrowhead": "arrow",
+      "createdAt": "2026-04-14T15:02:17.782Z",
+      "updatedAt": "2026-04-14T15:02:17.782Z",
+      "version": 1
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}
