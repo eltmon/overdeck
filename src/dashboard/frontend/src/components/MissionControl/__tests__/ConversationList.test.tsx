@@ -7,16 +7,20 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
 
-vi.mock('lucide-react', () => ({
-  Circle: (props: Record<string, unknown>) => <svg data-testid="conversation-dot" {...props} />,
-  Loader2: (props: Record<string, unknown>) => <svg data-testid="conversation-spinner" {...props} />,
-  Archive: () => <svg />,
-  Copy: () => <svg />,
-  Check: () => <svg />,
-  X: () => <svg />,
-  Pencil: () => <svg />,
-  Star: () => <svg />,
-}));
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+  return {
+    ...actual,
+    Circle: (props: Record<string, unknown>) => <svg data-testid="conversation-dot" {...props} />,
+    Loader2: (props: Record<string, unknown>) => <svg data-testid="conversation-spinner" {...props} />,
+    Archive: () => <svg />,
+    Copy: () => <svg />,
+    Check: () => <svg />,
+    X: () => <svg />,
+    Pencil: () => <svg />,
+    Star: () => <svg />,
+  };
+});
 
 vi.mock('../styles/mission-control.module.css', () => ({
   default: {

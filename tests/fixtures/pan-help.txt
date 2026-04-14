@@ -12,8 +12,26 @@ Commands:
   restore [timestamp]          Restore from backup
   backup                       Manage backups
   skills [options]             List and manage skills
-  plan-finalize [options]      Finalize a planning session: create beads from
-                               vBRIEF plan and write completion marker
+  issues [options]             List and triage work across configured trackers
+  show [options] <id>          Unified lens: shadow state, CV, context, health
+                               for one issue
+  review                       Review-loop management: pending items, request
+                               re-review, reset cycles
+  plan                         Create execution plan for an issue, or finalize
+                               an existing plan
+  tell <id> <message>          Send message to running agent
+  kill [options] <id>          Stop running agent (workspace preserved)
+  resume <id>                  Resume from saved Claude session
+  recover [options] [id]       Recover crashed or stopped agent
+  sync-main <id>               Merge latest main into workspace feature branch
+  done [options] <id>          Mark work complete, move to review
+  approve [options] <id>       Approve agent work, merge MR, update tracker
+  reopen [options] <id>        Re-open issue for rework (resets specialist
+                               state)
+  wipe [options] <id>          Destructive: reset all state for an issue.
+                               Confirms.
+  close [options] <id>         Verify, clean up, and close issue on tracker
+  start [options] <id>         Create workspace and spawn agent for an issue
   workspace                    Workspace management
   test                         Test running and management
   admin                        Plumbing commands: watchdog, specialists, infra,

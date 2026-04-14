@@ -20,7 +20,7 @@ vi.mock('ora', () => ({
 }));
 
 // Import after mocks
-import { syncMainCommand } from '../../../src/cli/commands/work/sync-main.js';
+import { syncMainCommand } from '../../../src/cli/commands/sync-main.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -62,7 +62,7 @@ describe('syncMainCommand', () => {
     await syncMainCommand('pan-242');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3011/api/workspaces/PAN-242/sync-main',
+      'http://localhost:3011/api/issues/PAN-242/sync-main',
       expect.objectContaining({ method: 'POST' }),
     );
   });

@@ -26,7 +26,7 @@ export async function syncMainCommand(id: string): Promise<void> {
   const spinner = ora(`Syncing main into ${issueId}...`).start();
 
   try {
-    const response = await fetch(`${DASHBOARD_URL}/api/workspaces/${issueId}/sync-main`, {
+    const response = await fetch(`${DASHBOARD_URL}/api/issues/${issueId}/sync-main`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });

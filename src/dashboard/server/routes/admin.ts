@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { getTldrDaemonService, getIndexStats } from '../../../lib/tldr-daemon.js';
+import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 // ─── Route: GET /api/admin/tldr/:issueId ──────────────────────────────────────
@@ -42,16 +42,12 @@ const getAdminTldrRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       const service = getTldrDaemonService(workspacePath, venvPath);
       const status = await service.getStatus();
-      const { fileCount, indexAge, edgeCount } = await getIndexStats(workspacePath);
       return jsonResponse({
         available: true,
         running: status.running,
         pid: status.pid,
         healthy: status.healthy,
         workspacePath,
-        fileCount,
-        indexAge,
-        edgeCount,
       });
     });
   }))

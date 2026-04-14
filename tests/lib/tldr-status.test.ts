@@ -23,7 +23,7 @@ vi.mock('../../src/lib/tldr-daemon.js', () => ({
 }));
 
 // Import the module once at the top level (after mocks are in place)
-const { tldrIndexStatusCommand } = await import('../../src/cli/commands/work/status.js');
+const { tldrIndexStatusCommand } = await import('../../src/cli/commands/status.js');
 
 describe('tldrIndexStatusCommand', () => {
   let tempDir: string;
