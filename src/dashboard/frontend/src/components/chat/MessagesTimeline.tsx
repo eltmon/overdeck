@@ -20,7 +20,7 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot } from 'lucide-react';
 import type { WorkLogEntry } from './chat-types';
 import { ChatMarkdown } from './ChatMarkdown';
 import {
@@ -299,17 +299,20 @@ function AssistantMessageRow({
 
   return (
     <div className={styles.assistantMessageRow}>
-      <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} />
-      <div className={styles.messageMetadata}>
-        <span className={styles.messageTimestamp}>
-          {formatTimestamp(message.createdAt)}
-        </span>
-        {duration && (
-          <>
-            <span className={styles.messageSeparator}>&middot;</span>
-            <span className={styles.messageTimestamp}>{duration}</span>
-          </>
-        )}
+      <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
+      <div className={styles.assistantMessageContent}>
+        <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} />
+        <div className={styles.messageMetadata}>
+          <span className={styles.messageTimestamp}>
+            {formatTimestamp(message.createdAt)}
+          </span>
+          {duration && (
+            <>
+              <span className={styles.messageSeparator}>&middot;</span>
+              <span className={styles.messageTimestamp}>{duration}</span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

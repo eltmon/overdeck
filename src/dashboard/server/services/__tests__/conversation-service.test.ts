@@ -99,6 +99,44 @@ describe('parseConversationMessages', () => {
     expect(result.streaming).toBe(false);
   });
 
+  it('keeps distinct assistant events separate when they reuse the same message.id', async () => {
+    const lines = [
+      {
+        type: 'assistant',
+        uuid: 'asst-1',
+        timestamp: '2024-01-01T00:00:01.000Z',
+        message: {
+          id: 'resp-shared',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'First assistant event' }],
+          stop_reason: 'end_turn',
+        },
+      },
+      {
+        type: 'assistant',
+        uuid: 'asst-2',
+        timestamp: '2024-01-01T00:00:02.000Z',
+        message: {
+          id: 'resp-shared',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Second assistant event' }],
+          stop_reason: 'end_turn',
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages.map((message) => message.id)).toEqual(['asst-1', 'asst-2']);
+    expect(result.messages.map((message) => message.text)).toEqual([
+      'First assistant event',
+      'Second assistant event',
+    ]);
+  });
+
   it('marks assistant message as streaming when no stop_reason and file is fresh', async () => {
     const lines = [
       {

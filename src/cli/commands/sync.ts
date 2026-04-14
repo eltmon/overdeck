@@ -14,6 +14,7 @@ import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
 import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-sync.js';
+import { ensurePlaywrightIsolation } from '../../lib/claude-mcp.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -366,9 +367,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   try {
     if (existsSync(mcpPath)) {
       const mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-      const pw = mcpConfig?.mcpServers?.playwright;
-      if (pw && Array.isArray(pw.args) && !pw.args.includes('--isolated')) {
-        pw.args.push('--isolated');
+      if (ensurePlaywrightIsolation(mcpConfig)) {
         writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
         console.log(chalk.green('✓ Added --isolated to Playwright MCP (prevents stale zoom/profile state)'));
       }
