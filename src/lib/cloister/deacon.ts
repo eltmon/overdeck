@@ -1675,18 +1675,23 @@ const timeoutNudgeCooldowns = new Map<string, number>();
 const FAILED_MERGE_RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 // Minimum time (ms) between timeout nudges to the same work agent
 const TIMEOUT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
-// Shorter cooldown for CI-transient failures (pending checks that may resolve quickly)
+// Shorter cooldown for CI-transient failures (pending checks that resolve quickly)
 const CI_TRANSIENT_RETRY_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 // Max number of automatic retries before requiring manual intervention
 const FAILED_MERGE_MAX_RETRIES = 3;
 
 // In-memory CI failure retry tracking — separate from mergeRetryCount because
 // CI failures are transient and should not permanently block merge attempts.
-export const ciRetryMap = new Map<string, { count: number; lastAttempt: number }>();
+const ciRetryMap = new Map<string, { count: number; lastAttempt: number }>();
 
 /**
  * Auto-retry issues whose mergeStatus='failed' due to transient post-rebase
  * verification failures (e.g. flaky tests or tests fixed on main after failure).
+ *
+ * CI check failures (pending/failing) are handled differently from real merge
+ * failures: they may resolve without any code change (e.g. CI queue clears,
+ * GitHub status updates). These get a separate retry mechanism with a shorter
+ * cooldown (2 min) and their own counter — they do NOT saturate mergeRetryCount.
  *
  * When review+test both passed but the post-rebase gate failed, the issue is
  * stuck: the deacon's merge-ready loop skips mergeStatus='failed' entries and
@@ -1695,8 +1700,9 @@ export const ciRetryMap = new Map<string, { count: number; lastAttempt: number }
  *
  * Guards:
  *   - Review + test must both be 'passed' (don't retry if code quality failed)
- *   - 30-min per-issue cooldown (in-memory, reset on server restart is fine)
- *   - Circuit breaker: max 3 retries (mergeRetryCount)
+ *   - 30-min per-issue cooldown for non-CI failures, 2-min for CI transient
+ *   - Circuit breaker: max 3 retries (mergeRetryCount) for non-CI
+ *   - CI transient failures: max 5 retries with exponential backoff
  */
 export async function checkFailedMergeRetry(): Promise<string[]> {
   const actions: string[] = [];
@@ -1728,60 +1734,32 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
       const issueId = status.issueId || key;
 
       if (isCiCheckFailure) {
+        // CI failures may be transient (pending checks, GitHub status lag).
+        // Use a separate retry counter that does NOT saturate mergeRetryCount.
         const ciEntry = ciRetryMap.get(issueId) ?? { count: 0, lastAttempt: 0 };
         const timeSinceLastCi = now - ciEntry.lastAttempt;
 
         if (ciEntry.count >= 5) {
-          if (ciEntry.count === 5) {
-            console.log(`[deacon] CI check failure for ${issueId} — retries exhausted, notifying work agent`);
-            const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
-            const { writeFeedbackFile } = await import('./feedback-writer.js');
-            await writeFeedbackFile({
-              issueId,
-              specialist: 'merge-agent',
-              outcome: 'ci-failure',
-              summary: 'CI checks still failing after 5 transient retries — merge blocked',
-              markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
-            }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
-            const agentSession = `agent-${issueId.toLowerCase()}`;
-            if (sessionExists(agentSession)) {
-              await sendKeysAsync(agentSession,
-                `CI checks are failing on the PR after 5 retries. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan done has completed successfully.`
-              );
-            }
-            ciEntry.count++;
-            ciRetryMap.set(issueId, ciEntry);
-            actions.push(`CI retry exhausted for ${issueId} — wrote feedback, notified agent`);
-          } else {
-            console.log(`[deacon] CI check failure for ${issueId} — max retries (5) exhausted, awaiting agent fix`);
-          }
+          // After 5 CI retry retries, back off to avoid hammering GitHub API
+          console.log(`[deacon] CI check failure for ${issueId} — ${ciEntry.count} retries exhausted, manual intervention needed`);
           continue;
         }
         if (timeSinceLastCi < CI_TRANSIENT_RETRY_COOLDOWN_MS) {
-          continue;
+          continue; // still in cooldown
         }
 
         ciEntry.count++;
         ciEntry.lastAttempt = now;
         ciRetryMap.set(issueId, ciEntry);
 
-        console.log(`[deacon] CI check failure for ${issueId} — notifying agent to re-submit (attempt ${ciEntry.count}/5)`);
-        const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
-        const { writeFeedbackFile } = await import('./feedback-writer.js');
-        await writeFeedbackFile({
-          issueId,
-          specialist: 'merge-agent',
-          outcome: 'ci-failure',
-          summary: 'CI checks failed at merge — re-submit to re-enter merge queue',
-          markdownBody: `## CI Check Failure\n\n${ciNotes}\n\nCI checks failed at merge time. This may be transient (pending checks, GitHub status lag). Re-submit to re-enter the merge queue:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
-        }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
-        const agentSessionCi = `agent-${issueId.toLowerCase()}`;
-        if (sessionExists(agentSessionCi)) {
-          await sendKeysAsync(agentSessionCi,
-            `CI checks failed on the PR for ${issueId}. This may be transient. Read .planning/feedback/ for details, then invoke the /rebase-and-submit skill for ${issueId}.`
-          );
-        }
-        actions.push(`CI failure notification for ${issueId} (attempt ${ciEntry.count}/5)`);
+        console.log(`[deacon] CI check failure for ${issueId} — transient CI issue, retrying merge (attempt ${ciEntry.count}/5)`);
+        setReviewStatus(issueId, {
+          mergeStatus: 'pending',
+          readyForMerge: true,
+          mergeRetryCount: status.mergeRetryCount || 0, // Don't touch main counter
+        });
+
+        actions.push(`CI transient retry for ${issueId} (attempt ${ciEntry.count}/5)`);
         continue;
       }
 
