@@ -1,6 +1,6 @@
 ---
 name: pan-health
-description: Check Panopticon system health
+description: "pan doctor — check Panopticon system health, dependencies, and configuration"
 triggers:
   - pan health
   - system health

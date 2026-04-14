@@ -1,6 +1,6 @@
 ---
 name: pan-status
-description: Check running agents, workspaces, and system health
+description: "pan status — show running agents overview and system health"
 triggers:
   - panopticon status
   - check agents

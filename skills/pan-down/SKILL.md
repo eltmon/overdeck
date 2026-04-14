@@ -1,6 +1,6 @@
 ---
 name: pan-down
-description: Stop Panopticon dashboard and services gracefully
+description: "pan down — stop the Panopticon dashboard and services"
 triggers:
   - stop panopticon
   - shutdown dashboard

@@ -1,6 +1,6 @@
 ---
 name: pan-restart
-description: Restart or reload the Panopticon dashboard with pan up; use this for dashboard restarts, stale builds, or EADDRINUSE on ports 3010/3011
+description: "pan up — restart the dashboard (handles stale builds, port conflicts on 3010/3011)"
 ---
 
 # Restart Panopticon Dashboard

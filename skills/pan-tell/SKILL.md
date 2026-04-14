@@ -1,6 +1,6 @@
 ---
 name: pan-tell
-description: Send a message to a running agent
+description: "pan tell <id> <msg> — send a message to a running agent's tmux session"
 triggers:
   - pan tell
   - message agent

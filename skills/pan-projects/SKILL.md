@@ -1,6 +1,6 @@
 ---
 name: pan-projects
-description: Add, remove, and manage Panopticon-managed projects
+description: "pan project <subcommand> — add, remove, and manage Panopticon-monitored projects"
 triggers:
   - pan projects
   - add project

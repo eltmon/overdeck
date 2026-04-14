@@ -1,6 +1,6 @@
 ---
 name: pan-sync-main
-description: Sync latest main into a workspace's feature branch via git merge. Use when a hotfix has been merged to main and active workspaces need to pick up the changes.
+description: "pan sync-main <id> — merge latest main into the feature branch for an active workspace"
 triggers:
   - sync with main
   - sync main into workspace

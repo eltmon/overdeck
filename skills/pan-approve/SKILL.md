@@ -1,6 +1,6 @@
 ---
 name: pan-approve
-description: Approve agent work and merge merge request
+description: "pan approve <id> — approve agent work and merge the pull request"
 triggers:
   - pan approve
   - approve agent work

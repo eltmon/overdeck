@@ -1,6 +1,6 @@
 ---
 name: pan-plan
-description: Interactive planning workflow with AI-assisted discovery
+description: "pan plan <id> — create an execution plan (vBRIEF) for an issue before starting"
 triggers:
   - plan issue
   - create plan

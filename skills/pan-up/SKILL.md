@@ -1,6 +1,6 @@
 ---
 name: pan-up
-description: Start Panopticon dashboard and services
+description: "pan up — start the Panopticon dashboard (Node 22, port 3010)"
 triggers:
   - start panopticon
   - start dashboard

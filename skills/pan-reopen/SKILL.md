@@ -1,6 +1,6 @@
 ---
 name: pan-reopen
-description: Reopen a completed issue for re-work. Resets specialist states, removes from queues, and prepares workspace for a new implementation cycle.
+description: "pan reopen <id> — reopen a completed issue, resetting specialist state for a new implementation cycle"
 triggers:
   - reopen issue
   - reopen PAN-

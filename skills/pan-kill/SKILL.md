@@ -1,6 +1,6 @@
 ---
 name: pan-kill
-description: Stop a running agent
+description: "pan kill <id> — stop a running agent (workspace and branch preserved)"
 triggers:
   - pan kill
   - stop agent
