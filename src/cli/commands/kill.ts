@@ -1,8 +1,8 @@
 import chalk from 'chalk';
-import { stopAgent, getAgentState } from '../../../lib/agents.js';
-import { sessionExists } from '../../../lib/tmux.js';
-import { isRemoteAvailable } from '../../../lib/remote/index.js';
-import { killRemoteAgent } from '../../../lib/remote/remote-agents.js';
+import { stopAgent, getAgentState } from '../../lib/agents.js';
+import { sessionExists } from '../../lib/tmux.js';
+import { isRemoteAvailable } from '../../lib/remote/index.js';
+import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
 
 interface KillOptions {
   force?: boolean;

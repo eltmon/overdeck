@@ -39,6 +39,7 @@ import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/work/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
+import { killCommand } from './commands/kill.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -110,6 +111,12 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
+
+program
+  .command('kill <id>')
+  .description('Stop running agent (workspace preserved)')
+  .option('--force', 'Force kill without confirmation')
+  .action(killCommand);
 
 program
   .command('start <id>')

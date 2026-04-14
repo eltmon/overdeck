@@ -19,8 +19,8 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [x] panopticon-cli-rgr: pan admin specialists (commit: ef060f73)
 - [x] panopticon-cli-1sd: pan admin hooks install (commit: 9d2b2fc4)
 - [x] panopticon-cli-f1v: pan start <id> (commit: f21a8e82)
-- [x] panopticon-cli-u7y: pan tell <id> (commit: pending)
-- [ ] panopticon-cli-dfb: pan kill <id>
+- [x] panopticon-cli-u7y: pan tell <id> (commit: 150cffe5)
+- [x] panopticon-cli-dfb: pan kill <id> (commit: pending)
 - [ ] panopticon-cli-vwd: pan resume <id>
 - [ ] panopticon-cli-agh: pan recover <id>
 - [ ] panopticon-cli-a0u: pan sync-main <id>
