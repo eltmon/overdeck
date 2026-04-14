@@ -38,6 +38,7 @@ import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/work/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
+import { tellCommand } from './commands/tell.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -104,7 +105,12 @@ program
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
 
-// Lifecycle verb: pan start <id>
+// Lifecycle verbs: pan start, pan tell, pan kill, pan resume, pan recover, pan sync-main, pan done, pan approve, pan reopen, pan wipe, pan close
+program
+  .command('tell <id> <message>')
+  .description('Send message to running agent')
+  .action(tellCommand);
+
 program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')

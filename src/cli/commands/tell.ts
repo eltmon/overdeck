@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { messageAgent } from '../../../lib/agents.js';
+import { messageAgent } from '../../lib/agents.js';
 
 export async function tellCommand(id: string, message: string): Promise<void> {
   const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
