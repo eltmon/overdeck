@@ -66,7 +66,7 @@ export function getAgentRuntimeBaseCommand(model: string): string {
 const AGENT_PREFIXES = ['agent-', 'planning-'];
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
-function normalizeAgentId(agentId: string): string {
+export function normalizeAgentId(agentId: string): string {
   if (AGENT_PREFIXES.some(p => agentId.startsWith(p))) {
     return agentId;
   }

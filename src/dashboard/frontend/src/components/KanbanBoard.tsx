@@ -2760,7 +2760,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           {/* Resume Session only when there's an actual prior work agent to resume.
               For freshly-planned issues with no work agent yet, show Start Agent
               instead (gated on beads existing). */}
-          {activeAgent ? (
+          {activeAgent?.lifecycle?.canResumeSession ? (
             <button
               onClick={handleResumeSession}
               disabled={resumeSessionMutation.isPending}
@@ -2808,7 +2808,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <div className={actionBarClass}>
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
-          {(isSessionLost || isResuming) && (
+          {((activeAgent?.lifecycle?.canResumeSession ?? false) || isSessionLost || isResuming) && (
             <button
               onClick={handleResumeSession}
               disabled={resumeSessionMutation.isPending || isResuming}

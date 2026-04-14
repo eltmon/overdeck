@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Bot, Wrench, Zap } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { updateConversationTitle } from '../MissionControl/ConversationList';
@@ -9,7 +9,22 @@ import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry } from '../../lib/workingPhase';
 import styles from '../MissionControl/styles/mission-control.module.css';
+
+// ─── Phase icon map ───────────────────────────────────────────────────────────
+
+const PHASE_ICONS = {
+  init:       Zap,
+  thinking:   Loader2,
+  bash:       Terminal,
+  file:       FileCode,
+  search:     Search,
+  web:        Globe,
+  agent:      Bot,
+  tool:       Wrench,
+  processing: Loader2,
+} as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,13 +79,27 @@ export function ConversationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.model]);
 
-  // Query messages at this level so we can access streaming status in the header
+  // Query messages at this level so we can drive the header working-spinner
   const { data: messagesData } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
     refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
-  const isStreaming = messagesData?.streaming ?? false;
+  const headerMessages = messagesData?.messages ?? [];
+  const headerWorkLog = messagesData?.workLog ?? [];
+  const headerLastMsg = headerMessages[headerMessages.length - 1];
+  // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
+  // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
+  const isWorking = conversation.sessionAlive && (
+    messagesData == null ||
+    headerMessages.length === 0 ||
+    headerLastMsg?.role === 'user' ||
+    (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
+  );
+  const workingPhase = isWorking ? getWorkingPhase(headerMessages, headerWorkLog) : 'thinking';
+  const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
+  const workingLabel = getPhaseLabel(workingPhase, pendingEntry);
+  const WorkingIcon = PHASE_ICONS[workingPhase];
 
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(conversation.name, selectedModel),
@@ -173,10 +202,12 @@ export function ConversationPanel({
       {/* Header bar */}
       <div className={styles.conversationTerminalHeader}>
         <span className={styles.conversationTerminalTitle}>
-          {isStreaming && (
-            <Loader2
+          {isWorking && (
+            <WorkingIcon
               size={14}
               className={styles.spinnerIcon}
+              title={workingLabel}
+              aria-label={workingLabel}
             />
           )}
           {editingTitle ? (
@@ -314,7 +345,6 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
-  const streaming = data?.streaming ?? false;
 
   // Drop optimistic messages once the server has returned at least as many messages
   // as we had before plus the optimistic ones (the real message has arrived).
@@ -341,15 +371,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
   const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
 
-  // "Working" = session is alive AND either:
-  // - server reports streaming (file modified < 5s ago with no terminal stop_reason)
-  // - last message is from the user (waiting for assistant response)
-  // We intentionally omit `!lastMsg.completedAt` — that caused the indicator to
-  // stick forever when completedAt was undefined due to missing/null timestamps.
+  // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
+  // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
+  // `entry.timestamp || new Date().toISOString()`, so `!lastMsg.completedAt` is safe.
   const lastMsg = messages[messages.length - 1];
-  const isWorking = conversation.sessionAlive && messages.length > 0 && (
-    streaming ||
-    lastMsg?.role === 'user'
+  const isWorking = conversation.sessionAlive && (
+    messages.length === 0 ||
+    lastMsg?.role === 'user' ||
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
   );
 
   return (

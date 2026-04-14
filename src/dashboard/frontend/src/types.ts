@@ -50,6 +50,26 @@ export interface GitStatus {
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
+export interface WorkAgentLifecycle {
+  agentId: string;
+  hasAgentState: boolean;
+  hasLiveTmuxSession: boolean;
+  hasSavedSession: boolean;
+  isRunning: boolean;
+  isStopped: boolean;
+  isCompleted: boolean;
+  isCrashed: boolean;
+  runtimeState: string;
+  agentStatus: string;
+  canStartFresh: boolean;
+  canResumeSession: boolean;
+  canRestartWithContext: boolean;
+  canResetSession: boolean;
+  requiresSessionResetBeforeFreshStart: boolean;
+  recommendedAction: 'start' | 'resume' | 'restart_with_context' | 'reset_session' | 'none';
+  reason?: string;
+}
+
 export interface Agent {
   id: string;
   issueId?: string;
@@ -73,6 +93,7 @@ export interface Agent {
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
   hasSession?: boolean;          // Whether a resumable Claude session exists
+  lifecycle?: WorkAgentLifecycle;
 }
 
 export interface AgentHealth {

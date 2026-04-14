@@ -3,7 +3,7 @@ import {
   XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle, ChevronRight,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { Agent } from '../../types';
+import { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../../lib/pipeline-state';
@@ -39,7 +39,7 @@ interface ActionsSectionProps {
   onDismissPending: () => void;
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
-  hasSession?: boolean;
+  lifecycle?: WorkAgentLifecycle;
 }
 
 export function ActionsSection({
@@ -67,11 +67,11 @@ export function ActionsSection({
   onDismissPending,
   onStartAgent,
   onCreateWorkspace,
-  hasSession,
+  lifecycle,
 }: ActionsSectionProps) {
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
-  const isResume = !!agent && agent.status === 'stopped' && hasSession === true && !resetSessionMutation.isSuccess;
+  const isResume = !!agent && agent.status === 'stopped' && lifecycle?.canResumeSession === true && !resetSessionMutation.isSuccess;
 
   // Stuck merge detection: if mergeStatus has been 'merging' for > 2 min, enable retry (PAN-490)
   const STUCK_MERGE_MS = 2 * 60 * 1000;
@@ -236,18 +236,24 @@ export function ActionsSection({
               </button>
             )}
             {!workspace?.exists && (
-              <button
-                onClick={onCreateWorkspace}
-                disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded disabled:opacity-50 border bg-surface-emphasis border-divider"
-              >
-                {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderPlus className="w-3 h-3" />}
-                {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
-              </button>
-            )}
-          </>
-        )}
-      </div>
+               <button
+                 onClick={onCreateWorkspace}
+                 disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
+                 className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded disabled:opacity-50 border bg-surface-emphasis border-divider"
+               >
+                 {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderPlus className="w-3 h-3" />}
+                 {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
+               </button>
+             )}
+           </>
+         )}
+       </div>
+
+      {!!agent && agent.status === 'stopped' && lifecycle?.reason && (
+        <div className="text-xs text-content-subtle mt-2 px-2 py-1 rounded bg-surface-emphasis/40 border border-divider">
+          {lifecycle.reason}
+        </div>
+      )}
 
       {/* Resume message input */}
       {showResumeInput && (
