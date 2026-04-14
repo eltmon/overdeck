@@ -270,7 +270,7 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
         <span className={styles.messageTimestamp}>
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <svg style={{ width: '10px', height: '10px', animation: 'spin 1.2s linear infinite' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--mc-accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12a9 9 0 11-6.219-8.56" />
               </svg>
               Sending…

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
-import { Agent, Issue } from '../types';
+import { Agent, Issue, WorkAgentLifecycle } from '../types';
 import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName } from './inspector/utils';
 import { BeadsDialog } from './BeadsDialog';
@@ -130,14 +130,14 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
 
-  // Check if a stopped agent has a resumable session (drives "Resume Session" vs "Start Agent" label)
-  const { data: hasSession } = useQuery({
+  // Check lifecycle state for stopped agents (drives Start vs Resume vs Reset semantics)
+  const { data: agentLifecycle } = useQuery<WorkAgentLifecycle | undefined>({
     queryKey: ['agent-session', agent?.id],
     queryFn: async () => {
       const res = await fetch(`/api/agents/${agent!.id}/has-session`);
-      if (!res.ok) return false;
+      if (!res.ok) return undefined;
       const data = await res.json();
-      return data.hasSession === true;
+      return data.lifecycle as WorkAgentLifecycle | undefined;
     },
     enabled: !!agent && agent.status === 'stopped',
     staleTime: 10000,
@@ -207,22 +207,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
-      // If there's a stopped agent, try to resume it
-      if (agent && agent.status === 'stopped') {
+      if (agent && agent.status === 'stopped' && agentLifecycle?.canResumeSession) {
         const res = await fetch(`/api/agents/${agent.id}/resume`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: message || undefined }),
         });
-        if (res.ok) return res.json();
-        const err = await res.json().catch(() => ({}));
-        // If resume fails because session was reset, fall through to fresh start
-        if (err.error?.includes('No saved session ID')) {
-          // Fall through to POST /api/agents below
-        } else {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
           throw new Error(err.error || 'Failed to resume session');
         }
+        return res.json();
       }
+
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -934,7 +931,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
-          hasSession={hasSession}
+          lifecycle={agentLifecycle}
         />
 
         {/* Issue labels/tags for no-agent view */}

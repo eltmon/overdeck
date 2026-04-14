@@ -57,9 +57,6 @@ import {
   resumeAgent,
   messageAgent,
   stopAgent,
-  getAgentRuntimeBaseCommand,
-  getProviderExportsForModel,
-  getProviderTmuxFlags,
   listRunningAgents,
   getAgentDir,
 } from '../../../lib/agents.js';
@@ -69,7 +66,7 @@ import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
-import { buildResumePrompt } from '../../../lib/cloister/resume-prompt.js';
+import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
@@ -389,7 +386,7 @@ const getAgentsRoute = HttpRouter.add(
                   reviewStatus.mergeStatus === 'failed'
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
-              const hasSession = !!getLatestSessionId(dir);
+              const lifecycle = getWorkAgentLifecycleState(dir);
               stoppedAgents.push({
                 id: dir,
                 issueId,
@@ -408,7 +405,8 @@ const getAgentsRoute = HttpRouter.add(
                 pendingQuestionCount: 0,
                 resolution: runtimeData.resolution || 'working',
                 resolutionCount: runtimeData.resolutionCount || 0,
-                hasSession,
+                hasSession: lifecycle.canResumeSession,
+                lifecycle,
               });
             } catch {}
           }
@@ -896,6 +894,14 @@ const postAgentResumeRoute = HttpRouter.add(
 
     const { message } = body as any;
     const eventStore = yield* EventStoreService;
+    const lifecycle = getWorkAgentLifecycleState(id);
+    if (!lifecycle.canResumeSession) {
+      return jsonResponse({
+        error: lifecycle.reason || `Cannot resume agent ${lifecycle.agentId}`,
+        lifecycle,
+      }, { status: 409 });
+    }
+
     const result = yield* Effect.promise(() => resumeAgent(id, message));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
@@ -907,6 +913,7 @@ const postAgentResumeRoute = HttpRouter.add(
         payload: {
           agentId: id,
           issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
+          resumed: true,
           agent: {
             id,
             issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
@@ -920,9 +927,9 @@ const postAgentResumeRoute = HttpRouter.add(
           },
         },
       })));
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true, resumed: true, lifecycle: getWorkAgentLifecycleState(id) });
     } else {
-      return jsonResponse({ error: result.error }, { status: 400 });
+      return jsonResponse({ error: result.error, lifecycle: getWorkAgentLifecycleState(id) }, { status: 400 });
     }
   })),
 );
@@ -1405,117 +1412,12 @@ const postAgentsRoute = HttpRouter.add(
 
     const agentSessionName = `agent-${issueLower}`;
 
-    // Check if we can resume a stopped agent with a saved session
-    const existingAgentState = getAgentState(agentSessionName);
-    const savedSessionId = getLatestSessionId(agentSessionName);
-
-    if (existingAgentState && savedSessionId && (existingAgentState.status === 'stopped' || existingAgentState.status === 'completed')) {
-      // Kill any zombie tmux session before resuming.
-      // NOTE: try/catch does NOT work with yield* in Effect.gen — Effect errors propagate
-      // through the Effect error channel, not as JS exceptions. Use .catch() in the Promise
-      // chain instead so the Effect never fails when the session doesn't exist.
-      yield* Effect.promise(() =>
-        killSessionAsync(agentSessionName)
-          .catch(() => { /* No existing session — good */ })
-      );
-
-      // Remove completed marker so the agent can work again
-      const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
-      try { yield* Effect.promise(() => rm(completedFile, { force: true })); } catch { /* non-fatal */ }
-
-      // Build context-rich resume prompt from STATE.md, beads, and feedback
-      const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
-      const resumeLauncher = join(agentDir, 'resume-launcher.sh');
-      const resumePromptFile = join(agentDir, 'resume-prompt.md');
-      const userMessage = (body as any).message || undefined;
-      const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
-      yield* Effect.promise(() => writeFile(resumePromptFile, resumePrompt));
-
-      // Fresh session with context prompt (not --resume, which has interactive prompts
-      // and loses prompt caching). The resume prompt contains STATE.md, beads, feedback,
-      // and optional user message — everything the agent needs to pick up where it left off.
-      // Use current config model (not the stale model from state.json)
-      let agentModel = existingAgentState.model || 'claude-sonnet-4-6';
-      try {
-        const { getModelId } = yield* Effect.promise(() => import('../../../lib/work-type-router.js'));
-        agentModel = getModelId(`issue-agent:${phase}` as any);
-      } catch { /* fall back to state model */ }
-      const providerExports = getProviderExportsForModel(agentModel);
-      const resumeContent = `#!/bin/bash\nexport CI=1\n${providerExports}prompt=$(cat "${resumePromptFile}")\nexec ${getAgentRuntimeBaseCommand(agentModel)} -p "$prompt"\n`;
-      yield* Effect.promise(() => writeFile(resumeLauncher, resumeContent, { mode: 0o755 }));
-
-      // Spawn tmux session with fresh claude session
-      const providerFlags = getProviderTmuxFlags(agentModel);
-      const providerEnv = Object.fromEntries(
-        Array.from(providerFlags.matchAll(/-e\s+([^=\s]+)=\"([^\"]*)\"/g), ([, key, value]) => [key, value]),
-      );
-      yield* Effect.promise(() => createSessionAsync(
-        agentSessionName,
-        workspacePath,
-        `bash ${resumeLauncher}`,
-        {
-          env: {
-            CI: '1',
-            PANOPTICON_AGENT_ID: agentSessionName,
-            PANOPTICON_ISSUE_ID: issueId,
-            PANOPTICON_SESSION_TYPE: phase,
-            CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
-            ...providerEnv,
-          },
-        },
-      ));
-
-      console.log(`[start-agent] Resumed ${agentSessionName} with fresh session (previous: ${savedSessionId.slice(0, 8)}...)`);
-
-      // Update agent state
-      existingAgentState.status = 'running';
-      existingAgentState.lastActivity = new Date().toISOString();
-      saveAgentState(existingAgentState);
-
-      saveAgentRuntimeState(agentSessionName, {
-        state: 'active',
-        resumedAt: new Date().toISOString(),
-      });
-
-      // Transition issue to "In Progress"
-      yield* Effect.promise(() => Effect.runPromise(
-        lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
-      ));
-
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'agent.started',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId: agentSessionName,
-          issueId,
-          resumed: true,
-          agent: {
-            id: agentSessionName,
-            issueId: existingAgentState.issueId,
-            workspace: existingAgentState.workspace,
-            runtime: existingAgentState.runtime,
-            model: existingAgentState.model,
-            status: 'running',
-            startedAt: existingAgentState.startedAt,
-            lastActivity: existingAgentState.lastActivity,
-            phase: existingAgentState.phase,
-          },
-        },
-      })));
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
-      })));
-      try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
-
+    const agentLifecycle = getWorkAgentLifecycleState(agentSessionName);
+    if (!agentLifecycle.canStartFresh) {
       return jsonResponse({
-        success: true,
-        message: `Resumed agent for ${issueId} (session ${savedSessionId.slice(0, 8)}...)`,
-        resumed: true,
-        agentId: agentSessionName,
-        projectPath,
-      });
+        error: agentLifecycle.reason || `Cannot start agent for ${issueId}`,
+        lifecycle: agentLifecycle,
+      }, { status: 409 });
     }
 
     // Kill any zombie tmux session from a previous crash.
@@ -1804,8 +1706,11 @@ const getAgentHasSessionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const sessionId = getLatestSessionId(id);
-    return jsonResponse({ hasSession: !!sessionId });
+    const lifecycle = getWorkAgentLifecycleState(id);
+    return jsonResponse({
+      hasSession: lifecycle.canResumeSession,
+      lifecycle,
+    });
   })),
 );
 
@@ -1821,18 +1726,19 @@ const postAgentResetSessionRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
+    const lifecycle = getWorkAgentLifecycleState(id);
     const agentState = getAgentState(id);
     if (!agentState) {
-      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+      return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
     }
 
-    if (agentState.status === 'running') {
-      return jsonResponse({ error: `Agent ${id} is running. Stop it first.` }, { status: 409 });
+    if (lifecycle.hasLiveTmuxSession) {
+      return jsonResponse({ error: `Agent ${id} is running. Stop it first.`, lifecycle }, { status: 409 });
     }
 
     const previousSessionId = getLatestSessionId(id);
     if (!previousSessionId) {
-      return jsonResponse({ error: `Agent ${id} has no saved session to reset` }, { status: 404 });
+      return jsonResponse({ error: `Agent ${id} has no saved session to reset`, lifecycle }, { status: 404 });
     }
 
     const agentDir = getAgentDir(id);
@@ -1869,7 +1775,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
     })));
 
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
-    return jsonResponse({ success: true, agentId: id, previousSessionId });
+    return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: getWorkAgentLifecycleState(id) });
   })),
 );
 

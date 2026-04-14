@@ -39,6 +39,8 @@ export interface ConversationActivitySummary {
   messages: ChatMessage[];
   streaming: boolean;
   isWorking: boolean;
+  /** Tool name of the most recently pending tool call, if any (e.g. "Bash", "Read"). */
+  currentTool: string | null;
 }
 
 // ─── CWD encoding ─────────────────────────────────────────────────────────────
@@ -344,10 +346,27 @@ export async function parseConversationMessages(
 export async function summarizeConversationActivity(
   sessionFile: string,
 ): Promise<ConversationActivitySummary> {
-  const { messages, streaming } = await parseConversationMessages(sessionFile);
+  const { messages, workLog, streaming } = await parseConversationMessages(sessionFile);
   const lastMsg = messages[messages.length - 1];
-  const isWorking = messages.length > 0 && (streaming || lastMsg?.role === 'user');
-  return { messages, streaming, isWorking };
+  // Agent is idle only when the last message is an assistant message with a terminal
+  // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
+  // — empty history, last message is user (tool result or prompt), or last message is
+  // an assistant still streaming / waiting on tool_use — means the agent is working.
+  const isWorking = messages.length === 0 ||
+    lastMsg?.role === 'user' ||
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt);
+
+  // Find the most recent pending tool (tool_use sent but tool_result not yet received)
+  let currentTool: string | null = null;
+  for (let i = workLog.length - 1; i >= 0; i--) {
+    const entry = workLog[i];
+    if (entry.tone === 'tool' && !entry.result && entry.toolTitle) {
+      currentTool = entry.toolTitle;
+      break;
+    }
+  }
+
+  return { messages, streaming, isWorking, currentTool };
 }
 
 // ─── Compact boundary offset cache ───────────────────────────────────────────

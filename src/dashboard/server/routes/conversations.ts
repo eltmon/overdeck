@@ -425,16 +425,18 @@ const getConversationsRoute = HttpRouter.add(
             const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
 
             let isWorking = false;
+            let currentTool: string | null = null;
             if (sessionAlive && conv.sessionFile) {
               try {
                 const summary = await summarizeConversationActivity(conv.sessionFile);
                 isWorking = summary.isWorking;
+                currentTool = summary.currentTool;
               } catch {
                 isWorking = false;
               }
             }
 
-            return { ...conv, sessionAlive, isWorking, isFavorited: favoritedNames.has(conv.name) };
+            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name) };
           }),
         );
 

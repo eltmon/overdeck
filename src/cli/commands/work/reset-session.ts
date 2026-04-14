@@ -1,8 +1,8 @@
 import chalk from 'chalk';
 import { existsSync, unlinkSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getAgentState, getAgentDir, getAgentRuntimeFile, getLatestSessionId, getAgentRuntimeState } from '../../../lib/agents.js';
-import { sessionExists } from '../../../lib/tmux.js';
+import { getAgentState, getAgentDir, getAgentRuntimeFile, getLatestSessionId } from '../../../lib/agents.js';
+import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 
 export async function resetSessionCommand(id: string): Promise<void> {
   // Support "agent-xxx" prefix, or just the issue ID
@@ -17,8 +17,10 @@ export async function resetSessionCommand(id: string): Promise<void> {
     process.exit(1);
   }
 
+  const lifecycle = getWorkAgentLifecycleState(agentId);
+
   // Refuse if running
-  if (sessionExists(agentId)) {
+  if (lifecycle.hasLiveTmuxSession) {
     console.log(chalk.red(`Agent ${agentId} is running. Stop it first with: pan work kill ${id}`));
     process.exit(1);
   }

@@ -71,6 +71,7 @@ import {
 import { isRemoteAvailable } from '../../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../../lib/remote/remote-agents.js';
+import { assertCanStartFresh } from '../../../lib/work-agent-lifecycle.js';
 
 interface IssueOptions {
   model: string;
@@ -533,6 +534,16 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
+
+    // Refuse fresh start when a resumable session already exists.
+    // Users must choose resume or reset-session explicitly.
+    try {
+      assertCanStartFresh(id);
+    } catch (error) {
+      if (workspacePath || isRemote) {
+        throw error;
+      }
+    }
 
     // Handle remote workspace
     if (isRemote || (locationPreference === 'remote' && !workspacePath)) {

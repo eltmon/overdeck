@@ -18,6 +18,7 @@ import { reopenCommand } from './reopen.js';
 import { requestReviewCommand } from './request-review.js';
 import { resetReviewCommand } from './reset-review.js';
 import { resetSessionCommand } from './reset-session.js';
+import { resumeCommand } from './resume.js';
 import { wipeCommand } from './wipe.js';
 import { shadowCommand } from './shadow.js';
 import { syncCommand } from './sync.js';
@@ -181,6 +182,11 @@ export function registerWorkCommands(program: Command): void {
     .command('reset-session <id>')
     .description('Clear saved Claude session so next start creates a fresh session (preserves workspace)')
     .action(resetSessionCommand);
+
+  work
+    .command('resume <id>')
+    .description('Resume a stopped agent from its saved Claude session')
+    .action(resumeCommand);
 
   work
     .command('wipe <id>')

@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2 } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Bot, Wrench, Zap } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { toolNameToPhase, getPhaseLabel } from '../../lib/workingPhase';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,6 +21,8 @@ export interface Conversation {
   lastAttachedAt: string | null;
   sessionAlive: boolean;
   isWorking?: boolean;
+  /** Tool name currently executing (e.g. "Bash", "Read"). Null when idle or not in a tool call. */
+  currentTool?: string | null;
   isFavorited?: boolean;
   /** Absolute path to the Claude Code JSONL session file. Null until discovered. */
   sessionFile?: string | null;
@@ -149,6 +152,44 @@ export function sortConversations(convs: Conversation[], sort: SortOption): Conv
 interface ConversationListProps {
   selectedConversation: string | null;
   onSelectConversation: (name: string | null) => void;
+}
+
+// ─── WorkingSpinner ───────────────────────────────────────────────────────────
+
+const PHASE_ICONS = {
+  init:       Zap,
+  thinking:   Loader2,
+  bash:       Terminal,
+  file:       FileCode,
+  search:     Search,
+  web:        Globe,
+  agent:      Bot,
+  tool:       Wrench,
+  processing: Loader2,
+} as const;
+
+function WorkingSpinner({
+  size,
+  className,
+  currentTool,
+  'aria-label': ariaLabel,
+}: {
+  size: number;
+  className: string;
+  currentTool: string | null;
+  'aria-label'?: string;
+}) {
+  const phase = currentTool ? toolNameToPhase(currentTool) : 'thinking';
+  const Icon = PHASE_ICONS[phase];
+  const label = getPhaseLabel(phase);
+  return (
+    <Icon
+      size={size}
+      className={className}
+      title={label}
+      aria-label={ariaLabel ?? label}
+    />
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -366,9 +407,10 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   </span>
                 )}
                 {conv.isWorking ? (
-                  <Loader2
+                  <WorkingSpinner
                     size={12}
                     className={styles.conversationWorkingSpinner}
+                    currentTool={conv.currentTool ?? null}
                     aria-label={`Agent working in ${conv.name}`}
                   />
                 ) : (

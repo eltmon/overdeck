@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ActionsSection } from './ActionsSection';
 import type { UseMutationResult } from '@tanstack/react-query';
-import type { Agent } from '../../types';
+import type { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +30,29 @@ function makeMutation(overrides: Partial<UseMutationResult<any, Error, any, unkn
 
 function makeSyncMutation(overrides = {}) {
   return makeMutation(overrides) as UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?: number }, Error, void, unknown>;
+}
+
+function makeLifecycle(overrides: Partial<WorkAgentLifecycle> = {}): WorkAgentLifecycle {
+  return {
+    agentId: 'agent-1',
+    hasAgentState: true,
+    hasLiveTmuxSession: false,
+    hasSavedSession: true,
+    isRunning: false,
+    isStopped: true,
+    isCompleted: false,
+    isCrashed: false,
+    runtimeState: 'idle',
+    agentStatus: 'stopped',
+    canStartFresh: false,
+    canResumeSession: true,
+    canRestartWithContext: true,
+    canResetSession: true,
+    requiresSessionResetBeforeFreshStart: true,
+    recommendedAction: 'resume',
+    reason: 'Agent agent-1 has a resumable Claude session.',
+    ...overrides,
+  };
 }
 
 function makeAgent(overrides: Partial<Agent> = {}): Agent {
@@ -92,6 +115,29 @@ describe('ActionsSection', () => {
   it('shows Start Agent button when no agent', () => {
     render(<ActionsSection {...defaultProps} />);
     expect(screen.getByText('Start Agent')).toBeInTheDocument();
+  });
+
+  it('shows Resume Session and Reset Session when stopped agent has resumable lifecycle', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent({ status: 'stopped' })}
+        lifecycle={makeLifecycle()}
+      />
+    );
+    expect(screen.getByText('Resume Session')).toBeInTheDocument();
+    expect(screen.getByText('Reset Session')).toBeInTheDocument();
+  });
+
+  it('shows lifecycle reason for stopped agent actions', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent({ status: 'stopped' })}
+        lifecycle={makeLifecycle({ reason: 'Use pan work resume PAN-331 first.' })}
+      />
+    );
+    expect(screen.getByText('Use pan work resume PAN-331 first.')).toBeInTheDocument();
   });
 
   it('calls onStartAgent when Start Agent clicked', () => {
