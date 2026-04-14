@@ -50,6 +50,8 @@ import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
 import { planCommand } from './commands/plan.js';
 import { showCommand } from './commands/show.js';
+import { listCommand as issuesCommand } from './commands/issues.js';
+import { triageCommand } from './commands/triage.js';
 import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
@@ -112,6 +114,25 @@ program
   .description('List and manage skills')
   .option('--json', 'Output as JSON')
   .action(skillsCommand);
+
+// pan issues — list and triage work
+program
+  .command('issues')
+  .description('List and triage work across configured trackers')
+  .option('--all', 'Include closed issues')
+  .option('--mine', 'Show only my assigned issues')
+  .option('--json', 'Output as JSON')
+  .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
+  .option('--all-trackers', 'Query all configured trackers')
+  .option('--shadow-only', 'Show only shadowed issues')
+  .option('--triage', 'Show triage queue')
+  .action((options) => {
+    if (options.triage) {
+      triageCommand(undefined, options);
+    } else {
+      issuesCommand(options);
+    }
+  });
 
 // pan show <id> — unified observation
 program

@@ -6,11 +6,11 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { loadConfig } from '../../../lib/config.js';
-import type { Issue, IssueTracker, TrackerType } from '../../../lib/tracker/index.js';
-import { createTracker, TrackerConfig } from '../../../lib/tracker/index.js';
-import { isShadowed, getPendingSyncCount } from '../../../lib/shadow-state.js';
-import { loadProjectsConfig } from '../../../lib/projects.js';
+import { loadConfig } from '../../lib/config.js';
+import type { Issue, IssueTracker, TrackerType } from '../../lib/tracker/index.js';
+import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';
+import { isShadowed, getPendingSyncCount } from '../../lib/shadow-state.js';
+import { loadProjectsConfig } from '../../lib/projects.js';
 
 interface ListOptions {
   all?: boolean;
