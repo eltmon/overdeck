@@ -134,6 +134,14 @@ describe('App conversation view routing', () => {
     expect(screen.getByTestId('view-mode')).toHaveTextContent('terminal');
   });
 
+  it('does not strip terminal view from a direct deep link on initial render', () => {
+    window.history.replaceState(null, '', '/conv/77?view=terminal');
+    renderApp();
+    expect(window.location.pathname).toBe('/conv/77');
+    expect(window.location.search).toBe('?view=terminal');
+    expect(screen.getByTestId('view-mode')).toHaveTextContent('terminal');
+  });
+
   it('updates the current conversation URL when the view mode changes', () => {
     renderApp();
     fireEvent.click(screen.getByText('Terminal'));
