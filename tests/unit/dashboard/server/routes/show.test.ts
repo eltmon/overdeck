@@ -1,16 +1,15 @@
 /**
  * Route logic tests for /api/show/:issueId endpoints (PAN-705).
  *
- * Exercises the real getShadowState function with real shadow-state files
- * and the real existsSync check used by the tldr route. Follows the pattern
- * in tests/lib/shadow-state.test.ts: write unique-prefix files to the real
- * ~/.panopticon/shadow-state dir and clean up after.
+ * Exercises the real getShadowState function with real shadow-state files.
+ * Follows the pattern in tests/lib/shadow-state.test.ts: write unique-prefix
+ * files to the real ~/.panopticon/shadow-state dir and clean up after.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, readdirSync, unlinkSync, mkdtempSync, rmSync, mkdirSync } from 'fs';
+import { existsSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { homedir, tmpdir } from 'os';
+import { homedir } from 'os';
 
 import {
   getShadowState,
@@ -106,31 +105,3 @@ describe('GET /api/show/:issueId (summary)', () => {
   });
 });
 
-// ─── GET /api/show/:issueId/tldr — real workspace-directory existsSync ───────
-
-describe('GET /api/show/:issueId/tldr', () => {
-  let tmpRoot: string;
-
-  beforeEach(() => {
-    tmpRoot = mkdtempSync(join(tmpdir(), 'pan705-show-tldr-'));
-  });
-
-  afterEach(() => {
-    rmSync(tmpRoot, { recursive: true, force: true });
-  });
-
-  it('workspace-not-found path — existsSync(workspacePath) is false', () => {
-    const issueId = 'PAN-999';
-    const workspacePath = join(tmpRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    // Route decision: if (!existsSync(workspacePath)) → 404
-    expect(existsSync(workspacePath)).toBe(false);
-  });
-
-  it('workspace-found path — existsSync(workspacePath) is true after mkdir', () => {
-    const issueId = 'PAN-705';
-    const workspacePath = join(tmpRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    mkdirSync(workspacePath, { recursive: true });
-    // Route decision: existsSync true → returns stub { available: false }
-    expect(existsSync(workspacePath)).toBe(true);
-  });
-});

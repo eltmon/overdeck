@@ -9,15 +9,11 @@ import { httpHandler } from './http-handler.js';
  *   GET /api/show/:issueId/health   — health + heartbeat only
  */
 
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
 import { getShadowState } from '../../../lib/shadow-state.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 // ─── Route: GET /api/show/:issueId ────────────────────────────────────────────
 
@@ -75,32 +71,10 @@ const getShowHealthRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: GET /api/show/:issueId/tldr ───────────────────────────────────────
-
-const getShowTldrRoute = HttpRouter.add(
-  'GET',
-  '/api/show/:issueId/tldr',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-
-    const project = resolveProjectFromIssue(issueId);
-    const projectPath = project?.path ?? process.cwd();
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-
-    if (!existsSync(workspacePath)) {
-      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
-    }
-
-    return jsonResponse({ available: false, reason: 'Use pan admin tldr for daemon status' });
-  }))
-);
-
 export const showRouteLayer = Layer.mergeAll(
   getShowRoute,
   getShowShadowRoute,
   getShowHealthRoute,
-  getShowTldrRoute,
 );
 
 export default showRouteLayer;
