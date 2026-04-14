@@ -302,7 +302,7 @@ export async function parseConversationMessages(
           messages.push(pendingAssistant);
         }
         pendingAssistant = {
-          id: msg.id ?? `asst-${messages.length}`,
+          id: entry.uuid ?? msg.id ?? `asst-${messages.length}`,
           role: 'assistant',
           text: assistantText,
           // createdAt = when the user sent the request (for duration calculation)
