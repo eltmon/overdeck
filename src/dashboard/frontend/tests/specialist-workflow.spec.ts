@@ -93,7 +93,7 @@ test.describe('Specialist Workflow', () => {
 
     // 2. Trigger the approve workflow
     console.log(`\n[2/5] Triggering approve workflow for ${TEST_ISSUE_ID}...`);
-    const approveResponse = await fetch(`${API_URL}/api/workspaces/${TEST_ISSUE_ID}/approve`, {
+    const approveResponse = await fetch(`${API_URL}/api/issues/${TEST_ISSUE_ID}/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

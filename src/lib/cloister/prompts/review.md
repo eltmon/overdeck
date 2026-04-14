@@ -66,7 +66,7 @@ Before reviewing anything, check if there are actual changes to review:
 **If 0 files changed across all repos:** the branch is stale or already merged into {{DIFF_BASE}}. Do NOT attempt a full review:
 
 ```bash
-curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
+curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
   -H "Content-Type: application/json" \
   -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to {{DIFF_BASE}} (already merged or stale)"}' | jq .
 
@@ -158,14 +158,14 @@ Use whenever you found ANY issue, no matter how trivial. Every finding is a bloc
 
 **If issues found:**
 ```bash
-curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
+curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
   -H "Content-Type: application/json" \
   -d '{"reviewStatus":"blocked","reviewNotes":"[describe issues here]"}' | jq .
 ```
 
 **If review passes (rare):**
 ```bash
-curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
+curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
   -H "Content-Type: application/json" \
   -d '{"reviewStatus":"passed"}' | jq .
 
@@ -199,4 +199,4 @@ You are a specialist agent, not the work agent. You do NOT have permission to cl
 - **NEVER** run `gh issue close` — that is only for humans or the merge-agent
 - **NEVER** say "Merged to main" — merging is done by humans clicking the Merge button
 - **NEVER** move issues to "Done" — the dashboard handles status transitions
-- **ONLY** call the `/api/workspaces/{{ISSUE_ID}}/review-status` endpoint
+- **ONLY** call the `/api/review/{{ISSUE_ID}}/status` endpoint

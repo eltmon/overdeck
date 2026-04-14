@@ -3783,7 +3783,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
       const apiPort = process.env.API_PORT || process.env.PORT || '3011';
       try {
         const mergeRes = yield* Effect.promise(() => fetch(
-          `http://localhost:${apiPort}/api/workspaces/${issueId}/merge`,
+          `http://localhost:${apiPort}/api/issues/${issueId}/merge`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' } }
         ));
         const mergeData = (yield* Effect.promise(() => mergeRes.json())) as any;
@@ -3896,15 +3896,15 @@ PROJECT: ${projectPath}
 
 === DECISION ===
 **IF ANY ISSUES FOUND:**
-- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[detailed list of all issues found]"}'
+- Update status: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[detailed list of all issues found]"}'
 - Use /send-feedback-to-agent to send detailed feedback to agent-${issueId.toLowerCase()}
 - DO NOT hand off to test-agent
 
 **ONLY IF CODE IS PERFECT (rare):**
-- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
+- Update status: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
 - Queue test-agent (DO NOT use pan specialists wake directly):
 
-curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST TASK for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status via API:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready."}'
+curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST TASK for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status via API:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready."}'
 
 === REVIEW PHILOSOPHY ===
 - Your default answer is BLOCK, not PASS

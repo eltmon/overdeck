@@ -97,14 +97,14 @@ You MUST execute the appropriate curl command and verify it succeeds. Do NOT jus
 
 **If NO new regressions (tests PASS):**
 ```bash
-curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
+curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
   -H "Content-Type: application/json" \
   -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any, and which suites were tested]"}' | jq .
 ```
 
 **If NEW regressions found (tests FAIL):**
 ```bash
-curl -s -X POST {{API_URL}}/api/workspaces/{{ISSUE_ID}}/review-status \
+curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
   -H "Content-Type: application/json" \
   -d '{"testStatus":"failed","testNotes":"[describe NEW failures only — specify which suite/repo]"}' | jq .
 ```
@@ -147,4 +147,4 @@ You are a specialist agent, not the work agent. You do NOT have permission to cl
 - **NEVER** run `gh issue close` — that is only for humans or the merge-agent
 - **NEVER** say "Merged to main" — humans click the Merge button
 - **NEVER** hand off to merge-agent — the human decides when to merge
-- **ONLY** call the `/api/workspaces/{{ISSUE_ID}}/review-status` endpoint
+- **ONLY** call the `/api/review/{{ISSUE_ID}}/status` endpoint

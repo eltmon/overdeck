@@ -96,12 +96,19 @@ async function archiveCustomState(apiKey: string, teamKey: string, stateName: st
   `;
 
   try {
-    // @ts-ignore - accessing private client
-    await client._client.request(archiveMutation, { id: targetState.id });
+    // Linear SDK doesn't expose workflowStateArchive as a top-level method,
+    // so we reach into the internal GraphQL client. Guard against undefined
+    // to avoid a confusing TypeError if the SDK internals change.
+    const internalClient = (client as unknown as { _client?: { request: (query: string, vars: Record<string, unknown>) => Promise<unknown> } })._client;
+    if (!internalClient || typeof internalClient.request !== 'function') {
+      console.log(chalk.yellow(`Linear SDK internal client unavailable — cannot archive "${stateName}".`));
+      console.log(chalk.gray(`Please archive it manually in Linear settings.`));
+      return false;
+    }
+    await internalClient.request(archiveMutation, { id: targetState.id });
     console.log(chalk.green(`Archived state "${stateName}" in team ${teamKey}`));
     return true;
   } catch (error: any) {
-    // If the above fails, try alternative approach
     console.log(chalk.yellow(`Could not archive via mutation: ${error.message}`));
     console.log(chalk.gray(`State "${stateName}" exists but could not be archived automatically.`));
     console.log(chalk.gray(`Please archive it manually in Linear settings.`));

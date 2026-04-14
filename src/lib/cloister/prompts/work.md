@@ -1,6 +1,6 @@
 ---
 name: work
-description: Primary work-agent prompt — reads STATE.md, processes feedback, drives the bead-by-bead implementation loop until pan work done.
+description: Primary work-agent prompt — reads STATE.md, processes feedback, drives the bead-by-bead implementation loop until pan done.
 requires:
   - ISSUE_ID
   - ISSUE_ID_LOWER
@@ -143,7 +143,7 @@ will be rejected.
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.planning/STATE.md`** — update Current Phase, move bead to Completed Work, update Remaining Work
 6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
-7. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
+7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
 8. `INSPECTION PASSED` → proceed to step 1
 9. `INSPECTION BLOCKED` → fix, commit, `bd close` again
 
@@ -184,9 +184,9 @@ Specialist agents have left feedback that you MUST address:
 
 {{PENDING_FEEDBACK}}
 
-**After addressing ALL feedback:** commit your fixes, then invoke the `/rebase-and-submit` skill — it will run `pan work request-review {{ISSUE_ID}} -m "Addressed feedback: <summary>"` for you (the correct re-review entry point; `pan work done` is only for the first submission).
+**After addressing ALL feedback:** commit your fixes, then invoke the `/rebase-and-submit` skill — it will run `pan review request {{ISSUE_ID}} -m "Addressed feedback: <summary>"` for you (the correct re-review entry point; `pan done` is only for the first submission).
 
-Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint — those are internal and will 404. The `pan work request-review` CLI command is the only supported path. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
+Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint — those are internal and will 404. The `pan review request` CLI command is the only supported path. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
 {{/PENDING_FEEDBACK}}
 
 {{#NEW_TRACKER_CONTEXT}}
@@ -209,7 +209,7 @@ Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint —
 {{#LOCAL}}
 3. If done, signal completion immediately:
    ```bash
-   pan work done {{ISSUE_ID}} -c "Work already complete from previous session"
+   pan done {{ISSUE_ID}} -c "Work already complete from previous session"
    ```
 {{/LOCAL}}
 {{#REMOTE}}
@@ -238,7 +238,7 @@ and your work will be rejected.
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.planning/STATE.md`** — this is MANDATORY before closing the bead (see STATE.md format below)
 6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
-7. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
+7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
 8. `INSPECTION PASSED` → proceed to step 1
 9. `INSPECTION BLOCKED` → fix, commit, `bd close` again
 
@@ -325,7 +325,7 @@ Your `.planning/STATE.md` MUST contain these sections (update in-place, don't ap
 
 **You have unlimited time and context. Use it. Do not be lazy.**
 
-**CRITICAL: NEVER stop working without calling `pan work done`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete, you MUST call `pan work done {{ISSUE_ID}} -c "summary"` as your final action. Ending your turn without either continuing work or calling `pan work done` is a failure state that blocks the entire pipeline.
+**CRITICAL: NEVER stop working without calling `pan done`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete, you MUST call `pan done {{ISSUE_ID}} -c "summary"` as your final action. Ending your turn without either continuing work or calling `pan done` is a failure state that blocks the entire pipeline.
 
 ## CRITICAL: Work Completion Requirements
 
@@ -342,16 +342,16 @@ npm test                                         # Run tests
 git add -A && git commit -m "feat: description"  # Commit ALL changes
 git push -u origin $(git branch --show-current)  # Push
 git status                                       # Must show "nothing to commit"
-pan work done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates GitHub PR
+pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates GitHub PR
 ```
 
-**IMPORTANT:** `pan work done` MUST be executed as a Bash command (via the Bash tool). Do NOT type it at the Claude Code interactive prompt — it will not work correctly.
+**IMPORTANT:** `pan done` MUST be executed as a Bash command (via the Bash tool). Do NOT type it at the Claude Code interactive prompt — it will not work correctly.
 
-**`pan work done` creates a GitHub PR automatically.** The review and test specialists run against this PR. When both pass, the human clicks MERGE in the dashboard, which rebases the feature branch onto main and merges via `gh pr merge --squash`.
+**`pan done` creates a GitHub PR automatically.** The review and test specialists run against this PR. When both pass, the human clicks MERGE in the dashboard, which rebases the feature branch onto main and merges via `gh pr merge --squash`.
 
-**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Always re-run `pan work done` after any new commits, even if you were told "review already passed". Do NOT assume a prior passing review still covers new code.
+**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Always re-run `pan done` after any new commits, even if you were told "review already passed". Do NOT assume a prior passing review still covers new code.
 
-**WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan work done` to signal completion.
+**WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.
 {{/LOCAL}}
 {{#REMOTE}}
 When ALL tasks are complete, commit and push everything:
