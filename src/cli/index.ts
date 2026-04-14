@@ -40,7 +40,7 @@ import { registerWorkCommands, statusCommand } from './commands/work/index.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
-import { registerCloisterCommands } from './commands/cloister/index.js';
+import { registerAdminCommands } from './commands/admin/index.js';
 import { registerSetupCommands } from './commands/setup/index.js';
 import { registerSpecialistsCommands } from './commands/specialists/index.js';
 import { registerConvoyCommands } from './commands/convoy/index.js';
@@ -119,8 +119,8 @@ registerWorkspaceCommands(program);
 // Register test commands (pan test run, pan test list)
 registerTestCommands(program);
 
-// Register cloister commands (pan cloister status, pan cloister start, etc.)
-registerCloisterCommands(program);
+// Register admin commands (pan admin cloister, pan admin specialists, etc.)
+registerAdminCommands(program);
 
 // Register specialists commands (pan specialists list, wake, queue, reset)
 registerSpecialistsCommands(program);

@@ -10,8 +10,8 @@ Working through beads systematically. Starting with setup/foundational beads bef
 - [x] panopticon-cli-4pp: Moved PRD from planned/ to active/pan-705/ (commit: 8c258178)
 
 ## Remaining Work
-- [x] panopticon-cli-9m0: Bumped version to 0.7.0 (commit: pending)
-- [ ] panopticon-cli-asp: pan admin cloister
+- [x] panopticon-cli-9m0: Bumped version to 0.7.0 (commit: 1fca6f9f)
+- [x] panopticon-cli-asp: Created pan admin group with cloister commands (commit: pending)
 - [ ] panopticon-cli-6f6: pan admin beads
 - [ ] panopticon-cli-d76: pan admin config
 - [ ] panopticon-cli-44j: pan admin remote
