@@ -16,6 +16,7 @@ import { registerBeadsCommands } from '../beads.js';
 import { registerConfigCommand } from '../config.js';
 import { setupHooksCommand } from '../setup/hooks.js';
 import { tldrCommand } from '../work/tldr.js';
+import { hookCommand } from '../work/hook.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -57,5 +58,14 @@ export function registerAdminCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .action((action, workspace, options) => {
       tldrCommand(action || 'status', workspace, options);
+    });
+
+  // pan admin fpp — first-person-plural hooks
+  admin
+    .command('fpp [action] [idOrMessage...]')
+    .description('FPP hooks: check, push, pop, clear, mail')
+    .option('--json', 'Output as JSON')
+    .action((action, idOrMessage, options) => {
+      hookCommand(action || 'help', idOrMessage?.join(' '), options);
     });
 }
