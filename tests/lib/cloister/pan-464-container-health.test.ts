@@ -52,8 +52,17 @@ vi.mock('child_process', () => ({
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
-  sessionExists: vi.fn().mockReturnValue(false),
+  sessionExists: vi.fn().mockReturnValue(true),
+  sessionExistsAsync: vi.fn().mockResolvedValue(true),
   sendKeysAsync: mockSendKeysAsync,
+  buildTmuxCommandString: vi.fn().mockReturnValue(''),
+  capturePaneAsync: vi.fn().mockResolvedValue(''),
+  createSessionAsync: vi.fn().mockResolvedValue(undefined),
+  killSession: vi.fn(),
+  killSessionAsync: vi.fn().mockResolvedValue(undefined),
+  listPaneValues: vi.fn().mockReturnValue([]),
+  listPaneValuesAsync: vi.fn().mockResolvedValue([]),
+  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
@@ -100,6 +109,7 @@ import {
   checkWorkspaceContainerHealth,
   type DeaconState,
 } from '../../../src/lib/cloister/deacon.js';
+import { sessionExistsAsync } from '../../../src/lib/tmux.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -348,8 +358,8 @@ describe('checkWorkspaceContainerHealth', () => {
 
     setupExec({
       'docker ps -a': { stdout: `${CONTAINER}|Exited (1) 2 minutes ago\n` },
-      'tmux has-session': { error: new Error('no server running') }, // session absent
     });
+    vi.mocked(sessionExistsAsync).mockResolvedValueOnce(false);
 
     const actions = await checkWorkspaceContainerHealth();
 
