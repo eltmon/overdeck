@@ -25,6 +25,7 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { PROVIDERS } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 
@@ -52,7 +53,7 @@ function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google'
     || modelId.startsWith('o1')
   ) return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
-  if (modelId.startsWith('kimi-')) return 'kimi';
+  if (modelId.startsWith('kimi-') || modelId === 'K2.6-code-preview') return 'kimi';
   if (modelId.startsWith('minimax-')) return 'minimax';
   if (modelId.startsWith('glm-')) return 'zai';
   return 'anthropic'; // default
@@ -82,6 +83,7 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'kimi-k2': { apiModel: 'moonshot-v1-8k' },
   'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
   'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' },
+  'K2.6-code-preview': { apiModel: 'K2.6-code-preview' },
   // MiniMax models
   'minimax-m2.7': { apiModel: 'minimax-m2.7' },
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
@@ -225,25 +227,30 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'kimi': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'moonshot-v1-8k') : 'moonshot-v1-8k';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'K2.6-code-preview') : 'K2.6-code-preview';
           try {
-            const resp = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+            const resp = await fetch(`${PROVIDERS.kimi.baseUrl}v1/messages`, {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
             });
             latencyMs = Date.now() - startTime;
+            const responseText = await resp.text();
             if (resp.ok) {
-              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-              response = data.choices?.[0]?.message?.content?.trim() || '';
-              success = response.includes(expectedAnswer);
-              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              try {
+                const data = JSON.parse(responseText) as { content?: Array<{ text?: string }> };
+                response = data.content?.[0]?.text?.trim() || '';
+                success = response.includes(expectedAnswer);
+                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              } catch {
+                error = `Kimi returned non-JSON response: ${responseText.slice(0, 100)}`;
+              }
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 404) {
               error = `Model not found: ${apiModel}`;
             } else {
-              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+              error = `HTTP ${resp.status}: ${responseText.slice(0, 100)}`;
             }
           } catch (err) {
             error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
@@ -354,7 +361,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
-    if (!['openai', 'google', 'minimax', 'zai'].includes(provider)) {
+    if (!['openai', 'google', 'kimi', 'minimax', 'zai'].includes(provider)) {
       return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -400,6 +407,28 @@ const postValidateApiKeyRoute = HttpRouter.add(
               valid = true;
               models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
             } else if (resp.status === 401 || resp.status === 403) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
+        case 'kimi': {
+          try {
+            const resp = await fetch(`${PROVIDERS.kimi.baseUrl}v1/models`, {
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data?: Array<{ id: string }> };
+              valid = true;
+              models = data.data?.map(m => m.id) || ['kimi-k2.5', 'K2.6-code-preview'];
+            } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
               error = 'Rate limit exceeded';

@@ -312,7 +312,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(22); // 4 Anthropic + 10 OpenAI + 7 Google + 1 Kimi
+      expect(models.length).toBe(23); // 4 Anthropic + 10 OpenAI + 7 Google + 2 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {

@@ -16,8 +16,6 @@ import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
-import { loadConfig as loadYamlConfig } from '../config-yaml.js';
-import { getProviderForModel, getProviderEnv } from '../providers.js';
 import {
   sessionExistsAsync,
   createSessionAsync,
@@ -27,7 +25,7 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -422,21 +420,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     writeFileSync(planningPromptPath, planningPrompt);
     const cmdWithArgs = getAgentRuntimeBaseCommand(planningModel);
 
-    // Get provider env vars for non-Anthropic models
-    let providerExports = '';
-    const provider = getProviderForModel(planningModel);
-    if (provider.name !== 'anthropic') {
-      const { config } = loadYamlConfig();
-      const apiKey = provider.name === 'openai' && config.providerAuth?.openai === 'subscription'
-        ? 'subscription-oauth'
-        : config.apiKeys[provider.name as keyof typeof config.apiKeys];
-      if (apiKey) {
-        const envVars = getProviderEnv(provider, apiKey);
-        providerExports = Object.entries(envVars)
-          .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
-          .join('\n');
-      }
-    }
+    const providerExports = getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────
     const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;

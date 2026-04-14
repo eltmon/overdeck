@@ -74,6 +74,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
+      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Latest Kimi coding preview model' },
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best-value implementation model, 256K context' },
     ],
   },
@@ -196,6 +197,7 @@ export function getModelById(id: ModelId): ModelDef | undefined {
   if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
 
   // Kimi models
+  if (id === 'K2.6-code-preview') return models.find(m => m.id === 'K2.6-code-preview');
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
     return models.find(m => m.id === 'kimi-k2.5');
   }
