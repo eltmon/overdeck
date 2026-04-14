@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
  * Specialist Workflow E2E Test (PAN-53)
  *
  * This test verifies the full specialist workflow when approving work:
- * 1. Trigger approve via POST /api/workspaces/:issueId/approve
+ * 1. Trigger approve via POST /api/issues/:issueId/approve
  * 2. Verify review-agent becomes active
  * 3. Verify test-agent becomes active
  * 4. Verify merge-agent becomes active
