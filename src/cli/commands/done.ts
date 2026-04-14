@@ -264,6 +264,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
   }
 
+  // Auto-commit planning artifacts updated by vBRIEF sync above.
+  // plan.vbrief.json is written during the AC check; it must be committed
+  // before git rebase is called or rebase will abort with "unstaged changes".
+  try {
+    const { stdout: planDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
+    if (planDirty.trim()) {
+      await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
+      await execAsync('git diff --cached --quiet .planning/plan.vbrief.json || git commit -m "chore: sync vBRIEF AC status"', { cwd: workspacePath });
+    }
+  } catch { /* non-fatal — if this fails the rebase error will surface clearly */ }
+
   const spinner = ora('Marking work as done...').start();
 
   try {
