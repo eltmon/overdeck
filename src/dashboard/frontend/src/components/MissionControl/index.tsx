@@ -162,9 +162,11 @@ export function MissionControl({
     }
     const conv = conversations.find((c) => c.name === selectedConversation);
     if (conv) {
-      onConvIdChange(String(conv.id));
+      const nextId = String(conv.id);
+      if (nextId === convId) return;
+      onConvIdChange(nextId);
     }
-  }, [selectedConversation, conversations, onConvIdChange]);
+  }, [selectedConversation, conversations, onConvIdChange, convId]);
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);

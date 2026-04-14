@@ -183,8 +183,11 @@ export default function App() {
     window.history.replaceState(null, '', buildConversationUrl(id, viewMode));
   }, []);
   const setSelectedConvId = useCallback((id: string | null) => {
-    setConversationRoute(id, id ? 'conversation' : 'conversation');
-  }, [setConversationRoute]);
+    const nextViewMode = id && id === selectedConvId
+      ? conversationViewMode
+      : 'conversation';
+    setConversationRoute(id, nextViewMode);
+  }, [conversationViewMode, selectedConvId, setConversationRoute]);
   const setConversationViewMode = useCallback((viewMode: ConversationViewMode) => {
     setConversationRoute(selectedConvId, viewMode);
   }, [selectedConvId, setConversationRoute]);
