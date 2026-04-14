@@ -1893,8 +1893,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       // Send the agent a nudge message with the correct resubmit command
       try {
         const nudgeMessage = isReviewBlocked
-          ? `The review agent found issues in your code. Read .planning/feedback/ for details, fix the issues, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan work done has completed successfully.`
-          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan work done has completed successfully.`;
+          ? `The review agent found issues in your code. Read .planning/feedback/ for details, fix the issues, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan work request-review\` has completed successfully (this is the re-review path, not \`pan work done\`).`
+          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan work request-review\` has completed successfully (this is the re-review path, not \`pan work done\`).`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);

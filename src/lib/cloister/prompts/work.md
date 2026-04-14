@@ -184,8 +184,9 @@ Specialist agents have left feedback that you MUST address:
 
 {{PENDING_FEEDBACK}}
 
-**After addressing ALL feedback:** commit, push, and run `pan work done {{ISSUE_ID}} -c "Addressed review feedback: <summary>"`.
-This re-submits for review automatically. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
+**After addressing ALL feedback:** commit your fixes, then invoke the `/rebase-and-submit` skill — it will run `pan work request-review {{ISSUE_ID}} -m "Addressed feedback: <summary>"` for you (the correct re-review entry point; `pan work done` is only for the first submission).
+
+Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint — those are internal and will 404. The `pan work request-review` CLI command is the only supported path. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
 {{/PENDING_FEEDBACK}}
 
 {{#NEW_TRACKER_CONTEXT}}
