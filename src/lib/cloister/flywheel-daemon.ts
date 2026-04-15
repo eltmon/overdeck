@@ -151,12 +151,19 @@ function releaseLock(): void {
 // ============================================================================
 
 /**
- * Spawn the retro-agent for a merged issue.
- * Implementation: `panopticon-cli-284` (retro-agent spawn-run-exit lifecycle).
+ * Spawn the retro-agent for a merged issue (PAN-284).
  */
 async function spawnRetroAgentForIssue(issueId: string): Promise<void> {
-  console.log(`[flywheel-daemon] Retro-agent spawn for ${issueId} — stub (PAN-284)`);
-  // TODO: import and call spawnRetroAgent(issueId) once panopticon-cli-284 lands
+  const { spawnRetroAgent } = await import('./retro-agent.js');
+  const result = await spawnRetroAgent(issueId);
+  if (!result.success) {
+    console.warn(`[flywheel-daemon] Retro-agent for ${issueId} failed: ${result.error}`);
+    if (result.timedOut) {
+      console.warn(`[flywheel-daemon] Retro-agent for ${issueId} timed out`);
+    }
+  } else {
+    console.log(`[flywheel-daemon] Retro-agent for ${issueId} completed`);
+  }
 }
 
 /**
