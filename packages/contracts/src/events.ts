@@ -823,6 +823,93 @@ export const ConversationPermissionChangedEvent = Schema.Struct({
 })
 export type ConversationPermissionChangedEvent = typeof ConversationPermissionChangedEvent.Type
 
+// ─── Conversation Discovery Events (PAN-457) ──────────────────────────────────
+
+/** Scan started */
+export const ScanStartedEvent = Schema.Struct({
+  type: Schema.Literal("scan.started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    mode: Schema.Literals(['targeted', 'watched', 'system']),
+    dirs: Schema.Array(Schema.String),
+  }),
+})
+export type ScanStartedEvent = typeof ScanStartedEvent.Type
+
+/** Scan progress tick */
+export const ScanProgressEvent = Schema.Struct({
+  type: Schema.Literal("scan.progress"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    dirsProcessed: Schema.Number,
+    dirsTotal: Schema.Number,
+    sessionsFound: Schema.Number,
+    elapsedMs: Schema.Number,
+  }),
+})
+export type ScanProgressEvent = typeof ScanProgressEvent.Type
+
+/** Scan completed */
+export const ScanCompleteEvent = Schema.Struct({
+  type: Schema.Literal("scan.complete"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    inserted: Schema.Number,
+    updated: Schema.Number,
+    skipped: Schema.Number,
+    errors: Schema.Number,
+    durationMs: Schema.Number,
+  }),
+})
+export type ScanCompleteEvent = typeof ScanCompleteEvent.Type
+
+/** Per-session enrichment progress */
+export const EnrichProgressEvent = Schema.Struct({
+  type: Schema.Literal("enrich.progress"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    sessionId: Schema.Number,
+    level: Schema.Number,
+    model: Schema.String,
+    cost: Schema.Number,
+    success: Schema.Boolean,
+    error: Schema.optional(Schema.String),
+  }),
+})
+export type EnrichProgressEvent = typeof EnrichProgressEvent.Type
+
+/** Enrichment batch completed */
+export const EnrichCompleteEvent = Schema.Struct({
+  type: Schema.Literal("enrich.complete"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    processed: Schema.Number,
+    totalCost: Schema.Number,
+    failures: Schema.Number,
+    durationMs: Schema.Number,
+  }),
+})
+export type EnrichCompleteEvent = typeof EnrichCompleteEvent.Type
+
+/** Per-session embedding progress */
+export const EmbedProgressEvent = Schema.Struct({
+  type: Schema.Literal("embed.progress"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    sessionId: Schema.Number,
+    model: Schema.String,
+    success: Schema.Boolean,
+    error: Schema.optional(Schema.String),
+  }),
+})
+export type EmbedProgressEvent = typeof EmbedProgressEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -895,5 +982,11 @@ export const DomainEvent = Schema.Union([
   ConversationCompactingChangedEvent,
   ConversationCreatedEvent,
   ConversationPermissionChangedEvent,
+  ScanStartedEvent,
+  ScanProgressEvent,
+  ScanCompleteEvent,
+  EnrichProgressEvent,
+  EnrichCompleteEvent,
+  EmbedProgressEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

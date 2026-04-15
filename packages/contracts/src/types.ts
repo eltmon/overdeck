@@ -476,3 +476,85 @@ export const ProjectSessionTree = Schema.Struct({
   features: Schema.Array(FeatureNode),
 })
 export type ProjectSessionTree = typeof ProjectSessionTree.Type
+
+// ─── Discovered Sessions (PAN-457) ───────────────────────────────────────────
+
+/** Snapshot of a discovered session for RPC responses and frontend display */
+export const DiscoveredSessionSnapshot = Schema.Struct({
+  id: Schema.Number,
+  jsonlPath: Schema.String,
+  sessionId: Schema.optional(Schema.String),
+  workspacePath: Schema.optional(Schema.String),
+  workspaceHash: Schema.optional(Schema.String),
+  messageCount: Schema.Number,
+  firstTs: Schema.optional(Schema.String),
+  lastTs: Schema.optional(Schema.String),
+  modelsUsed: Schema.Array(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  tokenInput: Schema.Number,
+  tokenOutput: Schema.Number,
+  estimatedCost: Schema.Number,
+  toolsUsed: Schema.Array(Schema.String),
+  filesTouched: Schema.Array(Schema.String),
+  tags: Schema.Array(Schema.String),
+  summary: Schema.optional(Schema.String),
+  summaryDetailed: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.Number,
+  enrichmentModel: Schema.optional(Schema.String),
+  enrichedAt: Schema.optional(Schema.String),
+  enrichmentFailed: Schema.Boolean,
+  panopticonManaged: Schema.Boolean,
+  panIssueId: Schema.optional(Schema.String),
+  panAgentId: Schema.optional(Schema.String),
+  scannedAt: Schema.String,
+})
+export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
+
+/** Filter parameters for conversation search */
+export const ConversationFilter = Schema.Struct({
+  workspacePath: Schema.optional(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  managed: Schema.optional(Schema.Boolean),
+  unmanaged: Schema.optional(Schema.Boolean),
+  since: Schema.optional(Schema.String),
+  before: Schema.optional(Schema.String),
+  after: Schema.optional(Schema.String),
+  minCost: Schema.optional(Schema.Number),
+  maxCost: Schema.optional(Schema.Number),
+  minMessages: Schema.optional(Schema.Number),
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  tools: Schema.optional(Schema.Array(Schema.String)),
+  files: Schema.optional(Schema.Array(Schema.String)),
+  issueId: Schema.optional(Schema.String),
+  enriched: Schema.optional(Schema.Boolean),
+  notEnriched: Schema.optional(Schema.Boolean),
+  query: Schema.optional(Schema.String),
+  semantic: Schema.optional(Schema.Boolean),
+  similarTo: Schema.optional(Schema.Number),
+  limit: Schema.optional(Schema.Number),
+  offset: Schema.optional(Schema.Number),
+  format: Schema.optional(Schema.Literals(['table', 'json', 'brief', 'ids'])),
+})
+export type ConversationFilter = typeof ConversationFilter.Type
+
+/** Aggregate cost breakdown for conversations */
+export const ConversationCostSummary = Schema.Struct({
+  groupBy: Schema.Literals(['workspace', 'model']),
+  entries: Schema.Array(Schema.Struct({
+    key: Schema.String,
+    totalCost: Schema.Number,
+    sessionCount: Schema.Number,
+  })),
+  grandTotal: Schema.Number,
+})
+export type ConversationCostSummary = typeof ConversationCostSummary.Type
+
+/** Scan result summary */
+export const ScanResult = Schema.Struct({
+  inserted: Schema.Number,
+  updated: Schema.Number,
+  skipped: Schema.Number,
+  errors: Schema.Number,
+  durationMs: Schema.Number,
+})
+export type ScanResult = typeof ScanResult.Type
