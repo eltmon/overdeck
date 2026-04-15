@@ -1772,7 +1772,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
             ciRetryMap.set(issueId, ciEntry);
             actions.push(`CI retry exhausted for ${issueId} — wrote feedback, notified agent`);
           } else {
-            console.log(`[deacon] CI check failure for ${issueId} — ${ciEntry.count} retries exhausted, awaiting agent fix`);
+            console.log(`[deacon] CI check failure for ${issueId} — max retries (5) exhausted, awaiting agent fix`);
           }
           continue;
         }

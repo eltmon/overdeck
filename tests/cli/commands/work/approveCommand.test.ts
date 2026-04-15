@@ -174,5 +174,9 @@ describe('approveCommand', () => {
     await approveCommand('PAN-714');
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
+    expect(mockExecSync).toHaveBeenCalledWith(
+      expect.stringContaining('gh pr merge 99'),
+      expect.anything(),
+    );
   });
 });
