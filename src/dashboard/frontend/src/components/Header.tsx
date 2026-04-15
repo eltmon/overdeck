@@ -13,4 +13,5 @@ export type Tab =
   | 'costs'
   | 'awaiting-merge'
   | 'settings'
-  | 'god-view';
+  | 'god-view'
+  | 'sessions';

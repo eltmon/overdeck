@@ -4,7 +4,7 @@ import {
   Eye, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, GitMerge,
+  Hammer, Loader2, GitMerge, History,
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
@@ -34,6 +34,7 @@ const NAV_GROUPS = [
     label: 'Observability',
     items: [
       { id: 'activity' as Tab, label: 'Activity', icon: Terminal },
+      { id: 'sessions' as Tab, label: 'Sessions', icon: History },
       { id: 'metrics' as Tab, label: 'Metrics', icon: BarChart3 },
       { id: 'costs' as Tab, label: 'Costs', icon: DollarSign },
       { id: 'health' as Tab, label: 'Health', icon: HeartPulse },

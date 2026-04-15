@@ -1,0 +1,99 @@
+/**
+ * Facet filter panel for session list (PAN-457)
+ */
+
+interface Filters {
+  workspace?: string;
+  since?: string;
+  managed?: boolean;
+  enriched?: boolean;
+}
+
+interface Props {
+  filters: Filters;
+  onChange: (key: string, value: string | boolean | undefined) => void;
+}
+
+const SINCE_OPTIONS = [
+  { label: 'All time', value: '' },
+  { label: 'Today', value: 'today' },
+  { label: 'Last 7 days', value: '7d' },
+  { label: 'Last 30 days', value: '30d' },
+  { label: 'Last 90 days', value: '90d' },
+];
+
+export function FacetPanel({ filters, onChange }: Props) {
+  return (
+    <div className="w-48 shrink-0 border-r border-gray-800 bg-gray-950 p-3 overflow-auto">
+      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        Filters
+      </div>
+
+      {/* Time range */}
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">Time range</label>
+        <select
+          value={filters.since ?? ''}
+          onChange={(e) => onChange('since', e.target.value || undefined)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+        >
+          {SINCE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Workspace filter */}
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">Workspace path</label>
+        <input
+          type="text"
+          value={filters.workspace ?? ''}
+          onChange={(e) => onChange('workspace', e.target.value || undefined)}
+          placeholder="e.g. /Projects/myapp"
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+        />
+      </div>
+
+      {/* Toggle filters */}
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.managed === true}
+            onChange={(e) => onChange('managed', e.target.checked ? true : undefined)}
+            className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-0"
+          />
+          <span className="text-xs text-gray-400">Panopticon-managed</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.enriched === true}
+            onChange={(e) => onChange('enriched', e.target.checked ? true : undefined)}
+            className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-0"
+          />
+          <span className="text-xs text-gray-400">Enriched only</span>
+        </label>
+      </div>
+
+      {/* Reset */}
+      {Object.values(filters).some(Boolean) && (
+        <button
+          onClick={() => {
+            onChange('since', undefined);
+            onChange('workspace', undefined);
+            onChange('managed', undefined);
+            onChange('enriched', undefined);
+          }}
+          className="mt-4 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+        >
+          Clear filters
+        </button>
+      )}
+    </div>
+  );
+}
