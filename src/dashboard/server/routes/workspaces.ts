@@ -62,6 +62,7 @@ import {
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
+import { listGitOperations } from '../../server/services/git-activity.js';
 import {
   computeQueuePositionFromStatus,
   findPositionInQueue,
@@ -3925,6 +3926,17 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           console.log(`Feature branch push note: ${pushErr.message}`);
         }
 
+        // Concurrent-merge detection: warn if another push to main succeeded in the last 30s
+        const recentCutoff = new Date(Date.now() - 30_000).toISOString();
+        const recentMainPushes = listGitOperations({ operation: 'push', since: recentCutoff })
+          .filter((op) => op.status === 'success' && op.branch === 'main' && op.issueId !== issueId);
+        const recentPushWarning = recentMainPushes.length > 0
+          ? `Another workspace pushed to main ${Math.round((Date.now() - new Date(recentMainPushes[0].ts).getTime()) / 1000)}s ago — divergence possible`
+          : undefined;
+        if (recentPushWarning) {
+          console.warn(`[approve] ${recentPushWarning} (${issueId})`);
+        }
+
         try {
           await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
           await execAsync('git pull origin main --ff-only', {
@@ -3936,6 +3948,19 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           completePendingOperation(issueId, error);
           return jsonResponse({ error }, { status: 400 });
         }
+
+        // Divergence preview: count how many commits main has advanced past the feature branch
+        let mainAdvancedBy = 0;
+        try {
+          const { stdout: aheadRaw } = await execAsync(
+            `git rev-list ${branchName}..main --count`,
+            { cwd: projectPath, encoding: 'utf-8' }
+          );
+          mainAdvancedBy = parseInt(aheadRaw.trim(), 10) || 0;
+          if (mainAdvancedBy > 0) {
+            console.log(`[approve] main has advanced ${mainAdvancedBy} commit(s) past ${branchName}`);
+          }
+        } catch {}
 
         const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } =
           await import('../../../lib/cloister/specialists.js');
@@ -4022,6 +4047,8 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
             message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
             pipeline: 'running',
             note: 'Watch the specialists panel for progress. Click Merge when review+test pass.',
+            ...(recentPushWarning && { recentPushWarning }),
+            ...(mainAdvancedBy > 0 && { mainAdvancedBy }),
           });
         }
 
