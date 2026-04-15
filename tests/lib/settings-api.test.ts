@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { loadConfig } from '../../src/lib/config-yaml.js';
-import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi } from '../../src/lib/settings-api.js';
+import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
 // Mock the config-yaml module
@@ -221,6 +221,39 @@ describe('settings-api', () => {
       expect(openaiIds).toContain('gpt-5.4');
       expect(openaiIds).toContain('o3');
       expect(openaiIds).toContain('o4-mini');
+    });
+  });
+
+  describe('getMiniMaxDefaultsApi', () => {
+    it('should return ApiSettingsConfig with minimax as the only enabled provider', () => {
+      const settings = getMiniMaxDefaultsApi();
+
+      expect(settings.models.providers.minimax).toBe(true);
+      expect(settings.models.providers.anthropic).toBe(false);
+      expect(settings.models.providers.openai).toBe(false);
+      expect(settings.models.providers.google).toBe(false);
+      expect(settings.models.providers.zai).toBe(false);
+      expect(settings.models.providers.kimi).toBe(false);
+    });
+
+    it('should set all overrides to minimax-m2.7-highspeed', () => {
+      const settings = getMiniMaxDefaultsApi();
+      const overrides = settings.models.overrides as Record<string, string>;
+
+      expect(Object.keys(overrides).length).toBeGreaterThan(0);
+      for (const [workType, modelId] of Object.entries(overrides)) {
+        expect(modelId).toBe('minimax-m2.7-highspeed', `Expected ${workType} to use minimax-m2.7-highspeed`);
+      }
+    });
+
+    it('should return a valid ApiSettingsConfig shape', () => {
+      const settings = getMiniMaxDefaultsApi();
+
+      expect(settings).toHaveProperty('models');
+      expect(settings).toHaveProperty('models.providers');
+      expect(settings).toHaveProperty('models.overrides');
+      expect(settings).toHaveProperty('api_keys');
+      expect(settings).toHaveProperty('tracker_keys');
     });
   });
 
