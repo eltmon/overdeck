@@ -1,6 +1,6 @@
 # Flywheel State
 <!-- LIVING DOCUMENT — overwritten by each /all-up run. History lives in OPERATION-FIX-ALL.md -->
-_Last updated: 2026-04-15 (Run 10) — auto-maintained by the all-up flywheel_
+_Last updated: 2026-04-15 (Run 11) — auto-maintained by the all-up flywheel_
 
 ---
 
@@ -11,19 +11,22 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 
 | Issue | Phase | Root Cause / Blocker | Auto-Requeues | Runs Stuck | Notes |
 |-------|-------|----------------------|---------------|------------|-------|
-| PAN-709 | in progress | Work agent running since 2026-04-14. Self-improving flywheel epic. | 0 | 0 | Agent running — monitoring |
-| PAN-712 | in progress | Review failed at build (verification gate). Work agent has feedback 018. | 0 | 0 | Agent running — fixing build errors |
-| PAN-714 | awaiting merge | Review passed, test passed, readyForMerge=true. | 0 | 0 | **Ready for user UAT + merge** |
-| PAN-611 | awaiting merge | Review passed, test passed, readyForMerge=true. | 0 | 0 | **Ready for user UAT + merge** (shebang fixed) |
-| PAN-457 | in progress | Review failed at test (verification gate). Work agent has feedback 017. | 0 | 0 | Agent running — fixing test failures |
-| PAN-653 | in progress | Review failed at test (verification gate). Work agent has feedback 016. | 0 | 0 | Agent running — fixing test failures |
-| PAN-540 | in progress | Review failed at test (verification gate). Work agent has feedback 016. | 0 | 0 | Agent running — fixing test failures |
+| PAN-369-TEST | awaiting merge | Review passed, test passed, readyForMerge=true. | 0 | 0 | Ready for merge |
+| PAN-457 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
+| PAN-540 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
+| PAN-611 | in progress | Merge failed — work agent did not push rebase within 10 min. | 0 | 2 | **Cycling at merge** — polyrepo rebase timeout |
+| PAN-653 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
+| PAN-709 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running — self-improving flywheel epic |
+| PAN-712 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
+| PAN-714 | in progress | Review blocked + merge failed (PR #716 timeout). | 0 | 0 | Back to review after merge timeout |
 
 ---
 
 ## Cycling Alerts
 
-_None — all previously tracked issues have moved forward or are actively being reworked._
+| Issue | Phase | Runs Stuck | Why It Cycles | Candidate Fix | Status |
+|-------|-------|------------|---------------|---------------|--------|
+| PAN-611 | merge | 2 | Polyrepo merge requires work agent to rebase and push all affected repos within a 10-min hard timeout. Agent is running but doesn't always complete the rebase push in time. | Extend timeout, add progress pings, or split rebase coordination from merge button. | Ongoing — merge-agent wrote feedback to work agent |
 
 ---
 
@@ -44,11 +47,13 @@ _None — all previously tracked issues have moved forward or are actively being
 | Zombie agent sessions after merge (state file absent) | agent-pan-NNN session survives merge, leaks Claude+MCP processes | Run 9 | No | **FIXED Run 9** (1ffb6e60 — kill unconditionally on sessionExists) |
 | Permission prompts blocking agent launches | Agents hang on TUI permission footer because `--permission-mode bypassPermissions` was missing in most launch paths | Run 10 | No | **FIXED Run 10** (cf311e75 — added to 10 files) |
 | CLI `admin specialists done` bypasses server auto-promotion | `testStatus=passed` set but `readyForMerge` stayed false; merge-agent never woke | Run 10 | No | **FIXED Run 10** (61248742 — CLI now mirrors server route logic; `normalizeReviewStatus` no longer clears readyForMerge based on stale verification) |
+| `setReviewStatus` blocks `readyForMerge` on stale `verificationStatus` | Merge queue/enqueue recomputes readyForMerge=false when verification failed from earlier cycle | Run 11 | No | **FIXED Run 11** (cdc8ffde — removed `verificationSatisfied` from readyForMerge computation) |
 | Deacon re-dispatch gate blocked for issues with prior passed reviews | When prUrl cleared (e.g. repairClosedPRs), deacon won't re-dispatch because hasPassedReview=true | Run 8 | No | Ongoing — mitigation: tell work agent to run pan done |
 | Verification gate runs on dirty workspace, not clean-committed state | Gitignored files or uncommitted changes make local build pass while CI fails | Run 7 | No | Ongoing — mitigated by check-status gate |
 | Review circuit breaker can't self-reset | Manual `pan review reset` after 7 requeues | Run 4 | No | Ongoing |
 | Verification bypass at 3 failures masks root causes | Bypass hides test failures | Run 5 | No | Ongoing |
 | GitHub PR check status not synced back to Panopticon DB when server was down | panopticon/review and panopticon/test pass on GitHub but internal DB shows null; work agent doesn't know it can merge | Run 9 | No | Ongoing — PAN-509 example; mitigation: resume work agent to re-check |
+| Per-project specialist wake via API/CLI | `/api/specialists/:name/wake` and CLI `admin specialists wake` target legacy global specialist, not per-project ephemeral ones | Run 11 | No | Ongoing — discovered while trying to wake `specialist-panopticon-cli-merge-agent` |
 
 ---
 
@@ -71,6 +76,7 @@ _None — all previously tracked issues have moved forward or are actively being
 | Zombie agent sessions after merge | `agent-pan-NNN` tmux session alive after merge; leaks Claude+MCP | `postMergeLifecycle` only killed session when agentState file present; missing state → session survives | Kill unconditionally on `sessionExists()`, update state if present (Run 9: 1ffb6e60) |
 | Agent permission prompt hangs | Agent sessions alive but no tool use for hours; TUI footer shows `⏵⏵ bypass permissions` | Only `merge-agent` launch path had `--permission-mode bypassPermissions`; all others hung on the footer prompt | Added `--dangerously-skip-permissions --permission-mode bypassPermissions` to ALL agent launch paths (Run 10: cf311e75) |
 | Test-done doesn't promote to readyForMerge | `testStatus=passed` but `readyForMerge=false`; merge queue empty | CLI `admin specialists done` lacked the server route's `readyForMerge=true` side-effect; `normalizeReviewStatus` also overrode it | Mirror server logic in CLI done.ts; remove verification gate from readyForMerge normalization (Run 10: 61248742) |
+| readyForMerge regression on stale verification | `setReviewStatus({ mergeStatus: 'queued' })` clears `readyForMerge` because `verificationStatus: failed` from earlier cycle | `setReviewStatus` re-evaluated `readyForMerge` using `verificationSatisfied(merged)` | Remove `verificationSatisfied` from `readyForMerge` computation in `setReviewStatus` (Run 11: cdc8ffde) |
 
 ---
 
@@ -88,37 +94,31 @@ _None — all previously tracked issues have moved forward or are actively being
 | `repairClosedPRs()` startup sweep | Clean up pre-fix stale-prUrl instances | High | **CLOSED Run 7** |
 | Merge-agent error reporting | Silent failures give operators nothing to debug | — | **CLOSED Run 6** |
 | `complete-planning` session cleanup | Orphaned planning sessions accumulate | — | **CLOSED Run 6** |
+| Per-project specialist wake via API/CLI | Wake route only supports legacy global specialists | Medium | Discovered Run 11 |
 
 ---
 
-## Run 10 Summary
+## Run 11 Summary
 
-**Bugs fixed in code** (2 substrate fixes, both pushed to `origin/main`):
+**Bugs fixed in code** (1 substrate fix, pushed to `origin/main`):
 
-1. **Inconsistent permission bypass across agent launch paths** (`cf311e75`):
-   - Only `merge-agent` and a few paths had `--permission-mode bypassPermissions`.
-   - Work agents, planning agents, review/test specialists, convoy agents, remote agents, and dashboard-launched compact/conversation agents were all hanging on the TUI permission footer (`⏵⏵ bypass permissions on (shift+tab to cycle)`).
-   - This caused PAN-714's test specialist and many other agents to stall indefinitely.
-   - Fix: added `--dangerously-skip-permissions --permission-mode bypassPermissions` to ALL 10 agent launch paths.
-
-2. **CLI `admin specialists done` bypassed merge promotion** (`61248742`):
-   - The CLI command updated `testStatus=passed` but did NOT set `readyForMerge=true`.
-   - Additionally, `normalizeReviewStatus` was clearing `readyForMerge` based on a stale `verificationStatus`, contradicting the server route's explicit comment.
-   - This left PAN-714 (and future issues) stuck after test completion when the CLI path was used.
-   - Fix: CLI `done.ts` now mirrors the server route's workspace-check + `readyForMerge=true` logic; `normalizeReviewStatus` no longer blocks readyForMerge on verification status.
+1. **`setReviewStatus` blocked `readyForMerge` on stale `verificationStatus`** (`cdc8ffde`):
+   - The merge API queued PAN-714 behind PAN-611, calling `setReviewStatus({ mergeStatus: 'queued' })`.
+   - `setReviewStatus` recomputed `readyForMerge` using `verificationSatisfied(merged)`, and PAN-714 had `verificationStatus: failed` from an earlier cycle.
+   - This regressed `readyForMerge` from `true` to `false`, causing PAN-714 to disappear from Awaiting Merge.
+   - Fix: removed `verificationSatisfied` from `setReviewStatus`'s `readyForMerge` computation, matching the Run 10 fix in `normalizeReviewStatus`.
+   - Updated 3 tests that asserted the old behavior (including 1 unrelated `agents-auth-routing` test that was missing the Run 10 `--permission-mode bypassPermissions` flag).
 
 **Issues moved**:
-- **PAN-714** → `readyForMerge: true` (unblocked by both cf311e75 and 61248742)
-- **PAN-611** → `readyForMerge: true` (shebang fix from prior run finally made it through review + test)
-- **PAN-540** → review failed at verification gate (agent has feedback 016, fixing test failures)
+- **PAN-714** → fell back to `review: blocked` / `merge: failed` after merge-agent timed out waiting for PR #716 to become mergeable. Review-agent provided new blockers.
+- **PAN-611** → `merge: failed` (polyrepo rebase timeout — work agent did not push rebased branches within 10 minutes). Entered cycling alert (2 consecutive runs stuck at merge).
 
 **Ready for your UAT + merge**:
-- PAN-611 — caveman shebang fix
-- PAN-714 — PAN-705 follow-up cleanup (permission bypass fix)
+- PAN-369-TEST — on Awaiting Merge page.
 
-**Main branch state**: Clean, up-to-date with `origin/main`. 2 substrate fixes committed this run.
+**Main branch state**: Clean, up-to-date with `origin/main`. 1 substrate fix committed this run.
 
 **Next-run priorities**:
-1. Monitor PAN-712 / PAN-457 / PAN-653 / PAN-540 for review re-submission after agents fix verification failures.
-2. Monitor PAN-709 implementation progress.
-3. Merge PAN-611 and PAN-714 after user UAT approval.
+1. Address PAN-611 cycling alert — polyrepo rebase 10-minute timeout is too tight or work agent feedback is insufficient.
+2. Monitor PAN-709 / PAN-712 / PAN-457 / PAN-653 / PAN-540 for review re-submission after agents fix verification failures.
+3. Consider fixing per-project specialist wake API gap.
