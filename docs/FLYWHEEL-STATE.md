@@ -1,6 +1,6 @@
 # Flywheel State
 <!-- LIVING DOCUMENT — overwritten by each /all-up run. History lives in OPERATION-FIX-ALL.md -->
-_Last updated: 2026-04-13 (Run 8) — auto-maintained by the all-up flywheel_
+_Last updated: 2026-04-14 (Run 9) — auto-maintained by the all-up flywheel_
 
 ---
 
@@ -11,34 +11,25 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 
 | Issue | Phase | Root Cause / Blocker | Auto-Requeues | Runs Stuck | Notes |
 |-------|-------|----------------------|---------------|------------|-------|
-| PAN-544 | merge blocked by CI | `bun install --frozen-lockfile` fails on CI: local bun 1.3.11 vs CI bun 1.3.12 lockfile mismatch. Feedback written (005-merge-agent-ci-failure.md) + tmux tell sent. New deacon fix will intercept next merge failure and route to work agent instead of retrying. | 0 | 2 | Work agent needs to upgrade bun to 1.3.12 + regenerate bun.lock |
-| PAN-611 | feedback sent — awaiting agent fix | `.gitignore:42` (`src/lib/**/*.js`) excludes caveman JS source files. CI's `cp` step fails on clean checkout. Feedback written (014-merge-agent-ci-failure-details.md) + tmux tell sent. Merge retry cycle broken by Run 8 fix. | 0 | 0 | Work agent must add `!src/lib/caveman/*.js` negation to .gitignore |
-| PAN-509 | pending review — awaiting dispatch | prUrl cleared by repairClosedPRs (Run 7). reviewStatus=pending but deacon re-dispatch gate blocks because `hasPassedReview=true`. Work agent told to run `pan done PAN-509`. | 0 | 1 | Work agent needs to call pan done to create fresh PR |
-| PAN-457 | in progress | Just started — work agent launched 2026-04-13 | 0 | 0 | Planning complete, work agent started |
-| PAN-540 | planning | Active planning session (planning-pan-540 attached) | 0 | 0 | Planning still in progress |
-| PAN-653 | in progress | Just started — work agent launched 2026-04-13 | 0 | 0 | Planning complete, work agent started |
+| PAN-709 | in progress | Work agent started 2026-04-14 (unblocked by workspace init fix). Self-improving flywheel epic. | 0 | 0 | Agent running — monitoring |
+| PAN-712 | in progress | Work agent started 2026-04-14 (unblocked by workspace init fix). Skills cleanup issue. | 0 | 0 | Agent running — monitoring |
+| PAN-714 | in progress | Work agent started 2026-04-14 (unblocked by workspace init fix). PAN-705 followup cleanup. | 0 | 0 | Agent running — monitoring |
+| PAN-611 | review blocked | Review agent (feedback 017) blocking on mid-file shebangs in caveman JS files. Work agent resumed 2026-04-14. | 0 | 3 | Agent resumed — needs to fix shebang issue and re-request review |
+| PAN-457 | in progress | Work agent started 2026-04-13, stopped, resumed 2026-04-14. Has uncommitted work. | 0 | 1 | Agent resumed |
+| PAN-653 | in progress | Work agent started 2026-04-13, stopped, resumed 2026-04-14. Has uncommitted work. | 0 | 1 | Agent resumed |
+| PAN-509 | in-review | PR #688 open with panopticon/review+test passing on GitHub. Internal Panopticon DB shows null state (sync gap). Work agent resumed 2026-04-14. | 0 | 1 | Agent resumed — may need to trigger merge via API |
+| PAN-540 | planning | Planning session restarted 2026-04-14. STATE.md had decisions captured; beads not materialized yet. | 0 | 1 | Planning-pan-540 running |
+| PAN-539 | planning | planning-pan-539 running since 2026-04-14 06:38. | 0 | 0 | Monitoring |
 
 ---
 
 ## Cycling Alerts
 
-### [RESOLVED Run 8] PAN-611 — CI cycling merge retry loop
-- **Pattern Run 5-7**: merge cycling due to check-status gate + deacon retry loop
-- **Root cause confirmed Run 8**: `checkFailedMergeRetry()` in deacon.ts was retrying ALL failed merges (up to 3×, 30min apart) including CI check failures. Cycle: gate sets mergeStatus=failed → 30min cooldown → deacon resets to pending → merge re-queued → gate blocks again.
-- **Fix (0209bf1f)**: `checkFailedMergeRetry` now detects `mergeNotes` containing "failing required checks", writes feedback file, saturates mergeRetryCount instead of retrying. `review-status.ts` adds `mergeStatus !== 'failed'` to rfm auto-computation as defense-in-depth.
-- **Runs Stuck**: 0 (cycle broken). Work agent must still fix the gitignore issue.
-
-### PAN-544 — Bun lockfile mismatch CI failure (2 runs — work agent has feedback)
-- **Pattern Run 7**: `bun install --frozen-lockfile` gate added but passes locally (bun 1.3.11 → "no changes"). CI uses bun 1.3.12 which considers the lockfile stale.
-- **Pattern Run 8**: same blocker. Merge will fail again → new deacon code will catch it and route to work agent. Feedback already written.
-- **Substrate status**: **Contained.** New `checkFailedMergeRetry` CI detection will prevent further merge cycling after the next failure. Work agent must fix.
-- **Runs Stuck**: 2
-
-### PAN-509 — Post-repair review re-dispatch blocked (1 run — agent has feedback)
-- **Pattern**: `repairClosedPRs` cleared prUrl and set reviewStatus=pending. But deacon re-dispatch gate checks `!hasPassedReview` which is false (history has passed entries) AND `status.prUrl` which is null. Re-dispatch blocked.
-- **Workaround**: work agent told to run `pan done` to create fresh PR. This bypasses the deacon re-dispatch gate.
-- **Potential substrate fix**: deacon re-dispatch should handle the case where prUrl is null AND the issue has passed reviews before — it should be eligible for re-dispatch.
-- **Runs Stuck**: 1
+### PAN-611 — Review cycling on caveman shebang (3 runs)
+- **Pattern Runs 7-9**: review agent keeps blocking on mid-file shebangs in caveman JS files
+- **Root cause confirmed**: `#!/usr/bin/env node` appears on line 4 (after vendor-header comments) — only line-1 hashbangs are legal. Node throws SyntaxError. Review agent correctly rejects this.
+- **Fix**: Agent needs to move shebang to line 1 OR remove it entirely (files are invoked via `node script.js`, not directly executed). Agent has feedback 017 explaining this.
+- **Runs Stuck**: 3
 
 ---
 
@@ -54,11 +45,14 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | `repairClosedPRs()` startup sweep | Pre-fix PAN-509 instance still needs cleanup | Run 6 | No | **FIXED Run 7** (6843dc27 + 9f974f43) |
 | Verification gate lacks `bun install --frozen-lockfile` | Lockfile drift invisible until GitHub CI catches it | Run 7 | No | **FIXED Run 7** (config update to panopticon-cli quality_gates) |
 | No GitHub check-status gate in `triggerMerge()` | Merge pipeline churns against red PRs | Run 7 | No | **FIXED Run 7** (40f5fe0e) |
-| `checkFailedMergeRetry` retries CI failures indefinitely | CI check failures cycle until circuit breaker trips (3×30min=90min wasted) | Run 8 | No | **FIXED Run 8** (0209bf1f — detect "failing required checks" in mergeNotes, write feedback, saturate circuit breaker) |
-| Deacon re-dispatch gate blocked for issues with prior passed reviews | When prUrl cleared (e.g. repairClosedPRs), deacon won't re-dispatch because hasPassedReview=true | Run 8 | No | **NEW** — mitigation: tell work agent to run pan done. Proper fix: deacon should re-dispatch when prUrl is null regardless of history. |
+| `checkFailedMergeRetry` retries CI failures indefinitely | CI check failures cycle until circuit breaker trips (3×30min=90min wasted) | Run 8 | No | **FIXED Run 8** (0209bf1f) |
+| Workspace init silently swallows bun install failure | Broken symlinks in node_modules; Docker init crashes ERR_MODULE_NOT_FOUND; work agents blocked | Run 9 | No | **FIXED Run 9** (ada4f64d — fatal errors, no timeout, stale node_modules wipe) |
+| Zombie agent sessions after merge (state file absent) | agent-pan-NNN session survives merge, leaks Claude+MCP processes | Run 9 | No | **FIXED Run 9** (1ffb6e60 — kill unconditionally on sessionExists) |
+| Deacon re-dispatch gate blocked for issues with prior passed reviews | When prUrl cleared (e.g. repairClosedPRs), deacon won't re-dispatch because hasPassedReview=true | Run 8 | No | Ongoing — mitigation: tell work agent to run pan done |
 | Verification gate runs on dirty workspace, not clean-committed state | Gitignored files or uncommitted changes make local build pass while CI fails | Run 7 | No | Ongoing — mitigated by check-status gate |
 | Review circuit breaker can't self-reset | Manual `pan review reset` after 7 requeues | Run 4 | No | Ongoing |
 | Verification bypass at 3 failures masks root causes | Bypass hides test failures | Run 5 | No | Ongoing |
+| GitHub PR check status not synced back to Panopticon DB when server was down | panopticon/review and panopticon/test pass on GitHub but internal DB shows null; work agent doesn't know it can merge | Run 9 | No | **NEW** — PAN-509 example; mitigation: resume work agent to re-check |
 
 ---
 
@@ -77,6 +71,8 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | CI failure retry cycling | merge fails (CI) → 30min → deacon retries → fails again → repeats until circuit breaker | `checkFailedMergeRetry` treated all failed merges as transient; no CI distinction | Detect "failing required checks" in mergeNotes, write feedback to work agent, saturate circuit breaker (Run 8: 0209bf1f) |
 | Post-merge lifecycle incomplete | `mergeStatus=merged` but GH issue OPEN | `close-issue` step failed silently | `repairIncompletePostMergeLifecycle()` (Run 4) |
 | PR merged on GH but Panopticon stuck | `gh pr view` → MERGED but `mergeStatus!=merged` | Post-merge verification failed after `gh pr merge` | `repairAlreadyMergedPRs()` (Run 4) |
+| Workspace init silently creates broken environment | Docker init crashes ERR_MODULE_NOT_FOUND; work agent never starts | `bun install` 60s timeout killed on cold cache; catch block swallowed error as "non-fatal warning" | Fatal errors, no timeout, pre-install stale node_modules wipe (Run 9: ada4f64d) |
+| Zombie agent sessions after merge | `agent-pan-NNN` tmux session alive after merge; leaks Claude+MCP | `postMergeLifecycle` only killed session when agentState file present; missing state → session survives | Kill unconditionally on `sessionExists()`, update state if present (Run 9: 1ffb6e60) |
 
 ---
 
@@ -85,44 +81,51 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | Desired Capability | Why Needed | Priority | Status |
 |-------------------|-----------|----------|--------|
 | Clean-checkout verification gate | Gate currently runs on dirty workspace, missing gitignore/uncommitted bugs | High | Run 7 — mitigated but not fixed. Needs `git stash push -u` + run + `git stash pop` or worktree sandbox. |
-| Deacon re-dispatch for null-prUrl issues with passed history | Issues cleared by repairClosedPRs can't re-dispatch via deacon | Medium | **NEW Run 8** — workaround: tell agent to run pan done |
+| Deacon re-dispatch for null-prUrl issues with passed history | Issues cleared by repairClosedPRs can't re-dispatch via deacon | Medium | Ongoing — workaround: tell agent to run pan done |
 | Cycle-aware work-agent escalation | PAN-611 cycled 3 runs; system should page operator after N stuck runs | Medium | Ongoing |
 | PR-state validator in `/review` and `/request-review` | Additional defense layer at review submission time | Medium | Partially addressed |
 | Holistic dead-code detection in review | Review finds dead code piecemeal | High | Ongoing |
 | Verification gate: configurable pass criteria | 3-failure bypass masks real issues | Medium | Ongoing |
+| GitHub check status → Panopticon DB sync on server startup | When server was down during CI run, internal DB never learns panopticon/review passed | Medium | **NEW Run 9** — startup repair: scan all PRs in "in-review" state and reconcile GitHub check results |
 | `repairClosedPRs()` startup sweep | Clean up pre-fix stale-prUrl instances | High | **CLOSED Run 7** |
 | Merge-agent error reporting | Silent failures give operators nothing to debug | — | **CLOSED Run 6** |
 | `complete-planning` session cleanup | Orphaned planning sessions accumulate | — | **CLOSED Run 6** |
 
 ---
 
-## Run 8 Summary
+## Run 9 Summary
 
-**Bugs fixed in code** (1 substrate fix, pushed to `origin/main`):
+**Bugs fixed in code** (2 substrate fixes, both pushed to `origin/main`):
 
-1. **Break CI-failure cycling merge retry loop** (`0209bf1f`):
-   - `checkFailedMergeRetry()` was retrying ALL failed merges (up to 3×, 30min apart) including CI check failures.
-   - Cycle confirmed: merge failure at 07:43, reset to pending at 08:13 — exact 30min `FAILED_MERGE_RETRY_COOLDOWN_MS` match.
-   - Fix: detect `mergeNotes` containing "failing required checks"; write feedback file to workspace + tmux nudge; saturate `mergeRetryCount` to suppress future re-entry.
-   - `checkPostReviewCommits` now resets `mergeRetryCount=0` when HEAD advances, so the counter clears after work agent pushes a fix.
-   - Secondary: orphaned-review restore won't reset CI-failed `mergeStatus='failed'→'pending'`.
-   - Defense-in-depth: `review-status.ts` rfm auto-computation now blocks on `mergeStatus !== 'failed'`.
-   - **Live-observed**: on startup, deacon immediately caught PAN-611 CI failure and wrote `013-merge-agent-ci-failure.md` feedback file.
+1. **Workspace init silently swallows bun install failure** (`ada4f64d`):
+   - `workspace-manager.ts` ran `bun install` with 60-second timeout; cold cache kills failed silently as "non-fatal warning"; workspace creation continued with broken symlinks.
+   - Docker init containers crashed: `ERR_MODULE_NOT_FOUND: Cannot find package 'tsdown'`.
+   - Work agents for PAN-709, PAN-712, PAN-714 were all blocked.
+   - Fix: removed timeout, added stale node_modules wipe before install, both install and package-build failures are now fatal.
+
+2. **Zombie agent sessions survive merge when state file absent** (`1ffb6e60`):
+   - `postMergeLifecycle` step 5 only killed the work-agent session if `getAgentState()` returned truthy.
+   - agent-pan-705 survived as zombie after PAN-705 merged (state file already gone).
+   - Fix: kill unconditionally on `sessionExists()`; update state file only if it exists.
 
 **Issues moved**:
-- **PAN-457** → Planning complete → work agent started (2026-04-13)
-- **PAN-653** → Planning complete → work agent started (2026-04-13)
-- **PAN-611** → Cycling loop broken. Feedback written explaining gitignore fix needed. Work agent notified.
-- **PAN-544** → Feedback written (bun 1.3.12 lockfile fix). Work agent notified. Merge cycling will stop after next failed attempt.
-- **PAN-509** → Work agent told to run `pan done` to create fresh PR (deacon re-dispatch blocked by hasPassedReview gate).
+- **PAN-709** → work agent started (unblocked by ada4f64d)
+- **PAN-712** → work agent started (unblocked by ada4f64d)
+- **PAN-714** → work agent started (unblocked by ada4f64d)
+- **PAN-611** → work agent resumed (has feedback 017, needs to fix mid-file shebangs)
+- **PAN-457** → work agent resumed
+- **PAN-653** → work agent resumed
+- **PAN-509** → work agent resumed (PR has all CI passing; needs to trigger merge)
+- **PAN-540** → planning session restarted (planning-pan-540 running)
 
-**Awaiting Merge (PAN scope)**: None currently ready (PAN-544 rfm=True but will fail CI; PAN-369-TEST is test artifact).
+**Zombie killed**: agent-pan-705 (PAN-705 was merged; session was leaked)
 
-**Main branch state**: Clean, up-to-date with `origin/main`. 1 substrate fix commit pushed this run (0209bf1f).
+**Main branch state**: Clean, up-to-date with `origin/main`. 2 substrate fixes + docs committed this run.
 
 **Next-run priorities**:
-1. Verify PAN-611/PAN-544 work agents pushed CI fixes → watch merge pipeline complete.
-2. Verify PAN-509 work agent ran `pan done` and is in review pipeline.
-3. PAN-457/PAN-653 work agents progressing through implementation.
-4. Consider fixing deacon re-dispatch gate for null-prUrl issues with passed history (medium priority).
-5. Design clean-checkout verification gate (structural fix for local-vs-CI divergence).
+1. Verify PAN-709/712/714 agents progressing through implementation.
+2. Check PAN-611 shebang fix + review pass.
+3. Check PAN-509 merge status (GitHub CI all green, just needs internal state reconciliation).
+4. Check PAN-457/653 commit and PR status.
+5. Verify PAN-540 planning completes and beads materialize.
+6. Consider implementing GitHub check status → Panopticon DB sync repair on startup (new skill gap from Run 9).
