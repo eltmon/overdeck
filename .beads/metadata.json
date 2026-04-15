@@ -2,6 +2,6 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "server",
-  "dolt_database": "panopticon_cli",
+  "dolt_database": "dolt",
   "project_id": "8403b792-11dd-4e86-b04c-ce7a6effd31b"
 }
