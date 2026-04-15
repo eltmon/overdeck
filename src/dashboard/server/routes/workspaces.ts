@@ -2430,44 +2430,18 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               return;
             }
 
-            const {
-              spawnEphemeralSpecialist: spawnEphemeral,
-            } = await import('../../../lib/cloister/specialists.js');
-
-            const reviewResolvedProject = resolveProjectFromIssue(issueId);
-            const reviewProjectKey = reviewResolvedProject?.projectKey ?? null;
-
-            let reviewResult: { success: boolean; message: string; error?: string };
-            if (reviewProjectKey) {
-              const prUrl = getReviewStatus(issueId)?.prUrl;
-              reviewResult = await spawnEphemeral(reviewProjectKey, 'review-agent', {
-                issueId,
-                branch: branchName,
-                workspace: workspacePath,
-                prUrl,
-                context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
-              });
-            } else {
-              console.error(
-                `[review] Could not resolve project for ${issueId} — cannot spawn review specialist`
-              );
-              reviewResult = {
-                success: false,
-                message: `No project configured for ${issueId}. Add it to projects.yaml.`,
-              };
-            }
+            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+            const prUrl = getReviewStatus(issueId)?.prUrl;
+            const reviewResult = await dispatchParallelReview({
+              issueId,
+              branch: branchName,
+              workspace: workspacePath,
+              prUrl,
+            });
 
             if (!reviewResult.success) {
-              if (reviewResult.error === 'specialist_busy') {
-                // Specialist busy — leave reviewStatus pending; deacon will retry
-                console.log(
-                  `[review] review-agent busy for ${issueId} — leaving pending for deacon retry`
-                );
-                completePendingOperation(issueId, null);
-                return;
-              }
               console.warn(
-                `[review] review-agent failed to wake: ${reviewResult.message}`
+                `[review] review dispatch failed: ${reviewResult.message}`
               );
               completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
               setReviewStatus(issueId, {
@@ -2477,8 +2451,8 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               return;
             }
 
-            console.log(`[review] Review pipeline started for ${issueId}`);
-            // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+            console.log(`[review] Parallel review dispatched for ${issueId}`);
+            // PAN-511: set 'reviewing' only after dispatch succeeds
             setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
           } catch (error: any) {
@@ -2801,8 +2775,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       });
 
       if (result.success) {
-        console.log(`[request-review] Spawned review specialist for ${issueId}`);
-        // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+        console.log(`[request-review] Parallel review dispatched for ${issueId}`);
+        // PAN-511: set 'reviewing' only after dispatch succeeds
         setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
@@ -2816,23 +2790,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           autoRequeueCount: newCount,
           remainingRequeues: MAX_AUTO_REQUEUE - newCount,
         });
-      } else if (result.error === 'specialist_busy') {
-        console.log(
-          `[request-review] Review specialist busy for ${issueId} — leaving pending for deacon retry`
-        );
-        // Keep reviewStatus as 'pending' — deacon orphan recovery will re-dispatch
-        return jsonResponse(
-          {
-            success: false,
-            error: 'Review specialist busy — will retry automatically',
-            retryable: true,
-            autoRequeueCount: newCount,
-          },
-          { status: 409 }
-        );
       } else {
         console.warn(
-          `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${result.error}`
+          `[request-review] Dispatch failed for ${issueId}: ${result.error}`
         );
         setReviewStatus(issueId, {
           reviewStatus: 'dispatch_failed',
@@ -2841,7 +2801,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         return jsonResponse(
           {
             success: false,
-            error: result.error || 'Failed to spawn review specialist',
+            error: result.error || 'Failed to dispatch review',
             autoRequeueCount: newCount,
           },
           { status: 500 }

@@ -2,7 +2,8 @@
  * Review Agent - Automatic code review using Claude Code
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile, writeFile, mkdir, appendFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
@@ -110,7 +111,7 @@ async function buildReviewPrompt(context: ReviewContext): Promise<string> {
     throw new Error(`Review agent prompt template not found at ${templatePath}`);
   }
 
-  const template = readFileSync(templatePath, 'utf-8');
+  const template = await readFile(templatePath, 'utf-8');
 
   // Get files changed from PR if not provided (non-blocking)
   let filesChanged = context.filesChanged || [];
@@ -317,14 +318,13 @@ async function sendFeedbackToWorkAgent(
 /**
  * Log review to history
  */
-function logReviewHistory(
+async function logReviewHistory(
   context: ReviewContext,
   result: ReviewResult,
   sessionId?: string
-): void {
-  // Ensure history directory exists
+): Promise<void> {
   if (!existsSync(REVIEW_HISTORY_DIR)) {
-    mkdirSync(REVIEW_HISTORY_DIR, { recursive: true });
+    await mkdir(REVIEW_HISTORY_DIR, { recursive: true });
   }
 
   const entry: ReviewHistoryEntry = {
@@ -340,7 +340,7 @@ function logReviewHistory(
     sessionId,
   };
 
-  appendFileSync(REVIEW_HISTORY_FILE, JSON.stringify(entry) + '\n', 'utf-8');
+  await appendFile(REVIEW_HISTORY_FILE, JSON.stringify(entry) + '\n', 'utf-8');
 }
 
 /**
@@ -367,7 +367,7 @@ async function postGitHubPRReview(
     let reviewBody = result.notes || 'Automated review by Panopticon review-agent.';
     const synthesisPath = join(outputDir, 'synthesis.md');
     if (existsSync(synthesisPath)) {
-      const synthesis = readFileSync(synthesisPath, 'utf-8');
+      const synthesis = await readFile(synthesisPath, 'utf-8');
       // Truncate to 65,000 chars (GitHub PR review body limit is 65,536)
       reviewBody = synthesis.slice(0, 65000);
     }
@@ -411,11 +411,11 @@ interface ReviewerTemplate {
   content: string;
 }
 
-export function parseReviewerTemplate(templatePath: string): ReviewerTemplate {
+export async function parseReviewerTemplate(templatePath: string): Promise<ReviewerTemplate> {
   if (!existsSync(templatePath)) {
     throw new Error(`Reviewer template not found: ${templatePath}`);
   }
-  const raw = readFileSync(templatePath, 'utf-8');
+  const raw = await readFile(templatePath, 'utf-8');
   const match = raw.match(/^---\n([\s\S]+?)\n---\n([\s\S]*)$/);
   if (!match) {
     throw new Error(`Invalid template format (missing frontmatter): ${templatePath}`);
@@ -510,7 +510,7 @@ async function runParallelReview(
 ): Promise<{ result: ReviewResult; reviewId: string }> {
   const reviewId = `review-${context.issueId}-${Date.now()}`;
   const outputDir = join(context.projectPath, '.pan', 'review', reviewId);
-  mkdirSync(outputDir, { recursive: true });
+  await mkdir(outputDir, { recursive: true });
 
   // ── Phase 1: Spawn all reviewers in parallel ──────────────────────────────
   const reviewerContext = [
@@ -524,7 +524,7 @@ async function runParallelReview(
   await Promise.all(agents.map(async agent => {
     const subagentName = `code-review-${agent.name}`;
     const templatePath = join(CACHE_AGENTS_DIR, `${subagentName}.md`);
-    const template = parseReviewerTemplate(templatePath);
+    const template = await parseReviewerTemplate(templatePath);
     const model = resolveReviewerModel(agent, template.model);
     const outputFile = join(outputDir, `${agent.name}.md`);
     const sessionName = `${reviewId}-${agent.name}`;
@@ -533,7 +533,7 @@ async function runParallelReview(
     const prompt = contextHeader + template.content;
 
     const promptFile = join(outputDir, `${agent.name}-prompt.md`);
-    writeFileSync(promptFile, prompt);
+    await writeFile(promptFile, prompt);
 
     reviewerSessions.push({ sessionName, outputFile, role: agent.name });
     await spawnReviewer(sessionName, model, promptFile, context.projectPath);
@@ -556,7 +556,7 @@ async function runParallelReview(
 
   // ── Phase 3: Synthesis ────────────────────────────────────────────────────
   const synthTemplatePath = join(CACHE_AGENTS_DIR, 'code-review-synthesis.md');
-  const synthTemplate = parseReviewerTemplate(synthTemplatePath);
+  const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
   const synthOutputFile = join(outputDir, 'synthesis.md');
   const synthSessionName = `${reviewId}-synthesis`;
@@ -577,13 +577,13 @@ async function runParallelReview(
 
   const synthPrompt = synthContextHeader + synthTemplate.content;
   const synthPromptFile = join(outputDir, 'synthesis-prompt.md');
-  writeFileSync(synthPromptFile, synthPrompt);
+  await writeFile(synthPromptFile, synthPrompt);
 
   await spawnReviewer(synthSessionName, synthModel, synthPromptFile, context.projectPath);
   await waitForReviewer(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
-  const result = parseReviewSynthesis(outputDir);
+  const result = await parseReviewSynthesis(outputDir);
   result.output = `Review ${reviewId}`;
 
   await postGitHubPRReview(context, result, outputDir);
@@ -595,7 +595,7 @@ async function runParallelReview(
  * Parse synthesis output and individual reviewer files into a ReviewResult.
  * Parses synthesis.md and individual reviewer output files into a ReviewResult.
  */
-export function parseReviewSynthesis(reviewOutputDir: string): ReviewResult {
+export async function parseReviewSynthesis(reviewOutputDir: string): Promise<ReviewResult> {
   const synthesisPath = join(reviewOutputDir, 'synthesis.md');
 
   if (!existsSync(synthesisPath)) {
@@ -606,24 +606,37 @@ export function parseReviewSynthesis(reviewOutputDir: string): ReviewResult {
     };
   }
 
-  const synthesisContent = readFileSync(synthesisPath, 'utf-8');
+  const synthesisContent = await readFile(synthesisPath, 'utf-8');
   const result = parseAgentOutput(synthesisContent);
 
   // Collect file references from all reviewer outputs
   const reviewerFiles = ['correctness.md', 'security.md', 'performance.md', 'requirements.md'];
   const filesReviewed: string[] = [];
 
-  for (const filename of reviewerFiles) {
+  await Promise.all(reviewerFiles.map(async filename => {
     const filePath = join(reviewOutputDir, filename);
     if (existsSync(filePath)) {
-      const content = readFileSync(filePath, 'utf-8');
+      const content = await readFile(filePath, 'utf-8');
       const matches = content.match(/\b[\w/\-.]+\.(ts|js|tsx|jsx|py|java|go|rs)\b/g);
       if (matches) filesReviewed.push(...matches);
     }
-  }
+  }));
 
   result.filesReviewed = [...new Set(filesReviewed)];
   return result;
+}
+
+/**
+ * Map a ReviewResult outcome to the reviewStatus value written after parallel review.
+ * CHANGES_REQUESTED → 'blocked' (not 'pending') so the deacon does not immediately
+ * re-dispatch the review before the work agent has a chance to address the feedback.
+ */
+export function reviewResultToReviewStatus(
+  reviewResult: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED',
+): 'passed' | 'blocked' | 'pending' {
+  if (reviewResult === 'APPROVED') return 'passed';
+  if (reviewResult === 'CHANGES_REQUESTED') return 'blocked';
+  return 'pending';
 }
 
 /**
@@ -652,7 +665,7 @@ export async function dispatchParallelReview(opts: {
   spawnReviewAgent(context)
     .then(result => {
       setReviewStatus(opts.issueId, {
-        reviewStatus: result.reviewResult === 'APPROVED' ? 'passed' : 'pending',
+        reviewStatus: reviewResultToReviewStatus(result.reviewResult),
         reviewNotes: result.notes,
       });
       console.log(`[review-agent] dispatchParallelReview finished for ${opts.issueId}: ${result.reviewResult}`);
@@ -690,7 +703,7 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
     const { result, reviewId } = await runParallelReview(context, filesChanged, reviewAgents);
 
     // Log to history
-    logReviewHistory(context, result, reviewId);
+    await logReviewHistory(context, result, reviewId);
 
     // Send feedback to work agent
     await sendFeedbackToWorkAgent(context, result);
@@ -705,7 +718,7 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
       notes: error.message || 'Parallel review failed',
     };
 
-    logReviewHistory(context, result);
+    await logReviewHistory(context, result);
 
     // Send feedback even on failure
     await sendFeedbackToWorkAgent(context, result);
