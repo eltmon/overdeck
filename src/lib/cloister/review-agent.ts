@@ -4,9 +4,8 @@
 
 import { existsSync } from 'fs';
 import { readFile, writeFile, unlink, mkdir, appendFile } from 'fs/promises';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { tmpdir } from 'os';
-import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
@@ -15,12 +14,9 @@ import { createSessionAsync, killSessionAsync, sessionExistsAsync } from '../tmu
 import { getProviderEnvForModel } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
+import { writeFeedbackFile } from './feedback-writer.js';
 
 const execAsync = promisify(exec);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-import { writeFeedbackFile } from './feedback-writer.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REVIEW_HISTORY_DIR = join(SPECIALISTS_DIR, 'review-agent');
