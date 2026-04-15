@@ -26,6 +26,7 @@ import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle } from '../types';
 import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName } from './inspector/utils';
+import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useConfirm } from './DialogProvider';
@@ -124,6 +125,7 @@ export interface InspectorPanelProps {
 export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const showAlert = useAlert();
   const [copied, setCopied] = useState(false);
   const [showPrdModal, setShowPrdModal] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
@@ -337,7 +339,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       }
       return data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
+      if (data?.alreadyPassed) {
+        showAlert({
+          message: data.message || `Review already passed for ${issueId}`,
+          variant: 'info',
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       await refreshDashboardState(queryClient);
     },
