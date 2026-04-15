@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-15T09:15:36Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-711: PAN-705 follow-up: remove transitional route aliases after merge"
+    "description": "Plan for PAN-711: PAN-705 follow-up: remove transitional route aliases after merge",
+    "updated": "2026-04-15T22:47:11.108Z"
   },
   "plan": {
     "id": "pan-711",
@@ -11,15 +12,33 @@
     "status": "approved",
     "uid": "523a1875-a300-485a-9d2f-3f1d81572c35",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 16,
     "created": "2026-04-15T09:15:36Z",
-    "updated": "2026-04-15T09:15:36Z",
+    "updated": "2026-04-15T22:47:11.108Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/711", "label": "PAN-711", "type": "issue" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/705", "label": "PAN-705 (parent rename)", "type": "issue" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/pull/708", "label": "PAN-705 PR (#708)", "type": "pr" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/711",
+        "label": "PAN-711",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
+        "label": "PAN-705 (parent rename)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/708",
+        "label": "PAN-705 PR (#708)",
+        "type": "pr"
+      }
     ],
-    "tags": ["cleanup", "dashboard", "routes", "docs", "regression-guard"],
+    "tags": [
+      "cleanup",
+      "dashboard",
+      "routes",
+      "docs",
+      "regression-guard"
+    ],
     "narratives": {
       "Problem": "PAN-705 originally landed with backward-compat alias routes that mirrored the old /api/workspaces/:id/{review-status,approve,merge,...} paths to the renamed /api/review/* and /api/issues/* handlers. The aliases were intentional tech debt to let specialists run on the PAN-705 branch against a stale main-built dashboard. PAN-711 was filed to delete them once main was rebuilt. During PAN-705 review (feedback round #007), the review agent flagged the aliases as a 'no bandaids' violation and they were deleted in commit d18c74cc, which was squashed into the merged PR #708. Source on main is already alias-free. What remains is (a) preventing them from being reintroduced and (b) sweeping a handful of living docs that still cite the old paths as authoritative.",
       "Proposal": "Two narrow, independent beads: (1) add a Vitest regression guard that fails if any of the eight deleted alias path literals reappear under src/, locking in the cleanup; (2) update five stale path references in four living docs (TESTING.md, PRD-CLOISTER.md, FIX-ALL-PRD.md, prds/active/pan-509/STATE.md). Explicitly leave historical incident logs and completed PRD archives alone — they're time-locked snapshots, not current reference docs. No live pipeline test is required; PAN-711's own merge cycle exercises the new routes end-to-end."
@@ -28,7 +47,7 @@
       {
         "id": "regression-guard",
         "title": "Add Vitest guard that fails if deleted alias routes reappear in src/",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-15T09:15:36Z",
         "metadata": {
@@ -42,45 +61,64 @@
           {
             "id": "regression-guard.ac1",
             "title": "Test file exists at tests/unit/dashboard/no-alias-routes.test.ts and runs as part of `npm test`",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           },
           {
             "id": "regression-guard.ac2",
             "title": "Test fails (red) if any of the 16 forbidden path literals (8 paths × :id and :issueId variants) is reintroduced anywhere under src/",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           },
           {
             "id": "regression-guard.ac3",
             "title": "Test passes (green) on the current branch with no production code changes — confirming the cleanup from PAN-705 commit d18c74cc is in fact complete",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           },
           {
             "id": "regression-guard.ac4",
             "title": "Test uses full quoted path literal matching, not substring search; legitimate routes such as `/api/workspaces/:issueId/plan`, `/api/workspaces/:issueId/tldr`, `/api/workspaces/:issueId/refresh-db`, `/api/review/:issueId/status` continue to exist in src/ without triggering the test",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           },
           {
             "id": "regression-guard.ac5",
             "title": "Test scans every .ts file under src/ recursively (excluding the test file itself and any node_modules); list of forbidden literals is hardcoded inline so it self-documents which paths are forbidden",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.108Z"
           },
           {
             "id": "regression-guard.ac6",
             "title": "`npm run typecheck`, `npm run lint`, and `npm test` all pass after the test is added",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.108Z"
           }
-        ]
+        ],
+        "completed": "2026-04-15T22:47:11.107Z"
       },
       {
         "id": "doc-sweep",
         "title": "Update stale alias-path references in four living docs",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-15T09:15:36Z",
         "metadata": {
@@ -94,46 +132,68 @@
           {
             "id": "doc-sweep.ac1",
             "title": "docs/TESTING.md line 132 references `/api/review/:id/status` (not `/api/workspaces/:id/review-status`)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.106Z"
           },
           {
             "id": "doc-sweep.ac2",
             "title": "docs/PRD-CLOISTER.md lines 178 and 179 reference `/api/review/:issueId/status` (not `/api/workspaces/:issueId/review-status`)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.106Z"
           },
           {
             "id": "doc-sweep.ac3",
             "title": "docs/FIX-ALL-PRD.md line 124 references `/api/issues/:id/merge` (not `/api/workspaces/:id/merge`)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.106Z"
           },
           {
             "id": "doc-sweep.ac4",
             "title": "docs/prds/active/pan-509/STATE.md line 17 references `/api/review/:issueId/status` (not `/api/workspaces/:issueId/review-status`)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.106Z"
           },
           {
             "id": "doc-sweep.ac5",
             "title": "docs/OPERATION-FIX-ALL.md is unchanged — the historical incident log entry referencing the old path is preserved as-written, since rewriting it would falsify the time-locked record",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           },
           {
             "id": "doc-sweep.ac6",
             "title": "No file under docs/prds/completed/ is modified",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           },
           {
             "id": "doc-sweep.ac7",
             "title": "No source file under src/ is modified by this bead — it is documentation-only",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T22:47:11.107Z"
           }
-        ]
+        ],
+        "completed": "2026-04-15T22:47:11.106Z"
       }
     ],
     "edges": []
