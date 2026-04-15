@@ -203,9 +203,13 @@ export async function closeOut(
  * 2. (Optional) Reset issue to backlog/open
  * 3. Clear review status
  */
-export async function deepWipe(
+async function destructiveResetWorkflow(
+  workflow: 'deep-wipe' | 'reset' | 'cancel',
   ctx: LifecycleContext,
   opts: DeepWipeOptions = {},
+  resetStep: (ctx: LifecycleContext) => Promise<StepResult>,
+  progressLabel: string,
+  progressSuccessDetail: string,
 ): Promise<WorkflowResult> {
   const start = Date.now();
   const allSteps: StepResult[] = [];
@@ -218,7 +222,6 @@ export async function deepWipe(
     onProgress?.({ step: stepNum, total: TOTAL_STEPS, label, detail, status });
   };
 
-  // 1. Teardown workspace (aggressive — delete branches, project-specific cleanup, clear beads)
   stepNum = 1;
   progress('Tearing down workspace', 'Killing agents, stopping services, removing files');
   const teardownSteps = await teardownWorkspace(ctx, {
@@ -232,30 +235,67 @@ export async function deepWipe(
   const teardownFailed = teardownSteps.some(s => !s.success && !s.skipped);
   progress('Tearing down workspace', teardownFailed ? 'Some steps failed' : 'Workspace torn down', teardownFailed ? 'error' : 'complete');
 
-  // 2. Delete git branches
   stepNum = 2;
   progress('Deleting git branches', `feature/${ctx.issueId.toLowerCase()}`);
-  // Branch deletion is already handled in teardownWorkspace when deleteBranches is true,
-  // but we report it as a separate visible step
   progress('Deleting git branches', deleteBranches ? 'Branches removed' : 'Skipped', 'complete');
 
-  // 3. Reset issue to open/backlog
   if (resetIssue) {
     stepNum = 3;
-    progress('Resetting issue status', `${ctx.issueId} → Todo`);
-    const resetResult = await resetIssueToTodo(ctx);
+    progress(progressLabel, `${ctx.issueId}`);
+    const resetResult = await resetStep(ctx);
     allSteps.push(resetResult);
-    progress('Resetting issue status', resetResult.success ? 'Issue reset to Todo' : (resetResult.error || 'Failed'), resetResult.success ? 'complete' : 'error');
+    progress(progressLabel, resetResult.success ? progressSuccessDetail : (resetResult.error || 'Failed'), resetResult.success ? 'complete' : 'error');
   }
 
-  // 4. Clear review status
   stepNum = resetIssue ? 4 : 3;
   progress('Clearing review status', 'Removing specialist state');
   const clearResult = await clearReviewStatusStep(ctx.issueId);
   allSteps.push(clearResult);
   progress('Clearing review status', 'Review status cleared', 'complete');
 
-  return buildResult('deep-wipe', ctx.issueId, allSteps, start);
+  return buildResult(workflow, ctx.issueId, allSteps, start);
+}
+
+export async function deepWipe(
+  ctx: LifecycleContext,
+  opts: DeepWipeOptions = {},
+): Promise<WorkflowResult> {
+  return destructiveResetWorkflow(
+    'deep-wipe',
+    ctx,
+    opts,
+    resetIssueToTodo,
+    'Resetting issue status',
+    'Issue reset to Todo',
+  );
+}
+
+export async function resetToTodo(
+  ctx: LifecycleContext,
+  opts: DeepWipeOptions = {},
+): Promise<WorkflowResult> {
+  return destructiveResetWorkflow(
+    'reset',
+    ctx,
+    opts,
+    resetIssueToTodo,
+    'Resetting issue status',
+    'Issue reset to Todo',
+  );
+}
+
+export async function cancelIssueWorkflow(
+  ctx: LifecycleContext,
+  opts: DeepWipeOptions = {},
+): Promise<WorkflowResult> {
+  return destructiveResetWorkflow(
+    'cancel',
+    ctx,
+    opts,
+    resetIssueToCanceled,
+    'Canceling issue',
+    'Issue moved to Canceled',
+  );
 }
 
 // --- Internal helpers ---
@@ -367,10 +407,10 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
 }
 
 /**
- * Reset issue back to open/backlog state (for deep-wipe).
+ * Reset issue back to open/backlog state (for destructive reset).
  */
 async function resetIssueToTodo(ctx: LifecycleContext): Promise<StepResult> {
-  const step = 'deep-wipe:reset-issue';
+  const step = 'reset:reset-issue';
   try {
     if (ctx.github) {
       const { owner, repo, number } = ctx.github;
@@ -454,6 +494,55 @@ async function clearReviewStatusStep(issueId: string): Promise<StepResult> {
     } catch (innerErr) {
       return stepSkipped(step, [`Failed to clear review status (non-fatal): ${(innerErr as Error).message}`]);
     }
+  }
+}
+
+async function resetIssueToCanceled(ctx: LifecycleContext): Promise<StepResult> {
+  const step = 'cancel:reset-issue';
+  try {
+    if (ctx.github) {
+      const { owner, repo, number } = ctx.github;
+      await execAsync(
+        `gh issue edit ${number} --repo ${owner}/${repo} --add-label "wontfix"`,
+        { encoding: 'utf-8' },
+      ).catch(() => {});
+      return stepOk(step, [`Marked GitHub issue #${number} as canceled/wontfix`]);
+    }
+
+    const linearApiKey = getLinearApiKey();
+    if (linearApiKey) {
+      const { LinearClient } = await import('@linear/sdk');
+      const client = new LinearClient({ apiKey: linearApiKey });
+      const issueNum = extractNumber(ctx.issueId);
+      const teamKey = extractPrefix(ctx.issueId);
+      if (issueNum === null || teamKey === null) {
+        return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
+      }
+      const results = await client.issues({
+        filter: {
+          number: { eq: issueNum },
+          team: { key: { eq: teamKey } },
+        },
+        first: 1,
+      });
+      if (results.nodes.length > 0) {
+        const issue = results.nodes[0];
+        const team = await issue.team;
+        if (team) {
+          const states = await team.states();
+          const canceledState = states.nodes.find(s => s.type === 'canceled') ||
+            states.nodes.find(s => s.name.toLowerCase() === 'canceled');
+          if (canceledState) {
+            await issue.update({ stateId: canceledState.id });
+          }
+        }
+      }
+      return stepOk(step, [`Reset Linear issue ${ctx.issueId} to Canceled`]);
+    }
+
+    return stepSkipped(step, ['No tracker available to cancel issue']);
+  } catch (err) {
+    return stepFailed(step, `Failed to cancel issue: ${(err as Error).message}`);
   }
 }
 

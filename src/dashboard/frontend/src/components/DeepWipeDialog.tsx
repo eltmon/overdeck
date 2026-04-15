@@ -99,7 +99,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
     setError(null);
 
     try {
-      const res = await fetch(`/api/issues/${issue.identifier}/deep-wipe`, {
+      const res = await fetch(`/api/issues/${issue.identifier}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteWorkspace: true }),
@@ -107,7 +107,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || 'Deep wipe failed');
+        setError(data.error || 'Reset failed');
         setState('error');
         return;
       }
@@ -158,7 +158,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
               queryClient.invalidateQueries({ queryKey: ['issues'] });
               queryClient.invalidateQueries({ queryKey: ['agents'] });
             } else if (event.type === 'error') {
-              setError(event.error || 'Deep wipe failed');
+              setError(event.error || 'Reset failed');
               setState('error');
             }
           } catch {
@@ -193,7 +193,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
               <Trash2 className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-content">Deep Wipe: {issue.identifier}</h2>
+              <h2 className="text-lg font-semibold text-content">Reset Issue: {issue.identifier}</h2>
               <p className="text-sm text-content-subtle line-clamp-1">{issue.title}</p>
             </div>
           </div>
@@ -233,7 +233,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
                   className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Wipe Everything
+                  Reset Issue
                 </button>
               </div>
             </div>
@@ -279,7 +279,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
               {state === 'complete' && (
                 <div className="text-center">
                   <p className="text-sm text-destructive font-medium mb-3">
-                    {issue.identifier} has been completely wiped.
+                    {issue.identifier} has been reset to Todo.
                   </p>
                   <button
                     onClick={handleClose}

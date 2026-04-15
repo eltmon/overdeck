@@ -36,4 +36,4 @@ export { teardownWorkspace } from './teardown-workspace.js';
 export { compactBeads } from './compact-beads.js';
 
 // Workflows
-export { approve, close, closeOut, deepWipe } from './workflows.js';
+export { approve, close, closeOut, deepWipe, resetToTodo, cancelIssueWorkflow } from './workflows.js';

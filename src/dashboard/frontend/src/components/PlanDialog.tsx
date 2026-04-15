@@ -448,9 +448,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
   const handleAbortPlanning = async () => {
     const confirmed = await confirm({
-      title: 'Abort Planning',
-      message: 'Abort planning and return to Todo?\n\nThis will:\n• Stop the planning agent\n• Move the issue back to "Todo"\n• Keep the workspace (can be deleted separately)\n\nAny planning artifacts in the workspace will be preserved.',
-      confirmLabel: 'Abort Planning',
+      title: 'Stop Planning',
+      message: 'Stop planning and return to Todo?\n\nThis will:\n• Stop the planning agent\n• Move the issue back to "Todo"\n• Keep the workspace (can be deleted separately)\n\nAny planning artifacts in the workspace will be preserved.',
+      confirmLabel: 'Stop Planning',
       variant: 'destructive',
     });
     if (confirmed) {
