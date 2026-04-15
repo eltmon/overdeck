@@ -121,6 +121,23 @@ describe('mirrorProjectSkills', () => {
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
   });
 
+  it('normalizes skill.md → SKILL.md even when content is identical', () => {
+    const content = '# Workspace\nIdentical content.';
+    // Source uses SKILL.md (uppercase)
+    createSkill('workspace-add-repo', content);
+    // Target has skill.md (lowercase) with the SAME content — triggers the equality path
+    mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), content, 'utf-8');
+
+    const result = mirrorProjectSkills(cwd);
+
+    // Filename must be normalized: SKILL.md created, skill.md removed
+    expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'))).toBe(false);
+    expect(readFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'), 'utf-8')).toBe(content);
+    expect(result.updated).toContain('workspace-add-repo');
+  });
+
   it('removes stale lowercase skill.md from target when content changes', () => {
     // Source uses SKILL.md (uppercase)
     createSkill('workspace-add-repo', '# Workspace\nUpdated content.');

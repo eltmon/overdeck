@@ -714,21 +714,29 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
       writeFileSync(targetSkillMd, sourceContent, 'utf-8');
       result.added.push(entry.name);
     } else {
-      const existingContent = existsSync(targetSkillMd)
+      const lowerTarget = join(targetPath, 'skill.md');
+      const hasUppercase = existsSync(targetSkillMd);
+      const hasLowercase = !hasUppercase && existsSync(lowerTarget);
+      const existingContent = hasUppercase
         ? readFileSync(targetSkillMd, 'utf-8')
-        : existsSync(join(targetPath, 'skill.md'))
-          ? readFileSync(join(targetPath, 'skill.md'), 'utf-8')
+        : hasLowercase
+          ? readFileSync(lowerTarget, 'utf-8')
           : null;
+
       if (existingContent !== sourceContent) {
+        // Content changed: write new SKILL.md and remove stale lowercase file
         writeFileSync(targetSkillMd, sourceContent, 'utf-8');
-        // Remove stale lowercase skill.md if it coexists (was the old canonical file)
-        const lowerTarget = join(targetPath, 'skill.md');
         if (existsSync(lowerTarget)) rmSync(lowerTarget);
         if (existingContent === null) {
           result.added.push(entry.name);
         } else {
           result.updated.push(entry.name);
         }
+      } else if (hasLowercase) {
+        // Content identical but stored as skill.md (lowercase) — normalize filename
+        writeFileSync(targetSkillMd, sourceContent, 'utf-8');
+        rmSync(lowerTarget);
+        result.updated.push(entry.name);
       }
     }
   }
