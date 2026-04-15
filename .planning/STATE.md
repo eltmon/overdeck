@@ -1,107 +1,106 @@
-# PAN-705: Command Taxonomy Reorganization
+# PAN-697 Planning — Root Artifact Cleanup
 
-## Status: In Progress
+## Problem
 
-## Current Phase
-Working through beads systematically. Starting with setup/foundational beads before CLI implementation.
+The Panopticon repo root mixes canonical entrypoint files with stray audit reports,
+historical writeups, and unused screenshots. The top level looks improvised rather
+than intentional, which is a bad first impression for anyone opening the repo.
 
-## Completed Work
-- [x] panopticon-cli-be5: Committed PRD + quick-reference docs (commit: a330e3be)
-- [x] panopticon-cli-4pp: Moved PRD from planned/ to active/pan-705/ (commit: 8c258178)
+## Goal
 
-## Remaining Work
-- [x] panopticon-cli-9m0: Bumped version to 0.7.0 (commit: 1fca6f9f)
-- [x] panopticon-cli-asp: Created pan admin group with cloister commands (commit: fffac536)
-- [x] panopticon-cli-6f6: pan admin beads (commit: 28b6e081)
-- [x] panopticon-cli-d76: pan admin config (commit: 5824d5bb)
-- [x] panopticon-cli-44j: pan admin remote (commit: 6e0673d9)
-- [x] panopticon-cli-73x: pan admin db (commit: 22be7e87)
-- [x] panopticon-cli-rgr: pan admin specialists (commit: ef060f73)
-- [x] panopticon-cli-1sd: pan admin hooks install (commit: 9d2b2fc4)
-- [x] panopticon-cli-f1v: pan start <id> (commit: f21a8e82)
-- [x] panopticon-cli-u7y: pan tell <id> (commit: 150cffe5)
-- [x] panopticon-cli-dfb: pan kill <id> (commit: 5320e057)
-- [x] panopticon-cli-vwd: pan resume <id> (commit: efbe3f91)
-- [x] panopticon-cli-agh: pan recover <id> (commit: 2532a087)
-- [x] panopticon-cli-a0u: pan sync-main <id> (commit: ae4b4ba5)
-- [x] panopticon-cli-a01: pan done <id> (commit: ae4b4ba5)
-- [x] panopticon-cli-5ul: pan approve <id> (commit: ae4b4ba5)
-- [x] panopticon-cli-50h: pan reopen <id> (commit: ae4b4ba5)
-- [x] panopticon-cli-hw3: pan wipe <id> (commit: ae4b4ba5)
-- [x] panopticon-cli-jcn: pan close <id> (commit: ae4b4ba5)
-- [x] panopticon-cli-6fs: pan plan / pan plan finalize (commit: pending)
-- [x] panopticon-cli-7n3: pan review (commit: pending)
-- [x] panopticon-cli-2mf: pan show <id> (commit: pending)
-- [x] panopticon-cli-pei: pan issues (commit: pending)
-- [x] panopticon-cli-5z3: Deleted pan work command group (commit: e307e22a)
-- [x] panopticon-cli-oyb: pan admin migrate-config (commit: fb273e21)
-- [x] panopticon-cli-f04: pan admin tldr (commit: ee1a4652)
-- [x] panopticon-cli-rg8: pan admin fpp (commit: 02af5fa2)
-- [x] panopticon-cli-q15: pan admin tracker (commit: 9d819edc)
-- [ ] panopticon-cli-ej8: Rename /api/work/* lifecycle routes to /api/issues/*
-- [ ] panopticon-cli-64h: Create /api/review/* routes
-- [ ] panopticon-cli-ub1: Create /api/show/* observation routes
-- [ ] panopticon-cli-a6h: Create /api/admin/* plumbing routes
-- [ ] panopticon-cli-7zw: Update packages/contracts RPC types
-- [ ] panopticon-cli-41f: Update frontend RPC client and Zustand store
-- [ ] panopticon-cli-njd: Replace hardcoded legacy command strings in frontend
-- [ ] panopticon-cli-9kq: Update kanban card + inspector panel action labels
-- [ ] panopticon-cli-y4k: First-launch upgrade announcement banner
-- [x] panopticon-cli-i3m: Updated USAGE.md and INDEX.md (commit: 84e61770)
-- [ ] panopticon-cli-mjv: Update doc references in all PRDs
-- [ ] panopticon-cli-auj: Update hook scripts and installed shell aliases
-- [ ] panopticon-cli-302: pan doctor: flag legacy invocations
-- [x] panopticon-cli-oo1: Plain-text fixture test for pan --help (commit: 1f3b4e09)
-- [ ] panopticon-cli-xqq: Umbrella /pan skill with dispatch
-- [ ] panopticon-cli-fqg: Rename skills to match new CLI verbs
-- [ ] panopticon-cli-8y6: Skill template
-- [ ] panopticon-cli-ix7: Rewrite skill descriptions CLI-first
-- [ ] panopticon-cli-naa: Curate 8-10 flat shortcut skills
-- [ ] panopticon-cli-t1p: pan sync deletes legacy skill files
-- [ ] panopticon-cli-gsq: Plain-text fixture test for synced skill set
-- [x] panopticon-cli-cf4: CHANGELOG entry with full migration table (commit: b38c071d)
+Move stray root-level artifacts into purpose-specific homes under `docs/`, update
+the one internal reference that breaks, and document a root-directory policy so
+future contributors know where similar artifacts belong. No source-code or package
+reorganization; no content rewrites.
 
-## Key Decisions
-- D1: PRD exists at docs/prds/planned/pan-command-taxonomy-reorg.md, active copy at docs/prds/active/pan-705/
-- D2: All Phase 1-3 CLI bead pattern is: register new command path in src/cli/index.ts pointing to existing handler
+## Discovery Findings
 
-## Specialist Feedback
-(none yet)
-- **[2026-04-14T15:43Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
-- **[2026-04-14T15:44Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
-- **[2026-04-14T17:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
-- **[2026-04-14T17:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/004-review-agent-changes-requested.md`
-- **[2026-04-14T17:42Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/005-review-agent-changes-requested.md`
-- **[2026-04-14T17:43Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/006-review-agent-changes-requested.md`
-- **[2026-04-14T17:58Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/007-review-agent-changes-requested.md`
-- **[2026-04-14T18:23Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/008-review-agent-changes-requested.md`
-- **[2026-04-14T18:36Z] verification-gate → FAILED** — `.planning/feedback/009-verification-gate-failed.md`
-- **[2026-04-14T18:45Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/010-review-agent-changes-requested.md`
-- **[2026-04-14T18:49Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/011-review-agent-changes-requested.md`
-- **[2026-04-14T18:59Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/012-review-agent-changes-requested.md`
-- **[2026-04-14T19:10Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/013-review-agent-changes-requested.md`
-- **[2026-04-14T19:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/014-review-agent-changes-requested.md`
-- **[2026-04-14T19:42Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/015-review-agent-changes-requested.md`
-- **[2026-04-14T19:56Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
-- **[2026-04-14T20:19Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/017-review-agent-changes-requested.md`
-- **[2026-04-14T20:27Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/018-review-agent-changes-requested.md`
-- **[2026-04-14T20:39Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/019-review-agent-changes-requested.md`
-- **[2026-04-14T20:58Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/020-review-agent-changes-requested.md`
-- **[2026-04-14T21:23Z] merge-agent → CI-FAILURE** — `.planning/feedback/021-merge-agent-ci-failure.md`
-- **[2026-04-14T21:24Z] merge-agent → CI-FAILURE** — `.planning/feedback/022-merge-agent-ci-failure.md`
-- **[2026-04-14T21:26Z] merge-agent → CI-FAILURE** — `.planning/feedback/023-merge-agent-ci-failure.md`
-- **[2026-04-14T21:28Z] merge-agent → CI-FAILURE** — `.planning/feedback/024-merge-agent-ci-failure.md`
-- **[2026-04-14T21:30Z] merge-agent → CI-FAILURE** — `.planning/feedback/025-merge-agent-ci-failure.md`
-- **[2026-04-14T21:32Z] merge-agent → CI-FAILURE** — `.planning/feedback/026-merge-agent-ci-failure.md`
-- **[2026-04-14T21:34Z] merge-agent → CI-FAILURE** — `.planning/feedback/027-merge-agent-ci-failure.md`
-- **[2026-04-14T21:36Z] merge-agent → CI-FAILURE** — `.planning/feedback/028-merge-agent-ci-failure.md`
-- **[2026-04-14T21:38Z] merge-agent → CI-FAILURE** — `.planning/feedback/029-merge-agent-ci-failure.md`
-- **[2026-04-14T21:39Z] merge-agent → CI-FAILURE** — `.planning/feedback/030-merge-agent-ci-failure.md`
-- **[2026-04-14T21:40Z] merge-agent → CI-FAILURE** — `.planning/feedback/031-merge-agent-ci-failure.md`
-- **[2026-04-14T21:42Z] merge-agent → CI-FAILURE** — `.planning/feedback/032-merge-agent-ci-failure.md`
-- **[2026-04-14T21:44Z] merge-agent → CI-FAILURE** — `.planning/feedback/033-merge-agent-ci-failure.md`
-- **[2026-04-14T21:45Z] merge-agent → CI-FAILURE** — `.planning/feedback/034-merge-agent-ci-failure.md`
-- **[2026-04-14T21:46Z] merge-agent → CI-FAILURE** — `.planning/feedback/035-merge-agent-ci-failure.md`
-- **[2026-04-14T21:48Z] merge-agent → CI-FAILURE** — `.planning/feedback/036-merge-agent-ci-failure.md`
-- **[2026-04-14T21:49Z] merge-agent → CI-FAILURE** — `.planning/feedback/037-merge-agent-ci-failure.md`
-- **[2026-04-14T21:50Z] merge-agent → CI-FAILURE** — `.planning/feedback/038-merge-agent-ci-failure.md`
+### Root artifacts to move (confirmed present)
+
+Markdown (5):
+- `AGENT_AUDIT_REPORT.md`
+- `BUGS_FOUND.md`
+- `gemini-gaps-found.md`
+- `IMPLEMENTATION_SUMMARY.md`
+- `PAN-428-CODEX-FEEDBACK.md`
+
+Screenshots (9):
+- `command-deck-full.png`, `command-deck.png`
+- `composer-fullpage.png`, `composer-visible.png`
+- `dashboard-home.png`
+- `dropdown-narrow.png`, `dropdown-open.png`
+- `final-dropdown-test.png`
+- `normal-viewport.png`
+
+### Reference impact (grep across repo, excluding node_modules/.venv/.git/planning/spec)
+
+- **Markdown references:** only one real internal reference —
+  `docs/AGENT_TYPES_INDEX.md:109` mentions `AGENT_AUDIT_REPORT.md` in prose.
+  Must be updated to the new path under `docs/audits/`.
+- **Screenshot references:** **zero**. All nine PNGs are orphan captures with no
+  inbound links from any `.md`, `.mdx`, `.json`, `.ts`, `.tsx`, `.html`, or `.css`.
+  Safe to move as a batch.
+
+### Destination directories (none exist yet)
+
+- `docs/audits/` — must be created
+- `docs/history/` — must be created
+- `docs/screenshots/root-cleanup/` — must be created (`docs/screenshots/` itself
+  also does not exist)
+
+### Stays at root (spec policy, unchanged)
+
+Canonical entrypoints, standard metadata, and the intentional top-level `.mdx`
+docs-site entries: `README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
+`LICENSE`, `package.json`, `bun.lock`, `bunfig.toml`, `tsconfig.json`,
+`tsdown.config.ts`, `vitest.config.ts`, `vitest.workspace.ts`, `typedoc.json`,
+`commitlint.config.js`, `.gitignore`, `.gitattributes`, `.eslintrc.json`,
+`.env.remote`, `introduction.mdx`, `quickstart.mdx`, `concepts.mdx`.
+
+## Decisions
+
+1. **History destination: `docs/history/`** — matches spec default; clearest
+   "retained for context, not front door" signal.
+2. **Screenshots destination: single batch to `docs/screenshots/root-cleanup/`** —
+   since zero references exist, there's no ambiguity and no risk of broken links.
+   Redistribution by feature would invent taxonomy for files nothing points at.
+3. **Root policy lives in `docs/REPO-ARTIFACTS.md`** — the existing canonical
+   artifact-policy doc. Extend it with a new "Repo root policy" section rather
+   than creating a new top-level policy file (which would itself add to docs/
+   clutter).
+4. **Use `git mv`** for every move to preserve history (spec constraint).
+5. **Out of scope:** other stray-looking root files not in the spec
+   (`debug-review.mjs`, `excalidraw.log`, `devcontainer.json`, `docker-compose.devcontainer.yml`,
+   `favicon.svg`, `docs.json`, `dev`). The spec is explicit about the file list;
+   expanding scope mid-session would violate the no-drift rule.
+
+## Approach
+
+Five beads, each independently reviewable and mergeable:
+
+1. **Move audit artifacts** to `docs/audits/` (3 files).
+2. **Move historical writeups** to `docs/history/` (2 files).
+3. **Move root screenshots** to `docs/screenshots/root-cleanup/` (9 files).
+4. **Update the one broken reference** in `docs/AGENT_TYPES_INDEX.md`.
+5. **Document the root-directory policy** by extending `docs/REPO-ARTIFACTS.md`.
+
+Beads 1-3 are independent and can land in any order. Bead 4 depends on bead 1
+(new path must exist). Bead 5 is independent and can land in parallel.
+
+## Acceptance (feature-level)
+
+- Root directory no longer contains any of the 14 listed artifacts.
+- All 14 files are reachable under `docs/` at the decided destinations with git
+  history preserved.
+- `docs/AGENT_TYPES_INDEX.md` references the new audit-report path.
+- `docs/REPO-ARTIFACTS.md` contains a "Repo root policy" section stating what
+  belongs at root and where audits/history/screenshots go.
+- No other repo behavior changes; `npm run typecheck`, `npm run lint`,
+  `npm test` all pass (these shouldn't be affected at all).
+
+## Risks
+
+- **Low overall.** File moves are mechanical and the reference surface is tiny.
+- Only real risk: missing a markdown image link that wasn't caught by grep
+  (e.g. split across lines). Mitigation: the reference-update bead includes a
+  final grep sweep for the old basenames before marking complete.
