@@ -14,6 +14,7 @@ optional:
   - PR_URL
   - POLYREPO_DIRS
   - ACCEPTANCE_CRITERIA
+  - FLYWHEEL_CHANGE
 ---
 # Code Review — {{ISSUE_ID}}
 
@@ -186,6 +187,33 @@ curl -s -X POST {{API_URL}}/api/specialists/done \
 ```
 
 Do NOT message the work agent directly from this prompt. The `/api/specialists/done` handler is responsible for status updates, downstream specialist handoff, and delivering review feedback to the work agent when needed.
+
+{{#FLYWHEEL_CHANGE}}
+## Flywheel-Change Skill Lint Gate (MANDATORY)
+
+This is a `flywheel-change` issue — a skill improvement PR. The diff must only touch `skills/` files.
+
+**Run skill lint for every modified SKILL.md:**
+
+```bash
+# Find all modified SKILL.md files
+git diff --name-only {{DIFF_BASE}}...HEAD | grep 'skills/.*/SKILL.md'
+```
+
+For each modified SKILL.md, validate it manually:
+1. **Has `audience` field**: `grep "^audience:" <path>` — must be one of `operator`, `agent`, or `both`
+2. **Has `name` field**: `grep "^name:" <path>` — required
+3. **Has `description` field**: `grep "^description:" <path>` — required
+4. **Frontmatter is valid YAML**: file starts with `---` and has a closing `---`
+5. **No out-of-scope files**: the diff must NOT touch any file outside `skills/`
+
+**Block approval if:**
+- Any modified SKILL.md is missing `audience`, `name`, or `description`
+- Any file outside `skills/` is in the diff
+- `audience` value is not one of `operator`, `agent`, or `both`
+
+Use the request-changes endpoint with specific lint error details if any check fails.
+{{/FLYWHEEL_CHANGE}}
 
 ## Never Close GitHub Issues
 

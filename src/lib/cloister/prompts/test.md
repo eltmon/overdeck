@@ -17,6 +17,7 @@ optional:
   - POLYREPO_DIRS
   - MULTI_SUITE
   - DNS_DOMAIN
+  - FLYWHEEL_CHANGE
 ---
 # Test Execution — {{ISSUE_ID}}
 
@@ -139,6 +140,29 @@ If containers are running, test these URLs:
 **If ANY of these fail, the test FAILS** — report via the API with details about which check failed.
 If containers are NOT running, note it but don't fail (containers may not be configured for this project).
 {{/DNS_DOMAIN}}
+
+{{#FLYWHEEL_CHANGE}}
+## Flywheel-Change Sync Validation Gate (MANDATORY)
+
+This is a `flywheel-change` issue — a skill improvement PR. Run `pan sync --dry-run` to validate the sync layout.
+
+```bash
+cd "{{WORKSPACE}}"
+pan sync --dry-run 2>&1 | tee /tmp/pan-sync-dry-run.txt
+echo "EXIT: $?"
+```
+
+**Pass if:**
+- `pan sync --dry-run` exits 0
+- Output shows no broken symlinks or routing errors
+- Each modified skill is listed at its correct audience-routed destination
+
+**Fail if:**
+- `pan sync --dry-run` exits non-zero
+- Output contains "Error:", "broken symlink", or "ENOENT"
+
+Report failure via the API with the full dry-run output.
+{{/FLYWHEEL_CHANGE}}
 
 ## Never Close GitHub Issues
 

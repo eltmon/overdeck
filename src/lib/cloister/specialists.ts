@@ -1062,6 +1062,24 @@ exec script -qfaec "bash '${innerScript}'" "${logFilePath}"
  * and wakeSpecialistWithTask (queue-based wake). Extracted to avoid the bug where
  * ephemeral test specialists got empty prompts (PAN-511).
  */
+
+/**
+ * Detect if a workspace is associated with a flywheel-change issue.
+ * Reads .planning/STATE.md and checks for the 'flywheel-change' marker written
+ * by autoFinalizePlanForFlywheelChange() during planning (PAN-709).
+ */
+function isFlywheelChangeWorkspace(workspace: string | undefined): boolean {
+  if (!workspace || workspace === 'unknown') return false;
+  try {
+    const stateMd = join(workspace, '.planning', 'STATE.md');
+    if (!existsSync(stateMd)) return false;
+    const content = readFileSync(stateMd, 'utf-8');
+    return content.includes('flywheel-change');
+  } catch {
+    return false;
+  }
+}
+
 export async function buildTestAgentPromptContent(task: {
   issueId: string;
   branch?: string;
@@ -1127,6 +1145,8 @@ export async function buildTestAgentPromptContent(task: {
   const multiSuite = testIsPolyrepo || (!!testConfigs && Object.keys(testConfigs).length > 1);
   const dnsDomain = testProjectConfig?.workspace?.dns?.domain || '';
 
+  const isFlywheelChange = isFlywheelChangeWorkspace(task.workspace);
+
   return renderPrompt({
     name: 'test',
     vars: {
@@ -1144,6 +1164,7 @@ export async function buildTestAgentPromptContent(task: {
       POLYREPO_DIRS: testIsPolyrepo ? testGitInfo.gitDirs.map(d => basename(d)).join(', ') : '',
       MULTI_SUITE: multiSuite,
       DNS_DOMAIN: dnsDomain,
+      FLYWHEEL_CHANGE: isFlywheelChange,
     },
   });
 }
@@ -2646,6 +2667,8 @@ export async function wakeSpecialistWithTask(
         ? `cd "${gitDir}" && git diff ${diffBase}...HEAD -- <file>`
         : `cd "${workspace}" && git diff ${diffBase}...HEAD -- <file>`;
 
+      const isFlywheelChange = isFlywheelChangeWorkspace(workspace);
+
       prompt = renderPrompt({
         name: 'review',
         vars: {
@@ -2659,6 +2682,7 @@ export async function wakeSpecialistWithTask(
           API_URL: apiUrl,
           PR_URL: task.prUrl || '',
           POLYREPO_DIRS: isPolyrepo ? gitDirs.map(d => basename(d)).join(', ') : '',
+          FLYWHEEL_CHANGE: isFlywheelChange,
         },
       });
       break;
