@@ -191,7 +191,7 @@ describe('workflows', () => {
       };
       const result = await deepWipe(ctx);
 
-      const resetStep = result.steps.find(s => s.step === 'deep-wipe:reset-issue');
+      const resetStep = result.steps.find(s => s.step === 'reset:reset-issue');
       expect(resetStep).toBeDefined();
     });
 
@@ -199,7 +199,7 @@ describe('workflows', () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await deepWipe(ctx, { resetIssue: false });
 
-      const resetStep = result.steps.find(s => s.step === 'deep-wipe:reset-issue');
+      const resetStep = result.steps.find(s => s.step === 'reset:reset-issue');
       expect(resetStep).toBeUndefined();
     });
 

@@ -107,6 +107,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     mockGetTmuxSessionName.mockImplementation((name: string) => `${name}-session`);
     mockSessionExists.mockReturnValue(false);
     mockGetAgentRuntimeState.mockReturnValue(null);
+    // Prevent mock return values from bleeding between tests
+    mockResolveProjectFromIssue.mockReturnValue(null);
   });
 
   afterEach(() => {
