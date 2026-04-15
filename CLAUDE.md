@@ -286,3 +286,19 @@ VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
 - Fetches from `GET /api/workspaces/:issueId/plan`
+
+## Skill changes go through the flywheel pipeline
+
+**Never edit skill files (`skills/*/SKILL.md`) directly** — unless you are explicitly implementing a `flywheel-change` issue or a blocker-tier substrate bug that requires an immediate skill fix.
+
+The self-improving flywheel works as follows:
+1. Retro-agent fires automatically after every merge and writes a surprise-centered report to `docs/flywheel/retros/`
+2. Synthesis groups retros by pattern and files `flywheel-change` PAN issues when the 3-signal threshold is met
+3. Work agents implement `flywheel-change` issues with narrow scope (skill files only)
+
+**Two approved escape hatches for proposing a skill improvement:**
+
+1. **File a `flywheel-change` PAN issue** with the proposed patch in the issue body. This gives the improvement a ticket, review, and inspection. Label it `flywheel-change`.
+2. **Write a retro note** in `docs/flywheel/retros/` following the retro schema. Synthesis picks it up on the next cycle.
+
+Inline skill edits during `/all-up` or any non-`flywheel-change` work session are never acceptable. They bypass review, skip audience validation, and disrupt the signal-to-threshold accounting that drives the improvement loop.
