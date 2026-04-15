@@ -10,12 +10,15 @@
  *   pan specialists done merge PAN-83 --status passed
  */
 
+import { existsSync } from 'fs';
+import { join } from 'path';
 import chalk from 'chalk';
 import {
   setReviewStatus,
   getReviewStatus,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed';
@@ -70,6 +73,18 @@ export async function doneCommand(
       if (options.notes) update.testNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
+        // Mirror server route logic: mark ready for merge when tests pass
+        const project = resolveProjectFromIssue(normalizedIssueId);
+        if (project) {
+          const workspacePath = join(
+            project.projectPath,
+            'workspaces',
+            `feature-${normalizedIssueId.toLowerCase()}`,
+          );
+          if (existsSync(workspacePath)) {
+            update.readyForMerge = true;
+          }
+        }
       } else {
         console.log(chalk.yellow(`✗ Tests ${options.status} for ${normalizedIssueId}`));
       }
