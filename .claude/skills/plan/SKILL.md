@@ -162,7 +162,14 @@ Create `.planning/plan.vbrief.json` following the vBRIEF schema. This replaces t
         "narrative": {
           "Action": "<Exact what to do: file paths, function names, specific changes>"
         },
-        "subItems": []
+        "subItems": [
+          {
+            "id": "<parent-id>.<ac-name>",
+            "title": "<Specific testable acceptance criterion>",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
       }
     ],
     "edges": [
@@ -176,18 +183,38 @@ Create `.planning/plan.vbrief.json` following the vBRIEF schema. This replaces t
 }
 ```
 
+**CRITICAL vBRIEF Structure Rules:**
+
+1. **Acceptance criteria MUST be subItems, NEVER top-level items.** Each AC is nested under its parent task/requirement as a `subItems` entry. Top-level items with `kind: "acceptance_criterion"` will fail vBRIEF Studio validation.
+
+2. **Hierarchical IDs required.** SubItem IDs must use dot-notation from the parent: `parent-id.ac-name`. Example: `work-prompt-ac.injects-ac-per-bead`. The parent prefix is mandatory.
+
+3. **Only actionable tasks are top-level items.** Requirements, tasks, and architectural decisions go in `items[]`. Acceptance criteria go in `subItems[]` under their parent.
+
+4. **Every task SHOULD have at least one acceptance criterion** in `subItems` to define "done."
+
 **Bead sizing guidance:**
 - Each item should be completable in one focused session
 - Include exact file paths and function names in the Action field
 - Set `edges` to capture blocking relationships between items
 - `difficulty`: trivial (typo/config), simple (1 file), medium (2-3 files), complex (multi-system)
 - 10-40 items for a typical feature; more for large refactors
+- SubItems (acceptance criteria) are NOT converted to beads — they're verification checklists
 
 **After writing the JSON file:**
 ```bash
 # Mark planning complete so the pipeline picks it up
 touch workspaces/feature-<issue-id-lowercase>/.planning/.planning-complete
 ```
+
+**Cloister hand-off:** When the `.planning-complete` marker is created, Cloister automatically:
+1. Reads `plan.vbrief.json` from the workspace
+2. Calls `createBeadsFromVBrief()` to convert vBRIEF items into beads tasks
+3. Preserves dependency relationships from `edges` (blocking order)
+4. Includes acceptance criteria in bead descriptions
+5. Starts the work agent with the beads ready for implementation
+
+You do NOT need to run `bd create` manually — Cloister handles the full conversion.
 
 ### Step 6: Stitch Integration (UI Work)
 
