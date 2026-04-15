@@ -909,6 +909,99 @@ function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 
 // Stuck Work Agent Detection
 // ============================================================================
 
+// ============================================================================
+// Q&A / Waiting-on-Human Terminal-Tail Detection (Defense-in-Depth)
+// ============================================================================
+
+/**
+ * Default regex patterns for detecting Q&A / approval prompts in tmux output.
+ * Conservative — false-positive rate must stay low.
+ * Source of truth: deacon.qaPatterns in ~/.panopticon/config.yaml (overrides this).
+ */
+const DEFAULT_QA_PATTERNS: RegExp[] = [
+  /\[y\/N\]/i,                     // Standard yes/no prompt
+  /\[y\/n\/\?]/i,                  // Yes/No/? prompt
+  /Do you want to proceed\?/i,     // Generic confirmation
+  /Press any key to continue/i,    // Press-key pause
+  /Waiting for input/i,            // Explicit wait
+  /^>\s*$/m,                       // Standalone > at line start (shell/REPL prompt)
+  /claude-code approval prompt/i,  // Claude Code hook marker
+  /Approve\? \[y\/N\]/i,           // Tool approval prompt
+];
+
+/**
+ * Load Q&A detection patterns from config (falls back to defaults).
+ */
+function loadQaPatterns(): RegExp[] {
+  try {
+    const { loadConfig } = require('../config.js') as typeof import('../config.js');
+    const config = loadConfig();
+    const customPatterns = (config as any).deacon?.qaPatterns as string[] | undefined;
+    if (customPatterns && customPatterns.length > 0) {
+      return customPatterns.map((p: string) => new RegExp(p, 'i'));
+    }
+  } catch { /* Non-fatal — use defaults */ }
+  return DEFAULT_QA_PATTERNS;
+}
+
+/**
+ * Check if tmux output contains a Q&A / approval prompt.
+ * Returns the matched pattern string, or null if no match.
+ */
+export function detectQaPromptInOutput(output: string, patterns?: RegExp[]): string | null {
+  const patternList = patterns ?? DEFAULT_QA_PATTERNS;
+  for (const pattern of patternList) {
+    if (pattern.test(output)) {
+      return pattern.source;
+    }
+  }
+  return null;
+}
+
+/**
+ * Defense-in-depth: scan tmux output of all live work agents and set
+ * `waiting-on-human` state if a Q&A prompt is detected.
+ *
+ * Only sets the state if pre-tool-hook has NOT already set it (hook wins).
+ * Reads last 20 lines via capturePaneAsync (async, no blocking calls).
+ */
+async function checkWorkAgentsForQaPrompts(): Promise<string[]> {
+  const actions: string[] = [];
+  const agents = listRunningAgents();
+  const patterns = loadQaPatterns();
+
+  for (const agent of agents) {
+    if (!agent.tmuxActive) continue;
+    if (!agent.id.startsWith('agent-')) continue;
+
+    // Check current runtime state — hook wins if it already set waiting-on-human
+    const rs = getAgentRuntimeState(agent.id);
+    if (rs?.state === 'waiting-on-human') continue; // Hook already set it — skip
+
+    // Only check agents in active state (not idle/stopped/etc)
+    if (rs && rs.state !== 'active') continue;
+
+    try {
+      const output = await capturePaneAsync(agent.id, 20);
+      if (!output.trim()) continue;
+
+      const matchedPattern = detectQaPromptInOutput(output, patterns);
+      if (matchedPattern) {
+        saveAgentRuntimeState(agent.id, {
+          state: 'waiting-on-human',
+          waitingReason: `terminal-tail fallback: matched pattern /${matchedPattern}/`,
+          waitingStartedAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString(),
+        });
+        actions.push(`Q&A detected (terminal-tail) for ${agent.id}: /${matchedPattern}/`);
+        console.log(`[deacon] Q&A terminal-tail detection: ${agent.id} — matched /${matchedPattern}/`);
+      }
+    } catch { /* Non-fatal — capturePaneAsync may fail on dead sessions */ }
+  }
+
+  return actions;
+}
+
 /**
  * Thinking duration threshold before an agent is considered stuck.
  * Claude Code shows "Thinking... (Xm Ys)" in tmux — if the duration
@@ -2721,6 +2814,11 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // Lazy agent correction DISABLED — sends messages to agents which costs
   // API credits. Human operator can check lazy behavior via dashboard.
+
+  // Q&A terminal-tail detection (defense-in-depth): sets waiting-on-human if hook is silent
+  const qaActions = await checkWorkAgentsForQaPrompts();
+  actions.push(...qaActions);
+  for (const a of qaActions) addLog('info', a, state.patrolCycle);
 
   // Stuck work agent recovery still runs — it only intervenes after 10 minutes
   // of no tool use, escalating to Escape/Ctrl-C/respawn (not paid messages).

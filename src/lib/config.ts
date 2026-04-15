@@ -88,10 +88,18 @@ export interface ShadowConfig {
   };
 }
 
+export interface DeaconConfig {
+  /** Conservative regex patterns (as strings) for detecting Q&A / approval prompts
+   *  in tmux output. Used as a fallback when pre-tool-hook is unavailable.
+   *  Each string is compiled to a RegExp at runtime. */
+  qaPatterns?: string[];
+}
+
 export interface PanopticonConfig {
   panopticon: {
     version: string;
   };
+  deacon?: DeaconConfig;
   sync: {
     backup_before_sync: boolean;
     auto_sync?: boolean;
