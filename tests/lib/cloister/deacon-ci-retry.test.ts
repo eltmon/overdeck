@@ -1,28 +1,34 @@
 /**
  * Tests for checkFailedMergeRetry — CI transient retry state machine.
+ * Tests for checkPostReviewCommits — ciRetryMap.delete on new-commit detection.
  *
  * Covers:
  *  - CI transient retry attempts merge (sets readyForMerge=true)
  *  - Respects 2-minute cooldown between retries
  *  - Exhausts at count=5, writes feedback + notifies agent exactly once
  *  - count>5 (post-exhaustion): just logs, no duplicate feedback
+ *  - checkPostReviewCommits clears ciRetryMap when new commits arrive, enabling
+ *    subsequent transient retries from checkFailedMergeRetry
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
+import { execSync } from 'child_process';
 
 // ── Module-level mocks ──────────────────────────────────────────────────────
 
 const mockSetReviewStatus = vi.fn();
+const mockLoadReviewStatuses = vi.fn();
 const mockSessionExists = vi.fn();
 const mockSendKeysAsync = vi.fn();
 const mockWriteFeedbackFile = vi.fn();
+const mockResolveProjectFromIssue = vi.fn();
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
-  loadReviewStatuses: vi.fn().mockReturnValue({}),
+  loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
@@ -71,7 +77,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
-  resolveProjectFromIssue: vi.fn().mockReturnValue(null),
+  resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
   findProjectByPath: vi.fn().mockReturnValue(null),
 }));
 
@@ -104,14 +110,17 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
 
   // Import after mocks are registered — we also need the ciRetryMap export
   let checkFailedMergeRetry: () => Promise<string[]>;
+  let checkPostReviewCommits: () => Promise<string[]>;
   let ciRetryMap: Map<string, { count: number; lastAttempt: number }>;
 
   beforeEach(async () => {
     vi.resetModules();
     mockSetReviewStatus.mockReset();
+    mockLoadReviewStatuses.mockReset().mockReturnValue({});
     mockSessionExists.mockReset().mockReturnValue(false);
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
+    mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
 
     // Back up existing file
     if (existsSync(REVIEW_STATUS_FILE)) {
@@ -122,6 +131,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkFailedMergeRetry = mod.checkFailedMergeRetry;
+    checkPostReviewCommits = mod.checkPostReviewCommits;
     ciRetryMap = mod.ciRetryMap;
     ciRetryMap.clear(); // Reset in-memory state for each test
   });
@@ -220,5 +230,67 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
 
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('(f) checkPostReviewCommits clears ciRetryMap on new commits, enabling retry on next patrol', async () => {
+    // Set up a real git workspace so execAsync('git rev-parse HEAD') works
+    const projectPath = mkdtempSync(join(tmpdir(), 'pan-deacon-ci-retry-'));
+    const workspacePath = join(projectPath, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
+    mkdirSync(workspacePath, { recursive: true });
+    execSync('git init && git commit --allow-empty -m "fix: ci checks"', {
+      cwd: workspacePath,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test.com',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test.com',
+      },
+    });
+
+    try {
+      // loadReviewStatuses returns an issue that has passed review at an OLD commit
+      // (different from the current HEAD → triggers the reset path)
+      mockLoadReviewStatuses.mockReturnValue({
+        [ISSUE_ID]: {
+          reviewStatus: 'passed',
+          readyForMerge: true,
+          mergeStatus: undefined,
+          reviewedAtCommit: 'deadbeef00000000000000000000000000000000',
+        },
+      });
+      // resolveProjectFromIssue returns our temp project so the workspace path resolves
+      mockResolveProjectFromIssue.mockReturnValue({ projectPath });
+
+      // Simulate exhausted CI retries from a previous merge failure
+      ciRetryMap.set(ISSUE_ID, { count: 6, lastAttempt: Date.now() - 5 * 60_000 });
+      expect(ciRetryMap.has(ISSUE_ID)).toBe(true);
+
+      // checkPostReviewCommits detects new commits and should clear the CI retry counter
+      const resetActions = await checkPostReviewCommits();
+
+      expect(resetActions).toHaveLength(1);
+      expect(resetActions[0]).toContain(ISSUE_ID);
+      // ciRetryMap must be cleared — the fix under test
+      expect(ciRetryMap.has(ISSUE_ID)).toBe(false);
+      // mergeRetryCount also reset to 0
+      expect(mockSetReviewStatus).toHaveBeenCalledWith(
+        ISSUE_ID,
+        expect.objectContaining({ mergeRetryCount: 0 }),
+      );
+
+      // On the next patrol: checkFailedMergeRetry should now treat this as a fresh start
+      // Write a CI-failed status so checkFailedMergeRetry has something to act on
+      writeStatusFile({ [ISSUE_ID]: CI_FAILED_STATUS });
+      const retryActions = await checkFailedMergeRetry();
+
+      expect(retryActions).toHaveLength(1);
+      expect(retryActions[0]).toMatch(/CI transient retry/);
+      expect(retryActions[0]).toMatch(/attempt 1\/5/); // count starts at 1, not blocked at 6
+      expect(ciRetryMap.get(ISSUE_ID)?.count).toBe(1);
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
   });
 });
