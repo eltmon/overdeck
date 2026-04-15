@@ -75,7 +75,7 @@
     "build:desktop:linux": "cd apps/desktop && bun run build && bun run dist:linux",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "vitest run --no-file-parallelism",
+    "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",
