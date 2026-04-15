@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus } from 'lucide-react';
+import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Hourglass } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
 import { selectGodViewAgentOutput, selectGodViewAgentStatuses } from '../../hooks/useGodViewSocket';
 import { useDashboardStore } from '../../lib/store';
@@ -18,6 +18,7 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   stuck: <AlertTriangle className="w-3 h-3" />,
   dead: <XCircle className="w-3 h-3" />,
   stopped: <Minus className="w-3 h-3" />,
+  'waiting-on-human': <Hourglass className="w-3 h-3" />,
 };
 
 const STATUS_GLOW: Record<string, string> = {
@@ -26,6 +27,7 @@ const STATUS_GLOW: Record<string, string> = {
   stuck: 'gv-breathe-stuck',
   dead: 'gv-breathe-dead',
   stopped: 'gv-breathe-dead',
+  'waiting-on-human': 'gv-breathe-warning',
 };
 
 const PHASE_COLORS: Record<string, string> = {
@@ -145,8 +147,20 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         </div>
       </div>
 
-      {/* Pending question indicator */}
-      {agent.hasPendingQuestion && (
+      {/* Waiting-on-human badge (PAN-709): agent is paused awaiting operator response */}
+      {agent.waitingOnHuman && (
+        <div
+          className="absolute top-1 right-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
+          style={{ background: 'var(--gv-amber)22', color: 'var(--gv-amber)', border: '1px solid var(--gv-amber)44', animation: 'gv-pulse 1.5s ease-in-out infinite' }}
+          title="Awaiting your input"
+        >
+          <Hourglass className="w-2.5 h-2.5" />
+          <span>Awaiting input</span>
+        </div>
+      )}
+
+      {/* Pending question indicator (fallback when not waiting-on-human) */}
+      {!agent.waitingOnHuman && agent.hasPendingQuestion && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full"
           style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}

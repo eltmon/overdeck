@@ -325,6 +325,8 @@ const getAgentsRoute = HttpRouter.add(
               resolutionCount: runtimeState?.resolutionCount || 0,
               contextPercent,
               initialContextPercent,
+              waitingOnHuman: runtimeState?.state === 'waiting-on-human',
+              waitingReason: runtimeState?.state === 'waiting-on-human' ? (runtimeState?.waitingReason as string | undefined) : undefined,
             };
           })
         ));

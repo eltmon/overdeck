@@ -97,6 +97,8 @@ export interface Agent {
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
   hasSession?: boolean;          // Whether a resumable Claude session exists
   lifecycle?: WorkAgentLifecycle;
+  waitingOnHuman?: boolean;      // True when runtime.json state === 'waiting-on-human' (PAN-709)
+  waitingReason?: string;        // e.g. 'agent-question', 'tool-approval', 'notification'
 }
 
 export interface AgentHealth {

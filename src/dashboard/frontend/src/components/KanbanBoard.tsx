@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Hourglass } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -2131,6 +2131,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
   const hasPendingQuestion = hasActualPendingQuestion(agent);
+  const isWaitingOnHuman = !isTerminal && (agent?.waitingOnHuman === true);
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
   const pipelineCallToAction = canonical === 'in_review' ? getPipelineCallToAction(reviewStatus) : null;
   const phaseLabel =
@@ -2626,8 +2627,23 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Ready
               </span>
             )}
+            {/* Waiting-on-human badge (PAN-709) - runtime.json shows waiting-on-human state */}
+            {isWaitingOnHuman && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect();
+                }}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium animate-pulse cursor-pointer"
+                style={{ background: 'hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))', border: '1px solid hsl(var(--warning)/0.4)' }}
+                title={`Agent is awaiting your input${agent?.waitingReason ? ` (${agent.waitingReason})` : ''} — click to open terminal`}
+              >
+                <Hourglass className="w-3 h-3" />
+                Awaiting input
+              </span>
+            )}
             {/* Awaiting Input badge - agent is waiting for user response */}
-            {!isTerminal && hasPendingQuestion && (
+            {!isWaitingOnHuman && !isTerminal && hasPendingQuestion && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
