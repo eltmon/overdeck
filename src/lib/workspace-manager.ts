@@ -638,17 +638,37 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
-  // Install dependencies using the project's package manager
+  // Install dependencies using the project's package manager.
+  // Stale or partial node_modules from a previous failed install can leave broken symlinks
+  // (e.g. packages/contracts/node_modules/tsdown → missing .bun store entry) that make
+  // Docker init containers fail with ERR_MODULE_NOT_FOUND. Wipe any existing node_modules
+  // before installing so bun always starts from a clean slate.
   progress('Installing dependencies', projectConfig.package_manager || 'detecting...');
   const pkgManager = projectConfig.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
+
+  // Remove stale node_modules directories (root + nested workspace packages) before install
+  const staleModulesDirs = [
+    join(workspacePath, 'node_modules'),
+    ...(projectConfig.workspace_packages ?? []).map(p => join(workspacePath, p.path, 'node_modules')),
+  ];
+  for (const dir of staleModulesDirs) {
+    if (existsSync(dir)) {
+      await execAsync(`rm -rf "${dir}"`);
+    }
+  }
+
   const installCmd = pkgManager === 'bun' ? 'bun install' : `${pkgManager} install`;
   try {
-    await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000 });
+    // No timeout — cold installs on fresh machines can take several minutes.
+    // A failed install leaves a broken workspace; treat it as fatal.
+    await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8' });
     result.steps.push(`Installed dependencies (${pkgManager})`);
     progress('Installing dependencies', `${pkgManager} — done`, 'complete');
   } catch (installErr: any) {
-    result.steps.push(`Dependency install warning: ${installErr.message?.slice(0, 100)}`);
-    progress('Installing dependencies', 'Warning (non-fatal)', 'complete');
+    const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
+    result.errors.push(msg);
+    progress('Installing dependencies', 'Failed — workspace creation aborted', 'complete');
+    return result;
   }
 
   // Build workspace packages (e.g., @panopticon/contracts) so types resolve correctly
@@ -657,10 +677,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     progress('Building workspace packages', workspacePackages.map(p => p.path).join(', '));
     for (const pkg of workspacePackages) {
       try {
-        await execAsync(pkg.build_command, { cwd: join(workspacePath, pkg.path), encoding: 'utf-8', timeout: 30000 });
+        // No timeout — tsdown builds can be slow on first run with a cold cache.
+        await execAsync(pkg.build_command, { cwd: join(workspacePath, pkg.path), encoding: 'utf-8' });
         result.steps.push(`Built workspace package: ${pkg.path}`);
       } catch (buildErr: any) {
-        result.steps.push(`Build warning (${pkg.path}): ${buildErr.message?.slice(0, 100)}`);
+        const msg = `Workspace package build failed (${pkg.path}): ${buildErr.message?.slice(0, 200)}`;
+        result.errors.push(msg);
+        progress('Building workspace packages', `Failed on ${pkg.path} — workspace creation aborted`, 'complete');
+        return result;
       }
     }
     progress('Building workspace packages', 'Packages built', 'complete');
