@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-712
+# Planning Session: PAN-711
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -68,30 +68,33 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 ---
 
 ## Issue Details
-- **ID:** PAN-712
-- **Title:** fix: stale pan work/cloister/specialists refs in .claude/skills/
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/712
+- **ID:** PAN-711
+- **Title:** PAN-705 follow-up: remove transitional route aliases after merge
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/711
 
 ## Description
-## Summary
+## Context
 
-Code review for PAN-705 flagged stale references in `.claude/skills/` project-level skill files. These files contain `pan work`, `cloister`, or `specialists` references that predated the PAN-705 command taxonomy reorganization.
+PAN-705 renames the dashboard specialist feedback routes:
+- `/api/workspaces/:id/review-status` → `/api/review/:id/status`
+- `/api/workspaces/:id/approve` → `/api/issues/:id/approve`
+- `/api/workspaces/:id/merge` → `/api/issues/:id/merge`
+- (and similar for approve/merge/review-trigger/review-reset/review-request)
 
-## What to fix
+To allow specialist reviews to run on the PAN-705 branch itself against the main-built dashboard, we kept the old paths as transitional aliases that delegate to the new handlers.
 
-Audit all files under `.claude/skills/` for:
-- `pan work start/done/kill/recover/tell/resume/approve/close/reopen/sync-main/wipe` → update to new verbs
-- `pan cloister` → update to new command group
-- `pan specialists` → update to new command group
+## What this issue does
 
-## Why
+Once PAN-705 is merged to `main` and the production dashboard is rebuilt, the old route aliases are dead code. Remove them:
 
-Stale skill docs mislead agents using those skills about the correct CLI syntax.
+- Delete the alias registrations in `src/dashboard/server/routes/workspaces.ts`
+- Delete any fallback handling added to the specialist prompts for the old paths
+- Confirm no external callers still hit the old paths (grep + one full pipeline run)
 
-## Acceptance criteria
+## Blocker
 
-- [ ] All `.claude/skills/*.md` files pass a grep for stale refs from PAN-705's taxonomy changes
-- [ ] Updated files verified against current `pan --help` output
+- Depends on PAN-705 being merged and dashboard rebuilt on main
+- Do not start until at least one full work→review→test→merge cycle has succeeded on the new routes
 
 ---
 
@@ -180,10 +183,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-712: <issue title>"
+    "description": "Plan for PAN-711: <issue title>"
   },
   "plan": {
-    "id": "pan-712",
+    "id": "pan-711",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
@@ -192,7 +195,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/712", "label": "PAN-712", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/711", "label": "PAN-711", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -208,7 +211,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-712"
+          "issueLabel": "pan-711"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -230,7 +233,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-712")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-711")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
