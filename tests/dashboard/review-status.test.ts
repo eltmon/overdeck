@@ -160,7 +160,10 @@ describe('setReviewStatus', () => {
     expect(result.mergeNotes).toBeUndefined();
   });
 
-  it('keeps readyForMerge true when verification has failed (test pass is authoritative)', () => {
+  it('preserves explicit readyForMerge=true even when verificationStatus=failed', () => {
+    // verificationStatus no longer blocks readyForMerge — normalizeReviewStatus only
+    // clears it for mergeStatus=merged, reviewStatus!=passed, or testStatus!=passed.
+    // The post-rebase gate in triggerMerge() is the authoritative quality gate.
     const result = setReviewStatus('PAN-113', {
       reviewStatus: 'passed',
       testStatus: 'passed',
