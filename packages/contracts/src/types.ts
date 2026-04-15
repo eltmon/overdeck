@@ -91,6 +91,9 @@ export const ReviewStatusSnapshot = Schema.Struct({
   readyForMerge: Schema.optional(Schema.Boolean),
   updatedAt: Schema.optional(Schema.String),
   prUrl: Schema.optional(Schema.String),
+  /** Persistent stuck flag — set by divergence guard, cleared by /unstick */
+  stuck: Schema.optional(Schema.Boolean),
+  stuckReason: Schema.optional(Schema.String),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

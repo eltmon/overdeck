@@ -78,7 +78,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason'>): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -90,6 +90,8 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     readyForMerge: status.readyForMerge === true,
     updatedAt: status.updatedAt,
     prUrl: status.prUrl || undefined,
+    stuck: status.stuck === true ? true : undefined,
+    stuckReason: status.stuckReason || undefined,
   };
 }
 

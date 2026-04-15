@@ -29,6 +29,9 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/review/:issueId/request
  *   POST   /api/review/:issueId/reset
  *   DELETE /api/review/:issueId/pending
+ *
+ * Stuck-state endpoints (/api/workspaces/):
+ *   POST   /api/workspaces/:issueId/unstick
  */
 
 import { exec, spawn } from 'node:child_process';
@@ -55,6 +58,7 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
+  clearWorkspaceStuck,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
@@ -2975,6 +2979,43 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/workspaces/:issueId/unstick ────────────────────────
+//
+// Clears the persistent stuck flag set by markWorkspaceStuck() so Deacon
+// resumes normal patrol for this workspace. Does NOT restart the agent —
+// the user should do that separately via the start-agent UI once they have
+// resolved the divergence (e.g. by syncing main and re-approving).
+
+const postWorkspaceUnstickRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/unstick',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+    if (!workspaceInfo.exists) {
+      return jsonResponse(
+        { success: false, error: 'Workspace does not exist' },
+        { status: 404 }
+      );
+    }
+
+    const current = getReviewStatus(issueId);
+    if (!current?.stuck) {
+      return jsonResponse(
+        { success: false, error: `Workspace ${issueId} is not stuck` },
+        { status: 400 }
+      );
+    }
+
+    clearWorkspaceStuck(issueId);
+    console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${current.stuckReason ?? 'unknown'})`);
+
+    return jsonResponse({ success: true, issueId, previousReason: current.stuckReason });
+  }))
+);
+
 // ─── Route: POST /api/issues/:issueId/sync-main ──────────────────────────
 
 const postWorkspaceSyncMainRoute = HttpRouter.add(
@@ -4210,6 +4251,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceReviewRoute,
   postWorkspaceRequestReviewRoute,
   postWorkspaceResetReviewRoute,
+  postWorkspaceUnstickRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
   postWorkspaceApproveRoute,
