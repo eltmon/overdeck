@@ -502,6 +502,8 @@ export interface PatrolResult {
   specialists: HealthCheckResult[];
   actionsToken: string[];
   massDeathDetected: boolean;
+  /** Agents currently in waiting-on-human state (for dashboard badge display). */
+  waitingAgents?: Array<{ agentId: string; issueId?: string; reason?: string; since?: string }>;
 }
 
 /**
@@ -968,6 +970,22 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     const recovery = stuckRecoveryState.get(agent.id);
     if (recovery && (now - recovery.lastAttempt) < STUCK_RECOVERY_COOLDOWN_MS) {
       continue;
+    }
+
+    // Skip stuck-recovery for agents waiting on human input (use 4x threshold instead)
+    const agentRuntimeState = getAgentRuntimeState(agent.id);
+    if (agentRuntimeState?.state === 'waiting-on-human') {
+      const waitingStartedAt = agentRuntimeState.waitingStartedAt
+        ? new Date(agentRuntimeState.waitingStartedAt).getTime()
+        : (agentRuntimeState.lastActivity ? new Date(agentRuntimeState.lastActivity).getTime() : now);
+      const waitingMs = now - waitingStartedAt;
+      const extendedThreshold = STUCK_THINKING_THRESHOLD_MS * 4; // 40 minutes
+      if (waitingMs < extendedThreshold) {
+        // Still within grace period — don't treat as stuck
+        continue;
+      }
+      // Exceeded extended threshold — fall through to stuck recovery
+      console.log(`[deacon] Agent ${agent.id} exceeded waiting-on-human threshold (${Math.round(waitingMs / 60000)}m) — treating as stuck`);
     }
 
     // Capture tmux output to check for stuck thinking
@@ -2810,12 +2828,28 @@ export async function runPatrol(): Promise<PatrolResult> {
   // accumulate in the shared state object and are persisted once here.
   saveState(state);
 
+  // Collect agents in waiting-on-human state for dashboard badge display
+  const waitingAgents: PatrolResult['waitingAgents'] = [];
+  for (const agent of listRunningAgents()) {
+    if (!agent.tmuxActive) continue;
+    const rs = getAgentRuntimeState(agent.id);
+    if (rs?.state === 'waiting-on-human') {
+      waitingAgents.push({
+        agentId: agent.id,
+        issueId: rs.currentIssue,
+        reason: rs.waitingReason,
+        since: rs.waitingStartedAt || rs.lastActivity,
+      });
+    }
+  }
+
   const result: PatrolResult = {
     cycle: state.patrolCycle,
     timestamp: state.lastPatrol,
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
+    waitingAgents: waitingAgents.length > 0 ? waitingAgents : undefined,
   };
 
   lastPatrolResult = result;
