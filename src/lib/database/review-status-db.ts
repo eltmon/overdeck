@@ -27,9 +27,10 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes,
-        updated_at, ready_for_merge, auto_requeue_count, pr_url
+        updated_at, ready_for_merge, auto_requeue_count, pr_url,
+        stuck, stuck_reason, stuck_at, stuck_details
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -45,7 +46,11 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         updated_at            = excluded.updated_at,
         ready_for_merge       = excluded.ready_for_merge,
         auto_requeue_count    = excluded.auto_requeue_count,
-        pr_url                = excluded.pr_url
+        pr_url                = excluded.pr_url,
+        stuck                 = excluded.stuck,
+        stuck_reason          = excluded.stuck_reason,
+        stuck_at              = excluded.stuck_at,
+        stuck_details         = excluded.stuck_details
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -62,6 +67,10 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.readyForMerge ? 1 : 0,
       s.autoRequeueCount ?? null,
       s.prUrl ?? null,
+      s.stuck ? 1 : 0,
+      s.stuckReason ?? null,
+      s.stuckAt ?? null,
+      s.stuckDetails ?? null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -160,6 +169,11 @@ interface DbReviewStatusRow {
   ready_for_merge: number;
   auto_requeue_count: number | null;
   pr_url: string | null;
+  // PAN-653: persistent stuck state
+  stuck: number;
+  stuck_reason: string | null;
+  stuck_at: string | null;
+  stuck_details: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -179,6 +193,59 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     readyForMerge: row.ready_for_merge === 1,
     autoRequeueCount: row.auto_requeue_count ?? undefined,
     prUrl: row.pr_url ?? undefined,
+    stuck: row.stuck === 1 ? true : undefined,
+    stuckReason: row.stuck_reason ?? undefined,
+    stuckAt: row.stuck_at ?? undefined,
+    stuckDetails: row.stuck_details ?? undefined,
     history: history.length > 0 ? history : undefined,
   });
+}
+
+// ============== Stuck state helpers (PAN-653) ==============
+
+/**
+ * Mark a workspace as stuck with a reason and optional JSON details.
+ * Persists across dashboard restarts. Deacon will skip stuck workspaces.
+ *
+ * @param issueId - Issue ID (e.g. "PAN-653"), case as stored in DB
+ * @param reason  - Short reason code (e.g. "main_diverged")
+ * @param details - Optional structured details (stored as JSON string)
+ */
+export function markWorkspaceStuck(
+  issueId: string,
+  reason: string,
+  details?: Record<string, unknown>,
+): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const detailsJson = details ? JSON.stringify(details) : null;
+
+  // Use INSERT OR IGNORE + UPDATE so we don't reset other columns.
+  // If no row exists yet, create a minimal placeholder first.
+  db.prepare(`
+    INSERT OR IGNORE INTO review_status (
+      issue_id, review_status, test_status, updated_at, ready_for_merge,
+      stuck, stuck_reason, stuck_at, stuck_details
+    ) VALUES (?, 'pending', 'pending', ?, 0, 1, ?, ?, ?)
+  `).run(issueId, now, reason, now, detailsJson);
+
+  db.prepare(`
+    UPDATE review_status
+    SET stuck = 1, stuck_reason = ?, stuck_at = ?, stuck_details = ?, updated_at = ?
+    WHERE issue_id = ?
+  `).run(reason, now, detailsJson, now, issueId);
+}
+
+/**
+ * Clear the stuck flag for a workspace (called when the human clicks "Unstick").
+ * Re-enables Deacon patrol for this workspace.
+ */
+export function clearWorkspaceStuck(issueId: string): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE review_status
+    SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
+    WHERE issue_id = ?
+  `).run(now, issueId);
 }

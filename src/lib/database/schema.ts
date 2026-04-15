@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 /**
  * Initialize the complete database schema.
@@ -76,7 +76,12 @@ export function initSchema(db: Database.Database): void {
       updated_at            TEXT NOT NULL,
       ready_for_merge       INTEGER NOT NULL DEFAULT 0,
       auto_requeue_count    INTEGER DEFAULT 0,
-      pr_url                TEXT
+      pr_url                TEXT,
+      -- PAN-653: persistent stuck state (set when main diverges mid-approve)
+      stuck                 INTEGER NOT NULL DEFAULT 0,
+      stuck_reason          TEXT,
+      stuck_at              TEXT,
+      stuck_details         TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -568,6 +573,16 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
     } catch { /* already exists */ }
+  }
+
+  // v19 → v20: add persistent stuck state columns to review_status (PAN-653)
+  // Each ALTER TABLE is wrapped in try/catch — SQLite requires separate statements
+  // per column and columns may pre-exist if a prior attempt partially ran.
+  if (currentVersion < 20) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

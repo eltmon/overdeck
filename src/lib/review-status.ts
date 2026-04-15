@@ -8,6 +8,8 @@ import {
   deleteReviewStatus as dbDelete,
   getReviewStatusFromDb,
   getAllReviewStatusesFromDb,
+  markWorkspaceStuck as dbMarkStuck,
+  clearWorkspaceStuck as dbClearStuck,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -397,5 +399,42 @@ export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FIL
     } catch (err) {
       console.error('[review-status] SQLite delete failed (continuing with JSON):', err);
     }
+  }
+}
+
+// ============== Stuck state helpers (PAN-653) ==============
+
+/**
+ * Mark a workspace as stuck with a reason and optional JSON details.
+ * Persists across dashboard restarts. Deacon will skip stuck workspaces.
+ *
+ * @param issueId - Issue ID (e.g. "PAN-653")
+ * @param reason  - Short reason code (e.g. "main_diverged")
+ * @param details - Optional structured details (e.g. {localSha, remoteSha})
+ */
+export function markWorkspaceStuck(
+  issueId: string,
+  reason: string,
+  details?: Record<string, unknown>,
+): void {
+  try {
+    dbMarkStuck(issueId, reason, details);
+    console.log(`[review-status] Marked ${issueId} as stuck: ${reason}`);
+  } catch (err) {
+    console.error(`[review-status] Failed to mark ${issueId} as stuck:`, err);
+  }
+}
+
+/**
+ * Clear the stuck flag for a workspace.
+ * Called when the human clicks "Unstick" in the dashboard.
+ * Re-enables Deacon patrol for this workspace.
+ */
+export function clearWorkspaceStuck(issueId: string): void {
+  try {
+    dbClearStuck(issueId);
+    console.log(`[review-status] Cleared stuck state for ${issueId}`);
+  } catch (err) {
+    console.error(`[review-status] Failed to clear stuck state for ${issueId}:`, err);
   }
 }
