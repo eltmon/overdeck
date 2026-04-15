@@ -4,7 +4,7 @@ import ora, { type Ora } from 'ora';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync } from 'fs';
 import { join, basename, resolve } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
-import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
+import { generateClaudeMd, generateAgentSkillsSection, TemplateVariables } from '../../lib/template.js';
 import { mergeSkillsIntoWorkspace, applyProjectTemplateOverlay } from '../../lib/skills-merge.js';
 import { listRunningAgents } from '../../lib/agents.js';
 import {
@@ -468,7 +468,11 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     };
 
     const claudeMd = generateClaudeMd(projectRoot, variables);
-    writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMd);
+    const agentSkillsSection = generateAgentSkillsSection(projectRoot);
+    const claudeMdContent = agentSkillsSection
+      ? `${claudeMd}\n\n---\n\n${agentSkillsSection}`
+      : claudeMd;
+    writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMdContent);
 
     // Merge skills, agents, and rules (unless disabled)
     let skillsResult = { added: [] as string[], updated: [] as string[], skipped: [] as string[], overlayed: [] as string[] };
