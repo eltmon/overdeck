@@ -9,7 +9,7 @@ import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { markAsSynced } from '../../lib/shadow-state.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 
-function checkGhCli(): boolean {
+export function checkGhCli(): boolean {
   try {
     execSync('which gh', { stdio: 'pipe' });
     return true;
@@ -18,7 +18,7 @@ function checkGhCli(): boolean {
   }
 }
 
-function findPRForBranch(workspace: string): { number: number; url: string } | null {
+export function findPRForBranch(workspace: string): { number: number; url: string } | null {
   try {
     // Get current branch
     const branch = execSync('git rev-parse --abbrev-ref HEAD', {
@@ -44,7 +44,7 @@ function findPRForBranch(workspace: string): { number: number; url: string } | n
   }
 }
 
-function mergePR(workspace: string, prNumber: number): { success: boolean; error?: string } {
+export function mergePR(workspace: string, prNumber: number): { success: boolean; error?: string } {
   try {
     // NOTE: Do NOT use --delete-branch - feature branches should be preserved for history
     execSync(`gh pr merge ${prNumber} --squash`, {
@@ -58,7 +58,7 @@ function mergePR(workspace: string, prNumber: number): { success: boolean; error
   }
 }
 
-async function updateLinearStatus(apiKey: string, issueIdentifier: string): Promise<boolean> {
+export async function updateLinearStatus(apiKey: string, issueIdentifier: string): Promise<boolean> {
   try {
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
