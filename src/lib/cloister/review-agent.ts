@@ -3,13 +3,13 @@
  */
 
 import { existsSync } from 'fs';
-import { readFile, writeFile, mkdir, appendFile } from 'fs/promises';
+import { readFile, writeFile, unlink, mkdir, appendFile } from 'fs/promises';
 import { join, dirname } from 'path';
+import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import { spawn, exec } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
-import { extractAcceptanceCriteria, formatAcceptanceCriteria } from '../vbrief/acceptance-criteria.js';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSession, killSession, sessionExists } from '../tmux.js';
 import { getProviderEnvForModel } from '../agents.js';
@@ -21,11 +21,6 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { writeFeedbackFile } from './feedback-writer.js';
-import {
-  getSessionId,
-  recordWake,
-  getTmuxSessionName,
-} from './specialists.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REVIEW_HISTORY_DIR = join(SPECIALISTS_DIR, 'review-agent');
@@ -99,60 +94,6 @@ export function getReviewAgents(): ReviewAgentConfig[] {
     // Config load failure → use defaults
   }
   return DEFAULT_REVIEW_AGENTS;
-}
-
-/**
- * Build the prompt for review-agent (non-blocking)
- */
-async function buildReviewPrompt(context: ReviewContext): Promise<string> {
-  const templatePath = join(__dirname, 'prompts', 'review-agent.md');
-
-  if (!existsSync(templatePath)) {
-    throw new Error(`Review agent prompt template not found at ${templatePath}`);
-  }
-
-  const template = await readFile(templatePath, 'utf-8');
-
-  // Get files changed from PR if not provided (non-blocking)
-  let filesChanged = context.filesChanged || [];
-  if (filesChanged.length === 0) {
-    filesChanged = await getFilesChangedFromPR(context.prUrl, context.projectPath);
-  }
-
-  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-
-  // Build acceptance criteria section from vBRIEF plan
-  let acSection = '';
-  if (context.workspace) {
-    const criteria = extractAcceptanceCriteria(context.workspace);
-    if (criteria.length > 0) {
-      acSection = formatAcceptanceCriteria(criteria);
-    }
-  }
-
-  // Build variables for template processing
-  const vars: Record<string, string | undefined> = {
-    apiUrl,
-    projectPath: context.projectPath,
-    prUrl: context.prUrl,
-    issueId: context.issueId,
-    branch: context.branch,
-    filesChanged: filesChanged.length > 0
-      ? filesChanged.map((f) => `  - ${f}`).join('\n')
-      : '  (Use `gh pr diff` to see changes)',
-    acceptanceCriteria: acSection || undefined,
-  };
-
-  // Substitute variables in template
-  let prompt = template;
-  for (const [key, value] of Object.entries(vars)) {
-    if (value !== undefined) {
-      prompt = prompt.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-    }
-  }
-
-  // Wrap in orchestration markers for context delineation
-  return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
 }
 
 /**
@@ -373,11 +314,8 @@ async function postGitHubPRReview(
     }
 
     // Write body to temp file to avoid shell escaping issues
-    const { tmpdir } = await import('os');
-    const { join: pathJoin } = await import('path');
-    const { writeFile: writeFileAsync, unlink: unlinkAsync } = await import('fs/promises');
-    const bodyFile = pathJoin(tmpdir(), `pan-review-body-${context.issueId}-${Date.now()}.md`);
-    await writeFileAsync(bodyFile, reviewBody, 'utf-8');
+    const bodyFile = join(tmpdir(), `pan-review-body-${context.issueId}-${Date.now()}.md`);
+    await writeFile(bodyFile, reviewBody, 'utf-8');
 
     try {
       let event: string;
@@ -394,7 +332,7 @@ async function postGitHubPRReview(
       );
       console.log(`[review-agent] Posted GitHub PR review (${event}) for PR #${prNumber}`);
     } finally {
-      unlinkAsync(bodyFile).catch(() => {});
+      unlink(bodyFile).catch(() => {});
     }
   } catch (err: any) {
     console.warn(`[review-agent] Failed to post GitHub PR review: ${err.message}`);
