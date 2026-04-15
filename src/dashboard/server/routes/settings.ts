@@ -20,6 +20,7 @@ import {
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
+  getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
   updateProviderApiKey,
@@ -121,6 +122,17 @@ const getOptimalDefaultsRoute = HttpRouter.add(
   '/api/settings/optimal-defaults',
   httpHandler(Effect.try({
     try: () => jsonResponse(getOptimalDefaultsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+// ─── Route: GET /api/settings/minimax-defaults ───────────────────────────────
+
+const getMiniMaxDefaultsRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/minimax-defaults',
+  httpHandler(Effect.try({
+    try: () => jsonResponse(getMiniMaxDefaultsApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -611,6 +623,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getSettingsRoute,
   getAvailableModelsRoute,
   getOptimalDefaultsRoute,
+  getMiniMaxDefaultsRoute,
   getClaudeAuthRoute,
   getOpenAIAuthRoute,
   postTestApiKeyRoute,
