@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-699
+# Planning Session: PAN-539
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -68,52 +68,108 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 ---
 
 ## Issue Details
-- **ID:** PAN-699
-- **Title:** Conversation view renders tool calls out of terminal order
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/699
+- **ID:** PAN-539
+- **Title:** feat: image paste support in activity view conversation
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/539
 
 ## Description
-## Problem
+## Summary
 
-The dashboard conversation view shows messages and tool calls in a different order than they actually occurred in the terminal/JSONL stream. Most visible with parallel tool calls and around session compact boundaries.
+Enable users to paste images (Ctrl+V or drag-drop) into the conversation input in the activity view. The image should be transmitted to the underlying tmux Claude Code session and appear as a vision input in the conversation.
 
-## Root cause
+## How Claude Code Handles Images (Research Findings)
 
-`src/dashboard/server/services/conversation-service.ts` — `parseConversationMessages` (lines ~172-342) walks the JSONL file and appends entries to the output array in file-read order. It never sorts.
+Claude Code's `Read` tool automatically handles image file paths. When a message includes `@/path/to/image.png`, Claude Code invokes the Read tool on that path, base64-encodes the bytes (with `sharp` compression if >5MB), and sends it as an Anthropic API `{type:"image"}` content block.
 
-Specific issues:
+Supported extensions: `png`, `jpg`, `jpeg`, `gif`, `webp`
 
-1. **No post-parse ordering.** `entry.timestamp` is captured for `createdAt` but never used as a sort key. If Claude Code buffers or writes entries non-monotonically, they render in whatever order they hit disk.
-2. **`pendingToolUse` map assumes forward order** (lines ~193, 228-296). On `tool_result`, it does `pendingToolUse.get(block.tool_use_id)`. If a result shows up before its `tool_use` (parallel tool calls, buffered writes, compact boundary), the lookup misses and the pair is orphaned — the tool_use flushes as unpaired at line ~328.
-3. **No `sequence` field.** Messages have no tiebreaker when timestamps collide at second/microsecond precision.
-4. **Compact boundary** (`parseFromLastCompactBoundary`, ~415-420) can slice mid-stream if the marker isn't written atomically with surrounding entries.
+This means **no X11 clipboard manipulation is needed** — the image can be injected entirely through the existing `load-buffer + paste-buffer` text mechanism Panopticon already uses.
 
-## How t3code handles this (reference)
+## Implementation Plan
 
-`/home/eltmon/Projects/t3code/apps/web/src/session-logic.ts`:
+### 1. Browser — Capture paste event
+In the conversation composer (activity view input), listen for `paste` events:
+```typescript
+onPaste={(e) => {
+  const items = Array.from(e.clipboardData.items);
+  const imageItem = items.find(i => i.type.startsWith('image/'));
+  if (imageItem) {
+    e.preventDefault();
+    const blob = imageItem.getAsFile();
+    handleImagePaste(blob);
+  }
+}}
+```
+Also support drag-drop: `onDrop` with `dataTransfer.files`.
 
-- `compareActivitiesByOrder` (~778-804) sorts by `sequence` → `createdAt` → lifecycle rank (started/progress/completed) → id. Ordering is independent of parse sequence.
-- Tool pairing is projected server-side via `turnId` + kind prefix with `.started`/`.progress`/`.completed` variants, so the UI receives pre-paired, pre-ordered activities.
-- `deriveTimelineEntries` (~827-853) does a final `.toSorted((a,b) => a.createdAt.localeCompare(b.createdAt))` on messages before render.
+Show a thumbnail preview in the composer input (similar to how t3code shows image attachments) so the user sees what they pasted before sending.
 
-## Proposed fix
+### 2. Upload — Send image to server
+POST to a new endpoint `/api/agents/:agentId/upload-image` as `multipart/form-data`.
 
-In `parseConversationMessages`:
+### 3. Server — Save to workspace temp file
+```typescript
+// Save to agent workspace temp dir (cleaned up periodically)
+const imgPath = path.join(agentWorkspacePath, '.tmp', `paste-${uuid()}.png`);
+await fs.writeFile(imgPath, imageBuffer);
+return { path: imgPath };
+```
+Save inside the agent's workspace so the path is accessible to Claude Code running there.
 
-1. Capture a `sequence` counter during parse (monotonic, per-entry) and stash on each message/workLog entry.
-2. After the walk, sort the combined stream by `(timestamp, sequence)` before returning.
-3. Do a **second pass** to resolve `tool_result` entries whose `tool_use` hadn't been seen yet — keep an `unresolvedResults` map and re-merge once the matching `tool_use` is parsed. Never drop a result because it arrived first.
-4. Propagate `sequence` through the API so `MessagesTimeline.tsx` has a stable tiebreaker.
+### 4. Message injection
+When sending the message, prepend the `@path` reference:
+```
+@/home/eltmon/.panopticon/agents/agent-pan-xxx/workspace/.tmp/paste-abc123.png
 
-## Files to touch
+<user's message text>
+```
+Send via existing `load-buffer + paste-buffer + C-m` mechanism. Claude Code invokes the Read tool automatically on the `@path`, reads the image bytes, and attaches as vision input.
 
-- `src/dashboard/server/services/conversation-service.ts` — parse + sort + two-pass pairing
-- `src/dashboard/server/routes/agents.ts` — pass sequence through response shape
-- `src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx` — use sequence as tiebreaker if needed
+If the user pasted image with no text, send:
+```
+@/path/to/image.png
+```
 
-## Repro
+### 5. Cleanup
+Delete temp image files after the message is confirmed sent (or after a 5-min TTL).
 
-Any session with parallel tool calls (a single assistant turn issuing multiple `tool_use` blocks at once) tends to show the mis-ordering. Sessions that have hit `/compact` also reproduce around the boundary.
+## Why Not X11 Clipboard?
+
+The alternative (xclip + tmux send-keys C-v) also works but has downsides:
+- Requires `xclip` or `wl-clipboard` installed
+- Race condition between clipboard write and keystroke
+- Doesn't work in headless/remote/Wayland-only environments
+- Adds OS-level dependency
+
+The `@path` approach works everywhere tmux text injection works.
+
+## UI Spec
+
+**Composer input with image attached:**
+```
+┌─────────────────────────────────────────────┐
+│ [🖼 paste-abc123.png ×]                      │
+│                                              │
+│ What do you see in this screenshot?_         │
+│                                          ↵  │
+└─────────────────────────────────────────────┘
+```
+
+- Image thumbnail shown in composer before send
+- × button to remove the image
+- Multiple images supported (each gets its own `@path` line)
+- Paste on the image thumbnail area, drag-drop on the whole composer
+
+## Files to Change
+
+- `src/dashboard/frontend/src/components/MissionControl/ActivityView/index.tsx` — add paste/drop handler to input
+- `src/dashboard/server/routes/agents.ts` (or new `agent-uploads.ts`) — new `POST /api/agents/:id/upload-image` endpoint
+- `src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx` — may need image attachment display in timeline
+
+## Out of Scope
+
+- Video / non-image file attachments (separate issue)
+- Images in the Kanban card message composer (follow-on)
 
 ---
 
@@ -133,41 +189,6 @@ Use AskUserQuestion tool to ask contextual questions:
 - Any technical constraints or preferences?
 - What does "done" look like?
 - Are there edge cases we need to handle?
-
-### Playwright Isolation
-
-If the issue will require browser-based verification, encode that expectation clearly in STATE.md and acceptance criteria:
-- Playwright/browser verification must use an isolated browser instance/profile.
-- Agents must not depend on another agent's Playwright session or shared browser state.
-- Any required login/setup should be reproducible inside the isolated session.
-
-### Task Granularity — Decompose Aggressively
-
-**Default to the smallest bead you can defend.** Your job is to produce a *lot* of small, independently reviewable beads — not a handful of large ones.
-
-A well-sized bead has all of these properties:
-- **One focused change.** One command added, one file moved, one collapsed handler, one rename batch. If you need the word "and" in the title, it's probably two beads.
-- **Independently reviewable.** A reviewer can verify the acceptance criteria by reading the diff for this bead alone, without cross-referencing others.
-- **Independently mergeable.** Landing this bead on its own leaves the tree in a working state. If it can only ship as part of a set, it's a sub-step inside a larger bead, not a bead itself.
-- **Testable in isolation.** The acceptance criteria name a specific behavior you can exercise after this bead and no others.
-
-**When a PRD has phases, phases are NOT bead boundaries.** Phases are organizational scaffolding for humans reading the PRD. A single phase will typically decompose into many beads. For example, a phase that says "rename 10 commands" is 10 beads (or 10 sub-items under one rename bead), not 1.
-
-**Concrete heuristics:**
-- One collapsed command = one bead. (`pan show`, `pan review`, `pan issues`, `pan plan finalize` → four beads, not one.)
-- One renamed verb = one bead, unless several renames are mechanically identical and land in the same file — then they can be sub-items under one bead.
-- One admin group moved under a new namespace = one bead per group.
-- One distributed-skill rename batch = one bead per logical group (lifecycle shortcuts, admin namespace, umbrella skill, description rewrite sweep). Not one bead for "rename all skills."
-- One snapshot test = one bead.
-- One doc migration = one bead (per doc or per logical doc cluster, not one bead for "update all docs").
-
-**When in doubt, split.** The cost of too-small beads is mild (more rows to track); the cost of too-large beads is severe (reviewers can't reason about them, work agents deliver partial results, specialists can't pinpoint which acceptance criterion failed, and the `inspect` specialist can't verify mid-implementation). Err on the side of more beads.
-
-**What this does NOT mean:**
-- It does NOT mean ship partial features. CLAUDE.md's "Deliver Complete Features" rule still applies: every bead's acceptance criteria must be fully met before it's marked done, and every bead in the plan must ship before the issue itself is marked done. Decomposition is about *reviewability and verifiability*, not about scope reduction.
-- It does NOT mean creating beads for trivia that doesn't need tracking (e.g. "update one line in a comment"). If the acceptance criterion fits inside another bead's existing scope and tests, absorb it as a sub-item instead of inflating the bead count.
-
-If the user ever asks "should this be one bead or many?", the answer is almost always "many" unless you can point to a specific reason the work is genuinely indivisible (e.g. a single atomic rename that touches N call sites in one commit).
 
 ### Difficulty Estimation
 
@@ -202,19 +223,19 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-699: <issue title>"
+    "description": "Plan for PAN-539: <issue title>"
   },
   "plan": {
-    "id": "pan-699",
+    "id": "pan-539",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
-    "author": "agent:claude-opus-4-7",
+    "author": "agent:gpt-5.4-pro",
     "sequence": 1,
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/699", "label": "PAN-699", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/539", "label": "PAN-539", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -230,7 +251,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-539"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -252,7 +273,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-699")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-539")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled

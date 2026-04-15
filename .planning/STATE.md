@@ -1,113 +1,60 @@
-# PAN-569: Bulk-Close Issues from Kanban Board
+# PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: In Progress
-
-## Current Phase
-Implementing bead pan-569-2tt (useBulkSelection hook) — foundational frontend multi-select state management.
-
-## Completed Work
-- [x] pan-569-2tt: Created useBulkSelection hook (commit: 1faa8d57)
-- [x] pan-569-gsj: Added POST /api/issues/bulk-close-out endpoint (commit: 4d5c77c4)
-- [x] pan-569-eww: Added selection checkbox and selected styling to IssueCard (commit: ed884a93)
-- [x] pan-569-fqr: Created floating BulkActionBar component (commit: 3f27794b)
-- [x] pan-569-hsw: Added select-all checkbox to kanban column headers (commit: 1d6f5125)
-- [x] pan-569-1wb: Created BulkAgentWarningDialog component (commit: f65f2f9a)
-- [x] pan-569-7ce: Created BulkCloseOutProgress modal component (commit: f03c0f3c)
-- [x] pan-569-qly: Wired bulk close-out mutation into KanbanBoard (commit: 24a3d107)
-- [x] pan-569-kl3: Added selection checkboxes to list view rows (commit: fe126e50)
-
-## Remaining Work
-None — all beads implemented.
-
-## Current Phase
-Implementation complete. Waiting for inspections and tests to pass.
-
-## Key Decisions
-- (from plan) Close action runs full closeOut lifecycle per issue, not lightweight status move
-- (from plan) Sequential execution since each closeOut touches filesystem/git
-- (from plan) Reuse existing issue.statusChanged events, no new bulk event type
-
-## Key Decisions
-- (from plan) Close action runs full closeOut lifecycle per issue, not lightweight status move
-- (from plan) Sequential execution since each closeOut touches filesystem/git
-- (from plan) Reuse existing issue.statusChanged events, no new bulk event type
-
-## Specialist Feedback
-- None currently
-- **[2026-04-22T19:58Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
-- **[2026-04-22T20:06Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
-- **[2026-04-22T20:18Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T20:31Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T20:42Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T22:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T22:45Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
-- **[2026-04-22T22:53Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T23:05Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T23:19Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+## Status: Planning Complete
 
 ## Problem
 
-Closing issues on the kanban board is one-at-a-time. Sprint cleanup with 10+ done issues is tedious.
+Users cannot share images (screenshots, diagrams) with the Claude Code agent running inside the conversation panel. The activity view's `ComposerFooter` only accepts plain text. Users who want to reference a screenshot must manually upload it and type a file path — friction that breaks flow.
 
-## Decisions
+## Approach
 
-1. **Close action: close-out lifecycle** — Bulk close runs `closeOut()` per issue (full lifecycle: verify merge, archive planning, teardown workspace, close on tracker, clear review status). Not a lightweight status move.
+Claude Code's `Read` tool handles image paths natively: when a message contains `@/absolute/path.png`, Claude reads the bytes and attaches them as a vision content block. No X11 clipboard manipulation needed. This lets us implement image paste entirely via the existing `load-buffer + paste-buffer` text injection path.
 
-2. **Scope: close/done only** — No generic bulk status transitions. The action bar has a single "Close Out" action. Other transitions are a follow-up.
+**Flow:**
+1. User pastes (Ctrl+V) or drops an image onto the `ComposerFooter`
+2. Browser converts image to base64 and immediately POSTs to `/api/conversations/:name/upload-image`
+3. Server saves to OS temp dir (`/tmp/panopticon-paste-{uuid}.{ext}`)
+4. Thumbnail preview appears in the composer with a × button
+5. On submit: message is prefixed with `@/tmp/panopticon-paste-{uuid}.ext\n` lines before user text
+6. Claude Code reads the `@path`, base64-encodes the bytes, sends as vision block
+7. Server cleanup: a 5-min TTL interval purges stale temp files
 
-3. **Select-all: included** — Column header checkbox selects all visible issues in that column.
+## Key Decisions
 
-4. **Endpoint: `POST /api/issues/bulk-close-out`** — Deviates from the issue spec's `bulk-move-status` name because we're running close-out lifecycle, not a generic status move. Sequential execution (not parallel) since each closeOut touches filesystem/git.
+### Endpoint location: conversations.ts, NOT agents.ts
+The issue spec proposes `/api/agents/:agentId/upload-image`, but `ComposerFooter` sends messages to `/api/conversations/:name/message`. The upload endpoint should live alongside the message endpoint in `conversations.ts` as `/api/conversations/:name/upload-image`. The conversation record has `cwd` and `tmuxSession` available if needed for context.
 
-5. **Event emission: reuse per-issue events** — Each closeOut already emits `issue.statusChanged`. No new bulk event type needed. Existing reducers handle it unchanged.
+### Image storage: OS temp dir
+Saving to `os.tmpdir()` (typically `/tmp`) keeps images off the user's workspace. Claude Code can read any absolute path — `cwd` co-location is not required. Same pattern as `sendKeysAsync()` which already uses tmpdir for tmux buffer files.
 
-6. **Active-agent guardrail: warn and let user choose** — If any selected issues have running agents, show a warning dialog listing them. User can proceed (skips those) or cancel. This mirrors the existing single-issue AgentWarningDialog pattern.
+### Paste interception: wrapper div, not Lexical plugin
+Lexical captures paste events internally. Attaching `onPaste` on the `<div>` *around* `ComposerPromptEditor` and calling `e.preventDefault()` only when an image item is detected avoids fighting Lexical internals. Text paste falls through normally.
 
-7. **Execution model: sequential with progress** — closeOut is heavy (filesystem, git, tracker API). Run sequentially. Show a progress modal with per-issue status (pending/running/done/failed/skipped).
+### Upload timing: optimistic on paste (not deferred to submit)
+Image uploads to the server immediately when pasted. The thumbnail appears right away. If upload fails, an error badge replaces the thumbnail. This avoids a blocking delay when the user hits Enter.
 
-8. **Frontend architecture** — Extract `useBulkSelection` hook (not inline in 3373-line KanbanBoard.tsx). Floating action bar as a separate component.
+### Request format: JSON with base64
+Consistent with the existing `mission-control.ts` upload pattern. No multipart parsing library needed.
 
-## Architecture
+### Scope
+- **In scope**: `ComposerFooter` (used in `ConversationPanel` across both AgentSection/activity view and standalone conversations)
+- **Out of scope**: GodView ActionBar (agent messages), KanbanBoard composer (per issue spec)
+- Side effect: paste support lands everywhere `ConversationPanel` appears, not just activity view — this is correct and desirable behavior
 
-### Backend
-
-New route in `src/dashboard/server/routes/issues.ts`:
-```
-POST /api/issues/bulk-close-out
-Body: { issueIds: string[] }
-Response: { results: Array<{ issueId: string, success: boolean, error?: string, skipped?: boolean }> }
-```
-
-Iterates issueIds sequentially, calling `closeOut(ctx)` for each. Emits per-issue `issue.statusChanged` events (already done by existing close-out route logic). Returns aggregated results.
-
-### Frontend
-
-- `useBulkSelection(issues)` hook — manages `Set<string>` of selected issue IDs, provides toggle/selectAll/clear
-- Checkbox on each `IssueCard` (top-left corner, visible in selection mode)
-- Column header checkbox for select-all per column
-- `BulkActionBar` floating component at bottom — "N selected", "Close Out", "Cancel"
-- Confirmation dialog with active-agent warning if applicable
-- Progress modal during execution showing per-issue status
-
-### Key Files Modified
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/dashboard/server/routes/issues.ts` | New `POST /api/issues/bulk-close-out` endpoint |
-| `src/dashboard/frontend/src/components/KanbanBoard.tsx` | Wire useBulkSelection, render BulkActionBar, column select-all |
-| `src/dashboard/frontend/src/components/KanbanBoard.tsx` (IssueCard) | Add checkbox + selected styling |
-| `src/dashboard/frontend/src/hooks/useBulkSelection.ts` | New hook for multi-select state |
-| `src/dashboard/frontend/src/components/BulkActionBar.tsx` | New floating action bar component |
+| `src/dashboard/server/routes/conversations.ts` | New `POST /api/conversations/:name/upload-image` endpoint |
+| `src/dashboard/server/main.ts` | Register 5-min cleanup interval for temp paste files |
+| `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` | Paste/drop handlers, image state, thumbnail preview, `@path` injection on submit |
 
-### No New Event Types
+## Architecture Notes
 
-Reuse existing `issue.statusChanged` emitted per-issue by closeOut. No changes to `packages/contracts/src/events.ts` or `event-reducers.ts`.
-
-## Browser Verification
-
-Playwright/browser verification should use an isolated browser instance. Test:
-1. Select multiple issues via checkboxes
-2. Use select-all on a column
-3. Click Close Out, confirm dialog
-4. Verify issues move to done column
-5. Verify active-agent warning appears when applicable
+- Cleanup interval uses `glob` or `readdir` on tmpdir filtered by `panopticon-paste-` prefix
+- TTL: delete files older than 5 minutes
+- Cleanup must be `async` (no sync FS in server code)
+- Upload endpoint must use `fs/promises.writeFile` (no `writeFileSync`)
+- Multiple images: each gets its own `@path` line, prepended in order of paste
+- Preview: small thumbnail image + filename + × button row above the editor
+- After send: revoke all `URL.createObjectURL()` URLs, clear images state
