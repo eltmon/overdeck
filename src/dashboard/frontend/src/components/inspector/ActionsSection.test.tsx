@@ -207,6 +207,16 @@ describe('ActionsSection', () => {
     expect(screen.getByTestId('review-test-btn')).toBeInTheDocument();
   });
 
+  it('shows Re-Review label when merge failed after review and test passed', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        reviewStatus={makeReviewStatus({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false })}
+      />
+    );
+    expect(screen.getByText('Re-Review')).toBeInTheDocument();
+  });
+
   it('shows Create Workspace button when workspace does not exist and no agent', () => {
     const workspace: WorkspaceInfo = { exists: false, issueId: 'PAN-331' };
     render(<ActionsSection {...defaultProps} workspace={workspace} />);

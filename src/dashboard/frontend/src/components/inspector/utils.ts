@@ -26,6 +26,7 @@ export interface ReviewButtonState {
 interface ReviewButtonInput {
   reviewStatus: string;
   testStatus: string;
+  mergeStatus?: string;
   queuePosition?: number | null;
   activeSpecialist?: string | null;
   readyForMerge: boolean;
@@ -65,7 +66,7 @@ export function getReviewButtonState(
     const n = status.queuePosition;
     return { label: `Queued (${n}${getOrdinalSuffix(n)})`, disabled: true, spinning: false };
   }
-  if (status.readyForMerge) {
+  if (status.readyForMerge || (status.reviewStatus === 'passed' && status.testStatus === 'passed' && status.mergeStatus === 'failed')) {
     return { label: 'Re-Review', disabled: false, spinning: false };
   }
   return { label: 'Review & Test', disabled: false, spinning: false };

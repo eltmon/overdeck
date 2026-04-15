@@ -86,6 +86,8 @@ export function ActionsSection({
     : 0;
   const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
+  const isReReview = reviewStatus?.readyForMerge
+    || (reviewStatus?.reviewStatus === 'passed' && reviewStatus?.testStatus === 'passed' && reviewStatus?.mergeStatus === 'failed');
 
   if (reviewStatusLoading) {
     return (
@@ -167,7 +169,7 @@ export function ActionsSection({
         >
           {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
             <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-          {reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test'}
+          {isReReview ? 'Re-Review' : 'Review & Test'}
         </button>
 
         {/* Stop Agent */}

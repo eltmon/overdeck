@@ -65,6 +65,8 @@ import {
   saveAgentRuntimeState,
   getAgentRuntimeState,
   transitionIssueToInReview,
+  getAgentState,
+  spawnAgent,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
@@ -78,8 +80,68 @@ import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
+import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 
 const execAsync = promisify(exec);
+
+function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
+  if (!status) return false;
+  return status.readyForMerge === true
+    || status.reviewStatus === 'passed'
+    || status.testStatus === 'passed'
+    || (status.reviewStatus === 'passed' && status.testStatus === 'passed' && status.mergeStatus === 'failed');
+}
+
+async function ensureWorkAgentReadyForMerge(
+  issueId: string,
+  workspacePath: string,
+  rebaseMsg: string,
+): Promise<{ recovered: boolean; agentId: string; detail: string }> {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const lifecycle = getWorkAgentLifecycleState(agentId);
+
+  if (lifecycle.hasLiveTmuxSession) {
+    await messageAgent(agentId, rebaseMsg);
+    return { recovered: true, agentId, detail: 'Work agent already running; sent merge preparation request.' };
+  }
+
+  const agentState = getAgentState(agentId);
+  if (agentState) {
+    try {
+      await messageAgent(agentId, rebaseMsg);
+      const updatedLifecycle = getWorkAgentLifecycleState(agentId);
+      return {
+        recovered: true,
+        agentId,
+        detail: updatedLifecycle.canResumeSession
+          ? 'Resumed work agent and sent merge preparation request.'
+          : 'Restarted work agent and sent merge preparation request.',
+      };
+    } catch (err: any) {
+      if (!lifecycle.canStartFresh) {
+        throw err;
+      }
+    }
+  }
+
+  if (!lifecycle.canStartFresh) {
+    throw new Error(lifecycle.reason || `Work agent ${agentId} cannot be resumed or started for merge preparation.`);
+  }
+
+  const state = await spawnAgent({
+    issueId,
+    workspace: workspacePath,
+    phase: 'implementation',
+    agentType: 'work-agent',
+    prompt: rebaseMsg,
+  });
+
+  return {
+    recovered: true,
+    agentId,
+    detail: `Started fresh work agent ${state.id} and sent merge preparation request.`,
+  };
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -2459,6 +2521,101 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     }
 
     if (existingStatus?.reviewStatus === 'passed') {
+      if (shouldTreatAsRerun(existingStatus)) {
+        console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
+        setPendingOperation(issueId, 'review');
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          mergeStatus: 'pending',
+          readyForMerge: false,
+          autoRequeueCount: 0,
+          verificationCycleCount: 0,
+          verificationStatus: 'pending',
+          verificationNotes: undefined,
+          reviewNotes: undefined,
+          testNotes: undefined,
+          mergeNotes: undefined,
+        });
+
+        (async () => {
+          try {
+            transitionIssueToInReview(issueId, workspacePath).catch((err: any) => {
+              console.warn(`[request-review] Could not transition ${issueId} to in_review: ${err.message}`);
+            });
+
+            try {
+              if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+                await execAsync(
+                  flyExecCmd(
+                    workspaceInfo.vmName,
+                    `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`
+                  ),
+                  { encoding: 'utf-8', timeout: 30000 }
+                );
+              } else {
+                await execAsync(`git push origin ${branchName}`, {
+                  cwd: workspacePath,
+                  encoding: 'utf-8',
+                });
+              }
+            } catch (pushErr: any) {
+              console.log(`[request-review] Feature branch push note: ${pushErr.message}`);
+            }
+
+            const result = await wakeSpecialistOrQueue(
+              issueId,
+              workspacePath,
+              branchName,
+              'request-review'
+            );
+
+            if (result.success) {
+              if (result.dispatched || result.spawned || result.position || result.alreadyRunning) {
+                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+              }
+              if (result.position) {
+                console.log(`[request-review] Review specialist queued for ${issueId} at position ${result.position}`);
+              } else {
+                console.log(`[request-review] Spawned review specialist for ${issueId}`);
+              }
+            } else {
+              if (result.busy) {
+                console.log(
+                  `[request-review] Review specialist busy for ${issueId} — leaving pending for deacon retry`
+                );
+                setReviewStatus(issueId, { reviewStatus: 'pending' });
+              } else {
+                const errorMsg = result.error || 'Failed to dispatch review specialist';
+                console.error(
+                  `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${errorMsg}`
+                );
+                setReviewStatus(issueId, {
+                  reviewStatus: 'pending',
+                  mergeStatus: existingStatus.mergeStatus,
+                  readyForMerge: existingStatus.readyForMerge,
+                  reviewNotes: errorMsg,
+                });
+              }
+            }
+          } catch (error: any) {
+            console.error(`[request-review] Error:`, error);
+            setReviewStatus(issueId, {
+              reviewStatus: 'pending',
+              mergeStatus: existingStatus.mergeStatus,
+              readyForMerge: existingStatus.readyForMerge,
+              reviewNotes: error.message || 'Unknown error',
+            });
+          }
+        })();
+
+        return jsonResponse({
+          success: true,
+          rerun: true,
+          message: `Re-running review & test pipeline for ${issueId}`,
+        });
+      }
+
       if (existingStatus.testStatus === 'failed' || existingStatus.testStatus === 'pending' || existingStatus.testStatus === 'dispatch_failed') {
         console.log(
           `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test specialist`
@@ -3410,25 +3567,17 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const { postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
-    const { messageAgent } = await import('../../../lib/agents.js');
     const { sessionExists } = await import('../../../lib/tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
-    const agentRunning = sessionExists(agentId);
+    const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
-    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${agentRunning ? 'running' : 'stopped'})...`);
+    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${sessionExists(agentId) ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
-    if (!agentRunning) {
-      rebaseResult = {
-        success: false,
-        reason: `Work agent ${agentId} is not running. Merge requires the work agent to rebase onto ${targetBranch} and push.`,
-      };
-    } else {
-      // Agent is running — tell it to rebase and wait for the push
-      const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
-      await messageAgent(agentId, rebaseMsg);
-      console.log(`[merge] Sent rebase request to work agent ${agentId}`);
+    try {
+      const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
+      console.log(`[merge] ${recovery.detail}`);
 
       // Poll for the push: check if remote HEAD changed
       const { stdout: headBefore } = await execAsync(
@@ -3444,7 +3593,6 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
         await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
 
-        // Check if agent pushed
         try {
           await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
           const { stdout: headNow } = await execAsync(
@@ -3458,7 +3606,6 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           }
         } catch { /* fetch failed, retry */ }
 
-        // Check if agent is still alive
         if (!sessionExists(agentId)) {
           console.log(`[merge] Work agent ${agentId} stopped during rebase`);
           break;
@@ -3473,9 +3620,13 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
         };
       } else {
-        // Timed out
         rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
       }
+    } catch (recoveryErr: any) {
+      rebaseResult = {
+        success: false,
+        reason: recoveryErr.message || `Work agent ${agentId} could not be prepared for merge`,
+      };
     }
 
     if (!rebaseResult.success) {

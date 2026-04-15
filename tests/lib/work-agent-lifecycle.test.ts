@@ -123,4 +123,18 @@ describe('work-agent-lifecycle', () => {
 
     sessionExistsSpy.mockRestore();
   });
+
+  it('allows fresh start when agent state is missing and no live session exists', () => {
+    const agentId = getUniqueAgentId('missing-state');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const lifecycle = getWorkAgentLifecycleState(agentId);
+
+    expect(lifecycle.hasAgentState).toBe(false);
+    expect(lifecycle.canStartFresh).toBe(true);
+    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.recommendedAction).toBe('start');
+
+    sessionExistsSpy.mockRestore();
+  });
 });

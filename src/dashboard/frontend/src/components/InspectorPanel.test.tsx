@@ -132,7 +132,16 @@ describe('getReviewButtonState', () => {
 
   it('shows "Re-Review" when readyForMerge is true', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: null, activeSpecialist: null, readyForMerge: true },
+      { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', queuePosition: null, activeSpecialist: null, readyForMerge: true },
+      false
+    );
+    expect(state.label).toBe('Re-Review');
+    expect(state.disabled).toBe(false);
+  });
+
+  it('shows "Re-Review" when review and test passed but merge previously failed', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', queuePosition: null, activeSpecialist: null, readyForMerge: false },
       false
     );
     expect(state.label).toBe('Re-Review');
