@@ -3,18 +3,20 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead panopticon-cli-3ta: prepend uploaded image paths on send and clear image state after successful submission in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`.
+Finalizing PAN-539 after browser verification: workspace dashboard now starts under Node 22 again, image paste/send flow is verified, and only git cleanup/push/`pan done` remain.
 
 ## Completed Work
 - [x] panopticon-cli-7c8: Added upload-image route with MIME validation, temp-file naming, and async writes in `src/dashboard/server/routes/conversations.ts` (commit: 94004849)
 - [x] panopticon-cli-a9c: Added async startup cleanup timer for stale `panopticon-paste-*` temp files in `src/dashboard/server/main.ts` (commit: d4fb58bb)
 - [x] panopticon-cli-m3x: Added paste/drop image ingestion, optimistic upload state, and conversation upload requests in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: 39170e46)
 - [x] panopticon-cli-5bu: Added thumbnail strip with filename, upload/error status, and remove button in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` and mission-control styles (commit: 40a5d176)
-- [ ] panopticon-cli-3ta: Added `@/tmp/...` prefix injection, upload-in-progress blocking, and pending image cleanup after successful send in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: pending)
+- [x] panopticon-cli-3ta: Added `@/tmp/...` prefix injection, upload-in-progress blocking, and pending image cleanup after successful send in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: 9f8bdfd9)
+- [x] Verification: `npm run lint`, `npm test`, and `npm run build` passed; browser verification on `http://127.0.0.1:3012` confirmed pasted image thumbnail rendering, uploaded state, `@/tmp/panopticon-paste-*.png` message prefixing, and composer cleanup after send.
+- [x] Environment fix: pinned transitive `@effect/platform-node-shared` resolution to `4.0.0-beta.43` in `package.json`/`bun.lock` so the workspace dashboard can boot under Node 22 instead of failing on a missing `effect/dist/Context.js` import.
 
 ## Remaining Work
-- [ ] Close beads that are currently blocked by reversed dependency metadata (`panopticon-cli-7c8`, `panopticon-cli-m3x`, `panopticon-cli-3ta`) once final send-path bead lands.
-- [ ] Run lint/tests and browser verification for the complete image-paste flow, then push and call `pan done`.
+- [ ] Resolve remaining working tree entries (`package.json`, `bun.lock`, untracked `docs/prds/active/pan-539/`) into the final PAN-539 commit set.
+- [ ] Push branch and call `pan done`.
 
 ## Key Decisions
 - Upload endpoint lives in `src/dashboard/server/routes/conversations.ts`, not an agent route, because `ComposerFooter` already targets conversation-specific message APIs.
