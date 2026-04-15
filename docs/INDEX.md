@@ -106,6 +106,7 @@
 | Location | Description |
 |----------|-------------|
 | [docs/prds/active/](./prds/active/) | 13 active product requirement documents |
+| [docs/prds/planned/PAN-724-agent-usage-analytics-dashboard.md](./prds/planned/PAN-724-agent-usage-analytics-dashboard.md) | Planned PRD for agent usage analytics, one-shot rates, and TLDR impact reporting |
 | [docs/prds/completed/](./prds/completed/) | 31 completed product requirement documents |
 
 ---
