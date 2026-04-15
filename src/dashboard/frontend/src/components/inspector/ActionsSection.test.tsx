@@ -267,7 +267,7 @@ describe('ActionsSection', () => {
       />
     );
     expect(screen.getByText('Verify:')).toBeInTheDocument();
-    expect(screen.getByText('frontend-typecheck failed')).toBeInTheDocument();
+    expect(screen.getAllByText('frontend-typecheck failed')).toHaveLength(2);
   });
 
   it('promotes Review & Test when verification failed and rerun is the next step', () => {
@@ -280,6 +280,28 @@ describe('ActionsSection', () => {
     const button = screen.getByTestId('review-test-btn');
     expect(button.className).toContain('bg-primary');
     expect(button.className).toContain('text-primary-foreground');
+  });
+
+  it('shows next-step hint for verification failure in workspace detail pane', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        reviewStatus={makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending', verificationStatus: 'failed', verificationNotes: 'frontend-typecheck failed' })}
+      />
+    );
+    expect(screen.getByText('Next: Review & Test')).toBeInTheDocument();
+    expect(screen.getAllByText('frontend-typecheck failed')).toHaveLength(2);
+  });
+
+  it('shows next-step hint for merge failure in workspace detail pane', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        reviewStatus={makeReviewStatus({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false })}
+      />
+    );
+    expect(screen.getByText('Next: Re-Review')).toBeInTheDocument();
+    expect(screen.getByText('Merge did not complete.')).toBeInTheDocument();
   });
 
   it('shows Create Workspace button when workspace does not exist and no agent', () => {

@@ -39,6 +39,9 @@ export type TestStatusValue = typeof TestStatusValue.Type
 export const MergeStatusValue = Schema.Literals(["pending", "queued", "merging", "verifying", "merged", "failed"])
 export type MergeStatusValue = typeof MergeStatusValue.Type
 
+export const VerificationStatusValue = Schema.Literals(["pending", "running", "passed", "failed", "skipped"])
+export type VerificationStatusValue = typeof VerificationStatusValue.Type
+
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
 export const AgentSnapshot = Schema.Struct({
@@ -82,6 +85,9 @@ export const ReviewStatusSnapshot = Schema.Struct({
   reviewStatus: Schema.optional(ReviewStatusValue),
   testStatus: Schema.optional(TestStatusValue),
   mergeStatus: Schema.optional(MergeStatusValue),
+  verificationStatus: Schema.optional(VerificationStatusValue),
+  verificationNotes: Schema.optional(Schema.String),
+  verificationCycleCount: Schema.optional(Schema.Number),
   readyForMerge: Schema.optional(Schema.Boolean),
   updatedAt: Schema.optional(Schema.String),
   prUrl: Schema.optional(Schema.String),

@@ -27,9 +27,26 @@ interface ReviewButtonInput {
   reviewStatus: string;
   testStatus: string;
   mergeStatus?: string;
+  verificationStatus?: string;
   queuePosition?: number | null;
   activeSpecialist?: string | null;
   readyForMerge: boolean;
+}
+
+export function shouldForceReviewTrigger(status: ReviewButtonInput | undefined): boolean {
+  if (!status) return false;
+
+  return (
+    status.readyForMerge ||
+    status.reviewStatus === 'passed' ||
+    status.reviewStatus === 'failed' ||
+    status.reviewStatus === 'blocked' ||
+    status.testStatus === 'passed' ||
+    status.testStatus === 'failed' ||
+    status.testStatus === 'dispatch_failed' ||
+    status.mergeStatus === 'failed' ||
+    status.verificationStatus === 'failed'
+  );
 }
 
 function getOrdinalSuffix(n: number): string {

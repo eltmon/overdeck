@@ -17,6 +17,7 @@ import {
   toReviewStatus,
   toTestStatus,
   toMergeStatus,
+  toVerificationStatus,
   toReviewStatusSnapshot,
 } from '../../src/dashboard/server/read-model.js'
 
@@ -180,15 +181,35 @@ describe('toMergeStatus', () => {
   })
 })
 
+describe('toVerificationStatus', () => {
+  it('passes through valid verification statuses', () => {
+    expect(toVerificationStatus('pending')).toBe('pending')
+    expect(toVerificationStatus('running')).toBe('running')
+    expect(toVerificationStatus('passed')).toBe('passed')
+    expect(toVerificationStatus('failed')).toBe('failed')
+    expect(toVerificationStatus('skipped')).toBe('skipped')
+  })
+
+  it('returns undefined for invalid values', () => {
+    expect(toVerificationStatus('error')).toBeUndefined()
+    expect(toVerificationStatus('FAILED')).toBeUndefined()
+    expect(toVerificationStatus(null)).toBeUndefined()
+    expect(toVerificationStatus(undefined)).toBeUndefined()
+  })
+})
+
 // ─── toReviewStatusSnapshot ──────────────────────────────────────────────────
 
 describe('toReviewStatusSnapshot', () => {
   it('preserves authoritative readyForMerge=false from persisted review status', () => {
-    const status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'readyForMerge' | 'updatedAt' | 'prUrl'> = {
+    const status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl'> = {
       issueId: 'PAN-486',
       reviewStatus: 'passed',
       testStatus: 'passed',
       mergeStatus: 'failed',
+      verificationStatus: 'failed',
+      verificationNotes: 'frontend-typecheck failed',
+      verificationCycleCount: 2,
       readyForMerge: false,
       updatedAt: '2026-04-11T17:00:00.000Z',
       prUrl: 'https://github.com/eltmon/panopticon-cli/pull/486',
@@ -197,6 +218,9 @@ describe('toReviewStatusSnapshot', () => {
 
     expect(snapshot.readyForMerge).toBe(false)
     expect(snapshot.mergeStatus).toBe('failed')
+    expect(snapshot.verificationStatus).toBe('failed')
+    expect(snapshot.verificationNotes).toBe('frontend-typecheck failed')
+    expect(snapshot.verificationCycleCount).toBe(2)
     expect(snapshot.prUrl).toContain('/pull/486')
   })
 })

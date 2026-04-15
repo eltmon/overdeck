@@ -19,7 +19,7 @@ import {
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
 } from '@panopticon/contracts';
-import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue } from '@panopticon/contracts';
+import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panopticon/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
@@ -35,6 +35,7 @@ const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", 
 const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
+const VALID_VERIFICATION_STATUSES = new Set<VerificationStatusValue>(["pending", "running", "passed", "failed", "skipped"]);
 
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
@@ -60,13 +61,19 @@ export function toTestStatus(v: unknown): TestStatusValue | undefined {
 export function toMergeStatus(v: unknown): MergeStatusValue | undefined {
   return v && VALID_MERGE_STATUSES.has(v as MergeStatusValue) ? v as MergeStatusValue : undefined;
 }
+export function toVerificationStatus(v: unknown): VerificationStatusValue | undefined {
+  return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
+}
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'readyForMerge' | 'updatedAt' | 'prUrl'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl'>): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
     testStatus: toTestStatus(status.testStatus),
     mergeStatus: toMergeStatus(status.mergeStatus),
+    verificationStatus: toVerificationStatus(status.verificationStatus),
+    verificationNotes: status.verificationNotes || undefined,
+    verificationCycleCount: typeof status.verificationCycleCount === 'number' ? status.verificationCycleCount : undefined,
     readyForMerge: status.readyForMerge === true,
     updatedAt: status.updatedAt,
     prUrl: status.prUrl || undefined,

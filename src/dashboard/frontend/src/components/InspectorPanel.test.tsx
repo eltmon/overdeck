@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { getReviewButtonState } from './InspectorPanel';
+import { shouldForceReviewTrigger } from './inspector/utils';
 
 describe('getReviewButtonState', () => {
   // ---------------------------------------------------------------------------
@@ -153,5 +154,32 @@ describe('getReviewButtonState', () => {
     expect(state.label).toBe('Review & Test');
     expect(state.disabled).toBe(false);
     expect(state.spinning).toBe(false);
+  });
+});
+
+describe('shouldForceReviewTrigger', () => {
+  it('forces rerun after a failed review', () => {
+    expect(shouldForceReviewTrigger({
+      reviewStatus: 'failed',
+      testStatus: 'pending',
+      readyForMerge: false,
+    })).toBe(true);
+  });
+
+  it('forces rerun after verification failure', () => {
+    expect(shouldForceReviewTrigger({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      verificationStatus: 'failed',
+      readyForMerge: false,
+    })).toBe(true);
+  });
+
+  it('does not force rerun for a brand-new pending review', () => {
+    expect(shouldForceReviewTrigger({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+    })).toBe(false);
   });
 });

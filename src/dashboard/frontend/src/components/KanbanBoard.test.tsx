@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge } from './KanbanBoard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -207,6 +207,34 @@ describe('shouldShowAgentDoneBadge', () => {
       resolution: 'done',
       hasPendingQuestion: false,
     })).toBe(false);
+  });
+});
+
+describe('getPipelineCallToAction', () => {
+  it('surfaces Review & Test as the next step after verification failure', () => {
+    expect(getPipelineCallToAction({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'failed',
+      verificationNotes: 'frontend-typecheck failed',
+    })).toEqual({
+      label: 'Next: Review & Test',
+      detail: 'frontend-typecheck failed',
+      title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+    });
+  });
+
+  it('surfaces Re-Review as the next step after merge failure', () => {
+    expect(getPipelineCallToAction({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'failed',
+    })).toEqual({
+      label: 'Next: Re-Review',
+      detail: 'Merge did not complete.',
+      title: 'Merge failed after a prior pass — rerun the pipeline before merging again.',
+    });
   });
 });
 
