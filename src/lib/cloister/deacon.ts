@@ -1455,6 +1455,15 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 }
 
 // ============================================================================
+// CI transient retry tracking (shared by checkPostReviewCommits + checkFailedMergeRetry)
+// ============================================================================
+
+// In-memory CI failure retry tracking — separate from mergeRetryCount because
+// CI failures are transient and should not permanently block merge attempts.
+// Declared here so checkPostReviewCommits can clear it when new commits arrive.
+export const ciRetryMap = new Map<string, { count: number; lastAttempt: number }>();
+
+// ============================================================================
 // Post-review commit detection
 // ============================================================================
 
@@ -1521,6 +1530,9 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // the work agent pushes a fix (e.g. to address a CI check failure).
         mergeRetryCount: 0,
       });
+      // Also clear the CI transient retry counter so the next merge attempt
+      // starts fresh. Without this, ciRetryMap retains count=6 from the previous
+      // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
       actions.push(
         `Reset review for ${issueId}: new commits after review passed ` +
@@ -1679,10 +1691,6 @@ const TIMEOUT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 const CI_TRANSIENT_RETRY_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 // Max number of automatic retries before requiring manual intervention
 const FAILED_MERGE_MAX_RETRIES = 3;
-
-// In-memory CI failure retry tracking — separate from mergeRetryCount because
-// CI failures are transient and should not permanently block merge attempts.
-const ciRetryMap = new Map<string, { count: number; lastAttempt: number }>();
 
 /**
  * Auto-retry issues whose mergeStatus='failed' due to transient post-rebase
