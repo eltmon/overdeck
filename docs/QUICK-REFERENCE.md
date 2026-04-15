@@ -43,7 +43,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan inspect <id>` | Request human inspection before proceeding |
 | `pan close <id>` | Verify, clean up, close on tracker |
 | `pan reopen <id>` | Re-open for rework (resets specialist state) |
-| `pan wipe <id>` | **Destructive.** Reset all state for an issue. Confirms. |
+| `pan wipe <id>` | **Destructive.** Canonical reset-to-Todo for an issue. Confirms. |
 
 ## 2. Observation
 
@@ -56,6 +56,10 @@ See what's happening — in aggregate and for specific issues.
 | `pan show <id> --cv` | Agent work history only |
 | `pan show <id> --context` | Context engineering state |
 | `pan show <id> --health` | Health + heartbeat only |
+| `pan logs <agent-id\|dashboard>` | Tail high-level dashboard or agent logs |
+| `less ~/.panopticon/agents/agent-<id>/lifecycle.log` | Inspect exact start/resume/stop lifecycle steps |
+| `less ~/.panopticon/agents/agent-<id>/spawn.log` | Inspect detached `pan start <id> --local --phase <phase>` stdout/stderr |
+| Dashboard Start/Resume action | Shows `Starting...` / `Resuming...` first, then flips to live controls once the tmux-backed agent is actually running |
 | `pan review pending` | Completed work awaiting review |
 | `pan review request <id>` | Request re-review after fixing feedback |
 | `pan review reset <id>` | Reset review/test/merge cycles (human override) |

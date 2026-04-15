@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -133,6 +133,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const [workspaceCreating, setWorkspaceCreating] = useState(false);
   const [containersStarting, setContainersStarting] = useState(false);
   const [containersStartedAt, setContainersStartedAt] = useState(0);
+  const [agentLaunchState, setAgentLaunchState] = useState<'starting' | 'resuming' | null>(null);
   const [containerMenu, setContainerMenu] = useState<{
     x: number; y: number; containerName: string; isRunning: boolean;
   } | null>(null);
@@ -175,13 +176,24 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       }
       return data;
     },
-    refetchInterval: (workspaceCreating || containersStarting) ? 5000 : 30000,
+    refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
   });
 
   // reviewStatus and reviewStatusLoading are hoisted to DetailPanelLayout to avoid
   // duplicate queries — they share react-query cache key ['review-status', issueId]
   const reviewStatus = reviewStatusProp;
   const reviewStatusLoading = reviewStatusLoadingProp ?? false;
+
+  useEffect(() => {
+    if (!agentLaunchState) return;
+    if (agent && agent.status !== 'stopped') {
+      setAgentLaunchState(null);
+      return;
+    }
+    if (agent?.status === 'stopped' && agentLifecycle && !agentLifecycle.canResumeSession && !agentLifecycle.isOrphaned) {
+      setAgentLaunchState(null);
+    }
+  }, [agent, agentLifecycle, agentLaunchState]);
 
   const { data: prdContent } = useQuery({
     queryKey: ['prd', issueId],
@@ -211,7 +223,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
-      if (agent && agent.status === 'stopped' && agentLifecycle?.canResumeSession) {
+      const shouldResume = !!(agent && agent.status === 'stopped' && agentLifecycle?.canResumeSession);
+      setAgentLaunchState(shouldResume ? 'resuming' : 'starting');
+
+      if (shouldResume) {
         const res = await fetch(`/api/agents/${agent.id}/resume`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -236,9 +251,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return res.json();
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
     },
     onError: (err: Error) => {
+      setAgentLaunchState(null);
       // Agent already running — store snapshot is stale, just refresh
       if (err.message.includes('runtime=active') || err.message.includes('status=running')) {
         setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 500);
@@ -953,6 +970,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
           lifecycle={agentLifecycle}
+          agentLaunchState={agentLaunchState}
         />
 
         {/* Issue labels/tags for no-agent view */}

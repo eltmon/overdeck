@@ -305,6 +305,10 @@ pan status
 # View agent logs
 pan logs agent-pan-123
 
+# Inspect raw agent runtime logs directly
+less ~/.panopticon/agents/agent-pan-123/lifecycle.log
+less ~/.panopticon/agents/agent-pan-123/spawn.log
+
 # Send message to agent
 pan tell agent-pan-123 "Your message"
 
@@ -327,6 +331,10 @@ pan reopen PAN-123 --reason "Post-regression in auth flow"
 
 # Reopen without confirmation prompt (e.g. in CI or scripts)
 pan reopen PAN-123 --force
+
+# Reset an issue destructively back to Todo
+# Removes workspace, branches, and agent state
+pan wipe PAN-123
 
 # Signal that work is complete and ready for review
 pan done PAN-123 -c "Brief summary of changes"
@@ -554,9 +562,19 @@ tmux list-sessions
 # Restart dashboard
 pan restart
 
-# Check agent logs
+# Check high-level agent logs
 pan logs agent-pan-123
+
+# Check detailed start/resume lifecycle events
+less ~/.panopticon/agents/agent-pan-123/lifecycle.log
+
+# Check detached spawn stdout/stderr if start was requested but no session appeared
+less ~/.panopticon/agents/agent-pan-123/spawn.log
 ```
+
+If the dashboard shows a stopped/starting placeholder agent but no tmux session appears, `lifecycle.log` should show the last successful step (`agent.start_requested`, container wait, spawn request, process spawned/closed). `spawn.log` captures the detached `pan start <id> --local --phase <phase>` subprocess output that was previously lost when stdout/stderr were sent to `ignore`.
+
+When Start Agent or Resume Session is working normally, the dashboard now shows a transient `Starting...` / `Resuming...` state first, then automatically swaps to the normal running controls once the live tmux-backed work agent is visible. If a stopped agent has stale session metadata but no usable workspace-backed state, the UI intentionally offers **Start Agent** instead of **Resume Session**.
 
 ### Git Worktree Issues
 

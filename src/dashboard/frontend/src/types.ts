@@ -55,6 +55,9 @@ export interface WorkAgentLifecycle {
   hasAgentState: boolean;
   hasLiveTmuxSession: boolean;
   hasSavedSession: boolean;
+  hasWorkspace: boolean;
+  isPlaceholder: boolean;
+  isOrphaned: boolean;
   isRunning: boolean;
   isStopped: boolean;
   isCompleted: boolean;

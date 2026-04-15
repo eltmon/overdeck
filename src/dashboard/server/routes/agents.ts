@@ -30,7 +30,7 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
 import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -86,6 +86,17 @@ import { EventStoreService } from '../services/domain-services.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
+
+async function appendAgentLifecycleLog(agentId: string, event: string, details: Record<string, unknown> = {}): Promise<void> {
+  const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+  await mkdir(agentDir, { recursive: true });
+  const logLine = JSON.stringify({
+    ts: new Date().toISOString(),
+    event,
+    ...details,
+  });
+  await appendFile(join(agentDir, 'lifecycle.log'), logLine + '\n');
+}
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
 
@@ -624,6 +635,7 @@ const deleteAgentRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
     stopAgent(id);
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
@@ -865,6 +877,7 @@ const postAgentSuspendRoute = HttpRouter.add(
       return jsonResponse({ error: 'Session ID required for suspend' }, { status: 400 });
     }
 
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.suspend_requested', { sessionId: effectiveSessionId }));
     saveSessionId(id, effectiveSessionId);
     yield* Effect.promise(() => killSessionAsync(id).catch(() => { /* no tmux session to kill */ }));
     saveAgentRuntimeState(id, {
@@ -902,6 +915,10 @@ const postAgentResumeRoute = HttpRouter.add(
       }, { status: 409 });
     }
 
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
+      hasMessage: !!message,
+      lifecycle,
+    }));
     const result = yield* Effect.promise(() => resumeAgent(id, message));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
@@ -927,8 +944,15 @@ const postAgentResumeRoute = HttpRouter.add(
           },
         },
       })));
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_succeeded', {
+        hasMessage: !!message,
+      }));
       return jsonResponse({ success: true, resumed: true, lifecycle: getWorkAgentLifecycleState(id) });
     } else {
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_failed', {
+        hasMessage: !!message,
+        error: result.error,
+      }));
       return jsonResponse({ error: result.error, lifecycle: getWorkAgentLifecycleState(id) }, { status: 400 });
     }
   })),
@@ -1177,6 +1201,7 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     const issueLower = issueId.toLowerCase();
+    const agentSessionName = `agent-${issueLower}`;
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
@@ -1410,10 +1435,24 @@ const postAgentsRoute = HttpRouter.add(
     const hasPlanning = existsSync(join(workspacePath, '.planning'));
     const phase = (body as any).phase || (hasPlanning ? 'implementation' : 'exploration');
 
-    const agentSessionName = `agent-${issueLower}`;
+    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_requested', {
+      issueId,
+      workspacePath,
+      hasPlanning,
+      phase,
+    }));
 
     const agentLifecycle = getWorkAgentLifecycleState(agentSessionName);
+    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_lifecycle_evaluated', {
+      issueId,
+      lifecycle: agentLifecycle,
+    }));
     if (!agentLifecycle.canStartFresh) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked', {
+        issueId,
+        reason: agentLifecycle.reason,
+        lifecycle: agentLifecycle,
+      }));
       return jsonResponse({
         error: agentLifecycle.reason || `Cannot start agent for ${issueId}`,
         lifecycle: agentLifecycle,
@@ -1432,14 +1471,56 @@ const postAgentsRoute = HttpRouter.add(
     );
 
     // Spawn pan start command
-    const spawnPanCommand = (args: string[], cwd?: string): string => {
+    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
       const activityId = `activity-${Date.now()}`;
+      const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
+      await mkdir(agentDir, { recursive: true });
+      const spawnLogPath = join(agentDir, 'spawn.log');
+      const spawnLogHandle = await open(spawnLogPath, 'a');
       const child = spawn('pan', args, {
         cwd: cwd || workspacePath,
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
+      });
+      child.on('error', (error) => {
+        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
+          issueId,
+          phase,
+          workspacePath,
+          activityId,
+          error: error.message,
+          args,
+          cwd: cwd || workspacePath,
+          spawnLogPath,
+        }).catch(() => undefined);
+      });
+      child.once('spawn', () => {
+        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
+          issueId,
+          phase,
+          workspacePath,
+          activityId,
+          pid: child.pid,
+          args,
+          cwd: cwd || workspacePath,
+          spawnLogPath,
+        }).catch(() => undefined);
+      });
+      child.once('close', (code, signal) => {
+        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
+          issueId,
+          phase,
+          workspacePath,
+          activityId,
+          code,
+          signal,
+          args,
+          cwd: cwd || workspacePath,
+          spawnLogPath,
+        }).catch(() => undefined);
       });
       child.unref();
+      await spawnLogHandle.close();
       return activityId;
     };
 
@@ -1482,6 +1563,11 @@ const postAgentsRoute = HttpRouter.add(
         };
 
         const featureName = yield* Effect.promise(() => getComposeProjectName(issueId, projectPath));
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_container_check', {
+          issueId,
+          featureName,
+          workspacePath,
+        }));
         let containersReady = false;
 
         try {
@@ -1497,18 +1583,33 @@ const postAgentsRoute = HttpRouter.add(
           if (allHealthy) containersReady = true;
         } catch {}
 
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_container_check_result', {
+          issueId,
+          featureName,
+          containersReady,
+        }));
+
         if (!containersReady) {
-          const earlyAgentId = `agent-${issueLower}`;
+          const earlyAgentId = agentSessionName;
           const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
           yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
             id: earlyAgentId,
             issueId,
+            runtime: 'claude',
+            model: 'pending-container-start',
             status: 'starting',
             startedAt: new Date().toISOString(),
             workspace: workspacePath,
+            phase,
             message: 'Waiting for containers to start...',
           }, null, 2)));
+          yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
+            issueId,
+            featureName,
+            workspacePath,
+            phase,
+          }));
 
               const containerActivityId = `containers-${Date.now()}`;
 
@@ -1517,6 +1618,11 @@ const postAgentsRoute = HttpRouter.add(
                 try {
                   const containerUid = process.getuid?.() ?? 1000;
                   const containerGid = process.getgid?.() ?? 1000;
+                  await appendAgentLifecycleLog(earlyAgentId, 'agent.container_start_spawned', {
+                    issueId,
+                    featureName,
+                    workspacePath,
+                  });
                   const containerChild = spawn('./dev', ['all'], {
                     cwd: workspacePath,
                     stdio: 'ignore',
@@ -1546,6 +1652,28 @@ const postAgentsRoute = HttpRouter.add(
                     await new Promise(r => setTimeout(r, pollIntervalMs));
                   }
 
+                  await appendAgentLifecycleLog(earlyAgentId, healthy ? 'agent.container_wait_succeeded' : 'agent.container_wait_timed_out', {
+                    issueId,
+                    featureName,
+                    waitedMs: Date.now() - startTime,
+                  });
+
+                  if (!healthy) {
+                    await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
+                      id: earlyAgentId,
+                      issueId,
+                      runtime: 'claude',
+                      model: 'pending-container-start',
+                      status: 'failed',
+                      startedAt: new Date().toISOString(),
+                      workspace: workspacePath,
+                      phase,
+                      message: 'Container startup timed out before work agent spawn',
+                      error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
+                    }, null, 2));
+                    return;
+                  }
+
                   // Docker named volumes may create root-owned empty node_modules.
                   // Remove them — workspace creation runs bun install which creates
                   // correct workspace-aware node_modules with proper local package resolution.
@@ -1563,9 +1691,31 @@ const postAgentsRoute = HttpRouter.add(
                     }
                   }
 
-                  spawnPanCommand(['work', 'issue', issueId, '--phase', phase], workspacePath);
+                  await appendAgentLifecycleLog(earlyAgentId, 'agent.work_spawn_requested_after_containers', {
+                    issueId,
+                    phase,
+                    workspacePath,
+                  });
+                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase], workspacePath);
                   await updateIssueStatus();
-                } catch (err) {
+                } catch (err: any) {
+                  const errorMessage = err instanceof Error ? err.message : String(err);
+                  await appendAgentLifecycleLog(earlyAgentId, 'agent.container_start_failed', {
+                    issueId,
+                    error: errorMessage,
+                  }).catch(() => undefined);
+                  await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
+                    id: earlyAgentId,
+                    issueId,
+                    runtime: 'claude',
+                    model: 'pending-container-start',
+                    status: 'failed',
+                    startedAt: new Date().toISOString(),
+                    workspace: workspacePath,
+                    phase,
+                    message: 'Container startup failed before work agent spawn',
+                    error: errorMessage,
+                  }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
               })();
@@ -1589,7 +1739,12 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     // Containers already ready or no containers needed
-    const activityId = spawnPanCommand(['work', 'issue', issueId, '--phase', phase], workspacePath);
+    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
+      issueId,
+      phase,
+      workspacePath,
+    }));
+    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase], workspacePath));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -1601,11 +1756,20 @@ const postAgentsRoute = HttpRouter.add(
     yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
+      runtime: 'claude',
+      model: 'pending-work-spawn',
       status: 'starting',
       startedAt: new Date().toISOString(),
       workspace: workspacePath,
       phase,
+      message: 'Work agent spawn requested',
     }, null, 2)));
+    yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
+      issueId,
+      phase,
+      workspacePath,
+      activityId,
+    }));
 
     yield* Effect.promise(() => updateIssueStatus());
 

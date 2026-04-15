@@ -137,4 +137,64 @@ describe('work-agent-lifecycle', () => {
 
     sessionExistsSpy.mockRestore();
   });
+
+  it('treats placeholder agents with missing live session as orphaned and fresh-startable', () => {
+    const agentId = getUniqueAgentId('placeholder-orphan');
+    const workspace = join('/tmp', agentId);
+    mkdirSync(workspace, { recursive: true });
+
+    saveAgentState({
+      id: agentId,
+      issueId: 'PAN-704',
+      workspace,
+      runtime: 'claude',
+      model: 'pending-container-start',
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      phase: 'implementation',
+    });
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const lifecycle = getWorkAgentLifecycleState(agentId);
+
+    expect(lifecycle.isPlaceholder).toBe(true);
+    expect(lifecycle.isOrphaned).toBe(true);
+    expect(lifecycle.canStartFresh).toBe(true);
+    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.recommendedAction).toBe('start');
+
+    sessionExistsSpy.mockRestore();
+  });
+
+  it('treats missing workspace as orphaned even with a saved session', () => {
+    const agentId = getUniqueAgentId('missing-workspace');
+    const workspace = join('/tmp', agentId, 'missing');
+
+    saveAgentState({
+      id: agentId,
+      issueId: 'PAN-704',
+      workspace,
+      runtime: 'claude',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    });
+    saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    saveSessionId(agentId, 'session-ghost');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const lifecycle = getWorkAgentLifecycleState(agentId);
+
+    expect(lifecycle.hasWorkspace).toBe(false);
+    expect(lifecycle.isOrphaned).toBe(true);
+    expect(lifecycle.canStartFresh).toBe(true);
+    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.canResetSession).toBe(false);
+    expect(lifecycle.reason).toContain('stale/orphaned');
+
+    sessionExistsSpy.mockRestore();
+  });
 });

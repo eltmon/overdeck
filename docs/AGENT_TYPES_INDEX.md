@@ -47,7 +47,7 @@ Canonical specialist registry metadata:
 
 ## Implementation flow
 - `work-agent`
-  - spawn path: `src/dashboard/server/services/agent-spawner.ts` -> `spawnAgent()` in `src/lib/agents.ts`
+  - spawn path: dashboard start agent -> `POST /api/agents` in `src/dashboard/server/routes/agents.ts` -> detached `pan start <id> --local --phase <phase>` -> `spawnAgent()` in `src/lib/agents.ts`
   - entrypoints: CLI `pan start`, dashboard start agent
   - routing path: explicit work type or `issue-agent:<phase>`
 
