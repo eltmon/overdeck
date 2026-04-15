@@ -20,6 +20,8 @@ All beads implemented. Awaiting inspection on panopticon-cli-cer.
 
 ---
 - **[2026-04-15T03:41Z] verification-gate → FAILED** — `.planning/feedback/016-verification-gate-failed.md`
+- **[2026-04-15T04:03Z] verification-gate → FAILED** — `.planning/feedback/017-verification-gate-failed.md`
+- **[2026-04-15T04:03Z] verification-gate → FAILED** — `.planning/feedback/018-verification-gate-failed.md`
 
 ## Problem
 
