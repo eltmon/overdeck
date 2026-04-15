@@ -1,125 +1,51 @@
-# PAN-722: Remove Queues for All Specialists Except Merge Agent
+# PAN-712: Fix stale pan work/cloister/specialists refs in .claude/skills/
 
-**Status:** Plan Approved
-**Planned by:** Claude Opus 4.6
-**Date:** 2026-04-15
+## Problem
 
----
+Code review for PAN-705 (command taxonomy reorg) flagged stale references in project-level skill files under `.claude/skills/`. Skills that reference the old taxonomy (`pan work`, `pan cloister`, `pan specialists`) mislead any agent that loads them about correct CLI syntax.
 
-## Discovery Summary
+## Audit findings
 
-### Queue System Architecture (as-found)
+Ran `grep -rn "pan work\|pan cloister\|pan specialists" .claude/skills/` against the current branch. Only **two files** contain stale refs (5 occurrences total):
 
-Panopticon has two distinct queue mechanisms:
+### 1. `.claude/skills/test-specialist-workflow/SKILL.md` (4 refs)
+- L40: `pan cloister start` → `pan admin cloister start`
+- L163: `pan specialists wake review-agent` → `pan admin specialists wake review-agent`
+- L164: `pan specialists wake test-agent` → `pan admin specialists wake test-agent`
+- L165: `pan specialists wake merge-agent` → `pan admin specialists wake merge-agent`
+- L174: `pan specialists wake test-agent --task "..."` → `pan admin specialists wake test-agent --task "..."`
 
-**1. FPP Hook Queue (file-based, per-agent)**
-- `src/lib/hooks.ts` — `~/.panopticon/agents/<name>/hook.json` per agent
-- Functions: `pushToHook`, `popFromHook`, `checkHook`, `clearHook`, `reorderHookItems`
-- Used by `SpecialistQueueItem` / `submitToSpecialistQueue` etc. in `specialists.ts`
-- **ALSO used by non-queue FPP system**: `initHook`, `checkHook`, `generateFixedPointPrompt`, `sendMail`, `collectMail` — imported by `agents.ts`, `fpp-violations.ts`, `fpp-handler.ts`
-- **CRITICAL**: Cannot delete `hooks.ts`. Only remove queue callers for non-merge specialists.
+### 2. `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md` (1 ref)
+- L294: `pan work --help` → `pan --help` (in Pattern 6's verify step; the collapsed taxonomy no longer has a `work` namespace — all lifecycle verbs are top-level: `pan start`, `pan done`, `pan kill`, etc.)
 
-**2. SQLite Merge Queue (persistent, per-project)**
-- `src/lib/database/merge-queue-db.ts` — `merge_queue` table
-- `src/dashboard/server/services/merge-queue-service.ts` — startup resume
-- Merge queue handling in `workspaces.ts` `triggerMerge()` / `dequeueNextMerge()`
-- **MUST be preserved in full.**
+## Current taxonomy (verified against `pan --help` on feature/pan-712)
 
-### Specialist Queue Call Sites (to remove/change)
+- Lifecycle verbs are **top-level**: `pan start`, `pan done`, `pan kill`, `pan recover`, `pan tell`, `pan resume`, `pan approve`, `pan close`, `pan reopen`, `pan sync-main`, `pan wipe`.
+- Plumbing lives under `pan admin`:
+  - `pan admin cloister {status,start,stop,emergency-stop}`
+  - `pan admin specialists {list,wake,queue,reset,clear-queue,done,logs,cleanup-logs}`
+- `pan workspace` **still exists** as a top-level group (create/list/start/stop/destroy/etc.) — refs like `pan workspace create PAN-42` in `pan-fly/SKILL.md`, `plan/SKILL.md`, `pan-oversee/SKILL.md`, and `test-specialist-workflow/SKILL.md` L70 are **valid** and NOT in scope.
 
-| File | Location | Change |
-|------|----------|--------|
-| `src/lib/cloister/specialists.ts` | Lines 2551–2669 | Delete `SpecialistQueueItem`, `submitToSpecialistQueue`, `checkSpecialistQueue`, `getNextSpecialistTask`, `completeSpecialistTask` + their `hooks.js` import |
-| `src/lib/cloister/test-agent-queue.ts` | Lines 39–93 | Remove `specialist_busy` branches → set `dispatch_failed` on busy; rename to `dispatchTestAgentAndNotify` |
-| `src/lib/review-status.ts` | Lines 257–287 | Replace `submitToSpecialistQueue('test-agent')` with `spawnEphemeralSpecialist` directly |
-| `src/lib/cloister/service.ts` | Lines 337–368 | Replace `submitToSpecialistQueue('review-agent')` with `spawnEphemeralSpecialist` in startup orphan recovery |
-| `src/lib/cloister/deacon.ts` | Lines 1282–1332 | Remove `alreadyQueued` check + `submitToSpecialistQueue` busy fallback in review orphan section |
-| `src/lib/cloister/deacon.ts` | Lines 1364–1422 | Remove `alreadyQueued` check + `submitToSpecialistQueue` busy fallback in test orphan section |
-| `src/lib/cloister/deacon.ts` | Lines 2247–2323 | Delete `checkSpecialistQueues()` function entirely |
-| `src/lib/cloister/deacon.ts` | Line 2669 | Remove `checkSpecialistQueues()` call |
-| `src/dashboard/server/routes/workspaces.ts` | Lines 2719–2730 | Remove `submitToSpecialistQueue` fallback in request-review busy handler |
-| `src/dashboard/server/routes/workspaces.ts` | Lines 2793–2804 | Remove review/test queue clearing in reset-review (keep merge-agent only) |
-| `src/dashboard/server/routes/workspaces.ts` | Lines 1963–1988 | Remove review/test queue lookups in GET /api/review/:issueId/status |
-| `src/dashboard/server/routes/workspaces.ts` | Line 73 | Remove `checkSpecialistQueue` import |
-| `src/dashboard/server/routes/specialists.ts` | Lines 337–353 | Remove queue clearing in done handler |
-| `src/dashboard/server/routes/specialists.ts` | Lines 630–1163 | Remove 5 queue routes + compositions (queues, :name/queue GET/POST/DELETE, reorder) |
-| `src/dashboard/server/routes/issues.ts` | Lines 1252–1263 | Remove review/test queue clearing on issue destroy |
-| `src/lib/reopen.ts` | Lines 102–117 | Remove queue clearing for review/test agents |
-| `src/lib/cloister/specialist-handoff-logger.ts` | Lines 17–48 | Update `KNOWN_SPECIALISTS` to `['merge-agent']` only |
+## Out of scope
 
-### Files to Delete
-- `src/cli/commands/specialists/queue.ts`
-- `src/cli/commands/specialists/clear-queue.ts`
-- `tests/lib/cloister/specialists-queue.test.ts`
+- `pan plan-finalize` (hyphenated) is referenced in `.claude/skills/pan-plan-finalize/SKILL.md` and in this workspace's PLANNING_PROMPT, but `pan --help` shows the real command is `pan plan finalize` (sub-command of `pan plan`). This looks like a separate bug (the hyphenated form falls back to top-level help instead of the subcommand). **Not PAN-712** — issue scope is strictly `pan work`/`pan cloister`/`pan specialists`. File a follow-up if needed.
+- Other `pan work`/`pan cloister`/`pan specialists` refs outside `.claude/skills/` (e.g. `docs/`, `src/`, `README.md`) — issue scope is `.claude/skills/*` only.
 
-### CLI Command Registration (to update)
-- `src/cli/commands/specialists/index.ts` — remove `queue` and `clear-queue` command registrations
+## Approach
 
-### Frontend Files to Update
-- `src/dashboard/frontend/src/components/HandoffsPage.tsx` — remove `queueDepth` display, update description text
-- `src/dashboard/frontend/src/components/MetricsSummaryRow.tsx` — rename "Queue" to "Merge Queue" (reflects only merge depth)
-- `src/dashboard/frontend/src/components/MetricsSummary.tsx` — same
-- `src/dashboard/frontend/src/components/InspectorPanel.test.tsx` — remove "Queued (Nth)" test cases; only `queuePosition === 0` (active) still applies for non-merge
+Two small, independently-reviewable doc edits. Each bead owns one file, uses `sed`/Edit-level changes, and re-runs the audit grep as its acceptance check. A final grep over `.claude/skills/` must return zero hits for the three stale forms.
 
-### Test Files to Update
-- `tests/lib/cloister/deacon-orphan-recovery.test.ts` — remove alreadyQueued test cases
-- `tests/unit/lib/cloister/pan-344-auto-merge.test.ts` — check for queue refs, update if present
-- `tests/unit/dashboard/pan-343-test-delivery.test.ts` — update to reflect direct dispatch not queue
+## Decomposition
 
----
+1. **Bead 1:** Fix `test-specialist-workflow/SKILL.md` — rewrite 5 occurrences (1× `pan cloister start`, 4× `pan specialists wake ...`) to `pan admin ...` equivalents. Difficulty: `trivial`.
+2. **Bead 2:** Fix `update-panopticon-docs/resources/EXAMPLES.md` — replace L294 `pan work --help` with `pan --help` and update surrounding Pattern 6 prose if it still implies a `pan work` namespace. Difficulty: `trivial`.
 
-## Key Architectural Decisions
+Both beads share one final AC: `grep -rn "pan work\|pan cloister\|pan specialists" .claude/skills/` returns nothing (excluding the string "pan workspace"). The grep pattern must be anchored to avoid matching `pan workspace` — use `\bpan (work|cloister|specialists)\b` or equivalent.
 
-### D1: When `specialist_busy` is returned, do not queue — set `dispatch_failed`
-**Decision:** When `spawnEphemeralSpecialist` returns `specialist_busy`, set `testStatus: 'dispatch_failed'` (for test) or keep `reviewStatus: 'pending'` (for review). Do NOT queue.
-**Rationale:** The deacon's existing orphan recovery already handles these states: `reviewStatus === 'pending'` + no active session → re-dispatches on next patrol. `testStatus === 'dispatch_failed'` → re-dispatches. This gives us the equivalent of "retry" without a queue data structure.
+Beads are independent — either can land on its own. No edges.
 
-### D2: `hooks.ts` survives unchanged
-**Decision:** Do not modify `hooks.ts`.
-**Rationale:** `hooks.ts` serves the FPP system (`initHook`, `checkHook`, `generateFixedPointPrompt`, `sendMail`, `collectMail`) which is used by `agents.ts`, `fpp-violations.ts`, `fpp-handler.ts`. The specialist queue was just a consumer of `pushToHook`/`popFromHook`. Removing those callers is sufficient; the hook file itself stays.
+## Verification
 
-### D3: Merge queue usage stays in `queue-position.ts` + workspaces.ts
-**Decision:** Keep `findPositionInQueue` in `src/lib/queue-position.ts`. In the review status endpoint, keep only the merge queue lookup branch.
-**Rationale:** The merge queue is persistent SQLite-backed; its position is still meaningful for the UI ("Awaiting Merge — 2nd in line"). Review/test no longer have queue positions.
-
-### D4: `getLiveQueueDepth` tracks merge-agent only
-**Decision:** In `specialist-handoff-logger.ts`, narrow `KNOWN_SPECIALISTS` to `['merge-agent']` so `queueDepth` only counts merge queue items.
-**Rationale:** The queueDepth metric is surfaced in MetricsSummary as a pending-work indicator. After this change, the only work that can pile up is in the merge queue, so the metric remains meaningful.
-
-### D5: Frontend "Queue" metric becomes "Merge Queue"
-**Decision:** Rename the Queue metric label in MetricsSummaryRow and MetricsSummary to "Merge Queue".
-**Rationale:** Avoids confusing `0` as "nothing queued" when in reality review/test now never queue.
-
-### D6: `autoQueueTestAgentAndNotify` becomes `dispatchTestAgentAndNotify`
-**Decision:** Rename the exported function in `test-agent-queue.ts`.
-**Rationale:** The word "queue" in the name is misleading after this change. All call sites use the import directly, so renaming is safe with a search-replace.
-
----
-
-## Architecture
-
-### What's Changing
-
-| Component | Before | After |
-|-----------|--------|-------|
-| review dispatch | try spawn → if busy, `submitToSpecialistQueue` | try spawn → if busy, keep pending (deacon retries) |
-| test dispatch (on review pass) | `submitToSpecialistQueue` in `setReviewStatus` | `spawnEphemeralSpecialist` directly |
-| test dispatch (test-agent-queue.ts) | try spawn → if busy, queue | try spawn → if busy, `dispatch_failed` |
-| startup recovery (service.ts) | `submitToSpecialistQueue('review-agent')` | `spawnEphemeralSpecialist` directly |
-| deacon patrol | `checkSpecialistQueues()` drains FPP hook files | function deleted |
-| deacon orphan recovery | check alreadyQueued, fallback to queue | just dispatch; on busy → skip (retry next patrol) |
-| merge dispatch | always SQLite queue | unchanged |
-| `GET /api/specialists/queues` | lists all specialist queues | DELETED |
-| `GET /api/specialists/:name/queue` | shows queue items | DELETED |
-| `POST /api/specialists/:name/queue` | enqueues if busy | DELETED |
-| `DELETE /api/specialists/:name/queue/:itemId` | removes item | DELETED |
-| `PUT /api/specialists/:name/queue/reorder` | reorders | DELETED |
-| `pan specialists queue <name>` | shows queue | DELETED |
-| `pan specialists clear-queue <name>` | clears queue | DELETED |
-| queueDepth metric | all 5 specialists' hooks | merge-agent hook only |
-| queuePosition in review status API | review + test + merge queues | merge queue only |
-
----
-
-## Remaining Work
-See plan.vbrief.json for the complete bead breakdown.
+- `grep -rn -E "\\bpan (work|cloister|specialists)\\b" .claude/skills/` → 0 hits.
+- Each rewritten command must correspond to an entry in `pan admin --help` / `pan admin cloister --help` / `pan admin specialists --help` (captured above).
+- No other skill files touched.
