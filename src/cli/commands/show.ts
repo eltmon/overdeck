@@ -17,7 +17,7 @@ import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { getShadowState } from '../../lib/shadow-state.js';
-import { getAgentHealth } from '../../lib/health.js';
+import { pingAgent } from '../../lib/health.js';
 import { getAgentCV } from '../../lib/cv.js';
 
 interface ShowOptions {
@@ -48,16 +48,16 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   // Scoped views delegate to the full sub-commands
   if (shadow) return shadowCommand(id);
   if (cv) return cvCommand(id, { json });
-  if (context) return contextCommand('state', id, undefined, { json });
-  if (health) return healthCommand('check', id, { json });
+  if (context) return contextCommand('state', `agent-${id.toLowerCase()}`, undefined, { json });
+  if (health) return healthCommand('ping', id, { json });
 
   // Default: compact combined summary (≤ 25 lines).
   const issueId = id.toUpperCase();
   const agentId = `agent-${issueId.toLowerCase()}`;
 
   const shadowState = await getShadowState(issueId);
-  const healthData = (() => {
-    try { return getAgentHealth(agentId); } catch { return null; }
+  const healthData = await (async () => {
+    try { return await pingAgent(agentId); } catch { return null; }
   })();
   const cvData = getAgentCV(agentId);
 
