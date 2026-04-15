@@ -2281,6 +2281,77 @@
   padding: 0 1px;
 }
 
+/* Pending image strip inside composer */
+.composerImageStrip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-3) var(--mc-space-3) 0;
+}
+
+.composerImageCard {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-3);
+  padding: var(--mc-space-2);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  background: var(--mc-bg-elevated);
+}
+
+.composerImageThumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--mc-radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.composerImageMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.composerImageName {
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composerImageStatus,
+.composerImageError {
+  font-size: 12px;
+  color: var(--mc-text-muted);
+}
+
+.composerImageError {
+  color: var(--mc-danger);
+}
+
+.composerImageRemoveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--mc-radius-sm);
+  background: transparent;
+  color: var(--mc-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.composerImageRemoveButton:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
 /* Toolbar row: inside the box, below the textarea */
 .composerToolbar {
   display: flex;

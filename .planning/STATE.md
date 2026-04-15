@@ -3,15 +3,15 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead panopticon-cli-m3x: add paste/drop ingestion and optimistic upload state in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`, then commit it before closing the bead.
+Implementing bead panopticon-cli-5bu: render thumbnail strip and remove/upload-status UI in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`, then commit it before closing the bead.
 
 ## Completed Work
 - [x] panopticon-cli-7c8: Added upload-image route with MIME validation, temp-file naming, and async writes in `src/dashboard/server/routes/conversations.ts` (commit: 94004849)
 - [x] panopticon-cli-a9c: Added async startup cleanup timer for stale `panopticon-paste-*` temp files in `src/dashboard/server/main.ts` (commit: d4fb58bb)
-- [ ] panopticon-cli-m3x: Added paste/drop image ingestion, optimistic upload state, and conversation upload requests in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: pending)
+- [x] panopticon-cli-m3x: Added paste/drop image ingestion, optimistic upload state, and conversation upload requests in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: 39170e46)
+- [ ] panopticon-cli-5bu: Added thumbnail strip with filename, upload/error status, and remove button in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` and mission-control styles (commit: pending)
 
 ## Remaining Work
-- [ ] panopticon-cli-5bu: Render thumbnail strip with remove/upload-state UI in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`
 - [ ] panopticon-cli-3ta: Prefix submitted messages with `@/tmp/...` lines and clear image state after send
 
 ## Key Decisions

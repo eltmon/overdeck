@@ -11,7 +11,7 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { SendHorizontal } from 'lucide-react';
+import { SendHorizontal, X } from 'lucide-react';
 import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
@@ -121,6 +121,16 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
 
   const updatePendingImage = useCallback((id: string, updates: Partial<PendingImage>) => {
     setPendingImages((images) => images.map((image) => (image.id === id ? { ...image, ...updates } : image)));
+  }, []);
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages((images) => {
+      const image = images.find((candidate) => candidate.id === id);
+      if (image) {
+        URL.revokeObjectURL(image.previewUrl);
+      }
+      return images.filter((candidate) => candidate.id !== id);
+    });
   }, []);
 
   const enqueueImages = useCallback((files: File[]) => {
@@ -245,6 +255,37 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     <div className={styles.composerFooter}>
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onPaste={handlePaste} onDrop={handleDrop} onDragOver={handleDragOver}>
+        {pendingImages.length > 0 && (
+          <div className={styles.composerImageStrip}>
+            {pendingImages.map((image) => {
+              const statusLabel = image.error
+                ? image.error
+                : image.serverPath
+                  ? 'Uploaded'
+                  : 'Uploading…';
+              return (
+                <div key={image.id} className={styles.composerImageCard}>
+                  <img src={image.previewUrl} alt={image.file.name} className={styles.composerImageThumb} />
+                  <div className={styles.composerImageMeta}>
+                    <span className={styles.composerImageName}>{image.file.name}</span>
+                    <span className={image.error ? styles.composerImageError : styles.composerImageStatus}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.composerImageRemoveButton}
+                    onClick={() => removePendingImage(image.id)}
+                    title={`Remove ${image.file.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Editor (no border of its own) */}
         <ComposerPromptEditor
           conversationName={conversation.name}
