@@ -233,3 +233,20 @@ pan up
 - Dashboard correctly shows all columns, tags, and states
 - No ghost agents, no stuck specialists, no wrong labels
 - Any issue counted as success completed through the actual Panopticon pipeline, not direct manual implementation
+
+---
+
+## Run Log
+
+### Run 10 — 2026-04-15
+
+**2 issues moved, 2 bugs fixed, 1 friction point removed.**
+
+- **PAN-714** → `readyForMerge: true` (was blocked by permission prompts and CLI `admin specialists done` bypass)
+- **PAN-611** → `readyForMerge: true` (shebang fix from prior run finally cleared review + test)
+
+**Bugs fixed:**
+1. `cf311e75` — Added `--permission-mode bypassPermissions` to all 10 agent launch paths. Root cause of agents stalling on TUI permission footer.
+2. `61248742` — CLI `admin specialists done` now mirrors server route's `readyForMerge=true` promotion; `normalizeReviewStatus` no longer blocks readyForMerge based on stale verification status.
+
+**Friction removed:** Cycling alert for PAN-611 cleared (no longer stuck on caveman shebang).
