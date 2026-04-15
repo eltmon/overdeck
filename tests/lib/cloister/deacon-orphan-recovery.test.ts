@@ -20,6 +20,11 @@ import { homedir } from 'os';
 
 const mockGetTmuxSessionName = vi.fn();
 const mockSpawnEphemeralSpecialist = vi.fn();
+const mockDispatchParallelReview = vi.fn();
+
+vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
+  dispatchParallelReview: (...args: unknown[]) => mockDispatchParallelReview(...args),
+}));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
@@ -107,6 +112,11 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     mockGetTmuxSessionName.mockImplementation((name: string) => `${name}-session`);
     mockSessionExists.mockReturnValue(false);
     mockGetAgentRuntimeState.mockReturnValue(null);
+    // Default: no project configured (prevents findWorkspacePath receiving undefined projectPath
+    // if a previous test set a project without projectPath and the mock leaked between tests)
+    mockResolveProjectFromIssue.mockReturnValue(null);
+    // Default: parallel review dispatch succeeds (review orphan re-dispatch path)
+    mockDispatchParallelReview.mockResolvedValue({ success: true, message: 'dispatched' });
   });
 
   afterEach(() => {
