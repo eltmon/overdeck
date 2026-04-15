@@ -18,7 +18,6 @@ vi.mock('child_process', async (importOriginal) => {
 
 // Mock Linear SDK used by updateLinearStatus
 const mockIssueUpdate = vi.fn();
-const mockTeamStates = vi.fn();
 const mockIssue = vi.fn();
 const mockSearchIssues = vi.fn();
 
@@ -146,7 +145,6 @@ describe('updateLinearStatus', () => {
     mockSearchIssues.mockReset();
     mockIssue.mockReset();
     mockIssueUpdate.mockReset();
-    mockTeamStates.mockReset();
   });
 
   it('returns false when issue is not found in Linear', async () => {

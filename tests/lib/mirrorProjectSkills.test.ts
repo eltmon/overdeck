@@ -12,10 +12,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { mkdtempSync } from 'fs';
 import { mirrorProjectSkills } from '../../src/lib/sync.js';
 
 describe('mirrorProjectSkills', () => {
