@@ -294,6 +294,12 @@ export function saveAgentState(state: AgentState): void {
   const dir = getAgentDir(state.id);
   mkdirSync(dir, { recursive: true });
 
+  if (state.status === 'running' || state.status === 'starting') {
+    delete state.stoppedAt;
+  } else if (state.status === 'stopped' && !state.stoppedAt) {
+    state.stoppedAt = new Date().toISOString();
+  }
+
   writeFileSync(
     join(dir, 'state.json'),
     JSON.stringify(state, null, 2)
