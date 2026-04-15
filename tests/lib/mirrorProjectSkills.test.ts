@@ -121,6 +121,23 @@ describe('mirrorProjectSkills', () => {
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
   });
 
+  it('removes stale lowercase skill.md from target when content changes', () => {
+    // Source uses SKILL.md (uppercase)
+    createSkill('workspace-add-repo', '# Workspace\nUpdated content.');
+    // Target still has the old lowercase skill.md from a previous mirror run
+    mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), '# Workspace\nStale content.', 'utf-8');
+
+    const result = mirrorProjectSkills(cwd);
+
+    expect(result.updated).toEqual(['workspace-add-repo']);
+    // New canonical SKILL.md must exist with updated content
+    expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'), 'utf-8')).toBe('# Workspace\nUpdated content.');
+    // Stale lowercase file must be removed
+    expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'))).toBe(false);
+  });
+
   it('classifies as added (not updated) when target dir exists but has no SKILL.md', () => {
     createSkill('pan-help', '# Help\nContent.');
     // Target dir exists but contains no SKILL.md or skill.md — existingContent will be null

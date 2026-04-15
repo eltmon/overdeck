@@ -721,6 +721,9 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
           : null;
       if (existingContent !== sourceContent) {
         writeFileSync(targetSkillMd, sourceContent, 'utf-8');
+        // Remove stale lowercase skill.md if it coexists (was the old canonical file)
+        const lowerTarget = join(targetPath, 'skill.md');
+        if (existsSync(lowerTarget)) rmSync(lowerTarget);
         if (existingContent === null) {
           result.added.push(entry.name);
         } else {
