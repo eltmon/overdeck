@@ -223,7 +223,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
   it('(e) no-op when REVIEW_STATUS_FILE does not exist', async () => {
     if (existsSync(REVIEW_STATUS_FILE)) {
       unlinkSync(REVIEW_STATUS_FILE);
-      originalContent = null;
+      // DO NOT set originalContent = null — afterEach needs it to restore the real file
     }
 
     const actions = await checkFailedMergeRetry();
