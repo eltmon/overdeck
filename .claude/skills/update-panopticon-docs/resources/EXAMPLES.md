@@ -276,8 +276,8 @@ What are the implications?
 
 1. **Update help text in source**:
    ```typescript
-   // cli/commands/work.ts
-   .description('Manage work agents')  // ← Update this
+   // cli/commands/done.ts
+   .description('Signal work completion for an issue')  // ← Update this
    ```
 
 2. **Update any README**:
@@ -291,7 +291,7 @@ What are the implications?
 
 3. **Verify**:
    ```bash
-   pan work --help
+   pan --help
    ```
 
 ---
