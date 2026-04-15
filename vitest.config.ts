@@ -8,7 +8,7 @@ export default defineConfig({
     environment: 'node',
     pool: 'forks',
     poolOptions: {
-      forks: { minForks: 1, maxForks: 2, singleFork: false },
+      forks: { minForks: 1, maxForks: 4, singleFork: false },
     },
     include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
