@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import chalk from 'chalk';
 import { getVBriefACStatus, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 
 const execAsync = promisify(exec);
@@ -170,7 +171,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
     }
     if (synced > 0) {
       // eslint-disable-next-line no-console
-      console.log(`  Synced ${synced} closed bead(s) to vBRIEF AC status`);
+      console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
     }
   } catch {
     // Non-fatal — sync failure shouldn't block completion check
