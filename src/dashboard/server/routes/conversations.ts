@@ -242,7 +242,7 @@ async function compactSession(sessionFile: string, cwd: string): Promise<void> {
   const sessionId = sessionIdFromFile(sessionFile);
   if (!sessionId) throw new Error('compactSession: cannot extract session id');
   console.log(`[conversations] Compacting session ${sessionId} via ${COMPACT_MODEL}`);
-  const cmd = `claude --resume "${sessionId}" --model ${COMPACT_MODEL} --print --dangerously-skip-permissions "/compact"`;
+  const cmd = `claude --resume "${sessionId}" --model ${COMPACT_MODEL} --print --dangerously-skip-permissions --permission-mode bypassPermissions "/compact"`;
   await execAsync(cmd, {
     cwd,
     encoding: 'utf-8',
@@ -293,7 +293,7 @@ async function spawnConversationSession(
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
-  let runtimeCommand = 'claude --dangerously-skip-permissions';
+  let runtimeCommand = 'claude --dangerously-skip-permissions --permission-mode bypassPermissions';
   const providerEnvExports: string[] = [];
   if (model) {
     runtimeCommand = getAgentRuntimeBaseCommand(model);
@@ -371,7 +371,7 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
   ].join('\n');
 
   const { stdout } = await execAsync(
-    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --model claude-haiku-4-5-20251001 --dangerously-skip-permissions`,
+    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --model claude-haiku-4-5-20251001 --dangerously-skip-permissions --permission-mode bypassPermissions`,
     { encoding: 'utf-8', timeout: 30_000 },
   );
 

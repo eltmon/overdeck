@@ -246,7 +246,7 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
   writeFileSync(promptFile, prompt);
 
   // Build claude command with resolved model
-  const claudeCmd = `claude --dangerously-skip-permissions --model ${model}`;
+  const claudeCmd = `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`;
 
   // Create tmux session
   createSession(agentState.tmuxSession, convoy.context.projectPath, claudeCmd, {

@@ -717,8 +717,8 @@ const postSpecialistWakeRoute = HttpRouter.add(
     const specCmd = getAgentCommand(specModel);
     const specCmdWithArgs =
       specCmd.args.length > 0
-        ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions`
-        : `${specCmd.command} --dangerously-skip-permissions`;
+        ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions --permission-mode bypassPermissions`
+        : `${specCmd.command} --dangerously-skip-permissions --permission-mode bypassPermissions`;
 
     const cwd = homedir();
     yield* Effect.promise(() => createSessionAsync(

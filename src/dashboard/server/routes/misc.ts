@@ -1247,8 +1247,8 @@ Continue the PLANNING session. Do NOT implement anything.
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
-            ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions`
-            : `${msgAgentCmd.command} --dangerously-skip-permissions`;
+            ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions --permission-mode bypassPermissions`
+            : `${msgAgentCmd.command} --dangerously-skip-permissions --permission-mode bypassPermissions`;
 
         const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
         await mkdir(agentStateDir, { recursive: true });

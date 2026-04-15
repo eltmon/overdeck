@@ -805,10 +805,8 @@ ${basePrompt}`;
       clearCredentialFileAuth(cwd);
     }
 
-    // Permission flags based on specialist type
-    const permissionFlags = specialistType === 'merge-agent'
-      ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
-      : '--dangerously-skip-permissions';
+    // All autonomous specialists need full permission bypass to avoid interactive prompts
+    const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
 
     // Write task prompt to file to avoid shell escaping issues
     const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
@@ -1919,7 +1917,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
 cd "${cwd}"
 ${PROVIDER_UNSET_LINES}
 prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --model ${model} "$prompt"
+exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "${newSessionId}" --model ${model} "$prompt"
 `, { mode: 0o755 });
     setSessionId(name, newSessionId);
 
@@ -2135,10 +2133,8 @@ export async function wakeSpecialist(
         clearCredentialFileAuth(cwd);
       }
 
-      // merge-agent needs full bypass to handle git stash drop, reset, etc.
-      const permissionFlags = name === 'merge-agent'
-        ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
-        : '--dangerously-skip-permissions';
+      // All autonomous specialists need full permission bypass to avoid interactive prompts
+      const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
 
       // Start with --resume if we have a session, otherwise generate a new session ID
       // Always start fresh — no --resume. Context compaction corrupts thinking block
