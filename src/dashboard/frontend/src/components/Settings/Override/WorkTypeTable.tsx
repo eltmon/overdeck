@@ -11,16 +11,16 @@ export interface WorkTypeTableProps {
 }
 
 export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, onRemoveOverride }: WorkTypeTableProps) {
-  const categories: WorkTypeCategory[] = ['issue-agent', 'specialist', 'convoy', 'subagent', 'pre-work', 'workflow', 'cli'];
+  const categories: WorkTypeCategory[] = ['issue-agent', 'specialist', 'review', 'subagent', 'cli'];
 
   const categoryLabels: Record<WorkTypeCategory, string> = {
     'issue-agent': 'Issue Agent Phases',
     'specialist': 'Specialist Agents',
-    'convoy': 'Convoy Members',
+    'review': 'Review Agents',
     'subagent': 'Subagents',
-    'pre-work': 'Planning',
-    'workflow': 'Workflow Jobs',
     'cli': 'CLI Contexts',
+    'pre-work': 'Pre-Work',
+    'workflow': 'Workflow',
   };
 
   const getEffectiveModel = (workType: WorkTypeId): ModelId => {

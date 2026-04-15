@@ -20,7 +20,7 @@ describe('ensurePanGitignore', () => {
     ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     expect(content).toContain('.pan/events/');
-    expect(content).toContain('.pan/convoy/');
+    expect(content).toContain('.pan/review/');
     expect(content).toContain('.pan/prompts/');
   });
 
@@ -30,12 +30,12 @@ describe('ensurePanGitignore', () => {
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     expect(content).toContain('node_modules/');
     expect(content).toContain('.pan/events/');
-    expect(content).toContain('.pan/convoy/');
+    expect(content).toContain('.pan/review/');
     expect(content).toContain('.pan/prompts/');
   });
 
   it('does not duplicate entries if already present', () => {
-    writeFileSync(join(dir, '.gitignore'), '.pan/events/\n.pan/convoy/\n.pan/prompts/\n', 'utf-8');
+    writeFileSync(join(dir, '.gitignore'), '.pan/events/\n.pan/review/\n.pan/prompts/\n', 'utf-8');
     ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const matches = (content.match(/\.pan\/events\//g) || []).length;
@@ -90,20 +90,20 @@ describe('migratePanopticonToPan', () => {
     expect(existsSync(join(dir, '.panopticon', 'events'))).toBe(false);
   });
 
-  it('migrates .panopticon/triage to .pan/convoy', () => {
+  it('migrates .panopticon/triage to .pan/review', () => {
     mkdirSync(join(dir, '.panopticon', 'triage'), { recursive: true });
     writeFileSync(join(dir, '.panopticon', 'triage', 'out.md'), 'triage', 'utf-8');
 
     migratePanopticonToPan(dir);
-    expect(existsSync(join(dir, '.pan', 'convoy'))).toBe(true);
+    expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
-  it('migrates .panopticon/health to .pan/convoy', () => {
+  it('migrates .panopticon/health to .pan/review', () => {
     mkdirSync(join(dir, '.panopticon', 'health'), { recursive: true });
     writeFileSync(join(dir, '.panopticon', 'health', 'out.md'), 'health', 'utf-8');
 
     migratePanopticonToPan(dir);
-    expect(existsSync(join(dir, '.pan', 'convoy'))).toBe(true);
+    expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
   it('migrates .panopticon/prompts to .pan/prompts', () => {

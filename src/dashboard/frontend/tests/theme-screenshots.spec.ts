@@ -6,7 +6,6 @@ const BASE_URL = 'http://localhost:3012'; // Vite dev server port
 const TABS = [
   { id: 'kanban', label: 'Board' },
   { id: 'agents', label: 'Agents' },
-  { id: 'convoys', label: 'Convoys' },
   { id: 'handoffs', label: 'Handoffs' },
   { id: 'activity', label: 'Activity' },
   { id: 'metrics', label: 'Metrics' },

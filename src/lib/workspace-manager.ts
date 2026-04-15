@@ -39,19 +39,18 @@ export interface PanMigrationResult {
  * - If old path exists and new path does NOT exist → move old to new.
  * - If both old and new exist → log warning and skip (never overwrite silently).
  * - If neither exists → nothing to do.
- * - Only migrates the specific runtime subdirs (events, convoy, prompts).
+ * - Only migrates the specific runtime subdirs (events, prompts, legacy output).
  *   .pan/skills/ is not migrated here since it may not have existed before.
  */
 export function migratePanopticonToPan(projectPath: string): PanMigrationResult {
   const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
 
-  // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths,
-  // including convoy unification (triage + health → convoy)
+  // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths.
   const legacyMappings: Array<{ old: string; new: string }> = [
     { old: '.panopticon/events', new: '.pan/events' },
-    { old: '.panopticon/triage', new: '.pan/convoy' },
-    { old: '.panopticon/health', new: '.pan/convoy' },
-    { old: '.panopticon/convoy-output', new: '.pan/convoy' },
+    { old: '.panopticon/triage', new: '.pan/review' },
+    { old: '.panopticon/health', new: '.pan/review' },
+    { old: '.panopticon/convoy-output', new: '.pan/review' },
     { old: '.panopticon/prompts', new: '.pan/prompts' },
   ];
 
@@ -99,13 +98,13 @@ export function migratePanopticonToPan(projectPath: string): PanMigrationResult 
 }
 
 /**
- * Ensure .pan/events/, .pan/convoy/, and .pan/prompts/ are excluded from git tracking
+ * Ensure .pan/events/, .pan/review/, and .pan/prompts/ are excluded from git tracking
  * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
  * since project-specific skills should be committed.
  */
 export function ensurePanGitignore(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
-  const requiredEntries = ['.pan/events/', '.pan/convoy/', '.pan/prompts/'];
+  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/'];
 
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const lines = content.split('\n');
@@ -615,7 +614,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     result.steps.push('Removed stale .planning/ directory from previous issue');
   }
 
-  // Ensure .pan/events/, .pan/convoy/, .pan/prompts/ are in the project's .gitignore
+  // Ensure .pan/events/, .pan/review/, .pan/prompts/ are in the project's .gitignore
   try {
     ensurePanGitignore(projectConfig.path);
     result.steps.push('Verified .pan/ runtime paths are in .gitignore');

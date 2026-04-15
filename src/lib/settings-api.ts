@@ -42,12 +42,12 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'specialist-inspect-agent': 'minimax-m2.7-highspeed',
     'specialist-uat-agent': 'K2.6-code-preview',
 
-    // Convoy reviewers
-    'convoy:security-reviewer': 'gpt-5.4',
-    'convoy:performance-reviewer': 'K2.6-code-preview',
-    'convoy:correctness-reviewer': 'glm-5.1',
-    'convoy:requirements-reviewer': 'K2.6-code-preview',
-    'convoy:synthesis-agent': 'minimax-m2.7',
+    // Review agents - mixed based on criticality
+    'review:security': 'claude-opus-4-6', // SAFETY CRITICAL
+    'review:performance': 'claude-sonnet-4-6',
+    'review:correctness': 'claude-sonnet-4-6',
+    'review:requirements': 'claude-sonnet-4-6',
+    'review:synthesis': 'claude-sonnet-4-6',
 
     // Subagents — GPT-5.4 Nano (155 tok/s, Tau2-Bench 92.5% tool use)
     'subagent:explore': 'gpt-5.4-nano',
@@ -142,8 +142,34 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelId('claude-sonnet-4-6');
 }
 
+/** One-time silent migration: convoy:* override keys → review:* equivalents */
+const CONVOY_TO_REVIEW_MIGRATION: Partial<Record<string, WorkTypeId>> = {
+  'convoy:security-reviewer': 'review:security',
+  'convoy:performance-reviewer': 'review:performance',
+  'convoy:correctness-reviewer': 'review:correctness',
+  'convoy:requirements-reviewer': 'review:requirements',
+  'convoy:synthesis-agent': 'review:synthesis',
+};
+
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
+
+  // Auto-migrate persisted convoy:* override keys to review:* equivalents.
+  // This is a one-time silent rename so existing user model overrides are preserved.
+  const migratedOverrides: Partial<Record<WorkTypeId, ModelId>> = {};
+  let migrationNeeded = false;
+  for (const [workType, modelId] of Object.entries(config.overrides)) {
+    const newKey = CONVOY_TO_REVIEW_MIGRATION[workType];
+    if (newKey) {
+      migratedOverrides[newKey] = modelId as ModelId;
+      migrationNeeded = true;
+    } else {
+      migratedOverrides[workType as WorkTypeId] = modelId as ModelId;
+    }
+  }
+  if (migrationNeeded) {
+    config.overrides = migratedOverrides as Record<WorkTypeId, ModelId>;
+  }
 
   // Detect deprecated models in current overrides
   const deprecationWarnings: ApiDeprecationWarning[] = [];
@@ -455,6 +481,54 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
     },
     api_keys: {},
     tracker_keys: {},
+  };
+}
+
+/**
+ * MiniMax-optimized defaults: use MiniMax M2.7 for all work, Anthropic disabled
+ */
+export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
+  return {
+    models: {
+      providers: {
+        anthropic: false,
+        openai: false,
+        google: false,
+        zai: false,
+        kimi: false,
+        minimax: true,
+        openrouter: false,
+      },
+      overrides: getMiniMaxModelDefaults(),
+      gemini_thinking_level: 3,
+    },
+    api_keys: {},
+    tracker_keys: {},
+  };
+}
+
+function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
+  return {
+    'issue-agent:exploration': 'minimax-m2.7-highspeed',
+    'issue-agent:implementation': 'minimax-m2.7-highspeed',
+    'issue-agent:testing': 'minimax-m2.7-highspeed',
+    'issue-agent:documentation': 'minimax-m2.7-highspeed',
+    'issue-agent:review-response': 'minimax-m2.7-highspeed',
+    'specialist-review-agent': 'minimax-m2.7-highspeed',
+    'specialist-test-agent': 'minimax-m2.7-highspeed',
+    'specialist-merge-agent': 'minimax-m2.7-highspeed',
+    'review:security': 'minimax-m2.7-highspeed',
+    'review:performance': 'minimax-m2.7-highspeed',
+    'review:correctness': 'minimax-m2.7-highspeed',
+    'review:requirements': 'minimax-m2.7-highspeed',
+    'review:synthesis': 'minimax-m2.7-highspeed',
+    'subagent:explore': 'minimax-m2.7-highspeed',
+    'subagent:plan': 'minimax-m2.7-highspeed',
+    'subagent:bash': 'minimax-m2.7-highspeed',
+    'subagent:general-purpose': 'minimax-m2.7-highspeed',
+    'planning-agent': 'minimax-m2.7-highspeed',
+    'cli:interactive': 'minimax-m2.7-highspeed',
+    'cli:quick-command': 'minimax-m2.7-highspeed',
   };
 }
 

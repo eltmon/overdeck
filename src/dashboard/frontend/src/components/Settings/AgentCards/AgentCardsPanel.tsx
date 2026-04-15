@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { AgentCard, AgentPhase } from './AgentCard';
 import { ModelOverrideModal } from './ModelOverrideModal';
 import { WorkTypeId, ModelId, Provider } from '../types';
-import { getEffectiveModelId } from '../modelDefaults';
 
 // Agent definitions with their work types
 const AGENT_DEFINITIONS = {
@@ -40,30 +39,36 @@ const AGENT_DEFINITIONS = {
     workType: 'specialist-merge-agent' as WorkTypeId,
   },
 
-  // Convoy members
+  // Review agents
   securityReviewer: {
     name: 'Security Reviewer',
     icon: 'shield',
     description: 'Security-focused code review',
-    workType: 'convoy:security-reviewer' as WorkTypeId,
+    workType: 'review:security' as WorkTypeId,
   },
   performanceReviewer: {
     name: 'Performance Reviewer',
     icon: 'speed',
     description: 'Performance-focused review',
-    workType: 'convoy:performance-reviewer' as WorkTypeId,
+    workType: 'review:performance' as WorkTypeId,
   },
   correctnessReviewer: {
     name: 'Correctness Reviewer',
     icon: 'verified',
     description: 'Correctness-focused review',
-    workType: 'convoy:correctness-reviewer' as WorkTypeId,
+    workType: 'review:correctness' as WorkTypeId,
+  },
+  requirementsReviewer: {
+    name: 'Requirements Reviewer',
+    icon: 'checklist',
+    description: 'Verifies requirements coverage vs issue + vBRIEF',
+    workType: 'review:requirements' as WorkTypeId,
   },
   synthesisAgent: {
     name: 'Synthesis Agent',
     icon: 'hub',
     description: 'Combines reviewer findings',
-    workType: 'convoy:synthesis-agent' as WorkTypeId,
+    workType: 'review:synthesis' as WorkTypeId,
   },
 
   // Subagents
@@ -107,6 +112,9 @@ const AGENT_DEFINITIONS = {
   },
 };
 
+// Default model when no override (smart selection)
+const DEFAULT_MODEL = 'claude-sonnet-4-5' as ModelId;
+
 interface AgentCardsPanelProps {
   overrides: Partial<Record<WorkTypeId, ModelId>>;
   enabledProviders: Record<Provider, boolean>;
@@ -137,7 +145,7 @@ export function AgentCardsPanel({
     const override = overrides[workType];
     return override
       ? { model: override, isOverride: true }
-      : { model: getEffectiveModelId(workType, overrides), isOverride: false };
+      : { model: DEFAULT_MODEL, isOverride: false };
   };
 
   // Build Issue Agent phases
@@ -240,17 +248,17 @@ export function AgentCardsPanel({
         </div>
       </div>
 
-      {/* Convoy Review Panel */}
+      {/* Review Panel */}
       <div>
         <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           <span className="inline-flex items-center gap-2">
             <span className="material-symbols-outlined text-base">diversity_3</span>
-            Convoy (Parallel Review Panel)
+            Review Panel
           </span>
         </h3>
         <div className="bg-surface-raised rounded-xl border border-divider p-4 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(['securityReviewer', 'performanceReviewer', 'correctnessReviewer', 'synthesisAgent'] as const).map((key) => {
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {(['securityReviewer', 'performanceReviewer', 'correctnessReviewer', 'requirementsReviewer', 'synthesisAgent'] as const).map((key) => {
               const agent = AGENT_DEFINITIONS[key];
               const { model, isOverride } = getModel(agent.workType);
               return (

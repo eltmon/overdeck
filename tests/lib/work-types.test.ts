@@ -62,18 +62,18 @@ describe('work-types', () => {
       });
     });
 
-    it('should have all convoy members', () => {
-      const convoy = [
-        'convoy:security-reviewer',
-        'convoy:performance-reviewer',
-        'convoy:correctness-reviewer',
-        'convoy:requirements-reviewer',
-        'convoy:synthesis-agent',
+    it('should have all review agents', () => {
+      const review = [
+        'review:security',
+        'review:performance',
+        'review:correctness',
+        'review:requirements',
+        'review:synthesis',
       ];
 
-      convoy.forEach((member) => {
+      review.forEach((member) => {
         expect(WORK_TYPES).toHaveProperty(member);
-        expect(WORK_TYPES[member as WorkTypeId].category).toBe('convoy');
+        expect(WORK_TYPES[member as WorkTypeId].category).toBe('review');
       });
     });
 
@@ -131,7 +131,7 @@ describe('work-types', () => {
       expect(categories).toContain('issue-agent');
       expect(categories).toContain('specialist');
       expect(categories).toContain('subagent');
-      expect(categories).toContain('convoy');
+      expect(categories).toContain('review');
       expect(categories).toContain('pre-work');
       expect(categories).toContain('workflow');
       expect(categories).toContain('cli');
@@ -154,18 +154,13 @@ describe('work-types', () => {
       expect(types).toHaveLength(4);
     });
 
-    it('should return 5 convoy types', () => {
-      const types = getWorkTypesByCategory('convoy');
+    it('should return 5 review types', () => {
+      const types = getWorkTypesByCategory('review');
       expect(types).toHaveLength(5);
     });
 
     it('should return 1 pre-work type', () => {
       const types = getWorkTypesByCategory('pre-work');
-      expect(types).toHaveLength(1);
-    });
-
-    it('should return 1 workflow type', () => {
-      const types = getWorkTypesByCategory('workflow');
       expect(types).toHaveLength(1);
     });
 
@@ -179,7 +174,7 @@ describe('work-types', () => {
         'issue-agent',
         'specialist',
         'subagent',
-        'convoy',
+        'review',
         'pre-work',
         'workflow',
         'cli',
@@ -198,7 +193,7 @@ describe('work-types', () => {
     it('should return true for valid work types', () => {
       expect(isValidWorkType('issue-agent:exploration')).toBe(true);
       expect(isValidWorkType('specialist-review-agent')).toBe(true);
-      expect(isValidWorkType('convoy:security-reviewer')).toBe(true);
+      expect(isValidWorkType('review:security')).toBe(true);
     });
 
     it('should return false for invalid work types', () => {
@@ -297,7 +292,7 @@ describe('work-types', () => {
         'issue-agent': 5,
         specialist: 5,
         subagent: 4,
-        convoy: 5,
+        review: 5,
         'pre-work': 1,
         workflow: 1,
         cli: 2,
@@ -314,7 +309,7 @@ describe('work-types', () => {
         'issue-agent',
         'specialist',
         'subagent',
-        'convoy',
+        'review',
         'pre-work',
         'workflow',
         'cli',

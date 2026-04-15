@@ -1,7 +1,7 @@
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'openrouter';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'openrouter';
 
 export type WorkTypeId =
   // Issue agent phases
@@ -21,12 +21,12 @@ export type WorkTypeId =
   | 'subagent:plan'
   | 'subagent:bash'
   | 'subagent:general-purpose'
-  // Convoy members
-  | 'convoy:security-reviewer'
-  | 'convoy:performance-reviewer'
-  | 'convoy:correctness-reviewer'
-  | 'convoy:requirements-reviewer'
-  | 'convoy:synthesis-agent'
+  // Review agents
+  | 'review:security'
+  | 'review:performance'
+  | 'review:correctness'
+  | 'review:requirements'
+  | 'review:synthesis'
   // Planning
   | 'planning-agent'
   // Workflow
@@ -41,9 +41,9 @@ export interface ProvidersConfig {
   anthropic: boolean; // Always true (required)
   openai: boolean;
   google: boolean;
-  minimax: boolean;
   zai: boolean;
   kimi: boolean;
+  minimax: boolean;
   openrouter: boolean;
 }
 
@@ -57,9 +57,9 @@ export interface ModelsConfig {
 export interface ApiKeysConfig {
   openai?: string;
   google?: string;
-  minimax?: string;
   zai?: string;
   kimi?: string;
+  minimax?: string;
   openrouter?: string;
 }
 
@@ -82,6 +82,8 @@ export interface SettingsConfig {
   openrouter?: {
     favorites?: string[];
   };
+  tracker_keys?: TrackerKeysConfig;
+  deprecation_warnings?: DeprecationWarning[];
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';
   };
@@ -90,15 +92,13 @@ export interface SettingsConfig {
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
   };
-  tracker_keys?: TrackerKeysConfig;
-  deprecation_warnings?: DeprecationWarning[];
 }
 
 export interface AvailableModels {
   anthropic: string[];
   openai: string[];
   google: string[];
-  minimax: string[];
+  zai: string[];
   kimi: string[];
 }
 
@@ -112,11 +112,11 @@ export interface WorkTypeInfo {
 export type WorkTypeCategory =
   | 'issue-agent'
   | 'specialist'
-  | 'convoy'
+  | 'review'
   | 'subagent'
+  | 'cli'
   | 'pre-work'
-  | 'workflow'
-  | 'cli';
+  | 'workflow';
 
 export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
   'issue-agent': [
@@ -133,12 +133,12 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'specialist-inspect-agent', category: 'specialist', displayName: 'Inspect Agent' },
     { id: 'specialist-uat-agent', category: 'specialist', displayName: 'UAT Agent' },
   ],
-  'convoy': [
-    { id: 'convoy:security-reviewer', category: 'convoy', displayName: 'Security Reviewer' },
-    { id: 'convoy:performance-reviewer', category: 'convoy', displayName: 'Performance Reviewer' },
-    { id: 'convoy:correctness-reviewer', category: 'convoy', displayName: 'Correctness Reviewer' },
-    { id: 'convoy:requirements-reviewer', category: 'convoy', displayName: 'Requirements Reviewer' },
-    { id: 'convoy:synthesis-agent', category: 'convoy', displayName: 'Synthesis Agent' },
+  'review': [
+    { id: 'review:security', category: 'review', displayName: 'Security Reviewer' },
+    { id: 'review:performance', category: 'review', displayName: 'Performance Reviewer' },
+    { id: 'review:correctness', category: 'review', displayName: 'Correctness Reviewer' },
+    { id: 'review:requirements', category: 'review', displayName: 'Requirements Reviewer' },
+    { id: 'review:synthesis', category: 'review', displayName: 'Synthesis Agent' },
   ],
   'subagent': [
     { id: 'subagent:explore', category: 'subagent', displayName: 'Explore' },
@@ -146,15 +146,15 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'subagent:bash', category: 'subagent', displayName: 'Bash' },
     { id: 'subagent:general-purpose', category: 'subagent', displayName: 'General Purpose' },
   ],
+  'cli': [
+    { id: 'cli:interactive', category: 'cli', displayName: 'Interactive' },
+    { id: 'cli:quick-command', category: 'cli', displayName: 'Quick Command' },
+  ],
   'pre-work': [
     { id: 'planning-agent', category: 'pre-work', displayName: 'Planning Agent' },
   ],
   'workflow': [
     { id: 'status-review', category: 'workflow', displayName: 'Status Review' },
-  ],
-  'cli': [
-    { id: 'cli:interactive', category: 'cli', displayName: 'Interactive' },
-    { id: 'cli:quick-command', category: 'cli', displayName: 'Quick Command' },
   ],
 };
 

@@ -1,676 +1,826 @@
 # Configuration Guide
 
-Complete guide to Panopticon model routing, provider auth, and per-job overrides.
+Complete guide to configuring Panopticon's multi-model routing system.
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [How Routing Works](#how-routing-works)
 - [Configuration Files](#configuration-files)
-- [Provider Authentication](#provider-authentication)
-- [Current Model Families](#current-model-families)
-- [Job Settings and Work Types](#job-settings-and-work-types)
-- [Overrides](#overrides)
-- [Fallback Behavior](#fallback-behavior)
+- [Presets](#presets)
+- [Per-Work-Type Overrides](#per-work-type-overrides)
+- [Provider Management](#provider-management)
+- [Model Deprecation & Migration](#model-deprecation--migration)
+- [Fallback Strategy](#fallback-strategy)
 - [Examples](#examples)
 - [Precedence Rules](#precedence-rules)
 - [Advanced Configuration](#advanced-configuration)
 - [Using Alternative LLM APIs with Claude Code](#using-alternative-llm-apis-with-claude-code)
-- [External Service Integrations](#external-service-integrations)
 - [Getting Help](#getting-help)
 
 ---
 
 ## Quick Start
 
-1. **Start with the default capability-based routing**
-   ```yaml
-   # ~/.panopticon/config.yaml
-   models:
-     providers:
-       anthropic:
-         enabled: true
-   ```
-
-2. **Enable the extra providers you actually want**
+1. **Choose a preset** (in `~/.panopticon/config.yaml`):
    ```yaml
    models:
-     providers:
-       anthropic:
-         enabled: true
-       openai:
-         enabled: true
-         auth: subscription
-       google:
-         enabled: false
-       kimi:
-         enabled: true
-         api_key: $KIMI_API_KEY
+     preset: balanced  # premium | balanced | budget
    ```
 
-3. **Add only the job-specific overrides you care about**
-   ```yaml
-   models:
-     overrides:
-       issue-agent:implementation: gpt-5.4
-       convoy:security-reviewer: claude-opus-4-6
-       cli:quick-command: claude-haiku-4-5
-   ```
-
-4. **Put secrets in `~/.panopticon.env` when you need API keys**
+2. **Add API keys** (in `~/.panopticon.env`):
    ```env
    ANTHROPIC_API_KEY=sk-ant-...
-   KIMI_API_KEY=sk-kimi-...
+   OPENAI_API_KEY=sk-...
    GOOGLE_API_KEY=...
-   OPENROUTER_API_KEY=...
+   ZAI_API_KEY=...
    ```
 
-If you do nothing beyond enabling Anthropic, Panopticon still works. The router selects models from enabled providers and falls back to Anthropic when a selected provider cannot be used.
-
----
-
-## How Routing Works
-
-Panopticon’s current model system is capability-based.
-
-Resolution flow:
-
-1. **Capability-based selection** picks a model for each work type from the providers you have enabled.
-2. **Per-work-type overrides** replace that automatic choice when you want a specific job pinned to a specific model.
-3. **Provider auth mode** determines how the runtime reaches the provider.
-   - OpenAI subscription auth routes through claudish as `cx@model`
-   - OpenAI API key auth routes through claudish as `oai@model`
-   - Google subscription auth routes through claudish as `go@model`
-   - Anthropic-compatible direct providers use direct endpoints
-4. **Fallback logic** swaps unavailable non-Anthropic models to a matching Anthropic tier so work continues.
-
-What you usually configure:
-
-- which providers are enabled
-- which auth mode each provider should use
-- a small number of job overrides
-- Gemini thinking level if you rely on Gemini
-
-What you usually do not need to configure:
-
-- one model per work type
-- Anthropic fallback behavior
-- provider-specific prompt formatting
+3. **Start using Panopticon** - it works!
 
 ---
 
 ## Configuration Files
 
-Panopticon reads configuration from four places.
+Panopticon uses two configuration file types:
 
-### 1. Global config: `~/.panopticon/config.yaml`
+### Global Configuration: `~/.panopticon/config.yaml`
 
-This is the main config file for model routing.
+System-wide defaults applied to all projects.
 
+**Location**: `~/.panopticon/config.yaml`
+
+**Format**: YAML
+
+**Example**:
 ```yaml
 models:
+  # Preset selection
+  preset: balanced  # premium | balanced | budget
+
+  # Provider enable/disable
   providers:
-    anthropic:
-      enabled: true
-    openai:
-      enabled: true
-      auth: subscription
-      plan: plus
-    google:
-      enabled: false
-    kimi:
-      enabled: true
-      api_key: $KIMI_API_KEY
-    openrouter:
-      enabled: false
+    anthropic: true   # Always enabled (required)
+    openai: true      # Enabled (has API key)
+    google: false     # Disabled (no API key or user preference)
+    zai: false        # Disabled
 
+  # Per-work-type overrides (optional)
   overrides:
-    issue-agent:implementation: gpt-5.4
-    issue-agent:testing: claude-sonnet-4-6
-    convoy:security-reviewer: claude-opus-4-6
+    issue-agent:implementation: gpt-5.2-codex
+    review:security: claude-opus-4-6
+    subagent:explore: glm-4.7-flashx
 
-  gemini_thinking_level: 3
-
-openrouter:
-  favorites:
-    - openai/gpt-5.4-mini
-    - anthropic/claude-sonnet-4.5
+  # Gemini thinking levels (optional)
+  thinking:
+    issue-agent:exploration: minimal
+    issue-agent:planning: high
+    review:performance: high
 ```
 
-You can also use the short boolean form for simple providers:
+### Per-Project Configuration: `.panopticon.yaml`
 
+Project-specific overrides in the project root directory.
+
+**Location**: `.panopticon.yaml` (project root)
+
+**Format**: YAML
+
+**Example**:
 ```yaml
 models:
-  providers:
-    anthropic: true
-    openai: true
-    google: false
-```
+  # Override preset for this project
+  preset: premium  # Use premium models for critical work
 
-Use the object form whenever you need `auth`, `plan`, or `api_key`.
-
-### 2. Per-project config: `.pan.yaml`
-
-Project config overrides global config for one repo.
-
-```yaml
-models:
+  # Project-specific overrides
   overrides:
-    issue-agent:implementation: kimi-k2.5
-    issue-agent:documentation: claude-sonnet-4-6
+    # Never compromise on security, even in budget mode
+    review:security: claude-opus-4-6
+
+    # Use Codex for implementation in this codebase
+    issue-agent:implementation: gpt-5.2-codex
 ```
 
-Panopticon still reads `.panopticon.yaml`, but that name is deprecated. Rename it to `.pan.yaml`.
+### API Keys: `~/.panopticon.env`
 
-### 3. Environment file: `~/.panopticon.env`
+Sensitive API keys stored separately from configuration.
 
-Use this for secrets and tokens that should not live in YAML.
+**Location**: `~/.panopticon.env`
 
+**Format**: Shell environment variable syntax
+
+**Example**:
 ```env
-ANTHROPIC_API_KEY=sk-ant-...
+# Anthropic (required)
+ANTHROPIC_API_KEY=sk-ant-api03-...
+
+# OpenAI (optional - requires router)
 OPENAI_API_KEY=sk-...
+
+# Google (optional - requires router)
 GOOGLE_API_KEY=...
+
+# Z.AI / GLM (optional - direct API, no router)
+ZAI_API_KEY=your-zai-key
+
+# Kimi / Moonshot (optional - direct API, no router)
 KIMI_API_KEY=sk-kimi-...
-OPENROUTER_API_KEY=sk-or-...
+
+# Linear (for issue tracking)
 LINEAR_API_KEY=lin_api_...
-GITHUB_TOKEN=ghp_...
-GITLAB_TOKEN=glpat-...
-RALLY_API_KEY=_abc123...
-HUME_API_KEY=...
+
+# Hume AI (optional - for EVI voice config management)
+HUME_API_KEY=your-hume-api-key
 ```
 
-### 4. Settings page
+**Note**: Direct-compatible providers (Kimi, GLM) don't need claude-code-router. Only OpenAI and Gemini require the router.
 
-The dashboard Settings page is the UI for:
-
-- enabling and disabling provider families
-- adding per-job model overrides
-- managing tracker keys
-- managing OpenRouter favorites
-
-The YAML files remain the source of truth.
+**Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below).
 
 ---
 
-## Provider Authentication
+## Presets
 
-Different providers use different auth paths.
+Presets provide curated model configurations optimized for different priorities.
 
-### Anthropic
+### Premium Preset
 
-Anthropic is the required base provider.
+**Goal**: Best quality and accuracy
+**Cost**: Highest
+**Use case**: Critical production work, complex problems, quality-first projects
 
-- Native route: Claude Code / Anthropic
-- Typical auth: local Claude login or `ANTHROPIC_API_KEY`
-- Typical jobs: fallback, planning, security, review, synthesis
+**Model Selection**:
+- **Critical thinking**: claude-opus-4-6
+- **Code generation**: gpt-5.2-codex
+- **Security**: claude-opus-4-6
+- **Exploration**: gemini-3-flash-preview
+- **Documentation**: claude-sonnet-4-5
 
-### OpenAI
-
-OpenAI routes through claudish.
-
-Use subscription auth when Panopticon should use your local Codex / ChatGPT login:
-
+**Example**:
 ```yaml
 models:
-  providers:
-    openai:
-      enabled: true
-      auth: subscription
-      plan: plus
+  preset: premium
 ```
 
-This maps OpenAI models to `cx@model`.
+### Balanced Preset (Recommended)
 
-Use API-key auth when Panopticon should use `OPENAI_API_KEY`:
+**Goal**: Good quality at moderate cost
+**Cost**: Moderate
+**Use case**: Daily development, most production work
 
+**Model Selection**:
+- **Critical thinking**: claude-opus-4-6 or gemini-3-pro-preview
+- **Code generation**: gpt-5.2-codex or gemini-3-pro-preview
+- **Security**: claude-sonnet-4-5
+- **Exploration**: gemini-3-flash-preview
+- **Documentation**: claude-sonnet-4-5
+
+**Example**:
 ```yaml
 models:
-  providers:
-    openai:
-      enabled: true
-      auth: api-key
-      api_key: $OPENAI_API_KEY
+  preset: balanced
 ```
 
-This maps OpenAI models to `oai@model`.
+### Budget Preset
 
-### Google
+**Goal**: Lowest cost, Gemini-leaning
+**Cost**: Lowest
+**Use case**: High-volume work, experimentation, learning
 
-Google also routes through claudish.
+**Model Selection**:
+- **Most work**: gemini-3-pro-preview or gemini-3-flash-preview
+- **Security**: gemini-3-pro-preview (thinking: high)
+- **Exploration**: glm-4.7-flashx
+- **Documentation**: claude-haiku-4-5
 
+**Example**:
 ```yaml
 models:
-  providers:
-    google:
-      enabled: true
-      auth: api-key
-      api_key: $GOOGLE_API_KEY
+  preset: budget
 ```
-
-If you use a subscription-style coding login instead:
-
-```yaml
-models:
-  providers:
-    google:
-      enabled: true
-      auth: subscription
-```
-
-### Kimi
-
-Kimi is direct and Anthropic-compatible.
-
-- Good for: implementation-heavy workloads where value matters
-- Typical auth: API key or Kimi credential helper
-
-```yaml
-models:
-  providers:
-    kimi:
-      enabled: true
-      api_key: $KIMI_API_KEY
-```
-
-### OpenRouter
-
-OpenRouter is direct and uses model IDs from its catalog.
-
-```yaml
-models:
-  providers:
-    openrouter:
-      enabled: true
-      api_key: $OPENROUTER_API_KEY
-```
-
-Use the Settings page to choose favorite OpenRouter models so they appear in the UI browser.
-
-### Direct-compatible legacy / custom provider slots
-
-Panopticon also supports direct Anthropic-compatible providers such as GLM-style and MiniMax-style integrations in the runtime. Most users do not need to touch those slots for normal day-to-day setup.
 
 ---
 
-## Current Model Families
+## Per-Work-Type Overrides
 
-These are the main model families Panopticon currently understands in the router.
+Override specific work types while keeping preset defaults for others.
 
-### Anthropic
+### Available Work Types
 
-| Model | Typical use |
-|-------|-------------|
-| `claude-opus-4-6` | Planning, architecture, security review, highest-confidence synthesis |
-| `claude-sonnet-4-6` | Strong all-around implementation support, testing, documentation, review response |
-| `claude-sonnet-4-5` | Compatibility with older overrides |
-| `claude-haiku-4-5` | Fast helper agents, quick commands, cheap exploration |
+See [WORK-TYPES.md](./WORK-TYPES.md) for the complete list of 23 work types.
 
-### OpenAI
+**Categories**:
+- `issue-agent:*` - Main work agent phases (6 types)
+- `specialist-*` - Long-running specialists (3 types)
+- `subagent:*` - Task tool subagents (4 types)
+- `review:*` - Parallel review agents (5 types: security, performance, correctness, requirements, synthesis)
+- `*-agent` - Pre-work agents (4 types: prd, triage, planning, decomposition)
+- `cli:*` - User-facing CLI contexts (2 types)
 
-| Model | Typical use |
-|-------|-------------|
-| `gpt-5.4-pro` | Highest-end OpenAI coding slot |
-| `gpt-5.4` | Premium implementation, debugging, large-context editing |
-| `o3` | Deliberate reasoning and hard debugging |
-| `o4-mini` | Cheaper reasoning-heavy work |
-| `gpt-5.4-mini` | Fast implementation and interactive work |
-| `gpt-5.4-nano` | Cheap quick tasks and lightweight agents |
+### Override Examples
 
-### Google
+**Example 1: Always use Opus for security**
+```yaml
+models:
+  preset: budget  # Use cheap models everywhere...
 
-| Model | Typical use |
-|-------|-------------|
-| `gemini-3.1-pro-preview` | Large-context planning and analysis |
-| `gemini-3-flash` | Fast exploration and mixed general work |
-| `gemini-3.1-flash-lite-preview` | Cheapest Gemini lane |
+  overrides:
+    review:security: claude-opus-4-6  # ...except security!
+```
 
-### Kimi
+**Example 2: Use Codex for implementation**
+```yaml
+models:
+  preset: balanced
 
-| Model | Typical use |
-|-------|-------------|
-| `kimi-k2.5` | High-value implementation and coding-heavy execution |
+  overrides:
+    issue-agent:implementation: gpt-5.2-codex  # Prefer Codex for code generation
+    issue-agent:testing: gpt-5.2-codex         # Also for testing
+```
 
-### OpenRouter
+**Example 3: Gemini-only configuration**
+```yaml
+models:
+  preset: budget
 
-OpenRouter favorites are user-selected. Panopticon does not hardcode one OpenRouter lineup because those model IDs vary by upstream provider.
+  overrides:
+    issue-agent:planning: gemini-3-pro-preview
+    issue-agent:implementation: gemini-3-pro-preview
+    review:security: gemini-3-pro-preview
 
----
+  thinking:
+    issue-agent:planning: high
+    review:security: high
+```
 
-## Job Settings and Work Types
+**Example 4: Performance-focused**
+```yaml
+models:
+  preset: balanced
 
-A "job setting" in Panopticon means a work type. Each work type maps to one part of the workflow and can be overridden independently.
+  overrides:
+    subagent:explore: glm-4.7-flashx  # Fast exploration
+    cli:quick-command: gpt-4o-mini    # Fast CLI responses
 
-These are routing slots, not a second copy of the runtime agent roster. Some entries below describe main workflow stages, some describe helper jobs, and convoy entries describe parallel review lanes inside the review system.
-
-Current router-backed work types:
-
-| Work type | When it is used |
-|-----------|-----------------|
-| `issue-agent:exploration` | Initial codebase discovery and requirement digestion before the main implementation push |
-| `issue-agent:implementation` | The main code-writing phase in the issue worktree |
-| `issue-agent:testing` | Test execution, test fixes, and validation passes |
-| `issue-agent:documentation` | README updates, inline docs, migration notes, and supporting documentation |
-| `issue-agent:review-response` | Follow-up passes after review feedback lands |
-| `specialist-review-agent` | Dedicated code review specialist stage |
-| `specialist-test-agent` | Specialist verification and test-focused validation |
-| `specialist-merge-agent` | Final merge preparation and merge-time housekeeping |
-| `specialist-inspect-agent` | Per-bead inspection stage invoked during implementation |
-| `specialist-uat-agent` | Browser-based UAT stage after automated tests pass |
-| `subagent:explore` | Fast helper subagent for searching and reading |
-| `subagent:plan` | Helper subagent for task breakdown and approach sketches |
-| `subagent:bash` | Helper subagent for shell-heavy work |
-| `subagent:general-purpose` | General helper subagent when the task is mixed or unclear |
-| `convoy:security-reviewer` | Security-focused parallel convoy review lane |
-| `convoy:performance-reviewer` | Performance-focused parallel convoy review lane |
-| `convoy:correctness-reviewer` | Logic and correctness parallel convoy review lane |
-| `convoy:requirements-reviewer` | Requirement/design alignment parallel convoy review lane |
-| `convoy:synthesis-agent` | Synthesis lane that combines convoy findings |
-| `planning-agent` | Up-front planning and vBRIEF generation |
-| `cli:interactive` | Long-running interactive CLI conversations |
-| `cli:quick-command` | Short one-shot CLI requests |
-
-See [WORK-TYPES.md](./WORK-TYPES.md) for the detailed per-job breakdown.
+  thinking:
+    issue-agent:exploration: minimal  # Minimal thinking for speed
+```
 
 ---
 
-## Overrides
+## Parallel Review Agents
 
-Overrides let you pin one job to one model while leaving the rest of the router automatic.
+Panopticon's review specialist runs multiple reviewer agents in parallel before producing a synthesis report. You can customize which agents run, their models, and their focus areas via the `specialists.review_agents` list in `~/.panopticon/cloister.toml`.
 
-### Basic override
+### Default Reviewers
+
+When `review_agents` is not configured, Panopticon uses four built-in reviewers:
+
+| Name | Focus |
+|---|---|
+| `correctness` | Logic, edge cases, null handling, type safety |
+| `security` | OWASP Top 10, injection, auth, secrets |
+| `performance` | Algorithms, N+1 queries, memory leaks |
+| `requirements` | Acceptance criteria, issue requirements |
+
+After all reviewers complete, a **synthesis** agent combines the findings.
+
+### Configuration Schema
+
+In `~/.panopticon/cloister.toml`:
+
+```toml
+[specialists.review_agents]
+# Each entry controls one parallel reviewer.
+# Absent = use the four defaults above.
+
+[[specialists.review_agents]]
+name = "security"
+model = "claude-opus-4-6"   # Optional: override model for this reviewer
+focus = ["OWASP Top 10", "injection", "auth"]
+enabled = true
+
+[[specialists.review_agents]]
+name = "performance"
+# model not set → resolved via review:performance work-type routing
+focus = ["algorithms", "N+1 queries", "memory leaks"]
+enabled = true
+
+[[specialists.review_agents]]
+name = "correctness"
+enabled = true
+
+[[specialists.review_agents]]
+name = "requirements"
+enabled = true
+
+[[specialists.review_agents]]
+name = "docs-coverage"     # Custom reviewer — uses code-review-docs-coverage.md agent
+focus = ["missing JSDoc", "README coverage"]
+enabled = false            # Disabled by default; set to true to activate
+```
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Reviewer name — maps to `agents/code-review-<name>.md` template |
+| `model` | string | no | Model override (e.g. `claude-opus-4-6`). Falls back to `review:<name>` work-type routing |
+| `focus` | string[] | no | Focus areas passed as context to the reviewer prompt |
+| `enabled` | boolean | no | Set to `false` to skip this reviewer. Defaults to `true` |
+
+### Per-Reviewer Model Overrides
+
+You can also override reviewer models via the standard `models.overrides` map in `config.yaml`:
 
 ```yaml
 models:
   overrides:
-    issue-agent:implementation: gpt-5.4
+    review:security: claude-opus-4-6    # Security reviewer always uses Opus
+    review:correctness: claude-sonnet-4-6
+    review:performance: claude-sonnet-4-6
+    review:requirements: claude-sonnet-4-6
+    review:synthesis: claude-sonnet-4-6
 ```
-
-### Security-first
-
-```yaml
-models:
-  overrides:
-    convoy:security-reviewer: claude-opus-4-6
-    convoy:correctness-reviewer: claude-sonnet-4-6
-```
-
-### Kimi-heavy implementation
-
-```yaml
-models:
-  providers:
-    anthropic:
-      enabled: true
-    kimi:
-      enabled: true
-      api_key: $KIMI_API_KEY
-
-  overrides:
-    issue-agent:implementation: kimi-k2.5
-    issue-agent:testing: claude-sonnet-4-6
-```
-
-### OpenAI subscription example
-
-```yaml
-models:
-  providers:
-    anthropic:
-      enabled: true
-    openai:
-      enabled: true
-      auth: subscription
-      plan: plus
-
-  overrides:
-    issue-agent:implementation: gpt-5.4
-    cli:quick-command: gpt-5.4-nano
-```
-
-### Gemini thinking level
-
-Gemini currently uses one global thinking level:
-
-```yaml
-models:
-  gemini_thinking_level: 4
-```
-
-Valid values are `1` through `4`.
 
 ---
 
-## Fallback Behavior
+## Provider Management
 
-When a selected provider cannot be used, Panopticon falls back to Anthropic.
+Enable or disable entire model families.
 
-Common reasons:
+### Provider Configuration
 
-- the provider is disabled
-- the provider requires an API key and none is configured
-- a subscription-only path is unavailable
+```yaml
+models:
+  providers:
+    anthropic: true   # Always enabled (Panopticon requires Claude)
+    openai: true      # Enable OpenAI models (gpt-*, o3-*)
+    google: true      # Enable Google models (gemini-*)
+    zai: false        # Disable Z.AI models (glm-*)
+```
 
-Typical fallback behavior:
+### When Providers are Disabled
 
-| Selected model | Typical fallback |
-|----------------|------------------|
-| `gpt-5.4` | `claude-sonnet-4-6` |
-| `gpt-5.4-mini` | `claude-haiku-4-5` |
-| `gpt-5.4-pro` | `claude-sonnet-4-6` |
-| `o3` | `claude-sonnet-4-6` |
-| `gemini-3.1-pro-preview` | `claude-sonnet-4-6` |
-| `gemini-3-flash` | `claude-haiku-4-5` |
-| `kimi-k2.5` | `claude-sonnet-4-6` |
+If a work type is configured to use a disabled provider:
+1. **Fallback** is applied automatically
+2. **Warning** is logged
+3. **Work continues** with Anthropic equivalent
 
-Fallback is intentional. The goal is continuity of work, not hard failure on every missing provider.
+**Example**:
+```yaml
+models:
+  preset: premium  # Uses gpt-5.2-codex for implementation
+
+  providers:
+    openai: false  # OpenAI disabled (no API key)
+
+# Result: gpt-5.2-codex → claude-sonnet-4-5 (fallback)
+```
+
+---
+
+## Model Deprecation & Migration
+
+When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Panopticon automatically migrates your configuration to use the current model IDs.
+
+### How It Works
+
+1. **Auto-Detection**: When you load settings (via Dashboard or CLI), Panopticon checks your model overrides against a deprecation mapping
+2. **Automatic Backup**: If deprecated models are found, `config.yaml.bak` is created before any changes
+3. **Silent Migration**: Deprecated model IDs are replaced with current equivalents in memory and on disk
+4. **Console Logging**: Migration actions are logged to the console
+5. **Dashboard Warnings**: The Settings page shows amber banners and toast notifications for deprecated models
+
+### Current Deprecations
+
+```yaml
+# Deprecated → Current
+claude-opus-4-5 → claude-opus-4-6
+claude-sonnet-4-5 → claude-sonnet-4-6
+```
+
+### Example Migration
+
+**Before** (`~/.panopticon/config.yaml`):
+```yaml
+models:
+  overrides:
+    issue-agent:planning: claude-opus-4-5      # deprecated
+    issue-agent:implementation: claude-sonnet-4-5  # deprecated
+```
+
+**After auto-migration**:
+```yaml
+models:
+  overrides:
+    issue-agent:planning: claude-opus-4-6
+    issue-agent:implementation: claude-sonnet-4-6
+```
+
+**Backup created**: `~/.panopticon/config.yaml.bak` (your original config, for safety)
+
+**Console output**:
+```
+✓ Backed up config.yaml → config.yaml.bak
+
+🔄 Model ID Migration:
+  issue-agent:planning: claude-opus-4-5 → claude-opus-4-6
+  issue-agent:implementation: claude-sonnet-4-5 → claude-sonnet-4-6
+```
+
+### Dashboard Behavior
+
+When you open the Settings page with deprecated model IDs:
+
+1. **Deprecation Banner**: Amber banner at the top showing all deprecated overrides
+2. **Toast Notification**: Warning toast prompting you to save to complete migration
+3. **Card Highlighting**: Agent cards with deprecated models show amber borders and "DEPRECATED" badge
+4. **Auto-Fix on Save**: Clicking "Save" automatically migrates to current model IDs
+
+### Strategy
+
+- **Single-Hop Only**: Deprecation mappings are updated with each new model version
+- **When 4.7 arrives**: Both `4-5→4-7` and `4-6→4-7` mappings will be added
+- **No Multi-Hop**: We don't chain `4-5→4-6→4-7`; each mapping is direct
+
+### Restoring from Backup
+
+If you need to restore your original configuration:
+
+```bash
+cp ~/.panopticon/config.yaml.bak ~/.panopticon/config.yaml
+```
+
+**Note**: The backup file is overwritten on each migration, so it always contains the most recent pre-migration state.
+
+---
+
+## Fallback Strategy
+
+When API keys are missing or providers disabled, Panopticon falls back to Anthropic models.
+
+### Fallback Mappings
+
+| Original Model | Fallback Model | Reason |
+|----------------|----------------|--------|
+| `gpt-5.2-codex` | `claude-sonnet-4-5` | Similar capability tier |
+| `gpt-4o` | `claude-sonnet-4-5` | Similar capability tier |
+| `gpt-4o-mini` | `claude-haiku-4-5` | Budget tier |
+| `o3-deep-research` | `claude-opus-4-6` | Premium tier |
+| `gemini-3-pro-preview` | `claude-sonnet-4-5` | Similar capability tier |
+| `gemini-3-flash-preview` | `claude-haiku-4-5` | Budget tier |
+| `glm-4.7` | `claude-haiku-4-5` | Budget tier |
+| `glm-4.7-flashx` | `claude-haiku-4-5` | Budget tier |
+
+### Fallback Behavior
+
+1. **Automatic**: No configuration needed
+2. **Logged**: Warning messages show fallback usage
+3. **Seamless**: Work continues without interruption
+4. **Guaranteed**: Works with only ANTHROPIC_API_KEY configured
+
+### Example Scenario
+
+**Configuration**:
+```yaml
+models:
+  preset: premium  # Uses gpt-5.2-codex for implementation
+```
+
+**Missing API key**: `OPENAI_API_KEY` not configured
+
+**Result**:
+```
+Warning: Model gpt-5.2-codex requires openai API key - falling back to claude-sonnet-4-5
+```
+
+**Outcome**: Implementation phase uses `claude-sonnet-4-5` instead
 
 ---
 
 ## Examples
 
-### Example 1: Minimal setup
+### Example 1: Default Setup (Balanced)
 
+Use Panopticon with sensible defaults.
+
+**~/.panopticon/config.yaml**:
 ```yaml
 models:
-  providers:
-    anthropic:
-      enabled: true
+  preset: balanced
 ```
 
-Result:
+**~/.panopticon.env**:
+```env
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
 
-- Anthropic only
-- capability-based defaults
-- no extra provider setup required
+**Result**: Works immediately with Claude models only. Falls back gracefully for all work types.
 
-### Example 2: OpenAI implementation, Claude reviews
+---
 
+### Example 2: Multi-Provider (Premium)
+
+Use all providers for maximum flexibility.
+
+**~/.panopticon/config.yaml**:
 ```yaml
 models:
+  preset: premium
+
   providers:
-    anthropic:
-      enabled: true
-    openai:
-      enabled: true
-      auth: subscription
-      plan: plus
+    anthropic: true
+    openai: true
+    google: true
+    zai: false  # Don't need Z.AI
+```
+
+**~/.panopticon.env**:
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
+```
+
+**Result**: Uses best model for each work type according to premium preset.
+
+---
+
+### Example 3: Budget-Conscious (Gemini-Heavy)
+
+Minimize costs with Gemini models.
+
+**~/.panopticon/config.yaml**:
+```yaml
+models:
+  preset: budget
+
+  providers:
+    anthropic: true
+    google: true
+    openai: false  # Don't pay for OpenAI
+    zai: false
 
   overrides:
-    issue-agent:implementation: gpt-5.4
-    issue-agent:testing: gpt-5.4-mini
-    convoy:security-reviewer: claude-opus-4-6
-    specialist-review-agent: claude-opus-4-6
+    # Only use Claude for security
+    review:security: claude-opus-4-6
+
+  thinking:
+    # Dial up thinking for complex tasks
+    issue-agent:planning: high
+    review:security: high
+    review:performance: high
 ```
 
-### Example 3: Kimi for implementation, Anthropic for review
+**~/.panopticon.env**:
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+```
 
+**Result**: Gemini for most work, Claude Opus only for security review.
+
+---
+
+### Example 4: Per-Project Override (Critical Project)
+
+Override global defaults for a specific project.
+
+**~/.panopticon/config.yaml** (global):
 ```yaml
 models:
-  providers:
-    anthropic:
-      enabled: true
-    kimi:
-      enabled: true
-      api_key: $KIMI_API_KEY
-
-  overrides:
-    issue-agent:implementation: kimi-k2.5
-    specialist-review-agent: claude-opus-4-6
-    specialist-test-agent: claude-sonnet-4-6
+  preset: balanced  # Default for all projects
 ```
 
-### Example 4: Large-context Google planning
-
+**.panopticon.yaml** (project root):
 ```yaml
 models:
-  providers:
-    anthropic:
-      enabled: true
-    google:
-      enabled: true
-      auth: api-key
-      api_key: $GOOGLE_API_KEY
+  preset: premium  # This project is critical
 
   overrides:
-    planning-agent: gemini-3.1-pro-preview
-    issue-agent:exploration: gemini-3-flash
-
-  gemini_thinking_level: 4
+    # Extra emphasis on quality
+    review:security: claude-opus-4-6
+    review:correctness: claude-opus-4-6
+    issue-agent:implementation: gpt-5.2-codex
 ```
 
-### Example 5: Project-specific override
+**Result**: This project uses premium models, other projects use balanced.
 
-Global config:
+---
 
+### Example 5: Custom Thinking Levels (Gemini)
+
+Fine-tune Gemini thinking for cost/quality tradeoffs.
+
+**~/.panopticon/config.yaml**:
 ```yaml
 models:
-  providers:
-    anthropic:
-      enabled: true
-    openai:
-      enabled: true
-      auth: subscription
+  preset: budget  # Use Gemini everywhere
 
-  overrides:
-    issue-agent:implementation: gpt-5.4
+  thinking:
+    # Minimal thinking for fast exploration
+    issue-agent:exploration: minimal
+    subagent:explore: minimal
+
+    # High thinking for critical tasks
+    issue-agent:planning: high
+    review:security: high
+
+    # Medium thinking for balanced tasks
+    issue-agent:implementation: medium
+    specialist-review-agent: medium
 ```
 
-Project config (`.pan.yaml`):
-
-```yaml
-models:
-  overrides:
-    issue-agent:implementation: kimi-k2.5
-    issue-agent:documentation: claude-sonnet-4-6
-```
-
-Result: the project uses Kimi for implementation while every other repo keeps the global GPT override.
+**Result**: Optimized Gemini usage - fast where possible, careful where needed.
 
 ---
 
 ## Precedence Rules
 
-Model resolution order:
+When multiple configuration sources exist, Panopticon resolves model selection in this order:
 
-1. `.pan.yaml` project override
-2. `~/.panopticon/config.yaml` global override
-3. capability-based automatic selection across enabled providers
-4. Anthropic fallback if the chosen provider cannot be used
+### Resolution Order
 
-For non-model settings:
+1. **Per-project override** (`.panopticon.yaml` in project root)
+2. **Global override** (`~/.panopticon/config.yaml` overrides section)
+3. **Preset default** (`~/.panopticon/config.yaml` preset selection)
+4. **Fallback** (if provider disabled or API key missing)
+5. **Hardcoded default** (`claude-sonnet-4-5`)
 
-1. project YAML overrides global YAML
-2. YAML overrides defaults
-3. environment variables fill in missing secrets
+### Example Resolution
+
+**Global config**:
+```yaml
+models:
+  preset: balanced  # Default: gemini-3-flash-preview for exploration
+
+  overrides:
+    issue-agent:exploration: claude-haiku-4-5  # Override: use Haiku
+```
+
+**Project config** (`.panopticon.yaml`):
+```yaml
+models:
+  overrides:
+    issue-agent:exploration: glm-4.7-flashx  # Project override: use GLM
+```
+
+**Result**: `issue-agent:exploration` uses `glm-4.7-flashx` (project override wins)
 
 ---
 
 ## Advanced Configuration
 
-### Debugging model resolution
+### Debugging Model Resolution
+
+To see which model is selected for a specific work type:
 
 Use the Settings page and the documented YAML files as the source of truth for model routing. Panopticon does not currently expose a `pan admin config show|get|set|validate` CLI for router inspection.
 
 For the older TOML-backed runtime config, the currently supported admin CLI surface is shadow mode only:
 
 ```bash
-pan admin config shadow --status
-pan admin config shadow --tracker github --enable
-pan admin config shadow --tracker github --disable
+# View effective configuration
+pan config show
+
+# Check model for specific work type
+pan config get issue-agent:implementation
 ```
 
 ### Validation
 
-Panopticon validates:
+Panopticon validates configuration on startup:
+- Invalid work type IDs → Warning logged, ignored
+- Missing API keys → Fallback applied
+- Syntax errors → Error message, defaults used
 
-- known model IDs
-- provider enablement
-- Gemini thinking level range
-- deprecated model IDs and migrations
+### Migration from settings.json
 
-### Deprecated IDs
+If you have an existing `~/.panopticon/settings.json`:
 
-Panopticon automatically migrates common retired IDs such as:
+```bash
+# Automatic migration (coming soon in PAN-118-6)
+pan migrate-config
 
-- `gpt-5.2-codex` → `gpt-5.4`
-- `o3-deep-research` → `o3`
-- `gpt-4o` → `gpt-5.4-mini`
-- `gpt-4o-mini` → `gpt-5.4-nano`
-- `gemini-3-pro-preview` → `gemini-3.1-pro-preview`
-- `gemini-3-flash-preview` → `gemini-3-flash`
-- `kimi-k2` → `kimi-k2.5`
-
-The dashboard warns when deprecated IDs are still present, and saving settings migrates them forward.
+# Manual migration: convert complexity levels to work types
+# Old: complexity.medium → New: issue-agent:* work types
+```
 
 ---
 
 ## Using Alternative LLM APIs with Claude Code
 
-This section is about the Claude Code CLI itself, not Panopticon’s work-type router.
+When working on Panopticon, you can configure Claude Code itself to use third-party LLM APIs like Kimi instead of Anthropic's API. This is separate from Panopticon's multi-model routing and affects the Claude Code CLI tool you use to interact with Panopticon.
 
-### API compatibility levels
+### API Compatibility Levels
 
-**Direct-compatible**:
+Different LLM providers have different compatibility with Claude Code's API format:
 
-- Kimi / Moonshot
-- GLM-style Anthropic-compatible endpoints
-- MiniMax coding endpoint
+**✅ Direct API Compatible** (No router needed):
+- **Kimi/Moonshot** - Implements Anthropic-compatible API ✅ Tested
+- **GLM (Z.AI)** - Implements Anthropic-compatible API ✅ Tested
 
-**Claudish-routed**:
+**🔄 Requires Router** (API format translation needed):
+- **OpenAI** - Different API structure, requires claude-code-router
+- **Google Gemini** - Different API structure, requires claude-code-router
 
-- OpenAI
-- Google Gemini
+### Why Use Alternative APIs?
 
-### Why do this?
+- **Cost savings**: Kimi and other providers may offer lower API costs
+- **API limits**: Continue working when Anthropic credits are exhausted
+- **Model access**: Use alternative models like Kimi K2, GLM, Gemini, GPT
 
-- keep coding when Anthropic usage is constrained
-- use a cheaper implementation model for heavy coding loops
-- match different workloads to different providers
+### Configuring Direct-Compatible APIs (Kimi, GLM)
 
-### Kimi example
+**CRITICAL**: Use `ANTHROPIC_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`):
 
+**Kimi API:**
 ```bash
+# Option 1: Kimi coding endpoint
 export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
+claude
+
+# Option 2: Moonshot/Kimi K2 endpoint
+export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
 export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
 claude
 ```
 
-### GLM-style example
-
+**GLM (Z.AI) API:**
 ```bash
+# GLM/Z.AI endpoint (Anthropic-compatible)
 export ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
 export ANTHROPIC_AUTH_TOKEN=your-zai-api-key
-export API_TIMEOUT_MS=300000
+export API_TIMEOUT_MS=300000  # Optional: increase timeout
 claude
 ```
 
-### Verify Claude Code
+**Alternative (China mainland):**
+```bash
+export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+```
 
+### Getting a Kimi API Key
+
+1. **Register**: Sign up at [platform.moonshot.ai](https://platform.moonshot.ai/) (Google account recommended)
+2. **Create key**: Console → API Keys → "Create New Key"
+3. **Copy immediately**: Key is shown only once for security
+4. **Add credits**: Navigate to Billing tab and purchase credits for API access
+
+### Persistent Configuration
+
+Add to your shell profile (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+# Kimi API configuration for Claude Code
+export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
+```
+
+Then reload your shell:
+```bash
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+### Verification
+
+Check your Claude Code configuration:
 ```bash
 claude /status
 ```
 
-You should see the active endpoint and auth mode there.
+You should see the custom API endpoint listed in the status output.
+
+### When to Use claude-code-router
+
+For providers that require API format translation (OpenAI, Gemini), use claude-code-router:
+
+```bash
+# Install router
+npm install -g @musistudio/claude-code-router
+
+# Configure via router config
+# See PAN-78 for dashboard UI configuration
+```
+
+**Architecture Decision**:
+- **Direct APIs** (Kimi, GLM): Use `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ← Simpler, less overhead
+- **Incompatible APIs** (OpenAI, Gemini): Use claude-code-router ← Required for API translation
+
+### Important Notes
+
+- This configures **Claude Code** (the CLI tool), not Panopticon's agent routing
+- Panopticon agents spawned via `pan work issue` will inherit this configuration
+- All Claude Code sessions in the terminal will use the configured endpoint
+- To switch back to Anthropic, unset the environment variables
+- For Panopticon multi-model routing (mixing providers in one workflow), see PAN-78
+
+### Resources
+
+- [Kimi Third-Party Agents Documentation](https://www.kimi.com/code/docs/en/more/third-party-agents.html)
+- [Setup Guide (Medium)](https://guozheng-ge.medium.com/set-up-claude-code-using-third-party-coding-models-glm-4-7-minimax-2-1-kimi-k2-5a3cdf38c261)
+- [Kimi API Documentation](https://platform.moonshot.ai/docs)
 
 ---
 
@@ -680,8 +830,9 @@ Panopticon can manage external service configurations as part of the workspace l
 
 ### Cloudflare Tunnels
 
-Automatically creates and deletes Cloudflare tunnel ingress routes so workspaces are reachable via public URLs.
+Automatically creates/deletes Cloudflare tunnel ingress routes so workspaces are accessible via public URLs (e.g., `api-feature-min-123.mindyournow.com`).
 
+**Config** (in `projects.yaml`):
 ```yaml
 workspace:
   tunnel:
@@ -697,21 +848,17 @@ workspace:
         no_tls_verify: true
 ```
 
-Lifecycle:
+**Lifecycle**: Created during `pan workspace create`, deleted during `pan workspace remove` and deep-wipe.
 
-- created during `pan workspace create`
-- deleted during `pan workspace remove` and deep-wipe
-
-Module: `src/lib/tunnel.ts`
+**Module**: `src/lib/tunnel.ts`
 
 ### Hume EVI (Voice AI)
 
-Automatically creates and deletes per-workspace Hume EVI configs for BYOLLM.
+Automatically creates/deletes per-workspace Hume EVI configs for BYOLLM (Bring Your Own LLM). Each workspace gets its own Hume config with a workspace-specific callback URL, cloned from a production template config.
 
-Prerequisite:
+**Prerequisites**: `HUME_API_KEY` in `~/.panopticon.env`
 
-- `HUME_API_KEY` in `~/.panopticon.env`
-
+**Config** (in `projects.yaml`):
 ```yaml
 workspace:
   hume:
@@ -722,41 +869,39 @@ workspace:
 
 | Field | Description |
 |-------|-------------|
-| `template_config_id` | Hume EVI config ID to clone from |
-| `name_pattern` | Name for workspace configs |
-| `byollm_url_pattern` | Workspace-specific BYOLLM callback URL |
-| `api_key_env` | Env var for the Hume API key, default `HUME_API_KEY` |
+| `template_config_id` | Hume EVI config ID to clone from (production config) |
+| `name_pattern` | Name for workspace configs (supports `{{FEATURE_FOLDER}}`, `{{FEATURE_NAME}}` placeholders) |
+| `byollm_url_pattern` | BYOLLM callback URL pattern (Hume calls this for LLM completions) |
+| `api_key_env` | Env var name for Hume API key (default: `HUME_API_KEY`) |
 
-Lifecycle:
+**Lifecycle**:
+- **Create**: Clones template config with workspace-specific BYOLLM URL, writes `.hume-config` env file (`HUME_CONFIG_ID`, `VITE_HUME_CONFIG_ID`) to workspace root
+- **Remove/Deep-wipe**: Deletes workspace-specific Hume config via API
 
-- create: clones the template config and writes `.hume-config`
-- remove: deletes the workspace-specific config
-
-Docker integration example:
-
+**Docker integration**: Add `.hume-config` as optional `env_file` in your docker-compose template:
 ```yaml
 env_file:
   - path: ../.hume-config
     required: false
 ```
 
-Module: `src/lib/hume.ts`
+**Module**: `src/lib/hume.ts`
 
-### Adding new integrations
+### Adding New Integrations
 
-External service integrations follow a common pattern:
+External service integrations follow a common pattern (see `tunnel.ts` and `hume.ts`):
 
-1. define the config interface in `workspace-config.ts`
-2. create a module with `create*()` and `delete*()` functions
-3. wire it into workspace create and remove flows
-4. add cleanup to deep-wipe
-5. add the schema to `projects.yaml`
+1. Define a config interface in `workspace-config.ts`
+2. Create a module with `create*()` and `delete*()` functions
+3. Wire into `createWorkspace()` (before Docker start) and `removeWorkspace()`
+4. Wire into the deep-wipe endpoint in `dashboard/server/index.ts`
+5. Add to `projects.yaml` schema
 
 ---
 
 ## Getting Help
 
-- inspect shadow-mode config: `pan admin config shadow --status`
-- inspect work-type coverage: [WORK-TYPES.md](./WORK-TYPES.md)
-- review higher-level guidance: [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md)
-- file issues: [panopticon-cli/issues](https://github.com/eltmon/panopticon-cli/issues)
+- **Configuration issues**: `pan config validate`
+- **Full documentation**: [WORK-TYPES.md](./WORK-TYPES.md)
+- **GitHub issues**: [panopticon-cli/issues](https://github.com/eltmon/panopticon-cli/issues)
+- **Tracking issue**: [PAN-118](https://github.com/eltmon/panopticon-cli/issues/118)

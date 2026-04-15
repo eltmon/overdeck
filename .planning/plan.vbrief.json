@@ -1,132 +1,661 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-15T01:58:14Z",
+    "created": "2026-04-15T03:12:26Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-712: fix stale pan work/cloister/specialists refs in .claude/skills/",
-    "updated": "2026-04-15T08:50:53.303Z"
+    "description": "Plan for PAN-540: Remove convoy abstraction, inline parallel review directly into review-agent",
+    "updated": "2026-04-15T21:14:09.855Z"
   },
   "plan": {
-    "id": "pan-712",
-    "title": "fix: stale pan work/cloister/specialists refs in .claude/skills/",
+    "id": "pan-540",
+    "title": "Remove convoy abstraction, inline parallel review directly into review-agent",
     "status": "approved",
-    "uid": "bf82ed53-bd83-4fcb-952f-f027a47b06d2",
+    "uid": "5c1e64f2-29e5-4560-a802-68cad6d5d797",
     "author": "agent:claude-opus-4-6",
-    "sequence": 17,
-    "created": "2026-04-15T01:58:14Z",
-    "updated": "2026-04-15T08:50:53.303Z",
+    "sequence": 84,
+    "created": "2026-04-15T03:12:26Z",
+    "updated": "2026-04-15T21:14:09.855Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/712",
-        "label": "PAN-712",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/540",
+        "label": "PAN-540",
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
-        "label": "PAN-705",
-        "type": "issue"
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-540/docs/prds/active/pan-540",
+        "label": "pan-540",
+        "type": "prd"
       }
     ],
     "tags": [
-      "docs",
-      "skills",
+      "refactor",
       "cleanup",
-      "pan-705-followup"
+      "review-agent",
+      "convoy-removal"
     ],
     "narratives": {
-      "Problem": "Project-level skill files under .claude/skills/ still reference the pre-PAN-705 command taxonomy (pan work <verb>, pan cloister, pan specialists). These references mislead any agent that loads the affected skills about correct CLI syntax. A grep audit found 5 stale occurrences in exactly 2 files: .claude/skills/test-specialist-workflow/SKILL.md (4 refs) and .claude/skills/update-panopticon-docs/resources/EXAMPLES.md (1 ref).",
-      "Proposal": "Two trivial, independent doc edits — one bead per file. Bead 1 rewrites the test-specialist-workflow skill to use `pan admin cloister start` and `pan admin specialists wake ...`. Bead 2 rewrites the pan-work example in the update-panopticon-docs skill to reflect the flat lifecycle taxonomy (no `pan work` namespace). A final anchored grep (\\bpan (work|cloister|specialists)\\b) over .claude/skills/ must return zero hits; `pan workspace` references are intentionally preserved because that command group still exists post-PAN-705."
+      "Problem": "The convoy abstraction (src/lib/convoy.ts, convoy-templates, CLI commands, dashboard panel, convoy:* work types) exists solely to run a fixed set of 4 agents in a fixed order for code review. The fleet-runner use case it was built for was never shipped. It's pure overhead — review-agent already knows which reviewers it needs.",
+      "Proposal": "Inline the parallel-review runner directly into review-agent.ts, delete all convoy machinery, rename convoy:* work types to review:* (with auto-migration of user overrides), and add a user-configurable specialists.review_agents[] list in config.yaml. Refactor first, delete second — every bead leaves the tree green."
     },
     "items": [
       {
-        "id": "fix-test-specialist-workflow-skill",
-        "title": "Update test-specialist-workflow SKILL.md to pan admin cloister/specialists",
+        "id": "inline-review-runner",
+        "title": "Inline parallel-review runner into review-agent.ts",
         "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-15T01:58:14Z",
+        "priority": "high",
+        "created": "2026-04-15T03:12:26Z",
         "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-712"
+          "difficulty": "complex",
+          "issueLabel": "pan-540"
         },
         "narrative": {
-          "Action": "Edit .claude/skills/test-specialist-workflow/SKILL.md. Replace `pan cloister start` (line 40) with `pan admin cloister start`. Replace the three `pan specialists wake <agent>` lines (163, 164, 165) and the `pan specialists wake test-agent --task \"...\"` line (174) with their `pan admin specialists wake ...` equivalents. Do not change any other content. Verify by running `pan admin cloister --help` and `pan admin specialists --help` against the resulting command strings."
+          "Action": "Replace startConvoy('code-review', ctx) + waitForConvoy(id) + parseConvoySynthesis(dir) in src/lib/cloister/review-agent.ts with a local runParallelReview() helper that spawns N reviewer tmux sessions in parallel, polls for completion, runs synthesis, and parses synthesis.md output. Hardcode the default 3 reviewers (correctness, security, performance) + synthesis for this bead — configurability is added in a later bead. Write outputs to .pan/review/<reviewId>/ (not .pan/convoy/). Remove all imports from src/lib/convoy.ts in review-agent.ts. Convoy files stay on disk (deleted in later beads) — nothing else breaks."
         },
         "subItems": [
           {
-            "id": "fix-test-specialist-workflow-skill.ac1",
-            "title": "File .claude/skills/test-specialist-workflow/SKILL.md contains zero occurrences of `pan cloister` or `pan specialists` (as standalone commands, not `pan admin cloister`/`pan admin specialists`)",
+            "id": "inline-review-runner.ac1",
+            "title": "src/lib/cloister/review-agent.ts has no imports from src/lib/convoy.ts or src/lib/convoy-templates.ts",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.294Z"
+            "completed": "2026-04-15T04:01:21.074Z"
           },
           {
-            "id": "fix-test-specialist-workflow-skill.ac2",
-            "title": "Every rewritten command in the file is a valid subcommand of `pan admin cloister` or `pan admin specialists` as shown by `pan admin cloister --help` and `pan admin specialists --help`",
+            "id": "inline-review-runner.ac2",
+            "title": "A new local helper (e.g. runParallelReview) spawns 3 reviewer tmux sessions in parallel (correctness, security, performance) and polls for their completion using the same cadence as the old waitForConvoy",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.294Z"
+            "completed": "2026-04-15T04:01:21.074Z"
           },
           {
-            "id": "fix-test-specialist-workflow-skill.ac3",
-            "title": "No unrelated changes in the file (diff is limited to the 5 stale command references and minimal surrounding whitespace)",
+            "id": "inline-review-runner.ac3",
+            "title": "After all 3 reviewers complete, a synthesis agent runs and produces synthesis.md with REVIEW_RESULT / FILES_REVIEWED / SECURITY_ISSUES / PERFORMANCE_ISSUES / NOTES markers",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.294Z"
+            "completed": "2026-04-15T04:01:21.074Z"
+          },
+          {
+            "id": "inline-review-runner.ac4",
+            "title": "Synthesis rules enforced: any reviewer CHANGES_REQUESTED ⇒ overall CHANGES_REQUESTED; security issues always surfaced; duplicate findings (same file + same concern) collapsed; findings attributed to source reviewer",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.074Z"
+          },
+          {
+            "id": "inline-review-runner.ac5",
+            "title": "Reviewer output files are written to .pan/review/<reviewId>/ (not .pan/convoy/<id>/)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.075Z"
+          },
+          {
+            "id": "inline-review-runner.ac6",
+            "title": "End-to-end review flow works on a sample PR: spawns 3 reviewers, runs synthesis, returns a parsed ReviewResult with correct status",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.075Z"
+          },
+          {
+            "id": "inline-review-runner.ac7",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.075Z"
           }
         ],
-        "completed": "2026-04-15T08:50:53.303Z"
+        "completed": "2026-04-15T21:14:09.855Z"
       },
       {
-        "id": "fix-update-panopticon-docs-examples",
-        "title": "Update update-panopticon-docs EXAMPLES.md Pattern 6 to drop pan work namespace",
+        "id": "rename-work-types",
+        "title": "Rename convoy:* work types to review:* with auto-migration",
         "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-15T01:58:14Z",
+        "priority": "high",
+        "created": "2026-04-15T03:12:26Z",
         "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-712"
+          "difficulty": "medium",
+          "issueLabel": "pan-540"
         },
         "narrative": {
-          "Action": "Edit .claude/skills/update-panopticon-docs/resources/EXAMPLES.md. Replace the `pan work --help` verify step (line 294) with `pan --help` (or a more specific command like `pan start --help` if the surrounding example is about the `start` verb). Review Pattern 6's surrounding prose and update any wording that still implies a `pan work` command namespace — after PAN-705, lifecycle verbs (`start`, `done`, `kill`, `recover`, `tell`, `resume`, `approve`, `close`, `reopen`, `sync-main`, `wipe`) are top-level, not subcommands of `pan work`. Keep the example's original teaching intent intact."
+          "Action": "Rename the 5 work-type keys across lib and frontend: convoy:correctness-reviewer → review:correctness, convoy:security-reviewer → review:security, convoy:performance-reviewer → review:performance, convoy:requirements-reviewer → review:requirements, convoy:synthesis-agent → review:synthesis. Update src/lib/work-types.ts, src/lib/smart-model-selector.ts, src/lib/settings-api.ts, src/dashboard/frontend/src/components/Settings/types.ts (WorkTypeId union), src/dashboard/frontend/src/components/Settings/SettingsPage.tsx (rename section header from 'Convoy Reviewers' to 'Review Agents'). In settings-api.ts, add a one-time auto-migration shim: when loading persisted model overrides, silently rewrite any surviving convoy:* keys to their review:* equivalents so existing user settings keep working without user action."
         },
         "subItems": [
           {
-            "id": "fix-update-panopticon-docs-examples.ac1",
-            "title": "File .claude/skills/update-panopticon-docs/resources/EXAMPLES.md contains zero occurrences of `pan work ` (trailing space, to exclude `pan workspace`)",
+            "id": "rename-work-types.ac1",
+            "title": "src/lib/work-types.ts defines review:correctness, review:security, review:performance, review:requirements, review:synthesis and no convoy:* entries",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.293Z"
+            "completed": "2026-04-15T04:01:21.071Z"
           },
           {
-            "id": "fix-update-panopticon-docs-examples.ac2",
-            "title": "Pattern 6 prose and example commands are consistent with the post-PAN-705 flat lifecycle taxonomy — no text implies lifecycle verbs live under a `pan work` group",
+            "id": "rename-work-types.ac2",
+            "title": "src/lib/smart-model-selector.ts routes the 5 review:* work types to their mapped default models",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.293Z"
+            "completed": "2026-04-15T04:01:21.071Z"
           },
           {
-            "id": "fix-update-panopticon-docs-examples.ac3",
-            "title": "Repo-wide audit `grep -rn -E '\\bpan (work|cloister|specialists)\\b' .claude/skills/` returns zero hits across all files under .claude/skills/ (this is the issue-level acceptance criterion and must be re-run after both beads land)",
+            "id": "rename-work-types.ac3",
+            "title": "src/lib/settings-api.ts auto-migrates persisted convoy:* keys to review:* on load; a user with pre-existing convoy:security-reviewer override sees it preserved under review:security with no manual action",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.293Z"
+            "completed": "2026-04-15T04:01:21.071Z"
+          },
+          {
+            "id": "rename-work-types.ac4",
+            "title": "Settings/types.ts WorkTypeId union contains review:* keys and no convoy:* keys",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.071Z"
+          },
+          {
+            "id": "rename-work-types.ac5",
+            "title": "Settings UI renders a 'Review Agents' section with the 5 review:* cards; no 'Convoy Reviewers' string remains in the frontend",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.072Z"
+          },
+          {
+            "id": "rename-work-types.ac6",
+            "title": "review-agent.ts (from the previous bead) resolves reviewer model IDs via the new review:* keys",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.072Z"
+          },
+          {
+            "id": "rename-work-types.ac7",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.073Z"
           }
         ],
-        "completed": "2026-04-15T08:50:53.302Z"
+        "completed": "2026-04-15T21:14:09.855Z"
+      },
+      {
+        "id": "configurable-review-agents",
+        "title": "Add specialists.review_agents[] config schema and wire into review-agent",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Extend SpecialistsConfig in src/lib/cloister/config.ts with a new optional field review_agents?: ReviewAgentConfig[]. ReviewAgentConfig has { name: string; model: ModelId; focus?: ReviewFocus[]; enabled?: boolean (default true) }. Parse it from projects.yaml/config.yaml. Update the runParallelReview helper in review-agent.ts to read this list when present (honoring enabled=false), falling back to the default 3 (correctness, security, performance) when absent. Per-agent model overrides take precedence over the review:<name> work-type default. Pass agent.focus (when set) into the reviewer prompt so the agent knows its focus areas."
+        },
+        "subItems": [
+          {
+            "id": "configurable-review-agents.ac1",
+            "title": "src/lib/cloister/config.ts exports ReviewAgentConfig type and SpecialistsConfig.review_agents?: ReviewAgentConfig[]",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.058Z"
+          },
+          {
+            "id": "configurable-review-agents.ac2",
+            "title": "projects.yaml parser accepts specialists.review_agents list with name/model/focus/enabled fields",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.058Z"
+          },
+          {
+            "id": "configurable-review-agents.ac3",
+            "title": "When specialists.review_agents is absent, review-agent runs the default 3 reviewers (correctness, security, performance) — existing behavior is preserved",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.059Z"
+          },
+          {
+            "id": "configurable-review-agents.ac4",
+            "title": "When specialists.review_agents is present, review-agent spawns exactly the enabled agents from that list (skipping enabled: false entries)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.059Z"
+          },
+          {
+            "id": "configurable-review-agents.ac5",
+            "title": "Per-agent model override takes precedence over the review:<name> work-type default",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.059Z"
+          },
+          {
+            "id": "configurable-review-agents.ac6",
+            "title": "When focus[] is set on an agent, the focus areas are included in the reviewer prompt sent to that agent",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.060Z"
+          },
+          {
+            "id": "configurable-review-agents.ac7",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.060Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.853Z"
+      },
+      {
+        "id": "delete-cli-convoy-commands",
+        "title": "Delete CLI convoy commands and unregister them",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Delete src/cli/commands/convoy/{index,start,stop,list,status}.ts entirely. Remove the registerConvoyCommands import and call from src/cli/index.ts. `pan convoy …` should exit with 'unknown command'."
+        },
+        "subItems": [
+          {
+            "id": "delete-cli-convoy-commands.ac1",
+            "title": "src/cli/commands/convoy/ directory no longer exists",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.069Z"
+          },
+          {
+            "id": "delete-cli-convoy-commands.ac2",
+            "title": "src/cli/index.ts has no reference to registerConvoyCommands or any convoy command import",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.069Z"
+          },
+          {
+            "id": "delete-cli-convoy-commands.ac3",
+            "title": "Running `pan convoy start code-review` prints an 'unknown command' error (not a runtime crash)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.070Z"
+          },
+          {
+            "id": "delete-cli-convoy-commands.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.070Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.855Z"
+      },
+      {
+        "id": "delete-convoy-api-routes",
+        "title": "Delete /api/convoys/* dashboard API routes",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Remove the 5 convoy endpoints from src/dashboard/server/routes/metrics.ts (GET /api/convoys, GET /api/convoys/:id, POST /api/convoys/start, POST /api/convoys/:id/stop, GET /api/convoys/:id/output) and drop the imports of startConvoy/stopConvoy/getConvoyStatus/listConvoys at the top of that file. If any other route module imports from src/lib/convoy.ts, clean those too."
+        },
+        "subItems": [
+          {
+            "id": "delete-convoy-api-routes.ac1",
+            "title": "src/dashboard/server/routes/metrics.ts has no references to convoy (imports or route handlers)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.068Z"
+          },
+          {
+            "id": "delete-convoy-api-routes.ac2",
+            "title": "GET /api/convoys returns 404 (route is gone, not 500)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.068Z"
+          },
+          {
+            "id": "delete-convoy-api-routes.ac3",
+            "title": "No other file in src/dashboard/server/routes/ imports from src/lib/convoy.ts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.068Z"
+          },
+          {
+            "id": "delete-convoy-api-routes.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.069Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.855Z"
+      },
+      {
+        "id": "delete-convoy-frontend-panel",
+        "title": "Delete ConvoyPanel component and useConvoys hook",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Delete src/dashboard/frontend/src/components/ConvoyPanel.tsx and src/dashboard/frontend/src/hooks/useConvoys.ts. Remove any remaining imports from other frontend files — should be zero after the nav/route bead lands. This bead and remove-convoys-nav-route ship as a pair to keep the frontend compiling."
+        },
+        "subItems": [
+          {
+            "id": "delete-convoy-frontend-panel.ac1",
+            "title": "src/dashboard/frontend/src/components/ConvoyPanel.tsx no longer exists",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.066Z"
+          },
+          {
+            "id": "delete-convoy-frontend-panel.ac2",
+            "title": "src/dashboard/frontend/src/hooks/useConvoys.ts no longer exists",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.067Z"
+          },
+          {
+            "id": "delete-convoy-frontend-panel.ac3",
+            "title": "No file under src/dashboard/frontend/ imports ConvoyPanel or useConvoys",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.067Z"
+          },
+          {
+            "id": "delete-convoy-frontend-panel.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test all pass; frontend vite build succeeds",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.067Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.854Z"
+      },
+      {
+        "id": "remove-convoys-nav-route",
+        "title": "Remove Convoys sidebar nav item and /convoys route",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Remove the { id: 'convoys', label: 'Convoys', icon: Network } entry from NAV_GROUPS in src/dashboard/frontend/src/components/Sidebar.tsx and delete the /convoys route from src/dashboard/frontend/src/App.tsx. Clean up the Network icon import if no other nav entry uses it."
+        },
+        "subItems": [
+          {
+            "id": "remove-convoys-nav-route.ac1",
+            "title": "Sidebar.tsx NAV_GROUPS has no 'convoys' entry",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.065Z"
+          },
+          {
+            "id": "remove-convoys-nav-route.ac2",
+            "title": "App.tsx has no /convoys route",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.065Z"
+          },
+          {
+            "id": "remove-convoys-nav-route.ac3",
+            "title": "Dashboard sidebar no longer renders a Convoys nav item; visiting /convoys hits the app's default/fallback route",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.065Z"
+          },
+          {
+            "id": "remove-convoys-nav-route.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.066Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.854Z"
+      },
+      {
+        "id": "delete-convoy-lib-and-templates",
+        "title": "Delete convoy.ts, convoy-templates.ts, YAML templates, and tests",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Delete src/lib/convoy.ts, src/lib/convoy-templates.ts, the src/agents/convoy/ directory (all template YAML files), and tests/lib/convoy.test.ts. This bead must land after all consumers (review-agent, CLI commands, dashboard routes, frontend panel) are gone — at this point nothing should import from either file. Grep case-insensitive for 'convoy' across src/ to confirm zero non-docs references remain."
+        },
+        "subItems": [
+          {
+            "id": "delete-convoy-lib-and-templates.ac1",
+            "title": "src/lib/convoy.ts and src/lib/convoy-templates.ts no longer exist",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.061Z"
+          },
+          {
+            "id": "delete-convoy-lib-and-templates.ac2",
+            "title": "src/agents/convoy/ directory no longer exists",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.061Z"
+          },
+          {
+            "id": "delete-convoy-lib-and-templates.ac3",
+            "title": "tests/lib/convoy.test.ts no longer exists",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.062Z"
+          },
+          {
+            "id": "delete-convoy-lib-and-templates.ac4",
+            "title": "Case-insensitive grep for 'convoy' across src/ returns zero matches (docs/ may still have pending updates in a later bead)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.062Z"
+          },
+          {
+            "id": "delete-convoy-lib-and-templates.ac5",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.062Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.854Z"
+      },
+      {
+        "id": "update-docs",
+        "title": "Update documentation to remove convoy references",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-04-15T03:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-540"
+        },
+        "narrative": {
+          "Action": "Remove the convoy section (if any) from docs/USAGE.md, update docs/INDEX.md if it references convoys, and rewrite docs/CONFIGURATION.md to replace all convoy:* work-type examples with review:* equivalents and document the new specialists.review_agents[] config schema with an example. Grep case-insensitive for 'convoy' across docs/ to confirm no stale references remain (except historical changelog entries, which may stay)."
+        },
+        "subItems": [
+          {
+            "id": "update-docs.ac1",
+            "title": "docs/USAGE.md has no convoy section",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.063Z"
+          },
+          {
+            "id": "update-docs.ac2",
+            "title": "docs/INDEX.md has no references to convoys",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.063Z"
+          },
+          {
+            "id": "update-docs.ac3",
+            "title": "docs/CONFIGURATION.md documents the new specialists.review_agents[] schema with a realistic example showing name/model/focus/enabled fields",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.063Z"
+          },
+          {
+            "id": "update-docs.ac4",
+            "title": "docs/CONFIGURATION.md examples use review:* work-type keys (no convoy:* strings remain in current config examples)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.064Z"
+          },
+          {
+            "id": "update-docs.ac5",
+            "title": "Case-insensitive grep for 'convoy' across docs/ returns only intentional historical references (none in current how-to or config sections)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T04:01:21.064Z"
+          }
+        ],
+        "completed": "2026-04-15T21:14:09.854Z"
       }
     ],
-    "edges": []
+    "edges": [
+      {
+        "from": "inline-review-runner",
+        "to": "delete-convoy-lib-and-templates",
+        "type": "blocks"
+      },
+      {
+        "from": "rename-work-types",
+        "to": "configurable-review-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "inline-review-runner",
+        "to": "rename-work-types",
+        "type": "informs"
+      },
+      {
+        "from": "delete-cli-convoy-commands",
+        "to": "delete-convoy-lib-and-templates",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-convoy-api-routes",
+        "to": "delete-convoy-lib-and-templates",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-convoy-frontend-panel",
+        "to": "delete-convoy-lib-and-templates",
+        "type": "informs"
+      },
+      {
+        "from": "remove-convoys-nav-route",
+        "to": "delete-convoy-frontend-panel",
+        "type": "informs"
+      },
+      {
+        "from": "delete-convoy-lib-and-templates",
+        "to": "update-docs",
+        "type": "informs"
+      }
+    ]
   }
 }

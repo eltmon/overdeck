@@ -61,7 +61,6 @@ import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
-import { registerConvoyCommands } from './commands/convoy/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
@@ -322,8 +321,6 @@ registerReleaseCommands(program);
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
 
-// Register convoy commands (pan convoy start, status, list, stop)
-registerConvoyCommands(program);
 
 // Register install command
 registerInstallCommand(program);
