@@ -6,7 +6,7 @@ http:
   routers:
     # Dashboard Frontend
     panopticon-frontend:
-      rule: "Host(`{{TRAEFIK_DOMAIN}}`) && !PathPrefix(`/api`)"
+      rule: "Host(`{{TRAEFIK_DOMAIN}}`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`)"
       entryPoints:
         - websecure
       service: panopticon-frontend
@@ -16,9 +16,9 @@ http:
             sans:
               - "*.{{TRAEFIK_DOMAIN}}"
 
-    # Dashboard API
+    # Dashboard API and WebSocket endpoints
     panopticon-api:
-      rule: "Host(`{{TRAEFIK_DOMAIN}}`) && PathPrefix(`/api`)"
+      rule: "Host(`{{TRAEFIK_DOMAIN}}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`))"
       entryPoints:
         - websecure
       service: panopticon-api
