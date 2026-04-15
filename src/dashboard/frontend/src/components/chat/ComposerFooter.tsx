@@ -212,10 +212,22 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       messageText = $getRoot().getTextContent().trim();
     });
 
-    if (!messageText) return;
+    const uploadingImages = pendingImages.filter((image) => !image.serverPath && !image.error);
+    if (uploadingImages.length > 0) {
+      toast.error('Please wait for image uploads to finish');
+      return;
+    }
+
+    const uploadedImages = pendingImages.filter((image) => image.serverPath);
+    if (!messageText && uploadedImages.length === 0) return;
+
+    const imagePrefix = uploadedImages
+      .map((image) => `@${image.serverPath}`)
+      .join('\n');
+    const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
 
     // Optimistic: notify parent immediately so message appears before server round-trip
-    onSend?.(messageText);
+    onSend?.(composedMessage);
 
     setSending(true);
     try {
@@ -227,13 +239,17 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
-      await sendConversationMessage(conversation.name, messageText);
+      await sendConversationMessage(conversation.name, composedMessage);
 
       // Clear editor after successful send
       editor.update(() => {
         $getRoot().clear();
       });
       setText('');
+      for (const image of pendingImages) {
+        URL.revokeObjectURL(image.previewUrl);
+      }
+      setPendingImages([]);
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
@@ -242,7 +258,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       // Refocus editor
       editor.focus();
     }
-  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend]);
+  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, pendingImages]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
@@ -306,7 +322,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
           <button
             className={styles.sendButton}
             onClick={() => void handleSubmit()}
-            disabled={isEmpty || isDisabled}
+            disabled={(isEmpty && pendingImages.filter((image) => !!image.serverPath).length === 0) || isDisabled}
             type="button"
             title="Send message (Enter)"
           >
