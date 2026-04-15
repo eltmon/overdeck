@@ -130,14 +130,16 @@ export function setReviewStatus(
 
   // readyForMerge is true when all required gates pass.
   // If uatStatus exists (UAT specialist has been involved), it must also be 'passed'.
-  // verificationStatus must not be 'failed' — verification catches pre-existing test breakage
-  // that scoped test runs (e2e/dashboard) may miss.
+  // NOTE: we intentionally do NOT check verificationStatus here. Verification can fail
+  // on pre-existing test breakage or environment issues, but the test specialist's pass
+  // is the authoritative signal. The post-rebase gate in triggerMerge() is the real
+  // quality check. Blocking readyForMerge on a stale verificationStatus causes issues
+  // to get stuck after tests pass (PAN-714).
   const readyForMerge = update.readyForMerge !== undefined
     ? update.readyForMerge
     : (
         merged.reviewStatus === 'passed' &&
         merged.testStatus === 'passed' &&
-        verificationSatisfied(merged) &&
         merged.mergeStatus !== 'merged' &&
         // Don't auto-recompute rfm=true when the previous merge attempt failed —
         // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.

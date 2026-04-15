@@ -114,7 +114,7 @@ describe('agents auth routing', () => {
 
   it('launches MiniMax models directly through claude instead of claudish', () => {
     expect(getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
-      'claude --dangerously-skip-permissions --model minimax-m2.7'
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model minimax-m2.7'
     );
   });
 
