@@ -72,14 +72,27 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       if (allItems.length === 0) {
         console.log(chalk.dim('  (nothing to sync)'));
       } else {
-        for (const item of allItems) {
+        // Show operator/both skills and other items first
+        const syncableItems = allItems.filter(i => i.status !== 'skipped-agent');
+        const agentOnlyItems = allItems.filter(i => i.status === 'skipped-agent');
+
+        for (const item of syncableItems) {
           const icon = item.status === 'conflict' ? chalk.yellow('!') :
                        item.status === 'symlink' ? chalk.blue('↻') :
                        chalk.green('+');
           const label = item.status === 'conflict' ? chalk.yellow('[modified]') :
                         item.status === 'symlink' ? chalk.dim('[update]') :
                         chalk.green('[new]');
-          console.log(`  ${icon} ${item.name} ${label}`);
+          const audienceLabel = item.audience === 'both' ? chalk.dim(' [both]') : '';
+          console.log(`  ${icon} ${item.name}${audienceLabel} ${label}`);
+        }
+
+        // Show agent-only skills that are skipped from devroot sync
+        if (agentOnlyItems.length > 0) {
+          console.log(chalk.dim(`\n  agent-only skills (${agentOnlyItems.length} — not synced to devroot, referenced in workspace CLAUDE.md):`));
+          for (const item of agentOnlyItems) {
+            console.log(`  ${chalk.dim('–')} ${chalk.dim(item.name)} ${chalk.dim('[agent-only]')}`);
+          }
         }
       }
     }

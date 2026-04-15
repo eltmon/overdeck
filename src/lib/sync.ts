@@ -16,11 +16,37 @@ import {
 } from './manifest.js';
 import { getDevrootPath } from './config.js';
 
+/** Audience values for skill routing (PAN-709). */
+type SkillAudience = 'operator' | 'agent' | 'both';
+
+/**
+ * Read the `audience` field from a skill's SKILL.md frontmatter.
+ * Falls back to 'operator' (backward compat) if the field is absent or invalid.
+ *
+ * @param skillDir - Absolute path to the skill directory (contains SKILL.md)
+ */
+function readSkillAudience(skillDir: string): SkillAudience {
+  try {
+    const skillMd = join(skillDir, 'SKILL.md');
+    if (!existsSync(skillMd)) return 'operator';
+    const content = readFileSync(skillMd, 'utf-8');
+    const m = content.match(/^audience:\s*(.+)$/m);
+    if (!m) return 'operator';
+    const val = m[1].trim();
+    if (val === 'agent' || val === 'both' || val === 'operator') return val;
+    return 'operator'; // unknown value → default operator
+  } catch {
+    return 'operator';
+  }
+}
+
 export interface SyncItem {
   name: string;
   sourcePath: string;
   targetPath: string;
-  status: 'new' | 'exists' | 'conflict' | 'symlink';
+  status: 'new' | 'exists' | 'conflict' | 'symlink' | 'skipped-agent';
+  /** Audience routing (PAN-709). Only present for skill items. */
+  audience?: SkillAudience;
 }
 
 export interface SyncPlan {
@@ -313,12 +339,34 @@ export function planSync(): SyncPlan {
   const manifestPath = join(targetBase, '.panopticon-manifest.json');
   const manifest = readManifest(manifestPath);
 
-  // Plan skills
+  // Plan skills (with audience-based routing, PAN-709)
   const skillFiles = collectSourceFiles(SKILLS_DIR, 'skills/');
+  // Cache audience per skill directory to avoid re-reading SKILL.md for each file
+  const audienceCache = new Map<string, SkillAudience>();
   for (const file of skillFiles) {
+    const skillName = file.relativePath.split('/')[1] || file.relativePath;
+    const skillDir = join(SKILLS_DIR, skillName);
+
+    let audience = audienceCache.get(skillName);
+    if (!audience) {
+      audience = readSkillAudience(skillDir);
+      audienceCache.set(skillName, audience);
+    }
+
+    // Agent-only skills are not synced to devroot
+    if (audience === 'agent') {
+      plan.skills.push({
+        name: file.relativePath,
+        sourcePath: file.absolutePath,
+        targetPath: join(targetBase, file.relativePath),
+        status: 'skipped-agent',
+        audience,
+      });
+      continue;
+    }
+
     const targetFile = join(targetBase, file.relativePath);
     const status = compareFileToManifest(targetFile, file.relativePath, manifest);
-    const skillName = file.relativePath.split('/')[1] || file.relativePath;
 
     let syncStatus: SyncItem['status'] = 'new';
     if (status.action === 'update') syncStatus = 'symlink';  // reusing 'symlink' for "managed, safe to update"
@@ -330,6 +378,7 @@ export function planSync(): SyncPlan {
       sourcePath: file.absolutePath,
       targetPath: targetFile,
       status: syncStatus,
+      audience,
     });
   }
 
@@ -410,9 +459,22 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
   const manifestPath = join(targetBase, '.panopticon-manifest.json');
   const manifest = readManifest(manifestPath);
 
-  // Collect all source files from cache
+  // Collect skill files, filtering out agent-only skills (PAN-709 audience routing)
+  const skillFiles = collectSourceFiles(SKILLS_DIR, 'skills/');
+  const audienceCache = new Map<string, SkillAudience>();
+  const filteredSkillFiles = skillFiles.filter((file) => {
+    const skillName = file.relativePath.split('/')[1] || file.relativePath;
+    let audience = audienceCache.get(skillName);
+    if (!audience) {
+      audience = readSkillAudience(join(SKILLS_DIR, skillName));
+      audienceCache.set(skillName, audience);
+    }
+    return audience !== 'agent'; // skip agent-only skills from devroot sync
+  });
+
+  // Collect all source files from cache (skills filtered by audience above)
   const allFiles = [
-    ...collectSourceFiles(SKILLS_DIR, 'skills/'),
+    ...filteredSkillFiles,
     ...collectSourceFiles(CACHE_AGENTS_DIR, 'agents/'),
     ...collectSourceFiles(CACHE_RULES_DIR, 'rules/'),
   ];
