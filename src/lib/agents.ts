@@ -261,6 +261,7 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  stoppedAt?: string;
   branch?: string; // Git branch name for this agent
 
   // Model routing & handoffs (Phase 4)
@@ -297,6 +298,17 @@ export function saveAgentState(state: AgentState): void {
     join(dir, 'state.json'),
     JSON.stringify(state, null, 2)
   );
+}
+
+function markAgentRunning(state: AgentState): void {
+  state.status = 'running';
+  state.lastActivity = new Date().toISOString();
+  delete state.stoppedAt;
+}
+
+function markAgentStopped(state: AgentState): void {
+  state.status = 'stopped';
+  state.stoppedAt = new Date().toISOString();
 }
 
 // ============================================================================
@@ -962,7 +974,7 @@ ${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
   }
 
   // Update status
-  state.status = 'running';
+  markAgentRunning(state);
   saveAgentState(state);
 
   // Track work in CV
@@ -1067,7 +1079,7 @@ export function stopAgent(agentId: string): void {
     // Ensure id is set — runtime state files may lack it (PAN-150)
     if (!state.id) state.id = normalizedId;
 
-    state.status = 'stopped';
+    markAgentStopped(state);
     saveAgentState(state);
   }
 
@@ -1164,8 +1176,7 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
       }
     });
 
-    agentState.status = 'running';
-    agentState.lastActivity = new Date().toISOString();
+    markAgentRunning(agentState);
     saveAgentState(agentState);
 
     const ready = await waitForReadySignal(normalizedId, 30);
@@ -1342,8 +1353,7 @@ ${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permiss
 
     // Update agent state
     if (agentState) {
-      agentState.status = 'running';
-      agentState.lastActivity = new Date().toISOString();
+      markAgentRunning(agentState);
       saveAgentState(agentState);
     }
 
@@ -1431,8 +1441,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   });
 
   // Update state
-  state.status = 'running';
-  state.lastActivity = new Date().toISOString();
+  markAgentRunning(state);
   saveAgentState(state);
 
   return state;
