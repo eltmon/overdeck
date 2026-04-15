@@ -1740,8 +1740,32 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         const timeSinceLastCi = now - ciEntry.lastAttempt;
 
         if (ciEntry.count >= 5) {
-          // After 5 CI retry retries, back off to avoid hammering GitHub API
-          console.log(`[deacon] CI check failure for ${issueId} — ${ciEntry.count} retries exhausted, manual intervention needed`);
+          // After 5 CI retries, back off to avoid hammering GitHub API.
+          // Notify the work agent exactly once (when count first reaches 5) so it
+          // can investigate rather than silently dead-ending the issue.
+          if (ciEntry.count === 5) {
+            console.log(`[deacon] CI check failure for ${issueId} — retries exhausted, notifying work agent`);
+            const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
+            const { writeFeedbackFile } = await import('./feedback-writer.js');
+            await writeFeedbackFile({
+              issueId,
+              specialist: 'merge-agent',
+              outcome: 'ci-failure',
+              summary: 'CI checks still failing after 5 transient retries — merge blocked',
+              markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
+            }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
+            const agentSession = `agent-${issueId.toLowerCase()}`;
+            if (sessionExists(agentSession)) {
+              await sendKeysAsync(agentSession,
+                `CI checks are failing on the PR after 5 retries. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan done has completed successfully.`
+              );
+            }
+            ciEntry.count++; // increment past 5 so this block only fires once
+            ciRetryMap.set(issueId, ciEntry);
+            actions.push(`CI retry exhausted for ${issueId} — wrote feedback, notified agent`);
+          } else {
+            console.log(`[deacon] CI check failure for ${issueId} — ${ciEntry.count} retries exhausted, awaiting agent fix`);
+          }
           continue;
         }
         if (timeSinceLastCi < CI_TRANSIENT_RETRY_COOLDOWN_MS) {
