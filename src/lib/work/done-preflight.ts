@@ -119,12 +119,32 @@ export function checkVBriefACStatus(workspacePath: string): string[] {
 /**
  * Run all pre-flight checks for `pan done`.
  *
- * Syncs closed bead statuses to vBRIEF before running the AC check so the
- * plan sees the latest state.
+ * Performs in order:
+ * 1. Auto-commit any .planning/ artifacts dirtied by a prior pan-done run (so
+ *    they don't surface as uncommitted changes in Check 2).
+ * 2. Check 1: open beads
+ * 3. Check 2: uncommitted changes
+ * 4. Sync closed bead statuses to vBRIEF (so Check 3 sees latest state).
+ * 5. Auto-commit .planning/ artifacts dirtied by the sync above.
+ * 6. Check 3: vBRIEF acceptance criteria completion.
  *
  * Returns an array of failure lines (empty = all checks passed).
  */
 export async function runPreflightChecks(workspacePath: string, issueId: string): Promise<string[]> {
+  // Auto-commit .planning/ before the uncommitted-changes check.
+  // plan.vbrief.json can be modified by a previous invocation of `pan done`
+  // (vBRIEF sync) and left dirty if that run failed. Commit it so Check 2
+  // doesn't block on workspace-internal state that this command manages.
+  try {
+    const { stdout: preDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
+    if (preDirty.trim()) {
+      await execAsync('git add .planning/', { cwd: workspacePath });
+      await execAsync('git commit -m "chore: sync planning artifacts" --allow-empty-message', { cwd: workspacePath }).catch(() =>
+        execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath })
+      );
+    }
+  } catch { /* non-fatal */ }
+
   const failures: string[] = [];
 
   // Check 1: Open beads
@@ -142,14 +162,29 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
       { cwd: workspacePath, encoding: 'utf-8' }
     );
     const closedBeads = JSON.parse(stdout || '[]');
+    let synced = 0;
     for (const bead of closedBeads) {
       if (bead.id) {
-        syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
+        const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
+        if (itemId) synced++;
       }
+    }
+    if (synced > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`  Synced ${synced} closed bead(s) to vBRIEF AC status`);
     }
   } catch {
     // Non-fatal — sync failure shouldn't block completion check
   }
+
+  // Auto-commit .planning/ artifacts dirtied by the vBRIEF sync above.
+  try {
+    const { stdout: afterSyncDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
+    if (afterSyncDirty.trim()) {
+      await execAsync('git add .planning/', { cwd: workspacePath });
+      await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+    }
+  } catch { /* non-fatal */ }
 
   // Check 3: vBRIEF AC status
   const acFailures = checkVBriefACStatus(workspacePath);
