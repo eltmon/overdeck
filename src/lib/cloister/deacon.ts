@@ -1029,6 +1029,14 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     const thinkingMinutes = Math.round(thinkingMs / 60000);
     const attempts = recovery?.attempts ?? 0;
 
+    // PAN-653: If the workspace is marked stuck (e.g. main diverged during approve),
+    // skip all recovery actions — Deacon must not respawn a stuck workspace.
+    const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+    if (getReviewStatus(agentIssueId)?.stuck) {
+      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): workspace is stuck`);
+      continue;
+    }
+
     console.log(`[deacon] Work agent ${agent.id} stuck thinking for ${thinkingMinutes}m (attempt ${attempts + 1})`);
 
     try {
@@ -2236,6 +2244,13 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       const resolution = runtimeState.resolution;
       const count = runtimeState.resolutionCount || 0;
       const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+
+      // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
+      // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
+      if (getReviewStatus(issueId)?.stuck) {
+        console.log(`[deacon] Skipping stuck workspace ${issueId} in patrolWorkAgentResolutions`);
+        continue;
+      }
 
       if (resolution === 'done' && count >= 2) {
         // Agent was nudged twice but still hasn't called pan work done — auto-complete

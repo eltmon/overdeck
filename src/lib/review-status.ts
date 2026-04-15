@@ -42,6 +42,14 @@ export interface ReviewStatus {
   history?: StatusHistoryEntry[];
   /** HEAD commit SHA at the time review passed — used to detect new commits after review */
   reviewedAtCommit?: string;
+  /** PAN-653: workspace is stuck (e.g. main diverged mid-approve) — Deacon skips it */
+  stuck?: boolean;
+  /** PAN-653: reason workspace is stuck (e.g. 'main_diverged') */
+  stuckReason?: string;
+  /** PAN-653: ISO timestamp when workspace was marked stuck */
+  stuckAt?: string;
+  /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
+  stuckDetails?: string;
 }
 
 function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
