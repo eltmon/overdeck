@@ -164,6 +164,11 @@ describe('work-types', () => {
       expect(types).toHaveLength(1);
     });
 
+    it('should return 1 workflow type', () => {
+      const types = getWorkTypesByCategory('workflow');
+      expect(types).toHaveLength(1);
+    });
+
     it('should return 2 CLI types', () => {
       const types = getWorkTypesByCategory('cli');
       expect(types).toHaveLength(2);
