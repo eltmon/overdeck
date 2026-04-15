@@ -25,6 +25,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
+import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';
@@ -59,12 +60,25 @@ const getMetricsSummaryRoute = HttpRouter.add(
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 5);
 
+      // Compute stuck count as union of:
+      //   1. Agents with inactivity-based health.state === 'stuck'
+      //   2. Workspaces with persistent review_status.stuck = true (divergence guard)
+      // Deduped by issueId to avoid double-counting when both flags are set.
+      const reviewStatuses = loadReviewStatuses();
+      const persistentStuckIssueIds = new Set(
+        Object.values(reviewStatuses)
+          .filter((rs) => rs.stuck === true)
+          .map((rs) => rs.issueId)
+      );
+      // health-based count is agent-level; add any extra diverged issues not in that count
+      const stuckCount = status.summary.stuck + persistentStuckIssueIds.size;
+
       return jsonResponse({
         today: {
           totalCost: Math.round(dailyTotal * 100) / 100,
           agentCount: status.summary.total,
           activeCount: status.summary.active,
-          stuckCount: status.summary.stuck,
+          stuckCount,
           warningCount: status.summary.warning,
         },
         topSpenders: {
