@@ -73,8 +73,10 @@ Add a top-level dashboard page for usage analytics.
 - Total cost
 - Total API calls / assistant calls
 - Total sessions
-- Input tokens
-- Output tokens
+- Total input tokens
+- Total output tokens
+- Total cached tokens
+- Total uncached tokens
 - Cache read tokens
 - Cache write tokens
 - Cache hit rate
@@ -143,7 +145,10 @@ These categories are required in the page, exports, and APIs.
 - model family / model name
 - calls
 - cost
-- token totals
+- input tokens
+- output tokens
+- cached tokens
+- uncached tokens
 - cache behavior
 - optional provider grouping
 
