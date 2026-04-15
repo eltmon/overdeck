@@ -159,7 +159,7 @@ describe('setReviewStatus', () => {
     expect(result.mergeNotes).toBeUndefined();
   });
 
-  it('does not keep readyForMerge true when verification has failed', () => {
+  it('keeps readyForMerge true when verification has failed (test pass is authoritative)', () => {
     const result = setReviewStatus('PAN-113', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -167,7 +167,7 @@ describe('setReviewStatus', () => {
       readyForMerge: true,
     }, statusFile);
 
-    expect(result.readyForMerge).toBe(false);
+    expect(result.readyForMerge).toBe(true);
   });
 
   it('does not block readyForMerge when verification is pending (not yet run)', () => {

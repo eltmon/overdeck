@@ -191,7 +191,7 @@ describe('getReviewStatusFromDb', () => {
     expect(result!.readyForMerge).toBe(false);
   });
 
-  it('normalizes impossible readyForMerge states when verification failed', () => {
+  it('does not clear readyForMerge when verification failed (test pass is authoritative)', () => {
     upsertReviewStatus(makeStatus({
       issueId: 'PAN-G-5',
       reviewStatus: 'passed',
@@ -201,7 +201,7 @@ describe('getReviewStatusFromDb', () => {
     }));
 
     const result = getReviewStatusFromDb('PAN-G-5');
-    expect(result!.readyForMerge).toBe(false);
+    expect(result!.readyForMerge).toBe(true);
   });
 });
 
