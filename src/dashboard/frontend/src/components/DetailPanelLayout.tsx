@@ -56,11 +56,11 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
-  // Fetch review status here — single owner; passed as prop to InspectorPanel to avoid duplicate queries
+  // Fetch review status from the canonical review-status route — passed as prop to InspectorPanel to avoid duplicate queries
   const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
     queryKey: ['review-status', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/review-status`);
+      const res = await fetch(`/api/review/${issueId}/status`);
       if (!res.ok) throw new Error('Failed to fetch review status');
       return res.json();
     },
