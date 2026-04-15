@@ -1746,7 +1746,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
           specialist: 'merge-agent',
           outcome: 'ci-failure',
           summary: 'CI checks are failing — merge blocked until CI passes',
-          markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueIdForFb}\n\`\`\``,
+          markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan work done ${issueIdForFb}\n\`\`\``,
         }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueIdForFb}:`, err.message));
         // Nudge the work agent session if it's running. Use the /rebase-and-submit
         // skill as the atomic task contract so Claude doesn't stop partway through
@@ -1754,7 +1754,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
         if (sessionExists(agentSession)) {
           await sendKeysAsync(agentSession,
-            `CI checks are failing on the PR. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueIdForFb}. The skill is an atomic task — do not stop until pan done has completed successfully.`
+            `CI checks are failing on the PR. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueIdForFb}. The skill is an atomic task — do not stop until pan work done has completed successfully.`
           );
         }
         actions.push(`CI check failure for ${issueIdForFb} — wrote feedback, saturated merge retry counter`);
@@ -1800,6 +1800,42 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
   return actions;
 }
 
+// ============================================================================
+// Stale feedback cleanup (PAN-705 flywheel fix)
+// ============================================================================
+
+/**
+ * Remove stale CI-failure feedback files from a workspace's .planning/feedback/ dir.
+ * These accumulate when the merge-agent retries CI-blocked merges, and cause
+ * the work agent to incorrectly believe CI is still failing on resume.
+ */
+async function clearStaleCiFeedback(issueId: string): Promise<void> {
+  const { readdir, rm } = await import('fs/promises');
+  const { resolveProjectFromIssue } = await import('../projects.js');
+  const projectConfig = resolveProjectFromIssue(issueId);
+  if (!projectConfig) return;
+
+  const repoDir = projectConfig.projectPath;
+  if (!repoDir) return;
+
+  // Find the workspace directory: workspaces/feature-<issueLower> under the repo
+  const issueLower = issueId.toLowerCase();
+  const candidateFeedbackDir = join(repoDir, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback');
+
+  try {
+    if (!existsSync(candidateFeedbackDir)) return;
+    const files = readdirSync(candidateFeedbackDir);
+    for (const file of files) {
+      if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
+        await rm(join(candidateFeedbackDir, file));
+        console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
+      }
+    }
+  } catch (err: any) {
+    console.log(`[deacon] Could not clear stale CI feedback for ${issueId}: ${err.message}`);
+  }
+}
+
 // Track per-issue cooldowns for dead-end recovery to avoid spamming
 const deadEndCooldowns = new Map<string, number>();
 
@@ -1809,15 +1845,19 @@ const DEAD_END_STALENESS_MS = 5 * 60 * 1000; // 5 minutes
 const DEAD_END_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
- * Detect dead-end agents: review blocked or tests failed, but work agent is idle.
+ * Detect dead-end agents: review blocked, tests failed, or merge failed (CI)
+ * but work agent is idle.
  *
  * This happens when:
  * - Review feedback was delivered with a wrong URL (now fixed, but old feedback persists)
  * - Agent forgot how to resubmit (context compaction lost instructions)
  * - Feedback delivery to tmux failed silently
+ * - Merge failed due to CI checks (now handled in checkFailedMergeRetry by routing
+ *   to the work agent with feedback; dead-end catches cases where the agent is idle)
  *
  * Recovery: re-queue the review via the request-review API endpoint and
  * send the agent a nudge message with the correct resubmit command.
+ * For CI-blocked merges: clear the stale merge failure and feedback files.
  */
 export async function checkDeadEndAgents(): Promise<string[]> {
   const actions: string[] = [];
@@ -1834,6 +1874,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       testStatus?: string;
       readyForMerge?: boolean;
       mergeStatus?: string;
+      mergeNotes?: string;
       updatedAt?: string;
       autoRequeueCount?: number;
       history?: Array<{ type: string; status: string; timestamp?: string }>;
@@ -1842,10 +1883,13 @@ export async function checkDeadEndAgents(): Promise<string[]> {
     const now = Date.now();
 
     for (const [key, status] of Object.entries(statuses)) {
-      // Only act on blocked reviews or failed tests
+      // Only act on blocked reviews, failed tests, or CI-blocked merges
       const isReviewBlocked = status.reviewStatus === 'blocked';
       const isTestFailed = status.testStatus === 'failed';
-      if (!isReviewBlocked && !isTestFailed) continue;
+      const isMergeCiFailed = status.mergeStatus === 'failed' &&
+        typeof status.mergeNotes === 'string' &&
+        status.mergeNotes.includes('failing required checks');
+      if (!isReviewBlocked && !isTestFailed && !isMergeCiFailed) continue;
 
       // Skip merged/completed issues
       if (status.mergeStatus === 'merged' || status.readyForMerge) continue;
@@ -1884,17 +1928,38 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       }
 
       // Agent is idle with a blocked/failed status — this is a dead end
-      const statusType = isReviewBlocked ? 'review blocked' : 'tests failed';
+      let statusType: string;
+      if (isReviewBlocked) {
+        statusType = 'review blocked';
+      } else if (isTestFailed) {
+        statusType = 'tests failed';
+      } else {
+        statusType = 'merge CI blocked';
+      }
       console.log(`[deacon] Dead-end detected: ${key} (${statusType}) with idle agent ${agentSessionName}`);
 
       // Record cooldown before taking action
       deadEndCooldowns.set(key, now);
 
+      // For merge CI-blocked: clear the stale merge failure, clean up stale
+      // CI-failure feedback files, and set readyForMerge so the merge flow can re-enter.
+      if (isMergeCiFailed) {
+        setReviewStatus(issueId, {
+          mergeStatus: 'pending',
+          readyForMerge: true,
+        });
+        // Clean up accumulated stale feedback so the work agent doesn't read them
+        await clearStaleCiFeedback(issueId).catch(() => {});
+        console.log(`[deacon] Cleared stale CI-blocked merge for ${issueId} — reset to readyForMerge`);
+        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
+        continue;
+      }
+
       // Send the agent a nudge message with the correct resubmit command
       try {
         const nudgeMessage = isReviewBlocked
-          ? `The review agent found issues in your code. Read .planning/feedback/ for details, fix the issues, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan review request\` has completed successfully (this is the re-review path, not \`pan done\`).`
-          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan review request\` has completed successfully (this is the re-review path, not \`pan done\`).`;
+          ? `The review agent found issues in your code. Read .planning/feedback/ for details, fix the issues, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan work request-review\` has completed successfully (this is the re-review path, not \`pan work done\`).`
+          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan work request-review\` has completed successfully (this is the re-review path, not \`pan work done\`).`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
@@ -1919,7 +1984,7 @@ const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudgi
 const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
 
 /**
- * Detect work agents that finished implementation but never called "pan done".
+ * Detect work agents that finished implementation but never called "pan work done".
  *
  * This is the Layer 3 safety net. Layer 2 (work-agent-stop-hook) should catch most
  * cases within seconds of the agent going idle. This catches agents where the stop-hook
@@ -1978,7 +2043,7 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 
       // HARD GATE: Never nudge agents that have been through the review pipeline.
       // Check review-status.json — if ANY entry exists for this issue, the agent
-      // has entered the specialist pipeline and must NOT receive a "pan done" nudge.
+      // has entered the specialist pipeline and must NOT receive a "pan work done" nudge.
       // (Dead-end detection handles agents stuck in review/test cycles.)
       const issueId = agent.issueId || agent.id.replace('agent-', '').toUpperCase();
       const issueKey = issueId.toLowerCase();
@@ -1996,7 +2061,7 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 
       // HARD GATE: Also check for review feedback files in the workspace.
       // If a feedback directory exists and is non-empty, a review agent has already
-      // processed this workspace — never send a "pan done" nudge.
+      // processed this workspace — never send a "pan work done" nudge.
       const agentStateForGate = getAgentState(agent.id);
       if (agentStateForGate?.workspace) {
         const feedbackDir = join(agentStateForGate.workspace, '.planning', 'feedback');
@@ -2045,14 +2110,14 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       }
       if (!hasCommits) continue; // No commits — agent may not have started yet
 
-      // All heuristics passed: agent likely forgot pan done
+      // All heuristics passed: agent likely forgot pan work done
       const idleMinutes = Math.round(idleMs / 60000);
       console.log(`[deacon] First-completion gap detected: ${agent.id} (${issueId}) idle for ${idleMinutes}m with commits but no completion marker`);
 
       firstCompletionCooldowns.set(agent.id, now);
 
       try {
-        const nudgeMessage = `You appear to have stopped working without calling "pan done". If your implementation is complete, run this now:\n\npan done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
+        const nudgeMessage = `You appear to have stopped working without calling "pan work done". If your implementation is complete, run this now:\n\npan work done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
         await sendKeysAsync(agent.id, nudgeMessage);
         actions.push(`First-completion nudge: ${agent.id} (idle ${idleMinutes}m)`);
         console.log(`[deacon] Sent first-completion nudge to ${agent.id}`);
@@ -2081,7 +2146,7 @@ const stuckPokeState: Map<string, { lastPoke: number; pokes: number }> = new Map
  * Patrol work agent resolution fields (PAN-309).
  *
  * For each running work agent:
- * - resolution === 'done' && count >= 2: auto-complete via pan done
+ * - resolution === 'done' && count >= 2: auto-complete via pan work done
  * - resolution === 'stuck' && count >= 3: send a poke (rate-limited, capped — PAN-650)
  */
 export async function patrolWorkAgentResolutions(): Promise<string[]> {
@@ -2103,7 +2168,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
 
       if (resolution === 'done' && count >= 2) {
-        // Agent was nudged twice but still hasn't called pan done — auto-complete
+        // Agent was nudged twice but still hasn't called pan work done — auto-complete
         console.log(`[deacon] Auto-completing ${agent.id} (${issueId}): resolution=done, count=${count}`);
 
         try {
@@ -2157,7 +2222,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         console.log(`[deacon] Poking stuck agent ${agent.id} (${issueId}): poke ${pokeState.pokes + 1}/${STUCK_POKE_MAX}`);
 
         try {
-          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan done ${issueId} -c "Implementation complete"`;
+          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan work done ${issueId} -c "Implementation complete"`;
           await sendKeysAsync(agent.id, pokeMsg);
           stuckPokeState.set(agent.id, { lastPoke: now, pokes: pokeState.pokes + 1 });
           actions.push(`Deacon poked stuck agent ${agent.id} (${issueId}) [${pokeState.pokes + 1}/${STUCK_POKE_MAX}]`);
