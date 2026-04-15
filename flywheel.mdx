@@ -31,11 +31,17 @@ The daemon never fires during:
 
 ## FLYWHEEL-REPORT.md
 
-Every synthesis run appends a structured section to `~/docs/FLYWHEEL-REPORT.md`. The full timeline is reproduced below.
+Every synthesis run appends a structured section to `~/docs/FLYWHEEL-REPORT.md`. The report accumulates an entry for each run — timestamp, proposals filed, retros archived, and any deferred signals that didn't yet cross the threshold.
 
-import FlywheelReport from '/docs/FLYWHEEL-REPORT.md'
+To view the live report:
 
-<FlywheelReport />
+```bash
+# Print the full report to terminal
+cat ~/docs/FLYWHEEL-REPORT.md
+
+# Or fetch it via the dashboard API
+curl http://localhost:3000/api/flywheel/report | jq '.content'
+```
 
 ---
 
