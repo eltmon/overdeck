@@ -54,8 +54,10 @@ import { EventStoreService } from '../services/domain-services.js';
 import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
+  markWorkspaceStuck,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
+import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
 import {
   computeQueuePositionFromStatus,
   findPositionInQueue,
@@ -4033,10 +4035,22 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           return jsonResponse({ error }, { status: 400 });
         }
 
-        // Push merged main
+        // Push merged main (with divergence guard — throws MainDivergedError if origin/main
+        // has advanced past our local ancestor, protecting against silent hotfix clobber)
         try {
-          await execAsync('git push origin main', { cwd: projectPath, encoding: 'utf-8' });
+          await gitPush(projectPath, 'origin', 'main', { issueId });
         } catch (pushErr: any) {
+          if (pushErr instanceof MainDivergedError) {
+            // origin/main advanced between our pull and our push — mark workspace stuck
+            // so Deacon does not re-trigger and the user sees a clear error in the UI.
+            markWorkspaceStuck(issueId, 'main_diverged', {
+              localSha: pushErr.localSha,
+              remoteSha: pushErr.remoteSha,
+            });
+            const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha.slice(0, 7)}, local: ${pushErr.localSha.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — sync main and retry.`;
+            completePendingOperation(issueId, error);
+            return jsonResponse({ error }, { status: 409 });
+          }
           const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
           completePendingOperation(issueId, error);
           return jsonResponse({ error }, { status: 400 });
