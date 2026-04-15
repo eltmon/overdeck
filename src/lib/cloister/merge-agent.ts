@@ -289,16 +289,20 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   }
 
   // 5. Kill work agent tmux session to free resources (non-fatal)
-  // Stopped agents with live tmux sessions leak memory (Claude + MCP processes stay resident)
+  // Stopped agents with live tmux sessions leak memory (Claude + MCP processes stay resident).
+  // Kill the session unconditionally if it exists — don't require agentState to exist first
+  // (state file may have been cleaned up already, leaving an orphaned session alive).
   try {
     const { getAgentState, saveAgentState } = await import('../agents.js');
     const { killSession, sessionExists } = await import('../tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
-    const agentState = getAgentState(agentId);
-    if (agentState && sessionExists(agentId)) {
+    if (sessionExists(agentId)) {
       killSession(agentId);
-      agentState.status = 'stopped';
-      saveAgentState(agentState);
+      const agentState = getAgentState(agentId);
+      if (agentState) {
+        agentState.status = 'stopped';
+        saveAgentState(agentState);
+      }
       console.log(`[merge-agent] ✓ Killed work agent session ${agentId} to free resources`);
       logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
     }
