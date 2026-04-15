@@ -432,6 +432,11 @@ export function ConversationPanel({
               </>
             )}
           </span>
+          {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
+            <span className={styles.featureCost} style={{ marginRight: 'var(--mc-space-2)' }}>
+              {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
+            </span>
+          )}
           <span className={styles.conversationTerminalStatus}>
             <Circle
               size={7}
@@ -521,7 +526,6 @@ export function ConversationPanel({
               </button>
             </div>
           )}
-
           {/* Delivery method toggle */}
           {conversation.harness === 'claude-code' && (
             <select
