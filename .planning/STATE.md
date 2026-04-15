@@ -1,4 +1,30 @@
-# PAN-697 Planning — Root Artifact Cleanup
+# PAN-697: Root Artifact Cleanup
+
+## Status: In Progress
+
+## Current Phase
+Implementing bead panopticon-cli-ezo (Move root screenshots to docs/screenshots/root-cleanup/)
+
+## Completed Work
+(none yet)
+
+## Remaining Work
+- [ ] panopticon-cli-ezo: Move root screenshots to docs/screenshots/root-cleanup/
+- [ ] panopticon-cli-7zf: Move historical writeups to docs/history/
+- [ ] panopticon-cli-80k: Document the repo-root policy in docs/REPO-ARTIFACTS.md
+- [ ] panopticon-cli-37m: Update the AGENT_AUDIT_REPORT.md reference in docs/AGENT_TYPES_INDEX.md
+- [ ] panopticon-cli-ch4: Move root audit artifacts to docs/audits/ (blocked until 37m completes)
+
+## Key Decisions
+- D1: ch4 (Move audit artifacts) depends on 37m (Update reference) per bead system — update reference first, then move audit files
+- D2: Use git mv for all moves to preserve history
+
+## Specialist Feedback
+(none yet)
+
+---
+
+# Planning Context
 
 ## Problem
 
