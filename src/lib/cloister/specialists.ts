@@ -167,7 +167,7 @@ const TASKS_DIR = join(SPECIALISTS_DIR, 'tasks');
 /**
  * Supported specialist types
  */
-export type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
+export type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'retro-agent';
 
 /**
  * Specialist state
@@ -309,6 +309,13 @@ const DEFAULT_SPECIALISTS: SpecialistMetadata[] = [
     description: 'Browser-based user acceptance testing',
     enabled: true,
     autoWake: true,
+  },
+  {
+    name: 'retro-agent',
+    displayName: 'Retro Agent',
+    description: 'Post-merge surprise-centered retrospective (spawn-run-exit, PAN-709)',
+    enabled: true,
+    autoWake: false, // Fired by flywheel daemon on merge, never polled
   },
 ];
 
