@@ -33,6 +33,8 @@ import { runMergeValidation, autoRevertMerge, runQualityGates } from './validati
 import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
+import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
+import { markWorkspaceStuck } from '../review-status.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -1060,12 +1062,13 @@ export async function spawnMergeAgentForBranches(
                 // Revert to ORIG_HEAD (set by git at merge time)
                 const revertSuccess = await autoRevertMerge(projectPath);
 
-                // Force push to revert the remote as well
+                // Force push to revert the remote as well (--force-with-lease: no divergence guard,
+                // this is an intentional revert of a bad merge we caused)
                 if (revertSuccess) {
                   try {
-                    await execAsync(`git push --force-with-lease origin ${targetBranch}`, {
-                      cwd: projectPath,
-                      encoding: 'utf-8',
+                    await gitForcePush(projectPath, 'origin', targetBranch, {
+                      issueId,
+                      reason: 'auto-revert after post-merge validation failure',
                     });
                     console.log(`[merge-agent] ✓ Auto-revert pushed to remote`);
                     logActivity('merge_auto_revert', 'Merge auto-reverted and pushed to remote');
@@ -1417,15 +1420,25 @@ async function salvageStrandedMerge(
       return { success: true };
     }
 
-    // Stranded merge detected — push it
+    // Stranded merge detected — push it (with divergence guard to protect hotfixes)
     console.log(`[merge-agent] SALVAGING stranded merge for ${issueId}: local HEAD ${currentHead.slice(0, 8)} != remote ${remoteHeadRaw.trim().slice(0, 8)}`);
     logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
 
-    await execAsync(`git push origin ${targetBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      timeout: 30000,
-    });
+    try {
+      await gitPush(projectPath, 'origin', targetBranch, { issueId });
+    } catch (pushErr: unknown) {
+      if (pushErr instanceof MainDivergedError) {
+        // origin has advanced past our local ancestor — a hotfix landed.
+        // Mark stuck so Deacon won't re-trigger, then let the caller handle it.
+        markWorkspaceStuck(issueId, 'main_diverged', {
+          localSha: pushErr.localSha,
+          remoteSha: pushErr.remoteSha,
+        });
+        logActivity('merge_salvage_diverged', `Salvage aborted: origin/${targetBranch} diverged (remote ${pushErr.remoteSha.slice(0, 7)} not ancestor of local ${pushErr.localSha.slice(0, 7)})`);
+        return { success: false, reason: pushErr.message };
+      }
+      throw pushErr;
+    }
 
     console.log(`[merge-agent] Salvage push successful for ${issueId}`);
     logActivity('merge_salvage_success', `Stranded merge pushed successfully`);
