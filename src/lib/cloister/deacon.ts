@@ -22,6 +22,7 @@ const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
 import { setReviewStatus, loadReviewStatuses } from '../review-status.js';
+import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -1278,50 +1279,48 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
         if (existsSync(completedProcessedFile)) {
           const agentState = getAgentState(agentIdForCheck);
-          const workspace = agentState?.workspace;
+          const { resolveProjectFromIssue } = await import('../projects.js');
+          const resolved = resolveProjectFromIssue(issueId);
+          const issueLower = issueId.toLowerCase();
+          const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
 
-          if (workspace) {
-            const branch = `feature/${issueId.toLowerCase()}`;
-            const { resolveProjectFromIssue } = await import('../projects.js');
-            const resolved = resolveProjectFromIssue(issueId);
-
-            if (resolved) {
-              const { spawnEphemeralSpecialist } = await import('./specialists.js');
-              const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-                issueId,
-                workspace,
-                branch,
-              });
-              if (result.success) {
-                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-                status.reviewStatus = 'reviewing';
-                modified = true;
-                actions.push(
-                  `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
-                );
-                console.log(
-                  `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection (project: ${resolved.projectKey})`,
-                );
-              } else if (result.error === 'specialist_busy') {
-                // Specialist busy — leave status as pending, deacon will retry next patrol
-                actions.push(
-                  `Skipped pending review for ${issueId}: specialist busy — will retry next patrol`,
-                );
-                console.log(`[deacon] Review specialist busy for ${issueId} — will retry next patrol`);
-              } else {
-                actions.push(
-                  `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-                );
-                console.log(
-                  `[deacon] Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-                );
-              }
+          if (workspace && resolved) {
+            const branch = `feature/${issueLower}`;
+            const { spawnEphemeralSpecialist } = await import('./specialists.js');
+            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+              issueId,
+              workspace,
+              branch,
+            });
+            if (result.success) {
+              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+              status.reviewStatus = 'reviewing';
+              modified = true;
+              actions.push(
+                `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
+              );
+              console.log(
+                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+              );
+            } else if (result.error === 'specialist_busy') {
+              // Specialist busy — leave status as pending, deacon will retry next patrol
+              actions.push(
+                `Skipped pending review for ${issueId}: specialist busy — will retry next patrol`,
+              );
+              console.log(`[deacon] Review specialist busy for ${issueId} — will retry next patrol`);
             } else {
-              actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
+              actions.push(
+                `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+              );
+              console.log(
+                `[deacon] Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+              );
             }
+          } else if (!resolved) {
+            actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
           } else {
-            actions.push(`Skipped pending review re-dispatch for ${issueId}: agent state unavailable`);
-            console.log(`[deacon] Skipped review re-dispatch for ${issueId} — agent state unavailable`);
+            actions.push(`Skipped pending review re-dispatch for ${issueId}: workspace unavailable`);
+            console.log(`[deacon] Skipped review re-dispatch for ${issueId} — workspace unavailable`);
           }
         }
       }
@@ -1341,65 +1340,61 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         // Re-dispatch using per-project ephemeral specialist (no queue fallback)
         const agentId = `agent-${issueId.toLowerCase()}`;
         const agentState = getAgentState(agentId);
-        const workspace = agentState?.workspace;
+        const { resolveProjectFromIssue } = await import('../projects.js');
+        const resolved = resolveProjectFromIssue(issueId);
+        const issueLower = issueId.toLowerCase();
+        const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
 
-        if (workspace) {
-          const branch = `feature/${issueId.toLowerCase()}`;
-          const { resolveProjectFromIssue } = await import('../projects.js');
-          const resolved = resolveProjectFromIssue(issueId);
-
-          if (resolved) {
-            const { spawnEphemeralSpecialist } = await import('./specialists.js');
-            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-              issueId,
-              workspace,
-              branch,
-            });
-            if (result.success) {
-              status.testStatus = 'testing';
-              modified = true;
-              actions.push(
-                `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
-              );
-              console.log(
-                `[deacon] Re-dispatched test for ${issueId} after orphan detection (project: ${resolved.projectKey})`,
-              );
-            } else if (result.error === 'specialist_busy') {
-              // Specialist busy — set dispatch_failed so deacon retries next patrol
-              status.testStatus = 'dispatch_failed';
-              modified = true;
-              actions.push(
-                `Orphaned test for ${issueId}: specialist busy — set dispatch_failed for next patrol retry`,
-              );
-              console.log(
-                `[deacon] Specialist busy for ${issueId} — set dispatch_failed for next patrol retry`,
-              );
-            } else {
-              status.testStatus = 'dispatch_failed';
-              modified = true;
-              actions.push(
-                `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-              );
-              console.log(
-                `[deacon] Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-              );
-            }
-          } else {
-            status.testStatus = 'pending';
+        if (workspace && resolved) {
+          const branch = `feature/${issueLower}`;
+          const { spawnEphemeralSpecialist } = await import('./specialists.js');
+          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+            issueId,
+            workspace,
+            branch,
+          });
+          if (result.success) {
+            status.testStatus = 'testing';
             modified = true;
             actions.push(
-              `Reset orphaned test for ${issueId}: no project configured`,
+              `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
+            );
+            console.log(
+              `[deacon] Re-dispatched test for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+            );
+          } else if (result.error === 'specialist_busy') {
+            // Specialist busy — set dispatch_failed so deacon retries next patrol
+            status.testStatus = 'dispatch_failed';
+            modified = true;
+            actions.push(
+              `Orphaned test for ${issueId}: specialist busy — set dispatch_failed for next patrol retry`,
+            );
+            console.log(
+              `[deacon] Specialist busy for ${issueId} — set dispatch_failed for next patrol retry`,
+            );
+          } else {
+            status.testStatus = 'dispatch_failed';
+            modified = true;
+            actions.push(
+              `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+            );
+            console.log(
+              `[deacon] Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
             );
           }
         } else {
-          // Cannot derive workspace — reset to pending so user can re-trigger
+          // Cannot derive workspace/project — reset to pending so the pipeline can re-trigger cleanly
           status.testStatus = 'pending';
           modified = true;
           actions.push(
-            `Reset orphaned test for ${issueId}: agent state unavailable`,
+            !resolved
+              ? `Reset orphaned test for ${issueId}: no project configured`
+              : `Reset orphaned test for ${issueId}: workspace unavailable`,
           );
           console.log(
-            `[deacon] Reset orphaned test for ${issueId} to pending (agent state unavailable)`,
+            !resolved
+              ? `[deacon] Reset orphaned test for ${issueId} to pending (no project configured)`
+              : `[deacon] Reset orphaned test for ${issueId} to pending (workspace unavailable)`,
           );
         }
       }

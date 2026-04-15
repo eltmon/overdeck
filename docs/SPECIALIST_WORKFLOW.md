@@ -563,6 +563,8 @@ The verification gate (PAN-174) runs between agent completion and review-agent w
 
 **Only `'failed'` blocks `readyForMerge`.** `'pending'` means "this cycle's gate hasn't run yet" — it is reset to `pending` at the start of each review cycle by `request-review`, and is not a signal of failure. This is enforced in `verificationSatisfied()` in `review-status.ts` and aligned in `normalizeReviewStatus()`.
 
+Orphaned review/test recovery in deacon must not depend solely on `agentState.workspace`. If the work-agent state file is missing but the workspace still exists on disk, deacon now falls back to canonical workspace discovery (`findWorkspacePath(projectPath, issueLower)`) before deciding recovery is impossible. This keeps `pending` review and `dispatch_failed`/orphaned test states recoverable after agent-state loss.
+
 A second verification gate also runs **post-rebase in the merge queue** (before the GitHub merge). This gate uses the same `quality_gates` but runs in the workspace state after rebase, not after the original `pan done`. Its failure sends feedback to the work agent and pauses the merge; the queue advances to the next issue.
 
 ### Activity Log
