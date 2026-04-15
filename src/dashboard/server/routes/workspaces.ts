@@ -2791,11 +2791,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         );
       }
 
-      const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-        issueId,
-        workspace: workspacePath,
-        branch: branchName,
-      }));
+      const result = yield* Effect.promise(async () => {
+        const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+        return dispatchParallelReview({
+          issueId,
+          workspace: workspacePath,
+          branch: branchName,
+        });
+      });
 
       if (result.success) {
         console.log(`[request-review] Spawned review specialist for ${issueId}`);
@@ -2919,9 +2922,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     if (rerun) {
       try {
         yield* Effect.promise(async () => {
-          const {
-            spawnEphemeralSpecialist,
-          } = await import('../../../lib/cloister/specialists.js');
+          const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
           const resolved = resolveProjectFromIssue(issueId);
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -2931,7 +2932,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               wsInfo.localPath ||
               join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
 
-            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+            const result = await dispatchParallelReview({
               issueId,
               workspace: wsPath,
               branch: branchName,
@@ -2941,10 +2942,6 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             if (result.success) {
               setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               console.log(`[reset-review] Re-dispatched review for ${issueId}`);
-            } else if (result.error === 'specialist_busy') {
-              // Specialist is busy — set pending so deacon retries on next patrol
-              setReviewStatus(issueId, { reviewStatus: 'pending' });
-              console.log(`[reset-review] Review specialist busy for ${issueId} — deacon will retry`);
             } else {
               console.warn(
                 `[reset-review] Re-dispatch failed for ${issueId}: ${result.message || result.error}`

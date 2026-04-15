@@ -1346,28 +1346,18 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
           if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
-            const { spawnEphemeralSpecialist } = await import('./specialists.js');
-            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-              issueId,
-              workspace,
-              branch,
-            });
+            const { dispatchParallelReview } = await import('./review-agent.js');
+            const result = await dispatchParallelReview({ issueId, workspace, branch });
             if (result.success) {
               setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               status.reviewStatus = 'reviewing';
               modified = true;
               actions.push(
-                `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
+                `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
               );
               console.log(
-                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
               );
-            } else if (result.error === 'specialist_busy') {
-              // Specialist busy — leave status as pending, deacon will retry next patrol
-              actions.push(
-                `Skipped pending review for ${issueId}: specialist busy — will retry next patrol`,
-              );
-              console.log(`[deacon] Review specialist busy for ${issueId} — will retry next patrol`);
             } else {
               actions.push(
                 `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,

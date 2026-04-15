@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { AgentCard, AgentPhase } from './AgentCard';
 import { ModelOverrideModal } from './ModelOverrideModal';
 import { WorkTypeId, ModelId, Provider } from '../types';
+import { getEffectiveModelId } from '../modelDefaults';
 
 // Agent definitions with their work types
 const AGENT_DEFINITIONS = {
@@ -112,9 +113,6 @@ const AGENT_DEFINITIONS = {
   },
 };
 
-// Default model when no override (smart selection)
-const DEFAULT_MODEL = 'claude-sonnet-4-5' as ModelId;
-
 interface AgentCardsPanelProps {
   overrides: Partial<Record<WorkTypeId, ModelId>>;
   enabledProviders: Record<Provider, boolean>;
@@ -142,10 +140,10 @@ export function AgentCardsPanel({
 
   // Helper to get model for a work type
   const getModel = (workType: WorkTypeId): { model: ModelId; isOverride: boolean } => {
-    const override = overrides[workType];
-    return override
-      ? { model: override, isOverride: true }
-      : { model: DEFAULT_MODEL, isOverride: false };
+    return {
+      model: getEffectiveModelId(workType, overrides),
+      isOverride: !!overrides[workType],
+    };
   };
 
   // Build Issue Agent phases

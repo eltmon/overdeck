@@ -335,7 +335,8 @@ export class CloisterService {
     try {
       const reviewStatuses = loadReviewStatuses();
       const { resolveProjectFromIssue } = await import('../projects.js');
-      const { spawnEphemeralSpecialist, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+      const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+      const { dispatchParallelReview } = await import('./review-agent.js');
 
       // Build set of issue IDs actively being reviewed by a running specialist
       const activeReviewIssues = new Set<string>();
@@ -383,15 +384,12 @@ export class CloisterService {
           }
 
           const branch = `feature/${issueId.toLowerCase()}`;
-          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-            issueId,
-            workspace,
-            branch,
-          });
+          const result = await dispatchParallelReview({ issueId, workspace, branch });
           if (result.success) {
-            console.log(`  ✓ Re-dispatched recovery review for ${issueId} (project: ${resolved.projectKey})`);
+            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+            console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
           } else {
-            // Busy or failed — reset to pending so deacon patrol picks it up
+            // Failed — reset to pending so deacon patrol picks it up
             console.log(`  ⚠ ${issueId}: recovery dispatch failed (${result.message}) — resetting to pending`);
             setReviewStatus(issueId, { reviewStatus: 'pending' });
           }

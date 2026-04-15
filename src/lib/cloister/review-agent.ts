@@ -13,7 +13,7 @@ import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSession, killSession, sessionExists } from '../tmux.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
-import { AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
+import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
 
 const execAsync = promisify(exec);
 
@@ -87,7 +87,7 @@ const DEFAULT_REVIEW_AGENTS: ReviewAgentConfig[] = [
 /**
  * Returns the list of enabled reviewer agents from config, falling back to defaults.
  */
-function getReviewAgents(): ReviewAgentConfig[] {
+export function getReviewAgents(): ReviewAgentConfig[] {
   try {
     const config = loadCloisterConfig();
     const configured = config.specialists?.review_agents;
@@ -411,7 +411,7 @@ interface ReviewerTemplate {
   content: string;
 }
 
-function parseReviewerTemplate(templatePath: string): ReviewerTemplate {
+export function parseReviewerTemplate(templatePath: string): ReviewerTemplate {
   if (!existsSync(templatePath)) {
     throw new Error(`Reviewer template not found: ${templatePath}`);
   }
@@ -440,7 +440,7 @@ function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | 
 }
 
 /** Resolve the model to use for a reviewer, preferring agent-level override then work-type routing */
-function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: string): string {
+export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: string): string {
   if (agent.model) return agent.model;
   const workType = reviewRoleToWorkType(agent.name);
   if (workType) {
@@ -523,7 +523,7 @@ async function runParallelReview(
 
   await Promise.all(agents.map(async agent => {
     const subagentName = `code-review-${agent.name}`;
-    const templatePath = join(AGENTS_DIR, `${subagentName}.md`);
+    const templatePath = join(CACHE_AGENTS_DIR, `${subagentName}.md`);
     const template = parseReviewerTemplate(templatePath);
     const model = resolveReviewerModel(agent, template.model);
     const outputFile = join(outputDir, `${agent.name}.md`);
@@ -555,7 +555,7 @@ async function runParallelReview(
   }
 
   // ── Phase 3: Synthesis ────────────────────────────────────────────────────
-  const synthTemplatePath = join(AGENTS_DIR, 'code-review-synthesis.md');
+  const synthTemplatePath = join(CACHE_AGENTS_DIR, 'code-review-synthesis.md');
   const synthTemplate = parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
   const synthOutputFile = join(outputDir, 'synthesis.md');
@@ -595,7 +595,7 @@ async function runParallelReview(
  * Parse synthesis output and individual reviewer files into a ReviewResult.
  * Parses synthesis.md and individual reviewer output files into a ReviewResult.
  */
-function parseReviewSynthesis(reviewOutputDir: string): ReviewResult {
+export function parseReviewSynthesis(reviewOutputDir: string): ReviewResult {
   const synthesisPath = join(reviewOutputDir, 'synthesis.md');
 
   if (!existsSync(synthesisPath)) {
@@ -624,6 +624,45 @@ function parseReviewSynthesis(reviewOutputDir: string): ReviewResult {
 
   result.filesReviewed = [...new Set(filesReviewed)];
   return result;
+}
+
+/**
+ * Dispatch a parallel code review asynchronously (fire-and-forget).
+ *
+ * Replaces `spawnEphemeralSpecialist('review-agent', ...)` — returns immediately
+ * with `{ success: true }` while the review runs in the background. The caller
+ * must set `reviewStatus: 'reviewing'` after receiving `success: true`.
+ */
+export async function dispatchParallelReview(opts: {
+  issueId: string;
+  workspace: string;
+  branch: string;
+  prUrl?: string;
+}): Promise<{ success: boolean; message: string; error?: string }> {
+  const { getReviewStatus, setReviewStatus } = await import('../review-status.js');
+  const prUrl = opts.prUrl || getReviewStatus(opts.issueId)?.prUrl || '';
+  const context: ReviewContext = {
+    projectPath: opts.workspace,
+    prUrl,
+    issueId: opts.issueId,
+    branch: opts.branch,
+    workspace: opts.workspace,
+  };
+
+  spawnReviewAgent(context)
+    .then(result => {
+      setReviewStatus(opts.issueId, {
+        reviewStatus: result.reviewResult === 'APPROVED' ? 'passed' : 'pending',
+        reviewNotes: result.notes,
+      });
+      console.log(`[review-agent] dispatchParallelReview finished for ${opts.issueId}: ${result.reviewResult}`);
+    })
+    .catch(err => {
+      console.error(`[review-agent] dispatchParallelReview failed for ${opts.issueId}:`, err);
+      setReviewStatus(opts.issueId, { reviewStatus: 'pending' });
+    });
+
+  return { success: true, message: `Parallel review dispatched for ${opts.issueId}` };
 }
 
 /**
