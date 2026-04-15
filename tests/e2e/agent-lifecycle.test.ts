@@ -233,6 +233,8 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       mkdirSync(workspaceDir, { recursive: true });
       saveSessionId(agentId, sessionId);
 
+      const stoppedAt = new Date(Date.now() - 60_000).toISOString();
+
       // Save AgentState first
       saveAgentState({
         id: agentId,
@@ -242,6 +244,7 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
         model: 'sonnet',
         status: 'stopped',
         startedAt: new Date().toISOString(),
+        stoppedAt,
       });
 
       // Then manually merge runtime state (since saveAgentRuntimeState would overwrite)
@@ -269,6 +272,10 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
 
       // Verify success
       expect(result.success).toBe(true);
+
+      const resumedAgentState = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
+      expect(resumedAgentState.status).toBe('running');
+      expect(resumedAgentState.stoppedAt).toBeUndefined();
 
       // Verify session ID was read
       const retrievedSessionId = getSessionId(agentId);
@@ -304,6 +311,8 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       mkdirSync(workspaceDir, { recursive: true });
       saveSessionId(agentId, sessionId);
 
+      const stoppedAt = new Date(Date.now() - 60_000).toISOString();
+
       // Save AgentState first
       saveAgentState({
         id: agentId,
@@ -313,6 +322,7 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
         model: 'sonnet',
         status: 'stopped',
         startedAt: new Date().toISOString(),
+        stoppedAt,
       });
 
       // Then manually merge runtime state
@@ -340,6 +350,10 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       vi.mocked(tmuxMock.sendKeysAsync).mockResolvedValue(undefined);
 
       await resumeAgent(agentId, message);
+
+      const resumedAgentState = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
+      expect(resumedAgentState.status).toBe('running');
+      expect(resumedAgentState.stoppedAt).toBeUndefined();
 
       // Verify sendKeysAsync was called with the message
       expect(tmuxMock.sendKeysAsync).toHaveBeenCalledWith(agentId, message);
