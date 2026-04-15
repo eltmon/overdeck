@@ -1,5 +1,6 @@
 ---
 name: plan
+audience: agent
 description: >
   Opus-driven planning for issues before Sonnet implementation. Creates workspace,
   STATE.md, plan.vbrief.json with beads, and updates issue tracker. Ensures

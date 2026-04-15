@@ -1,5 +1,6 @@
 ---
 name: beads
+audience: agent
 description: >
   Git-backed issue tracker for multi-session work with dependencies and persistent
   memory across conversation compaction. Use when work spans sessions, has blockers,

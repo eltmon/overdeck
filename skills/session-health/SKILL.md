@@ -1,5 +1,6 @@
 ---
 name: session-health
+audience: agent
 description: Detect and clean up stuck or corrupted Claude Code sessions. Use when agents crash with stack overflow, when sessions seem stuck, or for routine maintenance. Triggers on "session health", "check sessions", "stuck agent", "agent crashed", "stack overflow", "cleanup sessions".
 ---
 

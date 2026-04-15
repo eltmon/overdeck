@@ -1,5 +1,6 @@
 ---
 name: pan-admin-config
+audience: operator
 description: "pan admin config <cmd> — view and edit Panopticon project configuration"
 triggers:
   - pan admin config

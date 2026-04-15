@@ -1,5 +1,6 @@
 ---
 name: pan-status
+audience: operator
 description: "pan status — show running agents overview and system health"
 triggers:
   - panopticon status

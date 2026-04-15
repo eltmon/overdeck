@@ -1,5 +1,6 @@
 ---
 name: spec-readiness
+audience: agent
 description: >
   Evaluate an issue or epic's requirements readiness before development begins.
   Produces a scored report (0-100) across 5 dimensions with detailed findings,

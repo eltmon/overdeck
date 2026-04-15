@@ -1,5 +1,6 @@
 ---
 name: pan-subagent-creator
+audience: operator
 description: Create custom Claude Code subagents with isolated context windows, specific tool permissions, and specialized prompts. Use when users want to create a new subagent, configure agent delegation, set up task-specific agents, or define specialized assistants. Triggers on "create a subagent", "make a custom agent", "define an agent", "agent configuration", or "Task tool agent".
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: pan-show
+audience: operator
 description: "pan show <id> — show agent state, work history, context, or health for an issue"
 triggers:
   - pan show

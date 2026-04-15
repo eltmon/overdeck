@@ -1,5 +1,6 @@
 ---
 name: code-review-security
+audience: agent
 description: Deep security analysis focusing on OWASP Top 10
 ---
 

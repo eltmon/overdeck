@@ -1,3 +1,7 @@
+---
+name: Pan Test Config
+audience: operator
+---
 # Pan Test Config
 
 Configure test suites for your project in Panopticon.

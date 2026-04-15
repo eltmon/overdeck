@@ -1,5 +1,6 @@
 ---
 name: check-merged
+audience: agent
 description: >
   Verify whether an issue's feature branch has been merged into main.
   Checks git history, branch existence, and commit presence. Returns

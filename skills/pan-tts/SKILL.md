@@ -1,5 +1,6 @@
 ---
 name: pan-tts
+audience: operator
 description: Optional local text-to-speech sidecar that speaks Panopticon activity log entries through Qwen3-TTS (or any local TTS engine). Subscribes to the public /events/stream SSE feed; no pan-core dependency. Also exposes an ad-hoc speak helper (scripts/say.sh) so agents can announce one-off messages on demand.
 triggers:
   - pan tts

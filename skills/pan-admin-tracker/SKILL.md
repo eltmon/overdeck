@@ -1,5 +1,6 @@
 ---
 name: pan-admin-tracker
+audience: operator
 description: "pan admin tracker <cmd> — tracker-specific operations (Linear states, cleanup, sync)"
 triggers:
   - pan admin tracker

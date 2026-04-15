@@ -1,5 +1,6 @@
 ---
 name: pan-start
+audience: operator
 description: "pan start <id> — spawn a work agent for an issue in its own tmux session and workspace"
 triggers:
   - pan start

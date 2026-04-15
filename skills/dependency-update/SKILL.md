@@ -1,5 +1,6 @@
 ---
 name: dependency-update
+audience: agent
 description: Safe approach to updating dependencies
 ---
 

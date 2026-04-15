@@ -1,5 +1,6 @@
 ---
 name: refactor
+audience: agent
 description: Safe refactoring approach with test coverage first
 ---
 

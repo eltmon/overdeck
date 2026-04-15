@@ -1,5 +1,6 @@
 ---
 name: knowledge-capture
+audience: agent
 description: >
   AI self-monitoring skill. Triggers proactively when AI detects confusion or makes corrected mistakes
   (wrong DB schema, incorrect assumptions, user corrections on key insights). Prompts to capture

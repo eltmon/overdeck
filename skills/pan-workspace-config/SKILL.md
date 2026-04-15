@@ -1,3 +1,7 @@
+---
+name: Pan Workspace Config
+audience: operator
+---
 # Pan Workspace Config
 
 Configure workspace settings for polyrepo projects, DNS, Docker, services, and more.

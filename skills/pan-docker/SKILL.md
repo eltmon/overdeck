@@ -1,5 +1,6 @@
 ---
 name: pan-docker
+audience: operator
 description: Docker template selection and configuration for workspaces
 triggers:
   - pan docker

@@ -1,5 +1,6 @@
 ---
 name: spec-readiness-setup
+audience: agent
 description: >
   Create a customized wrapper for the spec-readiness skill. Configures branding,
   issue tracker bindings, field mappings, and org-specific conventions. Generates

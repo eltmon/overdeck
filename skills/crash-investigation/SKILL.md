@@ -1,5 +1,6 @@
 ---
 name: crash-investigation
+audience: agent
 description: >
   Investigate system crashes, OOM kills, and unresponsive episodes. Analyzes
   previous boot logs, identifies memory hogs, tallies per-process-group consumption,

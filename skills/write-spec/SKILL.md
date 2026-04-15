@@ -1,5 +1,6 @@
 ---
 name: write-spec
+audience: both
 description: >
   Write a feature spec (*-spec.md) for an issue. The spec is the human-written
   requirements document that feeds into the planning agent. Part of the

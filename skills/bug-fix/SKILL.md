@@ -1,5 +1,6 @@
 ---
 name: bug-fix
+audience: agent
 description: Systematic approach to investigating and fixing bugs
 ---
 

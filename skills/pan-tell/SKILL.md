@@ -1,5 +1,6 @@
 ---
 name: pan-tell
+audience: operator
 description: "pan tell <id> <msg> — send a message to a running agent's tmux session"
 triggers:
   - pan tell

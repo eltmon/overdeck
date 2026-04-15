@@ -1,5 +1,6 @@
 ---
 name: onboard-codebase
+audience: agent
 description: Systematic approach to understanding a new codebase
 ---
 

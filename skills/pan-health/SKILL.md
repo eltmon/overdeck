@@ -1,5 +1,6 @@
 ---
 name: pan-health
+audience: operator
 description: "pan doctor — check Panopticon system health, dependencies, and configuration"
 triggers:
   - pan health

@@ -1,5 +1,6 @@
 ---
 name: beads-panopticon-guide
+audience: agent
 description: >
   Panopticon-specific beads usage patterns. Covers common mistakes agents make
   when filtering beads by issue number (PAN-XXX) and working with Linear-synced beads.

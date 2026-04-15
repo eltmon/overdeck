@@ -1,5 +1,6 @@
 ---
 name: clear-writing
+audience: both
 description: >
   Use when writing prose humans will read—documentation, commit messages,
   error messages, explanations, reports, or UI text. Applies proven rules

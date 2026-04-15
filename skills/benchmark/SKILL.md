@@ -1,5 +1,6 @@
 ---
 name: benchmark
+audience: both
 description: >
   Create a benchmark issue to test Panopticon's agent pipeline. Creates a GitHub issue
   from a stored template with a scenario label for A/B comparison of models and approaches.

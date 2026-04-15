@@ -1,5 +1,6 @@
 ---
 name: pan-reopen
+audience: operator
 description: "pan reopen <id> — reopen a completed issue, resetting specialist state for a new implementation cycle"
 triggers:
   - reopen issue

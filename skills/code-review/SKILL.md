@@ -1,5 +1,6 @@
 ---
 name: code-review
+audience: agent
 description: Comprehensive code review covering correctness, security, performance
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: pan-new-project
+audience: operator
 description: >
   Complete setup for registering a new project with Panopticon. Handles
   project registration, issue prefix, workspace config, trust setup,

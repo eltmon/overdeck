@@ -1,5 +1,6 @@
 ---
 name: release
+audience: agent
 description: Step-by-step release process with versioning
 ---
 

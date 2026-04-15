@@ -1,5 +1,6 @@
 ---
 name: pan-network
+audience: operator
 description: Traefik, local domains, and platform-specific networking setup
 triggers:
   - pan network

@@ -1,5 +1,6 @@
 ---
 name: pan-diagnose
+audience: operator
 description: Troubleshoot common Panopticon issues
 triggers:
   - pan diagnose

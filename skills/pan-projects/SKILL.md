@@ -1,5 +1,6 @@
 ---
 name: pan-projects
+audience: operator
 description: "pan project <subcommand> — add, remove, and manage Panopticon-monitored projects"
 triggers:
   - pan projects

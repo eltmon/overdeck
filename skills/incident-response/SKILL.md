@@ -1,5 +1,6 @@
 ---
 name: incident-response
+audience: agent
 description: Structured approach to production incidents
 ---
 

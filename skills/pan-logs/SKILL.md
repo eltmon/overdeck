@@ -1,5 +1,6 @@
 ---
 name: pan-logs
+audience: operator
 description: View and analyze agent and system logs
 triggers:
   - pan logs

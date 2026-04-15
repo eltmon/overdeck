@@ -1,5 +1,6 @@
 ---
 name: pan-admin-hooks
+audience: operator
 description: "pan admin hooks install — install Claude Code heartbeat hooks for agent health monitoring"
 triggers:
   - pan admin hooks

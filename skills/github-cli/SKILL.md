@@ -1,5 +1,6 @@
 ---
 name: github-cli
+audience: both
 description: GitHub CLI (gh) reference for issues, PRs, and API calls
 triggers:
   - gh cli

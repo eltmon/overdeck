@@ -1,5 +1,6 @@
 ---
 name: design-md
+audience: both
 description: Analyze Stitch projects and synthesize a semantic design system into DESIGN.md files
 allowed-tools:
   - "stitch*:*"

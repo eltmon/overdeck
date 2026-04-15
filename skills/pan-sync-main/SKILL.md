@@ -1,5 +1,6 @@
 ---
 name: pan-sync-main
+audience: operator
 description: "pan sync-main <id> — merge latest main into the feature branch for an active workspace"
 triggers:
   - sync with main

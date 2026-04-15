@@ -1,5 +1,6 @@
 ---
 name: myn-standards
+audience: agent
 description: >
   Mind Your Now coding standards, design system, and component patterns.
   Auto-applied when writing or reviewing MYN code.

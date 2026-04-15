@@ -1,5 +1,6 @@
 ---
 name: refactor-radar
+audience: agent
 description: >
   AI self-monitoring skill. Detects architectural debt, confusing schemas, inconsistent patterns that
   cause repeated AI mistakes. Offers to create refactoring proposals as issues. NOT user-invoked -

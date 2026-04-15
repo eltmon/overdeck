@@ -1,5 +1,6 @@
 ---
 name: pan-issues
+audience: operator
 description: "pan issues — list and triage work across all connected issue trackers"
 triggers:
   - pan issues

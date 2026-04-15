@@ -1,5 +1,6 @@
 ---
 name: pan-install
+audience: operator
 description: Guide through installing Panopticon prerequisites
 triggers:
   - install panopticon

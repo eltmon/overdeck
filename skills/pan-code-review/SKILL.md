@@ -1,5 +1,6 @@
 ---
 name: pan-code-review
+audience: operator
 description: Orchestrated parallel code review with automatic synthesis
 triggers:
   - code review

@@ -1,5 +1,6 @@
 ---
 name: pan-dev
+audience: operator
 description: Start Panopticon in development mode with Vite HMR for the frontend and the Node 22 server
 triggers:
   - pan dev

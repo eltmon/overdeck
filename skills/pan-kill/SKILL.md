@@ -1,5 +1,6 @@
 ---
 name: pan-kill
+audience: operator
 description: "pan kill <id> — stop a running agent (workspace and branch preserved)"
 triggers:
   - pan kill

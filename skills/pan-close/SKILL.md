@@ -1,5 +1,6 @@
 ---
 name: pan-close
+audience: operator
 description: "pan close <id> — close-out ceremony for a completed and merged issue"
 triggers:
   - pan close

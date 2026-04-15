@@ -1,5 +1,6 @@
 ---
 name: pan-admin-cloister
+audience: operator
 description: "pan admin cloister <cmd> — lifecycle watchdog: status, restart, pause, resume"
 triggers:
   - pan admin cloister

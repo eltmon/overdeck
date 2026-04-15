@@ -1,5 +1,6 @@
 ---
 name: code-review-performance
+audience: agent
 description: Deep performance analysis focusing on algorithms and resources
 ---
 

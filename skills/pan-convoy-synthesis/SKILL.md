@@ -1,5 +1,6 @@
 ---
 name: pan-convoy-synthesis
+audience: operator
 description: Synthesize results from parallel agent work in a convoy
 triggers:
   - convoy synthesis

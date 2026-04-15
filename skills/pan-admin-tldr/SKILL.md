@@ -1,5 +1,6 @@
 ---
 name: pan-admin-tldr
+audience: operator
 description: "pan admin tldr <cmd> — TLDR daemon management for token-efficient code analysis"
 triggers:
   - pan admin tldr

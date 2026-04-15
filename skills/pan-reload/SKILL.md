@@ -1,3 +1,7 @@
+---
+name: Pan Reload
+audience: operator
+---
 # Pan Reload
 
 Rebuild and restart the Panopticon dashboard after code changes.

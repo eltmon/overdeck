@@ -1,5 +1,6 @@
 ---
 name: pan-skill-creator
+audience: operator
 description: Create effective Claude Code skills with specialized knowledge, workflows, and tools. Use when users want to create a new skill, update an existing skill, learn skill best practices, or extend Claude's capabilities. Triggers on "create a skill", "make a new skill", "skill development", "build a skill", or "extend capabilities".
 ---
 

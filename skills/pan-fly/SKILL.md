@@ -1,5 +1,6 @@
 ---
 name: pan-fly
+audience: operator
 description: Fly.io operations for Panopticon remote workspaces and deployed app instances. Use when users ask about Fly.io setup, remote workspaces, machine status, SSH/exec access, tunneling, or deploying/debugging Fly-hosted services.
 triggers:
   - fly.io

@@ -1,5 +1,6 @@
 ---
 name: all-up
+audience: agent
 description: >
   Run the Fix-All flywheel: pan-oversee EVERY PAN issue currently in In Progress
   and In Review simultaneously, drive each through the Panopticon pipeline to

@@ -1,5 +1,6 @@
 ---
 name: pan-oversee
+audience: operator
 description: Test the Panopticon framework by supervising an agent through the full lifecycle, identifying and filing every bug encountered
 triggers:
   - oversee issue

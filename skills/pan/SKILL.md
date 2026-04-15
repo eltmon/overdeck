@@ -1,5 +1,6 @@
 ---
 name: pan
+audience: operator
 description: "pan <verb> <args> — umbrella dispatch for all Panopticon CLI commands. Invoke bare to see the six-bucket taxonomy, or pass a full command to run it."
 triggers:
   - pan help

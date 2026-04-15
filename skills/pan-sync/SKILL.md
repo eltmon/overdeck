@@ -1,5 +1,6 @@
 ---
 name: pan-sync
+audience: operator
 description: "pan sync — sync skills and agents from devroot to ~/.claude/"
 triggers:
   - pan sync

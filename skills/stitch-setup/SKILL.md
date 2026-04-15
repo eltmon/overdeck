@@ -1,5 +1,6 @@
 ---
 name: stitch-setup
+audience: both
 description: Set up Google Stitch MCP server for AI-powered UI design generation
 ---
 

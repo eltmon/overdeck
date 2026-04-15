@@ -1,5 +1,6 @@
 ---
 name: pan-down
+audience: operator
 description: "pan down — stop the Panopticon dashboard and services"
 triggers:
   - stop panopticon

@@ -1,5 +1,6 @@
 ---
 name: beads-completion-check
+audience: agent
 description: >
   Verify all beads (tasks) in a workspace are closed before review completion.
   Use as final check in code review workflow. Returns PASS if no open beads,

@@ -1,5 +1,6 @@
 ---
 name: workspace-status
+audience: both
 description: Auto-applied when reporting on agent/workspace status. Displays robust workspace information with URLs and commands.
 ---
 

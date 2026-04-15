@@ -1,5 +1,6 @@
 ---
 name: pan-help
+audience: operator
 description: Overview of all Panopticon commands and capabilities
 triggers:
   - pan help

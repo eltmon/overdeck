@@ -1,5 +1,6 @@
 ---
 name: work-complete
+audience: agent
 description: Checklist for agents to properly complete work and signal readiness for review
 triggers:
   - work complete

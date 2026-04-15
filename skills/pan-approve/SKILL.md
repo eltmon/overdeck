@@ -1,5 +1,6 @@
 ---
 name: pan-approve
+audience: operator
 description: "pan approve <id> — approve agent work and merge the pull request"
 triggers:
   - pan approve

@@ -1,5 +1,6 @@
 ---
 name: send-feedback-to-agent
+audience: operator
 description: Send findings and feedback from specialist agents back to issue agents
 triggers:
   - send feedback

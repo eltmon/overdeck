@@ -1,5 +1,6 @@
 ---
 name: feature-work
+audience: agent
 description: Standard workflow for implementing new features with testing
 ---
 

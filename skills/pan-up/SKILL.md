@@ -1,5 +1,6 @@
 ---
 name: pan-up
+audience: operator
 description: "pan up — start the Panopticon dashboard (Node 22, port 3010)"
 triggers:
   - start panopticon

@@ -1,5 +1,6 @@
 ---
 name: pan-plan
+audience: operator
 description: "pan plan <id> — create an execution plan (vBRIEF) for an issue before starting"
 triggers:
   - plan issue

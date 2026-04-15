@@ -1,5 +1,6 @@
 ---
 name: pan-done
+audience: operator
 description: "pan done <id> — mark work complete and signal the review pipeline"
 triggers:
   - pan done

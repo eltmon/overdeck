@@ -1,5 +1,6 @@
 ---
 name: pan-review
+audience: operator
 description: "pan review <subcommand> — manage code review lifecycle: pending work, requesting review, resetting cycles"
 triggers:
   - pan review

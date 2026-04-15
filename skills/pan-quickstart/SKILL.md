@@ -1,5 +1,6 @@
 ---
 name: pan-quickstart
+audience: operator
 description: Quick start guide combining installation, setup, and first workspace
 triggers:
   - quick start panopticon
