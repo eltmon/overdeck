@@ -321,7 +321,6 @@ registerReleaseCommands(program);
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
 
-
 // Register install command
 registerInstallCommand(program);
 

@@ -188,8 +188,8 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // OpenAI models
   if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
-  if (idLower.includes('o1') && !idLower.includes('o3')) return models.find(m => m.id === 'o1');
-  if (idLower.includes('o3')) return models.find(m => m.id === 'o3-mini');
+  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3-deep-research');
+  if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.2-codex');
 
   // Google models
   if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-2.5-flash');
@@ -203,10 +203,8 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // GLM models
   if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
-    if (idLower.includes('flash')) return models.find(m => m.id === 'glm-4-flash');
-    if (idLower.includes('air')) return models.find(m => m.id === 'glm-4-air');
-    if (idLower.includes('long') || idLower.includes('1m')) return models.find(m => m.id === 'glm-4-long');
-    return models.find(m => m.id === 'glm-4-plus');
+    if (idLower.includes('flash')) return models.find(m => m.id === 'glm-4.7-flash');
+    return models.find(m => m.id === 'glm-4.7');
   }
 
   // MiniMax models
