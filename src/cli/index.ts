@@ -522,6 +522,24 @@ program
       // No existing processes — that's fine
     }
 
+    const waitForPortToFree = async (port: number, timeoutMs = 5000): Promise<void> => {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          const pids = execSync(`lsof -ti:${port} 2>/dev/null || true`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+          if (!pids) return;
+        } catch {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    };
+
+    await Promise.all([
+      waitForPortToFree(dashboardPort),
+      waitForPortToFree(dashboardApiPort),
+    ]);
+
     // Start dashboard
     if (isProduction) {
       console.log(chalk.dim('Starting dashboard (bundled mode)...'));

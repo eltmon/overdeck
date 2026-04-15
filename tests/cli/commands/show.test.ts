@@ -11,14 +11,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   shadowMock, cvMock, contextMock, healthMock,
-  getShadowStateMock, getAgentHealthMock, getAgentCVMock,
+  getShadowStateMock, pingAgentMock, getAgentCVMock,
 } = vi.hoisted(() => ({
   shadowMock: vi.fn().mockResolvedValue(undefined),
   cvMock: vi.fn().mockResolvedValue(undefined),
   contextMock: vi.fn().mockResolvedValue(undefined),
   healthMock: vi.fn().mockResolvedValue(undefined),
   getShadowStateMock: vi.fn(),
-  getAgentHealthMock: vi.fn(),
+  pingAgentMock: vi.fn(),
   getAgentCVMock: vi.fn(),
 }));
 
@@ -39,7 +39,7 @@ vi.mock('../../../src/lib/shadow-state.js', () => ({
   getShadowState: getShadowStateMock,
 }));
 vi.mock('../../../src/lib/health.js', () => ({
-  getAgentHealth: getAgentHealthMock,
+  pingAgent: pingAgentMock,
 }));
 vi.mock('../../../src/lib/cv.js', () => ({
   getAgentCV: getAgentCVMock,
@@ -53,7 +53,7 @@ describe('showCommand', () => {
     // Reasonable defaults for the compact-default-path tests; individual tests
     // can override via mockReturnValue / mockResolvedValue.
     getShadowStateMock.mockResolvedValue(null);
-    getAgentHealthMock.mockReturnValue({
+    pingAgentMock.mockResolvedValue({
       agentId: 'agent-pan-6',
       status: 'healthy',
       consecutiveFailures: 0,
@@ -99,7 +99,7 @@ describe('showCommand', () => {
 
     it('--context: delegates exclusively to contextCommand', async () => {
       await showCommand('PAN-3', { context: true });
-      expect(contextMock).toHaveBeenCalledWith('state', 'PAN-3', undefined, { json: undefined });
+      expect(contextMock).toHaveBeenCalledWith('state', 'agent-pan-3', undefined, { json: undefined });
       expect(shadowMock).not.toHaveBeenCalled();
       expect(cvMock).not.toHaveBeenCalled();
       expect(healthMock).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ describe('showCommand', () => {
 
     it('--health: delegates exclusively to healthCommand', async () => {
       await showCommand('PAN-4', { health: true });
-      expect(healthMock).toHaveBeenCalledWith('check', 'PAN-4', { json: undefined });
+      expect(healthMock).toHaveBeenCalledWith('ping', 'PAN-4', { json: undefined });
       expect(shadowMock).not.toHaveBeenCalled();
       expect(cvMock).not.toHaveBeenCalled();
       expect(contextMock).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe('showCommand', () => {
     it('reads from the shadow-state, health, and cv lib modules directly', async () => {
       await showCommand('PAN-6');
       expect(getShadowStateMock).toHaveBeenCalledWith('PAN-6');
-      expect(getAgentHealthMock).toHaveBeenCalledWith('agent-pan-6');
+      expect(pingAgentMock).toHaveBeenCalledWith('agent-pan-6');
       expect(getAgentCVMock).toHaveBeenCalledWith('agent-pan-6');
     });
 
