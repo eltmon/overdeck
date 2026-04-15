@@ -2,9 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 // react-resizable-panels v4 exports: Group, Panel, Separator (NOT PanelGroup/PanelResizeHandle)
 // v4 props: orientation (NOT direction), onLayoutChanged (NOT onLayout)
 import { Panel, Group, Separator } from 'react-resizable-panels';
+import { useQuery } from '@tanstack/react-query';
 import { InspectorPanel } from './InspectorPanel';
 import { TerminalPanel } from './TerminalPanel';
+import { TerminalTabs, savePinState, loadPinState } from './inspector/TerminalTabs';
+import { MergedSummaryCard } from './inspector/MergedSummaryCard';
+import { usePipelinePhase } from './inspector/usePipelinePhase';
 import { Agent, Issue } from '../types';
+import type { ReviewStatus, WorkspaceInfo } from './inspector/types';
 
 type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 
@@ -51,9 +56,92 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
+  // Fetch review status here — single owner; passed as prop to InspectorPanel to avoid duplicate queries
+  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
+    queryKey: ['review-status', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/review-status`);
+      if (!res.ok) throw new Error('Failed to fetch review status');
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  const { data: costData } = useQuery<{ totalCost?: number }>({
+    queryKey: ['issueCosts', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/costs`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: reviewStatus?.mergeStatus === 'merged',
+    staleTime: 60000,
+  });
+
+  const projectKey = issue?.project?.id;
+  const { phase, activeSession, availableTerminals, markSessionDead } = usePipelinePhase({
+    issueId,
+    agent,
+    reviewStatus,
+    projectKey,
+  });
+
+  // Shares cache key with InspectorPanel's workspace query — no extra network request
+  const { data: workspaceData } = useQuery<WorkspaceInfo>({
+    queryKey: ['workspace', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}`);
+      if (!res.ok) throw new Error('Failed to fetch workspace info');
+      return res.json();
+    },
+    enabled: phase === 'merged',
+    staleTime: 30000,
+  });
+
+  // Pinned session state: null = auto-follow, string = pinned to that session
+  const [pinnedSession, setPinnedSession] = useState<string | null>(() =>
+    loadPinState(issueId),
+  );
+  const [pinned, setPinned] = useState(() => loadPinState(issueId) !== null);
+
+  // The currently displayed session: pinned overrides auto
+  const selectedSession = pinned ? pinnedSession : activeSession;
+
+  const handleSelectSession = useCallback((sessionName: string | null) => {
+    setPinnedSession(sessionName);
+    savePinState(issueId, sessionName);
+  }, [issueId]);
+
+  const handleTogglePin = useCallback(() => {
+    setPinned(prev => {
+      const next = !prev;
+      if (!next) {
+        // Un-pinning: clear pin from localStorage
+        savePinState(issueId, null);
+        setPinnedSession(null);
+      } else if (activeSession) {
+        // Engaging pin: capture the currently-displayed session and persist it
+        setPinnedSession(activeSession);
+        savePinState(issueId, activeSession);
+      } else {
+        // No active session to pin — no-op, stay in auto-follow mode
+        return prev;
+      }
+      return next;
+    });
+  }, [issueId, activeSession]);
+
+
   // Reset panel state when issue changes
   useEffect(() => {
     setPanelState(loadPanelState(issueId));
+  }, [issueId]);
+
+  // Reset pin state when issue changes
+  useEffect(() => {
+    const saved = loadPinState(issueId);
+    setPinnedSession(saved);
+    setPinned(saved !== null);
   }, [issueId]);
 
   const openTerminal = useCallback(() => {
@@ -145,6 +233,9 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
                 issueId={issueId}
                 issueUrl={issueUrl}
                 issue={issue}
+                phase={phase}
+                reviewStatus={reviewStatus}
+                reviewStatusLoading={reviewStatusLoading}
                 onClose={onClose}
                 onOpenTerminal={openTerminal}
               />
@@ -161,8 +252,49 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
           />
 
           <Panel id="terminal" minSize="30%">
-            <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-              <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
+            <div className="flex flex-col" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+              {availableTerminals.length > 0 && (
+                <TerminalTabs
+                  tabs={availableTerminals}
+                  selectedSession={selectedSession}
+                  activePhase={phase}
+                  pinned={pinned}
+                  onSelectSession={handleSelectSession}
+                  onTogglePin={handleTogglePin}
+                />
+              )}
+              <div className="flex-1 min-h-0">
+                {/* Show merged summary unless the user has pinned a specific session to view */}
+                {phase === 'merged' && !(pinned && pinnedSession) ? (
+                  <MergedSummaryCard
+                    mergedAt={reviewStatus?.updatedAt ?? new Date().toISOString()}
+                    prUrl={workspaceData?.mrUrl ?? null}
+                    totalCost={costData?.totalCost}
+                    onViewLastLog={
+                      availableTerminals.some(t => t.id === 'merging' && !t.disabled)
+                        ? () => {
+                            const mergeTab = availableTerminals.find(t => t.id === 'merging');
+                            if (mergeTab?.sessionName) {
+                              handleSelectSession(mergeTab.sessionName);
+                              setPinned(true);
+                            }
+                          }
+                        : null
+                    }
+                  />
+                ) : selectedSession ? (
+                  <TerminalPanel
+                    key={selectedSession}
+                    agent={agent}
+                    onClose={closeTerminal}
+                    sessionName={selectedSession}
+                    title={selectedSession}
+                    onSessionEnded={markSessionDead}
+                  />
+                ) : (
+                  <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
+                )}
+              </div>
             </div>
           </Panel>
         </Group>
@@ -174,6 +306,9 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             issueId={issueId}
             issueUrl={issueUrl}
             issue={issue}
+            phase={phase}
+            reviewStatus={reviewStatus}
+            reviewStatusLoading={reviewStatusLoading}
             onClose={onClose}
             onOpenTerminal={agent ? openTerminal : undefined}
           />
