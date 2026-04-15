@@ -4,7 +4,7 @@
     "created": "2026-04-15T01:58:14Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-712: fix stale pan work/cloister/specialists refs in .claude/skills/",
-    "updated": "2026-04-15T08:45:45.034Z"
+    "updated": "2026-04-15T08:50:53.303Z"
   },
   "plan": {
     "id": "pan-712",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bf82ed53-bd83-4fcb-952f-f027a47b06d2",
     "author": "agent:claude-opus-4-6",
-    "sequence": 15,
+    "sequence": 17,
     "created": "2026-04-15T01:58:14Z",
-    "updated": "2026-04-15T08:45:45.034Z",
+    "updated": "2026-04-15T08:50:53.303Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/712",
@@ -80,7 +80,7 @@
             "completed": "2026-04-15T03:29:24.294Z"
           }
         ],
-        "completed": "2026-04-15T08:45:45.034Z"
+        "completed": "2026-04-15T08:50:53.303Z"
       },
       {
         "id": "fix-update-panopticon-docs-examples",
@@ -124,7 +124,7 @@
             "completed": "2026-04-15T03:29:24.293Z"
           }
         ],
-        "completed": "2026-04-15T08:45:45.033Z"
+        "completed": "2026-04-15T08:50:53.302Z"
       }
     ],
     "edges": []
