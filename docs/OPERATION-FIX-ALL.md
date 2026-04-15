@@ -250,3 +250,18 @@ pan up
 2. `61248742` — CLI `admin specialists done` now mirrors server route's `readyForMerge=true` promotion; `normalizeReviewStatus` no longer blocks readyForMerge based on stale verification status.
 
 **Friction removed:** Cycling alert for PAN-611 cleared (no longer stuck on caveman shebang).
+
+### Run 11 — 2026-04-15
+
+**0 issues moved to Awaiting Merge, 1 bug fixed, 1 friction point removed, 1 cycling alert created.**
+
+- **PAN-369-TEST** → awaiting merge (readyForMerge=true)
+- **PAN-611** → merge failed (polyrepo rebase timeout). Entered cycling alert (2 consecutive runs stuck at merge).
+- **PAN-714** → fell back to review blocked after merge-agent timed out waiting for PR #716 to become mergeable.
+
+**Bugs fixed:**
+1. `cdc8ffde` — `setReviewStatus` blocked `readyForMerge` on stale `verificationStatus`. When the merge API queued PAN-714 behind PAN-611, `setReviewStatus({ mergeStatus: 'queued' })` recomputed `readyForMerge` using `verificationSatisfied(merged)`. PAN-714 had `verificationStatus: failed` from an earlier cycle, so `readyForMerge` regressed from `true` to `false`. Fix: removed `verificationSatisfied` from `readyForMerge` computation in `setReviewStatus`, matching the Run 10 fix in `normalizeReviewStatus`. Updated 3 related tests.
+
+**Friction removed:** The `readyForMerge` computation is now consistent between `setReviewStatus` and `normalizeReviewStatus`.
+
+**Still in pipeline:** PAN-709, PAN-712, PAN-457, PAN-653, PAN-540 (all review failed at verification gate, agents fixing); PAN-611 (cycling at merge due to polyrepo rebase timeout); PAN-714 (review blocked + merge failed).
