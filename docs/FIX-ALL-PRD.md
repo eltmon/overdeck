@@ -121,7 +121,7 @@ A new top-level dashboard tab. Behavior:
 - For each row:
   - Issue identifier and title
   - **Open Frontend** link → the workspace's `frontendUrl` (so the user can UAT)
-  - **Merge** button → POSTs to `/api/workspaces/:id/merge`
+  - **Merge** button → POSTs to `/api/issues/:id/merge`
   - Last review-status timestamp
 - **Empty state**: "Nothing awaiting merge. The flywheel is idling — kick off
   more work or run `/all-up`."

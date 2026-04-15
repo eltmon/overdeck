@@ -175,8 +175,8 @@ Status transitions drive the specialist pipeline:
 - `autoRequeueCount`: number (circuit breaker, max 3 auto-requeues)
 
 **API endpoints:**
-- `GET /api/workspaces/:issueId/review-status` — Read all status fields
-- `POST /api/workspaces/:issueId/review-status` — Update status fields (accepts reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes)
+- `GET /api/review/:issueId/status` — Read all status fields
+- `POST /api/review/:issueId/status` — Update status fields (accepts reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes)
 - `POST /api/specialists/done` — Specialist reports completion with result
 
 ### Specialist Done Endpoint

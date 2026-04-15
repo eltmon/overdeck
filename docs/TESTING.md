@@ -129,7 +129,7 @@ The test-agent specialist runs tests as part of the review pipeline:
 1. **Feature branch tests**: Runs `npm test` in the workspace, output redirected to file
 2. **Baseline comparison**: If failures found, runs tests on main and compares
 3. **Pass criteria**: Feature branch introduces ZERO new test failures vs main
-4. **Status update**: Reports results via API (`POST /api/workspaces/:id/review-status`)
+4. **Status update**: Reports results via API (`POST /api/review/:id/status`)
 
 Test-agent prompt template: `src/lib/cloister/prompts/test-agent.md`
 
