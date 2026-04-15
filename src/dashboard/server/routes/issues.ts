@@ -12,6 +12,7 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/start-planning
  *   POST /api/issues/:id/abort-planning
  *   POST /api/issues/:id/complete-planning
+ *   POST /api/issues/:id/abort
  *   POST /api/issues/:id/reset
  *   POST /api/issues/:id/cancel
  *   POST /api/issues/:id/reopen
@@ -1053,6 +1054,147 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         ? 'Planning complete and pushed to git - ready for execution'
         : 'Planning complete - ready for execution',
     });
+  })),
+);
+
+// ─── Route: POST /api/issues/:id/abort ───────────────────────────────────────
+
+const postIssueAbortRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/abort',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const cleanupLog: string[] = [];
+    const lifecycle = yield* IssueLifecycle;
+    const eventStore = yield* EventStoreService;
+
+    const issuePrefix = extractTeamPrefix(id);
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const projectConfig = findProjectByTeam(issuePrefix);
+    const githubCheck = isGitHubIssue(id);
+    const issueDataService = getIssueDataService();
+    const issueSource = issueDataService.getIssueSource(id);
+
+    const ctx: any = {
+      issueId: id,
+      projectPath,
+      projectName: projectConfig?.name || '',
+      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+        : {}),
+    };
+
+    if (issueSource === 'rally') {
+      const rallyConfig = getRallyConfig();
+      if (rallyConfig) {
+        ctx.rally = {
+          apiKey: rallyConfig.apiKey,
+          server: rallyConfig.server,
+          workspace: rallyConfig.workspace,
+          project: rallyConfig.project,
+        };
+      }
+    }
+
+    yield* Effect.promise(async () => {
+      cleanupLog.push(...await closeIssuePullRequest(id));
+    });
+
+    let teardownFailed = false;
+    yield* Effect.promise(async () => {
+      try {
+        const { teardownWorkspace } = await import('../../../lib/lifecycle/index.js');
+        const teardownSteps = await teardownWorkspace(ctx, {
+          deleteWorkspace: true,
+          deleteBranches: true,
+          clearBeads: true,
+          workspaceConfig: projectConfig?.workspace,
+          projectName: projectConfig?.name || '',
+        });
+        cleanupLog.push(...teardownSteps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
+        teardownFailed = teardownSteps.some((step: any) => !step.success && !step.skipped);
+      } catch (wipeErr: any) {
+        teardownFailed = true;
+        cleanupLog.push(`Workspace cleanup failed: ${wipeErr.message}`);
+      }
+    });
+
+    yield* Effect.promise(async () => {
+      try {
+        clearReviewStatus(id.toUpperCase());
+        cleanupLog.push('Cleared review status');
+      } catch { /* non-fatal */ }
+
+      try {
+        const { resetPostMergeState } = await import('../../../lib/cloister/merge-agent.js');
+        resetPostMergeState(id);
+        resetPostMergeState(id.toUpperCase());
+        cleanupLog.push('Cleared merge state');
+      } catch { /* non-fatal */ }
+
+      try {
+        const { removeShadowState } = await import('../../../lib/shadow-state.js');
+        removeShadowState(id);
+        cleanupLog.push('Cleared shadow state');
+      } catch { /* non-fatal */ }
+    });
+
+    let transitionError: string | null = null;
+    yield* lifecycle.transitionTo(id, 'open').pipe(
+      Effect.tap(() => Effect.sync(() => cleanupLog.push('Moved issue to Todo'))),
+      Effect.catch((err) =>
+        Effect.sync(() => {
+          transitionError = String(err);
+          cleanupLog.push(`Abort transition failed: ${transitionError}`);
+        }),
+      ),
+    );
+
+    if (githubCheck.isGitHub) {
+      yield* lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
+      yield* lifecycle.removeLabel(id, 'review-ready').pipe(Effect.catch(() => Effect.void));
+    }
+
+    if (githubCheck.isGitHub) {
+      issueDataService.invalidateTracker('github').catch(() => {});
+    } else if (issueSource === 'rally') {
+      issueDataService.invalidateTracker('rally').catch(() => {});
+    } else {
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
+
+    const success = !teardownFailed && !transitionError;
+    if (success) {
+      for (const agentId of [`agent-${id.toLowerCase()}`, `planning-${id.toLowerCase()}`]) {
+        yield* eventStore.append({
+          type: 'agent.stopped',
+          timestamp: new Date().toISOString(),
+          payload: { agentId },
+        } as any).pipe(Effect.catch(() => Effect.void));
+      }
+      yield* eventStore.append({
+        type: 'issue.statusChanged',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
+      });
+      yield* eventStore.append({
+        type: 'workspace.destroyed',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: id },
+      });
+      try { issueDataService.patchIssue(id, { status: 'Todo', canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
+    }
+
+    const responseBody = {
+      success,
+      message: success ? `Aborted ${id}` : `Abort completed with errors for ${id}`,
+      cleanupLog,
+      error: transitionError ?? undefined,
+    };
+    return success
+      ? jsonResponse(responseBody)
+      : jsonResponse(responseBody, { status: 500 });
   })),
 );
 
@@ -2138,6 +2280,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueStartPlanningRoute,
   postIssueAbortPlanningRoute,
   postIssueCompletePlanningRoute,
+  postIssueAbortRoute,
   postIssueResetRoute,
   postIssueCancelRoute,
   postIssueReopenRoute,
