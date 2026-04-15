@@ -1,33 +1,4 @@
-# PAN-697: Root Artifact Cleanup
-
-## Status: Implementation Complete
-
-## Current Phase
-All beads complete. Ready to push and call pan work done.
-
-## Completed Work
-- [x] panopticon-cli-ezo: Moved 9 root screenshots to docs/screenshots/root-cleanup/ (commit: 2a6eff83)
-- [x] panopticon-cli-7zf: Moved IMPLEMENTATION_SUMMARY.md and PAN-428-CODEX-FEEDBACK.md to docs/history/ (commit: e4531bc6)
-- [x] panopticon-cli-80k: Added Repo Root Policy section to docs/REPO-ARTIFACTS.md (commit: fb3d7a3d)
-- [x] panopticon-cli-37m: Updated docs/AGENT_TYPES_INDEX.md:109 reference to docs/audits/ path (commit: 00cdc979)
-- [x] panopticon-cli-ch4: Moved AGENT_AUDIT_REPORT.md, BUGS_FOUND.md, gemini-gaps-found.md to docs/audits/ (commit: cc8d52a8)
-
-## Remaining Work
-None
-- [ ] panopticon-cli-80k: Document the repo-root policy in docs/REPO-ARTIFACTS.md
-- [ ] panopticon-cli-37m: Update the AGENT_AUDIT_REPORT.md reference in docs/AGENT_TYPES_INDEX.md
-- [ ] panopticon-cli-ch4: Move root audit artifacts to docs/audits/ (blocked until 37m completes)
-
-## Key Decisions
-- D1: ch4 (Move audit artifacts) depends on 37m (Update reference) per bead system — update reference first, then move audit files
-- D2: Use git mv for all moves to preserve history
-
-## Specialist Feedback
-(none yet)
-
----
-
-# Planning Context
+# PAN-697 Planning — Root Artifact Cleanup
 
 ## Problem
 
