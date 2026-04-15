@@ -18,7 +18,7 @@ export interface StepResult {
 }
 
 export interface WorkflowResult {
-  workflow: 'approve' | 'close' | 'close-out' | 'deep-wipe';
+  workflow: 'approve' | 'close' | 'close-out' | 'deep-wipe' | 'reset' | 'cancel';
   issueId: string;
   success: boolean;     // true only if ALL non-skipped steps succeeded
   steps: StepResult[];

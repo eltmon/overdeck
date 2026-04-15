@@ -1,19 +1,9 @@
 import chalk from 'chalk';
-import { getIssuePrefix } from '../../lib/projects.js';
-import { extractPrefix } from '../../lib/issue-id.js';
 import { homedir } from 'os';
 import { join } from 'path';
-import { existsSync, rmSync, readFileSync, readdirSync } from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { stopAgent, getAgentState } from '../../lib/agents.js';
-import { sessionExists, killSession } from '../../lib/tmux.js';
-import { createFlyProviderFromConfig } from '../../lib/remote/index.js';
-import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
-import { loadConfig } from '../../lib/config.js';
-import { loadWorkspaceMetadata, deleteWorkspaceMetadata } from '../../lib/remote/workspace-metadata.js';
-
-const execAsync = promisify(exec);
+import { readFileSync, existsSync } from 'fs';
+import { extractPrefix } from '../../lib/issue-id.js';
+import { getIssuePrefix } from '../../lib/projects.js';
 
 interface WipeOptions {
   workspace?: boolean;
@@ -21,12 +11,8 @@ interface WipeOptions {
 }
 
 export async function wipeCommand(issueId: string, options: WipeOptions): Promise<void> {
-  const issueLower = issueId.toLowerCase();
-  const cleanupLog: string[] = [];
+  console.log(chalk.yellow(`\n🔥 Reset issue to Todo for ${issueId}\n`));
 
-  console.log(chalk.yellow(`\n🔥 Deep wipe for ${issueId}\n`));
-
-  // Confirmation unless -y flag
   if (!options.yes) {
     const readline = await import('readline');
     const rl = readline.createInterface({
@@ -35,7 +21,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     });
 
     const confirmed = await new Promise<boolean>((resolve) => {
-      rl.question(chalk.red(`This will completely reset all state for ${issueId}. Continue? [y/N] `), (answer) => {
+      rl.question(chalk.red(`This will destroy the workspace and reset ${issueId} to Todo. Continue? [y/N] `), (answer) => {
         rl.close();
         resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
       });
@@ -47,109 +33,14 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 1. Kill tmux sessions
-  const sessionPatterns = [
-    `agent-${issueLower}`,
-  ];
-
-  for (const session of sessionPatterns) {
-    if (sessionExists(session)) {
-      try {
-        killSession(session);
-        cleanupLog.push(`Killed tmux session: ${session}`);
-        console.log(chalk.green(`  ✓ Killed tmux session: ${session}`));
-      } catch (e) {
-        // Session might already be dead
-      }
-    }
-  }
-
-  // 2. Clean up remote workspace and VM (check workspace metadata FIRST)
-  // This ensures we can clean up even if agent state was already deleted
-  const workspaceMetadata = loadWorkspaceMetadata(issueLower);
-  if (workspaceMetadata?.location === 'remote' && workspaceMetadata?.vmName) {
-    const vmName = workspaceMetadata.vmName;
-    console.log(chalk.gray(`  → Found remote workspace on VM: ${vmName}`));
-
-    try {
-      const fly = createFlyProviderFromConfig(loadConfig().remote);
-
-      // Kill all processes on VM (tmux, claude, etc.)
-      try {
-        await killRemoteAgent(`agent-${issueLower}`, vmName).catch(() => {});
-        await fly.ssh(vmName, `pkill -f claude 2>/dev/null || true`);
-        cleanupLog.push(`Killed processes on VM: ${vmName}`);
-        console.log(chalk.green(`  ✓ Killed processes on VM: ${vmName}`));
-      } catch (e) {
-        // Processes might not exist
-      }
-
-      // DELETE the VM (deep wipe = full cleanup)
-      try {
-        await fly.deleteVm(vmName);
-        cleanupLog.push(`Deleted remote VM: ${vmName}`);
-        console.log(chalk.green(`  ✓ Deleted remote VM: ${vmName}`));
-      } catch (e: any) {
-        console.log(chalk.yellow(`  ⚠ Could not delete VM: ${vmName} - ${e.message}`));
-      }
-    } catch (e: any) {
-      console.log(chalk.yellow(`  ⚠ Remote cleanup failed: ${e.message}`));
-    }
-
-    // Delete workspace metadata
-    if (deleteWorkspaceMetadata(issueLower)) {
-      cleanupLog.push(`Deleted workspace metadata`);
-      console.log(chalk.green(`  ✓ Deleted workspace metadata`));
-    }
-  } else {
-    // No workspace metadata - still check agent state for remote info (fallback)
-    const agentIds = [`agent-${issueLower}`];
-    for (const agentId of agentIds) {
-      const state = getAgentState(agentId) as any;
-      if (state?.location === 'remote' && state?.vmName) {
-        console.log(chalk.gray(`  → Found remote agent on VM: ${state.vmName}`));
-        try {
-          const fly = createFlyProviderFromConfig(loadConfig().remote);
-
-          // Kill processes and delete VM
-          try {
-            await killRemoteAgent(agentId, state.vmName).catch(() => {});
-            await fly.ssh(state.vmName, `pkill -f claude 2>/dev/null || true`);
-            await fly.deleteVm(state.vmName);
-            cleanupLog.push(`Deleted remote VM: ${state.vmName}`);
-            console.log(chalk.green(`  ✓ Deleted remote VM: ${state.vmName}`));
-          } catch (e: any) {
-            console.log(chalk.yellow(`  ⚠ Could not delete VM: ${state.vmName} - ${e.message}`));
-          }
-        } catch (e: any) {
-          console.log(chalk.yellow(`  ⚠ Remote cleanup failed: ${e.message}`));
-        }
-      }
-    }
-  }
-
-  // 3. Clean up agent state directories
-  const agentDirs = [
-    join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
-  ];
-
-  for (const dir of agentDirs) {
-    if (existsSync(dir)) {
-      rmSync(dir, { recursive: true, force: true });
-      cleanupLog.push(`Deleted agent state: ${dir}`);
-      console.log(chalk.green(`  ✓ Deleted agent state: ${dir.replace(homedir(), '~')}`));
-    }
-  }
-
-  // 4. Find project path
-  let projectPath: string | undefined;
   const prefix = extractPrefix(issueId);
   if (!prefix) {
     console.log(chalk.red('  ✗ Could not extract prefix from issue ID'));
     return;
   }
-  const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
 
+  const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+  let projectPath: string | undefined;
   if (existsSync(projectsYamlPath)) {
     try {
       const yaml = await import('js-yaml');
@@ -161,139 +52,60 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
           break;
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore YAML parse errors
     }
   }
 
-  // 5. Clear beads for this issue (before workspace deletion removes .beads/)
-  if (projectPath) {
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const workspaceBeadsDir = join(workspacePath, '.beads');
-
-    // Clear workspace-local beads via bd CLI (needs .beads/ to still exist)
-    if (existsSync(workspaceBeadsDir)) {
-      try {
-        const { stdout: listOutput } = await execAsync(
-          `bd list --json -l "${issueLower}" --limit 0`,
-          { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
-        );
-        const beads = JSON.parse(listOutput || '[]');
-        if (Array.isArray(beads) && beads.length > 0) {
-          const ids = beads.map((b: any) => b.id).filter(Boolean);
-          for (const id of ids) {
-            try {
-              await execAsync(`bd delete ${id} --force`, { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
-            } catch { /* individual delete failure non-fatal */ }
-          }
-          cleanupLog.push(`Deleted ${ids.length} beads for ${issueLower}`);
-          console.log(chalk.green(`  ✓ Deleted ${ids.length} beads for ${issueLower}`));
-        }
-      } catch {
-        // bd CLI may not be available or no beads exist — non-fatal
-      }
-    }
-
-    // Also clear from project-root JSONL (defense-in-depth)
-    const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-    if (existsSync(projJsonl)) {
-      try {
-        const content = readFileSync(projJsonl, 'utf-8');
-        const lines = content.split('\n');
-        const issueUpper = issueLower.toUpperCase();
-        const filtered = lines.filter(line => {
-          if (!line.trim()) return true;
-          try {
-            const entry = JSON.parse(line);
-            const title = (entry.title || '').toUpperCase();
-            const issue = (entry.issue || '').toUpperCase();
-            return !title.includes(issueUpper) && issue !== issueUpper;
-          } catch {
-            return true;
-          }
-        });
-        const removed = lines.length - filtered.length;
-        if (removed > 0) {
-          const { writeFileSync } = await import('fs');
-          writeFileSync(projJsonl, filtered.join('\n'));
-          cleanupLog.push(`Removed ${removed} beads entries from project JSONL`);
-          console.log(chalk.green(`  ✓ Removed ${removed} beads entries from project JSONL`));
-        }
-      } catch {
-        // JSONL cleanup failure non-fatal
-      }
-    }
+  if (!projectPath) {
+    console.log(chalk.red('  ✗ Could not resolve project path'));
+    return;
   }
 
-  // 6. Delete workspace if requested
-  if (options.workspace && projectPath) {
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    if (existsSync(workspacePath)) {
-      // Remove git worktrees first
-      try {
-        const gitDirs = ['api', 'frontend', 'fe', '.'];
-        for (const gitDir of gitDirs) {
-          const gitPath = join(projectPath, gitDir);
-          if (existsSync(join(gitPath, '.git'))) {
-            await execAsync(`cd "${gitPath}" && git worktree remove "${workspacePath}" --force 2>/dev/null || true`);
-          }
-        }
-      } catch (e) {
-        // Worktree might not exist
-      }
-      if (existsSync(workspacePath)) {
-        rmSync(workspacePath, { recursive: true, force: true });
-      }
-      cleanupLog.push(`Deleted workspace: ${workspacePath}`);
-      console.log(chalk.green(`  ✓ Deleted workspace`));
-    }
-  }
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const workspaceConfigPath = join(workspacePath, '.panopticon', 'workspace.json');
 
-  // 7. Reset Linear issue (if LINEAR_API_KEY is available)
-  const linearKey = process.env.LINEAR_API_KEY;
-  if (linearKey) {
+  let projectName = '';
+  let githubMeta: { owner: string; repo: string; number: number } | undefined;
+  if (existsSync(workspaceConfigPath)) {
     try {
-      const { LinearClient } = await import('@linear/sdk');
-      const client = new LinearClient({ apiKey: linearKey });
-      const issue = await client.issue(issueId);
-
-      if (issue) {
-        const team = await issue.team;
-        if (team) {
-          const states = await team.states();
-          const backlogState = states.nodes.find(s => s.type === 'backlog');
-
-          if (backlogState) {
-            await issue.update({ stateId: backlogState.id });
-            cleanupLog.push('Reset Linear status to Backlog');
-            console.log(chalk.green('  ✓ Reset Linear status to Backlog'));
-          }
-
-          // Remove labels
-          const labels = await issue.labels();
-          const labelsToRemove = labels.nodes.filter(l =>
-            l.name.toLowerCase() === 'review ready'
-          );
-          if (labelsToRemove.length > 0) {
-            const currentLabelIds = labels.nodes.map(l => l.id);
-            const newLabelIds = currentLabelIds.filter(
-              lid => !labelsToRemove.some(lr => lr.id === lid)
-            );
-            await issue.update({ labelIds: newLabelIds });
-            cleanupLog.push(`Removed labels: ${labelsToRemove.map(l => l.name).join(', ')}`);
-            console.log(chalk.green(`  ✓ Removed labels: ${labelsToRemove.map(l => l.name).join(', ')}`));
-          }
-        }
+      const workspaceConfig = JSON.parse(readFileSync(workspaceConfigPath, 'utf-8'));
+      projectName = workspaceConfig.projectName || '';
+      if (workspaceConfig.github?.owner && workspaceConfig.github?.repo && workspaceConfig.github?.number) {
+        githubMeta = workspaceConfig.github;
       }
-    } catch (linearErr: any) {
-      console.log(chalk.yellow(`  ⚠ Linear cleanup: ${linearErr.message}`));
+    } catch {
+      // best effort
     }
-  } else {
-    console.log(chalk.gray('  - Skipped Linear reset (no LINEAR_API_KEY)'));
   }
 
-  console.log(chalk.green(`\n✓ Deep wipe completed for ${issueId}`));
-  if (cleanupLog.length === 0) {
-    console.log(chalk.gray('  No state found to clean up.'));
+  const { resetToTodo } = await import('../../lib/lifecycle/index.js');
+  const result = await resetToTodo({
+    issueId,
+    projectPath,
+    projectName,
+    ...(githubMeta ? { github: githubMeta } : {}),
+  }, {
+    deleteWorkspace: options.workspace !== false,
+    deleteBranches: options.workspace !== false,
+    resetIssue: true,
+  });
+
+  for (const step of result.steps) {
+    if (step.details) {
+      for (const detail of step.details) {
+        console.log(step.success ? chalk.green(`  ✓ ${detail}`) : chalk.yellow(`  ⚠ ${detail}`));
+      }
+    }
+    if (step.error) {
+      console.log(chalk.yellow(`  ⚠ ${step.error}`));
+    }
+  }
+
+  if (result.success) {
+    console.log(chalk.green(`\n✓ Reset completed for ${issueId}`));
+  } else {
+    console.log(chalk.yellow(`\n⚠ Reset completed with errors for ${issueId}`));
   }
 }
