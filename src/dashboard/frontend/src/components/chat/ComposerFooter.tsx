@@ -12,6 +12,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { SendHorizontal } from 'lucide-react';
+import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
@@ -60,6 +61,43 @@ async function sendConversationMessage(
   }
 }
 
+interface PendingImage {
+  id: string;
+  file: File;
+  previewUrl: string;
+  serverPath: string | null;
+  error: string | null;
+}
+
+async function uploadConversationImage(
+  conversationName: string,
+  file: File,
+): Promise<string> {
+  const bytes = await file.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  const res = await fetch(
+    `/api/conversations/${encodeURIComponent(conversationName)}/upload-image`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        data: base64,
+        mimeType: file.type,
+      }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to upload image (${res.status})${body ? `: ${body}` : ''}`);
+  }
+  const payload = await res.json() as { path?: unknown };
+  if (typeof payload.path !== 'string' || payload.path.length === 0) {
+    throw new Error('Image upload response did not include a path');
+  }
+  return payload.path;
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ComposerFooterProps {
@@ -75,10 +113,41 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const editorRef = useRef<LexicalEditor | null>(null);
 
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
+
+  const updatePendingImage = useCallback((id: string, updates: Partial<PendingImage>) => {
+    setPendingImages((images) => images.map((image) => (image.id === id ? { ...image, ...updates } : image)));
+  }, []);
+
+  const enqueueImages = useCallback((files: File[]) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    const newImages = imageFiles.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+      serverPath: null,
+      error: null,
+    } satisfies PendingImage));
+
+    setPendingImages((images) => [...images, ...newImages]);
+
+    for (const image of newImages) {
+      void uploadConversationImage(conversation.name, image.file)
+        .then((serverPath) => {
+          updatePendingImage(image.id, { serverPath, error: null });
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Failed to upload image';
+          updatePendingImage(image.id, { error: message });
+        });
+    }
+  }, [conversation.name, updatePendingImage]);
 
   // Send /model command to tmux when model is changed on an active conversation
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
@@ -90,6 +159,31 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       });
     }
   }, [conversation.name, conversation.sessionAlive]);
+
+  const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
+    const items = Array.from(event.clipboardData.items);
+    const imageFiles = items
+      .filter((item) => item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (imageFiles.length === 0) return;
+    event.preventDefault();
+    enqueueImages(imageFiles);
+  }, [enqueueImages]);
+
+  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+    const imageFiles = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+    event.preventDefault();
+    enqueueImages(imageFiles);
+  }, [enqueueImages]);
+
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (Array.from(event.dataTransfer.items).some((item) => item.type.startsWith('image/'))) {
+      event.preventDefault();
+    }
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
@@ -150,7 +244,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   return (
     <div className={styles.composerFooter}>
       {/* Single unified container — T3Chat style */}
-      <div className={styles.composerBox}>
+      <div className={styles.composerBox} onPaste={handlePaste} onDrop={handleDrop} onDragOver={handleDragOver}>
         {/* Editor (no border of its own) */}
         <ComposerPromptEditor
           conversationName={conversation.name}
