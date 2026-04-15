@@ -648,3 +648,96 @@ function updateSettingsStatusline(settingsFile: string, scriptPath: string): voi
   mkdirSync(dirname(settingsFile), { recursive: true });
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
 }
+
+export interface SkillsMirrorResult {
+  added: string[];
+  updated: string[];
+  removed: string[];
+}
+
+/**
+ * Mirror the top-level skills/ directory into .claude/skills/ when run inside a
+ * panopticon-cli-style project that has a skills/ tree with SKILL.md files.
+ *
+ * - Creates missing skill directories and copies their SKILL.md
+ * - Updates out-of-date SKILL.md files when source content has changed
+ * - Removes directories in .claude/skills/ that no longer exist in skills/
+ * - Preserves .claude/skills/.gitignore untouched
+ * - No-op for any project without a top-level skills/ directory containing SKILL.md files
+ *
+ * @param cwd Working directory to check (defaults to process.cwd())
+ */
+export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorResult {
+  const result: SkillsMirrorResult = { added: [], updated: [], removed: [] };
+  const sourceDir = join(cwd, 'skills');
+  const targetDir = join(cwd, '.claude', 'skills');
+
+  if (!existsSync(sourceDir)) return result;
+
+  // Verify this is a project with actual skill definitions (has at least one SKILL.md)
+  let hasSkillFiles = false;
+  try {
+    for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (existsSync(join(sourceDir, entry.name, 'SKILL.md')) ||
+          existsSync(join(sourceDir, entry.name, 'skill.md'))) {
+        hasSkillFiles = true;
+        break;
+      }
+    }
+  } catch {
+    return result;
+  }
+  if (!hasSkillFiles) return result;
+
+  mkdirSync(targetDir, { recursive: true });
+
+  // Mirror source skill dirs → target
+  const sourceNames = new Set<string>();
+  for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const sourcePath = join(sourceDir, entry.name);
+    const sourceSkillMd =
+      existsSync(join(sourcePath, 'SKILL.md')) ? join(sourcePath, 'SKILL.md') :
+      existsSync(join(sourcePath, 'skill.md')) ? join(sourcePath, 'skill.md') :
+      null;
+    if (!sourceSkillMd) continue; // skip dirs without a skill definition
+
+    sourceNames.add(entry.name);
+    const targetPath = join(targetDir, entry.name);
+    const targetSkillMd = join(targetPath, 'SKILL.md');
+
+    const sourceContent = readFileSync(sourceSkillMd, 'utf-8');
+
+    if (!existsSync(targetPath)) {
+      mkdirSync(targetPath, { recursive: true });
+      writeFileSync(targetSkillMd, sourceContent, 'utf-8');
+      result.added.push(entry.name);
+    } else {
+      const existingContent = existsSync(targetSkillMd)
+        ? readFileSync(targetSkillMd, 'utf-8')
+        : existsSync(join(targetPath, 'skill.md'))
+          ? readFileSync(join(targetPath, 'skill.md'), 'utf-8')
+          : null;
+      if (existingContent !== sourceContent) {
+        writeFileSync(targetSkillMd, sourceContent, 'utf-8');
+        result.updated.push(entry.name);
+      }
+    }
+  }
+
+  // Remove target dirs that no longer exist in source (skip .gitignore and files)
+  try {
+    for (const entry of readdirSync(targetDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (!sourceNames.has(entry.name)) {
+        rmSync(join(targetDir, entry.name), { recursive: true, force: true });
+        result.removed.push(entry.name);
+      }
+    }
+  } catch {
+    // Non-fatal — target may not exist or be unreadable
+  }
+
+  return result;
+}
