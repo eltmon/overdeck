@@ -1,5 +1,24 @@
 # PAN-712: Fix stale pan work/cloister/specialists refs in .claude/skills/
 
+## Status: In Progress
+
+## Current Phase
+Bead panopticon-cli-vw1 complete. Working on bead panopticon-cli-cer (EXAMPLES.md fix).
+
+## Completed Work
+- [x] panopticon-cli-vw1: Fixed 5 stale refs in test-specialist-workflow/SKILL.md — `pan cloister start` → `pan admin cloister start`, `pan specialists wake *` → `pan admin specialists wake *`
+
+## Remaining Work
+- [ ] panopticon-cli-cer: Update update-panopticon-docs EXAMPLES.md Pattern 6 to drop pan work namespace
+
+## Key Decisions
+- `pan workspace` refs are valid (not stale) — only `pan work`, `pan cloister`, `pan specialists` are the stale forms per issue scope
+
+## Specialist Feedback
+(none yet)
+
+---
+
 ## Problem
 
 Code review for PAN-705 (command taxonomy reorg) flagged stale references in project-level skill files under `.claude/skills/`. Skills that reference the old taxonomy (`pan work`, `pan cloister`, `pan specialists`) mislead any agent that loads them about correct CLI syntax.

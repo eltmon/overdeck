@@ -37,7 +37,7 @@ Test the full specialist handoff pipeline: review-agent -> test-agent -> merge-a
 ## Prerequisites
 
 - Dashboard must be running (frontend on 3010, API on 3011)
-- Specialists must be initialized (run `pan cloister start` if not)
+- Specialists must be initialized (run `pan admin cloister start` if not)
 - GitHub CLI must be authenticated
 
 ## Instructions
@@ -160,9 +160,9 @@ tmux kill-session -t specialist-test-agent 2>/dev/null
 tmux kill-session -t specialist-merge-agent 2>/dev/null
 
 # Restart them
-pan specialists wake review-agent
-pan specialists wake test-agent
-pan specialists wake merge-agent
+pan admin specialists wake review-agent
+pan admin specialists wake test-agent
+pan admin specialists wake merge-agent
 ```
 
 ### Handoff Not Occurring
@@ -171,7 +171,7 @@ If test-agent doesn't receive task from review-agent:
 
 ```bash
 # Manually trigger the handoff
-pan specialists wake test-agent --task "TEST TASK for PAN-$ISSUE_NUM:
+pan admin specialists wake test-agent --task "TEST TASK for PAN-$ISSUE_NUM:
 WORKSPACE: $WORKSPACE
 BRANCH: feature/pan-$ISSUE_NUM
 PROJECT: /home/eltmon/projects/panopticon
