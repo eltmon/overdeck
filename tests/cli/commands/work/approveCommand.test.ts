@@ -8,7 +8,9 @@
  *  - shadow-mode: calls markAsSynced instead of Linear update
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
 
 // ── Module-level mocks ─────────────────────────────────────────────────────
 
@@ -74,7 +76,13 @@ function makeState(extra: Record<string, unknown> = {}) {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
+// approveCommand constructs agentId as 'agent-pan-714' from 'PAN-714'
+const TEST_AGENTS_DIR = '/tmp/pan-test-agents';
+const TEST_AGENT_DIR = join(TEST_AGENTS_DIR, 'agent-pan-714');
+
 describe('approveCommand', () => {
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.resetModules();
     mockExecSync.mockReset();
@@ -84,8 +92,11 @@ describe('approveCommand', () => {
     mockShouldSkipTrackerUpdate.mockReset();
     mockGetLinearApiKey.mockReset();
 
-    // Suppress process.exit in agent-guard path
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    // Create the agent directory so writeFileSync('approved') does not throw ENOENT
+    mkdirSync(TEST_AGENT_DIR, { recursive: true });
+
+    // Suppress process.exit and capture the spy for assertion
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
     // Remove agent guard env var
     delete process.env.PANOPTICON_AGENT_ID;
   });
@@ -93,6 +104,7 @@ describe('approveCommand', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.PANOPTICON_AGENT_ID;
+    rmSync(TEST_AGENTS_DIR, { recursive: true, force: true });
   });
 
   it('returns early when agent state is not found', async () => {
@@ -127,6 +139,7 @@ describe('approveCommand', () => {
 
     expect(mockMarkAsSynced).toHaveBeenCalledWith('PAN-714', 'closed');
     expect(mockGetLinearApiKey).not.toHaveBeenCalled();
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 
   it('happy path: no PR found — command completes without error', async () => {
@@ -141,7 +154,9 @@ describe('approveCommand', () => {
       .mockReturnValueOnce('[]'); // gh pr list → no PR
 
     const { approveCommand } = await import('../../../../src/cli/commands/approve.js');
-    await expect(approveCommand('PAN-714')).resolves.not.toThrow();
+    await approveCommand('PAN-714');
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 
   it('happy path: PR found and merged successfully', async () => {
@@ -156,6 +171,8 @@ describe('approveCommand', () => {
       .mockReturnValueOnce(''); // gh pr merge → success
 
     const { approveCommand } = await import('../../../../src/cli/commands/approve.js');
-    await expect(approveCommand('PAN-714')).resolves.not.toThrow();
+    await approveCommand('PAN-714');
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 });

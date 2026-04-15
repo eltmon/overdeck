@@ -199,8 +199,8 @@ export async function approveCommand(id: string): Promise<void> {
     console.log(chalk.dim('Workspace can be cleaned up with:'));
     console.log(chalk.dim(`  pan workspace destroy ${state.issueId}`));
 
-  } catch (error: any) {
-    spinner.fail(error.message);
+  } catch (error: unknown) {
+    spinner.fail(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
