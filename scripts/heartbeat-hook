@@ -116,7 +116,7 @@ if [ -f "$RUNTIME_FILE" ]; then
   # Update existing runtime state (include active Claude session ID)
   TEMP_RUNTIME="$RUNTIME_FILE.tmp"
   jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" --arg sid "$CLAUDE_SESSION_ID" \
-    '.lastActivity = $ts | .currentTool = $tool | .state = "active" | .claudeSessionId = $sid' \
+    '.lastActivity = $ts | .currentTool = $tool | .state = "active" | .claudeSessionId = $sid | del(.waitingReason) | del(.waitingStartedAt) | del(.waitingNotification)' \
     "$RUNTIME_FILE" > "$TEMP_RUNTIME" 2>/dev/null && mv "$TEMP_RUNTIME" "$RUNTIME_FILE" 2>/dev/null || true
 else
   # Create initial runtime state

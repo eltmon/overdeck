@@ -5,8 +5,18 @@
 # This hook updates runtime.json (NOT state.json) to prevent corrupting
 # AgentState config. runtime.json is the dedicated file for hook-based
 # heartbeat tracking, while state.json stores agent config set at spawn.
+#
+# Q&A / waiting-on-human detection (PAN-709):
+# When the agent calls AskUserQuestion, it is paused waiting for operator input.
+# We write state: waiting-on-human here so the deacon and dashboard can surface
+# the waiting badge without waiting for the tmux-tail Q&A scan to fire.
+# The PostToolUse heartbeat-hook resets state to active automatically after
+# any tool completes (i.e., when the user responds and the tool returns).
+# Design note: tool-approval prompts (Allow tool? [y/N]) are detected by the
+# deacon tmux-tail scanner -- the Notification hook does NOT fire for those;
+# it only fires for system/desktop notifications, not in-terminal approval dialogs.
 
-# Don't use set -e - we want the hook to be resilient to failures
+# Don not use set -e - we want the hook to be resilient to failures
 # and never break Claude Code execution
 
 # Get agent ID from env (set by pan work issue) or tmux session name
@@ -24,7 +34,7 @@ TOOL_INFO=$(cat 2>/dev/null || echo '{}')
 
 # Check if jq is available
 if ! command -v jq &> /dev/null; then
-  exit 0  # Silent failure - don't break Claude Code execution
+  exit 0  # Silent failure - do not break Claude Code execution
 fi
 
 # Extract tool name
@@ -34,6 +44,16 @@ TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || e
 STATE_DIR="$HOME/.panopticon/agents/$AGENT_ID"
 mkdir -p "$STATE_DIR"
 
+# Detect waiting-on-human: AskUserQuestion tool signals the agent is paused
+# for operator input. Set waiting-on-human state so the dashboard surfaces the badge.
+if [ "$TOOL_NAME" = "AskUserQuestion" ]; then
+  AGENT_STATE="waiting-on-human"
+  WAITING_REASON="agent-question"
+else
+  AGENT_STATE="active"
+  WAITING_REASON=""
+fi
+
 # Update runtime.json (separate from state.json to avoid corrupting AgentState)
 RUNTIME_FILE="$STATE_DIR/runtime.json"
 TEMP_FILE="$STATE_DIR/runtime.json.tmp"
@@ -41,20 +61,42 @@ TIMESTAMP="$(date -Iseconds)"
 
 if [ -f "$RUNTIME_FILE" ]; then
   # Update existing runtime state
-  jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
-    '.lastActivity = $ts | .currentTool = $tool | .state = "active"' \
-    "$RUNTIME_FILE" > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
+  if [ "$AGENT_STATE" = "waiting-on-human" ]; then
+    jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
+       --arg state "$AGENT_STATE" --arg reason "$WAITING_REASON" --arg since "$TIMESTAMP" \
+      '.lastActivity = $ts | .currentTool = $tool | .state = $state | .waitingReason = $reason | .waitingStartedAt = $since' \
+      "$RUNTIME_FILE" > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
+  else
+    jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
+      '.lastActivity = $ts | .currentTool = $tool | .state = "active" | del(.waitingReason) | del(.waitingStartedAt) | del(.waitingNotification)' \
+      "$RUNTIME_FILE" > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
+  fi
 else
   # Create initial runtime state
-  jq -n \
-    --arg timestamp "$TIMESTAMP" \
-    --arg state "active" \
-    --arg tool "$TOOL_NAME" \
-    '{
-      state: $state,
-      lastActivity: $timestamp,
-      currentTool: $tool
-    }' > "$TEMP_FILE" 2>/dev/null || true
+  if [ "$AGENT_STATE" = "waiting-on-human" ]; then
+    jq -n \
+      --arg timestamp "$TIMESTAMP" \
+      --arg state "$AGENT_STATE" \
+      --arg tool "$TOOL_NAME" \
+      --arg reason "$WAITING_REASON" \
+      '{
+        state: $state,
+        lastActivity: $timestamp,
+        currentTool: $tool,
+        waitingReason: $reason,
+        waitingStartedAt: $timestamp
+      }' > "$TEMP_FILE" 2>/dev/null || true
+  else
+    jq -n \
+      --arg timestamp "$TIMESTAMP" \
+      --arg state "active" \
+      --arg tool "$TOOL_NAME" \
+      '{
+        state: $state,
+        lastActivity: $timestamp,
+        currentTool: $tool
+      }' > "$TEMP_FILE" 2>/dev/null || true
+  fi
   mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
 fi
 
@@ -63,7 +105,7 @@ fi
 if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; then
   curl -s -X POST "http://localhost:3011/api/agents/$AGENT_ID/heartbeat" \
     -H "Content-Type: application/json" \
-    -d "{\"state\":\"active\",\"tool\":\"$TOOL_NAME\",\"timestamp\":\"$(date -Iseconds)\"}" \
+    -d "{"state":"$AGENT_STATE","tool":"$TOOL_NAME","timestamp":"$(date -Iseconds)"}" \
     > /dev/null 2>&1 &
 fi
 
