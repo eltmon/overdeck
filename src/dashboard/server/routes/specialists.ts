@@ -217,7 +217,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
 
     return jsonResponse({
       success: true,
-      message: `Reset ${results.length} specialists, cleared queues, reset ${reviewStatusesReset} review statuses`,
+      message: `Reset ${results.length} specialists, reset ${reviewStatusesReset} review statuses`,
       results,
       reviewStatusesReset,
     });
