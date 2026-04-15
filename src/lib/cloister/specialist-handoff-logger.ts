@@ -205,7 +205,7 @@ export async function getSpecialistHandoffStats(options?: { agentsDir?: string }
   stats.successRate = completedCount > 0 ? successCount / completedCount : 0;
 
   // Compute live queue depth from actual hook files (not stale JSONL status)
-  stats.queueDepth = await getLiveQueueDepth(options?.agentsDir);
+  stats.queueDepth = await getLiveQueueDepth();
 
   return stats;
 }

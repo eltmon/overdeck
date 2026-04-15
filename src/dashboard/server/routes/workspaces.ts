@@ -1964,7 +1964,9 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       try {
         const resolved = resolveProjectFromIssue(issueId);
         if (resolved) {
-          const { getQueueForProject } = await import('../../../lib/database/merge-queue-db.js');
+          const { getQueueForProject } = yield* Effect.promise(() =>
+            import('../../../lib/database/merge-queue-db.js')
+          );
           const mergeQueue = getQueueForProject(resolved.projectKey);
           const mergePos = findPositionInQueue(issueId, mergeQueue.map(e => ({
             id: String(e.id),
