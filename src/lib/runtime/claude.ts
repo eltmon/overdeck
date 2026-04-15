@@ -76,8 +76,8 @@ export function createClaudeAdapter(): RuntimeAdapter {
           args.push('--model', options.model);
         }
 
-        // Add --dangerously-skip-permissions for autonomous agents
-        args.push('--dangerously-skip-permissions');
+        // Add permission bypass flags for autonomous agents
+        args.push('--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions');
 
         // Spawn in tmux session using a launcher script (safer for prompts with special chars)
         const sessionName = `agent-${id}`;

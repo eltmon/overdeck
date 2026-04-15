@@ -46,8 +46,9 @@ export function getLaunchModelForModel(model: string): string {
 
 export function getAgentRuntimeBaseCommand(model: string): string {
   const provider = getProviderForModel(model);
+  const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   if (provider.compatibility === 'direct') {
-    return `claude --dangerously-skip-permissions --model ${model}`;
+    return `claude ${permissionFlags} --model ${model}`;
   }
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
@@ -55,11 +56,11 @@ export function getAgentRuntimeBaseCommand(model: string): string {
   // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
   // The provider env vars are injected separately by getProviderEnvForModel.
   if (provider.name === 'openai' && getProviderAuthMode(model) === 'subscription') {
-    return `claude --dangerously-skip-permissions --model ${model}`;
+    return `claude ${permissionFlags} --model ${model}`;
   }
 
   const routedModel = getLaunchModelForModel(model);
-  return `claudish -i --model ${routedModel} --dangerously-skip-permissions`;
+  return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -1257,7 +1258,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     const launcherContent = `#!/bin/bash
 export CI=1
-${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permissions
+${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permissions --permission-mode bypassPermissions
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;

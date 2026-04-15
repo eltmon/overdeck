@@ -160,14 +160,14 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     const launcherContent = `#!/bin/bash
 export PATH="/usr/local/bin:\$PATH"
 prompt=\$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --model ${model} "\$prompt"
+exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model} "\$prompt"
 `;
     const launcherBase64 = Buffer.from(launcherContent).toString('base64');
     await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `claude --dangerously-skip-permissions --model ${model}`;
+    claudeCmd = `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`;
   }
 
   await ensureRemoteTmuxContext(fly, vmName);

@@ -164,7 +164,7 @@ export async function generateContextDigest(
     const providerEnv = getProviderEnvForModel(model);
     const envPrefix = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ');
     const { stdout, stderr } = await execAsync(
-      `${envPrefix ? envPrefix + ' ' : ''}claude --dangerously-skip-permissions --model ${model} "$(cat '${promptFile}')"`,
+      `${envPrefix ? envPrefix + ' ' : ''}claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model} "$(cat '${promptFile}')"`,
       {
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer

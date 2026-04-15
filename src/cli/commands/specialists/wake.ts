@@ -94,7 +94,7 @@ export async function wakeCommand(name: string, options: WakeOptions): Promise<v
 
   try {
     // Build Claude command
-    let claudeCmd = 'claude --dangerously-skip-permissions';
+    let claudeCmd = 'claude --dangerously-skip-permissions --permission-mode bypassPermissions';
 
     if (sessionId) {
       claudeCmd += ` --resume ${sessionId}`;
