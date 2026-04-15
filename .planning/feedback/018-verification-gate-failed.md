@@ -1,37 +1,73 @@
 ---
 specialist: verification-gate
-issueId: PAN-712
+issueId: PAN-611
 outcome: failed
-timestamp: 2026-04-15T04:03:12Z
+timestamp: 2026-04-15T03:05:54Z
 ---
 
-VERIFICATION FAILED for PAN-712 (attempt 1/10):
+VERIFICATION FAILED for PAN-611 (attempt 1/10):
 
-Failed check: build
+Failed check: test
 
-Verification FAILED at build (10741ms):
+Verification FAILED at test (61303ms):
 
-event-store.ts (116:38) [33m[UNRESOLVED_IMPORT] Warning:[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts
-     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/dashboard/server/event-store.ts:116:39 [38;5;246m][0m
-     [38;5;246m│[0m
- [38;5;246m116 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m{[0m[38;5;249m [0m[38;5;249mD[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mb[0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249me[0m[38;5;249m [0m[38;5;249m}[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[38;5;249ma[0m[38;5;249mw[0m[38;5;249ma[0m[38;5;249mi[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249mi[0m[38;5;249mm[0m[38;5;249mp[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249mt[0m[38;5;249m([0m'bun:sqlite'[38;5;249m)[0m[38;5;249m;[0m
- [38;5;240m    │[0m                                       ──────┬─────  
- [38;5;240m    │[0m                                             ╰─────── Module not found, treating it as an external dependency
-[38;5;246m─────╯[0m
+pect(getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
+       |            ^
+    117|       'claude --dangerously-skip-permissions --model minimax-m2.7'
+    118|     );
 
-[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:[0m src/lib/cloister/specialist-logs.ts is dynamically imported by src/cli/commands/specialists/logs.ts, src/lib/cloister/specialists.ts but also statically imported by src/lib/cloister/specialist-context.ts, src/lib/cloister/specialists.ts, dynamic import will not move module into another chunk.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL |root|  tests/lib/agents-auth-routing.test.ts > agents auth routing > clears stale provider env before exporting Anthropic settings
+AssertionError: expected '' to be 'unset ANTHROPIC_BASE_URL\nunset ANTHR…' // Object.is equality
+
+- Expected
++ Received
+
+- unset ANTHROPIC_BASE_URL
+- unset ANTHROPIC_AUTH_TOKEN
+- unset OPENAI_API_KEY
+- unset GEMINI_API_KEY
+- unset API_TIMEOUT_MS
+- unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
+-
+
+ ❯ tests/lib/agents-auth-routing.test.ts:124:61
+    122|     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false });
+    123| 
+    124|     expect(getProviderExportsForModel('claude-sonnet-4-6')).toBe(
+       |                                                             ^
+    125|       [
+    126|         'unset ANTHROPIC_BASE_URL',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL |root|  tests/lib/agents-auth-routing.test.ts > agents auth routing > replaces stale Anthropic routing env with cliproxy exports for GPT subscription launches
+AssertionError: expected 'export AUTH_TOKEN="subscription-oauth…' to be 'unset ANTHROPIC_BASE_URL\nunset ANTHR…' // Object.is equality
+
+- Expected
++ Received
+
+- unset ANTHROPIC_BASE_URL
+- unset ANTHROPIC_AUTH_TOKEN
+- unset OPENAI_API_KEY
+- unset GEMINI_API_KEY
+- unset API_TIMEOUT_MS
+- unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
+- export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"
+- export ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key"
++ export AUTH_TOKEN="subscription-oauth"
 
 
-[43m WARN [49m `noExternal` is deprecated. Use `deps.alwaysBundle` instead.
+ ❯ tests/lib/agents-auth-routing.test.ts:140:51
+    138|     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+    139| 
+    140|     expect(getProviderExportsForModel('gpt-5.4')).toBe(
+       |                                                   ^
+    141|       [
+    142|         'unset ANTHROPIC_BASE_URL',
 
-Terminated
-npm error Lifecycle script `build` failed with error:
-npm error code 143
-npm error path /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-712/src/dashboard/frontend
-npm error workspace panopticon-dashboard@0.1.0
-npm error location /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-712/src/dashboard/frontend
-npm error command failed
-npm error command sh -c tsc && vite build
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
 
 
 ## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill
@@ -40,6 +76,6 @@ npm error command sh -c tsc && vite build
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-712 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-712 -m "Fixed build"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-611 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-611 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.
