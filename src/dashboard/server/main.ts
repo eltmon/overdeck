@@ -5,6 +5,8 @@
  * Usage (prod):  node dist/dashboard/server.js
  */
 
+import { readdir, stat, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { Effect } from 'effect';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
@@ -41,6 +43,31 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // `start-server`/`source-file` round-trips. Critical for terminal attach latency
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
+
+const PASTE_IMAGE_FILE_PREFIX = 'panopticon-paste-';
+const PASTE_IMAGE_TTL_MS = 5 * 60 * 1000;
+const PASTE_IMAGE_CLEANUP_INTERVAL_MS = 60 * 1000;
+
+async function cleanupStalePastedImages(): Promise<void> {
+  const tempDirectory = tmpdir();
+  try {
+    const names = await readdir(tempDirectory);
+    const now = Date.now();
+    await Promise.all(
+      names
+        .filter((name) => name.startsWith(PASTE_IMAGE_FILE_PREFIX))
+        .map(async (name) => {
+          const path = `${tempDirectory}/${name}`;
+          const details = await stat(path).catch(() => null);
+          if (!details) return;
+          if (now - details.mtimeMs <= PASTE_IMAGE_TTL_MS) return;
+          await unlink(path).catch(() => {});
+        }),
+    );
+  } catch (err) {
+    console.warn('[panopticon] Failed to clean pasted images:', err);
+  }
+}
 
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 void initTrackerConfigCache().catch(err => {
@@ -135,6 +162,12 @@ startTtsSummarizer();
 startCliproxyWatchdog();
 console.log('[panopticon] CLIProxy watchdog started (30s interval)');
 
+const pastedImageCleanupTimer = setInterval(() => {
+  void cleanupStalePastedImages();
+}, PASTE_IMAGE_CLEANUP_INTERVAL_MS);
+void cleanupStalePastedImages();
+console.log('[panopticon] Pasted image cleanup started');
+
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
@@ -148,12 +181,14 @@ const emitShutdownActivity = () => {
 };
 process.once('SIGTERM', () => {
   emitShutdownActivity();
+  clearInterval(pastedImageCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
+  clearInterval(pastedImageCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();

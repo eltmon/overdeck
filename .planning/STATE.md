@@ -3,13 +3,13 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead panopticon-cli-7c8: add `POST /api/conversations/:name/upload-image` in `src/dashboard/server/routes/conversations.ts`, then commit it before closing the bead.
+Implementing bead panopticon-cli-a9c: register async temp-file cleanup in `src/dashboard/server/main.ts`, then commit it before closing the bead.
 
 ## Completed Work
-- [ ] panopticon-cli-7c8: Added upload-image route skeleton plus MIME validation, temp-file naming, and async file writes in `conversations.ts` (commit: pending)
+- [x] panopticon-cli-7c8: Added upload-image route with MIME validation, temp-file naming, and async writes in `src/dashboard/server/routes/conversations.ts` (commit: 94004849)
+- [ ] panopticon-cli-a9c: Added async startup cleanup timer for stale `panopticon-paste-*` temp files in `src/dashboard/server/main.ts` (commit: pending)
 
 ## Remaining Work
-- [ ] panopticon-cli-a9c: Register async TTL cleanup for `panopticon-paste-*` temp files in `src/dashboard/server/main.ts`
 - [ ] panopticon-cli-m3x: Add paste and drag-drop image capture in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`
 - [ ] panopticon-cli-5bu: Render thumbnail strip with remove/upload-state UI in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`
 - [ ] panopticon-cli-3ta: Prefix submitted messages with `@/tmp/...` lines and clear image state after send
