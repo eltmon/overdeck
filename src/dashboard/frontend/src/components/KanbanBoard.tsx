@@ -174,6 +174,47 @@ export function shouldShowReviewReadyBadge(
   ) ?? false;
 }
 
+export function getPipelineCallToAction(
+  reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes'>,
+): { label: string; detail: string; title: string } | null {
+  if (!reviewStatus) return null;
+
+  if (reviewStatus.verificationStatus === 'failed') {
+    const detail = reviewStatus.verificationNotes || 'Verification failed.';
+    return {
+      label: 'Next: Review & Test',
+      detail,
+      title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+    };
+  }
+
+  if (reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked') {
+    return {
+      label: 'Next: Review & Test',
+      detail: 'Review did not pass.',
+      title: 'Review did not pass — rerun Review & Test after addressing the issue.',
+    };
+  }
+
+  if (reviewStatus.testStatus === 'failed' || reviewStatus.testStatus === 'dispatch_failed') {
+    return {
+      label: 'Next: Review & Test',
+      detail: 'Tests failed.',
+      title: 'Tests failed — rerun Review & Test to continue the pipeline.',
+    };
+  }
+
+  if (reviewStatus.mergeStatus === 'failed') {
+    return {
+      label: 'Next: Re-Review',
+      detail: 'Merge did not complete.',
+      title: 'Merge failed after a prior pass — rerun the pipeline before merging again.',
+    };
+  }
+
+  return null;
+}
+
 export function shouldShowAgentDoneBadge(options: {
   issueStatus: string;
   isTerminal: boolean;
@@ -2006,6 +2047,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
   const hasPendingQuestion = hasActualPendingQuestion(agent);
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
+  const pipelineCallToAction = canonical === 'in_review' ? getPipelineCallToAction(reviewStatus) : null;
   const phaseLabel =
     canonical === 'backlog' ? 'Backlog' :
     canonical === 'todo' ? 'Ready to start' :
@@ -2522,6 +2564,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Stuck
               </span>
             )}
+            {pipelineCallToAction && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground border border-warning/40"
+                title={pipelineCallToAction.title}
+              >
+                <AlertCircle className="w-3 h-3" />
+                {pipelineCallToAction.label}
+              </span>
+            )}
             {/* Lifecycle resolution badges (PAN-309) */}
             {shouldShowAgentDoneBadge({
               issueStatus: issue.status,
@@ -2799,9 +2850,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
       {/* In Review items - Resume Session (if lost) + Recover + Reopen */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
-        <div className={actionBarClass}>
-          <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
-          {((activeAgent?.lifecycle?.canResumeSession ?? false) || isSessionLost || isResuming) && (
+        <>
+          {pipelineCallToAction && (
+            <div className="mt-3 rounded-xl border border-warning/40 badge-bg-warning px-3 py-2 text-xs text-warning-foreground">
+              <div className="font-medium">{pipelineCallToAction.label}</div>
+              <div className="mt-1 text-warning-foreground/80">{pipelineCallToAction.detail}</div>
+            </div>
+          )}
+          <div className={actionBarClass}>
+            <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
+            {((activeAgent?.lifecycle?.canResumeSession ?? false) || isSessionLost || isResuming) && (
             <button
               onClick={handleResumeSession}
               disabled={resumeSessionMutation.isPending || isResuming}
@@ -2812,10 +2870,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
           )}
-          <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
-          <ReopenSection issue={issue} inline />
-          <ResetIssueButton issue={issue} />
-        </div>
+            <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
+            <ReopenSection issue={issue} inline />
+            <ResetIssueButton issue={issue} />
+          </div>
+        </>
       )}
 
       {/* Done items - Reopen + Close Out */}
@@ -2857,7 +2916,7 @@ function ResetPipelineButton({
   reviewStatus,
 }: {
   issue: Issue;
-  reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus'>;
+  reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus'>;
 }) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -3037,7 +3096,7 @@ function ResetIssueButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={resetMutation.isPending}
-      className="flex items-center gap-1 text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-content-subtle hover:text-destructive/70 transition-colors disabled:opacity-50"
       title="Reset Issue — wipe all work and return to Todo"
     >
       {resetMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}

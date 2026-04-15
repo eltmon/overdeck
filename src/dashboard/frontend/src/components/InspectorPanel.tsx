@@ -25,7 +25,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle } from '../types';
 import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
-import { getFriendlyModelName } from './inspector/utils';
+import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
@@ -555,12 +555,12 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   };
 
   const handleReview = async () => {
-    const isReReview = reviewStatus?.readyForMerge || reviewStatus?.reviewStatus === 'passed' || reviewStatus?.testStatus === 'passed';
-    const message = isReReview
+    const forceReview = shouldForceReviewTrigger(reviewStatus);
+    const message = forceReview
       ? `Re-run review & test pipeline for ${issueId}?`
       : `Start review & test pipeline for ${issueId}?`;
-    if (await confirm({ title: isReReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: isReReview ? 'Re-run' : 'Start Review' })) {
-      forceReviewRef.current = !!isReReview;
+    if (await confirm({ title: forceReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: forceReview ? 'Re-run' : 'Start Review' })) {
+      forceReviewRef.current = forceReview;
       reviewMutation.mutate();
     }
   };

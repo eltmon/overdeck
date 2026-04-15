@@ -6,11 +6,11 @@ Panopticon's dashboard typography has drifted into multiple competing systems. T
 
 The goal of this work is a complete typography cleanup across the non–God View dashboard so there is one canonical rule set:
 
-- **DM Sans** = universal app sans
-- **Space Grotesk** = branding / prominent heading exceptions only
+- **DM Sans** = universal app sans for all non–God View UI
 - **SF Mono** = technical strings, code, terminal, identifiers
+- **Sidebar wordmark** = the only allowed non–God View display-font exception
 - **Conversations** = entirely DM Sans except inline code / fenced code blocks / clearly technical strings
-- **God View** = explicit exception; do not normalize it in this issue
+- **God View** = explicit typography exception; do not normalize it in this issue
 
 This cleanup must also update Panopticon's documentation/style guide so future work does not drift again.
 
@@ -82,29 +82,31 @@ Conversations need to become visibly uniform and match the policy exactly.
 - `mission-control.module.css:.userMessageText`
 - `mission-control.module.css` message metadata / controls / headers / inputs
 
-### 4. Restrict Space Grotesk to the approved boundary
+### 4. Restrict display-font usage to the exact approved boundary
 
 The implementation should be stricter than the current style guide so future work is unambiguous.
 
-#### Allowed uses
-- Panopticon brand wordmark/logo text
-- Any explicitly approved hero/prominent heading treatment if retained after review
+#### Allowed non–God View use
+- the upper-left `Panopticon` wordmark in `src/dashboard/frontend/src/components/Sidebar.tsx`
 
 #### Default rule
-- Ordinary page headings, section headings, metric values, card titles, labels, nav items, dialogs, buttons, tables, and forms should all use DM Sans
+- Ordinary page headings, section headings, metric values, card titles, labels, nav items, dialogs, buttons, tables, forms, and all other non–God View UI should use DM Sans
+
+#### God View exception
+- `src/dashboard/frontend/src/components/GodView/*` keeps its own scoped typography system for aesthetic reasons and is out of scope for this cleanup
 
 #### Known non-God-View places to audit/change
 - `src/dashboard/frontend/src/components/Sidebar.tsx`
-  - keep brand wordmark if desired; nav labels remain sans
+  - keep only the `Panopticon` wordmark as the deliberate non–God View exception; nav labels remain sans
 - `src/dashboard/frontend/src/components/AwaitingMergePage.tsx`
-  - `font-display` page title should be normalized unless explicitly kept as a prominent heading exception
+  - convert `font-display` page title to DM Sans
 - `src/dashboard/frontend/src/components/MetricsSummaryRow.tsx`
-  - metric values currently use `font-display`; normalize to DM Sans unless the product explicitly wants them exempted
+  - convert `font-display` metric values to DM Sans
 
 #### Sweep requirement
-Search for all non–God View `font-display` usage and classify each instance as:
-- keep (brand/prominent-heading exception)
-- convert to DM Sans
+Search for all non–God View `font-display` usage and enforce this rule:
+- keep only the sidebar `Panopticon` wordmark
+- convert every other non–God View use to DM Sans
 
 ### 5. Preserve SF Mono only for semantically technical surfaces
 
@@ -169,9 +171,9 @@ Do a repo-wide audit for explicit font declarations and semantic-font misuse acr
 - `docs/MISSION-CONTROL.md`
 
 #### Documentation rule to encode
-- default dashboard UI = DM Sans
-- branding/prominent-heading exception = Space Grotesk only where explicitly approved
+- default non–God View dashboard UI = DM Sans
 - technical strings/code = SF Mono
+- sidebar `Panopticon` wordmark = the only approved non–God View display-font exception
 - conversations = DM Sans prose, SF Mono only for code/technical strings
 - God View uses its own scoped typography system and is not governed by the general dashboard cleanup
 

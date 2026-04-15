@@ -98,14 +98,38 @@ export function ActionsSection({
   );
   const isReReview = reviewStatus?.readyForMerge
     || (reviewStatus?.reviewStatus === 'passed' && reviewStatus?.testStatus === 'passed' && reviewStatus?.mergeStatus === 'failed');
-  const shouldPromoteReviewAction = !!reviewStatus && (
-    hasVerificationState
-    || isReReview
-    || isPipelineStuck
-    || reviewStatus.reviewStatus === 'failed'
-    || reviewStatus.reviewStatus === 'blocked'
-    || reviewStatus.testStatus === 'failed'
-  );
+  const reviewActionHint = !reviewStatus ? null : (() => {
+    if (reviewStatus.verificationStatus === 'failed') {
+      return {
+        label: 'Next: Review & Test',
+        detail: reviewStatus.verificationNotes || 'Verification failed.',
+        title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+      };
+    }
+    if (reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked') {
+      return {
+        label: 'Next: Review & Test',
+        detail: reviewStatus.reviewNotes || 'Review did not pass.',
+        title: 'Review did not pass — rerun Review & Test after addressing the issue.',
+      };
+    }
+    if (reviewStatus.testStatus === 'failed' || reviewStatus.testStatus === 'dispatch_failed') {
+      return {
+        label: 'Next: Review & Test',
+        detail: reviewStatus.testNotes || 'Tests failed.',
+        title: 'Tests failed — rerun Review & Test to continue the pipeline.',
+      };
+    }
+    if (reviewStatus.mergeStatus === 'failed') {
+      return {
+        label: 'Next: Re-Review',
+        detail: 'Merge did not complete.',
+        title: 'Merge failed after a prior pass — rerun the pipeline before merging again.',
+      };
+    }
+    return null;
+  })();
+  const shouldPromoteReviewAction = !!reviewActionHint || !!reviewStatus?.readyForMerge;
 
   if (reviewStatusLoading) {
     return (
@@ -146,8 +170,17 @@ export function ActionsSection({
       {showPipelineStatus && reviewStatus && (
         <ReviewPipelineSection reviewStatus={reviewStatus} />
       )}
+      {reviewActionHint && (
+        <div
+          className="mt-2 rounded border border-warning/40 badge-bg-warning px-2 py-1.5 text-xs text-warning-foreground"
+          title={reviewActionHint.title}
+        >
+          <div className="font-medium">{reviewActionHint.label}</div>
+          <div className="mt-1 text-warning-foreground/80">{reviewActionHint.detail}</div>
+        </div>
+      )}
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 mt-2">
         {/* MERGE button */}
         {reviewStatus?.readyForMerge && reviewStatus?.mergeStatus !== 'merged' && (
           <button
