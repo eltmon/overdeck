@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
+import { DialogProvider } from './DialogProvider';
+import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 
 describe('groupByLabels', () => {
@@ -490,6 +492,146 @@ describe('ListIssueRow', () => {
     const trackerLink = links.find(l => l.getAttribute('href') === 'https://github.com/test/repo/issues/123');
     expect(trackerLink).toBeDefined();
     expect(trackerLink!.getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('FeatureCard', () => {
+  const originalFetch = global.fetch;
+
+  const createFeature = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'feature-1',
+    identifier: 'F1234',
+    title: 'Feature title',
+    description: '',
+    status: 'Todo',
+    priority: 3,
+    labels: [],
+    url: 'https://test.com/F1234',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'rally',
+    artifactType: 'PortfolioItem/Feature',
+    totalChildCount: 3,
+    completedChildCount: 1,
+    inProgressChildCount: 1,
+    ...overrides,
+  });
+
+  const renderFeatureCard = ({
+    feature = createFeature(),
+    agents = [],
+    onPlan = vi.fn(),
+    onToggle = vi.fn(),
+    onViewBeads = vi.fn(),
+    onViewVBrief = vi.fn(),
+  }: {
+    feature?: Issue;
+    agents?: Agent[];
+    onPlan?: ReturnType<typeof vi.fn>;
+    onToggle?: ReturnType<typeof vi.fn>;
+    onViewBeads?: ReturnType<typeof vi.fn>;
+    onViewVBrief?: ReturnType<typeof vi.fn>;
+  } = {}) => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <FeatureCard
+            feature={feature}
+            childCount={feature.totalChildCount ?? 0}
+            isExpanded={false}
+            onToggle={onToggle}
+            agents={agents}
+            onPlan={onPlan}
+            onViewBeads={onViewBeads}
+            onViewVBrief={onViewVBrief}
+          />
+        </DialogProvider>
+      </QueryClientProvider>
+    );
+
+    return { feature, onPlan, onToggle, onViewBeads, onViewVBrief };
+  };
+
+  beforeEach(() => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: true, hasBeads: true, beadsCount: 2 }),
+        } as Response;
+      }
+      if (url.endsWith('/generate-tasks')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, created: ['b1'], count: 1 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    }) as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('renders chips and routes clicks without toggling the feature', async () => {
+    const { feature, onPlan, onToggle, onViewBeads, onViewVBrief } = renderFeatureCard();
+
+    expect(await screen.findByText('See Plan')).toBeDefined();
+    expect(screen.getByRole('button', { name: /tasks/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /vbrief/i })).toBeDefined();
+
+    fireEvent.click(screen.getByTestId(`action-plan-${feature.identifier}`));
+    expect(onPlan).toHaveBeenCalledWith(feature);
+
+    fireEvent.click(screen.getByRole('button', { name: /tasks/i }));
+    expect(onViewBeads).toHaveBeenCalledWith(feature);
+
+    fireEvent.click(screen.getByRole('button', { name: /vbrief/i }));
+    expect(onViewVBrief).toHaveBeenCalledWith(feature);
+
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('shows the watch planning button while a planning agent is active', async () => {
+    const feature = createFeature({ labels: [] });
+    const planningAgent: Agent = {
+      id: 'agent-1',
+      issueId: feature.identifier,
+      runtime: 'claude',
+      model: 'claude-opus-4-6',
+      status: 'healthy',
+      startedAt: new Date().toISOString(),
+      consecutiveFailures: 0,
+      killCount: 0,
+      agentPhase: 'planning',
+    };
+    const onPlan = vi.fn();
+    const onToggle = vi.fn();
+
+    renderFeatureCard({ feature, agents: [planningAgent], onPlan, onToggle });
+
+    const watchButton = await screen.findByTestId(`action-watch-planning-${feature.identifier}`);
+    expect(watchButton).toBeDefined();
+
+    fireEvent.click(watchButton);
+    expect(onPlan).toHaveBeenCalledWith(feature);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
 
