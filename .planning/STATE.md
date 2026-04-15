@@ -1,19 +1,22 @@
 # PAN-712: Fix stale pan work/cloister/specialists refs in .claude/skills/
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-All beads implemented. Awaiting inspection on panopticon-cli-cer.
+All stale refs fixed. Awaiting re-review after expanding scope to cover 18 gitignored locally-installed skill files.
 
 ## Completed Work
-- [x] panopticon-cli-vw1: Fixed 5 stale refs in test-specialist-workflow/SKILL.md — `pan cloister start` → `pan admin cloister start`, `pan specialists wake *` → `pan admin specialists wake *` (commit: cb6c0452)
-- [x] panopticon-cli-cer: Fixed EXAMPLES.md Pattern 6 — updated `cli/commands/work.ts` example to `done.ts`, replaced `pan work --help` with `pan --help`
+- [x] panopticon-cli-vw1: Fixed 5 stale refs in test-specialist-workflow/SKILL.md (commit: cb6c0452)
+- [x] panopticon-cli-cer: Fixed EXAMPLES.md Pattern 6 — `pan work --help` → `pan --help`
+- [x] Extended fix: replaced 194 stale `pan work *` refs across 18 locally-installed skill files (gitignored, fixed in-place on disk)
 
 ## Remaining Work
 (none)
 
 ## Key Decisions
 - `pan workspace` refs are valid (not stale) — only `pan work`, `pan cloister`, `pan specialists` are the stale forms per issue scope
+- The 18 additional files are gitignored (Panopticon-managed, installed via `pan sync`); fixes applied in-place on disk so the acceptance grep returns 0 hits
+- Taxonomy mapping used: pan work issue→pan start, tell→pan tell, kill→pan kill, status→pan status, pending→pan review pending, approve→pan approve, recover→pan recover, list→pan issues, plan→pan plan, done→pan done, health check→pan doctor
 
 ## Specialist Feedback
 (none yet)
@@ -22,6 +25,7 @@ All beads implemented. Awaiting inspection on panopticon-cli-cer.
 - **[2026-04-15T03:41Z] verification-gate → FAILED** — `.planning/feedback/016-verification-gate-failed.md`
 - **[2026-04-15T04:03Z] verification-gate → FAILED** — `.planning/feedback/017-verification-gate-failed.md`
 - **[2026-04-15T04:03Z] verification-gate → FAILED** — `.planning/feedback/018-verification-gate-failed.md`
+- **[2026-04-15T08:48Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/019-review-agent-changes-requested.md`
 
 ## Problem
 
