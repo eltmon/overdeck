@@ -111,7 +111,7 @@ describe('findPRForBranch', () => {
 
   it('returns null when gh command throws', async () => {
     mockExecSync
-      .mockReturnValueOnce(Buffer.from('feature/pan-714\n'))
+      .mockReturnValueOnce('feature/pan-714\n')
       .mockImplementationOnce(() => { throw new Error('gh: command not found'); });
     const { findPRForBranch } = await import('../../../../src/cli/commands/approve.js');
     const result = findPRForBranch('/fake/workspace');
