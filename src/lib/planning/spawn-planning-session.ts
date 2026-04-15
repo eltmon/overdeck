@@ -80,6 +80,8 @@ export interface PlanningIssue {
   url: string;
   source: 'linear' | 'github' | 'rally';
   comments?: Array<{ author: string; body: string; createdAt: string }>;
+  /** Labels on the issue (used for flywheel-change fast-path detection). */
+  labels?: string[];
 }
 
 /** Progress event emitted during planning session setup. */
@@ -261,6 +263,90 @@ ${effort === 'high'
   });
 }
 
+// ─── Flywheel-change auto-finalize ───────────────────────────────────────────
+
+/**
+ * Auto-finalize planning for `flywheel-change` issues.
+ *
+ * `flywheel-change` issues skip interactive planning — the issue body IS the plan.
+ * This function writes the planning artifacts directly and marks planning complete
+ * without spawning a tmux session.
+ */
+async function autoFinalizePlanForFlywheelChange(
+  issue: PlanningIssue,
+  workspacePath: string,
+  agentStateDir: string,
+  sessionName: string,
+  workspaceLocation: 'local' | 'remote',
+): Promise<void> {
+  const planningDir = join(workspacePath, '.planning');
+
+  // Write STATE.md with issue body as the plan and scope constraints
+  const stateContent = `# ${issue.identifier}: ${issue.title}
+
+## Status: Ready for Implementation (flywheel-change — planning auto-finalized)
+
+## Background
+This is a \`flywheel-change\` issue. Planning is skipped — the issue body IS the plan.
+The synthesis flywheel proposed this change after observing a pattern in retro reports.
+
+## The Plan
+
+${issue.description || 'No description provided.'}
+
+## CRITICAL: Scope Constraints (flywheel-change)
+
+This issue is scoped to SKILL FILES ONLY:
+
+- Only \`skills/<name>/SKILL.md\` files may be modified
+- Any diff touching files outside \`skills/\` is MIS-SCOPED and must be rejected
+  - Signal rejection by writing \`mis-scoped\` to STATE.md status and stopping work
+  - Do NOT commit any diff that includes non-skill files
+- Do NOT create TypeScript, JSON, YAML, or any non-skill files
+- If the implementation genuinely requires code changes (not just skill edits),
+  this issue should not have been filed as \`flywheel-change\` — reject to synthesis
+
+## Source
+Issue URL: ${issue.url}
+`;
+  writeFileSync(join(planningDir, 'STATE.md'), stateContent, 'utf-8');
+
+  // Create a single bead for this flywheel-change issue via bd create
+  const beadTitle = issue.title;
+  const beadBody = (issue.description || issue.title).slice(0, 1000);
+  const issueLabel = issue.identifier.toLowerCase();
+  try {
+    await execAsync(
+      `bd create --title ${JSON.stringify(beadTitle)} --body ${JSON.stringify(beadBody)} --label ${JSON.stringify(issueLabel)}`,
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 },
+    );
+  } catch (err: any) {
+    console.warn(`[flywheel-change] bd create warning: ${err.message}`);
+    // Non-fatal — bead DB may not exist yet. The workspace setup will handle it.
+  }
+
+  // Write .planning-complete marker
+  writeFileSync(
+    join(planningDir, '.planning-complete'),
+    `flywheel-change auto-finalized at ${new Date().toISOString()}\n`,
+    'utf-8',
+  );
+
+  // Mark agent state as stopped (no tmux session was spawned)
+  writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+    id: sessionName,
+    issueId: issue.identifier,
+    workspace: workspacePath,
+    status: 'stopped',
+    stoppedAt: new Date().toISOString(),
+    type: 'planning',
+    location: workspaceLocation,
+    flywheelChange: true,
+  }, null, 2), 'utf-8');
+
+  console.log(`[flywheel-change] Auto-finalized planning for ${issue.identifier}`);
+}
+
 // ─── Main spawn function ─────────────────────────────────────────────────────
 
 /**
@@ -283,8 +369,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     onProgress?.({ step, total: TOTAL_STEPS, label, detail, status });
   };
 
+  // ── flywheel-change fast path ────────────────────────────────────────────────
+  const isFlywheelChange = (issue.labels ?? []).includes('flywheel-change');
+
   try {
-    console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
+    console.log(`[start-planning] Background setup starting for ${issue.identifier}${isFlywheelChange ? ' (flywheel-change fast-path)' : ''}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────
     progress(1, 'Creating workspace', `${issueLower} on ${projectPath.split('/').pop() || 'project'}`);
@@ -382,6 +471,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     }
 
     progress(2, 'Preparing planning environment', 'Environment ready', 'complete');
+
+    // ── flywheel-change: auto-finalize (skip interactive planning) ────────
+    if (isFlywheelChange) {
+      progress(3, 'Auto-finalizing (flywheel-change)', 'Writing plan artifacts');
+      await autoFinalizePlanForFlywheelChange(issue, workspacePath, agentStateDir, sessionName, workspaceLocation);
+      progress(3, 'Auto-finalizing (flywheel-change)', 'Planning complete — no agent session spawned', 'complete');
+      console.log(`[flywheel-change] Planning complete for ${issue.identifier}, no tmux session spawned`);
+      return { success: true };
+    }
 
     // ── Step 3: Load specs & PRDs ────────────────────────────────────────
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);

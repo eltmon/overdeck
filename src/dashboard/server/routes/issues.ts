@@ -599,6 +599,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         url: ghIssue.htmlUrl,
         source: 'github',
         comments: ghComments.length > 0 ? ghComments : undefined,
+        labels: ghIssue.labels ?? [],
       };
 
       // Add "planning" label (ensure it exists, then apply to issue)

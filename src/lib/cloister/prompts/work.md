@@ -15,6 +15,7 @@ optional:
   - PENDING_FEEDBACK
   - NEW_TRACKER_CONTEXT
   - TLDR_AVAILABLE
+  - FLYWHEEL_CHANGE
 ---
 # Working on Issue: {{ISSUE_ID}}
 
@@ -192,6 +193,31 @@ Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint —
 {{#NEW_TRACKER_CONTEXT}}
 {{NEW_TRACKER_CONTEXT}}
 {{/NEW_TRACKER_CONTEXT}}
+
+{{#FLYWHEEL_CHANGE}}
+## CRITICAL: Flywheel-Change Issue — Skill Files Only
+
+This is a **`flywheel-change` issue**. The synthesis flywheel proposed this change
+after observing a repeating pattern in retro reports. Your scope is **strictly limited**:
+
+**Only `skills/<name>/SKILL.md` files may be modified.**
+
+Before every `git commit`:
+1. Run `git diff --name-only HEAD` (or `git diff --name-only --cached`)
+2. If ANY file outside `skills/` appears in the diff — STOP
+3. Mark the issue mis-scoped by updating STATE.md status to `Mis-Scoped` and writing:
+   ```
+   REJECTION REASON: diff includes non-skill file(s): <list>
+   This issue was mis-filed as flywheel-change. It requires code changes.
+   Rejecting back to synthesis.
+   ```
+4. Do NOT commit. Do NOT call `pan done`. Leave the branch as-is.
+
+The inspect agent will flag any commit that touches files outside `skills/`.
+
+**If the proposed skill edit genuinely requires code changes**: the issue was
+mis-scoped by synthesis. Reject it — do not implement the code changes yourself.
+{{/FLYWHEEL_CHANGE}}
 
 ## CRITICAL: Check Completion Status FIRST
 

@@ -18,6 +18,8 @@ export interface WorkAgentPromptContext {
   skipDynamicContext?: boolean;
   /** Pre-fetched tracker context (new comments, status). Injected by callers. */
   trackerContext?: string;
+  /** True when the issue has the `flywheel-change` label. Injects scope restrictions. */
+  isFlywheelChange?: boolean;
 }
 
 export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
@@ -57,6 +59,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
       POLYREPO_CONTEXT: polyrepoContextStr,
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
+      FLYWHEEL_CHANGE: ctx.isFlywheelChange ?? false,
     },
   });
 }

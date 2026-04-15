@@ -35,6 +35,8 @@ export interface InspectContext {
   beadId: string;
   workspace: string;
   branch?: string;
+  /** True when the issue has the flywheel-change label — narrow scope to skills/ only. */
+  isFlywheelChange?: boolean;
 }
 
 /**
@@ -127,8 +129,13 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
+  // Build flywheel-change scope constraint (injected when label is set)
+  const flywheelSection = context.isFlywheelChange
+    ? `\n## CRITICAL: flywheel-change scope constraint\n\nThis issue has the \`flywheel-change\` label. The ONLY files that should be modified\nare \`skills/<name>/SKILL.md\` files. If the diff touches ANY file outside \`skills/\`,\nyou MUST return BLOCKED with reason "mis-scoped: diff includes non-skill files: <list>".\nNormal compile checks still apply to skill file syntax.\n`
+    : '';
+
   // Replace template variables
-  const prompt = template
+  const prompt = (template + flywheelSection)
     .replace(/\{\{apiUrl\}\}/g, apiUrl)
     .replace(/\{\{projectPath\}\}/g, context.projectPath)
     .replace(/\{\{issueId\}\}/g, context.issueId)

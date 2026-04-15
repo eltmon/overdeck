@@ -76,6 +76,18 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
   console.log(chalk.dim(diffStats.split('\n').map(l => `  ${l}`).join('\n')));
   console.log('');
 
+  // Detect flywheel-change from STATE.md (written by auto-finalize)
+  const { join: pathJoin } = await import('path');
+  const { existsSync: fsExistsSync, readFileSync: fsReadFileSync } = await import('fs');
+  let isFlywheelChange = false;
+  try {
+    const stateMdPath = pathJoin(workspacePath, '.planning', 'STATE.md');
+    if (fsExistsSync(stateMdPath)) {
+      const stateContent = fsReadFileSync(stateMdPath, 'utf-8');
+      isFlywheelChange = stateContent.includes('flywheel-change');
+    }
+  } catch { /* Non-fatal — proceed without flywheel-change context */ }
+
   // Spawn the inspect specialist
   const context: InspectContext = {
     projectKey: project.projectKey,
@@ -84,6 +96,7 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
     beadId: options.bead,
     workspace: workspacePath,
     branch: `feature/${normalizedIssueId.toLowerCase()}`,
+    isFlywheelChange,
   };
 
   const result = await spawnInspectAgent(context);
