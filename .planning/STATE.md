@@ -6,7 +6,7 @@
 Updating `.planning/STATE.md` and closing bead `panopticon-cli-fwo3` after replacing stale live-doc references to renamed review/merge endpoints.
 
 ## Completed Work
-- [x] panopticon-cli-fwo3: Updated stale alias-path references in `docs/TESTING.md`, `docs/PRD-CLOISTER.md`, `docs/FIX-ALL-PRD.md`, and `docs/prds/active/pan-509/STATE.md` (commit: pending)
+- [x] panopticon-cli-fwo3: Updated stale alias-path references in `docs/TESTING.md`, `docs/PRD-CLOISTER.md`, `docs/FIX-ALL-PRD.md`, and `docs/prds/active/pan-509/STATE.md` (commit: 81b0cdf0)
 
 ## Remaining Work
 - [ ] panopticon-cli-q2vn: Add a Vitest regression guard that fails if deleted alias route literals reappear under `src/`
