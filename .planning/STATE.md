@@ -7,7 +7,7 @@ Updating `.planning/STATE.md` and closing bead `panopticon-cli-q2vn` after addin
 
 ## Completed Work
 - [x] panopticon-cli-fwo3: Updated stale alias-path references in `docs/TESTING.md`, `docs/PRD-CLOISTER.md`, `docs/FIX-ALL-PRD.md`, and `docs/prds/active/pan-509/STATE.md` (commit: 81b0cdf0)
-- [x] panopticon-cli-q2vn: Added `tests/unit/dashboard/no-alias-routes.test.ts` to fail if deleted workspace alias routes reappear under `src/` (commit: pending)
+- [x] panopticon-cli-q2vn: Added `tests/unit/dashboard/no-alias-routes.test.ts` to fail if deleted workspace alias routes reappear under `src/` (commit: e85b3c22)
 
 ## Remaining Work
 - [ ] Run full verification gates (`npm run typecheck`, `npm run lint`, `npm test`), then signal completion with `pan done`
