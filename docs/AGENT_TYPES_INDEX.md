@@ -106,7 +106,7 @@ These are routable model slots that appear in settings/UI/docs, but they are **n
 ## Legacy / drift that should not be treated as source of truth
 
 ## Stale audit document
-- `AGENT_AUDIT_REPORT.md` previously claimed `inspect-agent` / `uat-agent` were not fully wired.
+- `docs/audits/AGENT_AUDIT_REPORT.md` previously claimed `inspect-agent` / `uat-agent` were not fully wired.
 - Current code shows both exist and are used.
 - Treat that file as an audit narrative, not as the canonical inventory.
 
