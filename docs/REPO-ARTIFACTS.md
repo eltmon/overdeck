@@ -254,6 +254,40 @@ project-repo/
 
 ---
 
+## Repo Root Policy
+
+The repo root contains only canonical entrypoints and standard tooling metadata.
+Nothing else belongs there.
+
+**What belongs at root:**
+
+| File / Pattern | Why |
+|----------------|-----|
+| `README.md` | Project front door |
+| `CLAUDE.md`, `AGENTS.md` | AI tool instructions |
+| `CONTRIBUTING.md`, `LICENSE` | Standard project metadata |
+| `package.json`, `bun.lock`, `bunfig.toml` | Package manager manifest |
+| `tsconfig.json`, `tsdown.config.ts` | Build tooling |
+| `vitest.config.ts`, `vitest.workspace.ts` | Test runner config |
+| `typedoc.json`, `commitlint.config.js` | Doc/lint tooling |
+| `.gitignore`, `.gitattributes`, `.eslintrc.json` | Repo metadata |
+| `.env.remote` | Remote workspace env template |
+| `introduction.mdx`, `quickstart.mdx`, `concepts.mdx` | Docs-site top-level entries |
+
+**What does NOT belong at root — and where it goes instead:**
+
+| Artifact type | Examples | Correct home |
+|---------------|----------|--------------|
+| Audit / investigation reports | `AGENT_AUDIT_REPORT.md`, `BUGS_FOUND.md`, `gemini-gaps-found.md` | `docs/audits/` |
+| Historical writeups / post-mortems | `IMPLEMENTATION_SUMMARY.md`, `PAN-428-CODEX-FEEDBACK.md` | `docs/history/` |
+| Screenshots / screen captures | `dashboard-home.png`, `command-deck.png` | `docs/screenshots/<topic>/` |
+| Temporary debug scripts | `debug-review.mjs`, log files | `.gitignore`'d or deleted after use |
+
+When adding a new artifact, ask: *"Is this a canonical project entrypoint or tooling config?"*
+If yes → root. If no → find or create the appropriate `docs/` subdirectory.
+
+---
+
 ## What Does NOT Live in the Repo
 
 | Artifact | Where it lives | Why |

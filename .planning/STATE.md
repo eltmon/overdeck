@@ -3,13 +3,14 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead panopticon-cli-7zf (Move historical writeups to docs/history/)
+Implementing bead panopticon-cli-80k (Document repo-root policy in docs/REPO-ARTIFACTS.md)
 
 ## Completed Work
 - [x] panopticon-cli-ezo: Moved 9 root screenshots to docs/screenshots/root-cleanup/ (commit: 2a6eff83)
+- [x] panopticon-cli-7zf: Moved IMPLEMENTATION_SUMMARY.md and PAN-428-CODEX-FEEDBACK.md to docs/history/ (commit: e4531bc6)
 
 ## Remaining Work
-- [ ] panopticon-cli-7zf: Move historical writeups to docs/history/
+- [ ] panopticon-cli-80k: Document the repo-root policy in docs/REPO-ARTIFACTS.md
 - [ ] panopticon-cli-80k: Document the repo-root policy in docs/REPO-ARTIFACTS.md
 - [ ] panopticon-cli-37m: Update the AGENT_AUDIT_REPORT.md reference in docs/AGENT_TYPES_INDEX.md
 - [ ] panopticon-cli-ch4: Move root audit artifacts to docs/audits/ (blocked until 37m completes)
