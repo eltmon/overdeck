@@ -3,13 +3,12 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead panopticon-cli-ezo (Move root screenshots to docs/screenshots/root-cleanup/)
+Implementing bead panopticon-cli-7zf (Move historical writeups to docs/history/)
 
 ## Completed Work
-(none yet)
+- [x] panopticon-cli-ezo: Moved 9 root screenshots to docs/screenshots/root-cleanup/ (commit: 2a6eff83)
 
 ## Remaining Work
-- [ ] panopticon-cli-ezo: Move root screenshots to docs/screenshots/root-cleanup/
 - [ ] panopticon-cli-7zf: Move historical writeups to docs/history/
 - [ ] panopticon-cli-80k: Document the repo-root policy in docs/REPO-ARTIFACTS.md
 - [ ] panopticon-cli-37m: Update the AGENT_AUDIT_REPORT.md reference in docs/AGENT_TYPES_INDEX.md
