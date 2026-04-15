@@ -265,6 +265,26 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
+
+    -- ===== Git Operations (PAN-653: persistent git event log) =====
+    CREATE TABLE IF NOT EXISTS git_operations (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      operation   TEXT NOT NULL,   -- e.g. 'push', 'fetch', 'force_push', 'merge', 'rev_parse'
+      branch      TEXT,
+      issue_id    TEXT,
+      before_sha  TEXT,
+      after_sha   TEXT,
+      remote_sha  TEXT,
+      status      TEXT NOT NULL,   -- 'success' | 'failure' | 'aborted'
+      error       TEXT,
+      ts          TEXT NOT NULL    -- ISO 8601 timestamp
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
+      ON git_operations(issue_id, ts);
+
+    CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
+      ON git_operations(operation, ts);
   `);
 
   // Record schema version
@@ -583,6 +603,28 @@ export function runMigrations(db: Database.Database): void {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch { /* already exists */ }
+  }
+
+  // v19 → v20: add git_operations table (PAN-653: persistent git event log)
+  if (currentVersion < 20) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS git_operations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation   TEXT NOT NULL,
+        branch      TEXT,
+        issue_id    TEXT,
+        before_sha  TEXT,
+        after_sha   TEXT,
+        remote_sha  TEXT,
+        status      TEXT NOT NULL,
+        error       TEXT,
+        ts          TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
+        ON git_operations(issue_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
+        ON git_operations(operation, ts);
+    `);
   }
 
   // After all migrations, set the version
