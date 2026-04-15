@@ -114,7 +114,7 @@ Use this sparingly — the SSE-subscribed sidecar already speaks every activity 
 1. `pan up` — start the dashboard.
 2. `systemctl --user start pan-tts` — start the sidecar.
 3. `journalctl --user -u pan-tts -f` — watch logs.
-4. In another terminal: `pan start PAN-XXX` and listen. You should hear the merge agent, review specialist, etc. as they post activity entries.
+4. In another terminal: `pan work issue PAN-XXX` and listen. You should hear the merge agent, review specialist, etc. as they post activity entries.
 
 If nothing speaks:
 

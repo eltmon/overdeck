@@ -150,9 +150,8 @@ If PAN-709's retro process proposes a new operator-audience skill, it **must** f
 **Lifecycle:**
 - Triggered by Cloister's `onMergeComplete()` hook immediately after post-merge lifecycle finishes successfully
 - Bounded runtime: **5 minutes max** (killed by deacon if exceeded)
-- Lightweight model: **Haiku 4.5** (cheap, fast, focused)
+- Model: **Sonnet 4.6** — retro quality is the dominant lever because retros drive the whole skill-improvement loop. Fast enough to complete within the runtime cap; substantially richer surprise detection than a smaller model.
 - No tmux session persistence — spawn, run, write file, exit
-- Cost target: **~$0.05/retro** (bounded inputs + short outputs)
 
 **Inputs (bounded):**
 - `.planning/STATE.md` — narrative of what happened
@@ -495,18 +494,18 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 ## Acceptance criteria
 
 1. **Retro-agent fires automatically on merge.** Given a merged issue, a retro markdown file appears in `docs/flywheel/retros/` within 5 minutes, conforming to the schema.
-2. **No-op filtering works.** Routine merges produce `no-op` retros (~60 seconds, < $0.02 cost) and are archived without triggering synthesis.
+2. **No-op filtering works.** Routine merges produce `no-op` retros (~60 seconds) and are archived without triggering synthesis.
 3. **Signal threshold is enforced.** A skill change with only 2 retros does not produce a PAN issue — it appears on the watchlist. A change with 3+ retros produces a PAN issue.
 4. **Skill-change issues flow through the pipeline** end-to-end: filed by synthesis → planned (or PRD-skipped) → implemented by work agent → reviewed → tested → merged → appears in `~/.claude/skills/` (for operator audience) or in workspace CLAUDE.md (for agent audience).
 5. **Audience field is enforced.** `pan admin skills audit` identifies all skills missing the field. New skills proposed by retros include it. Review agent rejects new skills that don't.
 6. **`pan sync` respects audience.** Operator skills land in `~/.claude/skills/`. Agent skills are referenced from workspace CLAUDE.md but not copied to `~/.claude/skills/`. `both` lands in both places.
-7. **Q&A detection works.** An agent waiting on a prompt (planning Q&A OR Claude Code approval) is marked `waiting-on-human`. Dashboard shows the badge. Deacon does not intervene. Clicking the badge opens the terminal focused on the prompt.
-8. **Autonomous daemon runs.** With `flywheel.autonomous: true`, Cloister fires retro-agents on merge without user intervention. Every 30 min the daemon re-reads FLYWHEEL-STATE and runs synthesis if there are new retros. Quiet hours and active-session backoff are respected.
-9. **`docs/FLYWHEEL-REPORT.md` accumulates.** After 3 runs, the report has 3 sections with all required fields.
-10. **Public dashboard renders.** `panopticon-cli.com/flywheel` shows the timeline from FLYWHEEL-REPORT.md via the Mintlify pipeline.
-11. **Skill-change pipeline never interrupts the flywheel for approval.** During `/all-up`, zero approval prompts are raised for skill edits. All skill changes flow through filed issues.
-12. **`all-up` skill updated** with Step 8 synthesis and the rule "skill changes are never inline edits during `/all-up`."
-13. **Retro cost is bounded.** Median retro cost across 10 runs is ≤ $0.10. Max retro cost is ≤ $0.30 (including surprising retros with more proposals).
+7. **Audience backfill completes.** Every existing skill in `skills/` has an explicit `audience` value committed; `pan admin skills audit` reports zero missing fields.
+8. **Q&A detection works.** An agent waiting on a prompt (planning Q&A OR Claude Code approval) is marked `waiting-on-human`. Dashboard shows the badge. Deacon does not intervene. Clicking the badge opens the terminal focused on the prompt.
+9. **Autonomous daemon runs.** With `flywheel.autonomous: true`, Cloister fires retro-agents on merge without user intervention. Every 30 min the daemon re-reads FLYWHEEL-STATE and runs synthesis if there are new retros. Quiet hours and active-session backoff are respected.
+10. **`docs/FLYWHEEL-REPORT.md` accumulates.** After 3 runs, the report has 3 sections with all required fields.
+11. **Public dashboard renders.** `panopticon-cli.com/flywheel` shows the timeline from FLYWHEEL-REPORT.md via the Mintlify pipeline.
+12. **Skill-change pipeline never interrupts the flywheel for approval.** During `/all-up`, zero approval prompts are raised for skill edits. All skill changes flow through filed issues.
+13. **`all-up` skill updated** with Step 8 synthesis and the rule "skill changes are never inline edits during `/all-up`."
 14. **Main is always clean.** After every daemon cycle, `git status` on `main` is clean and pushed. No approval-requiring side effects left dangling.
 
 ---
@@ -521,14 +520,13 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 - Watchlist captures single-signal proposals without acting on them
 - Synthesis step reports aggregate filter ratio ("6 retros this run → 2 reached threshold → 2 issues filed"); if the filter ratio is consistently > 80% becoming issues, the threshold gets raised
 
-### Risk 2: Retro-agent cost escalates
+### Risk 2: Retro-agent runs unbounded
 
 **Mitigation:**
-- Haiku 4.5 for retro model (cheap, fast)
-- Hard 5-minute runtime cap enforced by deacon
+- Hard 5-minute runtime cap enforced by deacon (SIGKILL on overrun)
 - Output cap via schema (≤500 words)
-- Cost tracking in `FLYWHEEL-REPORT.md` so drift is visible
-- Hard budget: if median retro cost exceeds $0.15 over a rolling 10-retro window, retro-agent auto-disables and alerts via dashboard
+- Bounded input set (STATE.md, vBRIEF delta, feedback files, last 200 lines of each tmux tail, FLYWHEEL-STATE row, PR comments, merge commit)
+- No cost gating. The project is on a flat LLM plan; budget is not a code concern. Retro quality is the dominant lever because retros drive the whole skill-improvement loop.
 
 ### Risk 3: The skill-change pipeline introduces new failure modes
 
@@ -564,9 +562,9 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 ### Risk 7: Existing skills break when we add the audience field
 
 **Mitigation:**
-- Default for missing field is `operator` → exactly current behavior
-- Backfill ships as its own skill-change issue (eating our own dogfood)
-- `pan sync` is backward-compat: skills without audience field sync to `~/.claude/skills/` as before
+- Default for missing field at read time is `operator` → exactly current behavior, even if the backfill bead is mid-review
+- Audience backfill ships in this epic as its own bead (see AC-7), committed after the schema lands so the walk-and-classify runs against the live frontmatter reader
+- `pan sync` falls back to `operator` distribution for any skill missing the field, so a partial backfill never produces a broken sync layout
 
 ---
 
@@ -576,17 +574,16 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 - **Auto-merging skill-change issues.** Humans still click merge. Always.
 - **Retros for non-Panopticon projects.** Initial scope is PAN issues only. If the pattern works, we extend to MIN, AUR, KRUX later as a separate epic.
 - **Retro-agent interacting with agents during their run.** Retro-agent is strictly post-mortem. No in-flight coaching.
-- **Migrating every existing skill to the new audience field in this epic.** Backfill ships as a separate dog-fooded skill-change issue once the pipeline is live.
+- **Cost gating or LLM spend tracking.** This project is on a flat plan; there is no per-retro cost field, no dashboard cost metric, and no auto-disable gate. Retro quality is optimized instead.
 
 ---
 
 ## Open questions
 
-1. **Should retro-agent have access to LLM session transcripts** (not just terminal tail)? Gives deeper insight but increases cost. Default no; revisit after first 10 runs.
+1. **Should retro-agent have access to LLM session transcripts** (not just terminal tail)? Gives deeper insight at the cost of more input. Default no (terminal tail only); revisit after first 10 runs.
 2. **Should `flywheel-change` issues skip planning entirely**, or go through a minimal planning phase for validation? Default skip (synthesis writes the proposal into the issue body). Revisit if we see mis-scoped issues.
 3. **How to weight retro signals by issue importance?** A retro from a P0 hotfix issue vs. a routine enhancement — do they carry equal weight? Start with equal weight; add tiering if we see high-value signals getting drowned out.
-4. **Rate limiting for the autonomous daemon** — should it cap at N daemon cycles per day to avoid LLM spend spikes? Start uncapped with cost tracking in FLYWHEEL-REPORT.md; add caps if spend is surprising.
-5. **Public dashboard privacy** — does `FLYWHEEL-REPORT.md` include internal details we don't want public? Review before first render; add a `public: true/false` flag per section if needed.
+4. **Public dashboard privacy** — does `FLYWHEEL-REPORT.md` include internal details we don't want public? Review before first render; add a `public: true/false` flag per section if needed.
 
 ---
 

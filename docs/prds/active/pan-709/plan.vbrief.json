@@ -1,0 +1,709 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-14T17:45:43Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-709: self-improving flywheel — retro-agent, skill-change pipeline, audience-scoped skills, Q&A detection, autonomous daemon"
+  },
+  "plan": {
+    "id": "pan-709",
+    "title": "feat(flywheel): self-improving flywheel — retro agent, skill-change pipeline, audience-scoped skills, Q&A detection, autonomous daemon",
+    "status": "approved",
+    "uid": "b68028dd-c0a5-4ae5-a330-447c04eda2a9",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-14T17:45:43Z",
+    "updated": "2026-04-14T17:45:43Z",
+    "references": [
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/709", "label": "PAN-709", "type": "issue" },
+      { "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-709/docs/prds/planned/pan-709-self-improving-flywheel.md", "label": "pan-709-self-improving-flywheel.md (workspace)", "type": "prd" },
+      { "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/planned/pan-709-self-improving-flywheel.md", "label": "pan-709-self-improving-flywheel.md (devroot)", "type": "prd" },
+      { "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-709/.planning/STATE.md", "label": "STATE.md", "type": "plan" },
+      { "uri": "https://github.com/eltmon/panopticon-cli/pull/708", "label": "PAN-705 PR #708 (prereq)", "type": "pull-request" }
+    ],
+    "tags": ["epic", "flywheel", "retro-agent", "skill-pipeline", "autonomous", "dashboard", "cloister"],
+    "narratives": {
+      "Problem": "Panopticon's long-term value depends on skill quality, but the learning loop is manual and lossy — retros don't exist, skill refinement is episodic, skill audiences are undifferentiated, and inline skill edits raise approval prompts that halt the flywheel. The compounding mechanism never engages.",
+      "Proposal": "Ship an end-to-end self-improvement system as one epic: retro-agent fires on merge, synthesis turns retros into PAN issues with a 3-signal threshold, skill changes flow through the normal pipeline with narrow work-agent scope, pan sync respects audience, Q&A detection marks waiting agents, and an autonomous Cloister daemon drives the loop. Assumes PAN-705 (command taxonomy reorg) is merged — this plan writes against the post-PAN-705 surface."
+    },
+    "items": [
+      {
+        "id": "prereq-pan705",
+        "title": "Verify PAN-705 post-reorg surface exists before starting",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "trivial", "issueLabel": "pan-709" },
+        "narrative": { "Action": "First bead the work agent runs. Confirm PAN-705 has merged and the post-reorg CLI/API/skill surfaces exist. If not, halt and escalate — do not plan against the legacy surface." },
+        "subItems": [
+          { "id": "prereq-pan705.ac1", "title": "`src/cli/commands/work/` directory does not exist (collapsed by PAN-705)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "prereq-pan705.ac2", "title": "`pan done`, `pan approve`, `pan issue`, `pan show`, `pan status`, `pan sync` are callable top-level verbs", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "prereq-pan705.ac3", "title": "`src/dashboard/server/routes/issues.ts` is the current shape (no `work.ts`)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "prereq-pan705.ac4", "title": "`pan sync` already performs clean-slate delete of legacy skill copies in `~/.claude/skills/`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "prereq-pan705.ac5", "title": "If any of the above are missing, halt work and open a tmux tell to the operator; do not proceed to bead schema-audience", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "schema-audience",
+        "title": "Add `audience` frontmatter field + schema module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `packages/contracts/src/skills.ts` declaring `SkillFrontmatter` with a required `audience: 'operator' | 'agent' | 'both'` field and a read-time default of `operator` for backward compat. Export a parser/validator used by pan sync, review-agent, and skill-lint." },
+        "subItems": [
+          { "id": "schema-audience.ac1", "title": "`packages/contracts/src/skills.ts` exports `SkillFrontmatter` type with audience enum", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "schema-audience.ac2", "title": "Parser returns `audience: 'operator'` when the field is missing from an existing skill file (backward compat)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "schema-audience.ac3", "title": "Parser rejects an invalid audience value (not operator/agent/both) with a clear error", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "schema-audience.ac4", "title": "Unit tests cover: valid frontmatter, missing field, invalid value, plus a real existing skill from `skills/` parses cleanly", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "schema-audience.ac5", "title": "`packages/contracts` is rebuilt (`cd packages/contracts && npm run build`) so consumers see the new type", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-agent-type",
+        "title": "Register `retro-agent` specialist type + metadata",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend the `SpecialistType` union in `src/lib/cloister/specialists.ts` with `'retro-agent'`, add its metadata entry (displayName, description, model: `sonnet`, spawn-run-exit lifecycle flag), and wire `src/lib/cloister/prompts.ts` to load `prompts/retro-agent.md`." },
+        "subItems": [
+          { "id": "retro-agent-type.ac1", "title": "`SpecialistType` union includes `'retro-agent'`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-agent-type.ac2", "title": "Specialist metadata entry declares model `claude-sonnet-4-6`, autoWake false, spawn-run-exit true", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-agent-type.ac3", "title": "`renderPrompt('retro-agent')` resolves to `src/lib/cloister/prompts/retro-agent.md` and returns its contents", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-agent-type.ac4", "title": "Existing specialists (review, merge, test, inspect, uat) still resolve their prompts unchanged (no regression)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-prompt",
+        "title": "Write `retro-agent.md` surprise-centered prompt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `src/lib/cloister/prompts/retro-agent.md` with the surprise-centered framing from PRD section 1. Document the bounded input set, the output schema (YAML frontmatter + markdown body), the no-op escape hatch, and the hard instruction to self-validate schema before exiting." },
+        "subItems": [
+          { "id": "retro-prompt.ac1", "title": "Prompt instructs the agent to write `no-op` and stop if nothing surprised it (boring is good)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-prompt.ac2", "title": "Prompt declares bounded inputs verbatim: STATE.md, vBRIEF, feedback/*.md, tmux tails (last 200 lines), FLYWHEEL-STATE row, gh pr view --comments, merge commit + branch commits", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-prompt.ac3", "title": "Prompt specifies output location `docs/flywheel/retros/<issue-id>-<timestamp>.md` and the full YAML+markdown schema from PRD section 1", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-prompt.ac4", "title": "Prompt requires at least ONE `proposed_changes` entry or an explicit `no_op` reason — no narrative-only retros", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-prompt.ac5", "title": "Prompt caps output at ~500 words and requires self-validation of schema before exiting", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-workflow-skill",
+        "title": "Create `retro-workflow` skill (agent audience)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `skills/retro-workflow/SKILL.md` with `audience: agent`, trigger-context description, and the checklist the retro-agent follows: read inputs in order, apply surprise filter, write output, validate schema, exit." },
+        "subItems": [
+          { "id": "retro-workflow-skill.ac1", "title": "File exists with valid frontmatter including `audience: agent`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-workflow-skill.ac2", "title": "Description follows agent convention: `\"Triggered when <condition>. Use to <action>.\"` (not the CLI-verb operator convention)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-workflow-skill.ac3", "title": "Checklist body references the input order and schema from the retro-agent prompt (single source of truth — skill links back to prompt file)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-inputs",
+        "title": "Retro-agent bounded inputs gatherer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Implement the input-collection helper used by retro-agent at spawn time: reads STATE.md, plan.vbrief.json, every feedback/*.md, last 200 lines of each agent tmux history under `~/.panopticon/agents/<id>/`, the issue's row in `docs/FLYWHEEL-STATE.md`, `gh pr view --comments`, merge commit + branch commit list. Packages them as a single bounded context the prompt references." },
+        "subItems": [
+          { "id": "retro-inputs.ac1", "title": "Helper at `src/lib/flywheel/retro-inputs.ts` (new) takes an `issueId` and returns a structured input bundle", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-inputs.ac2", "title": "Tmux tail reads are capped at 200 lines each and gracefully handle missing session histories", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-inputs.ac3", "title": "FLYWHEEL-STATE row extraction returns `null` cleanly when the issue has no row (e.g., it never entered the pipeline visibly)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-inputs.ac4", "title": "All file I/O uses `fs/promises` (CLAUDE.md blocking-call rule)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-inputs.ac5", "title": "Unit test: given a fixture issue with STATE.md + vBRIEF + 2 feedback files, bundle returns all three in the expected structure", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-spawn",
+        "title": "Retro-agent spawn-run-exit lifecycle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Implement `src/lib/cloister/retro-agent.ts` with `spawnRetroAgent(issueId)`. Spawns an ephemeral tmux session under `retro-<issueId>`, launches Claude Code with the retro-agent prompt + bundled inputs, enforces a 5-minute hard cap (SIGKILL via deacon), and exits without leaving the session around. Does NOT reuse the long-lived specialist tmux pattern." },
+        "subItems": [
+          { "id": "retro-spawn.ac1", "title": "`spawnRetroAgent(issueId)` returns a promise that resolves after retro completes or the 5-min cap fires", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-spawn.ac2", "title": "Session is killed and removed (`tmux kill-session`) after exit — no orphaned retro sessions", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-spawn.ac3", "title": "5-minute cap is enforced by deacon calling `SIGKILL` on the session if not finished; deacon logs the overrun", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-spawn.ac4", "title": "Spawn uses `sendKeysAsync` (load-buffer/paste-buffer pattern) for any text delivery to the session, per CLAUDE.md tmux rule", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-spawn.ac5", "title": "Smoke test: spawn against a fixture issue writes a valid retro markdown file and returns within the cap", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-writer",
+        "title": "Retro markdown writer + schema self-validation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `docs/flywheel/retros/` directory convention and a writer helper that validates the retro against the schema before writing (and rejects invalid output from the retro-agent by failing the spawn). File name: `<issue-id>-<unix-ts>.md`." },
+        "subItems": [
+          { "id": "retro-writer.ac1", "title": "Writer helper validates frontmatter (issue, agent, run, cycle_count, friction_score 0-10, surprise bool, proposed_changes array OR no_op)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-writer.ac2", "title": "Writer uses `fs/promises.writeFile` and creates parent dirs as needed", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-writer.ac3", "title": "Writer rejects a retro missing both `proposed_changes` and `no_op` (no narrative-only retros)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-writer.ac4", "title": "Unit tests cover: valid retro, missing proposed_changes, invalid friction_score, wrong surprise type", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-on-merge",
+        "title": "Wire retro-agent spawn into `onMergeComplete()`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend `src/lib/cloister/merge-agent.ts::postMergeLifecycle()` (or the nearest `onMergeComplete` equivalent) to call `spawnRetroAgent(issueId)` after post-merge cleanup succeeds. Retro failures must NOT roll back the merge — log and continue. Respects postMergeLifecycle idempotency guards (PAN-328)." },
+        "subItems": [
+          { "id": "retro-on-merge.ac1", "title": "On successful merge + post-merge cleanup, `spawnRetroAgent(issueId)` is invoked", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-on-merge.ac2", "title": "Retro failure is caught and logged; merge remains completed (no rollback, no stuck state)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-on-merge.ac3", "title": "The existing postMergeLifecycle idempotency guard (PAN-328) is untouched and still prevents the specialists/done → onMergeComplete → postMergeLifecycle loop", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-on-merge.ac4", "title": "Retro spawn happens AFTER the existing postMergeLifecycle Docker cleanup step 6 (never removes that step)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "synthesis-module",
+        "title": "Synthesis core module (read/group/threshold)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `src/lib/flywheel/synthesis.ts::runSynthesis()`. Reads every non-archived retro, filters to `surprise: true`, groups by signature (same target skill + same gap description + same audience), applies the 3-signal threshold. Above-threshold groups become issue-proposal objects; below-threshold become watchlist entries." },
+        "subItems": [
+          { "id": "synthesis-module.ac1", "title": "Reads only retros under `docs/flywheel/retros/` excluding `archive/`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-module.ac2", "title": "Grouping key is deterministic: `(target_skill, audience, normalized_gap_description)`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-module.ac3", "title": "Threshold: groups with `retro_count >= 3` become issue proposals; smaller groups become watchlist entries", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-module.ac4", "title": "Returns a typed result: `{ proposals: IssueProposal[], watchlist: WatchlistEntry[], processedRetros: string[], filterRatio: number }`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-module.ac5", "title": "All file I/O uses `fs/promises`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-module.ac6", "title": "Unit tests: 1 retro (watchlist), 2 retros same signature (watchlist), 3 retros same signature (proposal), 3 retros different signatures (3 separate watchlist entries, no proposal)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "flywheel-change-labels",
+        "title": "Create `flywheel-change` + `substrate-improvement` GitHub labels",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "trivial", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create the two new GitHub labels (`flywheel-change`, `substrate-improvement`) via `gh label create`. Document the creation in `docs/CONFIGURATION.md` (or nearest equivalent) so a fresh clone can reproduce them." },
+        "subItems": [
+          { "id": "flywheel-change-labels.ac1", "title": "`gh label list` on the repo shows both `flywheel-change` and `substrate-improvement` labels", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-change-labels.ac2", "title": "Labels have distinct colors and short descriptions", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-change-labels.ac3", "title": "A setup/docs note references the labels so they can be recreated if wiped", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "synthesis-file-issues",
+        "title": "Synthesis files PAN issues for above-threshold proposals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend synthesis to file PAN issues via the tracker client for each above-threshold proposal. Label `flywheel-change`, title `flywheel: <verb> <skill-name> — <summary>`, body contains the proposal + links to every triggering retro + the proposed patch as a code block. Cap at 10 issues per run to prevent storms; overflow rolls to the next cycle." },
+        "subItems": [
+          { "id": "synthesis-file-issues.ac1", "title": "Each proposal maps to exactly one GitHub issue with the `flywheel-change` label applied", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-file-issues.ac2", "title": "Issue body includes triggering retro filenames (or links), the aggregated signal count, and the proposed SKILL.md patch as a fenced code block", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-file-issues.ac3", "title": "If `proposals.length > 10`, only the top 10 by aggregated friction score are filed; the remainder logs as deferred", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-file-issues.ac4", "title": "Priority is the median friction score across triggering retros, clamped to the repo's priority enum", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-file-issues.ac5", "title": "Runs via the existing tracker client (not a new gh wrapper) to inherit retry/auth behavior", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "flywheel-report-writer",
+        "title": "Append new section to `docs/FLYWHEEL-REPORT.md` per run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `docs/FLYWHEEL-REPORT.md` if absent (with header), and append one run section per synthesis invocation matching the PRD section 4 schema. Append-only — never rewrites existing sections." },
+        "subItems": [
+          { "id": "flywheel-report-writer.ac1", "title": "File is created on first run with the header + intro line (no cost content)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-report-writer.ac2", "title": "Each run appends one section with: run N, timestamp, trigger (`/all-up` or `daemon event`), quick stats, skill-change issues filed (linked), substrate bugs fixed inline, top friction patterns, watchlist, wins", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-report-writer.ac3", "title": "Writer NEVER touches content above the new section (append-only semantics)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-report-writer.ac4", "title": "No cost field, no spend chart, no dollar amounts anywhere in the report (confirms cost-out decision)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "retro-archive",
+        "title": "Archive processed retros to `archive/run-N/`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "After synthesis files issues and writes FLYWHEEL-REPORT, move each processed retro to `docs/flywheel/retros/archive/run-N/<filename>`. Watchlist retros stay in the main directory. After 30 days a watchlist retro without new signals moves to archive with a `wontfix` marker." },
+        "subItems": [
+          { "id": "retro-archive.ac1", "title": "Processed retros are moved to `archive/run-N/` (not copied — originals removed)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-archive.ac2", "title": "Run number N is derived from the FLYWHEEL-REPORT section count (or persistent counter)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "retro-archive.ac3", "title": "Watchlist retros older than 30 days without new matching signals are archived with a `wontfix` reason appended to frontmatter", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "synthesis-commit-push",
+        "title": "Synthesis commit + push archive moves + FLYWHEEL-REPORT update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "After synthesis finishes (issues filed, report appended, retros archived), commit the diff and push to main so the next cycle sees the clean state. Commit message follows the repo convention." },
+        "subItems": [
+          { "id": "synthesis-commit-push.ac1", "title": "Single commit contains: FLYWHEEL-REPORT.md append + archive moves + any watchlist bookkeeping", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-commit-push.ac2", "title": "Commit message: `flywheel: run N — <count> issues filed, <count> watchlisted`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-commit-push.ac3", "title": "Push is skipped (with log) if the working tree is unchanged — synthesis is a no-op safely", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "synthesis-commit-push.ac4", "title": "After the daemon cycle completes, `git status` on `main` is clean (enforces AC-14)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "all-up-step8",
+        "title": "Add Step 8 (synthesis) + no-inline rule to `all-up` skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Edit `skills/all-up/SKILL.md` to insert Step 8 (synthesis) between Step 7 (main hygiene) and Step 7.5 (FLYWHEEL-STATE update). Also add the explicit rule: 'skill changes are never inline edits during /all-up — always file via synthesis.' Document the `docs/flywheel/retros/` directory and the FLYWHEEL-REPORT.md schema briefly." },
+        "subItems": [
+          { "id": "all-up-step8.ac1", "title": "Step 8 section exists after Step 7 and before Step 7.5 and describes calling `runSynthesis()`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "all-up-step8.ac2", "title": "An explicit rule block states skill changes are never inline edits during `/all-up`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "all-up-step8.ac3", "title": "An explicit note says retro-agent fires automatically on merge — don't run retros manually during /all-up", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "all-up-step8.ac4", "title": "Substrate-bug tiering rule: blocker-tier can be inline; non-blocker becomes a `substrate-improvement` issue", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "claude-md-skill-pipeline",
+        "title": "Update repo `CLAUDE.md` with skill-change pipeline rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "trivial", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Append a new section to the repo-level `CLAUDE.md` explaining why skills are edited through the flywheel pipeline, not directly. Includes the two escape hatches (file a `flywheel-change` issue OR write a retro note)." },
+        "subItems": [
+          { "id": "claude-md-skill-pipeline.ac1", "title": "New section named `## Skill changes go through the flywheel pipeline` exists", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "claude-md-skill-pipeline.ac2", "title": "Section names both escape hatches: filing a `flywheel-change` PAN issue or writing a retro note", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "work-agent-flywheel-branch",
+        "title": "Work agent behavior branch for `flywheel-change` label",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Teach the work agent (and the planning entry gate) that `flywheel-change` issues: (1) skip planning — the issue body IS the plan; (2) narrow scope to `skills/<name>/SKILL.md` only; (3) reject any diff touching non-skill files back to synthesis with a `mis-scoped` marker; (4) never create beads for skill changes (they are atomic)." },
+        "subItems": [
+          { "id": "work-agent-flywheel-branch.ac1", "title": "Starting a work agent on a `flywheel-change` issue skips the `pan plan` phase and uses the issue body as the plan", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "work-agent-flywheel-branch.ac2", "title": "Work agent refuses to commit a diff that touches any file outside `skills/` when the label is set, and marks the issue `mis-scoped`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "work-agent-flywheel-branch.ac3", "title": "`pan plan` on a `flywheel-change` issue auto-finalizes with a single bead containing the issue body as the plan (no interactive planning)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "work-agent-flywheel-branch.ac4", "title": "Inspect agent adapts to the narrow-scope case (single-file SKILL.md) without regressing verification on normal issues", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "skill-lint-module",
+        "title": "Skill lint module (`src/lib/flywheel/skill-lint.ts`)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "New module exporting `lintSkill(path)` that validates frontmatter schema (via the contracts module), absence of broken skill references, markdown syntax, and 'focused diff' coherence (not a shotgun rewrite). Shared between review-agent, test-agent, and `pan admin skills audit`." },
+        "subItems": [
+          { "id": "skill-lint-module.ac1", "title": "`lintSkill(path)` returns `{ valid: boolean, errors: LintError[] }`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "skill-lint-module.ac2", "title": "Rejects skills missing the `audience` field once the schema is enforced (with a grace default of `operator` at read time — the lint distinguishes)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "skill-lint-module.ac3", "title": "Rejects skills referencing a non-existent skill name in description or body", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "skill-lint-module.ac4", "title": "Unit tests cover valid, invalid frontmatter, broken ref, and a real skill from `skills/`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "review-agent-skill-lint",
+        "title": "Review agent runs skill-lint on `flywheel-change` issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend the review-agent prompt or orchestration so that on `flywheel-change` issues it runs `lintSkill(path)` for every modified skill file and blocks approval on any lint error. No bandaid — the review-agent is the gate." },
+        "subItems": [
+          { "id": "review-agent-skill-lint.ac1", "title": "Review-agent prompt (`src/lib/cloister/prompts/review.md`) instructs running the lint for flywheel-change issues", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "review-agent-skill-lint.ac2", "title": "Review fails (feedback written) if any modified SKILL.md fails lint", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "review-agent-skill-lint.ac3", "title": "Review passes cleanly on a valid single-file SKILL.md change", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "test-agent-pan-sync-dryrun",
+        "title": "Test agent runs `pan sync --dry-run` for flywheel-change issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend test-agent so that on `flywheel-change` issues it runs `pan sync --dry-run` and validates the resulting sync layout is valid (no broken symlinks, audience routing produces the expected destinations)." },
+        "subItems": [
+          { "id": "test-agent-pan-sync-dryrun.ac1", "title": "Test-agent prompt instructs running `pan sync --dry-run` on flywheel-change issues", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "test-agent-pan-sync-dryrun.ac2", "title": "Dry-run failure blocks the test phase with explicit feedback", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "test-agent-pan-sync-dryrun.ac3", "title": "Dry-run success on the sample skill-change fixture lets the test phase pass", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "pan-sync-audience-routing",
+        "title": "`pan sync` routes by audience field",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend `src/lib/sync.ts` (and `src/cli/commands/sync.ts`) to read each skill's `audience` and route: `operator` → `~/.claude/skills/<name>/`, `agent` → referenced in workspace CLAUDE.md (not copied to `~/.claude/skills/`), `both` → both. Layer on top of PAN-705's clean-slate delete (do not conflict)." },
+        "subItems": [
+          { "id": "pan-sync-audience-routing.ac1", "title": "Operator-audience skills land in `~/.claude/skills/<name>/` as today", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-sync-audience-routing.ac2", "title": "Agent-audience skills are NOT copied to `~/.claude/skills/` (they're missing from that destination after sync)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-sync-audience-routing.ac3", "title": "`both` audience skills land in both `~/.claude/skills/` and the workspace CLAUDE.md reference section", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-sync-audience-routing.ac4", "title": "Skills missing the `audience` field fall back to operator routing (backward compat)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-sync-audience-routing.ac5", "title": "PAN-705's clean-slate delete behavior is preserved (not reverted or duplicated)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-sync-audience-routing.ac6", "title": "`pan sync --dry-run` shows per-skill destinations grouped by audience", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "workspace-create-agent-skills",
+        "title": "Workspace create injects `## Available Skills (agent audience)` into CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend the workspace bootstrap (inside `pan workspace create` or its library equivalent) to append a `## Available Skills (agent audience)` section to the workspace CLAUDE.md listing every agent-audience skill with name, description, and a link back to the SKILL.md in the repo." },
+        "subItems": [
+          { "id": "workspace-create-agent-skills.ac1", "title": "Fresh workspace CLAUDE.md contains the agent-audience skills section", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "workspace-create-agent-skills.ac2", "title": "Each listed skill links to its SKILL.md in the repo (relative path works from inside the worktree)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "workspace-create-agent-skills.ac3", "title": "Existing workspace CLAUDE.md content (project instructions) is preserved — section is appended, not overwritten", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "pan-admin-skills-audit",
+        "title": "New `pan admin skills audit` command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add the `pan admin skills audit` subcommand under the post-PAN-705 admin namespace. Walks every `skills/<name>/SKILL.md`, reports each with audience + sync destination + missing-field flag. `--fix` cleans up stale copies." },
+        "subItems": [
+          { "id": "pan-admin-skills-audit.ac1", "title": "`pan admin skills audit` runs cleanly and produces a table: skill, audience, sync destination, status", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-admin-skills-audit.ac2", "title": "Missing-field skills are listed with `audience: (missing → operator default)` and flagged as warnings", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-admin-skills-audit.ac3", "title": "`--fix` removes stale copies from `~/.claude/skills/` for skills now declared `agent`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pan-admin-skills-audit.ac4", "title": "Command uses `fs/promises`, not sync fs calls (CLAUDE.md blocking rule — even though CLI-only, for consistency)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "audience-backfill",
+        "title": "Backfill `audience` field on every existing skill",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Walk every `skills/<name>/SKILL.md` and add an explicit `audience` value. Classification uses the PRD alignment section: skills matching CLI verbs → `operator`; workflow/pattern skills used by autonomous agents → `agent`; skills both sides invoke → `both`. Commit one-by-one or in logical batches for a reviewable diff." },
+        "subItems": [
+          { "id": "audience-backfill.ac1", "title": "Every skill in `skills/` has an explicit `audience:` line in its frontmatter", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "audience-backfill.ac2", "title": "`pan admin skills audit` reports zero skills with missing audience field", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "audience-backfill.ac3", "title": "Classification rationale is documented inline or in the PR description (why each was operator/agent/both)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "audience-backfill.ac4", "title": "Before starting the backfill the work agent verifies no open PRs touch `skills/` (to avoid merge conflicts)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "audience-backfill.ac5", "title": "After backfill, `pan sync --dry-run` produces a sync layout that matches the pre-backfill operator-only layout for skills classified as `operator` (no regression)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "runtime-waiting-on-human",
+        "title": "Add `waiting-on-human` agent state to runtime schema",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend `AgentRuntimeState` / the runtime.json schema with a `waiting-on-human` state plus optional `waitingReason` field. All consumers of agent state must handle the new value." },
+        "subItems": [
+          { "id": "runtime-waiting-on-human.ac1", "title": "`src/lib/agents.ts` types declare `waiting-on-human` as a valid state", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "runtime-waiting-on-human.ac2", "title": "`saveAgentRuntimeState()` accepts the new state without error", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "runtime-waiting-on-human.ac3", "title": "Every call site reading the state handles `waiting-on-human` (grep + inspect in tests)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "pre-tool-hook-qa",
+        "title": "Extend `pre-tool-hook` for Q&A detection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend `~/.panopticon/bin/pre-tool-hook` (bash) to detect when Claude Code is in an approval-waiting state and write `state: waiting-on-human` + reason into `runtime.json`. Investigate the Claude Code `Notification` hook event as a more direct signal (fires on approval-needed); wire it if viable. Also determine whether pre-tool-hook can serve PostToolUse (clearing the marker) or whether a new binary is needed — document the decision." },
+        "subItems": [
+          { "id": "pre-tool-hook-qa.ac1", "title": "Hook writes `state: waiting-on-human` to runtime.json when an approval-required signal is detected", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pre-tool-hook-qa.ac2", "title": "Hook clears the marker (returns to `state: active`) after approval resolves — either by reusing pre-tool-hook for PostToolUse or by adding a dedicated clear-hook binary, whichever is cleanest", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pre-tool-hook-qa.ac3", "title": "`~/.claude/settings.json` is updated to wire the hook(s) to the correct Claude Code events, without removing existing hooks (pre-tool-hook, heartbeat-hook, tldr-read-enforcer, pre-compact-hook, post-compact-hook)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pre-tool-hook-qa.ac4", "title": "The investigation into using the Claude Code `Notification` hook event is documented (either wired or with a clear rationale for not using it)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "pre-tool-hook-qa.ac5", "title": "Manual test: triggering an approval prompt in a real Claude Code session marks the agent `waiting-on-human`; accepting it clears the marker", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "deacon-waiting-respect",
+        "title": "Deacon respects `waiting-on-human` state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Teach `src/lib/cloister/deacon.ts` to NOT count stuck-timer ticks against agents in `waiting-on-human` state under the normal threshold. Use a 4x longer threshold before even considering recovery, so genuinely stuck agents still get unblocked." },
+        "subItems": [
+          { "id": "deacon-waiting-respect.ac1", "title": "Deacon's stuck-check skips force-kill when `state === 'waiting-on-human'` until 4x the normal stuck threshold", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "deacon-waiting-respect.ac2", "title": "Deacon emits a distinct event type (`agent-waiting`) so the dashboard can surface the state without duplicating stuck-alert logic", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "deacon-waiting-respect.ac3", "title": "Existing stuck-recovery paths unchanged for agents in `active`/`running` states (no regression)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "planning-qa-state-set",
+        "title": "Planning sessions set `waiting-on-human` during AskUserQuestion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Planning agents (this planner's successor) are paused during discovery Q&A. Write `state: waiting-on-human` + `waitingReason: 'planning Q&A'` to the session's runtime.json during AskUserQuestion so the dashboard badge lights up. Clear on answer received." },
+        "subItems": [
+          { "id": "planning-qa-state-set.ac1", "title": "During an AskUserQuestion call the planning session's runtime.json shows `state: waiting-on-human`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "planning-qa-state-set.ac2", "title": "After user answers, state returns to `active`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "planning-qa-state-set.ac3", "title": "Mechanism works without depending on Claude Code's internal hook — write the marker from the launcher/wrapper that manages the planning session", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "dashboard-waiting-badge",
+        "title": "Dashboard: yellow ⏳ waiting-on-human badge + click-through",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add a yellow clock badge with text 'Awaiting your input' to the agent card and kanban issue card when the agent state is `waiting-on-human`. Clicking the badge opens the terminal panel for that agent scrolled to the bottom." },
+        "subItems": [
+          { "id": "dashboard-waiting-badge.ac1", "title": "Agent card shows the badge when the backing runtime.json state is `waiting-on-human`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "dashboard-waiting-badge.ac2", "title": "Kanban issue card shows the same badge for issues whose active agent is waiting", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "dashboard-waiting-badge.ac3", "title": "Clicking the badge navigates to the XTerminal panel for that agent, scrolled to the bottom where the prompt lives", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "dashboard-waiting-badge.ac4", "title": "Badge color and iconography are consistent with the existing dashboard status palette", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "api-flywheel-routes",
+        "title": "Dashboard API: `/api/flywheel/*` routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `src/dashboard/server/routes/flywheel.ts` (Effect HTTP style matching the other routes) and expose: `GET /api/flywheel/retros`, `GET /api/flywheel/retros/:issueId`, `GET /api/flywheel/report`, `GET /api/flywheel/daemon/status`. All handlers use `fs/promises` (CLAUDE.md blocking-call rule). Register the route module in the server bootstrap." },
+        "subItems": [
+          { "id": "api-flywheel-routes.ac1", "title": "`GET /api/flywheel/retros` returns a list of non-archived retros with frontmatter summary", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "api-flywheel-routes.ac2", "title": "`GET /api/flywheel/retros/:issueId` returns the full markdown body + frontmatter", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "api-flywheel-routes.ac3", "title": "`GET /api/flywheel/report` returns the FLYWHEEL-REPORT.md content (raw or parsed, caller's choice)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "api-flywheel-routes.ac4", "title": "`GET /api/flywheel/daemon/status` returns the daemon state for the dashboard banner", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "api-flywheel-routes.ac5", "title": "ZERO sync fs calls in these handlers (`readFileSync`, `readdirSync`, etc.) — verified by grep + lint", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "api-flywheel-routes.ac6", "title": "Route module registered in the Effect HTTP server layer composition", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "api-admin-skills-audit",
+        "title": "Dashboard API: `/api/admin/skills/audit`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add `GET /api/admin/skills/audit` under the post-PAN-705 `/api/admin/*` namespace. Returns the output of the skill audit as JSON for the dashboard to render." },
+        "subItems": [
+          { "id": "api-admin-skills-audit.ac1", "title": "Route returns an array of `{ name, audience, syncDestinations, missingField, stale }` records", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "api-admin-skills-audit.ac2", "title": "Handler uses `fs/promises` and the shared skill-lint module (no duplication)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "frontend-flywheel-tab",
+        "title": "Frontend: `FlywheelChangesTab` on Awaiting Merge page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add a new `FlywheelChangesTab.tsx` component rendered as a tab on `AwaitingMergePage.tsx`. Filters issues by `flywheel-change` label. Each card: skill name, diff view (before/after), retro provenance (collapsible), aggregated signal count, merge button, rollback preview link." },
+        "subItems": [
+          { "id": "frontend-flywheel-tab.ac1", "title": "AwaitingMergePage has a tab strip (All / Flywheel Changes) — `All` preserves current behavior for non-flywheel issues", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-tab.ac2", "title": "Flywheel Changes tab lists only issues with the `flywheel-change` label", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-tab.ac3", "title": "Each card renders a diff view for the modified SKILL.md (before → after)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-tab.ac4", "title": "Retro provenance is collapsible; clicking expands shows each triggering retro", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-tab.ac5", "title": "Merge button reuses the existing merge flow and succeeds end-to-end on a sample flywheel-change issue", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "frontend-flywheel-page-metrics",
+        "title": "Frontend: `/flywheel` page with metrics panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add a top-level `/flywheel` route that renders the same tab content plus a metrics panel at the top. Metrics: skills added (week/month/all-time), skills refined, retros processed, retros dropped by no-op filter, top 5 patterns that triggered changes. NO cost metric anywhere." },
+        "subItems": [
+          { "id": "frontend-flywheel-page-metrics.ac1", "title": "`/flywheel` route is reachable from the dashboard nav", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-page-metrics.ac2", "title": "Metrics panel shows the five metric tiles with real data from the API", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-page-metrics.ac3", "title": "ZERO cost/spend/dollar display anywhere on the page (confirms cost-out decision)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "frontend-flywheel-page-metrics.ac4", "title": "UI verified in a browser before calling this bead done (per CLAUDE.md UI testing rule)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "flywheel-daemon-scaffold",
+        "title": "`flywheelDaemon` loop scaffold",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Create `src/lib/cloister/flywheel-daemon.ts` with `startFlywheelDaemon()` and `stopFlywheelDaemon()`, mirroring the deacon loop shape. Register it in `CloisterService.start()` after `startDeacon()`. For this bead, the daemon's `tick()` is a no-op that logs its heartbeat — triggers land in subsequent beads." },
+        "subItems": [
+          { "id": "flywheel-daemon-scaffold.ac1", "title": "`startFlywheelDaemon()` is called from `CloisterService.start()` after `startDeacon()`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-daemon-scaffold.ac2", "title": "`stopFlywheelDaemon()` cleanly halts the loop and is called from `CloisterService.stop()`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-daemon-scaffold.ac3", "title": "Loop heartbeat logs visible in cloister startup output", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "flywheel-daemon-scaffold.ac4", "title": "Unit test: scaffold starts and stops without errors and without leaking intervals", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "daemon-event-triggers",
+        "title": "Daemon event-driven triggers (merge, cycle)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Wire the daemon to two event sources: merge-complete events (spawn retro-agent for the merged issue) and cycle-detected events from FLYWHEEL-STATE (file a substrate-improvement issue for non-blocker cycles; only inline-fix for blocker-tier cycles stopping issues stuck in the CURRENT run)." },
+        "subItems": [
+          { "id": "daemon-event-triggers.ac1", "title": "Daemon subscribes to merge-complete events and calls `spawnRetroAgent` per event", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-event-triggers.ac2", "title": "Daemon reads FLYWHEEL-STATE `cycling alerts` section and files `substrate-improvement` issues for non-blocker cycles", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-event-triggers.ac3", "title": "Blocker-tier cycles (issues currently stuck in this run) route to inline diagnose, bounded — no code edits by the daemon itself; it files a substrate issue with the blocker label", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "daemon-scheduled-triggers",
+        "title": "Daemon scheduled triggers (30-min synth, 24h cycle)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add two scheduled tick paths: every 30 minutes re-read FLYWHEEL-STATE and run synthesis if any new retros exist; every 24 hours run a full flywheel cycle (inventory → diagnose → file → synthesize → report)." },
+        "subItems": [
+          { "id": "daemon-scheduled-triggers.ac1", "title": "30-min tick calls `runSynthesis()` only if there are new retros since the last run", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-scheduled-triggers.ac2", "title": "24h tick runs the full cycle and logs start/end events", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-scheduled-triggers.ac3", "title": "Tick intervals are configurable via `~/.panopticon/config.yaml` keys `flywheel.trigger_interval_minutes` and `flywheel.full_cycle_interval_hours`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "daemon-guards",
+        "title": "Daemon guards: active-session backoff, quiet hours, mutex",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Enforce: (1) back off when a Claude Code session touched a file under `~/.claude/projects/` in the last 10 min; (2) back off during quiet hours from config; (3) single-cycle mutex via `~/.panopticon/flywheel.lock`; (4) never interrupt agents in `waiting-on-human`." },
+        "subItems": [
+          { "id": "daemon-guards.ac1", "title": "Active-session check examines recent mtime and backs off if threshold crossed", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-guards.ac2", "title": "Quiet hours from `flywheel.quiet_hours` are respected (no tick runs during the window)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-guards.ac3", "title": "Mutex on `~/.panopticon/flywheel.lock` prevents concurrent cycles; second attempt logs and exits", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-guards.ac4", "title": "Daemon never targets agents in `waiting-on-human` state for any action", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "daemon-awaiting-merge-banner",
+        "title": "Daemon: Awaiting Merge threshold notify banner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "When the Awaiting Merge queue length exceeds `flywheel.awaiting_merge_notify_threshold`, the daemon writes a dashboard banner event via the existing event store so the UI can show 'N items waiting for merge'." },
+        "subItems": [
+          { "id": "daemon-awaiting-merge-banner.ac1", "title": "Threshold check runs on each scheduled tick", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-awaiting-merge-banner.ac2", "title": "Banner event is emitted only when crossing the threshold (not spammed every tick)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-awaiting-merge-banner.ac3", "title": "Banner clears when the queue drops back below threshold", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "daemon-config-yaml",
+        "title": "New `flywheel:` section in `~/.panopticon/config.yaml`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Extend the config schema + setup wizard to support a new top-level `flywheel:` section with `autonomous`, `quiet_hours`, `trigger_interval_minutes`, `full_cycle_interval_hours`, `backoff_on_active_session`, `awaiting_merge_notify_threshold`. Provide sensible defaults." },
+        "subItems": [
+          { "id": "daemon-config-yaml.ac1", "title": "Config schema accepts the new section and returns validated values", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-config-yaml.ac2", "title": "Missing section falls back to defaults: `autonomous: true`, `quiet_hours: 22:00-08:00`, `trigger_interval_minutes: 30`, `full_cycle_interval_hours: 24`, `backoff_on_active_session: true`, `awaiting_merge_notify_threshold: 5`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "daemon-config-yaml.ac3", "title": "`pan config` / setup wizard surfaces the new knobs", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "mintlify-flywheel-mdx",
+        "title": "Public `flywheel.mdx` + `docs.json` nav entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T17:45:43Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-709" },
+        "narrative": { "Action": "Add a new `flywheel.mdx` at the Mintlify content root that renders `docs/FLYWHEEL-REPORT.md` (via import/transform or explicit embed — match the pattern of existing .mdx files in this repo). Add a nav entry under 'How It Works → The Flywheel' in `docs.json`. Verify the Mintlify site builds locally." },
+        "subItems": [
+          { "id": "mintlify-flywheel-mdx.ac1", "title": "`flywheel.mdx` exists and renders content from `docs/FLYWHEEL-REPORT.md`", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "mintlify-flywheel-mdx.ac2", "title": "`docs.json` includes a nav entry linking to `/flywheel` under a 'How It Works' group", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "mintlify-flywheel-mdx.ac3", "title": "Mintlify dev build succeeds locally (no broken links, no missing frontmatter)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "mintlify-flywheel-mdx.ac4", "title": "Page displays the full timeline from FLYWHEEL-REPORT.md (even if FLYWHEEL-REPORT.md is short at first)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "prereq-pan705", "to": "schema-audience", "type": "blocks" },
+      { "from": "prereq-pan705", "to": "retro-agent-type", "type": "blocks" },
+      { "from": "prereq-pan705", "to": "pan-sync-audience-routing", "type": "blocks" },
+      { "from": "prereq-pan705", "to": "pan-admin-skills-audit", "type": "blocks" },
+      { "from": "prereq-pan705", "to": "api-admin-skills-audit", "type": "blocks" },
+
+      { "from": "schema-audience", "to": "pan-sync-audience-routing", "type": "blocks" },
+      { "from": "schema-audience", "to": "skill-lint-module", "type": "blocks" },
+      { "from": "schema-audience", "to": "audience-backfill", "type": "blocks" },
+      { "from": "schema-audience", "to": "pan-admin-skills-audit", "type": "blocks" },
+
+      { "from": "retro-agent-type", "to": "retro-prompt", "type": "blocks" },
+      { "from": "retro-agent-type", "to": "retro-spawn", "type": "blocks" },
+      { "from": "retro-prompt", "to": "retro-spawn", "type": "blocks" },
+      { "from": "retro-inputs", "to": "retro-spawn", "type": "informs" },
+      { "from": "retro-writer", "to": "retro-spawn", "type": "informs" },
+      { "from": "retro-spawn", "to": "retro-on-merge", "type": "blocks" },
+      { "from": "retro-writer", "to": "retro-on-merge", "type": "blocks" },
+
+      { "from": "retro-on-merge", "to": "daemon-event-triggers", "type": "blocks" },
+
+      { "from": "synthesis-module", "to": "synthesis-file-issues", "type": "blocks" },
+      { "from": "synthesis-module", "to": "flywheel-report-writer", "type": "informs" },
+      { "from": "synthesis-module", "to": "retro-archive", "type": "informs" },
+      { "from": "flywheel-change-labels", "to": "synthesis-file-issues", "type": "blocks" },
+      { "from": "flywheel-change-labels", "to": "work-agent-flywheel-branch", "type": "blocks" },
+      { "from": "synthesis-file-issues", "to": "synthesis-commit-push", "type": "blocks" },
+      { "from": "flywheel-report-writer", "to": "synthesis-commit-push", "type": "blocks" },
+      { "from": "retro-archive", "to": "synthesis-commit-push", "type": "blocks" },
+
+      { "from": "synthesis-commit-push", "to": "all-up-step8", "type": "blocks" },
+
+      { "from": "skill-lint-module", "to": "review-agent-skill-lint", "type": "blocks" },
+      { "from": "work-agent-flywheel-branch", "to": "review-agent-skill-lint", "type": "informs" },
+      { "from": "pan-sync-audience-routing", "to": "test-agent-pan-sync-dryrun", "type": "blocks" },
+
+      { "from": "pan-sync-audience-routing", "to": "workspace-create-agent-skills", "type": "blocks" },
+      { "from": "pan-sync-audience-routing", "to": "audience-backfill", "type": "blocks" },
+      { "from": "pan-admin-skills-audit", "to": "audience-backfill", "type": "informs" },
+      { "from": "skill-lint-module", "to": "pan-admin-skills-audit", "type": "informs" },
+
+      { "from": "runtime-waiting-on-human", "to": "pre-tool-hook-qa", "type": "blocks" },
+      { "from": "runtime-waiting-on-human", "to": "deacon-waiting-respect", "type": "blocks" },
+      { "from": "runtime-waiting-on-human", "to": "planning-qa-state-set", "type": "blocks" },
+      { "from": "runtime-waiting-on-human", "to": "dashboard-waiting-badge", "type": "blocks" },
+      { "from": "deacon-waiting-respect", "to": "dashboard-waiting-badge", "type": "informs" },
+
+      { "from": "api-flywheel-routes", "to": "frontend-flywheel-tab", "type": "blocks" },
+      { "from": "api-flywheel-routes", "to": "frontend-flywheel-page-metrics", "type": "blocks" },
+      { "from": "api-admin-skills-audit", "to": "frontend-flywheel-page-metrics", "type": "informs" },
+      { "from": "work-agent-flywheel-branch", "to": "frontend-flywheel-tab", "type": "informs" },
+
+      { "from": "flywheel-daemon-scaffold", "to": "daemon-event-triggers", "type": "blocks" },
+      { "from": "flywheel-daemon-scaffold", "to": "daemon-scheduled-triggers", "type": "blocks" },
+      { "from": "flywheel-daemon-scaffold", "to": "daemon-guards", "type": "blocks" },
+      { "from": "flywheel-daemon-scaffold", "to": "daemon-awaiting-merge-banner", "type": "blocks" },
+      { "from": "daemon-config-yaml", "to": "daemon-scheduled-triggers", "type": "blocks" },
+      { "from": "daemon-config-yaml", "to": "daemon-guards", "type": "blocks" },
+      { "from": "daemon-config-yaml", "to": "daemon-awaiting-merge-banner", "type": "blocks" },
+      { "from": "synthesis-module", "to": "daemon-scheduled-triggers", "type": "blocks" },
+
+      { "from": "flywheel-report-writer", "to": "mintlify-flywheel-mdx", "type": "blocks" }
+    ]
+  }
+}
