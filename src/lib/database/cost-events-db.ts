@@ -23,8 +23,8 @@ export function insertCostEvent(event: CostEvent, sourceFile?: string): number |
         input, output, cache_read, cache_write, cost, request_id,
         session_id,
         tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
-        source_file
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        source_file, caveman_variant
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       event.ts,
       event.agentId,
@@ -44,6 +44,7 @@ export function insertCostEvent(event: CostEvent, sourceFile?: string): number |
       event.tldrTokensSaved ?? null,
       event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null,
       sourceFile ?? null,
+      event.cavemanVariant ?? null,
     );
     if (result.changes === 0) return null; // Duplicate
     return result.lastInsertRowid as number;
@@ -72,8 +73,8 @@ export function insertCostEvents(
       input, output, cache_read, cache_write, cost, request_id,
       session_id,
       tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
-      source_file
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      source_file, caveman_variant
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertMany = db.transaction((evs: CostEvent[]) => {
@@ -97,6 +98,7 @@ export function insertCostEvents(
         ev.tldrTokensSaved ?? null,
         ev.tldrBypassReasons ? JSON.stringify(ev.tldrBypassReasons) : null,
         sourceFile ?? null,
+        ev.cavemanVariant ?? null,
       );
       if (result.changes > 0) {
         inserted++;
@@ -391,6 +393,47 @@ function getStageBreakdownForIssue(db: import('better-sqlite3').Database, issueI
   return result;
 }
 
+/**
+ * Get caveman A/B experiment data: median output tokens and first-try review pass rate
+ * grouped by caveman_variant. Only returns rows where caveman_variant IS NOT NULL.
+ */
+export function getCavemanExperimentData(): CavemanExperimentRow[] {
+  const db = getDatabase();
+
+  const rows = db.prepare(`
+    SELECT
+      caveman_variant,
+      COUNT(*) as event_count,
+      AVG(output) as avg_output_tokens,
+      SUM(output) as total_output_tokens,
+      AVG(input) as avg_input_tokens,
+      AVG(cost) as avg_cost,
+      SUM(cost) as total_cost
+    FROM cost_events
+    WHERE caveman_variant IS NOT NULL
+    GROUP BY caveman_variant
+    ORDER BY caveman_variant
+  `).all() as Array<{
+    caveman_variant: string;
+    event_count: number;
+    avg_output_tokens: number;
+    total_output_tokens: number;
+    avg_input_tokens: number;
+    avg_cost: number;
+    total_cost: number;
+  }>;
+
+  return rows.map(r => ({
+    variant: r.caveman_variant,
+    eventCount: r.event_count,
+    avgOutputTokens: Math.round(r.avg_output_tokens),
+    totalOutputTokens: r.total_output_tokens,
+    avgInputTokens: Math.round(r.avg_input_tokens),
+    avgCost: r.avg_cost,
+    totalCost: r.total_cost,
+  }));
+}
+
 // ============== Row/type mapping ==============
 
 interface DbCostRow {
@@ -410,6 +453,7 @@ interface DbCostRow {
   tldr_bypasses: number | null;
   tldr_tokens_saved: number | null;
   tldr_bypass_reasons: string | null;
+  caveman_variant: string | null;
 }
 
 interface DbIssueSummaryRow {
@@ -441,6 +485,9 @@ function rowToCostEvent(row: DbCostRow): CostEvent {
     tldrBypasses: row.tldr_bypasses ?? undefined,
     tldrTokensSaved: row.tldr_tokens_saved ?? undefined,
     tldrBypassReasons: row.tldr_bypass_reasons ? JSON.parse(row.tldr_bypass_reasons) : undefined,
+    // caveman_variant is written only by injectCavemanSettings/determineCavemanVariant,
+    // which guarantee values in {'enabled','disabled','off'} — no unknown values in practice.
+    cavemanVariant: (row.caveman_variant as 'enabled' | 'disabled' | 'off' | undefined) ?? undefined,
   };
 }
 
@@ -456,6 +503,16 @@ export interface StageBreakdown {
   cost: number;
   calls: number;
   tokens: number;
+}
+
+export interface CavemanExperimentRow {
+  variant: string;
+  eventCount: number;
+  avgOutputTokens: number;
+  totalOutputTokens: number;
+  avgInputTokens: number;
+  avgCost: number;
+  totalCost: number;
 }
 
 export interface IssueAggregate {

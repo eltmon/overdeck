@@ -118,6 +118,8 @@ const lines = newContent.split('\n');
 const agentId: string = process.env.PANOPTICON_AGENT_ID || 'unattributed';
 let issueId: string = process.env.PANOPTICON_ISSUE_ID || '';
 const sessionType: string = process.env.PANOPTICON_SESSION_TYPE || 'implementation';
+// Caveman A/B test variant — set by agent launcher when agents.caveman.ab_test is active (PAN-611)
+const cavemanVariant = process.env.PANOPTICON_CAVEMAN_VARIANT as 'enabled' | 'disabled' | 'off' | undefined;
 
 // Infer issue ID from git branch if not set (covers ad-hoc Claude sessions)
 if (!issueId || issueId === 'UNKNOWN') {
@@ -245,6 +247,7 @@ for (const line of lines) {
       ...(requestId ? { requestId } : {}),
       sessionId,
       ...tldrFields,
+      ...(cavemanVariant ? { cavemanVariant } : {}),
     });
   } catch {
     // Skip malformed lines silently

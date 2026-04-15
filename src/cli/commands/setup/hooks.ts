@@ -321,11 +321,28 @@ export async function setupHooksCommand(): Promise<void> {
     ]
   });
 
-  // 8. Write updated settings
+  // 8. Install caveman hook files and compress scripts to ~/.panopticon/hooks/caveman/
+  try {
+    const { setupCavemanHooks, setupCavemanCompressScripts } = await import('../../../lib/caveman/setup.js');
+    const cavemanOk = setupCavemanHooks();
+    if (cavemanOk) {
+      console.log(chalk.green('✓ Installed caveman hook files to ~/.panopticon/hooks/caveman/'));
+    } else {
+      console.log(chalk.yellow('⚠ Caveman hook files not found — skipping (non-fatal)'));
+    }
+    const compressOk = setupCavemanCompressScripts();
+    if (compressOk) {
+      console.log(chalk.green('✓ Installed caveman-compress scripts to ~/.panopticon/hooks/caveman-compress/'));
+    }
+  } catch (err: unknown) {
+    console.log(chalk.yellow(`⚠ Caveman hook install failed: ${err instanceof Error ? err.message : String(err)} (non-fatal)`));
+  }
+
+  // 9. Write updated settings
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   console.log(chalk.green('✓ Updated Claude Code settings.json'));
 
-  // 9. Success message
+  // 10. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
   console.log(chalk.dim('Claude Code hooks are now configured:'));
   console.log(chalk.dim('  • PreToolUse  - Sets agent state to "active"'));
@@ -334,10 +351,10 @@ export async function setupHooksCommand(): Promise<void> {
   if (python3Available) {
     console.log(chalk.dim('  • TLDR Read   - Intercepts large file reads → TLDR summaries'));
     console.log(chalk.dim('  • TLDR Edit   - Tracks dirty files → auto re-warm'));
-    console.log(chalk.dim('  • TLDR MCP    - Token-efficient code analysis\n'));
-  } else {
-    console.log('');
+    console.log(chalk.dim('  • TLDR MCP    - Token-efficient code analysis'));
   }
+  console.log(chalk.dim('  • Caveman     - Compressed output hooks (activate with agents.caveman.enabled: true)'));
+  console.log('');
   console.log(chalk.dim('When you run agents via `pan start`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
 }

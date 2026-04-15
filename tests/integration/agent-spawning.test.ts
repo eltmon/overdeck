@@ -47,12 +47,15 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   return {
     ...actual,
     loadConfig: vi.fn().mockReturnValue({
-      preset: 'balanced',
-      enabledProviders: new Set(['anthropic', 'openai', 'google']),
-      apiKeys: {},
-      overrides: {},
-      geminiThinkingLevel: 3,
-    } as NormalizedConfig),
+      config: {
+        preset: 'balanced',
+        enabledProviders: new Set(['anthropic', 'openai', 'google']),
+        apiKeys: { openai: 'test-openai-key', google: 'test-google-key' },
+        overrides: {},
+        geminiThinkingLevel: 3,
+        caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
+      } as NormalizedConfig,
+    }),
   };
 });
 

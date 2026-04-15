@@ -310,7 +310,9 @@ function initSchema(db) {
       tldr_tokens_saved  INTEGER,
       tldr_bypass_reasons TEXT,  -- JSON string
       -- WAL source tracking
-      source_file   TEXT   -- path of WAL file this came from (for imports)
+      source_file   TEXT,  -- path of WAL file this came from (for imports)
+      -- Caveman A/B experiment tracking
+      caveman_variant TEXT  -- 'enabled', 'disabled', 'off', or null
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_request_id
@@ -527,7 +529,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
   `);
-	db.pragma(`user_version = 17`);
+	db.pragma(`user_version = 18`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -535,7 +537,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 17) return;
+	if (currentVersion === 18) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -721,7 +723,10 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_favorites_type
         ON favorites(type);
     `);
-	db.pragma(`user_version = 17`);
+	if (currentVersion < 18) try {
+		db.exec(`ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
+	} catch {}
+	db.pragma(`user_version = 18`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
@@ -784,9 +789,9 @@ function insertCostEvent(event, sourceFile) {
         input, output, cache_read, cache_write, cost, request_id,
         session_id,
         tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
-        source_file
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, sourceFile ?? null);
+        source_file, caveman_variant
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, sourceFile ?? null, event.cavemanVariant ?? null);
 		if (result.changes === 0) return null;
 		return result.lastInsertRowid;
 	} catch (err) {
@@ -7688,6 +7693,7 @@ const lines = buffer.toString("utf-8").split("\n");
 const agentId = process.env.PANOPTICON_AGENT_ID || "unattributed";
 let issueId = process.env.PANOPTICON_ISSUE_ID || "";
 const sessionType = process.env.PANOPTICON_SESSION_TYPE || "implementation";
+const cavemanVariant = process.env.PANOPTICON_CAVEMAN_VARIANT;
 if (!issueId || issueId === "UNKNOWN") try {
 	const branchMatch = execFileSync("git", ["branch", "--show-current"], {
 		encoding: "utf-8",
@@ -7767,7 +7773,8 @@ for (const line of lines) {
 			cost,
 			...requestId ? { requestId } : {},
 			sessionId,
-			...tldrFields
+			...tldrFields,
+			...cavemanVariant ? { cavemanVariant } : {}
 		});
 	} catch {}
 }

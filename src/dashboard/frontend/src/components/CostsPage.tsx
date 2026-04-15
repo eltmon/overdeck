@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, AlertTriangle, TrendingUp, Zap, X, BarChart3 } from 'lucide-react';
+import { DollarSign, AlertTriangle, TrendingUp, Zap, X, BarChart3, FlaskConical } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
@@ -103,6 +103,26 @@ async function fetchTrends(days = 30, issueId?: string): Promise<TrendsResponse>
 async function fetchIssueDetail(issueId: string): Promise<IssueDetail> {
   const res = await fetch(`/api/costs/issue/${issueId}`);
   if (!res.ok) throw new Error('Failed to fetch issue detail');
+  return res.json();
+}
+
+interface CavemanExperimentRow {
+  variant: string;
+  eventCount: number;
+  avgOutputTokens: number;
+  totalOutputTokens: number;
+  avgInputTokens: number;
+  avgCost: number;
+  totalCost: number;
+}
+
+interface ExperimentsResponse {
+  experiments: CavemanExperimentRow[];
+}
+
+async function fetchExperiments(): Promise<ExperimentsResponse> {
+  const res = await fetch('/api/costs/experiments');
+  if (!res.ok) throw new Error('Failed to fetch experiments');
   return res.json();
 }
 
@@ -303,39 +323,94 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
   );
 }
 
-// ============== Main Page ==============
+// ============== Experiments View ==============
 
-export function CostsPage() {
+function ExperimentsView({ experiments }: { experiments: CavemanExperimentRow[] }) {
+  if (experiments.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-content-subtle">
+        <FlaskConical className="w-12 h-12 mb-4 opacity-30" />
+        <p className="text-lg font-medium mb-2">No experiment data yet</p>
+        <p className="text-sm text-center max-w-md">
+          Enable caveman in your <code className="text-primary">~/.panopticon/config.yaml</code> with{' '}
+          <code className="text-primary">agents.caveman.enabled: true</code> to start tracking output token reduction.
+        </p>
+      </div>
+    );
+  }
+
+  const enabledRow = experiments.find(e => e.variant === 'enabled');
+  const disabledRow = experiments.find(e => e.variant === 'disabled');
+  const reductionPct = enabledRow && disabledRow && disabledRow.avgOutputTokens > 0
+    ? ((disabledRow.avgOutputTokens - enabledRow.avgOutputTokens) / disabledRow.avgOutputTokens) * 100
+    : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 mb-2">
+        <FlaskConical className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-semibold text-content">Caveman A/B Experiment</h2>
+        <span className="text-xs px-2 py-0.5 rounded badge-bg-primary text-primary">Output Token Reduction</span>
+      </div>
+
+      {reductionPct !== null && (
+        <div className="bg-surface-raised border border-divider rounded-lg p-6 flex items-center gap-6">
+          <div className="text-center">
+            <div className={`text-4xl font-bold ${reductionPct > 0 ? 'text-success' : 'text-destructive'}`}>
+              {reductionPct > 0 ? '-' : '+'}{Math.abs(reductionPct).toFixed(1)}%
+            </div>
+            <div className="text-sm text-content-subtle mt-1">output token reduction</div>
+          </div>
+          <div className="text-sm text-content-subtle">
+            Caveman-enabled agents produce <strong className="text-content">{enabledRow!.avgOutputTokens.toLocaleString()}</strong> avg output tokens
+            vs <strong className="text-content">{disabledRow!.avgOutputTokens.toLocaleString()}</strong> without caveman.
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {experiments.map(row => (
+          <div key={row.variant} className="bg-surface-raised border border-divider rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4">
+              <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
+                row.variant === 'enabled' ? 'badge-bg-success text-success' :
+                row.variant === 'disabled' ? 'badge-bg-destructive text-destructive' :
+                'badge-bg-surface text-content-subtle'
+              }`}>
+                caveman: {row.variant}
+              </span>
+              <span className="text-xs text-content-subtle">{row.eventCount.toLocaleString()} events</span>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs text-content-subtle mb-1">Avg Output Tokens</div>
+                <div className="text-2xl font-bold text-content">{row.avgOutputTokens.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-xs text-content-subtle mb-1">Avg Input Tokens</div>
+                <div className="text-lg font-semibold text-content">{row.avgInputTokens.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-xs text-content-subtle mb-1">Avg Cost per Request</div>
+                <div className="text-lg font-semibold text-success">${row.avgCost.toFixed(5)}</div>
+              </div>
+              <div className="pt-2 border-t border-divider flex justify-between text-xs text-content-subtle">
+                <span>Total output: {row.totalOutputTokens.toLocaleString()}</span>
+                <span>Total: ${row.totalCost.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============== Issues Tab Content ==============
+
+function IssuesTabContent({ costs, globalTrends }: { costs: CostsResponse; globalTrends: TrendsResponse | undefined }) {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [modalIssue, setModalIssue] = useState<string | null>(null);
-
-  const { data: costs, isLoading } = useQuery({
-    queryKey: ['costs-by-issue'],
-    queryFn: fetchCosts,
-    refetchInterval: 30000,
-  });
-
-  const { data: globalTrends } = useQuery({
-    queryKey: ['cost-trends-global'],
-    queryFn: () => fetchTrends(30),
-    refetchInterval: 60000,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="p-6 h-full flex items-center justify-center">
-        <div className="text-content-subtle">Loading costs...</div>
-      </div>
-    );
-  }
-
-  if (!costs) {
-    return (
-      <div className="p-6 h-full flex items-center justify-center">
-        <div className="text-destructive">Failed to load costs</div>
-      </div>
-    );
-  }
 
   const totalCost = costs.issues.reduce((sum, issue) => sum + issue.totalCost, 0);
   const issuesWithBudget = costs.issues.filter(i => i.budget);
@@ -343,22 +418,7 @@ export function CostsPage() {
   const selectedIssueData = selectedIssue ? costs.issues.find(i => i.issueId === selectedIssue) : null;
 
   return (
-    <div className="p-6 overflow-auto h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-content">Cost Tracking</h1>
-        <div className="flex items-center gap-3">
-          <div className={`px-3 py-1 rounded text-sm ${
-            costs.status === 'live' ? 'badge-bg-success text-success' :
-            costs.status === 'migrating' ? 'badge-bg-warning text-warning' :
-            'badge-bg-destructive text-destructive'
-          }`}>
-            {costs.status === 'live' ? '● Live' :
-             costs.status === 'migrating' ? '⟳ Migrating' : '⚠ Stale'}
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-surface-raised border border-divider rounded-lg p-6">
@@ -559,6 +619,105 @@ export function CostsPage() {
       {/* Detail Modal */}
       {modalIssue && (
         <IssueDetailModal issueId={modalIssue} onClose={() => setModalIssue(null)} />
+      )}
+    </>
+  );
+}
+
+// ============== Main Page ==============
+
+export function CostsPage() {
+  const [activeTab, setActiveTab] = useState<'issues' | 'experiments'>('issues');
+
+  const { data: costs, isLoading } = useQuery({
+    queryKey: ['costs-by-issue'],
+    queryFn: fetchCosts,
+    refetchInterval: 30000,
+  });
+
+  const { data: globalTrends } = useQuery({
+    queryKey: ['cost-trends-global'],
+    queryFn: () => fetchTrends(30),
+    refetchInterval: 60000,
+  });
+
+  const { data: experiments } = useQuery({
+    queryKey: ['cost-experiments'],
+    queryFn: fetchExperiments,
+    refetchInterval: 60000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 h-full flex items-center justify-center">
+        <div className="text-content-subtle">Loading costs...</div>
+      </div>
+    );
+  }
+
+  if (!costs) {
+    return (
+      <div className="p-6 h-full flex items-center justify-center">
+        <div className="text-destructive">Failed to load costs</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 overflow-auto h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-content">Cost Tracking</h1>
+        <div className="flex items-center gap-3">
+          <div className={`px-3 py-1 rounded text-sm ${
+            costs.status === 'live' ? 'badge-bg-success text-success' :
+            costs.status === 'migrating' ? 'badge-bg-warning text-warning' :
+            'badge-bg-destructive text-destructive'
+          }`}>
+            {costs.status === 'live' ? '● Live' :
+             costs.status === 'migrating' ? '⟳ Migrating' : '⚠ Stale'}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-divider">
+        <button
+          onClick={() => setActiveTab('issues')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'issues'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-content-subtle hover:text-content'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Issues
+          </div>
+        </button>
+        <button
+          onClick={() => setActiveTab('experiments')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'experiments'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-content-subtle hover:text-content'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FlaskConical className="w-4 h-4" />
+            Experiments
+          </div>
+        </button>
+      </div>
+
+      {/* Experiments Tab */}
+      {activeTab === 'experiments' && (
+        <ExperimentsView experiments={experiments?.experiments ?? []} />
+      )}
+
+      {/* Issues Tab */}
+      {activeTab === 'issues' && (
+        <IssuesTabContent costs={costs} globalTrends={globalTrends} />
       )}
     </div>
   );

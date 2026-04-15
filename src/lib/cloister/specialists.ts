@@ -19,6 +19,7 @@ import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-hand
 import type { ModelId } from '../settings.js';
 import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { loadCloisterConfig } from './config.js';
+import { readCavemanVariant } from '../caveman/workspace.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
@@ -129,6 +130,47 @@ function buildTmuxEnvFlags(env: Record<string, string>): string {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
+}
+
+/**
+ * Build shell export lines for caveman compression for specialist agents.
+ *
+ * Excluded: inspect-agent (its INSPECTION PASSED/BLOCKED sentinels are parsed by Cloister).
+ * Uses per-specialist-type intensity from config.
+ *
+ * @param specialistType  The specialist type (review-agent, test-agent, etc.)
+ * @param workspacePath   Workspace path to read the A/B variant from (may be undefined)
+ * @param config          Normalized caveman config
+ * @returns               Shell export lines to inject into the inner script
+ */
+export async function buildSpecialistCavemanExports(
+  specialistType: string,
+  workspacePath: string | undefined,
+  config: import('../config-yaml.js').NormalizedCavemanConfig
+): Promise<string> {
+  // inspect-agent: never compress — output contains sentinel strings parsed by Cloister
+  if (specialistType === 'inspect-agent' || !config.enabled) return '';
+
+  // Read the workspace's A/B variant if we have a workspace path
+  const variant = workspacePath ? await readCavemanVariant(workspacePath) : 'off';
+  if (variant === 'off') return '';
+  if (variant === 'disabled') {
+    return `export PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
+  }
+
+  // Map specialist type to caveman intensity mode
+  const modeMap: Record<string, keyof typeof config.modes> = {
+    'review-agent': 'review',
+    'test-agent': 'test',
+    'merge-agent': 'merge',
+  };
+  const modeKey = modeMap[specialistType];
+  if (!modeKey) return '';
+
+  const mode = config.modes[modeKey];
+  if (mode === 'off' || mode === 'disabled') return '';
+
+  return `export CAVEMAN_DEFAULT_MODE="${mode}"\nexport PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
 }
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -841,6 +883,16 @@ ${basePrompt}`;
     // 2. Specialists are task-based: each dispatch is a new task with a full prompt
     // 3. Accumulated context caused false-FAILs in test-agent (stale analysis)
     // Session ID is still deterministic per generation, so JSONL files are predictable.
+
+    // Caveman env exports for this specialist type.
+    // inspect-agent is excluded: its INSPECTION PASSED/BLOCKED sentinels are parsed
+    // by Cloister and must not be compressed.
+    const specialistCavemanExports = await buildSpecialistCavemanExports(
+      specialistType,
+      task.workspace,
+      loadYamlConfig().config.caveman
+    );
+
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
@@ -849,7 +901,7 @@ export CI=1
 export PANOPTICON_AGENT_ID="${tmuxSession}"
 export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
-prompt=$(cat "${promptFile}")
+${specialistCavemanExports}prompt=$(cat "${promptFile}")
 
 # Fresh session every dispatch — no --resume (PAN-612: thinking signature corruption)
 claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"

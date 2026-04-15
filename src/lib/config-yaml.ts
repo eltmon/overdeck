@@ -119,6 +119,52 @@ export interface YamlConfig {
      */
     also_sync?: string[];
   };
+
+  /** Agent behavior configuration */
+  agents?: {
+    /** Caveman compressed output mode configuration */
+    caveman?: CavemanConfig;
+  };
+}
+
+/**
+ * Valid caveman intensity modes for agents.
+ * Maps to CAVEMAN_DEFAULT_MODE env var values recognised by caveman-config.js.
+ */
+export type CavemanMode = 'off' | 'lite' | 'full' | 'ultra' | 'review' | 'disabled';
+
+/**
+ * Caveman hook configuration.
+ *
+ * Controls whether autonomous agents use the caveman compressed-output hooks to
+ * reduce output tokens ~65-75% without losing technical accuracy.
+ *
+ * Example (~/.panopticon/config.yaml):
+ *   agents:
+ *     caveman:
+ *       enabled: true
+ *       ab_test: false
+ *       work: full
+ *       review: review
+ *       test: full
+ *       merge: full
+ */
+export interface CavemanConfig {
+  /** Master switch — set to false to disable caveman globally with zero workspace changes */
+  enabled?: boolean;
+  /**
+   * A/B testing mode — randomly assigns new workspaces to enabled/disabled at creation.
+   * The variant is stored in workspace metadata and propagated to cost events.
+   */
+  ab_test?: boolean;
+  /** Intensity for work agents (default: 'full') */
+  work?: CavemanMode;
+  /** Intensity for review agents (default: 'review') */
+  review?: CavemanMode;
+  /** Intensity for test agents (default: 'full') */
+  test?: CavemanMode;
+  /** Intensity for merge agents (default: 'full') */
+  merge?: CavemanMode;
 }
 
 /**
@@ -184,6 +230,26 @@ export interface NormalizedConfig {
 
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
+
+  /** Caveman compressed output configuration (normalised, never undefined) */
+  caveman: NormalizedCavemanConfig;
+}
+
+/**
+ * Normalized caveman configuration — all fields resolved to their effective values.
+ */
+export interface NormalizedCavemanConfig {
+  /** Whether caveman hooks are active for new workspaces */
+  enabled: boolean;
+  /** A/B testing mode active */
+  abTest: boolean;
+  /** Per-agent-type intensity (already resolved, never undefined) */
+  modes: {
+    work: CavemanMode;
+    review: CavemanMode;
+    test: CavemanMode;
+    merge: CavemanMode;
+  };
 }
 
 /**
@@ -238,6 +304,16 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       github: false,
       gitlab: false,
       rally: false,
+    },
+  },
+  caveman: {
+    enabled: false,
+    abTest: false,
+    modes: {
+      work: 'full',
+      review: 'review',
+      test: 'full',
+      merge: 'full',
     },
   },
 };
@@ -384,6 +460,36 @@ function mergeShadowConfig(
 }
 
 /**
+ * Merge caveman configuration from a single config source into the result.
+ */
+function mergeCavemanConfig(
+  result: NormalizedCavemanConfig,
+  config: YamlConfig | null
+): void {
+  const caveman = config?.agents?.caveman;
+  if (!caveman) return;
+
+  if (caveman.enabled !== undefined) {
+    result.enabled = caveman.enabled;
+  }
+  if (caveman.ab_test !== undefined) {
+    result.abTest = caveman.ab_test;
+  }
+  if (caveman.work !== undefined) {
+    result.modes.work = caveman.work;
+  }
+  if (caveman.review !== undefined) {
+    result.modes.review = caveman.review;
+  }
+  if (caveman.test !== undefined) {
+    result.modes.test = caveman.test;
+  }
+  if (caveman.merge !== undefined) {
+    result.modes.merge = caveman.merge;
+  }
+}
+
+/**
  * Merge multiple configs with precedence: project > global > defaults
  */
 function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
@@ -396,6 +502,11 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
+    },
+    caveman: {
+      enabled: DEFAULT_CONFIG.caveman.enabled,
+      abTest: DEFAULT_CONFIG.caveman.abTest,
+      modes: { ...DEFAULT_CONFIG.caveman.modes },
     },
   };
 
@@ -569,6 +680,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
 
     // Merge shadow configuration
     mergeShadowConfig(result.shadow, config);
+
+    // Merge caveman configuration
+    mergeCavemanConfig(result.caveman, config);
   }
 
   return { config: result, explicitlyDisabled };

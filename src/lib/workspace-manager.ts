@@ -975,6 +975,24 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     // Non-fatal — agent can still work, user will just see trust prompt
   }
 
+  // Inject caveman hooks into workspace .claude/settings.json (if enabled in config)
+  try {
+    const { loadConfig: loadYamlConfig } = await import('./config-yaml.js');
+    const { determineCavemanVariant, injectCavemanSettings } = await import('./caveman/workspace.js');
+    const yamlConfig = loadYamlConfig();
+    const cavemanConfig = yamlConfig.config.caveman;
+    const variant = determineCavemanVariant(cavemanConfig);
+    await injectCavemanSettings(workspacePath, variant);
+    if (variant === 'enabled') {
+      result.steps.push('Injected caveman compression hooks into .claude/settings.json');
+    } else if (variant === 'disabled') {
+      result.steps.push('Caveman A/B test: assigned disabled variant for this workspace');
+    }
+  } catch (cavemanErr: unknown) {
+    // Non-fatal — workspace works without caveman
+    result.steps.push(`Caveman setup skipped: ${cavemanErr instanceof Error ? cavemanErr.message : String(cavemanErr)}`);
+  }
+
   result.success = result.errors.length === 0;
   return result;
 }
