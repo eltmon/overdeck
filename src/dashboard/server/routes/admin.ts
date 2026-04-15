@@ -5,6 +5,7 @@ import { httpHandler } from './http-handler.js';
  *
  * Implements /api/admin/* endpoints mirroring the `pan admin` CLI namespace:
  *   GET  /api/admin/tldr/:issueId     — TLDR daemon status for a workspace
+ *   GET  /api/admin/skills/audit      — Skill audit: audience, sync destinations, stale copies (PAN-709)
  */
 
 import { existsSync } from 'node:fs';
@@ -15,6 +16,7 @@ import { HttpRouter } from 'effect/unstable/http';
 
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { auditSkills } from '../../../cli/commands/admin/skills-handler.js';
 
 // ─── Route: GET /api/admin/tldr/:issueId ──────────────────────────────────────
 
@@ -52,8 +54,22 @@ const getAdminTldrRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: GET /api/admin/skills/audit ──────────────────────────────────────
+
+const getAdminSkillsAuditRoute = HttpRouter.add(
+  'GET',
+  '/api/admin/skills/audit',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      const records = await auditSkills();
+      return jsonResponse(records);
+    });
+  }))
+);
+
 export const adminRouteLayer = Layer.mergeAll(
   getAdminTldrRoute,
+  getAdminSkillsAuditRoute,
 );
 
 export default adminRouteLayer;

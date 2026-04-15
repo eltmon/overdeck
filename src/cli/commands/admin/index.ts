@@ -19,6 +19,7 @@ import { tldrCommand } from './tldr-handler.js';
 import { hookCommand } from './fpp-handler.js';
 import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
+import { skillsAuditCommand } from './skills-handler.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -89,6 +90,18 @@ export function registerAdminCommands(program: Command): void {
     .option('-s, --state <state>', 'State name to archive (default: Planning)')
     .option('--dry-run', 'Show what would be archived without making changes')
     .action((options) => cleanupStatesCommand(options));
+
+  // pan admin skills — skill audit and routing management (PAN-709)
+  const skills = admin
+    .command('skills')
+    .description('Skill audit and audience-routing management');
+
+  skills
+    .command('audit')
+    .description('Audit all skills: audience, sync destinations, and stale copies')
+    .option('--fix', 'Remove stale agent-only skill copies from devroot')
+    .option('--json', 'Output as JSON')
+    .action((options) => skillsAuditCommand(options));
 
   // pan admin migrate-config — one-time settings.json → config.yaml migration
   admin
