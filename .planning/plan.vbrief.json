@@ -1,0 +1,565 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-15T00:00:00.000Z",
+    "author": "plan",
+    "description": "Remove specialist queues for review, test, inspect, uat agents. Merge queue stays."
+  },
+  "plan": {
+    "id": "PAN-722",
+    "uid": "a3f2c8d1-7e4b-4a9f-b6c2-8d1e3f7a2b5c",
+    "title": "Remove queues for all specialists except merge agent",
+    "status": "approved",
+    "author": "claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-15T00:00:00.000Z",
+    "updated": "2026-04-15T00:00:00.000Z",
+    "references": {
+      "issues": ["https://github.com/eltmon/panopticon-cli/issues/722"]
+    },
+    "tags": ["refactor", "specialists", "queue-removal"],
+    "narratives": {
+      "Problem": "All specialist agents (review, test, inspect, uat, merge) have file-based hook queues. For review/test/inspect/uat, the queue exists only as a busy-fallback when a per-project specialist slot is occupied. Since specialists are ephemeral and dispatch is immediate in practice, the queue adds complexity (FPP hooks, deacon drain loops, status-tracking, CLI commands, API endpoints, dashboard UI) for minimal benefit.",
+      "Proposal": "Delete the specialist queue concept for review, test, inspect, and uat agents entirely. All dispatch is direct — try spawn, on busy set pending/dispatch_failed, let deacon orphan recovery retry. Merge queue (SQLite-backed) remains untouched because merges are human-approved serially.",
+      "Constraint": "hooks.ts cannot be deleted — it also serves the general FPP agent system (initHook, checkHook, generateFixedPointPrompt, sendMail, collectMail) used by agents.ts, fpp-violations.ts, fpp-handler.ts.",
+      "Risk": "When specialist is busy, work no longer queues — it fails to dispatch_failed or stays pending. Deacon orphan recovery (already in place) retries on next patrol (~30s). No work is lost.",
+      "Alternative": "Per-workspace specialist sessions would eliminate the busy conflict entirely. That's a separate architectural change; this PR removes the queue abstraction first."
+    },
+    "items": [
+      {
+        "id": "remove-queue-fns-specialists",
+        "title": "PAN-722: Delete queue functions from specialists.ts",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/specialists.ts, delete the entire block from the comment '=== Specialist Queue Helpers ===' (line ~2552) through completeSpecialistTask (line ~2669). This includes: the import of HookItem/pushToHook/checkHook/popFromHook from hooks.js (line 2557), the SpecialistQueueItem interface, submitToSpecialistQueue(), checkSpecialistQueue(), getNextSpecialistTask(), completeSpecialistTask(). The block ends at line ~2669 and the Feedback System section begins at ~2671 — stop there. Do NOT touch the merge-agent-related or Feedback system code below."
+        },
+        "subItems": [
+          {
+            "id": "remove-queue-fns-specialists.no-compile-error",
+            "title": "TypeScript compiles without errors after removal",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "remove-queue-fns-specialists.no-other-exports-removed",
+            "title": "All other specialists.ts exports still present (spawnEphemeralSpecialist, SpecialistType, etc.)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "rewrite-test-agent-queue",
+        "title": "PAN-722: Rewrite test-agent-queue.ts as direct dispatch (no queue fallback)",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "Rewrite src/lib/cloister/test-agent-queue.ts completely. New behavior: (1) try spawnEphemeralSpecialist, (2) if success → setReviewStatus testStatus='testing', notify work agent, (3) if specialist_busy → setReviewStatus testStatus='dispatch_failed', log warning (deacon will retry), (4) if other failure → retry once after 2s, then set dispatch_failed. Remove import of submitToSpecialistQueue. Rename exported function from autoQueueTestAgentAndNotify to dispatchTestAgentAndNotify. Update the work-agent notification message to remove the word 'queued': 'REVIEW PASSED for X. Tests have been dispatched automatically. Do NOT poll or check status — you will be notified when tests complete.'"
+        },
+        "subItems": [
+          {
+            "id": "rewrite-test-agent-queue.no-submittospecialistqueue-import",
+            "title": "No import of submitToSpecialistQueue in test-agent-queue.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "rewrite-test-agent-queue.busy-sets-dispatch-failed",
+            "title": "specialist_busy result sets testStatus='dispatch_failed' instead of queuing",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "rewrite-test-agent-queue.renamed",
+            "title": "Exported function is dispatchTestAgentAndNotify (not autoQueueTestAgentAndNotify)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-call-sites-test-agent-queue",
+        "title": "PAN-722: Update all call sites of renamed test-agent-queue function",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "Find all import/call sites of autoQueueTestAgentAndNotify across the codebase (grep: autoQueueTestAgentAndNotify). Update each import and call to use dispatchTestAgentAndNotify. Likely in src/lib/cloister/deacon.ts and/or src/dashboard/server/routes/. Do a grep to find all occurrences."
+        },
+        "subItems": [
+          {
+            "id": "update-call-sites-test-agent-queue.no-old-name",
+            "title": "grep for autoQueueTestAgentAndNotify returns zero results",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-review-status-test-trigger",
+        "title": "PAN-722: Replace test-agent queue call in review-status.ts with direct spawn",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/review-status.ts, find the block at lines ~257-287 inside setReviewStatus() that fires when reviewStatus transitions to 'passed'. Currently it calls submitToSpecialistQueue('test-agent'). Replace with: import resolveProjectFromIssue from './projects.js' and spawnEphemeralSpecialist from './cloister/specialists.js', then call spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', { issueId, workspace, branch }). On success: setReviewStatus(issueId, { testStatus: 'testing' }). On specialist_busy or failure: setReviewStatus(issueId, { testStatus: 'dispatch_failed' }). Keep the entire block async/IIFE pattern as-is. Remove import of submitToSpecialistQueue."
+        },
+        "subItems": [
+          {
+            "id": "fix-review-status-test-trigger.no-submittospecialistqueue",
+            "title": "No call to submitToSpecialistQueue in review-status.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-review-status-test-trigger.sets-dispatch-failed-on-busy",
+            "title": "specialist_busy sets testStatus='dispatch_failed'",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-service-startup-recovery",
+        "title": "PAN-722: Replace queue call in service.ts startup recovery with direct spawn",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/service.ts, find the block at lines ~337-368 that handles orphaned reviewStatus='reviewing' issues on startup. Currently calls submitToSpecialistQueue('review-agent', ...). Replace with: call spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', { issueId, workspace, branch }) instead. On success → log. On specialist_busy or failure → setReviewStatus(issueId, { reviewStatus: 'pending' }) so deacon picks it up. Remove submitToSpecialistQueue from imports."
+        },
+        "subItems": [
+          {
+            "id": "fix-service-startup-recovery.no-queue-import",
+            "title": "submitToSpecialistQueue not imported in service.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-deacon-review-dispatch",
+        "title": "PAN-722: Remove queue fallback in deacon.ts review orphan recovery",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts, find the review orphan recovery block at lines ~1270-1348. Remove: (1) the alreadyQueued check at lines ~1282-1290 (no queue to check). (2) the specialist_busy fallback at lines ~1317-1332 that calls submitToSpecialistQueue. On busy result: just log and continue (status stays 'pending', deacon will retry next patrol). Keep the success and other-failure branches. Remove import of submitToSpecialistQueue from the dynamic import within this block if it's no longer needed."
+        },
+        "subItems": [
+          {
+            "id": "fix-deacon-review-dispatch.no-alreadyqueued",
+            "title": "No alreadyQueued variable or checkSpecialistQueue call in review orphan section",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-deacon-review-dispatch.no-submit-queue",
+            "title": "No submitToSpecialistQueue call in review orphan section",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-deacon-test-dispatch",
+        "title": "PAN-722: Remove queue fallback in deacon.ts test orphan recovery",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts, find the test orphan recovery block at lines ~1352-1440. Remove: (1) the alreadyQueued check at lines ~1364-1379 that checks the test-agent queue. (2) the specialist_busy fallback at lines ~1407-1423 that calls submitToSpecialistQueue. On busy result: set testStatus='dispatch_failed', log (deacon orphan recovery handles dispatch_failed on next patrol). Keep all other branches intact."
+        },
+        "subItems": [
+          {
+            "id": "fix-deacon-test-dispatch.no-alreadyqueued",
+            "title": "No alreadyQueued variable or checkSpecialistQueue call in test orphan section",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-deacon-test-dispatch.no-submit-queue",
+            "title": "No submitToSpecialistQueue call in test orphan section",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "delete-deacon-checkspecialistqueues",
+        "title": "PAN-722: Delete checkSpecialistQueues() from deacon.ts",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts: (1) Delete the entire checkSpecialistQueues() function at lines ~2244-2323 including the JSDoc comment. (2) Delete the call at line ~2669: `const queueActions = await checkSpecialistQueues(); actions.push(...queueActions); for (const a of queueActions) addLog('action', a, state.patrolCycle);` (3) If checkSpecialistQueue or submitToSpecialistQueue is only imported inside this function or the removed branches above, also remove those dynamic imports."
+        },
+        "subItems": [
+          {
+            "id": "delete-deacon-checkspecialistqueues.function-gone",
+            "title": "grep for checkSpecialistQueues in deacon.ts returns zero results",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "delete-deacon-checkspecialistqueues.no-dead-import",
+            "title": "No orphaned imports of submitToSpecialistQueue/checkSpecialistQueue in deacon.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-request-review-busy",
+        "title": "PAN-722: Remove queue fallback in request-review endpoint",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces.ts, find the request-review handler at lines ~2719-2740. Remove the specialist_busy branch that calls submitToSpecialistQueue('review-agent'). On specialist_busy: return a 409 response with { success: false, error: 'Review specialist busy — will retry automatically', retryable: true, autoRequeueCount: newCount } and set reviewStatus: 'pending' (not 'reviewing'). Also remove the dynamic import of submitToSpecialistQueue from this handler."
+        },
+        "subItems": [
+          {
+            "id": "fix-request-review-busy.no-queue",
+            "title": "No submitToSpecialistQueue call in request-review handler",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-reset-review-queue-clear",
+        "title": "PAN-722: Remove review/test queue clearing in reset-review and related routes",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "Three places clear specialist queues on reset/destroy — remove queue clearing for review-agent and test-agent in each. Keep merge-agent queue clearing where present.\n\n1. src/dashboard/server/routes/workspaces.ts reset-review handler (lines ~2793-2804): Remove the loop over ['review-agent', 'test-agent', 'merge-agent'] → replace with just merge-agent. Actually since merge uses SQLite not hooks, this whole block that uses checkSpecialistQueue/completeSpecialistTask for reset can be deleted entirely (merge queue cleanup is handled elsewhere).\n\n2. src/dashboard/server/routes/workspaces.ts GET /api/review/:issueId/status (lines ~1963-1988): Remove the review-agent and test-agent queue lookup branches. Keep only the merge queue lookup branch (the mergeQueue check that calls checkSpecialistQueue('merge-agent')). Wait — after bead remove-queue-fns-specialists removes checkSpecialistQueue from specialists.ts, these calls will be compile errors anyway. So: import only from merge-queue-db instead of using checkSpecialistQueue for merge; or check if there's an existing merge queue position lookup path.\n\n3. src/dashboard/server/routes/specialists.ts done handler (lines ~337-353): Remove the loop that calls checkSpecialistQueue + completeSpecialistTask. Keep saveAgentRuntimeState to idle.\n\n4. src/dashboard/server/routes/issues.ts (lines ~1252-1263): Remove the for-loop that calls checkSpecialistQueue/completeSpecialistTask for review/test/merge-agent. (After the function is deleted, this becomes a compile error.)\n\nFor the merge queue position in GET /api/review/:issueId/status: use the SQLite merge-queue-db instead of the hook-based checkSpecialistQueue('merge-agent'). Import getAllActiveQueues() or a similar function from merge-queue-db.ts to check if this issue is in the merge queue and at what position. The merge queue has position tracking already."
+        },
+        "subItems": [
+          {
+            "id": "fix-reset-review-queue-clear.no-compile-errors",
+            "title": "No TypeScript errors from removed checkSpecialistQueue/completeSpecialistTask calls",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-reset-review-queue-clear.merge-queue-position-still-works",
+            "title": "GET /api/review/:issueId/status still returns merge queue position correctly",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-reopen-queue-clear",
+        "title": "PAN-722: Remove queue clearing from reopen.ts",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/reopen.ts, find the block at lines ~102-117 that loops SPECIALIST_NAMES and calls checkSpecialistQueue/completeSpecialistTask. Remove this entire block (the queue no longer exists for non-merge specialists). Also remove the imports of checkSpecialistQueue and completeSpecialistTask from specialists.ts if they're only used here. The merge queue clearing for reopened issues is handled via the SQLite merge queue path (which uses different functions), so verify no merge queue clearing regresses."
+        },
+        "subItems": [
+          {
+            "id": "fix-reopen-queue-clear.no-queue-calls",
+            "title": "No checkSpecialistQueue/completeSpecialistTask calls in reopen.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "remove-queue-api-routes",
+        "title": "PAN-722: Delete 5 queue API routes from specialists.ts route file",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/specialists.ts:\n\n1. Delete getSpecialistQueuesRoute (GET /api/specialists/queues) — lines ~630-654 including JSDoc.\n2. Delete getSpecialistQueueRoute (GET /api/specialists/:name/queue) — lines ~985-1012.\n3. Delete postSpecialistQueueRoute (POST /api/specialists/:name/queue) — lines ~1014-1087.\n4. Delete deleteSpecialistQueueItemRoute (DELETE /api/specialists/:name/queue/:itemId) — lines ~1089-1121.\n5. Delete putSpecialistQueueReorderRoute (PUT /api/specialists/:name/queue/reorder) — lines ~1123-1163.\n6. In the route composition at the bottom of the file (~lines 1949, 1961-1964): remove all 5 route variables from the composed router.\n7. Remove any imports from hooks.js or specialists.js that are now only used by these deleted routes (reorderHookItems, submitToSpecialistQueue, checkSpecialistQueue, completeSpecialistTask)."
+        },
+        "subItems": [
+          {
+            "id": "remove-queue-api-routes.no-queue-routes",
+            "title": "curl GET /api/specialists/queues returns 404",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "remove-queue-api-routes.other-routes-intact",
+            "title": "Other specialist routes (start, stop, done, status) still work",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "delete-cli-queue-commands",
+        "title": "PAN-722: Delete pan specialists queue and clear-queue CLI commands",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "1. Delete src/cli/commands/specialists/queue.ts.\n2. Delete src/cli/commands/specialists/clear-queue.ts.\n3. In src/cli/commands/specialists/index.ts, remove the imports of queueCommand (line 10) and clearQueueCommand (line 12), and remove the .command('queue') block (lines ~35-40) and .command('clear-queue') block (lines ~50-56)."
+        },
+        "subItems": [
+          {
+            "id": "delete-cli-queue-commands.files-gone",
+            "title": "queue.ts and clear-queue.ts deleted",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "delete-cli-queue-commands.index-clean",
+            "title": "specialists/index.ts has no references to queue/clear-queue commands",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "delete-cli-queue-commands.pan-typecheck",
+            "title": "npm run typecheck passes after deletion",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-handoff-logger-queue-depth",
+        "title": "PAN-722: Narrow getLiveQueueDepth to merge-agent only",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/specialist-handoff-logger.ts, change KNOWN_SPECIALISTS (lines ~17-23) to only include 'merge-agent': `const KNOWN_SPECIALISTS = ['merge-agent'] as const;`. The getLiveQueueDepth function reads hook.json files — after this change it will only count merge-agent's hook items. Add a comment: '// Only merge-agent uses a hook queue; all other specialists dispatch directly'."
+        },
+        "subItems": [
+          {
+            "id": "update-handoff-logger-queue-depth.only-merge",
+            "title": "KNOWN_SPECIALISTS only contains 'merge-agent'",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-frontend-queue-labels",
+        "title": "PAN-722: Update frontend queue metric labels and descriptions",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "Three frontend components show queueDepth with stale labels:\n\n1. src/dashboard/frontend/src/components/MetricsSummaryRow.tsx: Change label='Queue' (line ~147) to label='Merge Queue'. Update the color threshold comment if any.\n\n2. src/dashboard/frontend/src/components/MetricsSummary.tsx: Find the 'Queue Depth' or 'pending' label (lines ~180-185) and update to 'Merge Queue' / 'in merge queue'.\n\n3. src/dashboard/frontend/src/components/HandoffsPage.tsx: Change the description at line ~312 from 'Queue-based work handoffs between specialist agents (review, test, merge)' to 'Specialist pipeline: review → test → merge'. Remove or update the Queue Depth stat at line ~324-326 to be 'Merge Queue'.\n\nAlso update InspectorPanel.tsx if it has a 'Queued' label for review/test states — after this change, queuePosition will only be set for merge, so review/test should show 'Running...' (pos=0) or not show queue position at all."
+        },
+        "subItems": [
+          {
+            "id": "update-frontend-queue-labels.no-stale-queue-labels",
+            "title": "No component shows 'Queue' metric that includes review/test queue depth",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "delete-specialists-queue-tests",
+        "title": "PAN-722: Delete specialists-queue.test.ts",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "Delete tests/lib/cloister/specialists-queue.test.ts (282 lines). This file tests submitToSpecialistQueue, checkSpecialistQueue, getNextSpecialistTask, completeSpecialistTask — all of which are being deleted."
+        },
+        "subItems": [
+          {
+            "id": "delete-specialists-queue-tests.file-gone",
+            "title": "tests/lib/cloister/specialists-queue.test.ts does not exist",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-deacon-orphan-recovery-tests",
+        "title": "PAN-722: Update deacon-orphan-recovery.test.ts to remove queue test cases",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In tests/lib/cloister/deacon-orphan-recovery.test.ts (294 lines): remove any test cases that assert alreadyQueued behavior (e.g. 'skips dispatch if already queued', 'adds to queue when specialist busy'). Update test cases for busy specialist to assert dispatch_failed is set rather than queuing. If mock stubs for submitToSpecialistQueue exist, remove them."
+        },
+        "subItems": [
+          {
+            "id": "update-deacon-orphan-recovery-tests.no-queue-mocks",
+            "title": "No mock of submitToSpecialistQueue in deacon-orphan-recovery.test.ts",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "update-deacon-orphan-recovery-tests.passes",
+            "title": "deacon-orphan-recovery.test.ts passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-pan-343-pan-344-tests",
+        "title": "PAN-722: Update pan-343 and pan-344 test files to remove queue expectations",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "1. tests/unit/dashboard/pan-343-test-delivery.test.ts (201 lines): Update tests that mock/assert submitToSpecialistQueue behavior. After this change, test delivery uses spawnEphemeralSpecialist directly. Update mocks and assertions accordingly.\n\n2. tests/unit/lib/cloister/pan-344-auto-merge.test.ts (252 lines): Check for any queue-related stubs. Update if needed.\n\nRun the tests after updating to verify they pass."
+        },
+        "subItems": [
+          {
+            "id": "update-pan-343-pan-344-tests.pan-343-passes",
+            "title": "pan-343-test-delivery.test.ts passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "update-pan-343-pan-344-tests.pan-344-passes",
+            "title": "pan-344-auto-merge.test.ts passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-inspector-panel-tests",
+        "title": "PAN-722: Update InspectorPanel.test.tsx queue position tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/InspectorPanel.test.tsx: Remove test cases for queuePosition >= 1 ('Queued', 'Queued (2nd)', 'Queued (3rd)' etc.) since review/test agents no longer queue. queuePosition can still be 0 (actively processing) for review/test, but 1+ only applies to merge queue. If the getSpecialistButtonState function is what these tests call, update it: queuePosition >= 1 should only produce 'Queued' label when activeSpecialist === 'merge'. For review/test, if position 0, show 'Reviewing...' or 'Testing...'. Delete test cases that test queuePosition 1-21 for review/test specialists."
+        },
+        "subItems": [
+          {
+            "id": "update-inspector-panel-tests.passes",
+            "title": "InspectorPanel.test.tsx passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates",
+        "title": "PAN-722: Run quality gates — typecheck, lint, tests",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-722"
+        },
+        "narrative": {
+          "Action": "From the feature-pan-722 workspace root:\n1. Run `bun install` to ensure node_modules are correct.\n2. Run `npm run typecheck` — must pass with zero errors.\n3. Run `npm run lint` — must pass.\n4. Run `npm test` — all tests must pass.\nFix any issues found before marking done."
+        },
+        "subItems": [
+          {
+            "id": "quality-gates.typecheck-passes",
+            "title": "npm run typecheck passes with zero errors",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "quality-gates.lint-passes",
+            "title": "npm run lint passes",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "quality-gates.tests-pass",
+            "title": "npm test passes — merge queue tests still green, specialists-queue.test.ts deleted",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "remove-queue-fns-specialists", "to": "rewrite-test-agent-queue", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-review-status-test-trigger", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-service-startup-recovery", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-deacon-review-dispatch", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-deacon-test-dispatch", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "delete-deacon-checkspecialistqueues", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-request-review-busy", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-reset-review-queue-clear", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "fix-reopen-queue-clear", "type": "blocks" },
+      { "from": "remove-queue-fns-specialists", "to": "remove-queue-api-routes", "type": "blocks" },
+      { "from": "rewrite-test-agent-queue", "to": "update-call-sites-test-agent-queue", "type": "blocks" },
+      { "from": "delete-cli-queue-commands", "to": "quality-gates", "type": "blocks" },
+      { "from": "fix-deacon-review-dispatch", "to": "quality-gates", "type": "blocks" },
+      { "from": "fix-deacon-test-dispatch", "to": "quality-gates", "type": "blocks" },
+      { "from": "delete-deacon-checkspecialistqueues", "to": "quality-gates", "type": "blocks" },
+      { "from": "remove-queue-api-routes", "to": "quality-gates", "type": "blocks" },
+      { "from": "fix-reset-review-queue-clear", "to": "quality-gates", "type": "blocks" },
+      { "from": "delete-specialists-queue-tests", "to": "quality-gates", "type": "blocks" },
+      { "from": "update-deacon-orphan-recovery-tests", "to": "quality-gates", "type": "blocks" },
+      { "from": "update-pan-343-pan-344-tests", "to": "quality-gates", "type": "blocks" },
+      { "from": "update-inspector-panel-tests", "to": "quality-gates", "type": "blocks" },
+      { "from": "update-handoff-logger-queue-depth", "to": "quality-gates", "type": "blocks" }
+    ]
+  }
+}

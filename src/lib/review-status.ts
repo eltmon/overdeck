@@ -249,11 +249,10 @@ export function setReviewStatus(
     emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
   }
 
-  // Queue test-agent when review transitions to 'passed'.
+  // Dispatch test-agent when review transitions to 'passed'.
   // This fires regardless of how setReviewStatus() is called (API or direct import),
-  // ensuring test-agent is queued even when review-agent bypasses the specialist
-  // dispatch endpoint. Idempotent — if test-agent is already queued, pushToHook
-  // deduplicates by issueId.
+  // ensuring test-agent is dispatched even when review-agent bypasses the specialist
+  // dispatch endpoint.
   if (
     update.reviewStatus === 'passed' &&
     existing.reviewStatus !== 'passed' &&
@@ -261,7 +260,8 @@ export function setReviewStatus(
   ) {
     (async () => {
       try {
-        const { submitToSpecialistQueue } = await import('./cloister/specialists.js');
+        const { spawnEphemeralSpecialist } = await import('./cloister/specialists.js');
+        const { resolveProjectFromIssue } = await import('./projects.js');
         const workAgentId = `agent-${issueId.toLowerCase()}`;
         const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
         let workspace: string | undefined;
@@ -273,16 +273,26 @@ export function setReviewStatus(
             branch = workState.branch || `feature/${issueId.toLowerCase()}`;
           } catch {}
         }
-        submitToSpecialistQueue('test-agent', {
-          priority: 'high',
-          source: 'review-agent-auto',
+        const resolved = resolveProjectFromIssue(issueId);
+        if (!resolved) {
+          console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
+          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `No project configured for ${issueId}` });
+          return;
+        }
+        const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
           issueId,
           workspace,
           branch,
         });
-        console.log(`[review-status] Queued test-agent for ${issueId} after review passed`);
+        if (result.success) {
+          setReviewStatus(issueId, { testStatus: 'testing' });
+          console.log(`[review-status] Dispatched test-agent for ${issueId} after review passed`);
+        } else {
+          console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${result.message}`);
+          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `Dispatch failed: ${result.message}` });
+        }
       } catch (err: any) {
-        console.warn(`[review-status] Failed to queue test-agent for ${issueId}: ${err.message}`);
+        console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${err.message}`);
       }
     })();
   }

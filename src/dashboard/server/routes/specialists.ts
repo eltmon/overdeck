@@ -330,11 +330,11 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // Apply the update (triggers side effects like idle state, queue processing)
     const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
 
-    // Set specialist state to idle and clear queue.
+    // Set specialist state to idle.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
     yield* Effect.promise(async () => {
       try {
-        const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } =
+        const { getTmuxSessionName } =
           await import('../../../lib/cloister/specialists.js');
         const tmuxSession = getTmuxSessionName(`${specialist}-agent` as SpecialistType);
         saveAgentRuntimeState(tmuxSession, {
@@ -342,15 +342,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           lastActivity: new Date().toISOString(),
         });
         console.log(`[specialists/done] Set ${specialist}-agent to idle`);
-
-        // Clear this issue from the specialist's queue
-        const queue = checkSpecialistQueue(`${specialist}-agent` as SpecialistType);
-        for (const item of queue.items) {
-          if (item.payload?.issueId?.toLowerCase() === normalizedIssueId.toLowerCase()) {
-            completeSpecialistTask(`${specialist}-agent` as SpecialistType, item.id);
-            console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
-          }
-        }
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../lib/cloister/specialist-handoff-logger.js');
@@ -624,32 +615,6 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
       byProject: results.byProject,
       message: `Cleaned up ${results.totalDeleted} old logs`,
     });
-  })),
-);
-
-// ─── Route: GET /api/specialists/queues ───────────────────────────────────────
-// NOTE: Must be registered before /:name/queue to avoid "queues" matching as :name.
-
-const getSpecialistQueuesRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/queues',
-  httpHandler(Effect.gen(function* () {
-    const { getAllSpecialists, checkSpecialistQueue } =
-      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const specialists = getAllSpecialists();
-
-    const queues = specialists.map((specialist) => {
-      const queue = checkSpecialistQueue(specialist.name);
-      return {
-        specialistName: specialist.name,
-        hasWork: queue.hasWork,
-        urgentCount: queue.urgentCount,
-        totalCount: queue.items.length,
-        items: queue.items,
-      };
-    });
-
-    return jsonResponse({ queues });
   })),
 );
 
@@ -982,186 +947,6 @@ const getSpecialistCostRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/specialists/:name/queue ──────────────────────────────────
-
-const getSpecialistQueueRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:name/queue',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const name = params['name'] as string;
-
-    if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return jsonResponse(
-        { error: `Invalid specialist name: ${name}` },
-        { status: 400 },
-      );
-    }
-
-    const { checkSpecialistQueue } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const queue = checkSpecialistQueue(name as SpecialistType);
-
-    return jsonResponse({
-      specialistName: name,
-      hasWork: queue.hasWork,
-      urgentCount: queue.urgentCount,
-      totalCount: queue.items.length,
-      items: queue.items,
-    });
-  })),
-);
-
-// ─── Route: POST /api/specialists/:name/queue ─────────────────────────────────
-
-const postSpecialistQueueRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:name/queue',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const name = params['name'] as string;
-    const body = yield* readJsonBody;
-    const {
-      issueId,
-      workspace,
-      branch,
-      customPrompt,
-      priority = 'normal',
-    } = body as {
-      issueId?: string;
-      workspace?: string;
-      branch?: string;
-      customPrompt?: string;
-      priority?: string;
-    };
-
-    if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return jsonResponse(
-        { error: `Invalid specialist name: ${name}` },
-        { status: 400 },
-      );
-    }
-
-    if (!issueId) {
-      return jsonResponse({ error: 'issueId is required' }, { status: 400 });
-    }
-
-    const { spawnEphemeralSpecialist, submitToSpecialistQueue } =
-      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-
-    const resolved = resolveProjectFromIssue(issueId);
-    if (!resolved) {
-      return jsonResponse(
-        { error: `No project configured for ${issueId}. Add it to projects.yaml.` },
-        { status: 400 },
-      );
-    }
-
-    const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, name as SpecialistType, {
-      issueId,
-      workspace,
-      branch,
-      promptOverride: customPrompt,
-    }));
-
-    if (!result.success && result.error === 'specialist_busy') {
-      submitToSpecialistQueue(name as SpecialistType, {
-        priority: priority as 'urgent' | 'normal' | 'low',
-        source: 'api-queue',
-        issueId,
-        workspace,
-        branch,
-      });
-      return jsonResponse({
-        success: true,
-        queued: true,
-        message: `${name} busy, task queued for ${issueId}`,
-      });
-    }
-
-    return jsonResponse({
-      success: result.success,
-      queued: false,
-      ...result,
-    });
-  })),
-);
-
-// ─── Route: DELETE /api/specialists/:name/queue/:itemId ───────────────────────
-
-const deleteSpecialistQueueItemRoute = HttpRouter.add(
-  'DELETE',
-  '/api/specialists/:name/queue/:itemId',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const name = params['name'] as string;
-    const itemId = params['itemId'] as string;
-
-    if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return jsonResponse(
-        { error: `Invalid specialist name: ${name}` },
-        { status: 400 },
-      );
-    }
-
-    const { completeSpecialistTask } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const success = completeSpecialistTask(name as SpecialistType, itemId);
-
-    if (!success) {
-      return jsonResponse(
-        { error: `Item ${itemId} not found in queue for ${name}` },
-        { status: 404 },
-      );
-    }
-
-    return jsonResponse({
-      success: true,
-      message: `Removed item ${itemId} from ${name}'s queue`,
-    });
-  })),
-);
-
-// ─── Route: PUT /api/specialists/:name/queue/reorder ──────────────────────────
-
-const putSpecialistQueueReorderRoute = HttpRouter.add(
-  'PUT',
-  '/api/specialists/:name/queue/reorder',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const name = params['name'] as string;
-    const body = yield* readJsonBody;
-    const { itemIds } = body as { itemIds?: unknown };
-
-    if (!Array.isArray(itemIds)) {
-      return jsonResponse(
-        { error: 'itemIds must be an array' },
-        { status: 400 },
-      );
-    }
-
-    if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return jsonResponse(
-        { error: `Invalid specialist name: ${name}` },
-        { status: 400 },
-      );
-    }
-
-    const { reorderHookItems } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
-    const success = reorderHookItems(name, itemIds as string[]);
-
-    if (!success) {
-      return jsonResponse(
-        { error: 'Failed to reorder queue. Check that all item IDs are valid.' },
-        { status: 400 },
-      );
-    }
-
-    return jsonResponse({
-      success: true,
-      message: `Reordered queue for ${name}`,
-    });
-  })),
-);
-
 // ─── Route: POST /api/specialists/:name/auto-complete ────────────────────────
 
 const postSpecialistAutoCompleteRoute = HttpRouter.add(
@@ -1192,155 +977,107 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
     const {
       getTmuxSessionName,
-      completeSpecialistTask,
-      wakeSpecialistWithTask,
-      checkSpecialistQueue,
-      submitToSpecialistQueue,
+      spawnEphemeralSpecialist,
     } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-        const tmuxSession = getTmuxSessionName(name as SpecialistType);
+    const tmuxSession = getTmuxSessionName(name as SpecialistType);
 
-        // Set specialist to idle and clear currentIssue
-        saveAgentRuntimeState(tmuxSession, {
-          state: 'idle',
-          lastActivity: new Date().toISOString(),
-          currentIssue: undefined,
+    // Set specialist to idle and clear currentIssue
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      currentIssue: undefined,
+    });
+
+    // Update review/test status based on specialist type
+    const existingStatus = getReviewStatus(issueId);
+
+    if (name === 'review-agent') {
+      const alreadyReported =
+        existingStatus?.reviewNotes &&
+        !existingStatus.reviewNotes.startsWith('Auto-detected:');
+      if (alreadyReported) {
+        console.log(
+          `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.reviewStatus})`,
+        );
+      } else {
+        setReviewStatusBase(issueId, {
+          reviewStatus: status === 'passed' ? 'passed' : 'blocked',
+          reviewNotes: `Auto-detected: ${status}`,
         });
+      }
 
-        // Update review/test status based on specialist type
-        const existingStatus = getReviewStatus(issueId);
+      // If passed (by either method), dispatch test-agent immediately
+      const effectiveReviewStatus = alreadyReported
+        ? existingStatus!.reviewStatus
+        : status === 'passed'
+        ? 'passed'
+        : 'blocked';
+      if (effectiveReviewStatus === 'passed') {
+        // Get workspace info from work agent state
+        const workAgentId = `agent-${issueId.toLowerCase()}`;
+        const workStateFile = join(
+          homedir(),
+          '.panopticon',
+          'agents',
+          workAgentId,
+          'state.json',
+        );
+        let workspace: string | undefined;
+        let branch: string | undefined;
 
-        if (name === 'review-agent') {
-          const alreadyReported =
-            existingStatus?.reviewNotes &&
-            !existingStatus.reviewNotes.startsWith('Auto-detected:');
-          if (alreadyReported) {
-            console.log(
-              `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.reviewStatus})`,
-            );
-          } else {
-            setReviewStatusBase(issueId, {
-              reviewStatus: status === 'passed' ? 'passed' : 'blocked',
-              reviewNotes: `Auto-detected: ${status}`,
-            });
-          }
-
-          // If passed (by either method), queue test-agent
-          const effectiveReviewStatus = alreadyReported
-            ? existingStatus!.reviewStatus
-            : status === 'passed'
-            ? 'passed'
-            : 'blocked';
-          if (effectiveReviewStatus === 'passed') {
-            // Get workspace info from work agent state
-            const workAgentId = `agent-${issueId.toLowerCase()}`;
-            const workStateFile = join(
-              homedir(),
-              '.panopticon',
-              'agents',
-              workAgentId,
-              'state.json',
-            );
-            let workspace: string | undefined;
-            let branch: string | undefined;
-
-            if (existsSync(workStateFile)) {
-              try {
-                const workState = JSON.parse(yield* Effect.promise(() => readFile(workStateFile, 'utf-8')));
-                workspace = workState.workspace;
-                branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-              } catch {}
-            }
-
-            submitToSpecialistQueue('test-agent', {
-              priority: 'high',
-              source: 'review-agent-auto',
-              issueId,
-              workspace,
-              branch,
-            });
-            console.log(`[specialists] Queued test-agent for ${issueId} after review passed`);
-          }
-        } else if (name === 'test-agent') {
-          const alreadyReported =
-            existingStatus?.testNotes && !existingStatus.testNotes.startsWith('Auto-detected:');
-          if (alreadyReported) {
-            console.log(
-              `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.testStatus})`,
-            );
-          } else {
-            const testPassed = status === 'passed';
-            setReviewStatusBase(issueId, {
-              testStatus: testPassed ? 'passed' : 'failed',
-              testNotes: `Auto-detected: ${status}`,
-              // Set readyForMerge when test passes. Post-rebase verification in
-              // triggerMerge() is the real quality gate, not stale pre-merge verification.
-              // Without this, issues that go through per-project specialists never
-              // transition to readyForMerge (PAN-615).
-              ...(testPassed ? { readyForMerge: true } : {}),
-            });
-            if (testPassed) {
-              console.log(`[specialists] ${issueId} marked ready for merge after auto-detected test pass`);
-            }
-          }
+        if (existsSync(workStateFile)) {
+          try {
+            const workState = JSON.parse(yield* Effect.promise(() => readFile(workStateFile, 'utf-8')));
+            workspace = workState.workspace;
+            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+          } catch {}
         }
 
-        // Clear the current task from queue (if it matches)
-        const queueStatus = checkSpecialistQueue(name as SpecialistType);
-        for (const item of queueStatus.items) {
-          if (item.payload?.issueId?.toUpperCase() === issueId.toUpperCase()) {
-            completeSpecialistTask(name as SpecialistType, item.id);
-            console.log(`[specialists] Cleared ${issueId} from ${name} queue`);
-            break;
-          }
-        }
-
-        // Check for next queued task and wake if available
-        const specialistQueue = checkSpecialistQueue(name as SpecialistType);
-        let nextValidTask = null;
-        for (const task of specialistQueue.items) {
-          const taskIssueId = task.payload?.issueId;
-          if (!taskIssueId) {
-            completeSpecialistTask(name as SpecialistType, task.id);
-            continue;
-          }
-
-          const taskStatus = getReviewStatus(taskIssueId);
-          if (name === 'review-agent' && taskStatus?.reviewStatus === 'passed') {
-            completeSpecialistTask(name as SpecialistType, task.id);
-            console.log(
-              `[specialists] Skipping stale ${name} queue item: ${taskIssueId} (already reviewed)`,
-            );
-            continue;
-          }
-          if (name === 'test-agent' && taskStatus?.testStatus === 'passed') {
-            completeSpecialistTask(name as SpecialistType, task.id);
-            console.log(
-              `[specialists] Skipping stale ${name} queue item: ${taskIssueId} (already tested)`,
-            );
-            continue;
-          }
-          if (taskStatus?.mergeStatus === 'merged') {
-            completeSpecialistTask(name as SpecialistType, task.id);
-            console.log(
-              `[specialists] Skipping stale ${name} queue item: ${taskIssueId} (already merged)`,
-            );
-            continue;
-          }
-
-          nextValidTask = task;
-          break;
-        }
-
-        if (nextValidTask) {
-          console.log(`[specialists] Waking ${name} for next task: ${nextValidTask.payload.issueId}`);
-          yield* Effect.promise(() => wakeSpecialistWithTask(name as SpecialistType, {
-            issueId: nextValidTask.payload.issueId!,
-            workspace: nextValidTask.payload.context?.workspace,
-            branch: nextValidTask.payload.context?.branch,
+        const resolved = resolveProjectFromIssue(issueId);
+        if (resolved) {
+          const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+            issueId,
+            workspace,
+            branch,
           }));
-          completeSpecialistTask(name as SpecialistType, nextValidTask.id);
+          if (result.success) {
+            setReviewStatusBase(issueId, { testStatus: 'testing' });
+            console.log(`[specialists] Dispatched test-agent for ${issueId} after review passed`);
+          } else {
+            setReviewStatusBase(issueId, {
+              testStatus: 'dispatch_failed',
+              testNotes: `Test specialist dispatch failed: ${result.message || result.error}. Deacon will retry.`,
+            });
+            console.log(`[specialists] Test-agent dispatch failed for ${issueId}: ${result.message || result.error}`);
+          }
+        } else {
+          console.warn(`[specialists] Cannot dispatch test-agent for ${issueId}: no project configured`);
         }
+      }
+    } else if (name === 'test-agent') {
+      const alreadyReported =
+        existingStatus?.testNotes && !existingStatus.testNotes.startsWith('Auto-detected:');
+      if (alreadyReported) {
+        console.log(
+          `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.testStatus})`,
+        );
+      } else {
+        const testPassed = status === 'passed';
+        setReviewStatusBase(issueId, {
+          testStatus: testPassed ? 'passed' : 'failed',
+          testNotes: `Auto-detected: ${status}`,
+          // Set readyForMerge when test passes. Post-rebase verification in
+          // triggerMerge() is the real quality gate, not stale pre-merge verification.
+          // Without this, issues that go through per-project specialists never
+          // transition to readyForMerge (PAN-615).
+          ...(testPassed ? { readyForMerge: true } : {}),
+        });
+        if (testPassed) {
+          console.log(`[specialists] ${issueId} marked ready for merge after auto-detected test pass`);
+        }
+      }
+    }
 
     yield* eventStore.append({
       type: 'specialist.completed',
@@ -1352,7 +1089,6 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       success: true,
       status,
       issueId,
-      nextTaskQueued: !!nextValidTask,
     });
   })),
 );
@@ -1409,28 +1145,6 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       success: true,
       message: `Killed ${type} (${project})`,
     });
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/queue ────────────────────────
-
-const getProjectSpecialistQueueRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/queue',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistType(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { checkSpecialistQueue } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const queue = checkSpecialistQueue(type);
-    return jsonResponse(queue);
   })),
 );
 
@@ -1946,7 +1660,6 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
 export const specialistsRouteLayer = Layer.mergeAll(
   // ── Static-segment routes (must come first) ──
   getSpecialistsRoute,
-  getSpecialistQueuesRoute,
   getSpecialistsProjectsRoute,
   postSpecialistsResetAllRoute,
   postSpecialistsDoneRoute,
@@ -1958,16 +1671,11 @@ export const specialistsRouteLayer = Layer.mergeAll(
   postSpecialistInitRoute,
   postSpecialistReportStatusRoute,
   getSpecialistCostRoute,
-  getSpecialistQueueRoute,
-  postSpecialistQueueRoute,
-  deleteSpecialistQueueItemRoute,
-  putSpecialistQueueReorderRoute,
   postSpecialistAutoCompleteRoute,
 
   // ── Per-project /api/specialists/:project/:type/* routes ──
   getProjectSpecialistStatusRoute,
   postProjectSpecialistKillRoute,
-  getProjectSpecialistQueueRoute,
   postProjectSpecialistSpawnRoute,
   getProjectSpecialistRunsRoute,
   getProjectSpecialistRunStreamRoute,       // /runs/:runId/stream — before /runs/:runId

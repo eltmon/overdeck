@@ -168,12 +168,12 @@ export function MetricsSummary() {
         </div>
       </div>
 
-      {/* Queue Depth */}
+      {/* Merge Queue Depth */}
       <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-warning" />
-            <span className="text-sm text-content-subtle">Queue Depth</span>
+            <span className="text-sm text-content-subtle">Merge Queue</span>
           </div>
         </div>
         <div className="text-2xl font-bold text-content">

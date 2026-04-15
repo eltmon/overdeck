@@ -2411,16 +2411,17 @@ export interface TaskContext {
 }
 
 /**
- * Wake a specialist or queue the task if busy
+ * Wake a specialist, returning specialist_busy if currently active.
  *
  * This wrapper checks if the specialist is busy before waking.
- * If the specialist is running but not idle, the task is queued instead.
+ * If the specialist is running but not idle, returns error: 'specialist_busy'
+ * — callers should set dispatch_failed so the deacon can retry on the next patrol.
  *
  * @param name - Specialist name
  * @param task - Task details
  * @param priority - Task priority (default: 'normal')
  * @param source - Source of the task (default: 'handoff')
- * @returns Promise with result indicating whether task was queued or executed
+ * @returns Promise with result indicating success or busy error
  */
 export async function wakeSpecialistOrQueue(
   name: SpecialistType,
@@ -2470,35 +2471,15 @@ export async function wakeSpecialistOrQueue(
   const runtimeState = getAgentRuntimeState(tmuxSession);
   const idle = runtimeState?.state === 'idle' || runtimeState?.state === 'suspended';
 
-  // If running and busy (active), queue the task
+  // If running and busy (active), return specialist_busy — callers handle retry
   if (running && !idle) {
-    try {
-      submitToSpecialistQueue(name, {
-        priority,
-        source,
-        issueId: task.issueId,
-        workspace: task.workspace,
-        branch: task.branch,
-        prUrl: task.prUrl,
-        context: task.context,
-      });
-
-      console.log(`[specialist] ${name} busy, queued task for ${task.issueId} (priority: ${priority})`);
-
-      return {
-        success: true,
-        queued: true,
-        message: `Specialist ${name} is busy. Task queued with ${priority} priority.`,
-      };
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      return {
-        success: false,
-        queued: false,
-        message: `Failed to queue task for ${name}: ${msg}`,
-        error: msg,
-      };
-    }
+    console.log(`[specialist] ${name} busy for ${task.issueId} — caller should retry or deacon will recover`);
+    return {
+      success: false,
+      queued: false,
+      message: `Specialist ${name} is busy. Deacon will retry on next patrol.`,
+      error: 'specialist_busy',
+    };
   }
 
   // Otherwise, wake the specialist directly
@@ -2546,126 +2527,6 @@ export async function wakeSpecialistOrQueue(
       error: msg,
     };
   }
-}
-
-/**
- * ===========================================================================
- * Specialist Queue Helpers
- * ===========================================================================
- */
-
-import { HookItem, pushToHook, checkHook, popFromHook } from '../hooks.js';
-
-/**
- * Specialist queue item - extends HookItem with specialist-specific payload
- */
-export interface SpecialistQueueItem extends HookItem {
-  type: 'task';
-  payload: {
-    prUrl?: string;
-    issueId: string;
-    workspace?: string;
-    branch?: string;
-    filesChanged?: string[];
-    context?: TaskContext;
-  };
-}
-
-/**
- * Submit a task to a specialist's queue
- *
- * @param specialistName - Name of the specialist (e.g., 'review-agent', 'merge-agent')
- * @param task - Task details
- * @returns The created queue item
- */
-export function submitToSpecialistQueue(
-  specialistName: SpecialistType,
-  task: {
-    priority: 'urgent' | 'high' | 'normal' | 'low';
-    source: string;
-    prUrl?: string;
-    issueId: string;
-    workspace?: string;
-    branch?: string;
-    filesChanged?: string[];
-    context?: TaskContext;
-  }
-): HookItem {
-  // Put specialist-specific fields into context to match HookItem type
-  const item: Omit<HookItem, 'id' | 'createdAt'> = {
-    type: 'task',
-    priority: task.priority,
-    source: task.source,
-    payload: {
-      issueId: task.issueId,
-      context: {
-        ...task.context,
-        prUrl: task.prUrl,
-        workspace: task.workspace,
-        branch: task.branch,
-        filesChanged: task.filesChanged,
-      },
-    },
-  };
-
-  const queueItem = pushToHook(specialistName, item);
-
-  notifyPipeline({ type: 'task_queued', specialist: specialistName, issueId: task.issueId });
-
-  // Log specialist handoff event
-  const handoffEvent = createSpecialistHandoff(
-    task.source, // From (e.g., 'review-agent' or 'issue-agent')
-    specialistName, // To specialist
-    task.issueId,
-    task.priority,
-    {
-      workspace: task.workspace,
-      branch: task.branch,
-      prUrl: task.prUrl,
-      source: task.source,
-    }
-  );
-  logSpecialistHandoff(handoffEvent);
-
-  return queueItem;
-}
-
-/**
- * Check if a specialist has pending work in their queue
- *
- * @param specialistName - Name of the specialist
- * @returns Queue status
- */
-export function checkSpecialistQueue(specialistName: SpecialistType): {
-  hasWork: boolean;
-  urgentCount: number;
-  items: HookItem[];
-} {
-  return checkHook(specialistName);
-}
-
-/**
- * Remove a completed task from a specialist's queue
- *
- * @param specialistName - Name of the specialist
- * @param itemId - ID of the completed task
- * @returns True if item was removed
- */
-export function completeSpecialistTask(specialistName: SpecialistType, itemId: string): boolean {
-  return popFromHook(specialistName, itemId);
-}
-
-/**
- * Get the next task from a specialist's queue (highest priority)
- *
- * Does NOT remove the task - use completeSpecialistTask() after execution.
- *
- * @param specialistName - Name of the specialist
- * @returns The next task or null if queue is empty
- */
-export function getNextSpecialistTask(specialistName: SpecialistType): HookItem | null {
-  const { items } = checkSpecialistQueue(specialistName);
-  return items.length > 0 ? items[0] : null;
 }
 
 /**

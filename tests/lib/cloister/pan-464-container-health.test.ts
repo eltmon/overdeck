@@ -72,12 +72,8 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   initializeSpecialist: vi.fn(),
   wakeSpecialist: vi.fn(),
   clearSessionId: vi.fn(),
-  checkSpecialistQueue: vi.fn().mockResolvedValue({ items: [] }),
-  submitToSpecialistQueue: vi.fn(),
   spawnEphemeralSpecialist: vi.fn(),
-  getNextSpecialistTask: vi.fn(),
   wakeSpecialistWithTask: vi.fn(),
-  completeSpecialistTask: vi.fn(),
   getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
 }));
 

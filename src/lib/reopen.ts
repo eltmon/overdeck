@@ -12,9 +12,6 @@ import {
   saveReviewStatuses,
   type ReviewStatus,
 } from '../dashboard/server/review-status.js';
-import { checkSpecialistQueue, completeSpecialistTask, type SpecialistType } from './cloister/specialists.js';
-
-const SPECIALIST_NAMES: SpecialistType[] = ['review-agent', 'test-agent', 'merge-agent'];
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -99,24 +96,7 @@ export function reopenWorkspaceState(
   saveReviewStatuses(statuses, options.statusFilePath);
   result.specialistStatesReset = true;
 
-  // 2. Remove issue from all specialist queues
-  for (const specialistName of SPECIALIST_NAMES) {
-    const queue = checkSpecialistQueue(specialistName);
-    let removed = 0;
-    for (const item of queue.items) {
-      const itemIssueId = item.payload.issueId;
-      if (itemIssueId && itemIssueId.toUpperCase() === issueId.toUpperCase()) {
-        if (completeSpecialistTask(specialistName, item.id)) {
-          removed++;
-        }
-      }
-    }
-    if (removed > 0) {
-      result.queueItemsRemoved[specialistName] = removed;
-    }
-  }
-
-  // 3. Append "Reopened" section to STATE.md
+  // 2. Append "Reopened" section to STATE.md
   const statePath = join(workspacePath, '.planning', 'STATE.md');
   if (existsSync(statePath)) {
     const previousContent = readFileSync(statePath, 'utf-8');
