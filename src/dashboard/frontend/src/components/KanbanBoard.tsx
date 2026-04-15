@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -2119,6 +2119,7 @@ interface IssueCardProps {
 function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
@@ -2364,11 +2365,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const handleStartAgent = (e: React.MouseEvent) => {
     e.stopPropagation();
     startAgentMutation.mutate();
-  };
-
-  const handlePlan = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPlan();
   };
 
   // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
