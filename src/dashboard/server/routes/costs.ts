@@ -33,6 +33,7 @@ import {
   getDailyTrends,
   getModelRollup,
   getAgentRollup,
+  getCavemanExperimentData,
 } from '../../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
@@ -314,6 +315,17 @@ const postCostsReconcileRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/costs/experiments ───────────────────────────────────────
+
+const getCostsExperimentsRoute = HttpRouter.add(
+  'GET',
+  '/api/costs/experiments',
+  httpHandler(Effect.try({
+    try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const costsRouteLayer = Layer.mergeAll(
@@ -328,6 +340,7 @@ export const costsRouteLayer = Layer.mergeAll(
   getCostsByAgentRoute,
   postCostsSyncWalRoute,
   postCostsReconcileRoute,
+  getCostsExperimentsRoute,
 );
 
 export default costsRouteLayer;

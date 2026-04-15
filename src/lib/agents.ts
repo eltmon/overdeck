@@ -14,6 +14,8 @@ import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
+import type { NormalizedCavemanConfig } from './config-yaml.js';
+import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getCliproxyClientEnv } from './cliproxy.js';
@@ -268,7 +270,7 @@ export interface AgentState {
   sessionId?: string; // For resuming sessions after handoff
 
   // Work type system (PAN-118)
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response';
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
   workType?: WorkTypeId; // Current work type ID
 
   // SageOx session tracking (PAN-278)
@@ -529,8 +531,43 @@ export interface SpawnOptions {
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
   // Work type system (PAN-118)
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response';
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
   workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
+}
+
+/**
+ * Build shell export lines to inject into a work agent's launcher.sh.
+ *
+ * Sets CAVEMAN_DEFAULT_MODE and PANOPTICON_CAVEMAN_VARIANT so the caveman
+ * SessionStart hook activates at the right intensity level and cost events
+ * carry the A/B test variant.
+ *
+ * @param workspacePath  Absolute workspace path (to read stored variant)
+ * @param config         Normalized caveman config from YamlConfig
+ * @param isPlanning     True for planning agents — caveman always disabled there
+ * @returns              Shell export lines to prepend to the launcher script
+ */
+export async function buildCavemanExports(
+  workspacePath: string,
+  config: NormalizedCavemanConfig,
+  isPlanning: boolean
+): Promise<string> {
+  // Planning agents: never compress — output is user-facing
+  if (isPlanning || !config.enabled) return '';
+
+  const variant = await readCavemanVariant(workspacePath);
+
+  // If this workspace's A/B variant is 'disabled', set variant for tracking but no mode
+  if (variant === 'off') return '';
+  if (variant === 'disabled') {
+    return `export PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
+  }
+
+  // Work agents use the 'work' intensity mode
+  const mode = config.modes.work;
+  if (mode === 'off' || mode === 'disabled') return '';
+
+  return `export CAVEMAN_DEFAULT_MODE="${mode}"\nexport PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
 }
 
 /**
@@ -805,10 +842,22 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // one tool-use cycle on recent Claude Code versions. The fix is to start interactive
   // (no positional prompt), then send the prompt via sendKeysAsync once Claude is ready.
   const providerExports = getProviderExportsForModel(state.model);
+
+  // Build caveman env exports for the launcher script.
+  // Planning agents are excluded — their output is user-facing and must remain readable.
+  // Inspect agents are excluded because their INSPECTION PASSED/BLOCKED sentinels are
+  // parsed by Cloister and must not be compressed.
+  const yamlConfig = loadYamlConfig();
+  const cavemanExports = await buildCavemanExports(
+    options.workspace,
+    yamlConfig.config.caveman,
+    options.phase === 'planning'
+  );
+
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
   const launcherContent = `#!/bin/bash
 export CI=1
-${providerExports}${getAgentRuntimeBaseCommand(state.model)}
+${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
 `;
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
@@ -856,7 +905,7 @@ ${providerExports}${getAgentRuntimeBaseCommand(state.model)}
     }
 
     // For non-planner agents, find the planner's session path for parent linking
-    if (options.phase && (options.phase as string) !== 'planning') {
+    if (options.phase && options.phase !== 'planning') {
       const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
       const plannerState = getAgentState(plannerAgentId);
       if (plannerState?.sageoxSessionPath) {
@@ -928,7 +977,7 @@ ${providerExports}${getAgentRuntimeBaseCommand(state.model)}
   }
 
   // For planner agents, capture SageOx session path after it becomes available
-  if (sageoxEnabled && (options.phase as string) === 'planning') {
+  if (sageoxEnabled && options.phase === 'planning') {
     captureSageoxSessionPath(agentId, projectRoot).catch((err) => {
       console.warn(`[agents] Could not capture SageOx session path: ${err.message}`);
     });

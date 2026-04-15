@@ -66,8 +66,40 @@ import { updateCommand } from './commands/update.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
+import { registerCavemanCommands } from './commands/caveman.js';
+import { migrateConfigCommand } from './commands/migrate-config.js';
 
 const program = new Command();
+
+const ensureDashboardBundle = async (
+  bundledServer: string,
+  bundledFrontendIndex: string,
+  sourceDashboard: string,
+) => {
+  if (existsSync(bundledServer) && existsSync(bundledFrontendIndex)) {
+    return true;
+  }
+
+  if (!existsSync(sourceDashboard)) {
+    return false;
+  }
+
+  console.log(chalk.yellow('⚠ Dashboard bundle is incomplete; rebuilding dashboard assets...'));
+
+  try {
+    const { execSync } = await import('child_process');
+    execSync('npm run build:dashboard', {
+      cwd: join(import.meta.dirname, '..', '..'),
+      stdio: ['pipe', 'inherit', 'pipe'],
+    });
+  } catch (err: unknown) {
+    const e = err as { stderr?: Buffer };
+    if (e.stderr) process.stderr.write(e.stderr);
+    return false;
+  }
+
+  return existsSync(bundledServer) && existsSync(bundledFrontendIndex);
+};
 
 program
   .name('pan')
@@ -280,6 +312,19 @@ registerInstallCommand(program);
 // Register inspect command (pan inspect <issueId> --bead <beadId>)
 registerInspectCommand(program);
 
+// Register caveman commands (pan caveman-compress)
+registerCavemanCommands(program);
+
+// Config migration
+program
+  .command('migrate-config')
+  .description('Migrate from settings.json to config.yaml')
+  .option('--force', 'Force migration even if config.yaml exists')
+  .option('--preview', 'Preview migration without applying changes')
+  .option('--no-backup', 'Do not back up settings.json')
+  .option('--delete-legacy', 'Delete settings.json after migration')
+  .action(migrateConfigCommand);
+
 // Shorthand: pan status = pan status
 program
   .command('status')
@@ -305,6 +350,7 @@ program
     // Find dashboard - check bundled first, then source
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
+    const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
     const srcDashboard = join(__dirname, '..', '..', 'src', 'dashboard');
 
     // Check if Traefik is enabled
@@ -435,7 +481,12 @@ program
     }
 
     // Determine which mode to use
-    const isProduction = existsSync(bundledServer);
+    const hasBundledDashboard = await ensureDashboardBundle(
+      bundledServer,
+      bundledFrontendIndex,
+      srcDashboard,
+    );
+    const isProduction = hasBundledDashboard;
     const isDevelopment = existsSync(srcDashboard);
 
     if (!isProduction && !isDevelopment) {
@@ -830,11 +881,12 @@ program
 
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
+    const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
     const port = parseInt(options.port, 10) || 3011;
     const url = `http://localhost:${port}`;
 
-    if (!existsSync(bundledServer)) {
-      console.error(chalk.red('Error: Dashboard server not found.'));
+    if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
+      console.error(chalk.red('Error: Dashboard bundle not found.'));
       console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
       process.exit(1);
     }

@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /**
  * Initialize the complete database schema.
@@ -40,7 +40,9 @@ export function initSchema(db: Database.Database): void {
       tldr_tokens_saved  INTEGER,
       tldr_bypass_reasons TEXT,  -- JSON string
       -- WAL source tracking
-      source_file   TEXT   -- path of WAL file this came from (for imports)
+      source_file   TEXT,  -- path of WAL file this came from (for imports)
+      -- Caveman A/B experiment tracking
+      caveman_variant TEXT  -- 'enabled', 'disabled', 'off', or null
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_request_id
@@ -547,6 +549,13 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_favorites_type
         ON favorites(type);
     `);
+  }
+
+  // v17 → v18: add caveman_variant column to cost_events (PAN-611 A/B experiment tracking)
+  if (currentVersion < 18) {
+    try {
+      db.exec(`ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

@@ -40,6 +40,8 @@ workspaces/
 
 # Compiled TypeScript (build artifacts)
 src/lib/**/*.js
+# Vendored caveman hook files (JS, not compiled output)
+!src/lib/caveman/*.js
 src/dashboard/frontend/test-results/
 src/dashboard/frontend/playwright-report/
 test-results/
@@ -67,6 +69,9 @@ docker-compose.devcontainer.yml
 .claude/.panopticon-manifest.json
 # Workspace-specific agent definitions (triage-agent etc. are local tooling)
 .claude/agents/
+# Workspace-specific settings (absolute paths, caveman variant — must not merge to main)
+.claude/settings.json
+.claude/.caveman-variant
 
 # Build source maps
 scripts/*.map

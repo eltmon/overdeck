@@ -35,6 +35,9 @@ export interface CostEvent {
 
   requestId?: string;                      // Claude Code transcript request ID — used for precise dedup (PAN-238)
   sessionId?: string;                      // Claude Code session UUID — maps to transcript filename
+
+  // Caveman A/B test variant — set when agents.caveman.ab_test is true (PAN-611)
+  cavemanVariant?: 'enabled' | 'disabled' | 'off';
 }
 
 export interface EventMetadata {
