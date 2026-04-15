@@ -33,6 +33,7 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
+import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector/TerminalTabs';
 
 interface SessionCost {
   id: string;
@@ -110,11 +111,17 @@ export interface InspectorPanelProps {
   issueId: string;
   issueUrl?: string;
   issue?: Issue;
+  /** Current pipeline phase — passed from parent (DetailPanelLayout) via usePipelinePhase */
+  phase?: PipelinePhase | string;
+  /** Review status — hoisted to DetailPanelLayout to avoid duplicate queries */
+  reviewStatus?: ReviewStatus;
+  /** Loading state for reviewStatus */
+  reviewStatusLoading?: boolean;
   onClose: () => void;
   onOpenTerminal?: () => void;
 }
 
-export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpenTerminal }: InspectorPanelProps) {
+export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [copied, setCopied] = useState(false);
@@ -169,15 +176,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     refetchInterval: (workspaceCreating || containersStarting) ? 5000 : 30000,
   });
 
-  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
-    queryKey: ['review-status', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/review/${issueId}/status`);
-      if (!res.ok) throw new Error('Failed to fetch review status');
-      return res.json();
-    },
-    refetchInterval: 30000,
-  });
+  // reviewStatus and reviewStatusLoading are hoisted to DetailPanelLayout to avoid
+  // duplicate queries — they share react-query cache key ['review-status', issueId]
+  const reviewStatus = reviewStatusProp;
+  const reviewStatusLoading = reviewStatusLoadingProp ?? false;
 
   const { data: prdContent } = useQuery({
     queryKey: ['prd', issueId],
@@ -620,6 +622,17 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
               <span className="w-1.5 h-1.5 rounded-full bg-content-muted shrink-0" />
             )}
             <span className="font-mono text-sm font-semibold text-content truncate">{issueId.toUpperCase()}</span>
+            {phase && PHASE_LABELS[phase] && (() => {
+              const colors = PHASE_CHIP_COLORS[phase] ?? { bg: '#1e2d47', text: '#92a4c9' };
+              return (
+                <span
+                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+                  style={{ backgroundColor: colors.bg, color: colors.text }}
+                >
+                  {PHASE_LABELS[phase]}
+                </span>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {onOpenTerminal && agent && (

@@ -2,15 +2,21 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
-import { XTerminal } from './XTerminal';
 import { MessagesTimeline } from './chat/MessagesTimeline';
 import type { ConversationResponse } from '@panopticon/contracts';
 import { ActivityView } from './MissionControl/ActivityView';
 import { deriveAgentIssueId } from './AgentOutputPanel';
+import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 
 interface TerminalPanelProps {
   agent: Agent;
   onClose: () => void;
+  /** Override the tmux session to stream. Defaults to agent.id for back-compat. */
+  sessionName?: string;
+  /** Override the header title. Defaults to agent.id. */
+  title?: string;
+  /** Called when XTerminal exhausts reconnect attempts for this session. */
+  onSessionEnded?: (sessionName: string) => void;
 }
 
 function popoutTerminal(sessionName: string, title: string): void {
@@ -38,7 +44,9 @@ async function fetchConversation(agentId: string): Promise<ConversationResponse>
   return res.json();
 }
 
-export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
+export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
+  const activeSession = sessionNameProp ?? agent.id;
+  const displayTitle = titleProp ?? agent.id;
   const terminalRef = useRef<HTMLPreElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -46,6 +54,12 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
   // Planning agents get ActivityView instead of XTerminal
   const isPlanningAgent = agent.agentPhase === 'planning' || agent.id.startsWith('planning-');
   const planningIssueId = isPlanningAgent ? deriveAgentIssueId(agent.id, agent.issueId) : null;
+
+  // Only probe the work agent's session liveness when we're actually viewing it.
+  // Specialist sessions (sessionNameProp !== agent.id) stream their own tmux sessions
+  // independently — keying isStopped off agent.id when a specialist tab is selected would
+  // cause the work agent's fallback content to render in place of the specialist stream.
+  const isViewingWorkAgent = !sessionNameProp || sessionNameProp === agent.id;
 
   // Check if agent's tmux session is alive via a lightweight probe.
   // The store status can be stale after server restarts, so verify with the server.
@@ -59,10 +73,12 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
       return data.alive === true;
     },
     refetchInterval: 10000,
+    enabled: isViewingWorkAgent,
   });
 
-  // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined)
-  const isStopped = tmuxAlive === false;
+  // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined).
+  // Never true for specialist tabs — they manage their own session lifecycle via onSessionEnded.
+  const isStopped = isViewingWorkAgent && tmuxAlive === false;
 
   // Only fetch for stopped agents — running agents use XTerminal WebSocket
   const { data: output, refetch: refetchOutput } = useQuery({
@@ -147,7 +163,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : agent.id}
+          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -162,7 +178,7 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
           )}
           {!isStopped && (
             <button
-              onClick={() => popoutTerminal(agent.id, `agent-${agent.issueId ?? agent.id} · ${agent.issueId ?? agent.id}`)}
+              onClick={() => popoutTerminal(activeSession, displayTitle)}
               className="p-1 rounded transition-colors hover:bg-white/10"
               style={{ color: textSecondary }}
               title="Pop out terminal"
@@ -192,19 +208,22 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
             />
           </div>
         ) : (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
         )
       ) : (
         <div className="flex-1 min-h-0">
-          <XTerminal sessionName={agent.id} />
+          <TerminalSessionWrapper
+            sessionName={activeSession}
+            onSessionEnded={onSessionEnded ? () => onSessionEnded(activeSession) : undefined}
+          />
         </div>
       )}
     </div>
