@@ -296,6 +296,44 @@ If any of those show dirt, you are NOT done. Either commit + push, or surface
 the dirt to the user with the recurring-dirt analysis. Reporting "all-up
 complete" with `main` dirty is a violation of this skill.
 
+### 8. Run synthesis (AFTER main hygiene, BEFORE FLYWHEEL-STATE update)
+
+**Skill changes are never inline edits during `/all-up` — always file via synthesis.**
+
+If you notice a skill that needs improvement during a flywheel run, do NOT edit
+it directly. The autonomous retro-agent fires after every merge and feeds retro
+reports into `docs/flywheel/retros/`. The synthesis step processes those retros
+and files `flywheel-change` issues with the proposed diffs. This keeps the skill
+improvement loop fully observable and reviewable.
+
+**Retro-agent fires automatically on merge** — do NOT run retros manually during
+`/all-up`. If you want to force a synthesis cycle (e.g., many retros have
+accumulated), call:
+```bash
+pan flywheel synthesize
+```
+
+**Substrate-bug tiering rule:**
+- **Blocker-tier** (a bug currently preventing an issue from progressing): fix it
+  inline right now, per Step 2. Don't file a flywheel issue for something that's
+  actively blocking the pipeline.
+- **Non-blocker improvements** (substrate gaps, skill deficiencies, pattern
+  improvements): file a `substrate-improvement` or `flywheel-change` issue and
+  let the pipeline handle it. Never touch skill files directly during `/all-up`.
+
+**What synthesis does (for context):**
+1. Reads all unarchived retros in `docs/flywheel/retros/`
+2. Filters to entries with `surprise: true`
+3. Groups by signature (same target skill, same gap, same audience)
+4. Above 3-signal threshold → files a `flywheel-change` PAN issue with proposed patch
+5. Below threshold → watchlist entry in `docs/FLYWHEEL-REPORT.md`
+6. Archives processed retros to `docs/flywheel/retros/archive/run-N/`
+7. Appends a new section to `docs/FLYWHEEL-REPORT.md` (the append-only history)
+
+This step runs automatically via the flywheel daemon after every merge event and
+every 30 minutes while issues are in flight. You only call it manually if you
+need a fresh synthesis mid-run.
+
 ### 7.5. Update FLYWHEEL-STATE.md (AFTER main hygiene, BEFORE declaring done)
 
 Overwrite `docs/FLYWHEEL-STATE.md` with a fresh snapshot of current state. This is
