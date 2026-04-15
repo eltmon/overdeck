@@ -123,8 +123,13 @@ export async function embedVoyage(opts: EmbedOptions): Promise<EmbeddingResult> 
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
+const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|::1)(:\d+)?\/?$/;
+
 export async function embedOllama(opts: EmbedOptions): Promise<EmbeddingResult> {
   const baseUrl = opts.baseUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL;
+  if (!SAFE_OLLAMA_HOST_RE.test(baseUrl)) {
+    throw new Error(`Ollama baseUrl must be a localhost address (got: ${baseUrl})`);
+  }
   const url = `${baseUrl.replace(/\/$/, '')}/api/embeddings`;
 
   const resp = await fetch(url, {

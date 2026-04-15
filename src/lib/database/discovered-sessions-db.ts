@@ -8,6 +8,11 @@
 
 import { getDatabase } from './index.js';
 
+/** Escape LIKE metacharacters so user-supplied strings are matched literally. */
+function escapeLike(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface DiscoveredSession {
@@ -204,30 +209,32 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
   }
   if (filter.tags && filter.tags.length > 0) {
     // JSON array overlap: any tag in the filter matches
-    const tagConditions = filter.tags.map(() => `tags LIKE ?`);
+    const tagConditions = filter.tags.map(() => `tags LIKE ? ESCAPE '\\'`);
     conditions.push(`(${tagConditions.join(' OR ')})`);
     for (const tag of filter.tags) {
-      params.push(`%"${tag}"%`);
+      params.push(`%"${escapeLike(tag)}"%`);
     }
   }
   if (filter.tools && filter.tools.length > 0) {
-    const toolConditions = filter.tools.map(() => `tools_used LIKE ?`);
+    const toolConditions = filter.tools.map(() => `tools_used LIKE ? ESCAPE '\\'`);
     conditions.push(`(${toolConditions.join(' OR ')})`);
     for (const tool of filter.tools) {
-      params.push(`%"${tool}"%`);
+      params.push(`%"${escapeLike(tool)}"%`);
     }
   }
   if (filter.files && filter.files.length > 0) {
-    const fileConditions = filter.files.map(() => `files_touched LIKE ?`);
+    const fileConditions = filter.files.map(() => `files_touched LIKE ? ESCAPE '\\'`);
     conditions.push(`(${fileConditions.join(' OR ')})`);
     for (const file of filter.files) {
-      params.push(`%${file}%`);
+      params.push(`%${escapeLike(file)}%`);
     }
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = filter.limit !== undefined ? `LIMIT ${filter.limit}` : '';
-  const offset = filter.offset !== undefined ? `OFFSET ${filter.offset}` : '';
+  const safeLimit = Number.isFinite(filter.limit) && filter.limit! >= 0 ? filter.limit! : undefined;
+  const safeOffset = Number.isFinite(filter.offset) && filter.offset! >= 0 ? filter.offset! : undefined;
+  const limit = safeLimit !== undefined ? `LIMIT ${safeLimit}` : '';
+  const offset = safeOffset !== undefined ? `OFFSET ${safeOffset}` : '';
 
   const rows = db
     .prepare(

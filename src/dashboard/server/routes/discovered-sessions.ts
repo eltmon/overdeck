@@ -51,9 +51,18 @@ const listRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const params = new URL(req.url, 'http://localhost').searchParams;
 
+    const rawLimit = parseInt(params.get('limit') ?? '50', 10);
+    const rawOffset = parseInt(params.get('offset') ?? '0', 10);
+    if (!Number.isFinite(rawLimit) || rawLimit < 0) {
+      return jsonResponse({ error: 'Invalid limit' }, { status: 400 });
+    }
+    if (!Number.isFinite(rawOffset) || rawOffset < 0) {
+      return jsonResponse({ error: 'Invalid offset' }, { status: 400 });
+    }
+
     const filter: Parameters<typeof findDiscoveredSessions>[0] = {
-      limit: parseInt(params.get('limit') ?? '50', 10),
-      offset: parseInt(params.get('offset') ?? '0', 10),
+      limit: Math.min(rawLimit, 500),
+      offset: rawOffset,
     };
 
     if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
@@ -78,12 +87,14 @@ const searchRoute = HttpRouter.add(
     const params = new URL(req.url, 'http://localhost').searchParams;
 
     const q = params.get('q') ?? undefined;
-    const similarTo = params.has('similar_to') ? parseInt(params.get('similar_to')!, 10) : undefined;
-    const limit = parseInt(params.get('limit') ?? '20', 10);
+    const rawSimilarTo = params.has('similar_to') ? parseInt(params.get('similar_to')!, 10) : undefined;
+    const similarTo = rawSimilarTo !== undefined && Number.isFinite(rawSimilarTo) ? rawSimilarTo : undefined;
+    const rawLimit = parseInt(params.get('limit') ?? '20', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 20;
 
     const filter: Parameters<typeof searchSessions>[0]['filter'] = {};
     if (params.has('workspace')) filter!.workspacePath = params.get('workspace')!;
-    if (params.has('since')) filter!.since = params.get('since')!;
+    if (params.has('since')) filter!.since = parseRelativeTime(params.get('since')!);
 
     const result = searchSessions({ q, similarTo, filter, limit });
     return jsonResponse(result);
@@ -153,13 +164,20 @@ const postScanRoute = HttpRouter.add(
       maxParallel?: number;
     };
 
-    const mode = (body.mode ?? 'system') as 'system' | 'watched' | 'targeted';
+    const VALID_MODES = new Set(['system', 'watched', 'targeted']);
+    const rawMode = body.mode ?? 'system';
+    if (!VALID_MODES.has(rawMode)) {
+      return jsonResponse({ error: `Invalid mode: must be one of system, watched, targeted` }, { status: 400 });
+    }
+    const mode = rawMode as 'system' | 'watched' | 'targeted';
+    const maxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
+
     const result = yield* Effect.promise(() =>
       scan({
         mode,
         watchDirs: [],
         dryRun: body.dryRun,
-        maxParallel: body.maxParallel,
+        maxParallel,
       }),
     );
 
@@ -180,14 +198,20 @@ const postEnrichRoute = HttpRouter.add(
       maxParallel?: number;
     };
 
-    const tier = (body.tier ?? 1) as 1 | 2 | 3;
+    const rawTier = body.tier ?? 1;
+    if (rawTier !== 1 && rawTier !== 2 && rawTier !== 3) {
+      return jsonResponse({ error: 'Invalid tier: must be 1, 2, or 3' }, { status: 400 });
+    }
+    const tier = rawTier as 1 | 2 | 3;
+    const enrichMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
+    const enrichSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
 
     try {
       const result = yield* Effect.promise(() =>
         enrichSessions({
           tier,
-          sessionIds: body.sessionIds,
-          maxParallel: body.maxParallel,
+          sessionIds: enrichSessionIds,
+          maxParallel: enrichMaxParallel,
         }),
       );
       return jsonResponse(result);
@@ -222,12 +246,19 @@ const postEmbedRoute = HttpRouter.add(
       maxParallel?: number;
     };
 
+    const VALID_PROVIDERS = new Set(['openai', 'voyage', 'ollama']);
+    if (body.provider !== undefined && !VALID_PROVIDERS.has(body.provider)) {
+      return jsonResponse({ error: `Invalid provider: must be one of openai, voyage, ollama` }, { status: 400 });
+    }
+    const embedMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
+    const embedSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
+
     const result = yield* Effect.promise(() =>
       embedSessions({
-        sessionIds: body.sessionIds,
+        sessionIds: embedSessionIds,
         provider: body.provider as 'openai' | 'voyage' | 'ollama' | undefined,
         model: body.model,
-        maxParallel: body.maxParallel,
+        maxParallel: embedMaxParallel,
       }),
     );
 
