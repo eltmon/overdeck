@@ -144,7 +144,7 @@ export function MetricsSummaryRow() {
       />
       <MetricTile
         icon={<Layers className="w-4 h-4" />}
-        label="Queue"
+        label="Merge Queue"
         value={specialistStats?.queueDepth ?? 0}
         valueClass={queueColor}
       />

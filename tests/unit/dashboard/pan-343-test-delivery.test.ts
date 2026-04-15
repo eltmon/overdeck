@@ -1,17 +1,18 @@
 /**
  * Tests for PAN-343: test-agent delivery failure silently treated as success.
  * Updated for PAN-369: retry logic, dispatch_failed status.
+ * Updated for PAN-722: queue removal — direct ephemeral dispatch only.
  *
- * Tests the exported `autoQueueTestAgentAndNotify` function from
+ * Tests the exported `dispatchTestAgentAndNotify` function from
  * src/lib/cloister/test-agent-queue.ts — the production code extracted from
  * the route handler. Does NOT duplicate logic in a test helper.
  *
  * Coverage:
- *  1. Wake succeeds (queued=false): testStatus='testing', agent notified
- *  2. Wake succeeds (queued=true, specialist busy): testStatus='testing', agent notified
- *  3. Wake fails both attempts: retry sources verified, submitToSpecialistQueue called
- *  4. Wake fails both attempts: testStatus still set to 'testing' via fallback path
- *  5. Already queued: no wake/re-queue, testStatus refreshed, agent notified
+ *  1. Spawn succeeds: testStatus='testing', agent notified
+ *  2. First spawn fails (non-busy), retry succeeds: testStatus='testing', agent notified
+ *  3. specialist_busy: sets dispatch_failed immediately (no retry)
+ *  4. Both spawn attempts fail: testStatus='dispatch_failed', agent NOT notified
+ *  5. No project configured: dispatch_failed, agent NOT notified
  *  6. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
  *  7. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
  */
@@ -53,7 +54,7 @@ vi.mock('../../../src/lib/review-status.js', () => ({
 // Import the production function AFTER mocks are in place
 // ---------------------------------------------------------------------------
 
-import { autoQueueTestAgentAndNotify } from '../../../src/lib/cloister/test-agent-queue.js';
+import { dispatchTestAgentAndNotify } from '../../../src/lib/cloister/test-agent-queue.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,7 +82,7 @@ function setupNoProject() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
+describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -91,7 +92,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
     const notify = makeNotify();
 
-    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
     expect(notify).toHaveBeenCalledWith(
@@ -108,7 +109,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
       .mockResolvedValueOnce({ success: true, message: 'spawned on retry' });
     const notify = makeNotify();
 
-    const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    const promise = dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
     await vi.advanceTimersByTimeAsync(2000);
     await promise;
     vi.useRealTimers();
@@ -118,13 +119,29 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     expect(notify).toHaveBeenCalled();
   });
 
+  it('sets dispatch_failed immediately without retry when specialist_busy', async () => {
+    setupProjectResolved();
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, error: 'specialist_busy' });
+    const notify = makeNotify();
+
+    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+
+    // specialist_busy should NOT trigger a retry
+    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
+      testStatus: 'dispatch_failed',
+      testNotes: expect.stringContaining('deacon will retry'),
+    });
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it('retries once then sets dispatch_failed when both spawn attempts fail', async () => {
     vi.useFakeTimers();
     setupProjectResolved();
     mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'spawn failed' });
     const notify = makeNotify();
 
-    const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    const promise = dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
     await vi.advanceTimersByTimeAsync(2000);
     await promise;
     vi.useRealTimers();
@@ -146,7 +163,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'all busy' });
     const notify = makeNotify();
 
-    const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    const promise = dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
     await vi.advanceTimersByTimeAsync(2000);
     await promise;
     vi.useRealTimers();
@@ -159,7 +176,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     setupNoProject();
     const notify = makeNotify();
 
-    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
     expect(mockSpawnEphemeralSpecialist).not.toHaveBeenCalled();
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
@@ -174,7 +191,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnEphemeralSpecialist.mockRejectedValue(new Error('specialists module unavailable'));
     const notify = makeNotify();
 
-    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
     // Core PAN-343 invariant: exception must NOT advance the pipeline
     expect(notify).not.toHaveBeenCalled();
@@ -195,7 +212,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     const notify = makeNotify();
 
     // The nested catch must prevent this from propagating
-    await expect(autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify)).resolves.toBeUndefined();
+    await expect(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify)).resolves.toBeUndefined();
     expect(notify).not.toHaveBeenCalled();
   });
 });

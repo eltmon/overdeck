@@ -7,9 +7,7 @@
 import { Command } from 'commander';
 import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
-import { queueCommand } from './queue.js';
 import { resetCommand } from './reset.js';
-import { clearQueueCommand } from './clear-queue.js';
 import { doneCommand } from './done.js';
 import { logsCommand, cleanupLogsCommand } from './logs.js';
 
@@ -32,13 +30,6 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--task <description>', 'Optional task description to wake with')
     .action(wakeCommand);
 
-  // pan specialists queue <name>
-  specialists
-    .command('queue <name>')
-    .description('Show pending work in a specialist\'s queue')
-    .option('--json', 'Output in JSON format')
-    .action(queueCommand);
-
   // pan specialists reset <name> or pan specialists reset --all
   specialists
     .command('reset [name]')
@@ -46,14 +37,6 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--force', 'Skip confirmation prompt')
     .option('--all', 'Reset ALL specialists (wipe all context)')
     .action(resetCommand);
-
-  // pan specialists clear-queue <name>
-  specialists
-    .command('clear-queue <name>')
-    .description('Clear all items from a specialist\'s queue')
-    .option('--force', 'Skip confirmation prompt')
-    .option('--reset-status', 'Reset review statuses to pending')
-    .action(clearQueueCommand);
 
   // pan specialists done <type> <issueId> --status <passed|failed> [--notes "..."]
   specialists

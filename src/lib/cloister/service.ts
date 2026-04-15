@@ -304,12 +304,11 @@ export class CloisterService {
 
     // PAN-511: Startup recovery for orphaned reviewStatus='reviewing' issues.
     // If Cloister crashes after reviewStatus was set to 'reviewing' but before the specialist
-    // completes (or if Fix 1 wasn't in place and status was set pre-dispatch), the issue is
-    // stuck. On startup, find such issues and re-queue the review dispatch so work continues.
+    // completes, the issue is stuck. On startup, find such issues and re-dispatch directly.
     try {
       const reviewStatuses = loadReviewStatuses();
       const { resolveProjectFromIssue } = await import('../projects.js');
-      const { submitToSpecialistQueue, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+      const { spawnEphemeralSpecialist, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
 
       // Build set of issue IDs actively being reviewed by a running specialist
       const activeReviewIssues = new Set<string>();
@@ -329,7 +328,7 @@ export class CloisterService {
           activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
         }
       } catch {
-        // Non-fatal: if we can't check active sessions, re-queue all
+        // Non-fatal: if we can't check active sessions, re-dispatch all orphaned
       }
 
       const orphanedReviewing = identifyOrphanedReviewingIssues(reviewStatuses, activeReviewIssues);
@@ -357,14 +356,18 @@ export class CloisterService {
           }
 
           const branch = `feature/${issueId.toLowerCase()}`;
-          submitToSpecialistQueue('review-agent', {
-            priority: 'high',
-            source: 'startup-recovery',
+          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
             issueId,
             workspace,
             branch,
           });
-          console.log(`  ✓ Queued recovery review dispatch for ${issueId} (project: ${resolved.projectKey})`);
+          if (result.success) {
+            console.log(`  ✓ Re-dispatched recovery review for ${issueId} (project: ${resolved.projectKey})`);
+          } else {
+            // Busy or failed — reset to pending so deacon patrol picks it up
+            console.log(`  ⚠ ${issueId}: recovery dispatch failed (${result.message}) — resetting to pending`);
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+          }
         }
       }
     } catch (error) {

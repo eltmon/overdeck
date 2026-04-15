@@ -1242,24 +1242,11 @@ const postIssueCancelRoute = HttpRouter.add(
       });
     }
 
-    // Clear pipeline state, queued specialist work, and stale merge metadata.
+    // Clear pipeline state and stale merge metadata.
     yield* Effect.promise(async () => {
       try {
         clearReviewStatus(id.toUpperCase());
         cleanupLog.push('Cleared review status');
-      } catch { /* non-fatal */ }
-
-      try {
-        const { checkSpecialistQueue, completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
-        for (const specialist of ['review-agent', 'test-agent', 'merge-agent'] as const) {
-          const queue = checkSpecialistQueue(specialist);
-          for (const item of queue.items) {
-            if (item.payload?.issueId?.toUpperCase() === id.toUpperCase()) {
-              completeSpecialistTask(specialist, item.id);
-            }
-          }
-        }
-        cleanupLog.push('Removed queued specialist tasks');
       } catch { /* non-fatal */ }
 
       try {

@@ -8,43 +8,17 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
+import { PANOPTICON_HOME } from '../paths.js';
 
 /**
- * Known specialist agent IDs — matches SpecialistType in specialists.ts.
- * Used to compute live queue depth from hook.json files.
- */
-const KNOWN_SPECIALISTS = [
-  'review-agent',
-  'test-agent',
-  'merge-agent',
-  'inspect-agent',
-  'uat-agent',
-] as const;
-
-/**
- * Compute live queue depth by reading each specialist's hook.json.
+ * Compute live queue depth.
  *
- * The JSONL log is append-only so status fields never update. We use the
- * actual hook queue files (written by pushToHook / popFromHook in hooks.ts)
- * to get the real-time pending item count instead.
- *
- * @param agentsDir - Directory containing per-agent subdirectories (defaults to AGENTS_DIR)
+ * Non-merge specialists dispatch immediately (no queue). The merge queue is
+ * SQLite-backed per project, not hook-file-based. This function always returns
+ * 0 — merge queue depth is read separately via merge-queue-db.ts.
  */
-async function getLiveQueueDepth(agentsDir: string = AGENTS_DIR): Promise<number> {
-  let depth = 0;
-  for (const specialistId of KNOWN_SPECIALISTS) {
-    const hookFile = join(agentsDir, specialistId, 'hook.json');
-    if (!existsSync(hookFile)) continue;
-    try {
-      const content = await readFile(hookFile, 'utf-8');
-      const hook = JSON.parse(content) as { items: unknown[] };
-      depth += hook.items?.length ?? 0;
-    } catch {
-      // Corrupt hook file — skip
-    }
-  }
-  return depth;
+async function getLiveQueueDepth(): Promise<number> {
+  return 0;
 }
 
 /**
@@ -231,7 +205,7 @@ export async function getSpecialistHandoffStats(options?: { agentsDir?: string }
   stats.successRate = completedCount > 0 ? successCount / completedCount : 0;
 
   // Compute live queue depth from actual hook files (not stale JSONL status)
-  stats.queueDepth = await getLiveQueueDepth(options?.agentsDir);
+  stats.queueDepth = await getLiveQueueDepth();
 
   return stats;
 }

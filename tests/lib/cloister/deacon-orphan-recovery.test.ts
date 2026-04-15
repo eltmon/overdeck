@@ -1,13 +1,11 @@
 /**
  * Tests for PAN-369: checkOrphanedReviewStatuses orphan recovery logic.
  *
- * Covers the 3 branches added to checkOrphanedReviewStatuses for the
- * dispatch_failed recovery path:
- *   (a) testStatus='testing'/'dispatch_failed' + issue already in queue
- *       → keep testStatus='testing', action logged, no re-submit
- *   (b) testStatus='dispatch_failed' + queue empty + workspace available in agent state
- *       → re-submit to specialist queue, set testStatus='testing'
- *   (c) testStatus='testing' + queue empty + agent state unavailable
+ * Covers the dispatch paths after queue removal (PAN-722):
+ *   (a) testStatus='testing'/'dispatch_failed' + workspace available in agent state
+ *       → spawn via spawnEphemeralSpecialist, set testStatus='testing' on success
+ *   (b) specialist_busy → set dispatch_failed so deacon retries next patrol
+ *   (c) testStatus='testing'/'dispatch_failed' + no workspace available
  *       → reset to 'pending' (user must re-trigger manually)
  */
 
@@ -20,8 +18,6 @@ import { homedir } from 'os';
 // Mock specialist, tmux, and agent modules before importing deacon
 // ---------------------------------------------------------------------------
 
-const mockCheckSpecialistQueue = vi.fn();
-const mockSubmitToSpecialistQueue = vi.fn();
 const mockGetTmuxSessionName = vi.fn();
 const mockSpawnEphemeralSpecialist = vi.fn();
 
@@ -32,12 +28,8 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   initializeSpecialist: vi.fn(),
   wakeSpecialist: vi.fn(),
   clearSessionId: vi.fn(),
-  checkSpecialistQueue: (...args: unknown[]) => mockCheckSpecialistQueue(...args),
-  submitToSpecialistQueue: (...args: unknown[]) => mockSubmitToSpecialistQueue(...args),
   spawnEphemeralSpecialist: (...args: unknown[]) => mockSpawnEphemeralSpecialist(...args),
-  getNextSpecialistTask: vi.fn(),
   wakeSpecialistWithTask: vi.fn(),
-  completeSpecialistTask: vi.fn(),
   getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
 }));
 
@@ -123,72 +115,10 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Branch (a): issue already in test-agent queue
+  // Branch (a): workspace available → spawn immediately
   // -------------------------------------------------------------------------
 
-  it('(a) retains testStatus=testing and logs action when issue is already queued', async () => {
-    writeStatusFile({
-      [ISSUE_ID]: {
-        reviewStatus: 'passed',
-        testStatus: 'testing',
-        readyForMerge: false,
-        history: [],
-      },
-    });
-
-    // Issue is already in the specialist queue
-    mockCheckSpecialistQueue.mockReturnValue({
-      items: [{ payload: { issueId: ISSUE_ID } }],
-      hasWork: true,
-    });
-
-    const actions = await checkOrphanedReviewStatuses();
-
-    // Should NOT re-submit (item already queued)
-    expect(mockSubmitToSpecialistQueue).not.toHaveBeenCalled();
-
-    // Action must be logged
-    expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatch(/Retained queued test for/);
-    expect(actions[0]).toContain(ISSUE_ID);
-
-    // testStatus was already 'testing' — file should NOT be rewritten
-    // (no modification was needed)
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].testStatus).toBe('testing');
-  });
-
-  it('(a) updates dispatch_failed to testing when issue is already queued', async () => {
-    writeStatusFile({
-      [ISSUE_ID]: {
-        reviewStatus: 'passed',
-        testStatus: 'dispatch_failed',
-        readyForMerge: false,
-        history: [],
-      },
-    });
-
-    mockCheckSpecialistQueue.mockReturnValue({
-      items: [{ payload: { issueId: ISSUE_ID } }],
-      hasWork: true,
-    });
-
-    const actions = await checkOrphanedReviewStatuses();
-
-    expect(mockSubmitToSpecialistQueue).not.toHaveBeenCalled();
-    expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatch(/Retained queued test for/);
-
-    // dispatch_failed → testing (so deacon patrol sees the queued item)
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].testStatus).toBe('testing');
-  });
-
-  // -------------------------------------------------------------------------
-  // Branch (b): no queue item, workspace available from agent state
-  // -------------------------------------------------------------------------
-
-  it('(b) re-dispatches via spawnEphemeralSpecialist and sets testStatus=testing when workspace is available', async () => {
+  it('(a) re-dispatches via spawnEphemeralSpecialist and sets testStatus=testing when workspace is available', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
 
     writeStatusFile({
@@ -199,9 +129,6 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
         history: [],
       },
     });
-
-    // Queue is empty for this issue
-    mockCheckSpecialistQueue.mockReturnValue({ items: [], hasWork: false });
 
     // Agent state has the workspace
     mockGetAgentState.mockReturnValue({ workspace });
@@ -229,11 +156,9 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(content[ISSUE_ID].testStatus).toBe('testing');
   });
 
-  // -------------------------------------------------------------------------
-  // Branch (c): no queue item, agent state unavailable → reset to pending
-  // -------------------------------------------------------------------------
+  it('(a) also re-dispatches when testStatus=testing but agent is not active', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
 
-  it('(c) resets testStatus to pending when queue is empty and agent state is unavailable', async () => {
     writeStatusFile({
       [ISSUE_ID]: {
         reviewStatus: 'passed',
@@ -243,8 +168,68 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       },
     });
 
-    // Queue is empty
-    mockCheckSpecialistQueue.mockReturnValue({ items: [], hasWork: false });
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledWith('panopticon-cli', 'test-agent', {
+      issueId: ISSUE_ID,
+      workspace,
+      branch: `feature/${ISSUE_ID.toLowerCase()}`,
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain(ISSUE_ID);
+
+    const content = readStatusFile();
+    expect(content[ISSUE_ID].testStatus).toBe('testing');
+  });
+
+  // -------------------------------------------------------------------------
+  // Branch (b): specialist busy → set dispatch_failed for next patrol
+  // -------------------------------------------------------------------------
+
+  it('(b) sets dispatch_failed when specialist is busy', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
+
+    writeStatusFile({
+      [ISSUE_ID]: {
+        reviewStatus: 'passed',
+        testStatus: 'dispatch_failed',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, error: 'specialist_busy' });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalled();
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/specialist busy/i);
+
+    const content = readStatusFile();
+    expect(content[ISSUE_ID].testStatus).toBe('dispatch_failed');
+  });
+
+  // -------------------------------------------------------------------------
+  // Branch (c): no workspace → reset to pending
+  // -------------------------------------------------------------------------
+
+  it('(c) resets testStatus to pending when agent state is unavailable', async () => {
+    writeStatusFile({
+      [ISSUE_ID]: {
+        reviewStatus: 'passed',
+        testStatus: 'testing',
+        readyForMerge: false,
+        history: [],
+      },
+    });
 
     // No agent state (agent was wiped or never started)
     mockGetAgentState.mockReturnValue(null);
@@ -278,7 +263,6 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       },
     });
 
-    mockCheckSpecialistQueue.mockReturnValue({ items: [], hasWork: false });
     mockGetAgentState.mockReturnValue(null);
 
     const actions = await checkOrphanedReviewStatuses();

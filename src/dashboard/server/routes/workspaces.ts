@@ -70,7 +70,6 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
-import { checkSpecialistQueue } from '../../../lib/cloister/specialists.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
@@ -1960,31 +1959,31 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
 
     let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
 
+    // Only the merge queue is persistent — check it when no active phase is detected
     if (queuePosition === null) {
       try {
-        const reviewQueue = checkSpecialistQueue('review-agent');
-        const reviewPos = findPositionInQueue(issueId, reviewQueue.items);
-        if (reviewPos > 0) {
-          queuePosition = reviewPos;
-          activeSpecialist = 'review';
-        } else {
-          const testQueue = checkSpecialistQueue('test-agent');
-          const testPos = findPositionInQueue(issueId, testQueue.items);
-          if (testPos > 0) {
-            queuePosition = testPos;
-            activeSpecialist = 'test';
-          } else {
-            const mergeQueue = checkSpecialistQueue('merge-agent');
-            const mergePos = findPositionInQueue(issueId, mergeQueue.items);
-            if (mergePos > 0) {
-              queuePosition = mergePos;
-              activeSpecialist = 'merge';
-            }
+        const resolved = resolveProjectFromIssue(issueId);
+        if (resolved) {
+          const { getQueueForProject } = yield* Effect.promise(() =>
+            import('../../../lib/database/merge-queue-db.js')
+          );
+          const mergeQueue = getQueueForProject(resolved.projectKey);
+          const mergePos = findPositionInQueue(issueId, mergeQueue.map(e => ({
+            id: String(e.id),
+            type: 'task' as const,
+            priority: 'normal' as const,
+            source: 'merge-queue',
+            payload: { issueId: e.issueId },
+            createdAt: e.queuedAt,
+          })));
+          if (mergePos > 0) {
+            queuePosition = mergePos;
+            activeSpecialist = 'merge';
           }
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[review-status] Queue lookup failed for ${issueId} (non-fatal): ${msg}`);
+        console.warn(`[review-status] Merge queue lookup failed for ${issueId} (non-fatal): ${msg}`);
       }
     }
 
@@ -2024,7 +2023,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const status = setReviewStatus(issueId, update);
     console.log(`[review-status] Updated ${issueId}:`, status);
 
-    const { getTmuxSessionName, checkSpecialistQueue: cSQ, completeSpecialistTask } =
+    const { getTmuxSessionName } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
     const resolvedProject = resolveProjectFromIssue(issueId);
@@ -2038,14 +2037,6 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         lastActivity: new Date().toISOString(),
       });
       console.log(`[review-status] Set review-agent (${tmuxSession}) to idle`);
-
-      const queue = cSQ('review-agent');
-      for (const item of queue.items) {
-        if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
-          completeSpecialistTask('review-agent', item.id);
-          console.log(`[review-status] Cleared ${issueId} from review-agent queue`);
-        }
-      }
 
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
@@ -2092,11 +2083,11 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
         const testBranch = body.branch || `feature/${issueLower}`;
 
-        const { autoQueueTestAgentAndNotify } = yield* Effect.promise(() => import(
+        const { dispatchTestAgentAndNotify } = yield* Effect.promise(() => import(
           '../../../lib/cloister/test-agent-queue.js'
         ));
         try {
-          yield* Effect.promise(() => autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent));
+          yield* Effect.promise(() => dispatchTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent));
           yield* Effect.promise(() => Effect.runPromise(eventStore.append({
             type: 'pipeline.test-started',
             timestamp: new Date().toISOString(),
@@ -2104,7 +2095,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           })));
         } catch (err) {
           console.error(
-            `[review-status] Unhandled error in autoQueueTestAgentAndNotify for ${issueId}:`,
+            `[review-status] Unhandled error in dispatchTestAgentAndNotify for ${issueId}:`,
             err
           );
         }
@@ -2125,14 +2116,6 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         lastActivity: new Date().toISOString(),
       });
       console.log(`[review-status] Set test-agent (${tmuxSession}) to idle`);
-
-      const queue = cSQ('test-agent');
-      for (const item of queue.items) {
-        if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
-          completeSpecialistTask('test-agent', item.id);
-          console.log(`[review-status] Cleared ${issueId} from test-agent queue`);
-        }
-      }
 
       if (testStatus === 'failed') {
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
@@ -2387,43 +2370,10 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
             const {
               spawnEphemeralSpecialist: spawnEphemeral,
-              isRunning,
-              getTmuxSessionName,
-              submitToSpecialistQueue,
             } = await import('../../../lib/cloister/specialists.js');
 
             const reviewResolvedProject = resolveProjectFromIssue(issueId);
             const reviewProjectKey = reviewResolvedProject?.projectKey ?? null;
-            const reviewSession = getTmuxSessionName(
-              'review-agent',
-              reviewProjectKey ?? undefined
-            );
-            const reviewRunning = await isRunning('review-agent', reviewProjectKey ?? undefined);
-            const reviewState = getAgentRuntimeState(reviewSession);
-            const reviewIdle =
-              reviewState?.state === 'idle' ||
-              reviewState?.state === 'suspended' ||
-              !reviewRunning;
-
-            if (!reviewIdle) {
-              console.log(`[review] review-agent busy, queuing ${issueId}`);
-              const prUrl = getReviewStatus(issueId)?.prUrl;
-              submitToSpecialistQueue('review-agent', {
-                priority: 'normal',
-                source: 'review-endpoint',
-                issueId,
-                workspace: workspacePath,
-                branch: branchName,
-                prUrl,
-                context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
-                isRemote: workspaceInfo.isRemote,
-                vmName: workspaceInfo.vmName,
-              });
-              // PAN-511: set 'reviewing' only after task is committed to queue
-              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-              completePendingOperation(issueId, null);
-              return;
-            }
 
             let reviewResult: { success: boolean; message: string; error?: string };
             if (reviewProjectKey) {
@@ -2447,21 +2397,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
             if (!reviewResult.success) {
               if (reviewResult.error === 'specialist_busy') {
+                // Specialist busy — leave reviewStatus pending; deacon will retry
                 console.log(
-                  `[review] review-agent busy for ${issueId} — queuing for deacon dispatch`
+                  `[review] review-agent busy for ${issueId} — leaving pending for deacon retry`
                 );
-                const { submitToSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
-                submitToSpecialistQueue('review-agent', {
-                  priority: 'high',
-                  source: 'review-pipeline',
-                  issueId,
-                  branch: branchName,
-                  workspace: workspacePath,
-                  prUrl: getReviewStatus(issueId)?.prUrl,
-                  context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
-                });
                 completePendingOperation(issueId, null);
-                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
                 return;
               }
               console.warn(
@@ -2718,22 +2658,13 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         });
       } else if (result.error === 'specialist_busy') {
         console.log(
-          `[request-review] Review specialist busy for ${issueId} — queuing for deacon dispatch`
+          `[request-review] Review specialist busy for ${issueId} — leaving pending for deacon retry`
         );
-        const { submitToSpecialistQueue } = yield* Effect.promise(async () => import('../../../lib/cloister/specialists.js'));
-        submitToSpecialistQueue('review-agent', {
-          priority: 'high',
-          source: 'request-review',
-          issueId,
-          workspace: workspacePath,
-          branch: branchName,
-        });
-        // PAN-511: set 'reviewing' after task is committed to queue
-        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+        // Keep reviewStatus as 'pending' — deacon orphan recovery will re-dispatch
         return jsonResponse(
           {
             success: false,
-            error: 'Review specialist busy, will retry',
+            error: 'Review specialist busy — will retry automatically',
             retryable: true,
             autoRequeueCount: newCount,
           },
@@ -2790,20 +2721,6 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
 
     console.log(`[reset-review] Human-initiated pipeline reset for ${issueId}`);
 
-    const { checkSpecialistQueue: cSQ, completeSpecialistTask } = yield* Effect.promise(() => import(
-      '../../../lib/cloister/specialists.js'
-    ));
-
-    for (const specialist of ['review-agent', 'test-agent', 'merge-agent']) {
-      const queue = cSQ(specialist as any);
-      for (const item of queue.items) {
-        if (item.payload?.issueId?.toUpperCase() === issueId.toUpperCase()) {
-          completeSpecialistTask(specialist as any, item.id);
-          console.log(`[reset-review] Removed ${issueId} from ${specialist} queue`);
-        }
-      }
-    }
-
     setReviewStatus(issueId, {
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -2847,9 +2764,6 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
         yield* Effect.promise(async () => {
           const {
             spawnEphemeralSpecialist,
-            isRunning,
-            getTmuxSessionName,
-            submitToSpecialistQueue,
           } = await import('../../../lib/cloister/specialists.js');
           const resolved = resolveProjectFromIssue(issueId);
           if (resolved) {
@@ -2859,53 +2773,26 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             const wsPath =
               wsInfo.localPath ||
               join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
-            const reviewSession = getTmuxSessionName('review-agent', resolved.projectKey);
-            const reviewRunning = await isRunning('review-agent', resolved.projectKey);
-            const reviewState = getAgentRuntimeState(reviewSession);
-            const reviewIdle =
-              reviewState?.state === 'idle' ||
-              reviewState?.state === 'suspended' ||
-              !reviewRunning;
 
-            if (!reviewIdle) {
-              submitToSpecialistQueue('review-agent', {
-                priority: 'high',
-                source: 'reset-review',
-                issueId,
-                workspace: wsPath,
-                branch: branchName,
-                prUrl: getReviewStatus(issueId)?.prUrl,
-              });
+            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+              issueId,
+              workspace: wsPath,
+              branch: branchName,
+              prUrl: getReviewStatus(issueId)?.prUrl,
+            });
+
+            if (result.success) {
               setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-              console.log(`[reset-review] Review specialist busy, queued ${issueId}`);
+              console.log(`[reset-review] Re-dispatched review for ${issueId}`);
+            } else if (result.error === 'specialist_busy') {
+              // Specialist is busy — set pending so deacon retries on next patrol
+              setReviewStatus(issueId, { reviewStatus: 'pending' });
+              console.log(`[reset-review] Review specialist busy for ${issueId} — deacon will retry`);
             } else {
-              const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-                issueId,
-                workspace: wsPath,
-                branch: branchName,
-                prUrl: getReviewStatus(issueId)?.prUrl,
-              });
-
-              if (result.success) {
-                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-                console.log(`[reset-review] Re-dispatched review for ${issueId}`);
-              } else if (result.error === 'specialist_busy') {
-                submitToSpecialistQueue('review-agent', {
-                  priority: 'high',
-                  source: 'reset-review',
-                  issueId,
-                  workspace: wsPath,
-                  branch: branchName,
-                  prUrl: getReviewStatus(issueId)?.prUrl,
-                });
-                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-                console.log(`[reset-review] Review specialist became busy, queued ${issueId}`);
-              } else {
-                console.warn(
-                  `[reset-review] Re-dispatch failed for ${issueId}: ${result.message || result.error}`
-                );
-                setReviewStatus(issueId, { reviewStatus: 'pending' });
-              }
+              console.warn(
+                `[reset-review] Re-dispatch failed for ${issueId}: ${result.message || result.error}`
+              );
+              setReviewStatus(issueId, { reviewStatus: 'pending' });
             }
           } else {
             console.warn(
