@@ -56,7 +56,7 @@ The Deacon is Panopticon's health monitor, running as part of the dashboard serv
 - **Criteria:** `state.json` says running/starting, but tmux session doesn't exist
 - **Special handling:** Planning sessions check `pane_dead` flag (remain-on-exit)
 - **Action:** Reset to stopped, emit `agent.stopped` domain event
-- **Lifecycle invariant:** When an agent later resumes or recovers, the running transition must clear any prior `stoppedAt` tombstone in `state.json`. A state file that says both `status: "running"` and `stoppedAt: ...` is invalid and will confuse health/read-model consumers.
+- **Lifecycle invariant:** When an agent later resumes or recovers, the running transition must clear any prior `stoppedAt` tombstone in `state.json`. `saveAgentState()` now enforces that invariant for all running/starting writes, so a state file that says both `status: "running"` and `stoppedAt: ...` is invalid and should be treated as a bug.
 
 ### Merge-Ready Reminder (`checkReadyForMergeStuck`)
 - **File:** `src/lib/cloister/deacon.ts:1558-1631`
