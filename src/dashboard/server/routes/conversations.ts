@@ -15,8 +15,8 @@ import { jsonResponse } from "../http-helpers.js";
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createReadStream } from 'node:fs';
 import { exec } from 'node:child_process';
@@ -74,6 +74,14 @@ import {
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, reserveSummaryForkSession } from '../../../lib/conversations/summary-fork.js';
 
+const execAsync = promisify(exec);
+const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
+  ['image/png', '.png'],
+  ['image/jpeg', '.jpg'],
+  ['image/gif', '.gif'],
+  ['image/webp', '.webp'],
+]);
+
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
  * Polls every 500ms for up to 30 seconds. Claude Code takes a few seconds to start.
@@ -108,6 +116,24 @@ const readJsonBody = Effect.gen(function* () {
     return {} as Record<string, unknown>;
   }
 });
+
+function decodeUploadBytes(data: string): Buffer | null {
+  const trimmed = data.trim();
+  if (!trimmed) return null;
+  try {
+    const bytes = Buffer.from(trimmed, 'base64');
+    return bytes.length > 0 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeUploadExtension(filename: string, mimeType: string): string {
+  const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
+  if (!mimeExtension) return '';
+  const originalExtension = extname(filename).toLowerCase();
+  return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+}
 
 /** Generate a default conversation name, e.g. 20260404-1234 */
 function generateConversationName(): string {
@@ -707,6 +733,56 @@ const getConversationMessagesRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/upload-image ───────────────────────
+
+const postConversationUploadImageRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/upload-image',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const filename = typeof body['filename'] === 'string' ? body['filename'].trim() : '';
+        const data = typeof body['data'] === 'string' ? body['data'] : '';
+        const mimeType = typeof body['mimeType'] === 'string' ? body['mimeType'].trim() : '';
+
+        if (!filename || !data || !mimeType) {
+          return jsonResponse({ error: 'filename, data, and mimeType are required' }, { status: 400 });
+        }
+
+        if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+          return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
+        }
+
+        const bytes = decodeUploadBytes(data);
+        if (!bytes) {
+          return jsonResponse({ error: 'Invalid base64 image data' }, { status: 400 });
+        }
+
+        const extension = safeUploadExtension(filename, mimeType);
+        if (!extension) {
+          return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
+        }
+
+        const path = join(tmpdir(), `panopticon-paste-${randomUUID()}${extension}`);
+        await writeFile(path, bytes);
+
+        return jsonResponse({ path });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to upload image: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: POST /api/conversations/:name/message ────────────────────────────
 
 const postConversationMessageRoute = HttpRouter.add(
@@ -1065,6 +1141,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,
   getConversationMessagesRoute,
+  postConversationUploadImageRoute,
   postConversationMessageRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
