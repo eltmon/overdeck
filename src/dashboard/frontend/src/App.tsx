@@ -9,6 +9,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { HandoffsPage } from './components/HandoffsPage';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
+import { FlywheelPage } from './components/FlywheelPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
@@ -55,6 +56,7 @@ const TAB_PATHS: Record<Tab, string> = {
   resources: '/resources',
   handoffs: '/handoffs',
   'awaiting-merge': '/awaiting-merge',
+  flywheel: '/flywheel',
   activity: '/activity',
   metrics: '/metrics',
   costs: '/costs',
@@ -644,6 +646,11 @@ export default function App() {
         {activeTab === 'awaiting-merge' && (
           <div className="w-full overflow-auto">
             <AwaitingMergePage />
+          </div>
+        )}
+        {activeTab === 'flywheel' && (
+          <div className="w-full overflow-auto">
+            <FlywheelPage />
           </div>
         )}
         {activeTab === 'settings' && (

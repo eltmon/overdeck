@@ -167,12 +167,66 @@ async function spawnRetroAgentForIssue(issueId: string): Promise<void> {
 }
 
 /**
- * Run the synthesis step: read non-archived retros, apply threshold, file PAN issues.
- * Implementation: `panopticon-cli-ncg` (synthesis core module).
+ * Run the synthesis step: read non-archived retros, apply threshold, file PAN issues,
+ * archive processed retros, and append to FLYWHEEL-REPORT.md.
  */
 async function runSynthesis(): Promise<void> {
-  console.log('[flywheel-daemon] Synthesis step — stub (PAN-ncg)');
-  // TODO: import and call runFlywheelSynthesis() once panopticon-cli-ncg lands
+  console.log('[flywheel-daemon] Synthesis step — starting');
+  try {
+    const { runSynthesis: synthesize } = await import('../flywheel/synthesis.js');
+    const { fileFlywheelIssues } = await import('../flywheel/issue-filer.js');
+    const { archiveProcessedRetros } = await import('../flywheel/retro-archiver.js');
+    const { appendFlywheelReport } = await import('../flywheel/flywheel-report.js');
+
+    const result = await synthesize();
+    console.log(`[flywheel-daemon] Synthesis: ${result.proposals.length} proposals, ${result.watchlist.length} watchlist, filterRatio=${result.filterRatio.toFixed(2)}`);
+
+    if (result.proposals.length === 0 && result.watchlist.length === 0) {
+      console.log('[flywheel-daemon] Synthesis is a no-op (no retros)');
+      return;
+    }
+
+    // File GitHub issues for above-threshold proposals
+    const filingResult = await fileFlywheelIssues(result.proposals);
+    console.log(`[flywheel-daemon] Filed ${filingResult.filed.length} issues, deferred ${filingResult.deferred.length}`);
+
+    // Archive processed retros
+    const archiveResult = await archiveProcessedRetros(result.processedRetros);
+    console.log(`[flywheel-daemon] Archived ${archiveResult.archived.length} retros, wontfixed ${archiveResult.wontfixed.length}`);
+
+    // Determine run number from archive state
+    const runNumberMatch = archiveResult.archived.length > 0 ? 1 : 0; // rough — appendFlywheelReport tracks its own counter
+    void runNumberMatch;
+
+    // Append to FLYWHEEL-REPORT.md
+    await appendFlywheelReport({
+      runNumber: Date.now(), // monotonic stand-in; synthesis-commit derives the pretty number
+      timestamp: new Date().toISOString(),
+      trigger: 'daemon-scheduled',
+      issuesMergedThisRun: [],
+      skillChangesFiled: filingResult.filed.map(f => ({
+        issueId: String(f.issueNumber),
+        title: f.title,
+        signals: 0,
+      })),
+      substrateInlineFixes: [],
+      topFrictionPatterns: result.proposals.slice(0, 5).map(p => ({
+        pattern: p.signature.targetSkill,
+        issueCount: p.retroCount,
+      })),
+      watchlist: result.watchlist.map(w => ({
+        description: `${w.signature.targetSkill}: ${w.signature.gapDescription}`,
+        signals: w.retroCount,
+      })),
+      retroStats: {
+        total: result.processedRetros.length,
+        surprise: Math.round(result.filterRatio * result.processedRetros.length),
+        noop: result.processedRetros.length - Math.round(result.filterRatio * result.processedRetros.length),
+      },
+    });
+  } catch (err) {
+    console.warn('[flywheel-daemon] Synthesis step failed:', err);
+  }
 }
 
 /**
@@ -305,8 +359,8 @@ async function daemonTick(): Promise<void> {
     if (!acquireLock()) return;
     try {
       lastFullCycleAt = nowMs;
-      console.log('[flywheel-daemon] Full 24h flywheel cycle — stub (PAN-ncg)');
-      // TODO: run full cycle inventory + synthesis + archive + report
+      console.log('[flywheel-daemon] Full 24h flywheel cycle — running synthesis');
+      await runSynthesis();
     } catch (err) {
       console.warn('[flywheel-daemon] Full cycle failed:', err);
     } finally {

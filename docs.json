@@ -107,6 +107,17 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "How It Works",
+        "groups": [
+          {
+            "group": "The Flywheel",
+            "pages": [
+              "flywheel"
+            ]
+          }
+        ]
       }
     ]
   },

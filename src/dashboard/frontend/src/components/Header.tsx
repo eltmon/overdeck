@@ -13,5 +13,6 @@ export type Tab =
   | 'costs'
   | 'handoffs'
   | 'awaiting-merge'
+  | 'flywheel'
   | 'settings'
   | 'god-view';

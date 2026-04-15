@@ -1,0 +1,42 @@
+---
+title: The Flywheel
+description: 'How Panopticon teaches itself — a living record of every synthesis run'
+---
+
+# The Self-Improving Flywheel
+
+Panopticon gets better every time it ships code. After each merge, a **retro-agent** reviews the issue lifecycle and asks one question: _what surprised me?_
+
+Surprises accumulate in `docs/flywheel/retros/`. When three or more retros point at the same friction pattern, the **synthesis step** promotes it into a GitHub issue labeled `flywheel-change`. Accepted changes land as skill updates, and the cycle repeats.
+
+## How it works
+
+```
+merge → retro-agent → retros/
+         every 30 min → synthesis → proposals → issues → skill PRs → merge
+```
+
+1. **Event trigger** — `notifyFlywheelMergeComplete()` fires after every merge, spawning a short-lived retro-agent in its own tmux session.
+2. **Surprise filter** — The retro-agent identifies gaps: missing skills, failed patterns, unexpected friction. Routine merges become `no-op` retros.
+3. **Synthesis** — Every 30 minutes (and once per 24h full cycle), the daemon reads non-archived retros, groups them by `(target_skill, audience, gap_description)`, and applies a 3-signal threshold.
+4. **Issue filing** — Above-threshold groups become GitHub issues with the `flywheel-change` label. Capped at 10 per run to prevent storms.
+5. **Archive** — Processed retros move to `retros/archive/run-N/`. Watchlist retros older than 30 days age out with a `wontfix` marker.
+
+## Guards
+
+The daemon never fires during:
+- **Quiet hours** (default: 22:00–08:00) — configurable in `~/.panopticon/config.yaml`
+- **Active sessions** — backs off if a Claude Code session is live
+- **Concurrent cycles** — mutex lock at `~/.panopticon/flywheel.lock`
+
+## FLYWHEEL-REPORT.md
+
+Every synthesis run appends a structured section to `~/docs/FLYWHEEL-REPORT.md`. The full timeline is reproduced below.
+
+import FlywheelReport from '/docs/FLYWHEEL-REPORT.md'
+
+<FlywheelReport />
+
+---
+
+_If FLYWHEEL-REPORT.md is empty or missing, no synthesis runs have completed yet. Run `pan flywheel sync` to trigger one manually._

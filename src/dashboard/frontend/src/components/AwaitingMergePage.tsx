@@ -9,12 +9,13 @@
  * Fix-All flywheel. See FIX-ALL-PRD.md.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectIssues } from '../lib/store';
 import type { Issue } from '../types';
+import { FlywheelChangesTab } from './FlywheelChangesTab';
 
 interface WorkspaceInfo {
   exists?: boolean;
@@ -40,8 +41,11 @@ async function mergeIssue(issueId: string): Promise<unknown> {
   return res.json();
 }
 
+type MergeTab = 'all' | 'flywheel';
+
 export function AwaitingMergePage() {
   const queryClient = useQueryClient();
+  const [mergeTab, setMergeTab] = useState<MergeTab>('all');
   const awaiting = useDashboardStore(selectAwaitingMerge);
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
 
@@ -100,7 +104,7 @@ export function AwaitingMergePage() {
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-5xl mx-auto p-6">
-        <header className="mb-6">
+        <header className="mb-4">
           <div className="flex items-center gap-3 mb-1">
             <GitMerge className="w-6 h-6 text-primary" />
             <h1 className="text-2xl font-semibold text-foreground font-display">
@@ -116,7 +120,26 @@ export function AwaitingMergePage() {
           </p>
         </header>
 
-        {sortedAwaiting.length === 0 ? (
+        {/* Tab strip */}
+        <div className="flex gap-1 mb-5 border-b border-border">
+          {(['all', 'flywheel'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setMergeTab(t)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                mergeTab === t
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t === 'all' ? 'All' : 'Flywheel Changes'}
+            </button>
+          ))}
+        </div>
+
+        {mergeTab === 'flywheel' ? (
+          <FlywheelChangesTab />
+        ) : sortedAwaiting.length === 0 ? (
           <EmptyState />
         ) : (
           <ul className="space-y-3">

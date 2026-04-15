@@ -4,7 +4,7 @@ import {
   Eye, LayoutGrid, Bot, Server, ArrowRightLeft,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, GitMerge,
+  Hammer, Loader2, GitMerge, RefreshCw,
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
@@ -43,6 +43,7 @@ const NAV_GROUPS = [
     label: 'System',
     items: [
       { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
+      { id: 'flywheel' as Tab, label: 'Flywheel', icon: RefreshCw },
       { id: 'settings' as Tab, label: 'Settings', icon: Settings },
       { id: 'god-view' as Tab, label: 'God View', icon: Zap },
     ],
