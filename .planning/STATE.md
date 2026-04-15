@@ -3,13 +3,14 @@
 ## Status: In Progress
 
 ## Current Phase
-Bead panopticon-cli-vw1 complete. Working on bead panopticon-cli-cer (EXAMPLES.md fix).
+All beads implemented. Awaiting inspection on panopticon-cli-cer.
 
 ## Completed Work
-- [x] panopticon-cli-vw1: Fixed 5 stale refs in test-specialist-workflow/SKILL.md — `pan cloister start` → `pan admin cloister start`, `pan specialists wake *` → `pan admin specialists wake *`
+- [x] panopticon-cli-vw1: Fixed 5 stale refs in test-specialist-workflow/SKILL.md — `pan cloister start` → `pan admin cloister start`, `pan specialists wake *` → `pan admin specialists wake *` (commit: cb6c0452)
+- [x] panopticon-cli-cer: Fixed EXAMPLES.md Pattern 6 — updated `cli/commands/work.ts` example to `done.ts`, replaced `pan work --help` with `pan --help`
 
 ## Remaining Work
-- [ ] panopticon-cli-cer: Update update-panopticon-docs EXAMPLES.md Pattern 6 to drop pan work namespace
+(none)
 
 ## Key Decisions
 - `pan workspace` refs are valid (not stale) — only `pan work`, `pan cloister`, `pan specialists` are the stale forms per issue scope
