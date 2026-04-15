@@ -721,7 +721,11 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
           : null;
       if (existingContent !== sourceContent) {
         writeFileSync(targetSkillMd, sourceContent, 'utf-8');
-        result.updated.push(entry.name);
+        if (existingContent === null) {
+          result.added.push(entry.name);
+        } else {
+          result.updated.push(entry.name);
+        }
       }
     }
   }

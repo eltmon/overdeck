@@ -1710,7 +1710,7 @@ const FAILED_MERGE_MAX_RETRIES = 3;
  *   - Review + test must both be 'passed' (don't retry if code quality failed)
  *   - 30-min per-issue cooldown for non-CI failures, 2-min for CI transient
  *   - Circuit breaker: max 3 retries (mergeRetryCount) for non-CI
- *   - CI transient failures: max 5 retries with exponential backoff
+ *   - CI transient failures: max 5 retries with flat 2-minute cooldown
  */
 export async function checkFailedMergeRetry(): Promise<string[]> {
   const actions: string[] = [];

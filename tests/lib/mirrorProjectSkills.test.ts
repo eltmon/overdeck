@@ -121,6 +121,19 @@ describe('mirrorProjectSkills', () => {
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
   });
 
+  it('classifies as added (not updated) when target dir exists but has no SKILL.md', () => {
+    createSkill('pan-help', '# Help\nContent.');
+    // Target dir exists but contains no SKILL.md or skill.md — existingContent will be null
+    mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, 'pan-help', 'README.md'), '# Other\n', 'utf-8');
+
+    const result = mirrorProjectSkills(cwd);
+
+    expect(result.added).toEqual(['pan-help']);
+    expect(result.updated).toEqual([]);
+    expect(existsSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'))).toBe(true);
+  });
+
   it('handles multiple skills in a single pass', () => {
     createSkill('pan-help', '# Help');
     createSkill('commit', '# Commit');
