@@ -363,9 +363,10 @@ describe('specialist-handoff-logger', () => {
       expect(stats.successRate).toBe(1.0);
     });
 
-    it('should calculate queue depth from live hook files, not JSONL status', async () => {
-      // Log handoffs with queued/processing status — these should NOT affect queueDepth
-      // because the JSONL is append-only and statuses are stale.
+    it('should always return queueDepth=0 (non-merge specialists have no queue)', async () => {
+      // Log handoffs with queued/processing status — queueDepth is always 0 because
+      // non-merge specialists dispatch immediately (PAN-722). Merge queue depth is
+      // tracked separately via SQLite, not here.
       const handoffs = [
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal'), status: 'queued' as const },
         { ...createSpecialistHandoff('review-agent', 'test-agent', 'PAN-2', 'normal'), status: 'queued' as const },
@@ -373,20 +374,8 @@ describe('specialist-handoff-logger', () => {
       ];
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      // Without hook files: queueDepth = 0 (live hooks are authoritative)
-      const statsNoHooks = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
-      expect(statsNoHooks.queueDepth).toBe(0);
-
-      // Write a hook.json for test-agent with 2 pending items
-      const testAgentDir = join(TEST_AGENTS_DIR, 'test-agent');
-      mkdirSync(testAgentDir, { recursive: true });
-      writeFileSync(
-        join(testAgentDir, 'hook.json'),
-        JSON.stringify({ agentId: 'test-agent', items: [{ id: 'a' }, { id: 'b' }] }),
-      );
-
-      const statsWithHooks = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
-      expect(statsWithHooks.queueDepth).toBe(2);
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
+      expect(stats.queueDepth).toBe(0);
     });
 
     it('should count today\'s handoffs correctly', async () => {

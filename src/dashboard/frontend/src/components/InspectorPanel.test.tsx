@@ -63,12 +63,12 @@ describe('getReviewButtonState', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Queued (position >= 1)
+  // Queued in merge queue (position >= 1, activeSpecialist === 'merge')
   // ---------------------------------------------------------------------------
 
-  it('shows "Queued" for position 1', () => {
+  it('shows "Queued" for position 1 in merge queue', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 1, activeSpecialist: 'review', readyForMerge: false },
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: 1, activeSpecialist: 'merge', readyForMerge: true },
       false
     );
     expect(state.label).toBe('Queued');
@@ -76,41 +76,41 @@ describe('getReviewButtonState', () => {
     expect(state.spinning).toBe(false);
   });
 
-  it('shows "Queued (2nd)" for position 2', () => {
+  it('shows "Queued (2nd)" for position 2 in merge queue', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 2, activeSpecialist: 'review', readyForMerge: false },
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: 2, activeSpecialist: 'merge', readyForMerge: true },
       false
     );
     expect(state.label).toBe('Queued (2nd)');
   });
 
-  it('shows "Queued (3rd)" for position 3', () => {
+  it('shows "Queued (3rd)" for position 3 in merge queue', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 3, activeSpecialist: 'review', readyForMerge: false },
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: 3, activeSpecialist: 'merge', readyForMerge: true },
       false
     );
     expect(state.label).toBe('Queued (3rd)');
   });
 
-  it('shows "Queued (4th)" for position 4', () => {
+  it('shows "Queued (4th)" for position 4 in merge queue', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 4, activeSpecialist: 'review', readyForMerge: false },
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: 4, activeSpecialist: 'merge', readyForMerge: true },
       false
     );
     expect(state.label).toBe('Queued (4th)');
   });
 
-  it('shows "Queued (11th)" for position 11 (teens exception)', () => {
+  it('shows "Queued (11th)" for position 11 in merge queue (teens exception)', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 11, activeSpecialist: 'review', readyForMerge: false },
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: 11, activeSpecialist: 'merge', readyForMerge: true },
       false
     );
     expect(state.label).toBe('Queued (11th)');
   });
 
-  it('shows "Queued (21st)" for position 21', () => {
+  it('shows "Queued (21st)" for position 21 in merge queue', () => {
     const state = getReviewButtonState(
-      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 21, activeSpecialist: 'review', readyForMerge: false },
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: 21, activeSpecialist: 'merge', readyForMerge: true },
       false
     );
     expect(state.label).toBe('Queued (21st)');

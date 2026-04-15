@@ -1,11 +1,13 @@
 /**
- * Auto-queue logic for triggering the test-agent after review passes.
+ * Direct dispatch logic for triggering the test-agent after review passes.
  *
  * Uses per-project ephemeral specialists (no global test-agent pool).
+ * No queue fallback — on busy or failure, sets dispatch_failed so deacon
+ * orphan recovery retries on the next patrol cycle.
  */
 
 import { setReviewStatus } from '../review-status.js';
-import { spawnEphemeralSpecialist, submitToSpecialistQueue } from './specialists.js';
+import { spawnEphemeralSpecialist } from './specialists.js';
 import { resolveProjectFromIssue } from '../projects.js';
 
 /**
@@ -17,7 +19,7 @@ import { resolveProjectFromIssue } from '../projects.js';
  * @param branch      - Feature branch name (e.g. "feature/pan-343")
  * @param notifyAgent - Callback that sends a message to the work agent
  */
-export async function autoQueueTestAgentAndNotify(
+export async function dispatchTestAgentAndNotify(
   issueId: string,
   workspace: string,
   branch: string,
@@ -28,7 +30,7 @@ export async function autoQueueTestAgentAndNotify(
   try {
     const resolved = resolveProjectFromIssue(issueId);
     if (!resolved) {
-      console.error(`[test-queue] No project configured for ${issueId} — cannot spawn test specialist`);
+      console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test specialist`);
       setReviewStatus(issueId, {
         testStatus: 'dispatch_failed',
         testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
@@ -45,22 +47,17 @@ export async function autoQueueTestAgentAndNotify(
     if (result.success) {
       setReviewStatus(issueId, { testStatus: 'testing' });
       testTaskDelivered = true;
-      console.log(`[test-queue] Spawned test specialist for ${issueId} (${resolved.projectKey})`);
+      console.log(`[test-dispatch] Spawned test specialist for ${issueId} (${resolved.projectKey})`);
     } else if (result.error === 'specialist_busy') {
-      // Specialist is busy with another task — add to queue for deacon to drain
-      console.log(`[test-queue] Specialist busy for ${issueId} — queuing for deacon dispatch`);
-      submitToSpecialistQueue('test-agent', {
-        priority: 'high',
-        source: 'test-queue',
-        issueId,
-        workspace,
-        branch,
+      // Specialist is busy with another task — set dispatch_failed so deacon retries
+      console.log(`[test-dispatch] Specialist busy for ${issueId} — setting dispatch_failed for deacon retry`);
+      setReviewStatus(issueId, {
+        testStatus: 'dispatch_failed',
+        testNotes: `Test specialist busy — deacon will retry automatically.`,
       });
-      setReviewStatus(issueId, { testStatus: 'testing' });
-      testTaskDelivered = true; // notify agent that tests are queued
     } else {
       // Non-busy failure — retry once after 2s
-      console.log(`[test-queue] First spawn failed for ${issueId}: ${result.message}. Retrying in 2s...`);
+      console.log(`[test-dispatch] First spawn failed for ${issueId}: ${result.message}. Retrying in 2s...`);
       await new Promise((r) => setTimeout(r, 2000));
 
       const retry = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
@@ -72,21 +69,9 @@ export async function autoQueueTestAgentAndNotify(
       if (retry.success) {
         setReviewStatus(issueId, { testStatus: 'testing' });
         testTaskDelivered = true;
-        console.log(`[test-queue] Spawned test specialist for ${issueId} on retry`);
-      } else if (retry.error === 'specialist_busy') {
-        // Became busy between attempts — queue it
-        console.log(`[test-queue] Specialist became busy for ${issueId} — queuing for deacon dispatch`);
-        submitToSpecialistQueue('test-agent', {
-          priority: 'high',
-          source: 'test-queue',
-          issueId,
-          workspace,
-          branch,
-        });
-        setReviewStatus(issueId, { testStatus: 'testing' });
-        testTaskDelivered = true;
+        console.log(`[test-dispatch] Spawned test specialist for ${issueId} on retry`);
       } else {
-        console.error(`[test-queue] Both spawn attempts failed for ${issueId}: ${retry.message}`);
+        console.error(`[test-dispatch] Both spawn attempts failed for ${issueId}: ${retry.message}`);
         setReviewStatus(issueId, {
           testStatus: 'dispatch_failed',
           testNotes: `Test specialist spawn failed: ${retry.message}`,
@@ -95,27 +80,27 @@ export async function autoQueueTestAgentAndNotify(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[test-queue] Failed to dispatch test specialist for ${issueId}:`, err);
+    console.error(`[test-dispatch] Failed to dispatch test specialist for ${issueId}:`, err);
     try {
       setReviewStatus(issueId, {
         testStatus: 'dispatch_failed',
         testNotes: `Dispatch failed: ${msg}`,
       });
     } catch (statusErr) {
-      console.error(`[test-queue] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
+      console.error(`[test-dispatch] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
     }
   }
 
-  // Only notify work agent when test task was successfully delivered
+  // Only notify work agent when test was successfully dispatched
   if (testTaskDelivered) {
     try {
       await notifyAgent(
         `agent-${issueId.toLowerCase()}`,
-        `REVIEW PASSED for ${issueId}. Tests have been queued automatically. Do NOT poll or check status — you will be notified when tests complete.`,
+        `REVIEW PASSED for ${issueId}. Tests have been dispatched automatically. Do NOT poll or check status — you will be notified when tests complete.`,
       );
     } catch (err) {
       console.log(
-        `[test-queue] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`,
+        `[test-dispatch] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`,
       );
     }
   }

@@ -1,6 +1,6 @@
 # Specialist Workflow Guide
 
-This document explains how worker agents interact with specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) through the queue system.
+This document explains how worker agents interact with specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) through the direct dispatch system.
 
 For the canonical inventory of agent types, prompt templates, routing IDs, and spawn entrypoints, see [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md).
 
@@ -282,40 +282,34 @@ const prResult = execSync(
 const prUrl = prResult.trim(); // e.g., "https://github.com/owner/repo/pull/123"
 ```
 
-### Step 3: Submit to Review Queue
+### Step 3: Signal Completion
 
-```typescript
-import { submitToSpecialistQueue } from '@/lib/cloister/specialists';
+Workers signal completion via `pan done <issueId>` (Bash command). Cloister then:
 
-// Submit PR to review-agent
-submitToSpecialistQueue('review-agent', {
-  priority: 'normal', // or 'urgent', 'high', 'low'
-  source: 'agent-pan-42', // Worker agent ID
-  prUrl: prUrl,
-  issueId: 'PAN-42',
-  workspace: '/path/to/workspace',
-  branch: 'feature/pan-42',
-  filesChanged: ['src/foo.ts', 'src/bar.ts'], // Optional
-  context: {
-    // Optional additional context
-    description: 'Implemented new feature X',
-    estimatedComplexity: 'medium',
-  },
-});
+1. Runs the **verification gate** (typecheck, lint, test) from `projects.yaml`
+2. If gates pass, dispatches **review-agent** via `spawnEphemeralSpecialist` — no queue, immediate spawn
+
+```bash
+# Worker signals done — triggers verification gate → review-agent dispatch
+pan done PAN-42
 ```
 
-### Step 4: Worker Agent Waits
+The worker agent exits after calling `pan done`. The specialist pipeline takes over automatically.
 
-Worker agent can:
-- **Exit** and let specialists handle the rest (recommended)
-- **Wait and monitor** for review results (if immediate feedback needed)
-- **Continue with other tasks** while review is pending
+### Step 4: Specialist Pipeline Takes Over
+
+After `pan done`:
+- Verification gate passes → review-agent spawned immediately for this workspace
+- Review approved → test-agent spawned immediately
+- Tests pass → UAT-agent spawned (if configured)
+- UAT passes → issue enters the **merge queue** (SQLite-backed, per-project)
+- Human approves → merge-agent processes the merge
 
 ## Specialist Agent Processing
 
 ### Review Agent Workflow
 
-1. **Wakes up** when work is detected in queue (FPP principle)
+1. **Dispatched immediately** via `spawnEphemeralSpecialist` when verification gate passes
 2. **Reads PR** using GitHub CLI (`gh pr view`, `gh pr diff`)
 3. **Reviews code** for:
    - Correctness and logic errors
@@ -327,45 +321,39 @@ Worker agent can:
    - **CHANGES_REQUESTED**: Critical issues must be fixed
    - **COMMENTED**: Suggestions, questions, minor feedback
 5. **Reports results** with structured output markers
-6. **If approved**, submits to merge queue automatically
-7. **Removes task** from review queue
+6. **If approved**, dispatches test-agent immediately
 
-### Test Agent Workflow (Optional)
+### Test Agent Workflow
 
-Review-agent or worker-agent can optionally submit to test-agent:
-
-```typescript
-submitToSpecialistQueue('test-agent', {
-  priority: 'normal',
-  source: 'review-agent',
-  issueId: 'PAN-42',
-  workspace: '/path/to/workspace',
-  branch: 'feature/pan-42',
-});
-```
+Test-agent is dispatched automatically when review-agent reports APPROVED.
 
 Test agent:
-1. **Detects test runner** (npm, pytest, cargo, etc.)
-2. **Runs test suite**
-3. **Analyzes failures**
-4. **Attempts simple fixes** if applicable (< 5 min fix)
-5. **Reports results** with structured output
+1. **Dispatched immediately** via `spawnEphemeralSpecialist` when review passes
+2. **Detects test runner** (npm, pytest, cargo, etc.)
+3. **Runs test suite**
+4. **Analyzes failures**
+5. **Attempts simple fixes** if applicable (< 5 min fix)
+6. **Reports results** with structured output
 
 ### Merge Agent Workflow
 
-1. **Wakes up** when work is detected in queue
-2. **Attempts merge** to target branch (usually `main`)
-3. **If conflicts exist**:
+The merge agent uses a **SQLite-backed per-project queue** (`merge_queue` table). This is the only specialist with a queue — merges are human-approved and serialized per project.
+
+1. **Enqueued** when tests pass and issue enters `readyForMerge`
+2. **Dequeued** when human clicks MERGE in the dashboard
+3. **Attempts merge** to target branch (usually `main`)
+4. **If conflicts exist**:
    - Reads conflict files
    - Analyzes both sides of conflict
    - Resolves conflicts (preserving intent of both changes)
    - Runs tests if configured
-4. **Completes merge commit**
-5. **Pushes to remote**
-6. **Reports results**
-7. **Removes task** from merge queue
+5. **Completes merge commit**
+6. **Pushes to remote**
+7. **Reports results, advances queue** to next issue
 
-## Queue Priority Levels
+## Merge Queue Priority
+
+The merge queue (SQLite-backed, per-project) supports priority ordering:
 
 ```typescript
 type Priority = 'urgent' | 'high' | 'normal' | 'low';
@@ -376,7 +364,7 @@ type Priority = 'urgent' | 'high' | 'normal' | 'low';
 - **normal**: Standard features, bug fixes (default)
 - **low**: Minor improvements, cleanup tasks
 
-Specialists process queue items in priority order (urgent → high → normal → low).
+Only the merge queue has priority. Review, test, inspect, and UAT are dispatched immediately and run in parallel per workspace — there is no queue to prioritize.
 
 ## Result Monitoring
 
@@ -396,7 +384,6 @@ interface ReviewResult {
 Review results are:
 - Written to `~/.panopticon/specialists/review-agent/history.jsonl`
 - Posted as GitHub PR review comments
-- Available via CLI: `pan specialists queue review-agent`
 
 ### Test Agent Results
 
@@ -427,46 +414,18 @@ interface MergeResult {
 
 ## Example: Complete Worker Agent Flow
 
-```typescript
-// worker-agent.ts - Example implementation
+```bash
+# 1. Implement feature
+# ... (agent edits files, runs tests locally)
 
-// 1. Implement feature
-await implementFeature(issueId);
+# 2. Create PR via gh CLI
+gh pr create --title "feat: PAN-42 implement feature X" --body "..." --head feature/pan-42
 
-// 2. Run tests locally (optional but recommended)
-const localTestResult = execSync('npm test', { cwd: workspace });
-if (!localTestResult.includes('PASS')) {
-  console.error('Tests failed locally. Fixing...');
-  await fixTests();
-}
+# 3. Signal completion — triggers verification gate → specialist pipeline
+pan done PAN-42
 
-// 3. Create PR
-const prUrl = execSync(
-  `gh pr create --title "feat: ${issueTitle}" --body "${prBody}" --head ${branch}`,
-  { cwd: workspace, encoding: 'utf-8' }
-).trim();
-
-console.log(`Created PR: ${prUrl}`);
-
-// 4. Submit to review queue
-submitToSpecialistQueue('review-agent', {
-  priority: 'normal',
-  source: agentId,
-  prUrl,
-  issueId,
-  workspace,
-  branch,
-  filesChanged: getChangedFiles(),
-  context: {
-    description: 'Implemented feature X with tests',
-    testsPassed: true,
-  },
-});
-
-console.log('Submitted to review queue. Specialist will handle review and merge.');
-
-// 5. Worker agent work is done - specialist takes over
-exit(0);
+# That's it. Cloister handles the rest:
+#   verification gate → review-agent → test-agent → UAT-agent → merge queue
 ```
 
 ## CLI Commands
@@ -475,10 +434,7 @@ exit(0);
 # List all specialists with status
 pan specialists list
 
-# Check a specialist's queue
-pan specialists queue review-agent
-
-# Manually wake a specialist (for testing)
+# Manually dispatch a specialist (triggers immediate spawn)
 pan specialists wake review-agent
 
 # Reset a specialist (clear session, start fresh)
@@ -517,68 +473,38 @@ auto_wake = true
 
 ### For Specialist Configuration
 
-1. **Keep auto_wake enabled**: Ensures specialists respond to queue items
-2. **Monitor history logs**: Check `~/.panopticon/specialists/<name>/history.jsonl`
-3. **Reset sessions periodically**: If context gets too large (>100K tokens)
-4. **Configure test commands**: Override auto-detection for custom test setups
+1. **Monitor history logs**: Check `~/.panopticon/specialists/<name>/history.jsonl`
+2. **Configure test commands**: Override auto-detection for custom test setups
 
-## Session Persistence & Memory
+## Session Lifecycle
 
-Specialist agents maintain persistent sessions across invocations, accumulating project knowledge over time. This is a key differentiator — specialists get smarter the more they work on a project.
+Each specialist dispatch spawns a fresh ephemeral Claude Code session (random `--session-id`, no `--resume`). This is intentional: context compaction corrupts thinking block signatures when sessions are resumed with `--resume` (PAN-612). Fresh-session-per-dispatch avoids this class of failures at the cost of each cycle starting without prior conversation context.
 
-### How It Works
+A preamble is injected at the start of every task prompt to handle the case where a session has run before:
 
-Each specialist stores a session ID in `~/.panopticon/specialists/<name>.session` (global) or `~/.panopticon/specialists/projects/<projectKey>/<name>.session` (per-project). When a specialist is dispatched:
+```
+IMPORTANT: This is a NEW task dispatch. You may have context from prior runs in this session —
+that is useful background knowledge, but you MUST execute this task fresh RIGHT NOW.
+```
 
-1. **First dispatch** (no session file): A deterministic UUID is generated from the specialist's identity string (e.g., `specialist-mind-your-now-review-agent` → SHA-256 → UUID format). Claude Code starts with `--session-id <uuid>`, and the ID is persisted to disk.
-2. **Subsequent dispatches**: The saved session ID is read and Claude Code starts with `--resume <sessionId>`, restoring the full conversation history.
+### Context Digest (cross-dispatch memory)
 
-**Important**: Claude Code requires valid UUID format for both `--session-id` and `--resume`. Session IDs are generated via `deterministicUUID()` which hashes the specialist name with SHA-256 and formats the result as a UUID. This ensures the same specialist for the same project always gets the same session ID. A validation guard in `getSessionId()` discards any stored session IDs that aren't valid UUIDs (e.g., from older formats).
+Specialists write a **context digest** after each run (`specialist-context.ts`). This structured summary is injected into the next dispatch's prompt as background knowledge. It provides the specialist's accumulated understanding of the codebase without requiring session resume:
 
-This means the merge-agent remembers every merge it has performed, the review-agent accumulates knowledge of code patterns and past review decisions, and the test-agent retains awareness of flaky tests and project-specific test configurations.
-
-### What Gets Preserved
-
-| Specialist | Accumulated Knowledge |
-|------------|----------------------|
-| **merge-agent** | Previous merge resolutions, conflict patterns, project conventions, which files commonly conflict |
-| **review-agent** | Code quality patterns, past review decisions, security patterns specific to the project |
-| **test-agent** | Test infrastructure knowledge, known flaky tests, failure patterns |
-
-### Session Rotation (Context Management)
-
-When a specialist's token usage exceeds **100K tokens**, session rotation triggers automatically:
-
-1. The current session is killed
-2. A **tiered memory file** is built from git history:
-   - **Last 100 merges**: commit hash + message (summary)
-   - **Last 50 merges**: + files changed (detailed)
-   - **Last 20 merges**: + full diffs (complete context)
-3. A fresh session starts with the memory file injected as context
-4. The new session ID is persisted for future `--resume`
-
-This ensures specialists maintain long-term knowledge without exhausting their context window.
-
-### Why This Matters
-
-Without session persistence, every specialist wake starts from zero — the merge-agent would re-learn the same conflict patterns, the review-agent would forget past decisions, and the test-agent would lose awareness of the test infrastructure. Session persistence transforms specialists from stateless workers into experienced team members that improve over time.
+- **review-agent**: Patterns found, past decisions, recurring issues
+- **test-agent**: Known flaky tests, test runner quirks, infrastructure notes
+- **merge-agent**: Conflict patterns, resolution strategies
 
 ### Resetting a Specialist
 
-To clear a specialist's accumulated context and start fresh:
-
 ```bash
-# Delete the session file — next dispatch will create a new session with the same deterministic UUID
-rm ~/.panopticon/specialists/merge-agent.session
-
-# For per-project specialists:
-rm ~/.panopticon/specialists/projects/mind-your-now/review-agent.session
-
-# Or reset via CLI
-pan specialists reset merge-agent
+# Reset via CLI — clears session state and context digest
+pan specialists reset review-agent
 ```
 
-Note: resetting only clears the session file. The next dispatch will regenerate the same deterministic UUID from the specialist name, creating a fresh Claude session with a new conversation history.
+### Future: Persistent Sessions (tracked in PAN-722)
+
+Keeping specialist processes alive between dispatch cycles (so Claude's conversation context is preserved across review/test cycles for the same issue) is a planned enhancement. The tmux session should persist until the issue is merged; the specialist should receive new tasks into the existing session rather than being killed and re-spawned. This requires a launcher architecture change (interactive mode + task delivery via `sendKeysAsync`) and is tracked separately.
 
 ## Review Cycle Circuit Breaker
 
@@ -663,16 +589,13 @@ The REST `GET /api/activity` endpoint provides a bootstrap fallback for the Acti
 
 ## Troubleshooting
 
-### Review agent not processing queue
+### Review agent not dispatching
 
 ```bash
-# Check queue status
-pan specialists queue review-agent
-
 # Check if specialist is running
 pan specialists list
 
-# Manually wake specialist
+# Manually dispatch specialist
 pan specialists wake review-agent
 ```
 
@@ -850,14 +773,9 @@ On restart, the agent reads STATE.md and sees:
 
 The `getTrackerContext()` function (PAN-253) injects this into the work agent prompt, ensuring the agent never fast-paths to done when reopened.
 
-### Preventing Stale Queue Items
+### Preventing Stale Dispatch
 
-Without reopen clearing queues, specialists might pick up stale items from before the reset:
-- review-agent might re-review old code against old criteria
-- test-agent might run tests on the pre-fix branch
-- merge-agent might try to merge already-done state
-
-The reopen flow calls `completeSpecialistTask()` for all queue items matching the issue ID across all three specialist queues.
+Reopen clears `reviewStatus`, `testStatus`, and `mergeStatus` to `pending`. Because review/test specialists dispatch immediately on status transitions (no queue), there are no stale queue items to clear. The merge queue entry for the issue is also removed if one exists.
 
 ## Future Enhancements
 
@@ -865,12 +783,11 @@ The reopen flow calls `completeSpecialistTask()` for all queue items matching th
 - Multiple merge agents per repository
 - Webhook integration (GitHub webhooks trigger specialists)
 - Deacon backoff/escalation for repeated failures (PAN-247)
-- Queue dashboard UI
+- Persistent specialist sessions per issue — keep tmux session alive across review/test cycles so Claude doesn't regather context (PAN-722)
 
 ## Related Documentation
 
 - [BUILD.md](./BUILD.md) - Build pipeline and prompt template copying
 - [TESTING.md](./TESTING.md) - Test suites and Playwright conventions
-- [FPP Hooks System](../src/lib/hooks.ts) - Queue implementation
 - [Cloister Configuration](../src/lib/cloister/config.ts) - Config schema
 - [Specialist Registry](../src/lib/cloister/specialists.ts) - Registry management

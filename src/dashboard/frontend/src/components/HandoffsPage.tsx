@@ -309,7 +309,7 @@ export function HandoffsPage() {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-content mb-2">Specialist Handoffs</h2>
           <p className="text-content-subtle">
-            Queue-based work handoffs between specialist agents (review, test, merge)
+            Work handoffs between specialist agents (review, test, merge)
           </p>
         </div>
 
@@ -321,7 +321,7 @@ export function HandoffsPage() {
               <div className="text-2xl font-bold text-content">{specialistStats.todayCount}</div>
             </div>
             <div className="p-4 bg-surface-raised rounded-lg border border-divider">
-              <div className="text-sm text-content-subtle mb-1">Queue Depth</div>
+              <div className="text-sm text-content-subtle mb-1">Merge Queue</div>
               <div className="text-2xl font-bold text-warning">
                 {specialistStats.queueDepth}
               </div>
