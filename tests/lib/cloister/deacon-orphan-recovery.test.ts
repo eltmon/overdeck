@@ -7,6 +7,8 @@
  *   (b) specialist_busy → set dispatch_failed so deacon retries next patrol
  *   (c) testStatus='testing'/'dispatch_failed' + no workspace available
  *       → reset to 'pending' (user must re-trigger manually)
+ *   (d) reviewStatus='pending' + completed.processed marker + workspace + project
+ *       → re-dispatch via dispatchParallelReview, set reviewStatus='reviewing'
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -95,9 +97,11 @@ function readStatusFile(): Record<string, { testStatus?: string }> {
 
 describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   let originalContent: string | null = null;
+  let completedProcessedPath: string | null = null;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    completedProcessedPath = null;
 
     mockGetAgentDir.mockImplementation((agentId: string) => join(homedir(), '.panopticon', 'agents', agentId));
 
@@ -127,6 +131,10 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       writeFileSync(REVIEW_STATUS_FILE, originalContent, 'utf-8');
     } else if (existsSync(REVIEW_STATUS_FILE)) {
       unlinkSync(REVIEW_STATUS_FILE);
+    }
+    // Clean up any completed.processed markers created by tests
+    if (completedProcessedPath !== null && existsSync(completedProcessedPath)) {
+      unlinkSync(completedProcessedPath);
     }
   });
 
@@ -262,6 +270,50 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     // File must be rewritten with testStatus reset to pending
     const content = readStatusFile();
     expect(content[ISSUE_ID].testStatus).toBe('pending');
+  });
+
+  // -------------------------------------------------------------------------
+  // Branch (d): orphaned pending review → re-dispatch via dispatchParallelReview
+  // -------------------------------------------------------------------------
+
+  it('(d) re-dispatches pending review via dispatchParallelReview and sets reviewStatus=reviewing', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
+    const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
+    const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+    completedProcessedPath = join(agentDir, 'completed.processed');
+
+    writeStatusFile({
+      [ISSUE_ID]: {
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        prUrl: 'https://github.com/test/repo/pull/1',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    // Create the completed.processed marker that deacon checks
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(completedProcessedPath, '', 'utf-8');
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockDispatchParallelReview.mockResolvedValue({ success: true, message: 'dispatched' });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(mockDispatchParallelReview).toHaveBeenCalledWith({
+      issueId: ISSUE_ID,
+      workspace,
+      branch: `feature/${ISSUE_ID.toLowerCase()}`,
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Re-dispatched pending review for/);
+    expect(actions[0]).toContain(ISSUE_ID);
+
+    const content = readStatusFile();
+    expect(content[ISSUE_ID].reviewStatus).toBe('reviewing');
   });
 
   it('restores passed review/test state when top-level status is stuck in reviewing', async () => {

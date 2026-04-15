@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { loadConfig } from '../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
@@ -62,6 +63,49 @@ describe('settings-api', () => {
     it.skip('should always enable anthropic provider', () => {
       const settings = loadSettingsApi();
       expect(settings.models.providers.anthropic).toBe(true);
+    });
+
+    it('should migrate convoy:* override keys to review:* equivalents', () => {
+      // Simulate a persisted config written before PAN-540 removed the convoy abstraction
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['anthropic']),
+          apiKeys: {},
+          overrides: {
+            'convoy:security-reviewer': 'claude-opus-4-6',
+            'convoy:performance-reviewer': 'claude-sonnet-4-6',
+            'convoy:correctness-reviewer': 'claude-sonnet-4-6',
+            'convoy:requirements-reviewer': 'claude-sonnet-4-6',
+            'convoy:synthesis-agent': 'claude-sonnet-4-6',
+            // Non-convoy key should pass through unchanged
+            'specialist-review-agent': 'claude-haiku-4-5',
+          },
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' },
+          trackerKeys: {},
+        },
+        migration: null,
+      } as any);
+
+      const settings = loadSettingsApi();
+
+      // convoy:* keys should be remapped to their review:* equivalents
+      expect(settings.models.overrides['review:security']).toBe('claude-opus-4-6');
+      expect(settings.models.overrides['review:performance']).toBe('claude-sonnet-4-6');
+      expect(settings.models.overrides['review:correctness']).toBe('claude-sonnet-4-6');
+      expect(settings.models.overrides['review:requirements']).toBe('claude-sonnet-4-6');
+      expect(settings.models.overrides['review:synthesis']).toBe('claude-sonnet-4-6');
+
+      // Non-convoy key should pass through unchanged
+      expect(settings.models.overrides['specialist-review-agent']).toBe('claude-haiku-4-5');
+
+      // convoy:* keys must not appear in the output
+      expect(settings.models.overrides['convoy:security-reviewer']).toBeUndefined();
+      expect(settings.models.overrides['convoy:performance-reviewer']).toBeUndefined();
+      expect(settings.models.overrides['convoy:correctness-reviewer']).toBeUndefined();
+      expect(settings.models.overrides['convoy:requirements-reviewer']).toBeUndefined();
+      expect(settings.models.overrides['convoy:synthesis-agent']).toBeUndefined();
     });
   });
 
