@@ -35,6 +35,7 @@ import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
+import { appendGitOperation } from '../../dashboard/server/services/git-activity.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -653,6 +654,60 @@ async function captureTmuxOutput(sessionName: string): Promise<string> {
   }
 }
 
+/** Patterns to match in tmux capture-pane output (git push/fetch lines) */
+const GIT_PATTERNS: Array<{ re: RegExp; operation: string; level: 'info' | 'warn' | 'error' }> = [
+  { re: /git push/i,                     operation: 'push_attempt',    level: 'info' },
+  { re: /git fetch/i,                    operation: 'fetch_attempt',   level: 'info' },
+  { re: /\[rejected\]/i,                 operation: 'push_rejected',   level: 'error' },
+  { re: /non-fast-forward/i,             operation: 'non_ff',          level: 'error' },
+  { re: /force-with-lease/i,             operation: 'force_push_cmd',  level: 'warn' },
+  { re: /retrying/i,                     operation: 'retry',           level: 'warn' },
+  { re: /\[remote rejected\]/i,          operation: 'remote_rejected', level: 'error' },
+  { re: /Everything up-to-date/i,        operation: 'push_noop',       level: 'info' },
+];
+
+/**
+ * Scan tmux capture-pane output for git push/fetch patterns and emit each
+ * as a git_operations row. Uses seenLineHashes to dedupe within a session.
+ */
+function scanGitPatterns(
+  output: string,
+  seenLineHashes: Set<string>,
+  issueId: string,
+  branch?: string,
+): void {
+  const lines = output.split('\n');
+  const ts = new Date().toISOString();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    // Simple hash: first 120 chars (avoids hashing megabytes)
+    const hash = trimmed.slice(0, 120);
+    if (seenLineHashes.has(hash)) continue;
+
+    for (const { re, operation, level } of GIT_PATTERNS) {
+      if (re.test(trimmed)) {
+        seenLineHashes.add(hash);
+        appendGitOperation({
+          operation: operation as any,
+          branch,
+          issueId,
+          status: level === 'error' ? 'failure' : 'success',
+          error: level !== 'info' ? trimmed.slice(0, 200) : undefined,
+          ts,
+        });
+        emitActivityEntry({
+          source: 'merge-agent',
+          level,
+          message: `[git] ${trimmed.slice(0, 100)}`,
+          issueId,
+        });
+        break; // only match one pattern per line
+      }
+    }
+  }
+}
+
 /**
  * Check if specialist-merge-agent tmux session is running (async)
  */
@@ -940,11 +995,21 @@ export async function spawnMergeAgentForBranches(
   const POLL_INTERVAL = 5000; // 5 seconds
   const MAX_WAIT = 15 * 60 * 1000; // 15 minutes (match MERGE_TIMEOUT_MS)
   const startTime = Date.now();
+  // Dedupe set for git pattern lines scanned from tmux output within this session
+  const seenGitLines = new Set<string>();
 
   while (Date.now() - startTime < MAX_WAIT) {
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
     try {
+      // Scan tmux output for git push/fetch/rejected patterns (PAN-653 pan-1pt)
+      try {
+        const paneOutput = await captureTmuxOutput(mergeSession);
+        if (paneOutput) {
+          scanGitPatterns(paneOutput, seenGitLines, issueId, targetBranch);
+        }
+      } catch { /* non-fatal: pattern scanning is best-effort */ }
+
       // Check if we're still on target branch
       const { stdout: currentBranchRaw } = await execAsync('git branch --show-current', {
         cwd: projectPath,

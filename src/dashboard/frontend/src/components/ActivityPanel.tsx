@@ -21,6 +21,8 @@ interface ActivityEntry {
   message: string;
   details?: string | null;
   issueId?: string | null;
+  /** Logical category for filtering: 'git', 'specialist', 'sync', or undefined */
+  category?: string | null;
 }
 
 interface ActivityPanelProps {
@@ -30,6 +32,12 @@ interface ActivityPanelProps {
 async function fetchActivityREST(): Promise<ActivityEntry[]> {
   const res = await fetch('/api/activity');
   if (!res.ok) throw new Error('Failed to fetch activity');
+  return res.json() as Promise<ActivityEntry[]>;
+}
+
+async function fetchGitActivity(): Promise<ActivityEntry[]> {
+  const res = await fetch('/api/git-activity');
+  if (!res.ok) return [];
   return res.json() as Promise<ActivityEntry[]>;
 }
 
@@ -93,15 +101,34 @@ function formatTimestamp(iso: string): string {
 
 type LevelFilter = 'all' | ActivityEntry['level'];
 type SourceFilter = 'all' | string;
+type CategoryFilter = 'all' | 'git' | 'specialist' | 'sync';
 
 interface FilterState {
   level: LevelFilter;
   source: SourceFilter;
+  category: CategoryFilter;
   search: string;
+  pinWarnings: boolean;
+}
+
+/** Infer category from source if not explicitly set */
+function inferCategory(entry: ActivityEntry): string {
+  if (entry.category) return entry.category;
+  const src = entry.source ?? '';
+  if (src === 'git') return 'git';
+  if (src.includes('specialist') || src.includes('merge-agent') || src.includes('review') || src.includes('test')) return 'specialist';
+  if (src.includes('sync') || src.includes('pull')) return 'sync';
+  return 'other';
 }
 
 export function ActivityPanel({ onClose }: ActivityPanelProps) {
-  const [filters, setFilters] = useState<FilterState>({ level: 'all', source: 'all', search: '' });
+  const [filters, setFilters] = useState<FilterState>({
+    level: 'all',
+    source: 'all',
+    category: 'all',
+    search: '',
+    pinWarnings: true,
+  });
   const [showFilters, setShowFilters] = useState(false);
 
   const recentActivityRaw = useDashboardStore((s) => s.recentActivity) as unknown as ActivityEntry[];
@@ -113,14 +140,22 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
     staleTime: 5_000,
   });
 
+  const { data: gitActivities = [] } = useQuery({
+    queryKey: ['git-activity'],
+    queryFn: fetchGitActivity,
+    refetchInterval: 15_000,
+    staleTime: 5_000,
+  });
+
   const activities = useMemo<ActivityEntry[]>(() => {
     const byId = new Map<string, ActivityEntry>();
     for (const a of recentActivityRaw ?? []) byId.set(a.id, a);
     for (const a of restActivities) byId.set(a.id, a);
+    for (const a of gitActivities) byId.set(a.id, a);
     return Array.from(byId.values()).sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
-  }, [recentActivityRaw, restActivities]);
+  }, [recentActivityRaw, restActivities, gitActivities]);
 
   const sources = useMemo(() => {
     const set = new Set<string>();
@@ -129,9 +164,10 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
   }, [activities]);
 
   const filtered = useMemo(() => {
-    return activities.filter((a) => {
+    const matched = activities.filter((a) => {
       if (filters.level !== 'all' && a.level !== filters.level) return false;
       if (filters.source !== 'all' && a.source !== filters.source) return false;
+      if (filters.category !== 'all' && inferCategory(a) !== filters.category) return false;
       if (filters.search) {
         const q = filters.search.toLowerCase();
         if (!a.message.toLowerCase().includes(q) &&
@@ -141,6 +177,11 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
       }
       return true;
     });
+    if (!filters.pinWarnings) return matched;
+    // Pin warn/error to top, preserve timestamp order within each group
+    const pinned = matched.filter((a) => a.level === 'warn' || a.level === 'error');
+    const rest = matched.filter((a) => a.level !== 'warn' && a.level !== 'error');
+    return [...pinned, ...rest];
   }, [activities, filters]);
 
   const isLoading = restLoading && activities.length === 0;
@@ -188,6 +229,17 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
           </select>
 
           <select
+            value={filters.category}
+            onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value as CategoryFilter }))}
+            className="text-xs bg-surface border border-divider rounded px-2 py-1 text-content"
+          >
+            <option value="all">All types</option>
+            <option value="git">Git</option>
+            <option value="specialist">Specialist</option>
+            <option value="sync">Sync</option>
+          </select>
+
+          <select
             value={filters.source}
             onChange={(e) => setFilters((f) => ({ ...f, source: e.target.value as SourceFilter }))}
             className="text-xs bg-surface border border-divider rounded px-2 py-1 text-content"
@@ -206,9 +258,19 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
             className="text-xs bg-surface border border-divider rounded px-2 py-1 text-content flex-1 min-w-24 placeholder:text-content-muted"
           />
 
-          {(filters.level !== 'all' || filters.source !== 'all' || filters.search) && (
+          <label className="flex items-center gap-1.5 text-xs text-content-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filters.pinWarnings}
+              onChange={(e) => setFilters((f) => ({ ...f, pinWarnings: e.target.checked }))}
+              className="accent-warning"
+            />
+            Pin warnings
+          </label>
+
+          {(filters.level !== 'all' || filters.source !== 'all' || filters.category !== 'all' || filters.search) && (
             <button
-              onClick={() => setFilters({ level: 'all', source: 'all', search: '' })}
+              onClick={() => setFilters({ level: 'all', source: 'all', category: 'all', search: '', pinWarnings: filters.pinWarnings })}
               className="text-xs text-content-muted hover:text-content underline"
             >
               Clear
@@ -242,6 +304,11 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <SourceBadge source={activity.source} />
                       <span className={levelBadgeClass(activity.level)}>{activity.level}</span>
+                      {inferCategory(activity) !== 'other' && (
+                        <span className="text-xs text-content-muted bg-surface/60 px-1 py-0.5 rounded font-mono">
+                          {inferCategory(activity)}
+                        </span>
+                      )}
                       {activity.issueId && (
                         <span className="text-xs font-mono text-content-muted bg-surface px-1.5 py-0.5 rounded">
                           {activity.issueId}

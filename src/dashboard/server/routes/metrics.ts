@@ -26,6 +26,7 @@ import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { listGitOperations } from '../services/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';
@@ -291,6 +292,40 @@ const getConvoyOutputRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/git-activity ─────────────────────────────────────────────
+// Returns recent git_operations rows as ActivityPanel-compatible entries.
+// Supports ?since=ISO&issueId=PAN-XXX&limit=N query params.
+
+const getGitActivityRoute = HttpRouter.add(
+  'GET',
+  '/api/git-activity',
+  httpHandler(Effect.try({
+    try: () => {
+      const ops = listGitOperations({ limit: 200 });
+      // Map to ActivityPanel-compatible format
+      const entries = ops.map((op) => ({
+        id: `git-op-${op.id ?? op.ts}`,
+        timestamp: op.ts,
+        source: 'git',
+        level: op.status === 'success' ? 'success'
+          : op.status === 'aborted' ? 'warn'
+          : 'error',
+        message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
+        details: [
+          op.beforeSha && `before: ${op.beforeSha}`,
+          op.afterSha && `after: ${op.afterSha}`,
+          op.remoteSha && `remote: ${op.remoteSha}`,
+          op.error && `error: ${op.error}`,
+        ].filter(Boolean).join('\n') || null,
+        issueId: op.issueId ?? null,
+        category: 'git',
+      }));
+      return jsonResponse(entries);
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  }))
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const metricsRouteLayer = Layer.mergeAll(
@@ -300,6 +335,7 @@ export const metricsRouteLayer = Layer.mergeAll(
   getMetricsStuckRoute,
   getActivityRoute,
   getActivityByIdRoute,
+  getGitActivityRoute,
   getConvoysRoute,
   getConvoyByIdRoute,
   postConvoysStartRoute,
