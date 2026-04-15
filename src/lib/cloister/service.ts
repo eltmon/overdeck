@@ -57,6 +57,7 @@ import {
   type PatrolResult,
   type DeaconLogEntry,
 } from './deacon.js';
+import { startFlywheelDaemon, stopFlywheelDaemon } from './flywheel-daemon.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync } from 'fs';
 import { join } from 'path';
@@ -422,6 +423,15 @@ export class CloisterService {
       console.error('  ✗ Failed to start deacon:', error);
     }
 
+    // Start flywheel daemon (PAN-709)
+    try {
+      console.log('  → Starting flywheel daemon...');
+      startFlywheelDaemon();
+      console.log('  ✓ Flywheel daemon started');
+    } catch (error) {
+      console.error('  ✗ Failed to start flywheel daemon:', error);
+    }
+
     this.running = true;
     this.starting = false;
     this._statusCache = null;
@@ -460,6 +470,14 @@ export class CloisterService {
       console.log('  ✓ Deacon stopped');
     } catch (error) {
       console.error('Failed to stop deacon:', error);
+    }
+
+    // Stop flywheel daemon (PAN-709)
+    try {
+      stopFlywheelDaemon();
+      console.log('  ✓ Flywheel daemon stopped');
+    } catch (error) {
+      console.error('Failed to stop flywheel daemon:', error);
     }
 
     // Close database connection

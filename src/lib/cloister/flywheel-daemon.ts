@@ -1,0 +1,431 @@
+/**
+ * Flywheel Daemon — Autonomous self-improvement loop (PAN-709)
+ *
+ * Sits alongside the deacon as a second Cloister loop. Responsibilities:
+ *  - On merge complete: spawn retro-agent for the merged issue
+ *  - On cycle detected in FLYWHEEL-STATE: file substrate-improvement issue
+ *  - Every 30 min: run synthesis step if new retros exist
+ *  - Every 24 hours: full flywheel cycle
+ *  - Awaiting Merge queue exceeds threshold: emit dashboard banner notification
+ *
+ * Guards (always checked before any action):
+ *  - Quiet hours: configurable "22:00-08:00", no non-blocker actions
+ *  - Active session backoff: skip synthesis if user has a recent Claude Code session
+ *  - Mutex: ~/.panopticon/flywheel.lock prevents concurrent cycles
+ */
+
+import { existsSync, writeFileSync, readFileSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+import { PANOPTICON_HOME } from '../paths.js';
+import { loadCloisterConfig } from './config.js';
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+export interface FlywheelConfig {
+  autonomous: boolean;
+  /** Quiet hours range string "HH:MM-HH:MM" (local time). Default: "22:00-08:00" */
+  quiet_hours: string;
+  /** How often to run the synthesis step (minutes). Default: 30 */
+  trigger_interval_minutes: number;
+  /** How often to run a full flywheel cycle (hours). Default: 24 */
+  full_cycle_interval_hours: number;
+  /** Skip non-blocker actions when user has an active Claude Code session. Default: true */
+  backoff_on_active_session: boolean;
+  /** Number of Awaiting Merge flywheel-change issues above which to show a dashboard banner. Default: 5 */
+  awaiting_merge_notify_threshold: number;
+}
+
+const DEFAULT_CONFIG: FlywheelConfig = {
+  autonomous: true,
+  quiet_hours: '22:00-08:00',
+  trigger_interval_minutes: 30,
+  full_cycle_interval_hours: 24,
+  backoff_on_active_session: true,
+  awaiting_merge_notify_threshold: 5,
+};
+
+const FLYWHEEL_LOCK_FILE = join(PANOPTICON_HOME, 'flywheel.lock');
+const FLYWHEEL_STATE_FILE = join(homedir(), 'docs', 'FLYWHEEL-STATE.md');
+
+// ============================================================================
+// State
+// ============================================================================
+
+let daemonInterval: NodeJS.Timeout | null = null;
+let lastSynthesisAt: number = 0;
+let lastFullCycleAt: number = 0;
+
+/** Callbacks registered by other modules */
+let mergeCompleteHandler: ((issueId: string) => void) | null = null;
+let awaitingMergeNotifier: ((count: number) => void) | null = null;
+
+// ============================================================================
+// Guard: quiet hours
+// ============================================================================
+
+/**
+ * Parse "HH:MM-HH:MM" format into hour+minute numbers.
+ */
+function parseQuietHours(range: string): { startH: number; startM: number; endH: number; endM: number } | null {
+  const m = range.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return {
+    startH: parseInt(m[1], 10),
+    startM: parseInt(m[2], 10),
+    endH: parseInt(m[3], 10),
+    endM: parseInt(m[4], 10),
+  };
+}
+
+function isQuietHours(config: FlywheelConfig): boolean {
+  const parsed = parseQuietHours(config.quiet_hours);
+  if (!parsed) return false;
+
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const startMins = parsed.startH * 60 + parsed.startM;
+  const endMins = parsed.endH * 60 + parsed.endM;
+
+  if (startMins < endMins) {
+    // e.g. 09:00-17:00 — quiet during the day
+    return nowMins >= startMins && nowMins < endMins;
+  } else {
+    // e.g. 22:00-08:00 — quiet overnight
+    return nowMins >= startMins || nowMins < endMins;
+  }
+}
+
+// ============================================================================
+// Guard: active session backoff
+// ============================================================================
+
+/**
+ * Return true if there's a recent Claude Code session active on this machine.
+ * Heuristic: check if any process named "claude" was active in the last 5 minutes
+ * by looking at recently-modified jsonl heartbeat files.
+ */
+function hasActiveClaudeSession(): boolean {
+  try {
+    const agentsDir = join(PANOPTICON_HOME, 'agents');
+    if (!existsSync(agentsDir)) return false;
+    const fiveMinsAgo = Date.now() - 5 * 60 * 1000;
+    const entries = readdirSync(agentsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const heartbeatFile = join(agentsDir, entry.name, 'runtime.json');
+      if (!existsSync(heartbeatFile)) continue;
+      const mtime = statSync(heartbeatFile).mtimeMs;
+      if (mtime > fiveMinsAgo) {
+        const state = JSON.parse(readFileSync(heartbeatFile, 'utf-8')) as { state?: string };
+        if (state.state === 'active') return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// Guard: mutex lock
+// ============================================================================
+
+function acquireLock(): boolean {
+  if (existsSync(FLYWHEEL_LOCK_FILE)) {
+    try {
+      const lockData = JSON.parse(readFileSync(FLYWHEEL_LOCK_FILE, 'utf-8'));
+      const lockAge = Date.now() - lockData.ts;
+      // Stale lock older than 30 minutes — take it
+      if (lockAge < 30 * 60 * 1000) {
+        console.log(`[flywheel-daemon] Lock held by pid ${lockData.pid}, age ${Math.round(lockAge / 1000)}s — skipping`);
+        return false;
+      }
+      console.log(`[flywheel-daemon] Removing stale lock (${Math.round(lockAge / 60000)}min old)`);
+    } catch {
+      // Corrupt lock file — remove it
+    }
+  }
+  try {
+    writeFileSync(FLYWHEEL_LOCK_FILE, JSON.stringify({ pid: process.pid, ts: Date.now() }), 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseLock(): void {
+  try {
+    if (existsSync(FLYWHEEL_LOCK_FILE)) unlinkSync(FLYWHEEL_LOCK_FILE);
+  } catch { /* non-fatal */ }
+}
+
+// ============================================================================
+// Core actions (stubs — implementations land in subsequent beads)
+// ============================================================================
+
+/**
+ * Spawn the retro-agent for a merged issue.
+ * Implementation: `panopticon-cli-284` (retro-agent spawn-run-exit lifecycle).
+ */
+async function spawnRetroAgentForIssue(issueId: string): Promise<void> {
+  console.log(`[flywheel-daemon] Retro-agent spawn for ${issueId} — stub (PAN-284)`);
+  // TODO: import and call spawnRetroAgent(issueId) once panopticon-cli-284 lands
+}
+
+/**
+ * Run the synthesis step: read non-archived retros, apply threshold, file PAN issues.
+ * Implementation: `panopticon-cli-ncg` (synthesis core module).
+ */
+async function runSynthesis(): Promise<void> {
+  console.log('[flywheel-daemon] Synthesis step — stub (PAN-ncg)');
+  // TODO: import and call runFlywheelSynthesis() once panopticon-cli-ncg lands
+}
+
+/**
+ * Read FLYWHEEL-STATE.md and return any cycling alerts.
+ * Returns a list of issue IDs that appear to be cycling.
+ */
+function readCyclingAlerts(): string[] {
+  if (!existsSync(FLYWHEEL_STATE_FILE)) return [];
+  try {
+    const content = readFileSync(FLYWHEEL_STATE_FILE, 'utf-8');
+    // Parse "cycling alerts" section — lines matching "- PAN-NNN"
+    const section = content.match(/## Cycling Alerts\n([\s\S]*?)(?:\n##|$)/i);
+    if (!section) return [];
+    const alerts: string[] = [];
+    for (const line of section[1].split('\n')) {
+      const m = line.match(/[-*]\s+(PAN-\d+|[A-Z]+-\d+)/i);
+      if (m) alerts.push(m[1].toUpperCase());
+    }
+    return alerts;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * File a substrate-improvement issue for a cycling issue.
+ * Non-blocker tier: always files an issue, never edits inline.
+ */
+async function fileSubstrateIssue(cyclingIssueId: string): Promise<void> {
+  console.log(`[flywheel-daemon] Filing substrate-improvement issue for cycling ${cyclingIssueId} — stub`);
+  // TODO: use gh CLI to file a GitHub issue with label "substrate-improvement"
+}
+
+/**
+ * Check how many flywheel-change issues are in Awaiting Merge.
+ * Returns the count or 0 if unable to determine.
+ */
+async function getFlywheelAwaitingMergeCount(): Promise<number> {
+  try {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync('gh', [
+      'issue', 'list',
+      '--label', 'flywheel-change',
+      '--state', 'open',
+      '--json', 'number',
+    ]);
+    const issues: unknown[] = JSON.parse(stdout);
+    return issues.length;
+  } catch {
+    return 0;
+  }
+}
+
+// ============================================================================
+// Daemon tick
+// ============================================================================
+
+function loadFlywheelConfig(): FlywheelConfig {
+  try {
+    const cloisterConfig = loadCloisterConfig();
+    // Flywheel config lives in cloister.toml under [flywheel] — forward-compat
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const flywheelSection = (cloisterConfig as any)['flywheel'] as Partial<FlywheelConfig> | undefined;
+    return { ...DEFAULT_CONFIG, ...flywheelSection };
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+async function daemonTick(): Promise<void> {
+  const config = loadFlywheelConfig();
+
+  if (!config.autonomous) {
+    console.log('[flywheel-daemon] Autonomous mode disabled — skipping tick');
+    return;
+  }
+
+  // Guard: quiet hours
+  if (isQuietHours(config)) {
+    console.log('[flywheel-daemon] Quiet hours — skipping tick');
+    return;
+  }
+
+  // Guard: active session backoff
+  if (config.backoff_on_active_session && hasActiveClaudeSession()) {
+    console.log('[flywheel-daemon] Active Claude Code session detected — backing off');
+    return;
+  }
+
+  // Check awaiting-merge threshold (no mutex needed — just a count query)
+  try {
+    const flywheelCount = await getFlywheelAwaitingMergeCount();
+    if (flywheelCount >= config.awaiting_merge_notify_threshold) {
+      console.log(`[flywheel-daemon] Awaiting Merge: ${flywheelCount} flywheel-change issues (threshold: ${config.awaiting_merge_notify_threshold})`);
+      if (awaitingMergeNotifier) {
+        awaitingMergeNotifier(flywheelCount);
+      }
+    }
+  } catch (err) {
+    console.warn('[flywheel-daemon] Failed to check awaiting-merge count:', err);
+  }
+
+  // Check for cycling alerts in FLYWHEEL-STATE
+  try {
+    const cycling = readCyclingAlerts();
+    for (const issueId of cycling) {
+      await fileSubstrateIssue(issueId);
+    }
+  } catch (err) {
+    console.warn('[flywheel-daemon] Failed to process cycling alerts:', err);
+  }
+
+  // Scheduled synthesis (every 30 min)
+  const nowMs = Date.now();
+  const synthIntervalMs = config.trigger_interval_minutes * 60 * 1000;
+  if (nowMs - lastSynthesisAt > synthIntervalMs) {
+    if (!acquireLock()) return;
+    try {
+      lastSynthesisAt = nowMs;
+      await runSynthesis();
+    } catch (err) {
+      console.warn('[flywheel-daemon] Synthesis step failed:', err);
+    } finally {
+      releaseLock();
+    }
+  }
+
+  // Scheduled full cycle (every 24h)
+  const fullCycleIntervalMs = config.full_cycle_interval_hours * 60 * 60 * 1000;
+  if (nowMs - lastFullCycleAt > fullCycleIntervalMs) {
+    if (!acquireLock()) return;
+    try {
+      lastFullCycleAt = nowMs;
+      console.log('[flywheel-daemon] Full 24h flywheel cycle — stub (PAN-ncg)');
+      // TODO: run full cycle inventory + synthesis + archive + report
+    } catch (err) {
+      console.warn('[flywheel-daemon] Full cycle failed:', err);
+    } finally {
+      releaseLock();
+    }
+  }
+}
+
+// ============================================================================
+// Merge-complete event hook
+// ============================================================================
+
+/**
+ * Call this when a merge completes.
+ * Safe to call from postMergeLifecycle() — never throws, errors are logged.
+ */
+export function notifyFlywheelMergeComplete(issueId: string): void {
+  console.log(`[flywheel-daemon] Received merge-complete for ${issueId}`);
+  const config = loadFlywheelConfig();
+  if (!config.autonomous) return;
+  if (isQuietHours(config)) {
+    console.log(`[flywheel-daemon] Quiet hours — queuing retro for ${issueId} until next tick`);
+    return;
+  }
+  spawnRetroAgentForIssue(issueId).catch((err) => {
+    console.error(`[flywheel-daemon] Failed to spawn retro-agent for ${issueId}:`, err);
+  });
+  if (mergeCompleteHandler) {
+    mergeCompleteHandler(issueId);
+  }
+}
+
+// ============================================================================
+// Start / Stop / Status
+// ============================================================================
+
+/**
+ * Register a handler to be called when a merge-complete event fires.
+ * Used by the dashboard read-model to update Awaiting Merge state.
+ */
+export function setFlywheelMergeCompleteHandler(fn: (issueId: string) => void): void {
+  mergeCompleteHandler = fn;
+}
+
+/**
+ * Register a handler to be called when the Awaiting Merge count exceeds the threshold.
+ * Used by the dashboard to render a notification banner.
+ */
+export function setFlywheelAwaitingMergeNotifier(fn: (count: number) => void): void {
+  awaitingMergeNotifier = fn;
+}
+
+/** Interval between daemon ticks (1 minute, matching the deacon patrol interval). */
+const TICK_INTERVAL_MS = 60_000;
+
+/**
+ * Start the flywheel daemon loop.
+ * Called from CloisterService.start() after startDeacon().
+ */
+export function startFlywheelDaemon(): void {
+  if (daemonInterval) {
+    console.log('[flywheel-daemon] Already running');
+    return;
+  }
+
+  const config = loadFlywheelConfig();
+  console.log(`[flywheel-daemon] Starting autonomous flywheel daemon (tick every ${TICK_INTERVAL_MS / 1000}s, synthesis every ${config.trigger_interval_minutes}min, full cycle every ${config.full_cycle_interval_hours}h)`);
+
+  // Initial tick (non-blocking)
+  daemonTick().catch((err) => console.error('[flywheel-daemon] Tick error:', err));
+
+  daemonInterval = setInterval(() => {
+    daemonTick().catch((err) => console.error('[flywheel-daemon] Tick error:', err));
+  }, TICK_INTERVAL_MS);
+}
+
+/**
+ * Stop the flywheel daemon loop.
+ * Called from CloisterService.stop() alongside stopDeacon().
+ */
+export function stopFlywheelDaemon(): void {
+  if (daemonInterval) {
+    clearInterval(daemonInterval);
+    daemonInterval = null;
+    releaseLock(); // Release any held lock on clean shutdown
+    console.log('[flywheel-daemon] Stopped');
+  }
+}
+
+export function isFlywheelDaemonRunning(): boolean {
+  return daemonInterval !== null;
+}
+
+export interface FlywheelDaemonStatus {
+  isRunning: boolean;
+  config: FlywheelConfig;
+  lastSynthesisAt: number | null;
+  lastFullCycleAt: number | null;
+  lockHeld: boolean;
+}
+
+export function getFlywheelDaemonStatus(): FlywheelDaemonStatus {
+  return {
+    isRunning: isFlywheelDaemonRunning(),
+    config: loadFlywheelConfig(),
+    lastSynthesisAt: lastSynthesisAt || null,
+    lastFullCycleAt: lastFullCycleAt || null,
+    lockHeld: existsSync(FLYWHEEL_LOCK_FILE),
+  };
+}
