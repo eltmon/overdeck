@@ -345,6 +345,15 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Issue moved to Done — awaiting close-out.`);
   announceMerge('completed', issueId);
   logActivity('merge_complete', `Merged ${issueId}. Issue moved to Done — awaiting close-out.`);
+
+  // 7. Notify flywheel daemon to spawn retro-agent (PAN-709).
+  // Fire-and-forget — retro failures must never roll back or stall the merge.
+  try {
+    const { notifyFlywheelMergeComplete } = await import('./flywheel-daemon.js');
+    notifyFlywheelMergeComplete(issueId);
+  } catch (err) {
+    console.warn(`[merge-agent] Flywheel notification failed (non-fatal): ${err}`);
+  }
 }
 
 /**

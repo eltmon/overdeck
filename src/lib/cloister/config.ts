@@ -182,6 +182,24 @@ export interface RetentionConfig {
 }
 
 /**
+ * Flywheel autonomous daemon configuration (PAN-709)
+ */
+export interface FlywheelConfig {
+  /** Enable autonomous flywheel daemon. Default: true */
+  autonomous: boolean;
+  /** Quiet hours: no non-blocker actions (format "HH:MM-HH:MM"). Default: "22:00-08:00" */
+  quiet_hours: string;
+  /** How often to run the synthesis step (minutes). Default: 30 */
+  trigger_interval_minutes: number;
+  /** How often to run a full flywheel cycle (hours). Default: 24 */
+  full_cycle_interval_hours: number;
+  /** Back off when user has an active Claude Code session. Default: true */
+  backoff_on_active_session: boolean;
+  /** Number of flywheel-change issues in Awaiting Merge before showing a dashboard banner. Default: 5 */
+  awaiting_merge_notify_threshold: number;
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -197,6 +215,8 @@ export interface CloisterConfig {
   auto_restart?: AutoRestartConfig;
   cost_limits?: CostLimitsConfig;
   retention?: RetentionConfig;
+  /** Autonomous flywheel daemon configuration (PAN-709) */
+  flywheel?: FlywheelConfig;
 }
 
 /**
@@ -299,6 +319,14 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   retention: {
     agent_state_days: 30,
     health_staleness_hours: 24,
+  },
+  flywheel: {
+    autonomous: true,
+    quiet_hours: '22:00-08:00',
+    trigger_interval_minutes: 30,
+    full_cycle_interval_hours: 24,
+    backoff_on_active_session: true,
+    awaiting_merge_notify_threshold: 5,
   },
 };
 

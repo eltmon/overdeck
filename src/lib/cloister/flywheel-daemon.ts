@@ -18,25 +18,9 @@ import { existsSync, writeFileSync, readFileSync, unlinkSync, readdirSync, statS
 import { join } from 'path';
 import { homedir } from 'os';
 import { PANOPTICON_HOME } from '../paths.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfig, type FlywheelConfig } from './config.js';
 
-// ============================================================================
-// Configuration
-// ============================================================================
-
-export interface FlywheelConfig {
-  autonomous: boolean;
-  /** Quiet hours range string "HH:MM-HH:MM" (local time). Default: "22:00-08:00" */
-  quiet_hours: string;
-  /** How often to run the synthesis step (minutes). Default: 30 */
-  trigger_interval_minutes: number;
-  /** How often to run a full flywheel cycle (hours). Default: 24 */
-  full_cycle_interval_hours: number;
-  /** Skip non-blocker actions when user has an active Claude Code session. Default: true */
-  backoff_on_active_session: boolean;
-  /** Number of Awaiting Merge flywheel-change issues above which to show a dashboard banner. Default: 5 */
-  awaiting_merge_notify_threshold: number;
-}
+export type { FlywheelConfig };
 
 const DEFAULT_CONFIG: FlywheelConfig = {
   autonomous: true,
@@ -244,10 +228,7 @@ async function getFlywheelAwaitingMergeCount(): Promise<number> {
 function loadFlywheelConfig(): FlywheelConfig {
   try {
     const cloisterConfig = loadCloisterConfig();
-    // Flywheel config lives in cloister.toml under [flywheel] — forward-compat
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const flywheelSection = (cloisterConfig as any)['flywheel'] as Partial<FlywheelConfig> | undefined;
-    return { ...DEFAULT_CONFIG, ...flywheelSection };
+    return { ...DEFAULT_CONFIG, ...cloisterConfig.flywheel };
   } catch {
     return { ...DEFAULT_CONFIG };
   }
