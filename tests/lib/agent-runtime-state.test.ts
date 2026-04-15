@@ -283,6 +283,38 @@ describe('Agent Runtime State (PAN-80)', () => {
   });
 
   describe('State Transitions', () => {
+    it('should clear stoppedAt when saving a running agent state', async () => {
+      const { saveAgentState, getAgentState } = await import('../../src/lib/agents.js');
+      const agentId = getUniqueAgentId();
+      const stoppedAt = new Date(Date.now() - 60_000).toISOString();
+
+      saveAgentState({
+        id: agentId,
+        issueId: 'TEST-789',
+        workspace: '/tmp/test-workspace',
+        runtime: 'claude',
+        model: 'claude-sonnet-4-6',
+        status: 'stopped',
+        startedAt: new Date().toISOString(),
+        stoppedAt,
+      });
+
+      saveAgentState({
+        id: agentId,
+        issueId: 'TEST-789',
+        workspace: '/tmp/test-workspace',
+        runtime: 'claude',
+        model: 'claude-sonnet-4-6',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        stoppedAt,
+      });
+
+      const state = getAgentState(agentId);
+      expect(state?.status).toBe('running');
+      expect(state?.stoppedAt).toBeUndefined();
+    });
+
     it('should support active -> idle transition', async () => {
       const tempDir = mkdtempSync(join(tmpdir(), 'pan-test-'));
       const originalHome = process.env.HOME;
