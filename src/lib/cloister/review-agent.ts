@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSession, killSession, sessionExists } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync } from '../tmux.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
@@ -401,7 +401,7 @@ async function spawnReviewer(
   const claudeCmd = `claude --dangerously-skip-permissions --model ${model}`;
   const providerEnv = getProviderEnvForModel(model);
 
-  createSession(sessionName, projectPath, claudeCmd, { env: providerEnv });
+  await createSessionAsync(sessionName, projectPath, claudeCmd, { env: providerEnv });
 
   // Wait for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -421,14 +421,14 @@ async function waitForReviewer(
 ): Promise<'completed' | 'failed'> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!sessionExists(sessionName)) {
+    if (!await sessionExistsAsync(sessionName)) {
       // Session ended — check if output was produced
       return existsSync(outputFile) ? 'completed' : 'failed';
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
   // Timeout — kill and report failed
-  try { killSession(sessionName); } catch { /* ignore */ }
+  try { await killSessionAsync(sessionName); } catch { /* ignore */ }
   return 'failed';
 }
 
