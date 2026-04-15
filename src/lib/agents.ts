@@ -1248,6 +1248,8 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeState(normalizedId);
   const agentState = getAgentState(normalizedId);
+  const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
+  const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const allowedRuntimeStates = ['suspended', 'idle'];
   const allowedAgentStatuses = ['stopped', 'completed'];
 
@@ -1271,15 +1273,14 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   if (!sessionId) {
     return {
       success: false,
-      error: 'No saved session ID found'
+      error: 'No saved session ID found — this agent is not resumable. Start a fresh agent instead.'
     };
   }
 
-  // Verify agent state exists (already fetched above for status check)
-  if (!agentState) {
+  if (!agentState || !hasWorkspace || isPlaceholder) {
     return {
       success: false,
-      error: 'Agent state not found'
+      error: 'Saved Claude session is orphaned because the backing workspace/agent state is missing or placeholder-only. Start a fresh agent instead.'
     };
   }
 

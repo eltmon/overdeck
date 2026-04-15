@@ -182,9 +182,12 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
    b. Commits .planning/ artifacts to git
    c. Archives PLANNING_PROMPT.md → PLANNING_PROMPT.md.archived (PAN-250)
    d. Determines phase: .planning/ exists → 'implementation', otherwise → 'exploration'
-   e. Spawns work agent via `pan start <ID> --phase implementation`
+   e. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
+   f. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.panopticon/agents/agent-<id>/lifecycle.log` and `spawn.log`
 
-4. Work agent reads .planning/STATE.md and implements remaining work
+4. Dashboard UI shows `Starting...` / `Resuming...` immediately, then switches to the normal running controls once the work agent is actually live
+
+5. Work agent reads .planning/STATE.md and implements remaining work
 ```
 
 ### Beads Prerequisite

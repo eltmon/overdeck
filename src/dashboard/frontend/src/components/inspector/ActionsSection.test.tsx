@@ -38,6 +38,9 @@ function makeLifecycle(overrides: Partial<WorkAgentLifecycle> = {}): WorkAgentLi
     hasAgentState: true,
     hasLiveTmuxSession: false,
     hasSavedSession: true,
+    hasWorkspace: true,
+    isPlaceholder: false,
+    isOrphaned: false,
     isRunning: false,
     isStopped: true,
     isCompleted: false,
@@ -147,6 +150,45 @@ describe('ActionsSection', () => {
     expect(onStartAgent).toHaveBeenCalledOnce();
   });
 
+  it('shows Starting... while launching a fresh agent', () => {
+    render(<ActionsSection {...defaultProps} agentLaunchState="starting" />);
+    expect(screen.getByText('Starting...')).toBeInTheDocument();
+  });
+
+  it('shows Resuming... while resuming a stopped agent', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent({ status: 'stopped' })}
+        lifecycle={makeLifecycle()}
+        agentLaunchState="resuming"
+      />
+    );
+    expect(screen.getByText('Resuming...')).toBeInTheDocument();
+  });
+
+  it('shows Start Agent instead of Resume Session for orphaned stopped agents', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent({ status: 'stopped' })}
+        lifecycle={makeLifecycle({
+          hasSavedSession: true,
+          hasWorkspace: false,
+          isOrphaned: true,
+          canStartFresh: true,
+          canResumeSession: false,
+          canResetSession: false,
+          requiresSessionResetBeforeFreshStart: false,
+          recommendedAction: 'start',
+          reason: 'Agent agent-1 has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.',
+        })}
+      />
+    );
+    expect(screen.getByText('Start Agent')).toBeInTheDocument();
+    expect(screen.queryByText('Resume Session')).not.toBeInTheDocument();
+  });
+
   it('hides Start Agent when agent is running', () => {
     render(<ActionsSection {...defaultProps} agent={makeAgent()} />);
     expect(screen.queryByText('Start Agent')).not.toBeInTheDocument();
@@ -215,6 +257,29 @@ describe('ActionsSection', () => {
       />
     );
     expect(screen.getByText('Re-Review')).toBeInTheDocument();
+  });
+
+  it('shows pipeline section for verification-only failure states', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        reviewStatus={makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending', verificationStatus: 'failed', verificationNotes: 'frontend-typecheck failed' })}
+      />
+    );
+    expect(screen.getByText('Verify:')).toBeInTheDocument();
+    expect(screen.getByText('frontend-typecheck failed')).toBeInTheDocument();
+  });
+
+  it('promotes Review & Test when verification failed and rerun is the next step', () => {
+    render(
+      <ActionsSection
+        {...defaultProps}
+        reviewStatus={makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending', verificationStatus: 'failed' })}
+      />
+    );
+    const button = screen.getByTestId('review-test-btn');
+    expect(button.className).toContain('bg-primary');
+    expect(button.className).toContain('text-primary-foreground');
   });
 
   it('shows Create Workspace button when workspace does not exist and no agent', () => {

@@ -2192,6 +2192,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     }
   };
 
+  const [isStarting, setIsStarting] = useState(false);
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const startAgentMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/agents', {
@@ -2214,9 +2217,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       return res.json();
     },
     onSuccess: async () => {
+      setIsStarting(true);
+      if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+      startTimeoutRef.current = setTimeout(() => setIsStarting(false), 60000);
       await refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
+      setIsStarting(false);
       showAlert({ message: `Failed to start agent: ${err.message}`, variant: 'error' });
     },
   });
@@ -2224,13 +2231,17 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const [isResuming, setIsResuming] = useState(false);
   const resumingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear "resuming" state once the agent is actually running, or after 60s safety valve
+  // Clear transitional start/resume states once the agent is actually running, or after the safety valve
   useEffect(() => {
+    if (isStarting && isRunning) {
+      setIsStarting(false);
+      if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+    }
     if (isResuming && isRunning) {
       setIsResuming(false);
       if (resumingTimeoutRef.current) clearTimeout(resumingTimeoutRef.current);
     }
-  }, [isResuming, isRunning]);
+  }, [isStarting, isResuming, isRunning]);
 
   const resumeSessionMutation = useMutation({
     mutationFn: async () => {
@@ -2401,10 +2412,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
             )}
-            {isResuming && (
+            {(isStarting || isResuming) && (
               <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-primary text-primary-foreground">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Resuming…
+                {isResuming ? 'Resuming…' : 'Starting…'}
               </span>
             )}
             {isSessionLost && (
@@ -2660,7 +2671,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           )}
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
-          <AbortIssueButton issue={issue} />
+          <ResetIssueButton issue={issue} />
           {/* Model badge - centered between Tell and Kill */}
           {activeAgent && activeAgent.model && (
             <span className="flex-1 text-center text-[10px] text-content-body font-medium">
@@ -2727,11 +2738,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
-                disabled={startAgentMutation.isPending}
+                disabled={startAgentMutation.isPending || isStarting}
                 className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-                title={startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
+                title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
               >
-                {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               </button>
             </>
           )}
@@ -2774,33 +2785,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <button
               ref={startButtonRef}
               onClick={handleStartAgent}
-              disabled={startAgentMutation.isPending}
+              disabled={startAgentMutation.isPending || isStarting}
               className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-              title={startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
+              title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
             >
-              {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              <span>Start Agent</span>
+              {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
             </button>
           ) : null}
-          <button
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (await confirm({ title: 'Reset Issue', message: `Reset ${issue.identifier}?\n\nThis will:\n• Kill any running agents (local and remote)\n• Move the issue back to To Do in Linear\n• Keep the workspace for reference`, variant: 'destructive', confirmLabel: 'Reset' })) {
-                // Call the reset endpoint
-                fetch(`/api/issues/${issue.identifier}/reset`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                }).then(async () => {
-                  await refreshDashboardState(queryClient);
-                }).catch(err => console.error('Reset failed:', err));
-              }
-            }}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Reset"
-          >
-            <Undo className="w-3.5 h-3.5" />
-          </button>
-          <AbortIssueButton issue={issue} />
+          <ResetIssueButton issue={issue} />
         </div>
       )}
 
@@ -2821,7 +2814,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           <ReopenSection issue={issue} inline />
-          <AbortIssueButton issue={issue} />
+          <ResetIssueButton issue={issue} />
         </div>
       )}
 
@@ -2989,30 +2982,40 @@ function MergeIssueButton({
 }
 
 
-// Abort button — wipe all work (agent, workspace, beads, vBRIEF) and return to Todo
-function AbortIssueButton({ issue }: { issue: Issue }) {
+// Reset button — wipe all work (agent, workspace, beads, vBRIEF) and return to Todo
+function ResetIssueButton({ issue }: { issue: Issue }) {
   const confirm = useConfirm();
   const showAlert = useAlert();
   const queryClient = useQueryClient();
   const canonical = STATUS_LABELS[issue.status];
 
-  const abortMutation = useMutation({
+  const resetMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/abort`, {
+      const res = await fetch(`/api/issues/${issue.identifier}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteWorkspace: true }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || data.message || 'Failed to abort issue');
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Failed to reset issue');
       }
-      return data;
+      const reader = res.body?.getReader();
+      if (!reader) return { success: true };
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+      }
+      return { success: true, raw: buffer };
     },
     onSuccess: async () => {
       await refreshDashboardState(queryClient);
     },
     onError: (err: Error) => {
-      showAlert({ message: `Failed to abort: ${err.message}`, variant: 'error' });
+      showAlert({ message: `Failed to reset: ${err.message}`, variant: 'error' });
     },
   });
 
@@ -3025,20 +3028,20 @@ function AbortIssueButton({ issue }: { issue: Issue }) {
       onClick={async (e) => {
         e.stopPropagation();
         if (await confirm({
-          title: 'Abort Issue',
-          message: `Abort ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and branch\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
+          title: 'Reset Issue',
+          message: `Reset ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and branch\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
           variant: 'destructive',
-          confirmLabel: 'Abort',
+          confirmLabel: 'Reset Issue',
         })) {
-          abortMutation.mutate();
+          resetMutation.mutate();
         }
       }}
-      disabled={abortMutation.isPending}
+      disabled={resetMutation.isPending}
       className="flex items-center gap-1 text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors disabled:opacity-50"
-      title="Abort — wipe all work and return to Todo"
+      title="Reset Issue — wipe all work and return to Todo"
     >
-      {abortMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-      <span>{abortMutation.isPending ? 'Aborting...' : 'Abort'}</span>
+      {resetMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+      <span>{resetMutation.isPending ? 'Resetting...' : 'Reset Issue'}</span>
     </button>
   );
 }

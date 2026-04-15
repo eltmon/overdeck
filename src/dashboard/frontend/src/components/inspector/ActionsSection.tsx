@@ -40,6 +40,7 @@ interface ActionsSectionProps {
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
   lifecycle?: WorkAgentLifecycle;
+  agentLaunchState?: 'starting' | 'resuming' | null;
 }
 
 export function ActionsSection({
@@ -68,10 +69,13 @@ export function ActionsSection({
   onStartAgent,
   onCreateWorkspace,
   lifecycle,
+  agentLaunchState,
 }: ActionsSectionProps) {
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
   const isResume = !!agent && agent.status === 'stopped' && lifecycle?.canResumeSession === true && !resetSessionMutation.isSuccess;
+  const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
+  const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
 
   // Stuck merge detection: if mergeStatus has been 'merging' for > 2 min, enable retry (PAN-490)
   const STUCK_MERGE_MS = 2 * 60 * 1000;
@@ -86,8 +90,22 @@ export function ActionsSection({
     : 0;
   const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
+  const hasVerificationState = !!reviewStatus?.verificationStatus && reviewStatus.verificationStatus !== 'pending';
+  const showPipelineStatus = !!reviewStatus && (
+    reviewStatus.reviewStatus !== 'pending'
+    || reviewStatus.testStatus !== 'pending'
+    || hasVerificationState
+  );
   const isReReview = reviewStatus?.readyForMerge
     || (reviewStatus?.reviewStatus === 'passed' && reviewStatus?.testStatus === 'passed' && reviewStatus?.mergeStatus === 'failed');
+  const shouldPromoteReviewAction = !!reviewStatus && (
+    hasVerificationState
+    || isReReview
+    || isPipelineStuck
+    || reviewStatus.reviewStatus === 'failed'
+    || reviewStatus.reviewStatus === 'blocked'
+    || reviewStatus.testStatus === 'failed'
+  );
 
   if (reviewStatusLoading) {
     return (
@@ -125,7 +143,7 @@ export function ActionsSection({
       )}
 
       {/* Review status */}
-      {reviewStatus && (reviewStatus.reviewStatus !== 'pending' || reviewStatus.testStatus !== 'pending') && (
+      {showPipelineStatus && reviewStatus && (
         <ReviewPipelineSection reviewStatus={reviewStatus} />
       )}
 
@@ -165,7 +183,11 @@ export function ActionsSection({
           data-testid="review-test-btn"
           onClick={onReview}
           disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-muted-foreground hover:text-foreground hover:bg-accent"
+          className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
+            shouldPromoteReviewAction
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+          }`}
         >
           {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
             <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -219,11 +241,11 @@ export function ActionsSection({
                   onStartAgent();
                 }
               }}
-              disabled={startAgentMutation.isPending || startAgentMutation.isSuccess || showResumeInput}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 font-medium bg-primary"
+              disabled={isLaunching || showResumeInput}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
             >
-              {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : startAgentMutation.isSuccess ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              {startAgentMutation.isPending ? (isResume ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (isResume ? 'Resumed!' : 'Started!') : (isResume ? 'Resume Session' : 'Start Agent')}
+              {isLaunching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+              <span>{isLaunching ? launchLabel : (isResume ? 'Resume Session' : 'Start Agent')}</span>
             </button>
             {/* Reset Session — only when resuming (has a saved session) */}
             {isResume && (

@@ -293,7 +293,7 @@ If yes → root. If no → find or create the appropriate `docs/` subdirectory.
 | Artifact | Where it lives | Why |
 |---------|---------------|-----|
 | Global skills cache | `~/.panopticon/skills/` | Machine-local, refreshed by `pan sync` |
-| Agent state dirs | `~/.panopticon/agents/<id>/` | Runtime state, not portable |
+| Agent state dirs | `~/.panopticon/agents/<id>/` | Runtime state, not portable. Includes `state.json`, `health.json`, `lifecycle.log`, `spawn.log`, `output.log`, launcher scripts, and saved Claude session metadata. |
 | Specialist sessions | `~/.panopticon/specialists/` | Runtime state |
 | Issue archives | `~/.panopticon/archives/<issue>/` | Closed-issue state backup |
 | Traefik config | `~/.panopticon/traefik/` | Infrastructure, not project content |
