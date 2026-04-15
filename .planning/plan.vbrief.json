@@ -1,613 +1,542 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-12T00:00:00Z",
+    "created": "2026-04-15T00:44:09Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility",
-    "updated": "2026-04-19T16:01:23.441Z"
+    "description": "Plan for PAN-714: clean up stale .claude/skills/ references and add unit tests for doneCommand/approveCommand",
+    "updated": "2026-04-15T08:46:10.773Z"
   },
   "plan": {
-    "id": "pan-653",
-    "title": "Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility",
+    "id": "pan-714",
+    "title": "fix(pan-705 followup): clean up stale .claude/skills/ references and add unit tests for doneCommand/approveCommand",
     "status": "approved",
-    "uid": "3102731e-c901-43ed-9595-545316061952",
+    "uid": "163808ab-c659-4110-8ab8-3b50aeb510cf",
     "author": "agent:claude-opus-4-6",
-    "sequence": 176,
-    "created": "2026-04-12T00:00:00Z",
-    "updated": "2026-04-19T16:01:23.441Z",
+    "sequence": 180,
+    "created": "2026-04-15T00:44:09Z",
+    "updated": "2026-04-15T08:46:10.773Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/653",
-        "label": "PAN-653",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/714",
+        "label": "PAN-714",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
+        "label": "PAN-705 parent reorg",
         "type": "issue"
       }
     ],
     "tags": [
-      "bug",
-      "git",
-      "merge",
-      "kanban",
-      "activity",
-      "deacon",
-      "schema"
+      "cleanup",
+      "tests",
+      "pan-705-followup",
+      "skills"
     ],
     "narratives": {
-      "Problem": "Hotfix commits pushed to origin/main are silently clobbered by concurrent approve-flow merges. Root cause is a check-then-act race in workspaces.ts approve handler (pull, merge, push without re-fetch). The failure is invisible because activity log is in-memory, stuck is a derived heuristic not a flag, and Deacon would infinite-loop respawn any workspace marked stuck.",
-      "Proposal": "Ship all three phases as one coupled change. Phase 1 stops the bleed: Deacon-respect first, then persistent stuck columns on review_status, then pre-push divergence guard in approve + salvage paths, then unstick UI. Phase 2 makes it visible: thin git helper wrapper emitting structured git.* events to a new git_operations SQLite table, pattern-matched tmux streaming from the merge-agent specialist, concurrent-merge detection, and activity panel UX (group/filter/pin). Phase 3 fixes the kanban stuck-count to be the union of persistent stuck flag and inactivity heuristic."
+      "Problem": "PAN-705 command taxonomy reorg (pan work list → pan issues, pan cloister/specialists → pan admin *) left project-level .claude/skills/ with stale command refs, 5 orphan skills, 56 missing new skills, and structural bugs (nested dirs). Separately, work/done.ts (535 lines) and work/approve.ts (214 lines) have zero unit tests despite complex pre-flight logic, tracker API paths, and issue-id normalization.",
+      "Proposal": "Regenerate .claude/skills/ as an exact mirror of canonical skills/, then extend pan sync to auto-mirror project-level skills on future runs so drift cannot recur. Extract pre-flight checks from doneCommand into src/lib/work/done-preflight.ts and export the existing approve.ts helpers, unit-test both at the helper and command-behavior level following the reopen.test.ts convention."
     },
     "items": [
       {
-        "id": "deacon-respect",
-        "title": "Deacon respect: skip workspaces with stuck=true",
+        "id": "regen-claude-skills",
+        "title": "Regenerate .claude/skills/ as exact mirror of canonical skills/",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-653"
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "In src/lib/cloister/deacon.ts around lines 1960-2035, modify patrolWorkAgentResolutions and any stuck-poke / respawn code path so that workspaces whose review_status.stuck = 1 are skipped entirely. Key by issueId, not agentId, so respawned agents with new IDs still match. Must ship before any marking logic so the first stuck-mark is not instantly clobbered by an infinite respawn loop."
+          "Action": "Delete all tracked entries under .claude/skills/ except the .gitignore, then copy every directory from skills/ into .claude/skills/ verbatim. This removes the 5 orphan skills (hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-panopticon-docs), fixes structural bugs (nested pan-new-project/pan-new-project/, work-complete/work-complete/), eliminates all stale command references (pan work list, pan cloister start, pan specialists wake), and adds the 56 canonical skills missing from the project tree."
         },
         "subItems": [
           {
-            "id": "deacon-respect.ac1",
-            "title": "patrolWorkAgentResolutions skips iterations where review_status.stuck = 1 for the agent's issueId",
+            "id": "regen-claude-skills.ac1",
+            "title": "`rg -n \"pan work list|pan cloister start|pan specialists wake\" .claude/skills/` returns zero matches",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "deacon-respect.ac2",
-            "title": "Ephemeral specialist force-kill/respawn path also checks the flag and bails out",
+            "id": "regen-claude-skills.ac2",
+            "title": "Every directory in skills/ has a corresponding directory in .claude/skills/ with byte-identical SKILL.md contents (verify via `diff -rq skills/ .claude/skills/ | grep -v .gitignore` showing no differences)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "deacon-respect.ac3",
-            "title": "Unit test: patrol run with a mocked stuck issue produces zero poke/respawn actions",
+            "id": "regen-claude-skills.ac3",
+            "title": ".claude/skills/.gitignore is preserved unchanged (protects future Panopticon-managed symlinks)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.925Z"
+          },
+          {
+            "id": "regen-claude-skills.ac4",
+            "title": "No nested-duplicate directories remain (no `*/pan-new-project/pan-new-project`, no `*/work-complete/work-complete`)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.925Z"
+          },
+          {
+            "id": "regen-claude-skills.ac5",
+            "title": "Orphan skills hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-panopticon-docs are deleted from .claude/skills/",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.925Z"
           }
         ],
-        "completed": "2026-04-19T16:01:23.439Z"
+        "completed": "2026-04-15T08:46:10.772Z"
       },
       {
-        "id": "stuck-schema",
-        "title": "Persistent stuck state: schema + upsert helpers",
+        "id": "pan-sync-project-skills",
+        "title": "Extend pan sync to auto-mirror project-level .claude/skills/ from local skills/",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-653"
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Bump SCHEMA_VERSION to 17 in src/lib/database/schema.ts. Add columns to review_status: stuck BOOLEAN DEFAULT 0, stuck_reason TEXT, stuck_at TEXT, stuck_details TEXT (JSON). Add migration block for currentVersion < 17 using ALTER TABLE ADD COLUMN in try/catch per column. Export markWorkspaceStuck(issueId, reason, details) and clearWorkspaceStuck(issueId) helpers alongside existing review_status upsert code."
+          "Action": "In src/lib/sync.ts (or a helper called from it), after the existing user-level sync, detect whether the current working directory contains a top-level `skills/` tree with one or more SKILL.md files. If so, mirror skills/* into .claude/skills/* — creating missing directories, updating out-of-date SKILL.md files, and removing directories in .claude/skills/ that no longer exist in skills/. Preserve .claude/skills/.gitignore untouched. Report the count of added/updated/removed skills in the sync output. This must be a no-op for any project without a top-level skills/ directory (i.e., every non-panopticon-cli project)."
         },
         "subItems": [
           {
-            "id": "stuck-schema.ac1",
-            "title": "review_status table has stuck, stuck_reason, stuck_at, stuck_details columns after migration from v16",
+            "id": "pan-sync-project-skills.ac1",
+            "title": "Running `pan sync` inside panopticon-cli on a clean tree (after regen-claude-skills) produces no changes to .claude/skills/ and reports 0 added / 0 updated / 0 removed",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "stuck-schema.ac2",
-            "title": "markWorkspaceStuck / clearWorkspaceStuck helpers exist, roundtrip through SQLite, and persist across dashboard restart",
+            "id": "pan-sync-project-skills.ac2",
+            "title": "After touching one file under skills/ (e.g., adding a new line to skills/pan-help/SKILL.md), `pan sync` updates the corresponding .claude/skills/pan-help/SKILL.md to match and reports `1 updated`",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "stuck-schema.ac3",
-            "title": "Migration is idempotent (re-running does not error if columns already exist)",
+            "id": "pan-sync-project-skills.ac3",
+            "title": "After deleting a directory under skills/, `pan sync` removes the corresponding directory under .claude/skills/ and reports `1 removed`",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.926Z"
+          },
+          {
+            "id": "pan-sync-project-skills.ac4",
+            "title": "Running `pan sync` inside a project without a top-level skills/ directory is a no-op for .claude/skills/ (the existing user-level sync behavior is unchanged)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.926Z"
+          },
+          {
+            "id": "pan-sync-project-skills.ac5",
+            "title": "The existing .claude/skills/.gitignore file is never deleted, overwritten, or moved by the mirror logic",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.926Z"
+          },
+          {
+            "id": "pan-sync-project-skills.ac6",
+            "title": "Unit test in tests/lib/sync.test.ts (or similar) exercises the three cases above (no-op, update, remove) against a tmp-dir fixture",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.926Z"
           }
         ],
-        "completed": "2026-04-19T16:01:23.439Z"
+        "completed": "2026-04-15T08:46:10.773Z"
       },
       {
-        "id": "git-operations-table",
-        "title": "Create git_operations SQLite table and git-activity service",
+        "id": "extract-done-preflight",
+        "title": "Extract done.ts pre-flight checks into src/lib/work/done-preflight.ts",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-653"
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Add git_operations table to schema.ts: id INTEGER PK AUTOINCREMENT, operation TEXT, branch TEXT, issue_id TEXT, before_sha TEXT, after_sha TEXT, remote_sha TEXT, status TEXT, error TEXT, ts TEXT. Create src/dashboard/server/services/git-activity.ts with appendGitOperation() and listGitOperations(filter) functions. Index on (issue_id, ts) and (operation, ts). Survives dashboard restart."
+          "Action": "Create src/lib/work/done-preflight.ts exporting `checkOpenBeads(workspacePath, issueId)`, `checkUncommittedChanges(workspacePath)`, `checkVBriefACStatus(workspacePath)`, and a composed `runPreflightChecks(workspacePath, issueId)` that returns a string[] of failure lines (empty array = pass). The composed function must also invoke the existing `syncBeadStatusToVBrief` pass over closed beads before running checkVBriefACStatus so the AC check sees the latest state. Refactor doneCommand in src/cli/commands/work/done.ts to call `runPreflightChecks` and, on failure, print the same output and exit(1) — the surface behavior must be byte-identical to the current implementation."
         },
         "subItems": [
           {
-            "id": "git-operations-table.ac1",
-            "title": "git_operations table exists with all columns and indexes after fresh init and after migration",
+            "id": "extract-done-preflight.ac1",
+            "title": "src/lib/work/done-preflight.ts exists and exports checkOpenBeads, checkUncommittedChanges, checkVBriefACStatus, runPreflightChecks",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.924Z"
           },
           {
-            "id": "git-operations-table.ac2",
-            "title": "appendGitOperation and listGitOperations functions work and are used by the activity API",
+            "id": "extract-done-preflight.ac2",
+            "title": "doneCommand in src/cli/commands/work/done.ts no longer contains inline bd/git/AC-check logic; it calls runPreflightChecks and handles the returned failure lines",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.924Z"
           },
           {
-            "id": "git-operations-table.ac3",
-            "title": "Rows survive a dashboard process restart",
+            "id": "extract-done-preflight.ac3",
+            "title": "Running `pan work done <issue>` against a workspace with known failures (open bead + uncommitted file + pending AC) produces the same stderr output as before the refactor (verify by comparing against a pre-refactor capture)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.924Z"
+          },
+          {
+            "id": "extract-done-preflight.ac4",
+            "title": "npm run typecheck and npm run lint pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.924Z"
           }
         ],
-        "completed": "2026-04-19T16:01:23.440Z"
+        "completed": "2026-04-15T08:46:10.772Z"
       },
       {
-        "id": "git-helper-wrapper",
-        "title": "Thin git-operations helper wrapper module",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "Create src/lib/git/operations.ts exporting gitFetch(cwd, remote, branch), gitPush(cwd, remote, branch, {issueId}), gitForcePush(cwd, remote, branch, {issueId, reason}), gitMerge(cwd, branch), gitRevParse(cwd, ref). Each wraps execAsync, records before/after/remote SHAs via git rev-parse, and emits a structured git.* event through git-activity.ts. gitPush MUST perform a pre-push git fetch + ancestor check and throw MainDivergedError if origin has advanced past the local ancestor. All helpers use execAsync (never execSync)."
-        },
-        "subItems": [
-          {
-            "id": "git-helper-wrapper.ac1",
-            "title": "gitPush throws MainDivergedError when origin/main is not an ancestor of local main",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "git-helper-wrapper.ac2",
-            "title": "Every helper call writes exactly one row to git_operations with before/after/remote SHAs populated where applicable",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "git-helper-wrapper.ac3",
-            "title": "Unit tests cover success, non-fast-forward rejection, and divergence cases using mocked execAsync",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-19T16:01:23.439Z"
-      },
-      {
-        "id": "approve-divergence-guard",
-        "title": "Pre-push divergence guard in approve flow",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "In src/dashboard/server/routes/workspaces.ts around line 3941, replace the raw `git push origin main` with gitPush() from the new helper. On MainDivergedError: leave local state clean (the existing merge-abort/reset fallback), call markWorkspaceStuck(issueId, 'main_diverged', {localSha, remoteSha}), emit git.main_diverged, return 409 with a human-readable error. Do NOT retry automatically."
-        },
-        "subItems": [
-          {
-            "id": "approve-divergence-guard.ac1",
-            "title": "Approve flow aborts cleanly on divergence without losing the hotfix commit on origin/main",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "approve-divergence-guard.ac2",
-            "title": "review_status.stuck is set to 1 with reason='main_diverged' and both SHAs in stuck_details",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "approve-divergence-guard.ac3",
-            "title": "Integration repro: hotfix push between pull and push is preserved, not clobbered",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-19T16:01:23.438Z"
-      },
-      {
-        "id": "salvage-divergence-guard",
-        "title": "Same guard in salvageStrandedMerge + merge-agent push sites",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "Route src/lib/cloister/merge-agent.ts salvageStrandedMerge (line 1742), spawnRebaseAgentForBranch (1538), and the auto-revert force-push (1385) through gitPush / gitForcePush helpers. Each emits git.* events. salvageStrandedMerge must mark-stuck on divergence rather than blind-pushing."
-        },
-        "subItems": [
-          {
-            "id": "salvage-divergence-guard.ac1",
-            "title": "salvageStrandedMerge aborts and marks stuck when origin/main has advanced beyond what it intended to push",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "salvage-divergence-guard.ac2",
-            "title": "Rebase force-push and auto-revert force-push both emit git.force_push activity events",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-15T03:25:52.482Z"
-      },
-      {
-        "id": "unstick-api-ui",
-        "title": "Unstick API endpoint and kanban card UI",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane — card stays where it is per the issue comment clarification."
-        },
-        "subItems": [
-          {
-            "id": "unstick-api-ui.ac1",
-            "title": "POST /unstick clears stuck flag and re-enables Deacon for that workspace",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "unstick-api-ui.ac2",
-            "title": "Kanban card shows red border + warning badge when stuck=1",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "unstick-api-ui.ac3",
-            "title": "No new kanban lane added; grid remains at 4 columns",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-19T16:01:23.438Z"
-      },
-      {
-        "id": "tmux-stream-patterns",
-        "title": "Pattern-match specialist tmux output into activity feed",
+        "id": "test-done-preflight-beads",
+        "title": "Unit tests: checkOpenBeads helper",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "Extend the existing merge-agent specialist polling loop (src/lib/cloister/merge-agent.ts near line 1995) to tail tmux capture-pane output and scan for lines matching git push/fetch/rejected/non-fast-forward/retrying/force-with-lease patterns. Emit each as a git.* activity event. Dedupe by line hash within the session. No raw capture dump into the DB."
-        },
-        "subItems": [
-          {
-            "id": "tmux-stream-patterns.ac1",
-            "title": "User sees 'pushing…', 'rejected non-fast-forward', 'retrying…' events live in the activity panel during an approve",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "tmux-stream-patterns.ac2",
-            "title": "Events are deduped and do not flood the activity table with repeated lines",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-19T16:01:23.441Z"
-      },
-      {
-        "id": "concurrent-merge-detection",
-        "title": "Concurrent-merge detection + divergence preview on approve",
-        "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "When approve starts, check git_operations for a successful git.push to main in the last 30 seconds and surface a warning card. After the initial pull, show 'main has advanced by N commits since you opened this' so the approver knows what they are including."
-        },
-        "subItems": [
-          {
-            "id": "concurrent-merge-detection.ac1",
-            "title": "Approve flow shows a warning when another approve pushed to main in the last 30s",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "concurrent-merge-detection.ac2",
-            "title": "Divergence preview displays commit count delta after pull, before merge-agent runs",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-19T16:01:23.441Z"
-      },
-      {
-        "id": "activity-panel-ux",
-        "title": "Activity panel: grouping, filtering, warning pinning",
-        "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-12T00:00:00Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-653"
-        },
-        "narrative": {
-          "Action": "Update src/dashboard/frontend/src/components/ActivityPanel.tsx to group entries by issue/workspace, add event-type filter (git / specialist / sync), and pin warning/error-level entries to the top. Wire the git event stream from the new git_operations SQLite backend. Keep the existing in-memory stream for non-git entries."
-        },
-        "subItems": [
-          {
-            "id": "activity-panel-ux.ac1",
-            "title": "Activity panel groups by issue/workspace and filters by event type",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "activity-panel-ux.ac2",
-            "title": "git.* events survive a dashboard restart and are visible in the panel",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          },
-          {
-            "id": "activity-panel-ux.ac3",
-            "title": "Warning and error entries are pinned to the top of the panel",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T03:25:52.482Z"
-          }
-        ],
-        "completed": "2026-04-19T16:01:23.440Z"
-      },
-      {
-        "id": "kanban-stuck-count-union",
-        "title": "Kanban stuck count = union of persistent flag + inactivity heuristic",
-        "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-12T00:00:00Z",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-653"
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Update src/dashboard/server/routes/metrics.ts around line 114 to compute the stuck count as the union of workspaces with review_status.stuck = 1 AND agents with health.state === 'stuck', deduped by issue. Update MetricsSummary.tsx:133 to consume the new field. Verify the stat increments by exactly 1 on divergence-abort and decrements on unstick."
+          "Action": "Create tests/lib/work/done-preflight.beads.test.ts. Mock execAsync or use a fake workspace with a scripted bd binary. Cover: (1) zero open beads → returns []; (2) N open beads → returns N+1 lines starting with `  Open beads (N):`; (3) bd not installed → returns [] (silent skip); (4) issue-id is lowercased correctly in the bd query."
         },
         "subItems": [
           {
-            "id": "kanban-stuck-count-union.ac1",
-            "title": "metrics.today.stuckCount reflects the deduped union",
+            "id": "test-done-preflight-beads.ac1",
+            "title": "Test file exists at tests/lib/work/done-preflight.beads.test.ts and imports from src/lib/work/done-preflight.ts",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.923Z"
           },
           {
-            "id": "kanban-stuck-count-union.ac2",
-            "title": "Stat increments by exactly 1 when a divergence-abort fires",
+            "id": "test-done-preflight-beads.ac2",
+            "title": "Covers happy path (0 beads), failure path (N beads), bd-missing path, and issue-id casing",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.923Z"
           },
           {
-            "id": "kanban-stuck-count-union.ac3",
-            "title": "Stat decrements by exactly 1 when the unstick button is clicked",
+            "id": "test-done-preflight-beads.ac3",
+            "title": "All tests pass under `npm test`",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.923Z"
           }
         ],
-        "completed": "2026-04-19T16:01:23.440Z"
+        "completed": "2026-04-15T08:46:10.772Z"
       },
       {
-        "id": "integration-tests",
-        "title": "End-to-end integration tests",
+        "id": "test-done-preflight-git",
+        "title": "Unit tests: checkUncommittedChanges helper (mono + polyrepo)",
         "status": "completed",
-        "priority": "high",
-        "created": "2026-04-12T00:00:00Z",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-653"
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Write integration tests reproducing the original bug and verifying the fix. Two concurrent approves against the same repo: one succeeds, second detects divergence, aborts cleanly, marks stuck, Deacon does not respawn, restart persists state, unstick clears it."
+          "Action": "Create tests/lib/work/done-preflight.git.test.ts. Build tmp-dir fixtures via mkdtempSync that simulate (a) monorepo — single top-level .git marker, clean and dirty states; (b) polyrepo — multiple subdirs each with their own .git marker, mixed clean/dirty. Use real `git init` + `git add` where feasible, or mock execAsync to return canned `git status --porcelain` output. Assert failure-line format: `  Uncommitted changes:` for monorepo, `  Uncommitted changes in <subdir>/:` for polyrepo."
         },
         "subItems": [
           {
-            "id": "integration-tests.ac1",
-            "title": "Original bug repro test exists and fails on pre-fix code, passes on post-fix",
+            "id": "test-done-preflight-git.ac1",
+            "title": "Covers monorepo-clean (returns []), monorepo-dirty (returns failure lines), polyrepo-mixed (returns failure lines scoped per subdir)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.920Z"
           },
           {
-            "id": "integration-tests.ac2",
-            "title": "Restart-mid-stuck test confirms persistence across dashboard restart",
+            "id": "test-done-preflight-git.ac2",
+            "title": "Covers polyrepo detection fallback: workspace with no top-level .git correctly walks subdirectories",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.920Z"
           },
           {
-            "id": "integration-tests.ac3",
-            "title": "Concurrent approve test confirms second approve aborts and marks stuck",
+            "id": "test-done-preflight-git.ac3",
+            "title": "Dotfile subdirectories (e.g., .planning/) are skipped during polyrepo walk",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:25:52.482Z"
+            "completed": "2026-04-15T02:59:53.920Z"
+          },
+          {
+            "id": "test-done-preflight-git.ac4",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.920Z"
           }
         ],
-        "completed": "2026-04-19T16:01:23.437Z"
+        "completed": "2026-04-15T08:46:10.769Z"
+      },
+      {
+        "id": "test-done-preflight-ac",
+        "title": "Unit tests: checkVBriefACStatus helper",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create tests/lib/work/done-preflight.ac.test.ts. Build a tmp-dir workspace with a synthetic .planning/plan.vbrief.json containing items with mixed AC statuses. Cover: (1) all AC completed → returns []; (2) one pending AC → returns two lines (header + `  - [ ] <title>`); (3) multiple items with pending AC → returns grouped output; (4) no vBRIEF file present → returns [] (silent skip, matching current behavior)."
+        },
+        "subItems": [
+          {
+            "id": "test-done-preflight-ac.ac1",
+            "title": "Covers all-completed, one-pending, multiple-pending, and no-vBRIEF cases",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-preflight-ac.ac2",
+            "title": "Test fixtures are created and torn down per-test (no leftover tmp dirs)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-preflight-ac.ac3",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          }
+        ],
+        "completed": "2026-04-15T08:46:10.770Z"
+      },
+      {
+        "id": "export-test-approve-helpers",
+        "title": "Export and unit-test approve.ts helpers",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Add `export` keywords to findPRForBranch, mergePR, and updateLinearStatus in src/cli/commands/work/approve.ts (checkGhCli already trivially testable). Create tests/cli/commands/work/approve.test.ts following the reopen.test.ts dynamic-import pattern. Cover: (1) findPRForBranch — mocked `gh pr list --json` output returns PR object; empty output returns null; gh failure returns null. (2) mergePR — success returns {success:true}; non-zero exit returns {success:false,error}. (3) updateLinearStatus — mock @linear/sdk; happy path returns true; team-missing returns false; target-state-missing returns false. Use vi.mock or monkey-patch imports as existing tests do."
+        },
+        "subItems": [
+          {
+            "id": "export-test-approve-helpers.ac1",
+            "title": "findPRForBranch, mergePR, updateLinearStatus are exported from src/cli/commands/work/approve.ts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          },
+          {
+            "id": "export-test-approve-helpers.ac2",
+            "title": "tests/cli/commands/work/approve.test.ts covers happy and failure paths for each of the three helpers",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          },
+          {
+            "id": "export-test-approve-helpers.ac3",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          }
+        ],
+        "completed": "2026-04-15T08:46:10.771Z"
+      },
+      {
+        "id": "test-done-command-behavior",
+        "title": "Command-level tests: doneCommand behavior (force, shadow, id normalization)",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create tests/cli/commands/work/done.test.ts. Mock the lib-level dependencies (runPreflightChecks, updateLinearToInReview, updateGitHubToInReview, createReviewArtifactsForIssue, saveAgentState, the dashboard auto-review HTTP calls) so the test exercises the *control flow* in doneCommand without hitting real APIs. Cover: (1) --force bypasses runPreflightChecks entirely (spy asserts it is never called); (2) shadow mode (via shouldSkipTrackerUpdate returning true) skips both Linear and GitHub update paths and calls updateShadowState instead; (3) issue-id normalization: `agent-pan-714`, `pan-714`, `PAN-714` all route to the same canonical `PAN-714` / `agent-pan-714` pair; (4) GitHub branch taken when issueId.startsWith('PAN-'), Linear branch otherwise."
+        },
+        "subItems": [
+          {
+            "id": "test-done-command-behavior.ac1",
+            "title": "--force flag skips pre-flight checks (runPreflightChecks spy asserts zero calls)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac2",
+            "title": "Shadow mode routes to updateShadowState and skips both Linear and GitHub tracker update paths",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac3",
+            "title": "Issue-id normalization covered for agent-prefixed, lowercase, and uppercase inputs",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac4",
+            "title": "PAN- prefix routes to GitHub branch; non-PAN routes to Linear branch",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac5",
+            "title": "All tests pass under `npm test` and do not make real network calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          }
+        ],
+        "completed": "2026-04-15T08:46:10.771Z"
+      },
+      {
+        "id": "test-approve-command-behavior",
+        "title": "Command-level tests: approveCommand behavior",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "In tests/cli/commands/work/approve.test.ts (same file as export-test-approve-helpers), add a describe block for approveCommand covering: (1) agent not found → exits with error; (2) PR not found in workspace → exits with error; (3) happy path (PR found, merge succeeds, Linear update succeeds) exits 0 and marks agent state stopped; (4) shouldSkipTrackerUpdate=true skips Linear update but still merges PR. Mock getAgentState/saveAgentState, findPRForBranch, mergePR, updateLinearStatus."
+        },
+        "subItems": [
+          {
+            "id": "test-approve-command-behavior.ac1",
+            "title": "Covers agent-not-found, pr-not-found, happy-path, and shadow-mode-skip",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          },
+          {
+            "id": "test-approve-command-behavior.ac2",
+            "title": "All tests pass under `npm test` and do not make real network or gh CLI calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          }
+        ],
+        "completed": "2026-04-15T08:46:10.771Z"
       }
     ],
     "edges": [
       {
-        "from": "deacon-respect",
-        "to": "stuck-schema",
-        "type": "blocks"
-      },
-      {
-        "from": "stuck-schema",
-        "to": "approve-divergence-guard",
-        "type": "blocks"
-      },
-      {
-        "from": "stuck-schema",
-        "to": "salvage-divergence-guard",
-        "type": "blocks"
-      },
-      {
-        "from": "stuck-schema",
-        "to": "unstick-api-ui",
-        "type": "blocks"
-      },
-      {
-        "from": "git-operations-table",
-        "to": "git-helper-wrapper",
-        "type": "blocks"
-      },
-      {
-        "from": "git-helper-wrapper",
-        "to": "approve-divergence-guard",
-        "type": "blocks"
-      },
-      {
-        "from": "git-helper-wrapper",
-        "to": "salvage-divergence-guard",
-        "type": "blocks"
-      },
-      {
-        "from": "git-helper-wrapper",
-        "to": "tmux-stream-patterns",
+        "from": "regen-claude-skills",
+        "to": "pan-sync-project-skills",
         "type": "informs"
       },
       {
-        "from": "git-operations-table",
-        "to": "concurrent-merge-detection",
+        "from": "extract-done-preflight",
+        "to": "test-done-preflight-beads",
         "type": "blocks"
       },
       {
-        "from": "git-operations-table",
-        "to": "activity-panel-ux",
+        "from": "extract-done-preflight",
+        "to": "test-done-preflight-git",
         "type": "blocks"
       },
       {
-        "from": "stuck-schema",
-        "to": "kanban-stuck-count-union",
+        "from": "extract-done-preflight",
+        "to": "test-done-preflight-ac",
         "type": "blocks"
       },
       {
-        "from": "approve-divergence-guard",
-        "to": "integration-tests",
+        "from": "extract-done-preflight",
+        "to": "test-done-command-behavior",
         "type": "blocks"
       },
       {
-        "from": "unstick-api-ui",
-        "to": "integration-tests",
-        "type": "blocks"
-      },
-      {
-        "from": "deacon-respect",
-        "to": "integration-tests",
-        "type": "blocks"
+        "from": "export-test-approve-helpers",
+        "to": "test-approve-command-behavior",
+        "type": "informs"
       }
     ]
   }
