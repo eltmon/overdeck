@@ -28,6 +28,7 @@ import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
+import { PlanChip, TasksChip, VBriefChip } from './PlanningChips';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
@@ -626,8 +627,6 @@ export function FeatureCard({
   onViewVBrief,
   children,
 }: FeatureCardProps) {
-  const queryClient = useQueryClient();
-  const showAlert = useAlert();
   const completed = feature.completedChildCount ?? 0;
   const inProgress = feature.inProgressChildCount ?? 0;
   const total = feature.totalChildCount ?? childCount;
@@ -639,42 +638,7 @@ export function FeatureCard({
       agent.agentPhase === 'planning' &&
       agent.status !== 'dead'
   );
-
-  const planningStateQuery = useQuery({
-    queryKey: ['planning-state', feature.identifier],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${feature.identifier}/planning-state`);
-      if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number }>;
-    },
-    enabled: !!feature.identifier,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  });
-  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
-  const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
-  const needsTaskGeneration = hasPlan && beadsCount === 0;
-  const planLabelExists = hasPlan || feature.labels?.some(l => l.toLowerCase() === 'planned');
   const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-divider/70 bg-surface/80 px-2.5 py-2';
-
-  const generateTasksMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${feature.identifier}/generate-tasks`, { method: 'POST' });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body?.success === false) {
-        throw new Error(body?.error || (body?.errors?.[0] ?? 'Failed to generate tasks'));
-      }
-      return body as { success: true; created: string[]; count: number };
-    },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ['planning-state', feature.identifier] });
-      await refreshDashboardState(queryClient);
-      void showAlert({ title: 'Tasks generated', message: `Created ${data.count} bead${data.count === 1 ? '' : 's'} from the vBRIEF plan.` });
-    },
-    onError: (err: Error) => {
-      void showAlert({ title: 'Generate tasks failed', message: err.message, variant: 'error' });
-    },
-  });
 
   // Check if derived status differs from raw Rally state
   const hasDerivedDiff = feature.derivedStatus && feature.rawTrackerState &&
@@ -742,76 +706,9 @@ export function FeatureCard({
           )}
 
           <div className={actionBarClass}>
-            {isPlanningActive ? (
-              <button
-                data-testid={`action-watch-planning-${feature.identifier}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPlan(feature);
-                }}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
-                title="Watch Planning"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Watch Planning</span>
-              </button>
-            ) : (
-              <button
-                data-testid={`action-plan-${feature.identifier}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPlan(feature);
-                }}
-                className={`flex items-center gap-1 text-xs transition-colors ${
-                  planLabelExists
-                    ? 'text-success hover:text-success/80'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                {planLabelExists ? 'See Plan' : 'Plan'}
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (needsTaskGeneration) {
-                  if (!generateTasksMutation.isPending) generateTasksMutation.mutate();
-                  return;
-                }
-                onViewBeads(feature);
-              }}
-              disabled={generateTasksMutation.isPending}
-              className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${
-                needsTaskGeneration
-                  ? 'text-destructive hover:text-destructive/80 font-medium'
-                  : beadsCount > 0
-                    ? 'text-success hover:text-success/80'
-                    : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title={needsTaskGeneration ? 'Generate beads from vBRIEF plan' : 'Tasks'}
-            >
-              {generateTasksMutation.isPending
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <List className="w-3.5 h-3.5" />}
-              {needsTaskGeneration ? 'Generate Tasks' : 'Tasks'}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewVBrief?.(feature);
-              }}
-              className={`flex items-center gap-1 text-xs transition-colors ${
-                hasPlan
-                  ? 'text-success hover:text-success/80'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title="vBRIEF"
-            >
-              <ScrollText className="w-3.5 h-3.5" />
-              vBRIEF
-            </button>
+            <PlanChip issue={feature} onPlan={onPlan} isPlanningActive={isPlanningActive} />
+            <TasksChip issue={feature} onViewBeads={onViewBeads} />
+            <VBriefChip issue={feature} onViewVBrief={onViewVBrief} />
           </div>
         </div>
       </div>
@@ -2222,7 +2119,6 @@ interface IssueCardProps {
 function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
@@ -2289,10 +2185,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     4: 'bg-border',
   };
 
-  // Planning state — drives chip coloring + Generate Tasks affordance.
-  // Only fetched when this card has any chance of having a plan (anything past
-  // backlog where the agent could have produced one). We poll every 30s so the
-  // chip flips from red→green right after Generate Tasks runs.
+  // Planning state still lives on IssueCard because Start Agent visibility
+  // depends on the current bead count; chip components subscribe separately.
   const planningStateQuery = useQuery({
     queryKey: ['planning-state', issue.identifier],
     queryFn: async () => {
@@ -2306,93 +2200,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   });
   const hasPlan = planningStateQuery.data?.hasPlan ?? false;
   const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
-  const needsTaskGeneration = hasPlan && beadsCount === 0;
-
-  const generateTasksMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/generate-tasks`, { method: 'POST' });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body?.success === false) {
-        throw new Error(body?.error || (body?.errors?.[0] ?? 'Failed to generate tasks'));
-      }
-      return body as { success: true; created: string[]; count: number };
-    },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ['planning-state', issue.identifier] });
-      await refreshDashboardState(queryClient);
-      void showAlert({ title: 'Tasks generated', message: `Created ${data.count} bead${data.count === 1 ? '' : 's'} from the vBRIEF plan.` });
-    },
-    onError: (err: Error) => {
-      void showAlert({ title: 'Generate tasks failed', message: err.message, variant: 'error' });
-    },
-  });
-
-  const handleTasksClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (needsTaskGeneration) {
-      if (!generateTasksMutation.isPending) generateTasksMutation.mutate();
-    } else {
-      onViewBeads && onViewBeads(issue);
-    }
-  };
-
-  // Reusable chip elements — colored by planning state.
-  // vBRIEF green when a plan exists; Tasks red when plan exists but no beads
-  // (and the click action becomes "Generate Tasks" instead of "view beads").
-  const tasksChip = (
-    <button
-      onClick={handleTasksClick}
-      disabled={generateTasksMutation.isPending}
-      className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${
-        needsTaskGeneration
-          ? 'text-destructive hover:text-destructive/80 font-medium'
-          : beadsCount > 0
-            ? 'text-success hover:text-success/80'
-            : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title={needsTaskGeneration ? 'Generate beads from vBRIEF plan' : 'Tasks'}
-    >
-      {generateTasksMutation.isPending
-        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        : <List className="w-3.5 h-3.5" />}
-      {needsTaskGeneration ? 'Generate Tasks' : 'Tasks'}
-    </button>
-  );
-
-  // Plan/See Plan chip — opens the planning dialog. Green "See Plan" when a
-  // plan already exists (clearer than "Re-plan" when the user is *continuing*
-  // an in-progress planning session, not starting over).
-  const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
-  const planChip = (
-    <button
-      data-testid={`action-plan-${issue.identifier}`}
-      onClick={(e) => { e.stopPropagation(); handlePlan(e); }}
-      className={`flex items-center gap-1 text-xs transition-colors ${
-        planLabelExists
-          ? 'text-success hover:text-success/80'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
-    >
-      <FileText className="w-3.5 h-3.5" />
-      {planLabelExists ? 'See Plan' : 'Plan'}
-    </button>
-  );
-
-  const vbriefChip = (
-    <button
-      onClick={(e) => { e.stopPropagation(); onViewVBrief && onViewVBrief(issue); }}
-      className={`flex items-center gap-1 text-xs transition-colors ${
-        hasPlan
-          ? 'text-success hover:text-success/80'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title="vBRIEF"
-    >
-      <ScrollText className="w-3.5 h-3.5" />
-      vBRIEF
-    </button>
-  );
 
   // Kill agent mutation
   const killMutation = useMutation({
@@ -2931,8 +2738,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <Eye className="w-3.5 h-3.5" />
             Watch
           </button>
-          {tasksChip}
-          {vbriefChip}
+          <TasksChip issue={issue} onViewBeads={onViewBeads} />
+          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -2995,22 +2802,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
         <div className={actionBarClass}>
-          {isPlanningActive ? (
-            <button
-              data-testid={`action-watch-planning-${issue.identifier}`}
-              onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
-              title="Watch Planning"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            planChip
-          )}
-          {planLabelExists && (
+          <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} />
+          {hasPlan && (
             <>
-              {tasksChip}
-              {vbriefChip}
+              <TasksChip issue={issue} onViewBeads={onViewBeads} />
+              <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
@@ -3030,20 +2826,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
         <div className={actionBarClass}>
-          {isPlanningActive ? (
-            <button
-              data-testid={`action-watch-planning-${issue.identifier}`}
-              onClick={handlePlan}
-              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
-              title="Watch Planning"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            planChip
-          )}
-          {tasksChip}
-          {vbriefChip}
+          <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} />
+          <TasksChip issue={issue} onViewBeads={onViewBeads} />
+          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
           {/* Resume Session only when there's an actual prior work agent to resume.
               For freshly-planned issues with no work agent yet, show Start Agent
               instead (gated on beads existing). */}
@@ -3105,20 +2890,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {/* Done items - Reopen + Close Out */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
         <div className={actionBarClass}>
-          <button
-            onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Tasks"
-          >
-            <List className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="vBRIEF"
-          >
-            <ScrollText className="w-3.5 h-3.5" />
-          </button>
+          <TasksChip issue={issue} onViewBeads={onViewBeads} />
+          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
         </div>
