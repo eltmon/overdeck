@@ -444,6 +444,7 @@ export function ComposerPromptEditor({
 
   const [text, setText] = useState(draft);
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
+  const [pendingSlashTrigger, setPendingSlashTrigger] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
 
@@ -465,9 +466,13 @@ export function ComposerPromptEditor({
   const handleChange = useCallback(
     (t: string) => {
       setText(t);
+      if (pendingSlashTrigger && t.includes('/')) {
+        setIsSlashMenuOpen(true);
+        setPendingSlashTrigger(false);
+      }
       onChange?.(t);
     },
-    [onChange],
+    [onChange, pendingSlashTrigger],
   );
 
   const slashContext = useMemo(() => {
@@ -495,7 +500,7 @@ export function ComposerPromptEditor({
       const rect = range.getBoundingClientRect();
       setMenuAnchorRect(rect);
     }
-    setIsSlashMenuOpen(true);
+    setPendingSlashTrigger(true);
     setSelectedIndex(0);
   }, []);
 
@@ -517,6 +522,7 @@ export function ComposerPromptEditor({
         });
       }
       setIsSlashMenuOpen(false);
+      setPendingSlashTrigger(false);
       setSelectedIndex(0);
     },
     [editorRef, slashContext],
@@ -524,6 +530,7 @@ export function ComposerPromptEditor({
 
   const handleSlashClose = useCallback(() => {
     setIsSlashMenuOpen(false);
+    setPendingSlashTrigger(false);
     setSelectedIndex(0);
   }, []);
 

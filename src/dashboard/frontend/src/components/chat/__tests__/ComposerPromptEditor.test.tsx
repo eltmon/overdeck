@@ -7,16 +7,19 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ComposerPromptEditor, SlashMenu, type SlashCommand } from '../ComposerPromptEditor';
 
 // Mock the CSS module — must match class names used in ComposerPromptEditor
-vi.mock('../MissionControl/styles/mission-control.module.css', () => ({
-  composerEditor: 'composerEditor',
-  composerEditorDisabled: 'composerEditorDisabled',
-  composerEditable: 'composerEditable',
-  composerPlaceholder: 'composerPlaceholder',
-  slashMenu: 'slashMenu',
-  slashMenuItem: 'slashMenuItem',
-  slashMenuItemSelected: 'slashMenuItemSelected',
-  slashMenuLabel: 'slashMenuLabel',
-  slashMenuDescription: 'slashMenuDescription',
+vi.mock('../../MissionControl/styles/mission-control.module.css', () => ({
+  default: {
+    composerEditor: 'composerEditor',
+    composerEditorDisabled: 'composerEditorDisabled',
+    composerEditable: 'composerEditable',
+    composerPlaceholder: 'composerPlaceholder',
+    slashMenu: 'slashMenu',
+    slashMenuItem: 'slashMenuItem',
+    slashMenuItemSelected: 'slashMenuItemSelected',
+    slashMenuLabel: 'slashMenuLabel',
+    slashMenuDescription: 'slashMenuDescription',
+    slashMenuMatch: 'slashMenuMatch',
+  },
 }));
 
 // Mock localStorage
@@ -32,6 +35,9 @@ let capturedRootElement: HTMLDivElement;
 
 const mockEditor = {
   registerCommand: vi.fn(() => () => {}),
+  read: (fn: () => void) => fn(),
+  update: (fn: () => void) => fn(),
+  focus: vi.fn(),
   getRootElement: () => {
     if (!capturedRootElement) {
       capturedRootElement = document.createElement('div');
@@ -43,13 +49,15 @@ const mockEditor = {
 
 // Mock window.getSelection / Range
 const mockRange = {
-  getBoundingClientRect: vi.fn(() => ({ bottom: 100, left: 50 })),
+  getBoundingClientRect: vi.fn(() => ({ top: 80, bottom: 100, left: 50 })),
 };
 const mockSelection = {
   rangeCount: 1,
   getRangeAt: vi.fn(() => mockRange),
 };
 vi.stubGlobal('getSelection', vi.fn(() => mockSelection));
+
+let mockLexicalText = '/';
 
 // Mock Lexical
 vi.mock('@lexical/react/LexicalComposer', () => ({
@@ -77,8 +85,13 @@ vi.mock('@lexical/react/LexicalHistoryPlugin', () => ({
   HistoryPlugin: () => null,
 }));
 
+let onChangePluginCallback: ((editorState: unknown, editor: unknown, tags: Set<string>) => void) | null = null;
+
 vi.mock('@lexical/react/LexicalOnChangePlugin', () => ({
-  OnChangePlugin: () => null,
+  OnChangePlugin: ({ onChange }: any) => {
+    onChangePluginCallback = onChange;
+    return null;
+  },
 }));
 
 vi.mock('@lexical/react/LexicalComposerContext', () => ({
@@ -87,7 +100,7 @@ vi.mock('@lexical/react/LexicalComposerContext', () => ({
 
 vi.mock('lexical', () => ({
   $getRoot: () => ({
-    getTextContent: () => '/',
+    getTextContent: () => mockLexicalText,
     clear: () => {},
     append: () => {},
     getLastChild: () => null,
@@ -118,6 +131,8 @@ describe('ComposerPromptEditor', () => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
     capturedRootElement = undefined as unknown as HTMLDivElement;
+    mockLexicalText = '/';
+    onChangePluginCallback = null;
   });
 
   afterEach(() => {
@@ -175,8 +190,15 @@ describe('ComposerPromptEditor', () => {
         />,
       );
 
-      // Fire / keydown on the root element (where the listener is registered)
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
 
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
     });
@@ -190,6 +212,10 @@ describe('ComposerPromptEditor', () => {
       );
 
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
 
       const menu = screen.getByRole('listbox', { name: 'Slash commands' });
       expect(menu).toBeInTheDocument();
@@ -208,6 +234,10 @@ describe('ComposerPromptEditor', () => {
       );
 
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Escape handler is on document
@@ -227,6 +257,10 @@ describe('ComposerPromptEditor', () => {
       );
 
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Click outside (on body, which is definitely outside the menu)
@@ -246,6 +280,10 @@ describe('ComposerPromptEditor', () => {
       );
 
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Click /model button
@@ -266,6 +304,10 @@ describe('ComposerPromptEditor', () => {
       );
 
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
 
       // Initially /model is selected (index 0)
@@ -299,6 +341,10 @@ describe('ComposerPromptEditor', () => {
       );
 
       fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
 
       // Navigate forward to /cancel (index 3)
       act(() => { fireEvent.keyDown(document, { key: 'ArrowDown' }); });
@@ -360,7 +406,7 @@ describe('SlashMenu filter', () => {
 
     // 'ext' matches /context label only (via '/context' → '/conte**xt**')
     expect(screen.queryByText('/model')).not.toBeInTheDocument();
-    expect(screen.getByText('/context')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /context/i })).toBeInTheDocument();
     expect(screen.queryByText('/effort')).not.toBeInTheDocument();
     expect(screen.queryByText('/cancel')).not.toBeInTheDocument();
   });
@@ -378,7 +424,7 @@ describe('SlashMenu filter', () => {
     );
 
     // 'cancel' matches /cancel label and 'Cancel the current operation' description
-    expect(screen.getByText('/cancel')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /cancel/i })).toBeInTheDocument();
     expect(screen.queryByText('/model')).not.toBeInTheDocument();
   });
 
@@ -412,5 +458,41 @@ describe('SlashMenu filter', () => {
     // 'ILE' (case-insensitive) matches /context via "fILE"
     expect(screen.getByText('/context')).toBeInTheDocument();
     expect(screen.queryByText('/model')).not.toBeInTheDocument();
+  });
+
+  it('highlights label matches', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter="ext"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    const match = document.querySelector('mark');
+    expect(match).not.toBeNull();
+    expect(match?.textContent).toBe('ext');
+    expect(match).toHaveClass('slashMenuMatch');
+  });
+
+  it('highlights description matches when label does not match', () => {
+    render(
+      <SlashMenu
+        commands={TEST_COMMANDS}
+        filter="file"
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    const match = document.querySelector('mark');
+    expect(match).not.toBeNull();
+    expect(match?.textContent?.toLowerCase()).toContain('file');
+    expect(match).toHaveClass('slashMenuMatch');
   });
 });

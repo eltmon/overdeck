@@ -40,6 +40,7 @@ import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
+import { forkCommand } from './commands/fork.js';
 import { resumeCommand } from './commands/resume.js';
 import { recoverCommand } from './commands/recover.js';
 import { syncMainCommand } from './commands/sync-main.js';
@@ -219,7 +220,7 @@ planCmd
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
 
-// Lifecycle verbs: pan start, pan tell, pan kill, pan resume, pan recover, pan sync-main, pan done, pan approve, pan reopen, pan wipe, pan close
+// Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan approve, pan reopen, pan wipe, pan close
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
@@ -230,6 +231,13 @@ program
   .description('Stop running agent (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
+
+program
+  .command('fork <conv>')
+  .description('Fork a conversation — creates new session with summary of previous work')
+  .option('--model <model>', 'Model for the forked session')
+  .option('--cwd <path>', 'Working directory for the forked session')
+  .action(forkCommand);
 
 program
   .command('resume <id>')
