@@ -265,6 +265,7 @@ const SETTINGS_SECTIONS = [
   { id: 'smart-selection', label: 'Smart Selection', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'openrouter', label: 'OpenRouter', icon: Globe },
+  { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'tmux', label: 'Terminal', icon: Terminal },
   { id: 'trackers', label: 'Tracker Keys', icon: GitBranch },
   { id: 'model-assignments', label: 'Model Assignments', icon: Brain },
@@ -506,6 +507,26 @@ export function SettingsPage() {
     });
   };
 
+  const handleCompactionModelChange = (modelId: ModelId) => {
+    setFormData({
+      ...formData,
+      conversations: {
+        ...formData.conversations,
+        compaction_model: modelId,
+      },
+    });
+  };
+
+  const handleManualCompactModeChange = (mode: 'claude-code' | 'panopticon-native') => {
+    setFormData({
+      ...formData,
+      conversations: {
+        ...formData.conversations,
+        manual_compact_mode: mode,
+      },
+    });
+  };
+
   const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
     setFormData({
       ...formData,
@@ -544,7 +565,12 @@ export function SettingsPage() {
           gemini_thinking_level: optimalDefaults.models.gemini_thinking_level,
         },
         api_keys: { ...(formData?.api_keys || {}) },
+        conversations: {
+          ...(formData?.conversations || optimalDefaults.conversations || {}),
+        },
         tracker_keys: { ...(formData?.tracker_keys || {}) },
+        tmux: { ...(formData?.tmux || optimalDefaults.tmux || {}) },
+        openrouter: { ...(formData?.openrouter || optimalDefaults.openrouter || {}) },
       };
       setFormData(newFormData);
     } catch (error) {
@@ -1052,6 +1078,105 @@ export function SettingsPage() {
           onApiKeySaved={handleOpenRouterKeySaved}
           onToggleEnabled={() => handleProviderToggle('openrouter')}
         />
+      </section>
+
+      {/* Conversations */}
+      <section id="conversations" className="mb-12 scroll-mt-4">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          Conversations
+          <div className="h-px flex-1 bg-divider-strong" />
+        </h2>
+        <p className="text-content-muted text-sm mb-6">
+          Control how Panopticon handles compaction for dashboard-owned resume flows and for typed <code>/compact</code> commands in the conversation composer.
+        </p>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-content">Panopticon compaction model</h3>
+              <p className="text-sm text-content-muted mt-1">
+                This model is used when Panopticon performs native conversation compaction. It does not affect Claude Code&apos;s own built-in <code>/compact</code> behavior.
+              </p>
+            </div>
+            <select
+              value={formData.conversations?.compaction_model || 'claude-haiku-4-5'}
+              onChange={(e) => handleCompactionModelChange(e.target.value as ModelId)}
+              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-sm text-content-body focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
+                providerDef.models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {providerDef.name} — {model.name}
+                  </option>
+                ))
+              )}
+              {openRouterFavoriteModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  OpenRouter — {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-content-muted">
+              Default: Claude Haiku 4.5 for fast, low-cost compaction.
+            </p>
+          </div>
+
+          <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-content">Typed /compact handling</h3>
+              <p className="text-sm text-content-muted mt-1">
+                Choose whether a user-typed <code>/compact</code> is passed through to Claude Code or intercepted and handled by Panopticon-native compaction.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => handleManualCompactModeChange('claude-code')}
+                className={`text-left rounded-xl border p-4 transition-colors ${
+                  (formData.conversations?.manual_compact_mode || 'claude-code') === 'claude-code'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-divider bg-surface-raised hover:border-divider-strong'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <div>
+                    <div className="font-bold text-content">Pass through to Claude Code</div>
+                    <div className="text-xs text-content-muted font-mono">Default</div>
+                  </div>
+                  {(formData.conversations?.manual_compact_mode || 'claude-code') === 'claude-code' && (
+                    <div className="text-blue-400 text-xs font-semibold">Selected</div>
+                  )}
+                </div>
+                <p className="text-sm text-content-muted">
+                  Preserve today&apos;s behavior: sending <code>/compact</code> directly to the Claude Code session.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleManualCompactModeChange('panopticon-native')}
+                className={`text-left rounded-xl border p-4 transition-colors ${
+                  formData.conversations?.manual_compact_mode === 'panopticon-native'
+                    ? 'border-emerald-500 bg-emerald-500/10'
+                    : 'border-divider bg-surface-raised hover:border-divider-strong'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <div>
+                    <div className="font-bold text-content">Use Panopticon-native compaction</div>
+                    <div className="text-xs text-content-muted font-mono">Opt-in override</div>
+                  </div>
+                  {formData.conversations?.manual_compact_mode === 'panopticon-native' && (
+                    <div className="text-emerald-400 text-xs font-semibold">Selected</div>
+                  )}
+                </div>
+                <p className="text-sm text-content-muted">
+                  Intercept typed <code>/compact</code> in the dashboard and run Panopticon&apos;s native compaction instead of Claude Code&apos;s built-in command.
+                </p>
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Terminal */}
