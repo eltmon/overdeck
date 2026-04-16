@@ -1430,6 +1430,34 @@
   color: var(--mc-text-primary);
 }
 
+.conversationItem:hover .conversationSummaryForkBtn {
+  opacity: 1;
+}
+
+.conversationSummaryForkBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.conversationSummaryForkBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
 .conversationItem:hover .conversationCopyBtn {
   opacity: 1;
 }

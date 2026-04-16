@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -115,6 +115,13 @@ async function favoriteConversation(name: string): Promise<void> {
 async function unfavoriteConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/favorite`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
+}
+
+async function summaryForkConversation(name: string): Promise<Conversation> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/summary-fork`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to create summary fork');
+  const data = await res.json();
+  return data.conversation as Conversation;
 }
 
 // ─── Sorting helpers ──────────────────────────────────────────────────────────
@@ -257,6 +264,14 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
+  const summaryForkMutation = useMutation({
+    mutationFn: summaryForkConversation,
+    onSuccess: (newConversation) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      onSelectConversation(newConversation.name);
     },
   });
 
@@ -494,6 +509,25 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                       fill: conv.isFavorited ? 'currentColor' : 'none',
                     }}
                   />
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={styles.conversationSummaryForkBtn}
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (!summaryForkMutation.isPending) summaryForkMutation.mutate(conv.name);
+                  }}
+                  onKeyDown={e => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !summaryForkMutation.isPending) {
+                      e.stopPropagation();
+                      summaryForkMutation.mutate(conv.name);
+                    }
+                  }}
+                  title="Create summary fork"
+                  aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
+                >
+                  <GitBranchPlus size={11} />
                 </span>
                 <span
                   role="button"
