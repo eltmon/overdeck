@@ -98,6 +98,10 @@ export interface ApiSettingsConfig {
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
+  conversations?: {
+    compaction_model?: ModelId;
+    manual_compact_mode?: 'claude-code' | 'panopticon-native';
+  };
   api_keys: {
     openai?: string;
     google?: string;
@@ -173,6 +177,10 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
+    conversations: {
+      compaction_model: config.conversations.compactionModel,
+      manual_compact_mode: config.conversations.manualCompactMode,
+    },
     tracker_keys: config.trackerKeys,
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
@@ -223,6 +231,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
     },
     openrouter: settings.openrouter,
     tmux: settings.tmux,
+    conversations: settings.conversations,
     tracker_keys: settings.tracker_keys,
   };
 
@@ -274,6 +283,10 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     tmux: {
       ...current.tmux,
       ...updates.tmux,
+    },
+    conversations: {
+      ...current.conversations,
+      ...updates.conversations,
     },
     tracker_keys: {
       ...current.tracker_keys,

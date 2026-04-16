@@ -85,6 +85,10 @@ export interface SettingsConfig {
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';
   };
+  conversations?: {
+    compaction_model?: ModelId;
+    manual_compact_mode?: 'claude-code' | 'panopticon-native';
+  };
   tracker_keys?: TrackerKeysConfig;
   deprecation_warnings?: DeprecationWarning[];
 }

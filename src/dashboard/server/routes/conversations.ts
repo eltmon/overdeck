@@ -12,7 +12,6 @@ import { jsonResponse } from "../http-helpers.js";
  * Conversations are NEVER deleted from the database. The only removal verb is `archive`.
  */
 
-import { exec } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -20,7 +19,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createReadStream } from 'node:fs';
-import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -62,10 +60,13 @@ import {
   parseFromLastCompactBoundary,
   summarizeConversationActivity,
 } from '../services/conversation-service.js';
+import {
+  maybeCompactBeforeRespawn,
+  compactConversationNative,
+  shouldInterceptManualCompact,
+} from '../services/conversation-compaction.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { createSummaryFork } from '../../../lib/conversations/summary-fork.js';
-
-const execAsync = promisify(exec);
 
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
@@ -187,112 +188,13 @@ void backfillConversationModels().catch((err: unknown) => {
  */
 // ─── Compaction helpers ───────────────────────────────────────────────────────
 //
-// When stopping a conversation and resuming with a different model — or when the
-// session has accumulated a lot of context — we run `/compact` against the JSONL
-// before respawning. This writes a `compact_boundary` entry that subsequent
-// `--resume` calls honor, so the new model only loads the summary forward.
-//
-// Compaction always runs on Haiku (cheap, fast, and avoids tripping the user's
-// usage limit on whatever the original model was).
-
-const COMPACT_MODEL = 'claude-haiku-4-5-20251001';
-const COMPACT_TOKEN_THRESHOLD = 100_000;
+// Dashboard-owned compaction is Panopticon-native. We append the compact
+// boundary and continuation summary directly to the JSONL so subsequent
+// `--resume` calls load only the summarized context forward.
 
 function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
   if (!sessionFile) return undefined;
   return sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined;
-}
-
-/**
- * Estimate the current context size of a Claude Code session by reading the
- * most recent `usage` block from its JSONL file. Returns 0 if the file is
- * missing, empty, or has no usage entries yet.
- */
-async function estimateContextTokens(sessionFile: string | null | undefined): Promise<number> {
-  if (!sessionFile || !existsSync(sessionFile)) return 0;
-  try {
-    const content = await readFile(sessionFile, 'utf-8');
-    const lines = content.split('\n');
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      try {
-        const entry = JSON.parse(line);
-        const usage = entry?.message?.usage ?? entry?.usage;
-        if (usage && typeof usage.input_tokens === 'number') {
-          return (usage.input_tokens ?? 0)
-            + (usage.cache_creation_input_tokens ?? 0)
-            + (usage.cache_read_input_tokens ?? 0);
-        }
-      } catch {
-        // Skip malformed line
-      }
-    }
-  } catch (err) {
-    console.warn(`[conversations] estimateContextTokens failed for ${sessionFile}:`, err);
-  }
-  return 0;
-}
-
-/**
- * Run `/compact` against a stopped session via Haiku. Appends a compact_boundary
- * entry to the JSONL so subsequent --resume calls load only the summary forward.
- * Throws on failure — callers decide whether to swallow.
- */
-async function compactSession(sessionFile: string, cwd: string): Promise<void> {
-  const sessionId = sessionIdFromFile(sessionFile);
-  if (!sessionId) throw new Error('compactSession: cannot extract session id');
-  console.log(`[conversations] Compacting session ${sessionId} via ${COMPACT_MODEL}`);
-  const cmd = `claude --resume "${sessionId}" --model ${COMPACT_MODEL} --print --dangerously-skip-permissions --permission-mode bypassPermissions "/compact"`;
-
-  // Strip any non-Anthropic provider overrides so compact always hits the real
-  // Anthropic API. The dashboard server may have inherited ANTHROPIC_BASE_URL /
-  // ANTHROPIC_AUTH_TOKEN from whichever provider was active when `pan up` ran
-  // (e.g. OpenRouter, MiniMax), which would cause the claude-haiku compact to
-  // route to the wrong endpoint and fail.
-  const env: NodeJS.ProcessEnv = { ...process.env };
-  delete env['ANTHROPIC_BASE_URL'];
-  delete env['ANTHROPIC_AUTH_TOKEN'];
-  delete env['OPENAI_API_KEY'];
-  delete env['GEMINI_API_KEY'];
-  delete env['API_TIMEOUT_MS'];
-  delete env['CLAUDE_CODE_API_KEY_HELPER_TTL_MS'];
-
-  await execAsync(cmd, {
-    cwd,
-    env,
-    encoding: 'utf-8',
-    maxBuffer: 16 * 1024 * 1024,
-    timeout: 5 * 60 * 1000,
-  });
-}
-
-/**
- * Decide whether to compact, then do it (best-effort). Compaction runs when
- * the model is being changed (so the new model doesn't choke on the original
- * model's accumulated context) OR when the session is already over the token
- * threshold (so any resume avoids `Input is too long`).
- */
-async function maybeCompactBeforeRespawn(opts: {
-  sessionFile: string | null | undefined;
-  cwd: string;
-  modelChanged: boolean;
-}): Promise<void> {
-  if (!opts.sessionFile || !existsSync(opts.sessionFile)) return;
-
-  const tokens = await estimateContextTokens(opts.sessionFile);
-  const overThreshold = tokens > COMPACT_TOKEN_THRESHOLD;
-  if (!opts.modelChanged && !overThreshold) {
-    console.log(`[conversations] Skipping compact (modelChanged=false, tokens=${tokens})`);
-    return;
-  }
-
-  console.log(`[conversations] Compacting before respawn (modelChanged=${opts.modelChanged}, tokens=${tokens})`);
-  try {
-    await compactSession(opts.sessionFile, opts.cwd);
-  } catch (err) {
-    console.error('[conversations] Compact failed, proceeding without compaction:', err);
-  }
 }
 
 async function spawnConversationSession(
@@ -810,6 +712,14 @@ const postConversationMessageRoute = HttpRouter.add(
         const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
         if (!message) {
           return jsonResponse({ error: 'Message is required' }, { status: 400 });
+        }
+
+        if (shouldInterceptManualCompact(message)) {
+          if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+            return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
+          }
+          const result = await compactConversationNative(conv.sessionFile);
+          return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
         }
 
         // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)

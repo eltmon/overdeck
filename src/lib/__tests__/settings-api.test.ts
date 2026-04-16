@@ -29,6 +29,10 @@ describe('getDefaultConversationModelApi', () => {
         apiKeys: {},
         openrouterFavorites: [],
         trackerKeys: {},
+        conversations: {
+          compactionModel: 'claude-haiku-4-5',
+          manualCompactMode: 'claude-code',
+        },
       },
     });
 
@@ -47,6 +51,10 @@ describe('getDefaultConversationModelApi', () => {
         apiKeys: {},
         openrouterFavorites: [],
         trackerKeys: {},
+        conversations: {
+          compactionModel: 'claude-haiku-4-5',
+          manualCompactMode: 'claude-code',
+        },
       },
     });
 
@@ -54,5 +62,31 @@ describe('getDefaultConversationModelApi', () => {
 
     expect(getDefaultConversationModelApi()).toBe('gpt-5.4');
     expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.4');
+  });
+
+  it('loads conversation compaction settings from config', async () => {
+    mockLoadConfig.mockReturnValue({
+      config: {
+        enabledProviders: new Set(['anthropic']),
+        overrides: {},
+        geminiThinkingLevel: 3,
+        apiKeys: {},
+        openrouterFavorites: [],
+        trackerKeys: {},
+        tmux: { configMode: 'managed' },
+        conversations: {
+          compactionModel: 'claude-sonnet-4-6',
+          manualCompactMode: 'panopticon-native',
+        },
+      },
+    });
+
+    const { loadSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.conversations).toEqual({
+      compaction_model: 'claude-sonnet-4-6',
+      manual_compact_mode: 'panopticon-native',
+    });
   });
 });

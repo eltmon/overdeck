@@ -56,6 +56,15 @@ export interface TmuxConfig {
   config_mode?: TmuxConfigMode;
 }
 
+export type ManualCompactMode = 'claude-code' | 'panopticon-native';
+
+export interface ConversationsConfig {
+  /** Model used for Panopticon-native conversation compaction */
+  compaction_model?: ModelId;
+  /** How typed /compact in the conversation composer is handled */
+  manual_compact_mode?: ManualCompactMode;
+}
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -109,6 +118,9 @@ export interface YamlConfig {
 
   /** tmux runtime configuration */
   tmux?: TmuxConfig;
+
+  /** Conversation-specific configuration */
+  conversations?: ConversationsConfig;
 
   /** Multi-tool sync configuration */
   tools?: {
@@ -228,6 +240,12 @@ export interface NormalizedConfig {
     rally?: string;
   };
 
+  /** Conversation-specific behavior */
+  conversations: {
+    compactionModel: ModelId;
+    manualCompactMode: ManualCompactMode;
+  };
+
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
 
@@ -297,6 +315,10 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
+  conversations: {
+    compactionModel: 'claude-haiku-4-5',
+    manualCompactMode: 'claude-code',
+  },
   shadow: {
     enabled: false,
     trackers: {
@@ -601,6 +623,14 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     // Merge tmux configuration
     if (config.tmux?.config_mode) {
       result.tmux.configMode = config.tmux.config_mode;
+    }
+
+    // Merge conversation configuration
+    if (config.conversations?.compaction_model) {
+      result.conversations.compactionModel = resolveModelId(config.conversations.compaction_model);
+    }
+    if (config.conversations?.manual_compact_mode) {
+      result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
     }
 
     // Merge OpenRouter favorites
