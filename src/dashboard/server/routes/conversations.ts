@@ -243,8 +243,23 @@ async function compactSession(sessionFile: string, cwd: string): Promise<void> {
   if (!sessionId) throw new Error('compactSession: cannot extract session id');
   console.log(`[conversations] Compacting session ${sessionId} via ${COMPACT_MODEL}`);
   const cmd = `claude --resume "${sessionId}" --model ${COMPACT_MODEL} --print --dangerously-skip-permissions --permission-mode bypassPermissions "/compact"`;
+
+  // Strip any non-Anthropic provider overrides so compact always hits the real
+  // Anthropic API. The dashboard server may have inherited ANTHROPIC_BASE_URL /
+  // ANTHROPIC_AUTH_TOKEN from whichever provider was active when `pan up` ran
+  // (e.g. OpenRouter, MiniMax), which would cause the claude-haiku compact to
+  // route to the wrong endpoint and fail.
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env['ANTHROPIC_BASE_URL'];
+  delete env['ANTHROPIC_AUTH_TOKEN'];
+  delete env['OPENAI_API_KEY'];
+  delete env['GEMINI_API_KEY'];
+  delete env['API_TIMEOUT_MS'];
+  delete env['CLAUDE_CODE_API_KEY_HELPER_TTL_MS'];
+
   await execAsync(cmd, {
     cwd,
+    env,
     encoding: 'utf-8',
     maxBuffer: 16 * 1024 * 1024,
     timeout: 5 * 60 * 1000,
