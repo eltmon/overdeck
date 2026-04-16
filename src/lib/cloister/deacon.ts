@@ -2478,7 +2478,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Per-project ephemeral specialist patrol is below (dead session + stuck detection).
 
   // Recover orphaned agents: status=running but tmux session gone (failed resume, crash, etc.)
-  const orphanedAgentActions = recoverOrphanedAgents();
+  const orphanedAgentActions = await recoverOrphanedAgents();
   actions.push(...orphanedAgentActions);
   for (const a of orphanedAgentActions) addLog('action', a, state.patrolCycle);
 
@@ -2730,7 +2730,7 @@ export function getLastPatrolResult(): PatrolResult | null {
  * no live tmux session — this happens after a system crash where tmux was killed but
  * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
  */
-function recoverOrphanedAgents(context?: string): string[] {
+async function recoverOrphanedAgents(context?: string): Promise<string[]> {
   if (!existsSync(AGENTS_DIR)) return [];
   let dirs: string[];
   try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
@@ -2748,10 +2748,10 @@ function recoverOrphanedAgents(context?: string): string[] {
         // Claude exits. Check if the pane's process is actually dead.
         if (dir.startsWith('planning-')) {
           try {
-            const result = listPaneValues(dir, '#{pane_dead}')[0]?.trim() ?? '';
+            const result = (await listPaneValuesAsync(dir, '#{pane_dead}'))[0]?.trim() ?? '';
             if (result !== '1') continue; // pane is alive — truly still running
             // Pane is dead — kill the zombie tmux session and fall through to recovery
-            try { killSession(dir); } catch { /* ignore */ }
+            try { await killSessionAsync(dir); } catch { /* ignore */ }
           } catch {
             continue; // can't check — assume alive
           }
@@ -2839,7 +2839,7 @@ export function startDeacon(): void {
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
   // Recover agents whose tmux sessions were killed by a system crash
-  recoverOrphanedAgents('Startup recovery');
+  void recoverOrphanedAgents('Startup recovery');
 
   // Run initial patrol
   runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));

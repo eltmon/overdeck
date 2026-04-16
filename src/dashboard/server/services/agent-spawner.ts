@@ -250,8 +250,8 @@ export const AgentSpawnerLive = Layer.effect(
     kill: (agentId) =>
       Effect.tryPromise({
         try: async () => {
-          const { stopAgent } = await import('../../../lib/agents.js') as any;
-          stopAgent(agentId);
+          const { stopAgentAsync } = await import('../../../lib/agents.js') as any;
+          await stopAgentAsync(agentId);
         },
         catch: () => undefined,
       }).pipe(Effect.ignore),
