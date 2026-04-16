@@ -924,17 +924,43 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
         }
 
-        const model = typeof body['model'] === 'string' && body['model'].trim()
+        const model = typeof body['model'] === 'string'
           ? body['model'].trim()
+          : undefined;
+        const summaryModel = typeof body['summaryModel'] === 'string'
+          ? body['summaryModel'].trim()
           : undefined;
         const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
           ? body['cwd'].trim()
           : undefined;
 
-        const result = await createSummaryFork(conv, { model, cwd });
+        if (typeof body['model'] === 'string' && !model) {
+          return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
+        }
+        if (typeof body['summaryModel'] === 'string' && !summaryModel) {
+          return jsonResponse({ error: 'summaryModel must not be blank' }, { status: 400 });
+        }
+
+        const result = await createSummaryFork(conv, { model, summaryModel, cwd });
+        await spawnConversationSession(
+          result.conversation.tmuxSession,
+          result.conversation.cwd,
+          result.sessionId,
+          result.conversation.model ?? undefined,
+          result.conversation.effort ?? undefined,
+          result.conversation.issueId ?? undefined,
+        );
+        await waitForTmuxSession(result.conversation.tmuxSession);
+        const ready = await waitForClaudePrompt(result.conversation.tmuxSession, 30000);
+        if (!ready) {
+          throw new Error(`Forked conversation ${result.conversation.name} did not reach the Claude prompt in time`);
+        }
+        await sendKeysAsync(result.conversation.tmuxSession, result.summary, 'summary-fork');
+
         return jsonResponse({
           success: true,
           conversation: result.conversation,
+          summaryModel: result.summaryModel,
         });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
