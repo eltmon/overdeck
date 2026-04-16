@@ -71,6 +71,35 @@ describe('parseConversationMessages', () => {
     expect(result.workLog).toEqual([]);
   });
 
+  it('joins multiple text blocks in a single user entry with newlines', async () => {
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'u-multiline',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        message: {
+          content: [
+            { type: 'text', text: 'line one' },
+            { type: 'text', text: 'line two' },
+            { type: 'text', text: 'line three' },
+          ],
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      id: 'u-multiline',
+      role: 'user',
+      text: 'line one\nline two\nline three',
+    });
+    expect(result.workLog).toEqual([]);
+  });
+
   it('parses an assistant text message', async () => {
     const lines = [
       {
