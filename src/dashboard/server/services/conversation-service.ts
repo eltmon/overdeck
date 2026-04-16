@@ -226,13 +226,12 @@ export async function parseConversationMessages(
           });
         }
       } else if (Array.isArray(rawContent)) {
+        // Collect tool_result blocks first (they complete pending WorkLogEntries)
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
-            // Complete a pending WorkLogEntry with result content
             const pending = pendingToolUse.get(block.tool_use_id);
             if (pending) {
               pendingToolUse.delete(block.tool_use_id);
-              // Extract result text from tool_result content
               let resultText: string | undefined;
               if (typeof block.content === 'string') {
                 resultText = block.content;
@@ -251,16 +250,25 @@ export async function parseConversationMessages(
                 tone: block.is_error ? 'error' : pending.tone,
               });
             }
-          } else if (block.type === 'text' && block.text && !isSystemInjection(block.text)) {
-            const ts = entry.timestamp ?? new Date().toISOString();
-            lastUserTimestamp = ts;
-            messages.push({
-              id: entry.uuid ?? `user-${messages.length}`,
-              role: 'user',
-              text: block.text,
-              createdAt: ts,
-            });
           }
+        }
+
+        // Collect all text blocks, joining with newlines to preserve multiline input
+        const textBlocks: string[] = [];
+        for (const block of rawContent as ContentBlock[]) {
+          if (block.type === 'text' && block.text && !isSystemInjection(block.text)) {
+            textBlocks.push(block.text);
+          }
+        }
+        if (textBlocks.length > 0) {
+          const ts = entry.timestamp ?? new Date().toISOString();
+          lastUserTimestamp = ts;
+          messages.push({
+            id: entry.uuid ?? `user-${messages.length}`,
+            role: 'user',
+            text: textBlocks.join('\n'),
+            createdAt: ts,
+          });
         }
       }
     } else if (entry.type === 'assistant' && entry.message) {
