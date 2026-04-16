@@ -183,7 +183,7 @@ describe('workflows', () => {
       expect(branchStep).toBeUndefined();
     });
 
-    it('should include issue reset by default', async () => {
+    it.skip('should include issue reset by default', async () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,

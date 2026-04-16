@@ -444,7 +444,7 @@ export function ComposerPromptEditor({
 
   const [text, setText] = useState(draft);
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
-  const [pendingSlashTrigger, setPendingSlashTrigger] = useState(false);
+  const pendingSlashTriggerRef = useRef(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
 
@@ -466,13 +466,13 @@ export function ComposerPromptEditor({
   const handleChange = useCallback(
     (t: string) => {
       setText(t);
-      if (pendingSlashTrigger && t.includes('/')) {
+      if (pendingSlashTriggerRef.current && t.includes('/')) {
         setIsSlashMenuOpen(true);
-        setPendingSlashTrigger(false);
+        pendingSlashTriggerRef.current = false;
       }
       onChange?.(t);
     },
-    [onChange, pendingSlashTrigger],
+    [onChange],
   );
 
   const slashContext = useMemo(() => {
@@ -500,7 +500,8 @@ export function ComposerPromptEditor({
       const rect = range.getBoundingClientRect();
       setMenuAnchorRect(rect);
     }
-    setPendingSlashTrigger(true);
+    pendingSlashTriggerRef.current = true;
+    setIsSlashMenuOpen(true);
     setSelectedIndex(0);
   }, []);
 
@@ -522,7 +523,7 @@ export function ComposerPromptEditor({
         });
       }
       setIsSlashMenuOpen(false);
-      setPendingSlashTrigger(false);
+      pendingSlashTriggerRef.current = false;
       setSelectedIndex(0);
     },
     [editorRef, slashContext],
@@ -530,13 +531,13 @@ export function ComposerPromptEditor({
 
   const handleSlashClose = useCallback(() => {
     setIsSlashMenuOpen(false);
-    setPendingSlashTrigger(false);
+    pendingSlashTriggerRef.current = false;
     setSelectedIndex(0);
   }, []);
 
   useEffect(() => {
     if (!isSlashMenuOpen) return;
-    if (!slashContext) {
+    if (!pendingSlashTriggerRef.current && !slashContext) {
       handleSlashClose();
     }
   }, [isSlashMenuOpen, slashContext, handleSlashClose]);
@@ -606,10 +607,10 @@ export function ComposerPromptEditor({
           {editorRef && <EditorRefPlugin editorRef={editorRef} />}
         </div>
       </LexicalComposer>
-      {isSlashMenuOpen && slashContext && filteredCommands.length > 0 && (
+      {isSlashMenuOpen && filteredCommands.length > 0 && (
         <SlashMenu
           commands={SLASH_COMMANDS}
-          filter={slashContext.filterText}
+          filter={slashContext?.filterText ?? ''}
           selectedIndex={selectedIndex}
           onSelect={handleSlashSelect}
           onClose={handleSlashClose}
