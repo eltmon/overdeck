@@ -2198,6 +2198,13 @@
   color: var(--mc-text-secondary);
 }
 
+.slashMenuMatch {
+  background: color-mix(in srgb, var(--mc-accent) 24%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
 /* Toolbar row: inside the box, below the textarea */
 .composerToolbar {
   display: flex;

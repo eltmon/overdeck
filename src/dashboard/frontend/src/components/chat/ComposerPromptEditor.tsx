@@ -9,7 +9,7 @@
  * - Undo/redo via Lexical HistoryPlugin
  */
 
-import { useEffect, useCallback, useRef, useState, type RefObject } from 'react';
+import { useEffect, useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -317,12 +317,36 @@ interface SlashMenuProps {
   anchorRect: DOMRect | null;
 }
 
-export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, anchorRect }: SlashMenuProps) {
-  const filtered = commands.filter(
+function filterCommands(commands: SlashCommand[], filter: string): SlashCommand[] {
+  const normalizedFilter = filter.toLowerCase();
+  return commands.filter(
     (cmd) =>
-      cmd.label.toLowerCase().includes(filter.toLowerCase()) ||
-      cmd.description.toLowerCase().includes(filter.toLowerCase()),
+      cmd.label.toLowerCase().includes(normalizedFilter) ||
+      cmd.description.toLowerCase().includes(normalizedFilter),
   );
+}
+
+function renderHighlightedText(text: string, filter: string, className: string) {
+  if (!filter) return text;
+
+  const normalizedText = text.toLowerCase();
+  const normalizedFilter = filter.toLowerCase();
+  const matchIndex = normalizedText.indexOf(normalizedFilter);
+
+  if (matchIndex < 0) return text;
+
+  const matchEnd = matchIndex + filter.length;
+  return (
+    <>
+      {text.slice(0, matchIndex)}
+      <mark className={className}>{text.slice(matchIndex, matchEnd)}</mark>
+      {text.slice(matchEnd)}
+    </>
+  );
+}
+
+export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, anchorRect }: SlashMenuProps) {
+  const filtered = filterCommands(commands, filter);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -378,6 +402,7 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
           </div>
           {groupedCommands[category].map((cmd) => {
             const globalIndex = filtered.findIndex(c => c.id === cmd.id);
+            const labelMatches = filter ? cmd.label.toLowerCase().includes(filter.toLowerCase()) : false;
             return (
               <button
                 key={cmd.id}
@@ -386,8 +411,16 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
                 role="option"
                 aria-selected={globalIndex === selectedIndex}
               >
-                <span className={styles.slashMenuLabel}>{cmd.label}</span>
-                <span className={styles.slashMenuDescription}>{cmd.description}</span>
+                <span className={styles.slashMenuLabel}>
+                  {labelMatches
+                    ? renderHighlightedText(cmd.label, filter, styles.slashMenuMatch)
+                    : cmd.label}
+                </span>
+                <span className={styles.slashMenuDescription}>
+                  {labelMatches
+                    ? cmd.description
+                    : renderHighlightedText(cmd.description, filter, styles.slashMenuMatch)}
+                </span>
               </button>
             );
           })}
@@ -413,7 +446,6 @@ export function ComposerPromptEditor({
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
-  const [filterText, setFilterText] = useState('');
 
   const initialConfig = {
     namespace: `composer:${conversationName}`,
@@ -438,6 +470,24 @@ export function ComposerPromptEditor({
     [onChange],
   );
 
+  const slashContext = useMemo(() => {
+    const slashIdx = text.lastIndexOf('/');
+    if (slashIdx < 0) return null;
+
+    const afterSlash = text.slice(slashIdx + 1);
+    if (/\s/.test(afterSlash)) return null;
+
+    return {
+      slashIdx,
+      filterText: afterSlash,
+    };
+  }, [text]);
+
+  const filteredCommands = useMemo(
+    () => filterCommands(SLASH_COMMANDS, slashContext?.filterText ?? ''),
+    [slashContext],
+  );
+
   const handleSlashKey = useCallback(() => {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
@@ -447,7 +497,6 @@ export function ComposerPromptEditor({
     }
     setIsSlashMenuOpen(true);
     setSelectedIndex(0);
-    setFilterText('');
   }, []);
 
   const handleSlashSelect = useCallback(
@@ -458,7 +507,7 @@ export function ComposerPromptEditor({
           const root = $getRoot();
           const fullText = root.getTextContent();
           // Find the last '/' that triggered the menu and strip it + any filter chars after it
-          const slashIdx = fullText.lastIndexOf('/');
+          const slashIdx = slashContext?.slashIdx ?? fullText.lastIndexOf('/');
           const textBefore = slashIdx >= 0 ? fullText.slice(0, slashIdx) : fullText;
           // Replace editor content: text before the slash trigger + the selected command
           root.clear();
@@ -470,7 +519,7 @@ export function ComposerPromptEditor({
       setIsSlashMenuOpen(false);
       setSelectedIndex(0);
     },
-    [editorRef],
+    [editorRef, slashContext],
   );
 
   const handleSlashClose = useCallback(() => {
@@ -478,62 +527,49 @@ export function ComposerPromptEditor({
     setSelectedIndex(0);
   }, []);
 
-  // Handle keyboard navigation in slash menu
   useEffect(() => {
     if (!isSlashMenuOpen) return;
+    if (!slashContext) {
+      handleSlashClose();
+    }
+  }, [isSlashMenuOpen, slashContext, handleSlashClose]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [slashContext?.filterText]);
+
+  // Handle keyboard navigation in slash menu
+  useEffect(() => {
+    if (!isSlashMenuOpen || !slashContext) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const filtered = SLASH_COMMANDS.filter(
-        (cmd) =>
-          cmd.label.toLowerCase().includes(filterText.toLowerCase()) ||
-          cmd.description.toLowerCase().includes(filterText.toLowerCase()),
-      );
-
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         e.stopPropagation();
-        if (filtered.length > 0) setSelectedIndex((i) => (i + 1) % filtered.length);
+        if (filteredCommands.length > 0) setSelectedIndex((i) => (i + 1) % filteredCommands.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         e.stopPropagation();
-        if (filtered.length > 0) setSelectedIndex((i) => (i - 1 + filtered.length) % filtered.length);
+        if (filteredCommands.length > 0) setSelectedIndex((i) => (i - 1 + filteredCommands.length) % filteredCommands.length);
       } else if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (filtered.length > 0 && filtered[selectedIndex]) {
-          handleSlashSelect(filtered[selectedIndex]);
+        if (filteredCommands.length > 0 && filteredCommands[selectedIndex]) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSlashSelect(filteredCommands[selectedIndex]);
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         handleSlashClose();
-      } else if (e.key === 'Backspace') {
-        e.preventDefault();
-        e.stopPropagation();
-        setFilterText((prev) => {
-          if (prev.length === 0) {
-            // No filter text left — close the menu
-            handleSlashClose();
-            return prev;
-          }
-          return prev.slice(0, -1);
-        });
       } else if (e.key === 'Tab') {
-        // Let Tab close the menu naturally
         handleSlashClose();
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Capture typed characters into the filter — prevent them from reaching the editor
-        e.preventDefault();
-        e.stopPropagation();
-        setFilterText((prev) => prev + e.key);
-        setSelectedIndex(0);
       }
     };
 
     // Use capture phase so we intercept before Lexical's keydown handler
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [isSlashMenuOpen, selectedIndex, filterText, handleSlashSelect, handleSlashClose]);
+  }, [isSlashMenuOpen, slashContext, selectedIndex, filteredCommands, handleSlashSelect, handleSlashClose]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -563,10 +599,10 @@ export function ComposerPromptEditor({
           {editorRef && <EditorRefPlugin editorRef={editorRef} />}
         </div>
       </LexicalComposer>
-      {isSlashMenuOpen && (
+      {isSlashMenuOpen && slashContext && filteredCommands.length > 0 && (
         <SlashMenu
           commands={SLASH_COMMANDS}
-          filter={filterText}
+          filter={slashContext.filterText}
           selectedIndex={selectedIndex}
           onSelect={handleSlashSelect}
           onClose={handleSlashClose}

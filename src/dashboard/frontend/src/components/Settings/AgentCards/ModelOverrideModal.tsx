@@ -233,11 +233,23 @@ export function getCapabilityMatchScore(modelId: ModelId, workType: string): { s
   };
 }
 
+export type OpenRouterFavoriteModel = {
+  id: string;
+  name: string;
+  promptCostPer1M: number;
+  completionCostPer1M: number;
+  contextLength: number;
+  supportsThinking: boolean;
+  category: string;
+};
+
 interface ModelOverrideModalProps {
   workType: WorkTypeId;
   currentModel: ModelId;
   isOverride: boolean;
   enabledProviders: string[];
+  /** Ignored placeholder prop for SettingsPage compatibility. */
+  openRouterFavorites?: OpenRouterFavoriteModel[];
   onApply: (model: ModelId) => void;
   onRemove: () => void;
   onClose: () => void;
