@@ -55,7 +55,7 @@ import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
 import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
-import { reviewResetAction } from './actions/review-reset.js';
+import { resetReviewCommand } from './commands/reset-review.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -197,7 +197,7 @@ review
   .command('reset <id>')
   .description('Reset review/test/merge cycles (human override)')
   .option('--session', 'Also clear saved Claude session')
-  .action(reviewResetAction);
+  .action(resetReviewCommand);
 
 // pan plan <id> and pan plan finalize <id>
 const planCmd = program

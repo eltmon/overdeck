@@ -4,14 +4,21 @@
  * Human-initiated full pipeline reset. Clears all specialist states,
  * resets the circuit breaker, and re-triggers the review pipeline.
  * No circuit breaker limit — this is a deliberate human override.
+ * With --session, also clears the saved Claude session after the
+ * review reset completes.
  */
 
 import chalk from 'chalk';
 import { getDashboardApiUrl } from '../../lib/config.js';
+import { resetSessionCommand } from './reset-session.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
-export async function resetReviewCommand(id: string): Promise<void> {
+export interface ResetReviewOptions {
+  session?: boolean;
+}
+
+export async function resetReviewCommand(id: string, options: ResetReviewOptions = {}): Promise<void> {
   const issueId = id.toUpperCase();
 
   console.log(chalk.dim(`Resetting review cycles for ${issueId}...`));
@@ -33,6 +40,10 @@ export async function resetReviewCommand(id: string): Promise<void> {
 
     if (result.queued) {
       console.log(chalk.dim('  Review-agent will pick this up when available.'));
+    }
+
+    if (options.session) {
+      await resetSessionCommand(id);
     }
 
   } catch (error: any) {

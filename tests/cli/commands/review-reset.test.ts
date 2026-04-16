@@ -1,57 +1,74 @@
 /**
- * Tests for `pan review reset` action.
+ * Tests for `pan review reset` command.
  *
- * Regression: the --session flag previously REPLACED resetReviewCommand with
+ * Regression: the --session flag previously REPLACED the review reset with
  * resetSessionCommand. It must be ADDITIVE — review is always reset; --session
  * also clears the Claude session.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { resetReviewMock, resetSessionMock } = vi.hoisted(() => ({
-  resetReviewMock: vi.fn().mockResolvedValue(undefined),
+const { resetSessionMock, fetchMock } = vi.hoisted(() => ({
   resetSessionMock: vi.fn().mockResolvedValue(undefined),
+  fetchMock: vi.fn(),
 }));
 
-vi.mock('../../../src/cli/commands/reset-review.js', () => ({
-  resetReviewCommand: resetReviewMock,
-}));
 vi.mock('../../../src/cli/commands/reset-session.js', () => ({
   resetSessionCommand: resetSessionMock,
 }));
 
-import { reviewResetAction } from '../../../src/cli/actions/review-reset.js';
+import { resetReviewCommand } from '../../../src/cli/commands/reset-review.js';
 
-describe('reviewResetAction (pan review reset)', () => {
+describe('resetReviewCommand (pan review reset)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, message: 'Reset complete', queued: false }),
+    });
   });
 
-  it('default (no flags): runs ONLY resetReviewCommand', async () => {
-    await reviewResetAction('PAN-1');
-    expect(resetReviewMock).toHaveBeenCalledWith('PAN-1');
+  it('default (no flags): resets review only', async () => {
+    await resetReviewCommand('PAN-1');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/review/PAN-1/reset'),
+      expect.objectContaining({ method: 'POST' }),
+    );
     expect(resetSessionMock).not.toHaveBeenCalled();
   });
 
-  it('--session: runs BOTH resetReviewCommand AND resetSessionCommand', async () => {
-    await reviewResetAction('PAN-2', { session: true });
-    expect(resetReviewMock).toHaveBeenCalledWith('PAN-2');
+  it('--session: resets review and then clears session', async () => {
+    await resetReviewCommand('PAN-2', { session: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/review/PAN-2/reset'),
+      expect.objectContaining({ method: 'POST' }),
+    );
     expect(resetSessionMock).toHaveBeenCalledWith('PAN-2');
   });
 
-  it('--session: review reset runs first, then session reset', async () => {
+  it('--session: review reset runs before session reset', async () => {
     const callOrder: string[] = [];
-    resetReviewMock.mockImplementation(async () => { callOrder.push('review'); });
-    resetSessionMock.mockImplementation(async () => { callOrder.push('session'); });
+    fetchMock.mockImplementation(async () => {
+      callOrder.push('review');
+      return {
+        ok: true,
+        json: async () => ({ success: true, message: 'Reset complete', queued: false }),
+      };
+    });
+    resetSessionMock.mockImplementation(async () => {
+      callOrder.push('session');
+    });
 
-    await reviewResetAction('PAN-3', { session: true });
+    await resetReviewCommand('PAN-3', { session: true });
 
     expect(callOrder).toEqual(['review', 'session']);
   });
 
   it('session: false behaves like default', async () => {
-    await reviewResetAction('PAN-4', { session: false });
-    expect(resetReviewMock).toHaveBeenCalledWith('PAN-4');
+    await resetReviewCommand('PAN-4', { session: false });
     expect(resetSessionMock).not.toHaveBeenCalled();
   });
 });

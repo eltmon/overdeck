@@ -121,7 +121,7 @@ describe('conversations route — DB integration', () => {
     expect(conv!.status).toBe('active');
   });
 
-  it('creates a summary fork conversation with summary metadata', async () => {
+  it('creates a summary fork conversation without ending the source conversation', async () => {
     const { createConversation, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
     const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
 
@@ -161,8 +161,10 @@ describe('conversations route — DB integration', () => {
     expect(result.conversation.title).toBe('Summary Fork: Original conversation');
     expect(result.conversation.model).toBe('claude-sonnet-4-6');
     expect(result.conversation.effort).toBe('medium');
+    expect(result.summary).toContain('Conversation Summary Fork');
+    expect(result.summaryModel).toBe('claude-sonnet-4-6');
 
     const sourceConv = getConversationByName('source-conv');
-    expect(sourceConv?.status).toBe('ended');
+    expect(sourceConv?.status).toBe('active');
   });
 });
