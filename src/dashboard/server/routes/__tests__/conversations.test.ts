@@ -151,7 +151,6 @@ describe('conversations route — DB integration', () => {
       cwd,
       sessionFile,
       title: 'Original conversation',
-      model: 'claude-sonnet-4-6',
       effort: 'medium',
     });
 
@@ -159,10 +158,10 @@ describe('conversations route — DB integration', () => {
 
     expect(result.conversation.name).not.toBe('source-conv');
     expect(result.conversation.title).toBe('Summary Fork: Original conversation');
-    expect(result.conversation.model).toBe('claude-sonnet-4-6');
+    expect(result.conversation.model).toBeNull();
     expect(result.conversation.effort).toBe('medium');
     expect(result.summary).toContain('Conversation Summary Fork');
-    expect(result.summaryModel).toBe('claude-sonnet-4-6');
+    expect(result.summaryModel).toBeNull();
 
     const sourceConv = getConversationByName('source-conv');
     expect(sourceConv?.status).toBe('active');

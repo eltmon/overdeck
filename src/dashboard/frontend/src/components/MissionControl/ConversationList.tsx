@@ -6,6 +6,7 @@ import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import styles from './styles/mission-control.module.css';
+import { getDefaultConversationModel } from '../chat/defaultConversationModel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -117,10 +118,17 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function summaryForkConversation(name: string): Promise<Conversation> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/summary-fork`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to create summary fork');
-  const data = await res.json();
+async function summaryForkConversation(conv: Conversation): Promise<Conversation> {
+  const model = conv.model || getDefaultConversationModel();
+  const res = await fetch(`/api/conversations/${encodeURIComponent(conv.name)}/summary-fork`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, summaryModel: model }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error || 'Failed to create summary fork');
+  }
   return data.conversation as Conversation;
 }
 
@@ -516,12 +524,12 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   className={styles.conversationSummaryForkBtn}
                   onClick={e => {
                     e.stopPropagation();
-                    if (!summaryForkMutation.isPending) summaryForkMutation.mutate(conv.name);
+                    if (!summaryForkMutation.isPending) summaryForkMutation.mutate(conv);
                   }}
                   onKeyDown={e => {
                     if ((e.key === 'Enter' || e.key === ' ') && !summaryForkMutation.isPending) {
                       e.stopPropagation();
-                      summaryForkMutation.mutate(conv.name);
+                      summaryForkMutation.mutate(conv);
                     }
                   }}
                   title="Create summary fork"
