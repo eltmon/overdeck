@@ -234,9 +234,9 @@ program
 
 program
   .command('fork <conv>')
-  .description('Fork a conversation — creates new session with summary of previous work')
-  .option('--model <model>', 'Model for the forked session')
-  .option('--cwd <path>', 'Working directory for the forked session')
+  .description('Summary Fork a conversation — creates new session from a summary of previous work')
+  .option('--model <model>', 'Model for the summary-forked session')
+  .option('--cwd <path>', 'Working directory for the summary-forked session')
   .action(forkCommand);
 
 program

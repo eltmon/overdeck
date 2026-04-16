@@ -6,7 +6,7 @@
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync } from 'fs';
+import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -119,5 +119,50 @@ describe('conversations route — DB integration', () => {
     const conv = getConversationByName('resume-me');
     expect(conv!.lastAttachedAt).toBeTruthy();
     expect(conv!.status).toBe('active');
+  });
+
+  it('creates a summary fork conversation with summary metadata', async () => {
+    const { createConversation, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
+    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+
+    const cwd = '/home/test/project';
+    const sessionId = 'session-123';
+    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+    mkdirSync(claudeProjectDir, { recursive: true });
+    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+    writeFileSync(sessionFile, [
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken dashboard route' }] },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/panopticon-cli/src/file.ts' } }],
+        },
+      }),
+    ].join('\n') + '\n');
+
+    const conv = createConversation({
+      name: 'source-conv',
+      tmuxSession: 'conv-source-conv',
+      cwd,
+      sessionFile,
+      title: 'Original conversation',
+      model: 'claude-sonnet-4-6',
+      effort: 'medium',
+    });
+
+    const result = await createSummaryFork(conv);
+
+    expect(result.conversation.name).not.toBe('source-conv');
+    expect(result.conversation.title).toBe('Summary Fork: Original conversation');
+    expect(result.conversation.model).toBe('claude-sonnet-4-6');
+    expect(result.conversation.effort).toBe('medium');
+
+    const sourceConv = getConversationByName('source-conv');
+    expect(sourceConv?.status).toBe('ended');
   });
 });

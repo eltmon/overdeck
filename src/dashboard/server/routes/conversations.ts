@@ -63,6 +63,7 @@ import {
   summarizeConversationActivity,
 } from '../services/conversation-service.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { createSummaryFork } from '../../../lib/conversations/summary-fork.js';
 
 const execAsync = promisify(exec);
 
@@ -993,6 +994,46 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
+
+const postConversationSummaryForkRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/summary-fork',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = decodeURIComponent(params['name'] ?? '');
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+          return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
+        }
+
+        const model = typeof body['model'] === 'string' && body['model'].trim()
+          ? body['model'].trim()
+          : undefined;
+        const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
+          ? body['cwd'].trim()
+          : undefined;
+
+        const result = await createSummaryFork(conv, { model, cwd });
+        return jsonResponse({
+          success: true,
+          conversation: result.conversation,
+        });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to create summary fork: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -1009,6 +1050,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationMessageRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
+  postConversationSummaryForkRoute,
 );
 
 export default conversationsRouteLayer;
