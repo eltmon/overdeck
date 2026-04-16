@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -48,8 +48,36 @@ import {
   CAPABILITY_INFO,
   Capability,
   MODELS_BY_PROVIDER,
+  OpenRouterFavoriteModel,
 } from './AgentCards/ModelOverrideModal';
 import { FALLBACK_DEFAULT_MODEL, getEffectiveModelId } from './modelDefaults';
+
+// OpenRouter types matching OpenRouterModelBrowser
+interface OpenRouterModelCatalog {
+  id: string;
+  name: string;
+  promptCostPer1M: number;
+  completionCostPer1M: number;
+  contextLength: number;
+  supportsThinking: boolean;
+  category: 'free' | 'chat' | 'code' | 'other';
+  topProvider?: string;
+}
+
+interface OpenRouterCatalogResponse {
+  models: OpenRouterModelCatalog[];
+  favorites: string[];
+}
+
+async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | null> {
+  try {
+    const res = await fetch('/api/settings/openrouter/models');
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
 
 // API Functions
 async function fetchSettings(): Promise<SettingsConfig> {
@@ -283,6 +311,7 @@ export function SettingsPage() {
   const [modelsModalProvider, setModelsModalProvider] = useState<Provider | null>(null);
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
+  const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   const [activeSection, setActiveSection] = useState<string>('smart-selection');
   const [claudeAuth, setClaudeAuth] = useState<ClaudeAuthStatus | null>(null);
@@ -349,6 +378,25 @@ export function SettingsPage() {
   useEffect(() => {
     void refreshProviderAuth();
   }, [refreshProviderAuth]);
+
+  useEffect(() => {
+    fetchOpenRouterCatalog().then(setOrCatalog);
+  }, []);
+
+  const openRouterFavoriteModels = useMemo<OpenRouterFavoriteModel[]>(() => {
+    if (!orCatalog) return [];
+    return orCatalog.models
+      .filter((m) => orCatalog.favorites.includes(m.id))
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        promptCostPer1M: m.promptCostPer1M,
+        completionCostPer1M: m.completionCostPer1M,
+        contextLength: m.contextLength,
+        supportsThinking: m.supportsThinking,
+        category: m.category,
+      }));
+  }, [orCatalog]);
 
   useEffect(() => {
     if (settings && !formData) {
@@ -1146,10 +1194,13 @@ export function SettingsPage() {
 
       {/* Agent Configuration by Category */}
       <section id="model-assignments" className="mb-12 scroll-mt-4">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-content text-2xl font-bold mb-2 flex items-center gap-3">
           Model Assignments
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
+        <p className="text-content-muted text-sm mb-5 leading-relaxed">
+          Assign models to specific <strong className="text-content-body">work types</strong> — the internal routing identifiers that Panopticon uses to resolve which model an agent or workflow step should use. Click any card to change its model.
+        </p>
 
         <div className="space-y-8">
           {AGENT_CATEGORIES.map((category) => (
@@ -1383,6 +1434,7 @@ export function SettingsPage() {
           enabledProviders={Object.entries(formData.models.providers)
             .filter(([_, enabled]) => enabled)
             .map(([provider]) => provider)}
+          openRouterFavorites={openRouterFavoriteModels}
           onApply={(model) => handleSetOverride(modalWorkType, model)}
           onRemove={() => handleRemoveOverride(modalWorkType)}
           onClose={() => setModalWorkType(null)}
