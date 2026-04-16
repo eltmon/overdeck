@@ -351,14 +351,12 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
 
 /** Load a file into a unique tmux buffer, paste it into the session, then clean up. */
 async function tmpLoadAndPaste(sessionName: string, tmpFile: string, index: number): Promise<void> {
-  const bufId = `pan-${process.pid}-${index}`;
-  try {
-    await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName, '-d'], { encoding: 'utf-8' });
-    await new Promise(r => setTimeout(r, 50));
-  } finally {
-    await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
-  }
+  const bufId = `pan-sendkeys-${process.pid}-${index}`;
+  await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
+  await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName], { encoding: 'utf-8' });
+  await new Promise(r => setTimeout(r, 50));
+  // Skip explicit delete — paste-buffer already delivered the text.
+  // tmux reuses buffer names safely across operations.
 }
 
 /**

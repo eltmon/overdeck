@@ -11,6 +11,7 @@ import {
   Globe,
   X,
   CheckCircle2,
+  Star,
 } from 'lucide-react';
 import { WorkTypeId, ModelId } from '../types';
 
@@ -248,7 +249,6 @@ interface ModelOverrideModalProps {
   currentModel: ModelId;
   isOverride: boolean;
   enabledProviders: string[];
-  /** Ignored placeholder prop for SettingsPage compatibility. */
   openRouterFavorites?: OpenRouterFavoriteModel[];
   onApply: (model: ModelId) => void;
   onRemove: () => void;
@@ -260,6 +260,7 @@ export function ModelOverrideModal({
   currentModel,
   isOverride,
   enabledProviders,
+  openRouterFavorites,
   onApply,
   onRemove,
   onClose,
@@ -276,11 +277,35 @@ export function ModelOverrideModal({
     );
   }, [enabledProviders]);
 
+  // Build display list: base providers + OpenRouter favorites section
+  const displayProviders = useMemo(() => {
+    const base = availableProviders.map(([key, provider]) => ({
+      key,
+      name: provider.name,
+      models: provider.models,
+    }));
+    if (openRouterFavorites && openRouterFavorites.length > 0) {
+      base.push({
+        key: 'openrouter',
+        name: 'OpenRouter (Favorites)',
+        models: openRouterFavorites.map((m) => ({
+          id: m.id as ModelId,
+          name: m.name,
+          icon: Star,
+          tier: 'premium' as const,
+          capabilities: ['reasoning', 'code'] as Capability[],
+          description: `Context: ${(m.contextLength / 1000).toFixed(0)}K · Thinking: ${m.supportsThinking ? 'Yes' : 'No'}`,
+        })),
+      });
+    }
+    return base;
+  }, [availableProviders, openRouterFavorites]);
+
   // Find recommended model (best capability match)
   const recommendedModel = useMemo(() => {
     let bestMatch: { id: ModelId; score: number } | null = null;
 
-    for (const [_providerKey, provider] of availableProviders) {
+    for (const provider of displayProviders) {
       for (const model of provider.models) {
         const matchingCaps = model.capabilities.filter(c => requiredCapabilities.includes(c));
         const score = matchingCaps.length / requiredCapabilities.length;
@@ -294,7 +319,7 @@ export function ModelOverrideModal({
       }
     }
     return bestMatch?.id;
-  }, [availableProviders, requiredCapabilities]);
+  }, [displayProviders, requiredCapabilities]);
 
   const handleApply = () => {
     onApply(selectedModel);
@@ -332,8 +357,8 @@ export function ModelOverrideModal({
 
         {/* Model List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[450px]">
-          {availableProviders.map(([providerKey, provider], providerIndex) => (
-            <div key={providerKey} className="flex flex-col">
+          {displayProviders.map((provider, providerIndex) => (
+            <div key={provider.key} className="flex flex-col">
               {providerIndex > 0 && <div className="h-px bg-divider mx-6 my-2" />}
               <h3 className="text-content-muted text-xs font-bold uppercase tracking-widest px-6 pb-2 pt-5">
                 {provider.name}
@@ -344,6 +369,7 @@ export function ModelOverrideModal({
                 const isRecommended = model.id === recommendedModel;
                 const matchingCaps = model.capabilities.filter(c => requiredCapabilities.includes(c));
                 const matchScore = matchingCaps.length / requiredCapabilities.length;
+                const isFavorite = provider.key === 'openrouter';
 
                 return (
                   <div
@@ -369,6 +395,12 @@ export function ModelOverrideModal({
                         <p className={`text-content text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
                           {model.name}
                         </p>
+                        {isFavorite && !isRecommended && (
+                          <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-[9px] text-amber-400 font-bold uppercase tracking-tight shrink-0">
+                            <Star className="w-2.5 h-2.5 fill-amber-400" />
+                            Favorite
+                          </span>
+                        )}
                         {isRecommended && (
                           <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-content font-bold uppercase tracking-tight shrink-0">
                             Best Fit
