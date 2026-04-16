@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, sendKeys, sendKeysAsync, sessionExists, getAgentSessions, capturePane, capturePaneAsync } from './tmux.js';
+import { createSession, killSession, killSessionAsync, sendKeys, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -1092,6 +1092,35 @@ export function stopAgent(agentId: string): void {
   // Also mark runtime.json as stopped so Cloister/Deacon won't auto-restart.
   // state.json and runtime.json are separate files — both must agree the agent
   // was intentionally stopped to prevent race conditions with health check polls.
+  saveAgentRuntimeState(normalizedId, { state: 'stopped' });
+}
+
+export async function stopAgentAsync(agentId: string): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  if (await sessionExistsAsync(normalizedId)) {
+    try {
+      const output = await capturePaneAsync(normalizedId, 5000);
+      if (output) {
+        const agentDir = getAgentDir(normalizedId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'output.log'), output);
+      }
+    } catch {
+      // Non-fatal — best effort log capture
+    }
+
+    await killSessionAsync(normalizedId);
+  }
+
+  const state = getAgentState(normalizedId);
+  if (state) {
+    if (!state.id) state.id = normalizedId;
+
+    markAgentStopped(state);
+    saveAgentState(state);
+  }
+
   saveAgentRuntimeState(normalizedId, { state: 'stopped' });
 }
 

@@ -57,6 +57,7 @@ import {
   resumeAgent,
   messageAgent,
   stopAgent,
+  stopAgentAsync,
   listRunningAgents,
   getAgentDir,
 } from '../../../lib/agents.js';
@@ -636,7 +637,7 @@ const deleteAgentRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
-    stopAgent(id);
+    yield* Effect.promise(() => stopAgentAsync(id));
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
@@ -1828,7 +1829,7 @@ const postAgentsRestartAllRoute = HttpRouter.add(
         for (const agent of running) {
           try {
             // Stop the agent (captures output, kills tmux, marks stopped)
-            stopAgent(agent.id);
+            await stopAgentAsync(agent.id);
 
             // Re-start via internal API call — reuses all existing start-agent logic
             const res = await fetch('http://localhost:3011/api/agents', {
