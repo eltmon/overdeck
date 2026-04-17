@@ -6,6 +6,8 @@ import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
 } from '../chat/defaultConversationModel';
 import styles from './styles/mission-control.module.css';
+
+const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 import type { Conversation } from './ConversationList';
 
 interface PickerModel {
@@ -49,14 +51,15 @@ function formatCost(costPer1M: number): string {
   return `$${Math.round(costPer1M)}/1M`;
 }
 
-function useAvailableModels(): ModelGroup[] {
+function useAvailableModels(): { groups: ModelGroup[]; compactionModel: string } {
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
+  const [compactionModel, setCompactionModel] = useState(FALLBACK_COMPACTION_MODEL);
 
   useEffect(() => {
     async function load() {
       try {
         await ensureDefaultConversationModel();
-        const [availRes, orRes] = await Promise.allSettled([
+        const [availRes, orRes, settingsRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
             Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
           >,
@@ -64,7 +67,14 @@ function useAvailableModels(): ModelGroup[] {
             models: Array<{ id: string; name: string; promptCostPer1M: number }>;
             favorites: string[];
           }>,
+          fetch('/api/settings').then((r) => r.json()) as Promise<{
+            conversations?: { compaction_model?: string };
+          }>,
         ]);
+
+        if (settingsRes.status === 'fulfilled' && settingsRes.value?.conversations?.compaction_model) {
+          setCompactionModel(settingsRes.value.conversations.compaction_model);
+        }
 
         const avail = availRes.status === 'fulfilled' ? availRes.value : {};
         const orData = orRes.status === 'fulfilled' ? orRes.value : { models: [], favorites: [] };
@@ -108,7 +118,7 @@ function useAvailableModels(): ModelGroup[] {
     void load();
   }, []);
 
-  return groups;
+  return { groups, compactionModel };
 }
 
 function ModelSelect({
@@ -188,10 +198,14 @@ interface ForkModalProps {
 }
 
 export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkModalProps) {
-  const groups = useAvailableModels();
+  const { groups, compactionModel } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
-  const [summaryModel, setSummaryModel] = useState(defaultModel);
+  const [summaryModel, setSummaryModel] = useState(compactionModel);
+
+  useEffect(() => {
+    setSummaryModel(compactionModel);
+  }, [compactionModel]);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
