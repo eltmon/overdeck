@@ -1828,6 +1828,29 @@
   gap: var(--mc-space-3);
 }
 
+/* Context injection block (e.g. conversation summary fork) — full-width, markdown-rendered */
+.contextMessageRow {
+  padding: 2px 0;
+}
+
+.contextMessageBlock {
+  width: 100%;
+  background: color-mix(in srgb, var(--mc-accent) 6%, var(--mc-bg-card));
+  border-left: 3px solid var(--mc-accent);
+  border-radius: 4px;
+  padding: var(--mc-space-3) var(--mc-space-4);
+}
+
+.contextMessageLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mc-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--mc-space-2);
+  opacity: 0.8;
+}
+
 /* User message — right-aligned bubble */
 .userMessageRow {
   display: flex;
@@ -2580,6 +2603,178 @@
   border-radius: var(--mc-radius-sm);
   background: color-mix(in srgb, var(--mc-error) 12%, transparent);
   cursor: help;
+}
+
+/* ─── Fork progress view (conversation detail) ──────────────────────────── */
+
+.forkProgressView {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mc-space-8);
+}
+
+.forkProgressCard {
+  width: 100%;
+  max-width: 420px;
+  background: var(--mc-bg-secondary);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-lg);
+  padding: var(--mc-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mc-space-5);
+}
+
+.forkProgressHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mc-space-3);
+}
+
+.forkProgressIcon {
+  color: var(--mc-accent);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.forkProgressTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mc-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.forkProgressSubtitle {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  margin: 2px 0 0;
+  line-height: 1.4;
+}
+
+.forkProgressSubtitle strong {
+  color: var(--mc-text-secondary);
+  font-weight: 500;
+}
+
+.forkProgressTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-left: var(--mc-space-1);
+}
+
+.forkProgressStep {
+  display: flex;
+  gap: var(--mc-space-3);
+  position: relative;
+  min-height: 48px;
+}
+
+.forkProgressStep:last-child {
+  min-height: unset;
+}
+
+.forkProgressStepIndicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  position: relative;
+}
+
+.forkProgressStepLine {
+  position: absolute;
+  top: 22px;
+  width: 2px;
+  bottom: -4px;
+  background: var(--mc-border);
+  border-radius: 1px;
+}
+
+.forkProgressStep--done .forkProgressStepLine {
+  background: var(--mc-accent);
+}
+
+.forkProgressStepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--mc-space-3);
+}
+
+.forkProgressStepLabel {
+  font-size: var(--mc-font-size-sm);
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.forkProgressStepDesc {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  line-height: 1.4;
+}
+
+.forkProgressStep--done {
+  color: var(--mc-accent);
+}
+
+.forkProgressStep--done .forkProgressStepDesc {
+  color: var(--mc-text-muted);
+}
+
+.forkProgressStep--active {
+  color: var(--mc-accent);
+}
+
+.forkProgressStep--active .forkProgressStepLabel {
+  color: var(--mc-text-primary);
+}
+
+.forkProgressStep--pending {
+  color: var(--mc-text-muted);
+}
+
+.forkProgressStep--pending .forkProgressStepLabel {
+  color: var(--mc-text-muted);
+}
+
+.forkProgressStep--failed {
+  color: var(--mc-error);
+}
+
+.forkProgressStep--failed .forkProgressStepLabel {
+  color: var(--mc-error);
+}
+
+@keyframes forkSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.forkProgressSpinner {
+  animation: forkSpin 1s linear infinite;
+}
+
+.forkProgressError {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mc-space-2);
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-error);
+  padding: var(--mc-space-3);
+  background: color-mix(in srgb, var(--mc-error) 8%, transparent);
+  border-radius: var(--mc-radius-md);
+  border: 1px solid color-mix(in srgb, var(--mc-error) 20%, transparent);
+  line-height: 1.4;
+}
+
+.forkProgressError svg {
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 /* ─── Fork dialog ────────────────────────────────────────────────────────── */
