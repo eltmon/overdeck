@@ -162,14 +162,40 @@ async function runModelSummary(prompt: string, model?: string): Promise<string> 
   });
 }
 
-export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string): Promise<{ summary: string; summaryModel: string | null }> {
-  const transcript = await readFile(jsonlPath, 'utf-8');
+const MAX_TRANSCRIPT_CHARS = 600_000;
 
-  if (!transcript.trim()) {
+function truncateTranscript(raw: string): string {
+  if (raw.length <= MAX_TRANSCRIPT_CHARS) return raw;
+  const lines = raw.split('\n');
+  const head: string[] = [];
+  const tail: string[] = [];
+  let headLen = 0;
+  let tailLen = 0;
+  const budget = MAX_TRANSCRIPT_CHARS - 200;
+  const halfBudget = Math.floor(budget / 2);
+
+  for (const line of lines) {
+    if (headLen + line.length + 1 > halfBudget) break;
+    head.push(line);
+    headLen += line.length + 1;
+  }
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (tailLen + lines[i].length + 1 > halfBudget) break;
+    tail.unshift(lines[i]);
+    tailLen += lines[i].length + 1;
+  }
+  return head.join('\n') + '\n\n[... transcript truncated for length ...]\n\n' + tail.join('\n');
+}
+
+export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string): Promise<{ summary: string; summaryModel: string | null }> {
+  const raw = await readFile(jsonlPath, 'utf-8');
+
+  if (!raw.trim()) {
     throw new Error(`Session file is empty: ${jsonlPath}`);
   }
 
   const useModel = summaryModel || DEFAULT_SUMMARY_MODEL;
+  const transcript = truncateTranscript(raw);
   const prompt = buildSummaryPrompt(transcript);
   try {
     const summary = await runModelSummary(prompt, useModel);
