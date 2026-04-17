@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
@@ -119,11 +120,16 @@ async function unfavoriteConversation(name: string): Promise<void> {
 }
 
 async function summaryForkConversation(conv: Conversation): Promise<Conversation> {
-  const model = conv.model || getDefaultConversationModel();
+  const model = conv.model || null;
+  const fallbackModel = getDefaultConversationModel();
+  const body = model
+    ? { model, summaryModel: model }
+    : { summaryModel: fallbackModel };
+
   const res = await fetch(`/api/conversations/${encodeURIComponent(conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, summaryModel: model }),
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -280,6 +286,10 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     onSuccess: (newConversation) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       onSelectConversation(newConversation.name);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+      console.error('Summary fork failed:', err);
     },
   });
 

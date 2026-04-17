@@ -211,10 +211,17 @@ async function spawnConversationSession(
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
-  let runtimeCommand = 'claude --dangerously-skip-permissions --permission-mode bypassPermissions';
+  const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+  let runtimeCommand = `claude ${permissionFlags}`;
   const providerEnvExports: string[] = [];
   if (model) {
     runtimeCommand = getAgentRuntimeBaseCommand(model);
+    if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
+      runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
+    }
+    if (!runtimeCommand.includes('--permission-mode')) {
+      runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
+    }
     const providerExports = getProviderExportsForModel(model).trim();
     if (providerExports) {
       providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
