@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
 import { findLastCompactBoundary } from './conversation-service.js';
-import { generateSummary } from '../../../lib/conversations/summary-fork.js';
+import { generateSmartSummary } from '../../../lib/conversations/smart-compaction.js';
+import { generateFallbackSummary } from '../../../lib/conversations/summary-fork.js';
 import { loadConfig } from '../../../lib/config-yaml.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../../lib/agents.js';
 
@@ -27,6 +28,7 @@ export function getConversationCompactionSettings() {
   return {
     model: config.conversations.compactionModel,
     manualCompactMode: config.conversations.manualCompactMode,
+    richCompaction: config.conversations.richCompaction,
   };
 }
 
@@ -81,7 +83,19 @@ export async function compactConversationNative(sessionFile: string): Promise<Na
 
   const settings = getConversationCompactionSettings();
   const tokensBefore = await estimateContextTokens(sessionFile);
-  const summary = await generateSummary(sessionFile);
+
+  let summary: string;
+  let summaryModel: string | null;
+  try {
+    const result = await generateSmartSummary({ jsonlPath: sessionFile, model: settings.model, richMode: settings.richCompaction });
+    summary = result.summary;
+    summaryModel = result.summaryModel;
+  } catch (error) {
+    console.warn(`[conversation-compaction] Smart summary failed, falling back to heuristic:`, error);
+    summary = await generateFallbackSummary(sessionFile);
+    summaryModel = null;
+  }
+
   const continuation = buildContinuationSummary(summary, settings.model);
   const boundaryUuid = randomUUID();
   const timestamp = new Date().toISOString();

@@ -63,6 +63,8 @@ export interface ConversationsConfig {
   compaction_model?: ModelId;
   /** How typed /compact in the conversation composer is handled */
   manual_compact_mode?: ManualCompactMode;
+  /** Whether to use the richer 9-section summary format (more tokens, less efficient incremental updates) */
+  rich_compaction?: boolean;
 }
 
 /**
@@ -244,6 +246,7 @@ export interface NormalizedConfig {
   conversations: {
     compactionModel: ModelId;
     manualCompactMode: ManualCompactMode;
+    richCompaction: boolean;
   };
 
   /** Shadow mode configuration */
@@ -318,6 +321,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   conversations: {
     compactionModel: 'claude-haiku-4-5',
     manualCompactMode: 'claude-code',
+    richCompaction: false,
   },
   shadow: {
     enabled: false,
@@ -631,6 +635,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     }
     if (config.conversations?.manual_compact_mode) {
       result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
+    }
+    if (config.conversations?.rich_compaction !== undefined) {
+      result.conversations.richCompaction = config.conversations.rich_compaction;
     }
 
     // Merge OpenRouter favorites

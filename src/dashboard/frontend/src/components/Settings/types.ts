@@ -88,6 +88,7 @@ export interface SettingsConfig {
   conversations?: {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
+    rich_compaction?: boolean;
   };
   tracker_keys?: TrackerKeysConfig;
   deprecation_warnings?: DeprecationWarning[];

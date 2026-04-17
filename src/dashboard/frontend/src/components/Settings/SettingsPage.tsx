@@ -527,6 +527,16 @@ export function SettingsPage() {
     });
   };
 
+  const handleRichCompactionChange = (enabled: boolean) => {
+    setFormData({
+      ...formData,
+      conversations: {
+        ...formData.conversations,
+        rich_compaction: enabled,
+      },
+    });
+  };
+
   const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
     setFormData({
       ...formData,
@@ -1174,6 +1184,44 @@ export function SettingsPage() {
                   Intercept typed <code>/compact</code> in the dashboard and run Panopticon&apos;s native compaction instead of Claude Code&apos;s built-in command.
                 </p>
               </button>
+            </div>
+          </div>
+
+          <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-content">Richer compaction / forking summaries</h3>
+              <p className="text-sm text-content-muted mt-1">
+                Use a more verbose 9-section summary format instead of the default 6-section format. Includes all user messages and fuller code snippets.
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm text-content-body">
+                <span className={formData.conversations?.rich_compaction ? 'text-content' : 'text-content-muted'}>
+                  {formData.conversations?.rich_compaction ? 'Enabled' : 'Disabled'}
+                </span>
+                <span className="text-xs text-content-muted ml-2">(default: off)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRichCompactionChange(!formData.conversations?.rich_compaction)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  formData.conversations?.rich_compaction ? 'bg-blue-500' : 'bg-gray-400'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.conversations?.rich_compaction ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+              <p className="text-xs text-amber-400 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Higher token usage per summary. Less efficient incremental updates. May hit the context window sooner, requiring more frequent compaction.
+                </span>
+              </p>
             </div>
           </div>
         </div>

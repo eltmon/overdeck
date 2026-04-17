@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
 import { encodeClaudeProjectDir } from '../paths.js';
-import { renderPrompt } from '../cloister/prompts.js';
+import { loadConfig } from '../config-yaml.js';
+import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 
 export interface SummaryForkOptions {
   model?: string;
@@ -22,15 +22,14 @@ export interface SummaryForkResult {
   summaryModel: string | null;
 }
 
-const SUMMARY_TIMEOUT_MS = 60_000;
-
 const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;
 
 /**
- * Extract a summary from a Claude Code JSONL session file.
- * Returns a markdown summary string.
+ * Generate a heuristic fallback summary without calling an LLM.
+ * Used only when smart summary fails and we need a last-resort fallback.
  */
-export async function generateSummary(jsonlPath: string): Promise<string> {
+export async function generateFallbackSummary(jsonlPath: string): Promise<string> {
+  const { readFile } = await import('node:fs/promises');
   const lines = (await readFile(jsonlPath, 'utf-8'))
     .split('\n')
     .filter((l) => l.trim());
@@ -106,103 +105,22 @@ export async function generateSummary(jsonlPath: string): Promise<string> {
   return summary;
 }
 
-function buildSummaryPrompt(transcript: string): string {
-  return renderPrompt({ name: 'summary-fork', vars: { TRANSCRIPT: transcript } });
-}
-
-const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
-
-async function runModelSummary(prompt: string, model?: string): Promise<string> {
-  const useModel = model || DEFAULT_SUMMARY_MODEL;
-  const args = [
-    '-p',
-    '--model', useModel,
-    '--dangerously-skip-permissions',
-    '--permission-mode', 'bypassPermissions',
-  ];
-
-  const child = spawn('claude', args, {
-    env: process.env as Record<string, string>,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  let stdout = '';
-  let stderr = '';
-
-  return await new Promise<string>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`Summary generation timed out after ${SUMMARY_TIMEOUT_MS}ms`));
-    }, SUMMARY_TIMEOUT_MS);
-
-    child.stdin.end(prompt);
-    child.stdout.setEncoding('utf-8');
-    child.stderr.setEncoding('utf-8');
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.stderr.on('data', chunk => { stderr += chunk; });
-    child.on('error', err => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-    child.on('close', code => {
-      clearTimeout(timeout);
-      if (code !== 0) {
-        const detail = stderr.trim() || stdout.trim() || `exit code ${code}`;
-        reject(new Error(`Summary generation failed: ${detail}`));
-        return;
-      }
-
-      const summary = stdout.trim();
-      if (!summary) {
-        reject(new Error(`Summary generation returned empty output`));
-        return;
-      }
-      resolve(summary);
-    });
-  });
-}
-
-const MAX_TRANSCRIPT_CHARS = 600_000;
-
-function truncateTranscript(raw: string): string {
-  if (raw.length <= MAX_TRANSCRIPT_CHARS) return raw;
-  const lines = raw.split('\n');
-  const head: string[] = [];
-  const tail: string[] = [];
-  let headLen = 0;
-  let tailLen = 0;
-  const budget = MAX_TRANSCRIPT_CHARS - 200;
-  const halfBudget = Math.floor(budget / 2);
-
-  for (const line of lines) {
-    if (headLen + line.length + 1 > halfBudget) break;
-    head.push(line);
-    headLen += line.length + 1;
-  }
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (tailLen + lines[i].length + 1 > halfBudget) break;
-    tail.unshift(lines[i]);
-    tailLen += lines[i].length + 1;
-  }
-  return head.join('\n') + '\n\n[... transcript truncated for length ...]\n\n' + tail.join('\n');
-}
-
 export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string): Promise<{ summary: string; summaryModel: string | null }> {
-  const raw = await readFile(jsonlPath, 'utf-8');
-
-  if (!raw.trim()) {
-    throw new Error(`Session file is empty: ${jsonlPath}`);
+  if (!summaryModel) {
+    // Default to haiku for cost-effective summarization
+    summaryModel = 'claude-haiku-4-5-20251001';
   }
 
-  const useModel = summaryModel || DEFAULT_SUMMARY_MODEL;
-  const transcript = truncateTranscript(raw);
-  const prompt = buildSummaryPrompt(transcript);
+  const { config } = loadConfig();
+  const richMode = config.conversations.richCompaction;
+
   try {
-    const summary = await runModelSummary(prompt, useModel);
-    return { summary: summary + FORK_WAIT_INSTRUCTION, summaryModel: useModel };
+    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode });
+    return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
   } catch (error) {
-    console.warn(`[summary-fork] Falling back to local summary for ${jsonlPath}:`, error);
-    return { summary: await generateSummary(jsonlPath), summaryModel: null };
+    console.warn(`[summary-fork] Smart summary failed for ${jsonlPath}:`, error);
+    // Final fallback: heuristic extraction
+    return { summary: await generateFallbackSummary(jsonlPath), summaryModel: null };
   }
 }
 
@@ -232,8 +150,8 @@ export async function createSummaryFork(
   const cwd = options.cwd || conv.cwd || process.cwd();
   const launchModel = options.model || conv.model;
   const { summary, summaryModel: usedSummaryModel } = options.localSummaryOnly
-    ? { summary: await generateSummary(conv.sessionFile), summaryModel: null }
-    : await generateSummaryForFork(conv.sessionFile);
+    ? { summary: await generateFallbackSummary(conv.sessionFile), summaryModel: null }
+    : await generateSummaryForFork(conv.sessionFile, options.model);
   const { sessionId, sessionFile } = await reserveSummaryForkSession(cwd);
 
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -262,3 +180,6 @@ export async function createSummaryFork(
     summaryModel: usedSummaryModel,
   };
 }
+
+// Re-export runModelSummary for any callers that need it directly
+export { runModelSummary };
