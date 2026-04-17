@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
 import { encodeClaudeProjectDir } from '../paths.js';
+import { renderPrompt } from '../cloister/prompts.js';
 
 export interface SummaryForkOptions {
   model?: string;
@@ -106,20 +107,7 @@ export async function generateSummary(jsonlPath: string): Promise<string> {
 }
 
 function buildSummaryPrompt(transcript: string): string {
-  return [
-    'You are creating a continuation summary for a coding conversation fork.',
-    'Summarize the prior conversation so a fresh coding session can continue without losing context.',
-    'Focus on the user goal, key decisions, files changed, important tool findings, blockers, and what remains.',
-    'Be concrete and concise. Use markdown with these sections when relevant:',
-    '- Goal',
-    '- Important context',
-    '- Files changed',
-    '- Open questions / risks',
-    '- Next steps',
-    '',
-    'Transcript excerpt:',
-    transcript,
-  ].join('\n');
+  return renderPrompt({ name: 'summary-fork', vars: { TRANSCRIPT: transcript } });
 }
 
 const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
