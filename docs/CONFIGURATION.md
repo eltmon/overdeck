@@ -340,6 +340,8 @@ OpenRouter favorites are user-selected. Panopticon does not hardcode one OpenRou
 
 A "job setting" in Panopticon means a work type. Each work type maps to one part of the workflow and can be overridden independently.
 
+These are routing slots, not a second copy of the runtime agent roster. Some entries below describe main workflow stages, some describe helper jobs, and convoy entries describe parallel review lanes inside the review system.
+
 Current router-backed work types:
 
 | Work type | When it is used |
@@ -358,11 +360,11 @@ Current router-backed work types:
 | `subagent:plan` | Helper subagent for task breakdown and approach sketches |
 | `subagent:bash` | Helper subagent for shell-heavy work |
 | `subagent:general-purpose` | General helper subagent when the task is mixed or unclear |
-| `convoy:security-reviewer` | Security-focused convoy review pass |
-| `convoy:performance-reviewer` | Performance-focused convoy review pass |
-| `convoy:correctness-reviewer` | Logic and correctness convoy pass |
-| `convoy:requirements-reviewer` | Requirement/design alignment convoy pass |
-| `convoy:synthesis-agent` | Synthesis pass that combines convoy findings |
+| `convoy:security-reviewer` | Security-focused parallel convoy review lane |
+| `convoy:performance-reviewer` | Performance-focused parallel convoy review lane |
+| `convoy:correctness-reviewer` | Logic and correctness parallel convoy review lane |
+| `convoy:requirements-reviewer` | Requirement/design alignment parallel convoy review lane |
+| `convoy:synthesis-agent` | Synthesis lane that combines convoy findings |
 | `planning-agent` | Up-front planning and vBRIEF generation |
 | `cli:interactive` | Long-running interactive CLI conversations |
 | `cli:quick-command` | Short one-shot CLI requests |

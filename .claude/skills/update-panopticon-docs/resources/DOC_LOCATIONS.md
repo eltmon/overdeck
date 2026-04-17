@@ -1,11 +1,13 @@
-# Complete Panopticon Documentation Index
+# Panopticon Documentation Locations
 
-Comprehensive index of all documentation files in the Panopticon project.
+Guide to where different kinds of documentation belong in the Panopticon repo.
 
-## Root Directory (`/home/eltmon/projects/panopticon/`)
+Use this to choose the right destination before writing. The goal is not to list every markdown file forever; it is to keep the main documentation surfaces easy to place and maintain.
+
+## Root Directory (`/home/eltmon/Projects/panopticon-cli/`)
 
 ### README.md
-**Path**: `/home/eltmon/projects/panopticon/README.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/README.md`
 
 **Purpose**: Main project overview, installation guide, quick start, feature highlights
 
@@ -27,7 +29,7 @@ Comprehensive index of all documentation files in the Panopticon project.
 ---
 
 ### CLAUDE.md
-**Path**: `/home/eltmon/projects/panopticon/CLAUDE.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/CLAUDE.md`
 
 **Purpose**: Guidance for Claude Code agents working on Panopticon
 
@@ -49,7 +51,7 @@ Comprehensive index of all documentation files in the Panopticon project.
 ---
 
 ### CONTRIBUTING.md
-**Path**: `/home/eltmon/projects/panopticon/CONTRIBUTING.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/CONTRIBUTING.md`
 
 **Purpose**: Contribution guidelines for external developers
 
@@ -62,7 +64,7 @@ Comprehensive index of all documentation files in the Panopticon project.
 ---
 
 ### AGENTS.md
-**Path**: `/home/eltmon/projects/panopticon/AGENTS.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/AGENTS.md`
 
 **Purpose**: High-level agent architecture documentation
 
@@ -73,10 +75,10 @@ Comprehensive index of all documentation files in the Panopticon project.
 
 ---
 
-## Docs Directory (`/home/eltmon/projects/panopticon/docs/`)
+## Docs Directory (`/home/eltmon/Projects/panopticon-cli/docs/`)
 
 ### INDEX.md
-**Path**: `/home/eltmon/projects/panopticon/docs/INDEX.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/docs/INDEX.md`
 
 **Purpose**: Master documentation index organized by category with Topic Quick-Find section
 
@@ -99,12 +101,12 @@ Comprehensive index of all documentation files in the Panopticon project.
 - Documentation Maintenance
 
 **Maintenance**:
-This file MUST be kept in sync with actual documentation. See "Index Maintenance" section in update-panopticon-docs skill.
+This file MUST be kept in sync with actual documentation. Use the `pan-docs` skill and `docs/INDEX.md` maintenance guidance when documentation coverage changes.
 
 ---
 
 ### CONFIGURATION.md
-**Path**: `/home/eltmon/projects/panopticon/docs/CONFIGURATION.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/docs/CONFIGURATION.md`
 
 **Purpose**: Complete guide to configuring Panopticon's multi-model routing and API setup
 
@@ -130,7 +132,7 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 ---
 
 ### WORK-TYPES.md
-**Path**: `/home/eltmon/projects/panopticon/docs/WORK-TYPES.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/docs/WORK-TYPES.md`
 
 **Purpose**: Definitions of all 23+ work types and their model assignments
 
@@ -149,7 +151,7 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 ---
 
 ### SETTINGS-UI-DESIGN.md
-**Path**: `/home/eltmon/projects/panopticon/docs/SETTINGS-UI-DESIGN.md`
+**Path**: `/home/eltmon/Projects/panopticon-cli/docs/SETTINGS-UI-DESIGN.md`
 
 **Purpose**: Settings UI design and implementation guide
 
@@ -160,10 +162,10 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 
 ---
 
-## PRD Directory (`/home/eltmon/projects/panopticon/docs/prds/`)
+## PRD Directory (`/home/eltmon/Projects/panopticon-cli/docs/prds/`)
 
 ### Active PRDs (`docs/prds/active/`)
-**Path**: `/home/eltmon/projects/panopticon/docs/prds/active/`
+**Path**: `/home/eltmon/Projects/panopticon-cli/docs/prds/active/`
 
 **Purpose**: Planning documents for in-progress issues
 
@@ -176,7 +178,7 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 ---
 
 ### Completed PRDs (`docs/prds/completed/`)
-**Path**: `/home/eltmon/projects/panopticon/docs/prds/completed/`
+**Path**: `/home/eltmon/Projects/panopticon-cli/docs/prds/completed/`
 
 **Purpose**: Archived planning documents for reference
 
@@ -186,10 +188,10 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 
 ---
 
-## CLI Directory (`/home/eltmon/projects/panopticon/cli/`)
+## CLI Directory (`/home/eltmon/Projects/panopticon-cli/cli/`)
 
 ### Command Documentation
-**Path**: `/home/eltmon/projects/panopticon/cli/`
+**Path**: `/home/eltmon/Projects/panopticon-cli/cli/`
 
 **Purpose**: Command-specific documentation and help text
 
@@ -200,10 +202,10 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 
 ---
 
-## Features Directory (`/home/eltmon/projects/panopticon/features/`)
+## Features Directory (`/home/eltmon/Projects/panopticon-cli/features/`)
 
 ### Feature Documentation
-**Path**: `/home/eltmon/projects/panopticon/features/`
+**Path**: `/home/eltmon/Projects/panopticon-cli/features/`
 
 **Purpose**: Feature-specific documentation and specifications
 
@@ -213,10 +215,10 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 
 ---
 
-## Guides Directory (`/home/eltmon/projects/panopticon/guides/`)
+## Guides Directory (`/home/eltmon/Projects/panopticon-cli/guides/`)
 
 ### User Guides
-**Path**: `/home/eltmon/projects/panopticon/guides/`
+**Path**: `/home/eltmon/Projects/panopticon-cli/guides/`
 
 **Purpose**: Step-by-step guides for common tasks
 
@@ -226,10 +228,10 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 
 ---
 
-## Configuration Directory (`/home/eltmon/projects/panopticon/configuration/`)
+## Configuration Directory (`/home/eltmon/Projects/panopticon-cli/configuration/`)
 
 ### Configuration Examples
-**Path**: `/home/eltmon/projects/panopticon/configuration/`
+**Path**: `/home/eltmon/Projects/panopticon-cli/configuration/`
 
 **Purpose**: Sample configuration files and templates
 
@@ -238,6 +240,26 @@ This file MUST be kept in sync with actual documentation. See "Index Maintenance
 - Example configurations needed for new features
 
 ---
+
+## Placement Rules
+
+### Put it in `README.md` when
+- the reader needs the project overview
+- the content helps someone get started quickly
+- the detail can stay high-level with links outward
+
+### Put it in `docs/` when
+- the topic needs a durable guide, reference, or workflow explanation
+- multiple pages may need to link to it
+- it is part of the product's maintained documentation set
+
+### Put it in `docs/prds/` when
+- the file is a planning artifact for a specific issue or initiative
+- the content is about scoped work rather than evergreen reference material
+
+### Put it near the feature or subsystem when
+- the documentation is tightly coupled to a tool, integration, or implementation surface
+- the main docs index should link to it rather than duplicate it
 
 ## File Discovery
 

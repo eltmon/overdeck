@@ -4,6 +4,8 @@ Reference for the job settings Panopticon uses for model routing.
 
 This document is about **routed work types and model-selection slots**, not the high-level roster of Panopticon runtime agents. Use [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) if you want the newcomer-friendly map of what kinds of agents exist.
 
+A work type is a routing slot for one kind of job inside the system. Some work types line up with runtime agents, some line up with helper jobs, and some line up with parallel review lanes or CLI contexts. They all matter for model selection, but they are **not** all members of the main Panopticon runtime agent roster.
+
 Each work type is a routable job slot. You can override any of these IDs in `models.overrides` inside `~/.panopticon/config.yaml` or `.pan.yaml`.
 
 ## Overview
@@ -84,7 +86,9 @@ These are smaller helper jobs spawned for focused tasks.
 
 ## Convoy Reviewers
 
-Convoy work types run parallel review passes with different review lenses.
+Convoy work types are routing slots for **parallel review lanes**, not additional members of the main runtime agent roster.
+
+A convoy run fans out into multiple review lenses in parallel, then combines those results into a final synthesis step. These entries matter because you can route each lane to a different model, but they should be understood as configuration slots inside the review system rather than standalone Panopticon runtime agents.
 
 | Work type | When it runs | Typical default | Why you might override it |
 |-----------|--------------|-----------------|---------------------------|
@@ -98,6 +102,7 @@ Convoy work types run parallel review passes with different review lenses.
 
 - Security and synthesis are the convoy slots most worth upgrading.
 - Performance review is often a good place to save cost if you already trust your benchmark/test loop.
+- If you are trying to understand the main Panopticon workflow, read convoy entries as review configuration lanes, not as part of the core runtime agent inventory.
 
 ---
 

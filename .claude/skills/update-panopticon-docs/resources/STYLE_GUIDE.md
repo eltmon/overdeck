@@ -1,15 +1,78 @@
-# Panopticon Documentation Style Guide
+# Panopticon Documentation Guide
 
-Markdown conventions and formatting standards for Panopticon documentation.
+How Panopticon documentation should be structured, written, and maintained.
 
-## General Principles
+## Documentation Philosophy
 
-1. **Clarity over cleverness** - Write to be understood, not to impress
-2. **Consistency** - Follow existing patterns in the file you're editing
-3. **Progressive disclosure** - Start simple, add depth with links
-4. **Code-first examples** - Show working code, then explain
+1. **Write for the reader who is new to Panopticon.** Start with what exists, when it appears, and why it matters before code paths or implementation detail.
+2. **Keep one document focused on one job.** Overview docs, reference docs, workflow guides, and implementation deep dives should stay distinct.
+3. **High-level before low-level.** A newcomer-facing page should explain the mental model first and link outward for deeper detail.
+4. **Prefer linking over duplication.** Let the most specific document own the detail.
+5. **Make the docs searchable.** `docs/INDEX.md` is part of the documentation system, not optional maintenance trivia.
+6. **Match the abstraction level to the audience.** If a document is becoming a code audit, it probably belongs in a deeper reference or implementation guide.
+
+## Document Types
+
+### Overview docs
+Use these when the reader needs a mental model.
+
+Good for:
+- what kinds of things exist
+- where they appear in the workflow
+- how to think about the system
+
+Avoid:
+- long source-file inventories
+- exact code-path explanations unless they are essential to the concept
+
+### Reference docs
+Use these when the reader needs a reliable lookup surface.
+
+Good for:
+- routing slots
+- config keys
+- option tables
+- field-by-field definitions
+
+Avoid:
+- turning a reference into a full tutorial
+
+### Workflow docs
+Use these when the reader needs sequence and interaction.
+
+Good for:
+- stage ordering
+- handoffs
+- validation gates
+- lifecycle narratives
+
+Avoid:
+- restating every reference table inline
+
+### Implementation deep dives
+Use these when the reader needs internals.
+
+Good for:
+- exact code paths
+- source-of-truth files
+- internal mechanics
+- architectural constraints
+
+Avoid:
+- using these as the first entry point for newcomers
+
+## Writing Rules
+
+- Lead with a short framing paragraph that says what the document is for.
+- Name neighboring docs when readers might confuse them.
+- Use tables for comparison and lookup, not for every concept.
+- Keep terminology stable across related docs.
+- If a term is commonly confused, explain the distinction early.
+- When a document changes role, update `docs/INDEX.md` so the description matches reality.
 
 ## Markdown Conventions
+
+Use these formatting conventions after the document's audience, purpose, and abstraction level are already correct.
 
 ### Headings
 
@@ -154,6 +217,14 @@ Use blockquotes with emoji for callouts:
 - 📝 Note / Information
 - 🚀 Quick Start / Getting Started
 - 🔧 Configuration / Setup
+
+## Maintenance Rules
+
+- Read the target document completely before editing it.
+- Preserve the document's intended audience and abstraction level.
+- Update `docs/INDEX.md` when a document's coverage, role, or discoverability changes.
+- Prefer updating an existing owner document over creating a new file unless the topic clearly needs its own surface.
+- If a page is hard to navigate, split by document purpose, not by arbitrary length.
 
 ## Document Structure
 

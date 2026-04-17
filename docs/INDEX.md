@@ -234,4 +234,4 @@
 3. If adding new topic coverage, add keywords to Topic Quick-Find section
 4. Verify all links in this index remain valid
 
-See also: `update-panopticon-docs` skill for documentation best practices.
+For Panopticon documentation work, use the `pan-docs` skill. It is the primary docs skill and points to the documentation guide, location guide, and update examples.
