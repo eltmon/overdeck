@@ -12,9 +12,28 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Classify release channel
+        id: channel
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-canary\.[0-9]+$ ]]; then
+            echo "channel=canary" >> "$GITHUB_OUTPUT"
+            echo "npm_tag=canary" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported release tag: $tag"
+            exit 1
+          fi
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -39,7 +58,12 @@ jobs:
           node dist/cli/index.js --help
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: |
+          if [ "${{ steps.channel.outputs.npm_tag }}" = "latest" ]; then
+            npm publish --provenance --access public
+          else
+            npm publish --provenance --access public --tag "${{ steps.channel.outputs.npm_tag }}"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -50,6 +74,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
+          prerelease: ${{ steps.channel.outputs.prerelease }}
           files: |
             apps/desktop/dist/*.AppImage
         env:

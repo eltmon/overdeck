@@ -357,8 +357,10 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     // S-Enter (Shift+Enter) inserts a newline in readline without submitting,
     // whereas literal \n in a pasted buffer gets interpreted as Enter/submit.
     for (let i = 0; i < lines.length; i++) {
-      await writeFile(tmpFile, lines[i]!);
-      await tmpLoadAndPaste(sessionName, tmpFile, i);
+      if (lines[i]!.length > 0) {
+        await writeFile(tmpFile, lines[i]!);
+        await tmpLoadAndPaste(sessionName, tmpFile, i);
+      }
       if (i < lines.length - 1) {
         await tmuxExecAsync(['send-keys', '-t', sessionName, 'S-Enter'], { encoding: 'utf-8' });
       }

@@ -49,7 +49,7 @@ const mockEditor = {
 
 // Mock window.getSelection / Range
 const mockRange = {
-  getBoundingClientRect: vi.fn(() => ({ top: 80, bottom: 100, left: 50 })),
+  getBoundingClientRect: vi.fn(() => ({ top: 80, bottom: 100, left: 50, right: 50, width: 0, height: 20 })),
 };
 const mockSelection = {
   rangeCount: 1,
@@ -223,6 +223,51 @@ describe('ComposerPromptEditor', () => {
       expect(screen.getByText('/context')).toBeInTheDocument();
       expect(screen.getByText('/effort')).toBeInTheDocument();
       expect(screen.getByText('/cancel')).toBeInTheDocument();
+    });
+
+    it('falls back to the editor bounds when the caret rect is empty for the first slash', () => {
+      mockRange.getBoundingClientRect.mockReturnValueOnce({
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 0,
+      });
+      const rootRect = {
+        top: 120,
+        bottom: 156,
+        left: 24,
+        right: 424,
+        width: 400,
+        height: 36,
+        x: 24,
+        y: 120,
+        toJSON: () => ({}),
+      } as DOMRect;
+      const getRootRect = vi.fn(() => rootRect);
+
+      capturedRootElement = document.createElement('div');
+      capturedRootElement.contentEditable = 'true';
+      capturedRootElement.getBoundingClientRect = getRootRect;
+
+      render(
+        <ComposerPromptEditor
+          conversationName="test-conversation"
+          onCommandKeyDown={mockOnCommandKeyDown}
+        />,
+      );
+
+      fireEvent.keyDown(capturedRootElement, { key: '/' });
+      act(() => {
+        mockLexicalText = '/';
+        onChangePluginCallback?.({}, mockEditor, new Set());
+      });
+
+      const menu = screen.getByRole('listbox', { name: 'Slash commands' });
+      expect(menu).toBeInTheDocument();
+      expect(getRootRect).toHaveBeenCalled();
+      expect(menu).toHaveStyle({ left: '24px' });
     });
 
     it('closes menu on Escape', () => {

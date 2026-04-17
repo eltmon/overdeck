@@ -154,7 +154,7 @@ describe('conversations route — DB integration', () => {
       effort: 'medium',
     });
 
-    const result = await createSummaryFork(conv);
+    const result = await createSummaryFork(conv, { localSummaryOnly: true });
 
     expect(result.conversation.name).not.toBe('source-conv');
     expect(result.conversation.title).toBe('Summary Fork: Original conversation');

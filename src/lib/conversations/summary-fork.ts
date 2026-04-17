@@ -5,13 +5,12 @@ import { join } from 'node:path';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
-import { getAgentRuntimeBaseCommand, getProviderEnvForModel } from '../agents.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 export interface SummaryForkOptions {
   model?: string;
-  summaryModel?: string;
   cwd?: string;
+  localSummaryOnly?: boolean;
 }
 
 export interface SummaryForkResult {
@@ -23,6 +22,8 @@ export interface SummaryForkResult {
 }
 
 const SUMMARY_TIMEOUT_MS = 60_000;
+
+const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;
 
 /**
  * Extract a summary from a Claude Code JSONL session file.
@@ -99,9 +100,7 @@ export async function generateSummary(jsonlPath: string): Promise<string> {
     summary += `### Tools Used: ${[...toolsUsed].sort().join(', ')}\n\n`;
   }
 
-  summary += `### Remaining work:\n`;
-  summary += `- Verify the changes are complete with \`npm run build\` and \`npm test\`\n`;
-  summary += `- Review and commit the changes\n`;
+  summary += FORK_WAIT_INSTRUCTION;
 
   return summary;
 }
@@ -123,17 +122,18 @@ function buildSummaryPrompt(transcript: string): string {
   ].join('\n');
 }
 
-async function runModelSummary(prompt: string, model: string): Promise<string> {
-  const runtimeCommand = getAgentRuntimeBaseCommand(model);
-  const providerEnv = getProviderEnvForModel(model);
-  const [command, ...runtimeArgs] = runtimeCommand.split(' ');
-  const args = [...runtimeArgs, '-p'];
+const SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
 
-  const child = spawn(command!, args, {
-    env: {
-      ...process.env,
-      ...providerEnv,
-    },
+async function runModelSummary(prompt: string): Promise<string> {
+  const args = [
+    '-p',
+    '--model', SUMMARY_MODEL,
+    '--dangerously-skip-permissions',
+    '--permission-mode', 'bypassPermissions',
+  ];
+
+  const child = spawn('claude', args, {
+    env: process.env as Record<string, string>,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -143,7 +143,7 @@ async function runModelSummary(prompt: string, model: string): Promise<string> {
   return await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
       child.kill('SIGTERM');
-      reject(new Error(`Summary generation timed out after ${SUMMARY_TIMEOUT_MS}ms for model "${model}"`));
+      reject(new Error(`Summary generation timed out after ${SUMMARY_TIMEOUT_MS}ms`));
     }, SUMMARY_TIMEOUT_MS);
 
     child.stdin.end(prompt);
@@ -159,13 +159,13 @@ async function runModelSummary(prompt: string, model: string): Promise<string> {
       clearTimeout(timeout);
       if (code !== 0) {
         const detail = stderr.trim() || stdout.trim() || `exit code ${code}`;
-        reject(new Error(`Summary generation failed for model "${model}": ${detail}`));
+        reject(new Error(`Summary generation failed: ${detail}`));
         return;
       }
 
       const summary = stdout.trim();
       if (!summary) {
-        reject(new Error(`Summary generation returned empty output for model "${model}"`));
+        reject(new Error(`Summary generation returned empty output`));
         return;
       }
       resolve(summary);
@@ -173,21 +173,17 @@ async function runModelSummary(prompt: string, model: string): Promise<string> {
   });
 }
 
-export async function generateSummaryForFork(jsonlPath: string, model?: string): Promise<{ summary: string; summaryModel: string | null }> {
+export async function generateSummaryForFork(jsonlPath: string): Promise<{ summary: string; summaryModel: string | null }> {
   const transcript = await readFile(jsonlPath, 'utf-8');
 
   if (!transcript.trim()) {
     throw new Error(`Session file is empty: ${jsonlPath}`);
   }
 
-  if (!model) {
-    return { summary: await generateSummary(jsonlPath), summaryModel: null };
-  }
-
   const prompt = buildSummaryPrompt(transcript);
   try {
-    const summary = await runModelSummary(prompt, model);
-    return { summary, summaryModel: model };
+    const summary = await runModelSummary(prompt);
+    return { summary: summary + FORK_WAIT_INSTRUCTION, summaryModel: SUMMARY_MODEL };
   } catch (error) {
     console.warn(`[summary-fork] Falling back to local summary for ${jsonlPath}:`, error);
     return { summary: await generateSummary(jsonlPath), summaryModel: null };
@@ -219,8 +215,9 @@ export async function createSummaryFork(
 
   const cwd = options.cwd || conv.cwd || process.cwd();
   const launchModel = options.model || conv.model;
-  const summaryModel = options.summaryModel || launchModel || conv.model || undefined;
-  const { summary, summaryModel: usedSummaryModel } = await generateSummaryForFork(conv.sessionFile, summaryModel);
+  const { summary, summaryModel: usedSummaryModel } = options.localSummaryOnly
+    ? { summary: await generateSummary(conv.sessionFile), summaryModel: null }
+    : await generateSummaryForFork(conv.sessionFile);
   const { sessionId, sessionFile } = await reserveSummaryForkSession(cwd);
 
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');

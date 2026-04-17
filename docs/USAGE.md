@@ -369,6 +369,25 @@ pan skills
 pan skills validate /path/to/skill
 ```
 
+### Release Commands
+
+```bash
+# Verify that main is releasable
+pan release check
+
+# Create a stable release commit + tag locally
+pan release stable --version 0.7.1
+
+# Create a canary release commit + tag locally
+pan release canary --version 0.8.0-canary.1
+
+# Draft release notes from git history
+pan release notes
+pan release notes v0.7.0 HEAD
+```
+
+Panopticon develops directly on `main`. Releases are intentional promotions by tag, not automatic publishes from every commit.
+
 ---
 
 ## Workspaces
