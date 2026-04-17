@@ -1199,7 +1199,7 @@ export function SettingsPage() {
                 <span className={formData.conversations?.rich_compaction ? 'text-content' : 'text-content-muted'}>
                   {formData.conversations?.rich_compaction ? 'Enabled' : 'Disabled'}
                 </span>
-                <span className="text-xs text-content-muted ml-2">(default: off)</span>
+                <span className="text-xs text-content-muted ml-2">(default: on)</span>
               </div>
               <button
                 type="button"
