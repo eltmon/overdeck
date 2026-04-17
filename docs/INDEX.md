@@ -54,6 +54,7 @@
 | Document | Description |
 |----------|-------------|
 | [BUILD.md](./BUILD.md) | Build pipeline (tsdown + Vite), `__dirname` resolution, prompt template copying |
+| [TERMINAL-INTERACTION-LAYERS.md](./TERMINAL-INTERACTION-LAYERS.md) | Browser/app shell vs wrapper vs xterm vs tmux ownership for right-click, wheel, selection, and terminal history |
 | [WORKSPACE-DEPENDENCIES.md](./WORKSPACE-DEPENDENCIES.md) | Workspace dependency isolation: host vs container node_modules, package_manager config, Docker volumes |
 | [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
@@ -161,7 +162,8 @@
 - **"DNS"** / **"domains"** → DNS_SETUP.md
 - **"remote"** → PRD-REMOTE-WORKSPACES.md
 - **"git"** / **"worktree"** → README.md, CLAUDE.md
-- **"terminal"** / **"WebSocket"** / **"PTY"** / **"tmux attach"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture)
+- **"terminal"** / **"WebSocket"** / **"PTY"** / **"tmux attach"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture), TERMINAL-INTERACTION-LAYERS.md
+- **"context menu"** / **"right-click"** / **"wheel"** / **"trackpad"** / **"two-finger scroll"** → TERMINAL-INTERACTION-LAYERS.md
 - **"capture-pane"** / **"send-keys"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture, tmux Message Delivery)
 
 ### External Integrations & Event Stream
