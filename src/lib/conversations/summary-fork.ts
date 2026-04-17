@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
@@ -185,16 +185,16 @@ export async function generateSummaryForFork(jsonlPath: string, model?: string):
   }
 
   const prompt = buildSummaryPrompt(transcript);
-  const summary = await runModelSummary(prompt, model);
-  return { summary, summaryModel: model };
+  try {
+    const summary = await runModelSummary(prompt, model);
+    return { summary, summaryModel: model };
+  } catch (error) {
+    console.warn(`[summary-fork] Falling back to local summary for ${jsonlPath}:`, error);
+    return { summary: await generateSummary(jsonlPath), summaryModel: null };
+  }
 }
 
-/**
- * Create a new JSONL file with the summary as the first user message.
- * Returns the new session ID.
- */
-export async function createSummaryForkJsonl(
-  summary: string,
+export async function reserveSummaryForkSession(
   cwd: string,
 ): Promise<{ sessionId: string; sessionFile: string }> {
   const sessionId = randomUUID();
@@ -203,30 +203,10 @@ export async function createSummaryForkJsonl(
 
   await mkdir(sessionsDir, { recursive: true });
 
-  const sessionFile = join(sessionsDir, `${sessionId}.jsonl`);
-  const now = new Date().toISOString();
-
-  const lines = [
-    JSON.stringify({
-      type: 'permission-mode',
-      permissionMode: 'bypassPermissions',
-      sessionId,
-    }),
-    JSON.stringify({
-      type: 'user',
-      message: {
-        role: 'user',
-        content: summary,
-      },
-      uuid: randomUUID(),
-      timestamp: now,
-    }),
-  ];
-
-  await mkdir(dirname(sessionFile), { recursive: true });
-  await writeFile(sessionFile, lines.join('\n') + '\n');
-
-  return { sessionId, sessionFile };
+  return {
+    sessionId,
+    sessionFile: join(sessionsDir, `${sessionId}.jsonl`),
+  };
 }
 
 export async function createSummaryFork(
@@ -241,7 +221,7 @@ export async function createSummaryFork(
   const launchModel = options.model || conv.model;
   const summaryModel = options.summaryModel || launchModel || conv.model || undefined;
   const { summary, summaryModel: usedSummaryModel } = await generateSummaryForFork(conv.sessionFile, summaryModel);
-  const { sessionId, sessionFile } = await createSummaryForkJsonl('', cwd);
+  const { sessionId, sessionFile } = await reserveSummaryForkSession(cwd);
 
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const suffix = randomUUID().slice(0, 4);
