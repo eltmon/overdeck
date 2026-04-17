@@ -26,7 +26,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../../../dist/dashboard/public',
+    outDir: '/home/eltmon/Projects/panopticon-cli/dist/dashboard/public',
     emptyOutDir: true,
   },
 });
