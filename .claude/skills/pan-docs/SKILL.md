@@ -1,113 +1,129 @@
 ---
 name: pan-docs
-description: Find information in Panopticon documentation using the docs index
+description: Find, update, and structure Panopticon documentation using the docs index and documentation guide
 author: Panopticon
-version: 1.0.0
+version: 2.0.0
 triggers:
   - panopticon docs
   - find in panopticon docs
   - where is documentation for
   - panopticon documentation
   - pan docs
-  - docs
+  - update docs
+  - update panopticon docs
 allowed-tools:
   - Read
   - Grep
   - Glob
+  - Edit
 ---
 
-# Pan-Docs Skill — Documentation Finder
+# Pan-Docs Skill
 
-**Purpose:** Help agents quickly find information in Panopticon documentation by using the master documentation index.
+**Purpose:** Be the single Panopticon-specific skill for finding, updating, and improving documentation.
+
+Use this skill for three kinds of work:
+- answering questions from existing docs
+- deciding where new documentation should live
+- updating docs so they stay newcomer-friendly, consistent, and discoverable
+
+This is the primary Panopticon documentation skill. If you need general prose cleanup, use `clear-writing` as a supporting skill, not as a replacement for Panopticon-specific documentation judgment.
+
+---
+
+## Core Rules
+
+1. **Start with the docs index.** Use `docs/INDEX.md` before guessing where information lives.
+2. **Write for the reader who is new to Panopticon.** Lead with purpose and mental model before code paths or implementation details.
+3. **One document should do one job well.** Keep overview docs, routing references, workflow guides, and implementation deep dives distinct.
+4. **Prefer linking over duplicating.** If another doc already owns the detail, summarize briefly and point there.
+5. **Keep the index current.** If docs coverage changes, update `docs/INDEX.md` too.
+
+For the full writing philosophy and maintenance guidance, read:
+- `.claude/skills/update-panopticon-docs/resources/STYLE_GUIDE.md`
+- `.claude/skills/update-panopticon-docs/resources/DOC_LOCATIONS.md`
+- `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md`
 
 ---
 
 ## Workflow
 
-When a user asks about Panopticon documentation or needs to find information:
+### 1. Find the right document
+Read `docs/INDEX.md` first.
 
-### Step 1: Read the Documentation Index
-```bash
-Read docs/INDEX.md
-```
+Use:
+- category tables to find the owning document
+- Topic Quick-Find to find likely matches by keyword
 
-The index contains:
-- **Category organization**: Documents grouped by topic (Getting Started, Architecture, Configuration, etc.)
-- **Topic Quick-Find**: Keyword mappings to relevant documents
+If the index is not enough, grep the docs tree.
 
-### Step 2: Use Topic Quick-Find
-Search the "Topic Quick-Find" section for keywords related to the user's question.
+### 2. Decide the document type before editing
+Ask what kind of document this is:
+- **Overview doc** — newcomer mental model first
+- **Reference doc** — lookup table or canonical options
+- **Workflow doc** — how stages interact over time
+- **Implementation deep dive** — internals and code-shaped detail
 
-**Example queries:**
-- "How do I configure API keys?" → Look for **"API keys"** → CONFIGURATION.md
-- "How do agents work?" → Look for **"agent"** → AGENTS.md, SPECIALIST_WORKFLOW.md
-- "How do I set up DNS?" → Look for **"DNS"** → DNS_SETUP.md
-- "What are work types?" → Look for **"work types"** → WORK-TYPES.md
+Do not mix these levels unless the file already clearly does one job.
 
-### Step 3: Read the Identified Document(s)
-Use the Read tool to read the identified documentation file(s).
+### 3. Update the target document
+When editing:
+- preserve the file's existing role
+- up-level docs that drift into code-audit detail when they are meant to orient newcomers
+- keep terminology consistent with neighboring docs
+- add links to related docs instead of repeating their full content
 
-```bash
-Read docs/CONFIGURATION.md
-```
+### 4. Update the index
+Whenever documentation coverage changes:
+- add new files to `docs/INDEX.md`
+- update descriptions if a file's role changed
+- add or adjust Topic Quick-Find keywords when new topic coverage appears
 
-### Step 4: Return Answer with Source References
-Provide the answer and **always include source file references**:
-
-**Example response:**
-> API keys are configured via environment variables in `.env` or `~/.panopticon/.env`. You can set:
-> - `ANTHROPIC_API_KEY` for Claude/Anthropic
-> - `MOONSHOT_API_KEY` for Kimi
-> - `OPENROUTER_API_KEY` for OpenRouter
->
-> **Source:** docs/CONFIGURATION.md (lines 45-67)
-
----
-
-## Tips
-
-- **Always check INDEX.md first** — Don't guess which file contains the information
-- **Use multiple keywords** — If one keyword doesn't work, try related terms
-- **Read multiple files if needed** — Some topics span multiple documents
-- **Provide file paths** — Help users find the source for deeper reading
+### 5. Verify the docs surface
+After editing, check:
+- the file still matches its intended audience and abstraction level
+- links point to the right owner docs
+- `docs/INDEX.md` still helps someone find the topic
 
 ---
 
-## Common Questions & Answers
+## Common Uses
 
-| Question | Keywords | Document(s) |
-|----------|----------|-------------|
-| "How do I install Panopticon?" | install, setup | README.md |
-| "How do I configure models?" | model routing, smart selection | CONFIGURATION.md, WORK-TYPES.md |
-| "How do specialists work?" | specialist, handoff | SPECIALIST_WORKFLOW.md |
-| "How do I set up workspaces?" | workspace, Docker | README.md, DNS_SETUP.md |
-| "How do I contribute?" | contribution, contributing | CONTRIBUTING.md |
-| "How does cost tracking work?" | cost, billing | cost-tracking.md |
-| "What are beads?" | beads, tasks | CLAUDE.md |
-| "How do I commit changes?" | commit, git commit | CLAUDE.md |
+### Answer a docs question
+1. Read `docs/INDEX.md`
+2. Read the identified file(s)
+3. Answer with file references
 
----
+### Add or update documentation
+1. Identify the owning document type
+2. Read the full file before editing
+3. Keep the explanation at the right level for that doc
+4. Update `docs/INDEX.md` if discoverability changed
 
-## When Documentation Is Missing
-
-If you search the index and **cannot find** relevant documentation:
-
-1. Check if the topic is covered under a different name in Topic Quick-Find
-2. Use Grep to search all documentation for keywords:
-   ```bash
-   Grep --pattern "your keyword" --path docs/ --glob "*.md" --output-mode files_with_matches
-   ```
-3. If still not found, inform the user: *"I couldn't find documentation on [topic] in the current docs. The available categories are: [list categories from INDEX.md]"*
+### Clean up confusing docs
+When a doc feels too low-level for its audience:
+- keep exact implementation details in the deeper doc
+- rewrite the overview to explain what exists, when it appears, and why it matters
+- add links to the deeper reference instead of embedding the full internals
 
 ---
 
-## Skill Maintenance
+## Quick Pointers
 
-This skill relies on `docs/INDEX.md` being up-to-date. When documentation changes:
+| Need | Start here |
+|------|------------|
+| Find documentation | `docs/INDEX.md` |
+| Documentation philosophy | `.claude/skills/update-panopticon-docs/resources/STYLE_GUIDE.md` |
+| Where docs belong | `.claude/skills/update-panopticon-docs/resources/DOC_LOCATIONS.md` |
+| Common update patterns | `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md` |
+| General prose cleanup | `clear-writing` |
 
-- New files → Add to INDEX.md
-- New topics → Add keywords to Topic Quick-Find
-- Renamed/moved files → Update INDEX.md paths
-- Deleted files → Remove from INDEX.md
+---
 
-See: `update-panopticon-docs` skill for documentation maintenance guidelines.
+## When docs are missing
+
+If the index and docs search do not reveal coverage:
+1. confirm the topic is really missing
+2. choose the smallest correct owning doc
+3. add the documentation there
+4. update `docs/INDEX.md` so the topic is findable next time

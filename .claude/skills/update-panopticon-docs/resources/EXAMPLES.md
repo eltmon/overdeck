@@ -2,6 +2,8 @@
 
 Real-world examples of common documentation tasks in Panopticon.
 
+Use these patterns after you have already decided the right owning document and abstraction level.
+
 ## Pattern 1: Adding Third-Party API Integration
 
 **Task**: Document how to use a new API provider (like Kimi) with Claude Code.
