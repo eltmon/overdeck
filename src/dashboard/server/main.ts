@@ -15,6 +15,7 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
+import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore } from './event-store.js';
 import { emitActivityEntry } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
@@ -118,6 +119,8 @@ process.once('SIGINT', () => {
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
+// Mark any in-progress forks as failed — they were interrupted by the restart.
+{ const n = clearStuckForks(); if (n) console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`); }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
 // Repair workflow labels for any GitHub issue that merged but still has in-review label (PAN-676).

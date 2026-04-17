@@ -1,13 +1,13 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle } from 'lucide-react';
+import { ForkModal } from './ForkModal';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import styles from './styles/mission-control.module.css';
-import { getDefaultConversationModel } from '../chat/defaultConversationModel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,10 @@ export interface Conversation {
   model?: string | null;
   /** Effort level used when spawning this conversation. */
   effort?: string | null;
+  /** Async fork provisioning status. Null = not a fork or completed. */
+  forkStatus?: string | null;
+  /** Error message when forkStatus='failed'. */
+  forkError?: string | null;
 }
 
 /** Marker that we're in draft mode — no session spawned yet. */
@@ -119,19 +123,16 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function summaryForkConversation(conv: Conversation): Promise<Conversation> {
-  const model = conv.model || getDefaultConversationModel();
-
-  const res = await fetch(`/api/conversations/${encodeURIComponent(conv.name)}/summary-fork`, {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string }): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model }),
+    body: JSON.stringify({ model: opts.model, summaryModel: opts.summaryModel }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(data?.error || 'Failed to create summary fork');
   }
-  return data.conversation as Conversation;
 }
 
 // ─── Sorting helpers ──────────────────────────────────────────────────────────
@@ -222,13 +223,18 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
   const committingRef = useRef(false);
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
+  const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
   const queryClient = useQueryClient();
   const now = useNow(60_000);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: fetchConversations,
-    refetchInterval: 10000,
+    refetchInterval: (query) => {
+      const data = query.state.data ?? [];
+      const pending = data.some((c: Conversation) => c.forkStatus && c.forkStatus !== 'failed');
+      return pending ? 2000 : 10000;
+    },
   });
 
   const archiveMutation = useMutation({
@@ -279,9 +285,9 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
 
   const summaryForkMutation = useMutation({
     mutationFn: summaryForkConversation,
-    onSuccess: (newConversation) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      onSelectConversation(newConversation.name);
+      toast.success('Fork started — summarizing conversation...', { duration: 4000 });
     },
     onError: (err: Error) => {
       toast.error(err.message, { duration: 8000 });
@@ -471,6 +477,18 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                 ) : (
                   <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
                 )}
+                {conv.forkStatus && conv.forkStatus !== 'failed' && (
+                  <span className={styles.conversationForkStatus} title={`Fork: ${conv.forkStatus}`}>
+                    <Loader2 size={10} className={styles.conversationWorkingSpinner} />
+                    <span>{conv.forkStatus === 'summarizing' ? 'Summarizing...' : conv.forkStatus === 'spawning' ? 'Spawning...' : 'Injecting...'}</span>
+                  </span>
+                )}
+                {conv.forkStatus === 'failed' && (
+                  <span className={styles.conversationForkFailed} title={conv.forkError || 'Fork failed'}>
+                    <AlertCircle size={10} />
+                    <span>Failed</span>
+                  </span>
+                )}
                 {conv.lastAttachedAt && (
                   <time
                     className={styles.conversationTime}
@@ -524,25 +542,29 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     }}
                   />
                 </span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={styles.conversationSummaryForkBtn}
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (!summaryForkMutation.isPending) summaryForkMutation.mutate(conv);
-                  }}
-                  onKeyDown={e => {
-                    if ((e.key === 'Enter' || e.key === ' ') && !summaryForkMutation.isPending) {
+                {conv.sessionFile && !conv.forkStatus && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={styles.conversationSummaryForkBtn}
+                    onClick={e => {
                       e.stopPropagation();
-                      summaryForkMutation.mutate(conv);
-                    }
-                  }}
-                  title="Create summary fork"
-                  aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
-                >
-                  <GitBranchPlus size={11} />
-                </span>
+                      if (!summaryForkMutation.isPending) {
+                        setForkTarget(conv);
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if ((e.key === 'Enter' || e.key === ' ') && !summaryForkMutation.isPending) {
+                        e.stopPropagation();
+                        setForkTarget(conv);
+                      }
+                    }}
+                    title="Create summary fork"
+                    aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
+                  >
+                    <GitBranchPlus size={11} />
+                  </span>
+                )}
                 <span
                   role="button"
                   tabIndex={0}
@@ -569,6 +591,18 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
             ))}
           </AnimatePresence>
         </div>
+      )}
+
+      {forkTarget && (
+        <ForkModal
+          conversation={forkTarget}
+          isPending={summaryForkMutation.isPending}
+          onClose={() => setForkTarget(null)}
+          onConfirm={(conv, launchModel, summaryModel) => {
+            summaryForkMutation.mutate({ conv, model: launchModel, summaryModel });
+            setForkTarget(null);
+          }}
+        />
       )}
     </div>
   );

@@ -122,12 +122,13 @@ function buildSummaryPrompt(transcript: string): string {
   ].join('\n');
 }
 
-const SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
 
-async function runModelSummary(prompt: string): Promise<string> {
+async function runModelSummary(prompt: string, model?: string): Promise<string> {
+  const useModel = model || DEFAULT_SUMMARY_MODEL;
   const args = [
     '-p',
-    '--model', SUMMARY_MODEL,
+    '--model', useModel,
     '--dangerously-skip-permissions',
     '--permission-mode', 'bypassPermissions',
   ];
@@ -173,17 +174,18 @@ async function runModelSummary(prompt: string): Promise<string> {
   });
 }
 
-export async function generateSummaryForFork(jsonlPath: string): Promise<{ summary: string; summaryModel: string | null }> {
+export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string): Promise<{ summary: string; summaryModel: string | null }> {
   const transcript = await readFile(jsonlPath, 'utf-8');
 
   if (!transcript.trim()) {
     throw new Error(`Session file is empty: ${jsonlPath}`);
   }
 
+  const useModel = summaryModel || DEFAULT_SUMMARY_MODEL;
   const prompt = buildSummaryPrompt(transcript);
   try {
-    const summary = await runModelSummary(prompt);
-    return { summary: summary + FORK_WAIT_INSTRUCTION, summaryModel: SUMMARY_MODEL };
+    const summary = await runModelSummary(prompt, useModel);
+    return { summary: summary + FORK_WAIT_INSTRUCTION, summaryModel: useModel };
   } catch (error) {
     console.warn(`[summary-fork] Falling back to local summary for ${jsonlPath}:`, error);
     return { summary: await generateSummary(jsonlPath), summaryModel: null };

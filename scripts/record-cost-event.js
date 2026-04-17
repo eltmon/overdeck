@@ -454,7 +454,9 @@ function initSchema(db) {
       total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
       archived_at      TEXT,                               -- ISO timestamp when archived, null = active
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
-      effort           TEXT                                -- effort level (e.g. 'low', 'medium', 'high')
+      effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
+      fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
+      fork_error       TEXT                                -- error message when fork_status='failed'
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -529,7 +531,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
   `);
-	db.pragma(`user_version = 18`);
+	db.pragma(`user_version = 19`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -537,7 +539,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 18) return;
+	if (currentVersion === 19) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -726,7 +728,15 @@ function runMigrations(db) {
 	if (currentVersion < 18) try {
 		db.exec(`ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
 	} catch {}
-	db.pragma(`user_version = 18`);
+	if (currentVersion < 19) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_status TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 19`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

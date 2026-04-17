@@ -37,6 +37,10 @@ export interface Conversation {
   model: string | null;
   /** Effort level (e.g. 'low', 'medium', 'high'). Null = default. */
   effort: string | null;
+  /** Async fork provisioning status: summarizing, spawning, injecting, failed. Null = not a fork or completed. */
+  forkStatus: string | null;
+  /** Error message when forkStatus='failed'. */
+  forkError: string | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -60,6 +64,8 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     archivedAt: (row['archived_at'] as string | null) ?? null,
     model: (row['model'] as string | null) ?? null,
     effort: (row['effort'] as string | null) ?? null,
+    forkStatus: (row['fork_status'] as string | null) ?? null,
+    forkError: (row['fork_error'] as string | null) ?? null,
   };
 }
 
@@ -71,7 +77,8 @@ export function listConversations(): Conversation[] {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at, model, effort
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
        FROM conversations
        WHERE archived_at IS NULL
        ORDER BY created_at DESC`,
@@ -86,7 +93,8 @@ export function getConversationByName(name: string): Conversation | null {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at, model, effort
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
        FROM conversations
        WHERE name = ?`,
     )
@@ -100,7 +108,8 @@ export function getConversationById(id: number): Conversation | null {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at, model, effort
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
        FROM conversations
        WHERE id = ?`,
     )
@@ -121,13 +130,14 @@ export function createConversation(opts: {
   titleSeed?: string;
   model?: string;
   effort?: string;
+  forkStatus?: string;
 }): Conversation {
   const db = getDatabase();
   const now = new Date().toISOString();
   const result = db
     .prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file, title, title_source, title_seed, model, effort)
-       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file, title, title_source, title_seed, model, effort, fork_status)
+       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       opts.name,
@@ -141,12 +151,15 @@ export function createConversation(opts: {
       opts.titleSeed ?? null,
       opts.model ?? null,
       opts.effort ?? null,
+      opts.forkStatus ?? null,
     );
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
-              title_source, title_seed, total_cost, archived_at, model, effort
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error,
+              fork_status, fork_error
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -234,6 +247,22 @@ export function updateConversationModel(name: string, model: string): void {
   db.prepare(
     `UPDATE conversations SET model = ? WHERE name = ? AND model IS NULL`,
   ).run(model, name);
+}
+
+export function updateForkStatus(name: string, status: string | null, error?: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET fork_status = ?, fork_error = ? WHERE name = ?`,
+  ).run(status, error ?? null, name);
+}
+
+export function clearStuckForks(): number {
+  const db = getDatabase();
+  const result = db.prepare(
+    `UPDATE conversations SET fork_status = 'failed', fork_error = 'Dashboard restarted during fork'
+     WHERE fork_status IS NOT NULL AND fork_status != 'failed'`,
+  ).run();
+  return result.changes;
 }
 
 /**

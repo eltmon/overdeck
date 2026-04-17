@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /**
  * Initialize the complete database schema.
@@ -184,7 +184,9 @@ export function initSchema(db: Database.Database): void {
       total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
       archived_at      TEXT,                               -- ISO timestamp when archived, null = active
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
-      effort           TEXT                                -- effort level (e.g. 'low', 'medium', 'high')
+      effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
+      fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
+      fork_error       TEXT                                -- error message when fork_status='failed'
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -555,6 +557,16 @@ export function runMigrations(db: Database.Database): void {
   if (currentVersion < 18) {
     try {
       db.exec(`ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
+    } catch { /* already exists */ }
+  }
+
+  // v18 → v19: add fork_status + fork_error columns to conversations (async fork provisioning)
+  if (currentVersion < 19) {
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN fork_status TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
     } catch { /* already exists */ }
   }
 
