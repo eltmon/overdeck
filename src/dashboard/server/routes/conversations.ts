@@ -348,7 +348,7 @@ const getConversationsRoute = HttpRouter.add(
               conv.status === 'active' &&
               !conv.endedAt &&
               Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
-            const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
+            const sessionAlive = !conv.forkStatus && (withinGrace || (await tmuxSessionExists(conv.tmuxSession)));
 
             let isWorking = false;
             let currentTool: string | null = null;
@@ -939,6 +939,7 @@ async function runForkPipeline(convName: string, parentConv: Conversation, sessi
   }
   await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
 
+  markConversationActive(convName);
   updateForkStatus(convName, null);
 }
 

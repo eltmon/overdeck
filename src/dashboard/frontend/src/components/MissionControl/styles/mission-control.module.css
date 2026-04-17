@@ -1828,7 +1828,7 @@
   gap: var(--mc-space-3);
 }
 
-/* Context injection block (e.g. conversation summary fork) — full-width, markdown-rendered */
+/* Context injection block (e.g. conversation summary fork) — collapsible */
 .contextMessageRow {
   padding: 2px 0;
 }
@@ -1838,17 +1838,42 @@
   background: color-mix(in srgb, var(--mc-accent) 6%, var(--mc-bg-card));
   border-left: 3px solid var(--mc-accent);
   border-radius: 4px;
-  padding: var(--mc-space-3) var(--mc-space-4);
+  overflow: hidden;
+}
+
+.contextMessageToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  width: 100%;
+  padding: var(--mc-space-2) var(--mc-space-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mc-accent);
+  font-size: var(--mc-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.contextMessageToggle:hover {
+  background: color-mix(in srgb, var(--mc-accent) 8%, transparent);
+}
+
+.contextMessageIcon {
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .contextMessageLabel {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--mc-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: var(--mc-space-2);
-  opacity: 0.8;
+  flex: 1;
+}
+
+.contextMessageContent {
+  padding: 0 var(--mc-space-4) var(--mc-space-3);
+  border-top: 1px solid color-mix(in srgb, var(--mc-accent) 15%, transparent);
 }
 
 /* User message — right-aligned bubble */
@@ -2798,7 +2823,6 @@
   width: 440px;
   max-width: 100%;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

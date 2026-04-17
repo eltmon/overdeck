@@ -192,11 +192,16 @@ export function ConversationPanel({
 
   const showTerminal = conversation.sessionAlive || resumed;
 
-  const statusColor = conversation.sessionAlive
+  const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
+  const isForkFailedHeader = conversation.forkStatus === 'failed';
+  const statusColor = isForkingHeader
+    ? 'var(--mc-warning)'
+    : isForkFailedHeader
+    ? 'var(--mc-error)'
+    : conversation.sessionAlive
     ? 'var(--mc-success)'
     : 'var(--mc-text-muted)';
-
-  const statusLabel = conversation.sessionAlive ? 'active' : 'ended';
+  const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
 
   return (
     <div className={styles.conversationTerminal}>
@@ -504,7 +509,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           streaming={isWorking}
         />
       )}
-      {onResume ? (
+      {isForking ? null : onResume ? (
         <div className={styles.conversationResumeBar}>
           {modelPicker}
           <button

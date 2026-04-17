@@ -20,7 +20,7 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus } from 'lucide-react';
 import type { WorkLogEntry } from './chat-types';
 import { ChatMarkdown } from './ChatMarkdown';
 import {
@@ -257,7 +257,16 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
 
 // ─── User message ─────────────────────────────────────────────────────────────
 
+function isSummaryForkMessage(text: string): boolean {
+  return text.startsWith('## Conversation Summary Fork') ||
+    text.includes('**Do not take any action.** This is context from a prior conversation fork');
+}
+
 function UserMessageRow({ message }: { message: ChatMessage }) {
+  if (isSummaryForkMessage(message.text)) {
+    return <ContextMessageBlock message={message} />;
+  }
+
   const isPending = message.id.startsWith('optimistic-');
   return (
     <div className={styles.userMessageRow}>
@@ -279,6 +288,34 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
             formatTimestamp(message.createdAt)
           )}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function ContextMessageBlock({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = useState(false);
+  const cleanText = message.text
+    .replace(/\n---\n\n\*\*Do not take any action\.\*\*.*$/s, '')
+    .trim();
+
+  return (
+    <div className={styles.contextMessageRow}>
+      <div className={styles.contextMessageBlock}>
+        <button
+          type="button"
+          className={styles.contextMessageToggle}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <GitBranchPlus size={14} className={styles.contextMessageIcon} />
+          <span className={styles.contextMessageLabel}>Conversation Fork Summary</span>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+        {expanded && (
+          <div className={styles.contextMessageContent}>
+            <ChatMarkdown text={cleanText} />
+          </div>
+        )}
       </div>
     </div>
   );
