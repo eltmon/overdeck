@@ -25,6 +25,7 @@ vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
+  stopAgentAsync: mockStopAgent,
   messageAgent: mockMessageAgent,
   normalizeAgentId: (id: string) => id.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
 }));

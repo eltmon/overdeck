@@ -11,6 +11,7 @@
 | [README.md](../README.md) | Project overview, installation, and quickstart guide |
 | [QUICK-REFERENCE.md](./QUICK-REFERENCE.md) | Command taxonomy cheat sheet — all `pan` commands, organized by bucket (lifecycle, observation, nouns, system, admin) plus the legacy→new migration table |
 | [USAGE.md](./USAGE.md) | Detailed CLI usage examples |
+| [RELEASING.md](./RELEASING.md) | Stable vs canary release policy and intentional tag-driven workflow |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Contribution guidelines and development setup |
 
 ---
@@ -120,6 +121,7 @@
 - **"getting started"** → README.md, CONTRIBUTING.md
 - **"install"** / **"setup"** → README.md, CONTRIBUTING.md, DNS_SETUP.md
 - **"quickstart"** → README.md
+- **"release"** / **"releasing"** / **"stable"** / **"canary"** / **"tag"** → RELEASING.md, USAGE.md, QUICK-REFERENCE.md
 - **"contribution"** / **"contributing"** → CONTRIBUTING.md
 
 ### Configuration & Models

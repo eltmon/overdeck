@@ -47,6 +47,17 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 - If a feature genuinely cannot be completed in one session (e.g., token limits), the agent should document exactly what remains and NOT signal completion. The issue stays open until ALL work is done.
 - PRD phases are implementation guidance, not separate deliverables.
 
+## CRITICAL: JSONL Session Files Are Sacred — NEVER Delete
+
+**NEVER delete, overwrite, or truncate Claude Code JSONL session files** (`~/.claude/projects/*/*.jsonl`). These files are the only record of conversation history — they contain the user's work, context, and decisions. Losing them is irreversible data loss.
+
+**Rules:**
+- **NEVER delete a JSONL file** unless the user explicitly asks AND you have confirmed with them a second time ("Are you sure? This cannot be undone.")
+- **NEVER delete JSONL files as part of cleanup operations** — cleaning up orphaned conversations means removing DB records and killing tmux sessions, NOT touching JSONL files
+- **NEVER assume a JSONL file is "garbage"** based on size — even small files may represent conversations the user is actively working with
+- Code that programmatically deletes JSONL files (e.g., `fs.unlinkSync` on a session path) must NEVER be written without explicit user instruction
+- When cleaning up failed forks or orphaned conversations, leave the JSONL files intact
+
 ## CRITICAL: No Blocking Calls in Dashboard Server Code
 
 **NEVER use `execSync`, `readFileSync`, `writeFileSync`, `readdirSync`, or `statSync` in any code reachable from the dashboard server** (Effect route handlers in `src/dashboard/server/routes/`, services in `src/dashboard/server/services/`, or any module imported by them).

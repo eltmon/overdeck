@@ -209,7 +209,7 @@ interface InnerPluginProps {
   conversationName: string;
   onCommandKeyDown: (key: 'Enter') => void;
   onTextChange: (text: string) => void;
-  onSlashKey: () => void;
+  onSlashKey: (root: HTMLElement) => void;
 }
 
 function ComposerPlugin({
@@ -251,7 +251,7 @@ function ComposerPlugin({
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const target = e.target as HTMLElement;
         if (target === root || root.contains(target)) {
-          onSlashKey();
+          onSlashKey(root);
         }
       }
     };
@@ -493,13 +493,23 @@ export function ComposerPromptEditor({
     [slashContext],
   );
 
-  const handleSlashKey = useCallback(() => {
+  const handleSlashKey = useCallback((root: HTMLElement) => {
     const selection = window.getSelection();
+    let anchorRect: DOMRect | null = null;
+
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      setMenuAnchorRect(rect);
+      if (rect.width > 0 || rect.height > 0 || rect.top > 0 || rect.left > 0 || rect.bottom > 0) {
+        anchorRect = rect;
+      }
     }
+
+    if (!anchorRect) {
+      anchorRect = root.getBoundingClientRect();
+    }
+
+    setMenuAnchorRect(anchorRect);
     pendingSlashTriggerRef.current = true;
     setIsSlashMenuOpen(true);
     setSelectedIndex(0);

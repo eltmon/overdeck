@@ -120,16 +120,12 @@ async function unfavoriteConversation(name: string): Promise<void> {
 }
 
 async function summaryForkConversation(conv: Conversation): Promise<Conversation> {
-  const model = conv.model || null;
-  const fallbackModel = getDefaultConversationModel();
-  const body = model
-    ? { model, summaryModel: model }
-    : { summaryModel: fallbackModel };
+  const model = conv.model || getDefaultConversationModel();
 
   const res = await fetch(`/api/conversations/${encodeURIComponent(conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ model }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {

@@ -69,6 +69,7 @@ import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
+import { registerReleaseCommands } from './commands/release.js';
 
 const program = new Command();
 
@@ -307,6 +308,9 @@ registerWorkspaceCommands(program);
 
 // Register test commands (pan test run, pan test list)
 registerTestCommands(program);
+
+// Register release commands (pan release check/stable/canary/notes)
+registerReleaseCommands(program);
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);

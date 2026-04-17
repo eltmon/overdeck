@@ -46,6 +46,7 @@ pan-oversee
 pan-plan
 pan-projects
 pan-quickstart
+pan-release
 pan-reload
 pan-reopen
 pan-restart

@@ -123,7 +123,21 @@ pan down              Stop dashboard (and Traefik if enabled)
 pan serve             One-shot npx launcher (dashboard + open browser)
 ```
 
-## 5. First-run & maintenance
+## 5. Releases
+
+Panopticon develops on `main`, then publishes intentionally by tag.
+
+```
+pan release check                         Verify branch, tree, build, tests, CLI
+pan release stable --version <x.y.z>      Create stable release commit + tag locally
+pan release canary --version <x.y.z-canary.n>
+                                          Create canary release commit + tag locally
+pan release notes [from] [to]             Draft notes from git history
+```
+
+Stable tags publish npm `latest`; canary tags publish npm `canary` and create GitHub prereleases.
+
+## 6. First-run & maintenance
 
 ```
 pan init              Initialize ~/.panopticon/
@@ -136,7 +150,7 @@ pan backup            Manage backups
 pan restore [ts]      Restore from backup
 ```
 
-## 6. `pan admin` — plumbing
+## 7. `pan admin` — plumbing
 
 You should rarely need these. They're here for debugging, recovery, and infra ops.
 

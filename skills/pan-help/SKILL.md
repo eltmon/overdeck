@@ -126,6 +126,7 @@ Panopticon comes with a suite of skills to guide AI assistants:
 - `/pan-status` - System health overview
 - `/pan-plan` - Planning workflow guidance
 - `/pan-issue` - Workspace + agent creation
+- `/pan-release` - Stable vs canary release workflow from main
 - And many more... (use `pan skills` to see full list)
 
 ## Typical Workflows
