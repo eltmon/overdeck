@@ -197,6 +197,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   // Handle context menu (right-click)
   const handleContextMenu = useCallback((event: MouseEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     const term = terminalInstance.current;
     if (!term) return;
 
@@ -206,6 +207,12 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       y: event.clientY,
       canCopy: term.hasSelection(),
     });
+  }, []);
+
+  const handleTerminalWheel = useCallback((event: WheelEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
   }, []);
 
   // Close context menu
@@ -358,15 +365,20 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
 
+      // Keep wheel/trackpad gestures contained inside the terminal surface so
+      // outer browser/app-shell handlers (like chat-input history navigation)
+      // never consume them while the pointer is over the terminal.
+      term.attachCustomWheelEventHandler(handleTerminalWheel);
+
       // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
       // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
       // drag-selection disappear. Re-dispatch primary-button mousedown with shiftKey
       // so xterm enters selection mode while leaving wheel scrolling untouched.
       terminalRef.current.addEventListener('mousedown', handleForcedSelectionMouseDown, true);
 
-      // Do NOT intercept wheel events — let them pass through to xterm.js and tmux.
-      // Claude/tmux mouse mode is currently the only working path for wheel-driven
-      // history in alternate-screen sessions.
+      // Wheel/trackpad gestures stay inside the terminal surface. xterm still
+      // handles the terminal-facing semantics, but the browser/app shell must not
+      // see the gesture or reinterpret it as page scroll / chat history.
 
       // Register input/resize handlers once per terminal instance.
       // Using wsRef.current ensures they always send to the current WebSocket,
@@ -563,6 +575,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     return () => {
       window.removeEventListener('resize', handleResize);
       terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
+      terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
       setShouldReconnect(false);
       readyForLiveData.current = false;
       if (reconnectTimer.current) {
@@ -574,7 +587,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       terminalInstance.current = null;
       fitAddon.current = null;
     };
-  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu, getMeasuredSize, sendResizeIfNeeded]);
+  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
 
   useEffect(() => {
     let cancelled = false;

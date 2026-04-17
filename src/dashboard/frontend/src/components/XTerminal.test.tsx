@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -309,6 +309,44 @@ describe('XTerminal', () => {
     await waitFor(() => {
       expect(term.resize).toHaveBeenCalledWith(90, 28);
     });
+  });
+
+  it('shows the Panopticon context menu on right-click', async () => {
+    const { container } = render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const terminalSurface = container.querySelector('.absolute.inset-0') as HTMLDivElement | null;
+    expect(terminalSurface).toBeTruthy();
+
+    fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
+
+    expect(await screen.findByText('Paste')).toBeInTheDocument();
+  });
+
+  it('contains wheel events inside the terminal surface', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ wheelHandler: ((event: WheelEvent) => boolean) | null }> }).instances[0];
+    expect(term.wheelHandler).toBeTruthy();
+
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    const event = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'preventDefault', { value: preventDefault });
+    Object.defineProperty(event, 'stopPropagation', { value: stopPropagation });
+
+    const result = term.wheelHandler!(event);
+
+    expect(result).toBe(true);
+    expect(preventDefault).toHaveBeenCalled();
+    expect(stopPropagation).toHaveBeenCalled();
   });
 });
 

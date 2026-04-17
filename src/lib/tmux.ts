@@ -14,6 +14,12 @@ const MANAGED_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
   'set -g mouse on',
+  '# Panopticon owns the browser-facing context menu. Prevent tmux defaults',
+  '# from opening a competing right-click menu inside managed sessions.',
+  'unbind-key -T root MouseDown3Pane',
+  'unbind-key -T root M-MouseDown3Pane',
+  'bind-key -T root MouseDown3Pane select-pane -t =',
+  'bind-key -T root M-MouseDown3Pane select-pane -t =',
   '',
 ].join('\n');
 
@@ -55,14 +61,36 @@ async function ensureManagedTmuxDirAsync(): Promise<void> {
   await mkdir(getTmuxDir(), { recursive: true });
 }
 
+function reloadManagedTmuxConfigSync(): void {
+  try {
+    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore' });
+    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
+  } catch {
+    // If tmux isn't available or the server can't be started yet, callers will
+    // still write the managed config file and retry on the next tmux interaction.
+  }
+}
+
+async function reloadManagedTmuxConfigAsync(): Promise<void> {
+  try {
+    await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8' });
+    await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
+  } catch {
+    // If tmux isn't available or the server can't be started yet, callers will
+    // still write the managed config file and retry on the next tmux interaction.
+  }
+}
+
 function ensureManagedTmuxConfigSync(): void {
   ensureManagedTmuxDirSync();
   writeFileSync(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
+  reloadManagedTmuxConfigSync();
 }
 
 async function ensureManagedTmuxConfigAsync(): Promise<void> {
   await ensureManagedTmuxDirAsync();
   await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
+  await reloadManagedTmuxConfigAsync();
 }
 
 export function getTmuxConfigMode(): TmuxConfigMode {
