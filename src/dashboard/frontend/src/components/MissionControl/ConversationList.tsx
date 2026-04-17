@@ -352,13 +352,14 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
       filtered = filtered.filter((c) => c.isFavorited);
     }
 
-    // Sort within each group
+    // Sort within each group — forking conversations count as active
+    const isActive = (c: Conversation) => c.sessionAlive || (c.forkStatus && c.forkStatus !== 'failed');
     const active = sortConversations(
-      filtered.filter((c) => c.sessionAlive),
+      filtered.filter((c) => isActive(c)),
       sort,
     );
     const inactive = sortConversations(
-      filtered.filter((c) => !c.sessionAlive),
+      filtered.filter((c) => !isActive(c)),
       sort,
     );
 
@@ -443,7 +444,14 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     <X size={11} />
                   </span>
                 )}
-                {conv.isWorking ? (
+                {conv.forkStatus && conv.forkStatus !== 'failed' ? (
+                  <Loader2
+                    size={12}
+                    className={styles.conversationWorkingSpinner}
+                    style={{ color: 'var(--mc-warning)' }}
+                    aria-label={`Forking ${conv.name}`}
+                  />
+                ) : conv.isWorking ? (
                   <WorkingSpinner
                     size={12}
                     currentTool={conv.currentTool ?? null}

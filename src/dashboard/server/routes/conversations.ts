@@ -998,6 +998,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           effort: conv.effort ?? undefined,
           forkStatus: 'summarizing',
         });
+        markConversationActive(newConv.name);
 
         runForkPipeline(newConv.name, conv, sessionId, summaryModel).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);

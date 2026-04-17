@@ -321,7 +321,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   conversations: {
     compactionModel: 'claude-haiku-4-5',
     manualCompactMode: 'claude-code',
-    richCompaction: false,
+    richCompaction: true,
   },
   shadow: {
     enabled: false,
