@@ -40,6 +40,7 @@ import {
   listFavoritedIds,
   setFavorite,
   removeFavorite,
+  updateForkStatus,
 } from '../../../lib/database/conversations-db.js';
 import {
   sendKeysAsync,
@@ -66,7 +67,7 @@ import {
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
-import { createSummaryFork } from '../../../lib/conversations/summary-fork.js';
+import { generateSummaryForFork, reserveSummaryForkSession } from '../../../lib/conversations/summary-fork.js';
 
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
@@ -913,6 +914,34 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
 
+async function runForkPipeline(convName: string, parentConv: Conversation, sessionId: string, summaryModel?: string): Promise<void> {
+  const conv = getConversationByName(convName);
+  if (!conv) throw new Error(`Fork conversation ${convName} not found`);
+
+  if (!parentConv.sessionFile) throw new Error(`Parent has no session file`);
+  const { summary } = await generateSummaryForFork(parentConv.sessionFile, summaryModel);
+
+  updateForkStatus(convName, 'spawning');
+  await spawnConversationSession(
+    conv.tmuxSession,
+    conv.cwd,
+    sessionId,
+    conv.model ?? undefined,
+    conv.effort ?? undefined,
+    conv.issueId ?? undefined,
+  );
+  await waitForTmuxSession(conv.tmuxSession);
+
+  updateForkStatus(convName, 'injecting');
+  const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
+  if (!ready) {
+    console.warn(`[summary-fork] Prompt not detected in time for ${convName}, sending summary anyway`);
+  }
+  await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
+
+  updateForkStatus(convName, null);
+}
+
 const postConversationSummaryForkRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/summary-fork',
@@ -934,6 +963,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string'
           ? body['model'].trim()
           : undefined;
+        const summaryModel = typeof body['summaryModel'] === 'string'
+          ? body['summaryModel'].trim()
+          : undefined;
         const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
           ? body['cwd'].trim()
           : undefined;
@@ -942,26 +974,38 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
         }
 
-        const result = await createSummaryFork(conv, { model, cwd });
-        await spawnConversationSession(
-          result.conversation.tmuxSession,
-          result.conversation.cwd,
-          result.sessionId,
-          result.conversation.model ?? undefined,
-          result.conversation.effort ?? undefined,
-          result.conversation.issueId ?? undefined,
+        const { sessionId, sessionFile } = await reserveSummaryForkSession(
+          cwd || conv.cwd || process.cwd(),
         );
-        await waitForTmuxSession(result.conversation.tmuxSession);
-        const ready = await waitForClaudePrompt(result.conversation.tmuxSession, 60000).catch(() => false);
-        if (!ready) {
-          console.warn(`[summary-fork] Prompt not detected in time for ${result.conversation.name}, sending summary anyway`);
-        }
-        await sendKeysAsync(result.conversation.tmuxSession, result.summary, 'summary-fork');
+
+        const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const suffix = randomUUID().slice(0, 4);
+        const newName = `${timestamp}-${suffix}`;
+        const newTmux = `conv-${newName}`;
+        const launchModel = model || conv.model;
+
+        const newConv = createConversation({
+          name: newName,
+          tmuxSession: newTmux,
+          cwd: cwd || conv.cwd || process.cwd(),
+          issueId: conv.issueId ?? undefined,
+          title: `Summary Fork: ${conv.title || conv.name}`,
+          titleSource: 'manual',
+          titleSeed: `Summary Fork of ${conv.name}`,
+          sessionFile,
+          model: launchModel ?? undefined,
+          effort: conv.effort ?? undefined,
+          forkStatus: 'summarizing',
+        });
+
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel).catch((err) => {
+          console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
+          updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
+        });
 
         return jsonResponse({
           success: true,
-          conversation: result.conversation,
-          summaryModel: result.summaryModel,
+          conversation: newConv,
         });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

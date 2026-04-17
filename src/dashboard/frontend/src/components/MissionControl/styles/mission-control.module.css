@@ -2552,3 +2552,300 @@
   padding: 4px;
   margin-top: 2px;
 }
+
+/* ─── Fork status indicators ─────────────────────────────────────────────── */
+
+.conversationForkStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--mc-accent);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: var(--mc-radius-sm);
+  background: color-mix(in srgb, var(--mc-accent) 12%, transparent);
+}
+
+.conversationForkFailed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--mc-error);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: var(--mc-radius-sm);
+  background: color-mix(in srgb, var(--mc-error) 12%, transparent);
+  cursor: help;
+}
+
+/* ─── Fork dialog ────────────────────────────────────────────────────────── */
+
+.forkOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mc-space-8);
+}
+
+.forkDialog {
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-lg);
+  width: 440px;
+  max-width: 100%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.forkHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--mc-border);
+}
+
+.forkHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.forkHeaderIcon {
+  color: var(--mc-accent);
+  flex-shrink: 0;
+}
+
+.forkTitle {
+  margin: 0;
+  font-size: var(--mc-font-size-md);
+  font-weight: 600;
+  color: var(--mc-text-primary);
+}
+
+.forkClose {
+  padding: var(--mc-space-1);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  transition: all 0.1s;
+}
+
+.forkClose:hover {
+  color: var(--mc-text-primary);
+  background: var(--mc-bg-hover);
+}
+
+.forkBody {
+  padding: 16px 20px 8px;
+}
+
+.forkDesc {
+  margin: 0 0 16px;
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-secondary);
+  line-height: 1.5;
+}
+
+.forkFields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.forkField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.forkFieldLabel {
+  font-size: var(--mc-font-size-sm);
+  font-weight: 500;
+  color: var(--mc-text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.forkFieldHint {
+  font-size: 11px;
+  color: var(--mc-text-muted);
+  padding: 0 0 8px;
+  line-height: 1.3;
+}
+
+/* ─── Fork model picker ──────────────────────────────────────────────────── */
+
+.forkPickerWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.forkPickerBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: var(--mc-font-size-sm);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-sm);
+  background: var(--mc-bg-secondary);
+  color: var(--mc-text-primary);
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  font-family: inherit;
+}
+
+.forkPickerBtn:hover {
+  border-color: var(--mc-accent);
+  background: var(--mc-bg-hover);
+}
+
+.forkPickerValue {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.forkPickerCost {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+}
+
+.forkPickerChevron {
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+}
+
+.forkPickerDropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 200;
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.forkPickerGroupHeader {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mc-text-muted);
+}
+
+.forkPickerOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: var(--mc-font-size-sm);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--mc-radius-sm);
+  cursor: pointer;
+  color: var(--mc-text-primary);
+  font-family: inherit;
+  transition: background 0.1s;
+}
+
+.forkPickerOption:hover {
+  background: var(--mc-bg-hover);
+}
+
+.forkPickerOptionActive {
+  background: var(--mc-bg-selected);
+  font-weight: 500;
+}
+
+.forkPickerOptionLabel {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.forkPickerOptionCost {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+}
+
+/* ─── Fork footer ────────────────────────────────────────────────────────── */
+
+.forkFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+}
+
+.forkCancelBtn {
+  padding: 7px 16px;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-sm);
+  background: transparent;
+  color: var(--mc-text-secondary);
+  font-size: var(--mc-font-size-sm);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s, color 0.1s;
+}
+
+.forkCancelBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
+.forkConfirmBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--mc-radius-sm);
+  background: var(--mc-accent);
+  color: white;
+  font-size: var(--mc-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter 0.1s, opacity 0.1s;
+}
+
+.forkConfirmBtn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.forkConfirmBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
