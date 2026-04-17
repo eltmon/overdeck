@@ -1093,9 +1093,9 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
             <div>
-              <h3 className="font-bold text-content">Panopticon compaction model</h3>
+              <h3 className="font-bold text-content">Compaction &amp; summary model</h3>
               <p className="text-sm text-content-muted mt-1">
-                This model is used when Panopticon performs native conversation compaction. It does not affect Claude Code&apos;s own built-in <code>/compact</code> behavior.
+                Used for native conversation compaction and as the default summary model when forking conversations. Does not affect Claude Code&apos;s built-in <code>/compact</code>.
               </p>
             </div>
             <select
