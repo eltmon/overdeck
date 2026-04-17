@@ -1,168 +1,108 @@
 # Agent Types Index
 
-Code-first reference for Panopticon runtime agent types and adjacent routed workflow jobs.
+High-level map of the kinds of agents and routed jobs you will encounter in Panopticon.
 
-This document answers four questions for each type:
-- does it exist in code,
-- is it actually used,
-- where/how is it spawned,
-- which prompt and model-routing path apply.
+This document is for someone who is new to Panopticon and wants to understand:
+- what kinds of agents exist,
+- what role each one plays,
+- when each one shows up in the workflow,
+- and what kind of instructions it runs on.
 
-For model precedence details, see [MODEL_ROUTING.md](./MODEL_ROUTING.md). For specialist sequencing, see [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md).
+If you want implementation details, routing settings, or workflow internals, use the related docs linked at the end.
+
+## The big picture
+
+Panopticon has a few different layers of "agent types," and they are easy to mix up if everything is listed in one flat table.
+
+- **Primary agents** do the main planning and implementation work.
+- **Specialist agents** validate work at important checkpoints.
+- **Convoy reviewers** are parallel review lenses, not the main workflow engine.
+- **Subagents** are short-lived helpers for focused tasks.
+- **Workflow jobs and CLI contexts** are routable slots used by the system, but they are not standalone Panopticon runtime agents in the same sense as the planning, work, or specialist agents.
 
 ## Runtime agent inventory
 
-These are the **actual runtime agent types** in the current codebase.
+These are the agent types a new Panopticon user is most likely to care about first.
 
-| Type | Category | Status | Spawn / trigger | Prompt source | Model routing | User-facing surface |
-|---|---|---|---|---|---|---|
-| `planning-agent` | primary | Active | `src/lib/planning/spawn-planning-session.ts` via `pan plan` / dashboard planning start | `src/lib/cloister/prompts/planning.md` via `buildPlanningPrompt()` | `planning-agent` | CLI + dashboard |
-| `work-agent` | primary | Active | `src/dashboard/server/services/agent-spawner.ts` -> `src/lib/agents.ts` | `src/lib/cloister/prompts/work.md` plus phase-specific work-agent prompt building | `issue-agent:<phase>` | CLI + dashboard |
-| `review-agent` | specialist | Active | spawned by `spawnEphemeralSpecialist()` from Cloister verification/handoff pipeline | `src/lib/cloister/prompts/review.md` via `buildTaskPrompt()` | `specialist-review-agent` + `cloister.toml` specialist override | automatic / specialist tooling |
-| `test-agent` | specialist | Active | spawned by verification pipeline after review | `src/lib/cloister/prompts/test.md` via `buildTestAgentPromptContent()` | `specialist-test-agent` + `cloister.toml` specialist override | automatic / specialist tooling |
-| `inspect-agent` | specialist | Active | `src/lib/cloister/inspect-agent.ts` via `pan inspect <issue> --bead <id>` | `src/lib/cloister/prompts/inspect-agent.md` via prompt override built in `inspect-agent.ts`, plus fallback handler in `buildTaskPrompt()` | `specialist-inspect-agent` + `cloister.toml` specialist override | CLI-triggered during implementation |
-| `uat-agent` | specialist | Active | specialist pipeline after test pass | `src/lib/cloister/prompts/uat-agent.md` via `buildTaskPrompt()` | `specialist-uat-agent` + `cloister.toml` specialist override | automatic / specialist tooling |
-| `merge-agent` | specialist | Active | specialist pipeline after verification/UAT success | `src/lib/cloister/prompts/merge.md` via `buildTaskPrompt()` | `specialist-merge-agent` + `cloister.toml` specialist override | explicit approval path + specialist tooling |
+| Type | Category | Status | When it runs | Instruction basis |
+|---|---|---|---|---|
+| `planning-agent` | primary | Active | Runs when Panopticon is turning an issue or request into an execution plan | Uses planning instructions, project context, and planning artifacts to produce a vBRIEF-backed plan |
+| `work-agent` | primary | Active | Runs when actual issue work begins and code needs to be implemented | Uses the main work prompt plus the current phase context, issue context, and workspace state |
+| `inspect-agent` | specialist | Active | Runs during implementation when a bead is explicitly inspected before work continues | Uses per-bead inspection instructions focused on spec fidelity, constraints, and quick verification |
+| `review-agent` | specialist | Active | Runs after implementation is submitted for review | Uses review instructions focused on code quality, correctness, security, and change coverage |
+| `test-agent` | specialist | Active | Runs after review approval to verify the work through tests | Uses test-focused instructions for running checks, interpreting failures, and reporting test status |
+| `uat-agent` | specialist | Active | Runs after tests pass when Panopticon wants real-browser validation | Uses browser/UAT instructions for requirement verification, visual checks, auth flows, and real-user behavior |
+| `merge-agent` | specialist | Active | Runs at the end of the pipeline when work is ready for merge preparation and completion steps | Uses merge-focused instructions for final validation, merge prep, and post-merge lifecycle work |
 
-## Canonical type definitions
+## What each category is for
 
 ### Primary agents
-- `planning-agent` is a routable pre-work job in `src/lib/work-types.ts`
-- `work-agent` is the main implementation runtime in `src/lib/agents.ts` and is routed by phase rather than by a dedicated `work-agent` work type
+
+These are the main workers in the system.
+
+- **planning-agent** decides what should be done and how the work should be broken down.
+- **work-agent** does the actual implementation work once planning is complete.
+
+If you are trying to understand the normal day-to-day Panopticon workflow, start here.
 
 ### Specialist agents
-Canonical runtime specialist type definition:
-- `src/lib/cloister/specialists.ts` — `SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent'`
 
-Canonical specialist registry metadata:
-- `src/lib/cloister/specialists.ts` — `DEFAULT_SPECIALISTS`
+These are quality gates and validation stages around the main implementation flow.
 
-## Spawn map
+- **inspect-agent** checks work incrementally during implementation.
+- **review-agent** performs a dedicated review pass.
+- **test-agent** verifies the work through automated checks.
+- **uat-agent** validates the result in a real browser from a user perspective.
+- **merge-agent** handles the final merge-stage responsibilities.
 
-## Planning flow
-- `planning-agent`
-  - spawn path: `src/lib/planning/spawn-planning-session.ts`
-  - entrypoints: CLI `pan plan`, dashboard planning start
-  - prompt builder: `buildPlanningPrompt()`
+A useful mental model is: the work agent builds, and the specialists decide whether that work is actually ready to move forward.
 
-## Implementation flow
-- `work-agent`
-  - spawn path: dashboard start agent -> `POST /api/agents` in `src/dashboard/server/routes/agents.ts` -> detached `pan start <id> --local --phase <phase>` -> `spawnAgent()` in `src/lib/agents.ts`
-  - entrypoints: CLI `pan start`, dashboard start agent
-  - routing path: explicit work type or `issue-agent:<phase>`
+### Support and routing-only types
 
-## Per-bead verification flow
-- `inspect-agent`
-  - spawn path: `src/lib/cloister/inspect-agent.ts` -> `spawnEphemeralSpecialist()`
-  - entrypoint: CLI `pan inspect`
-  - note: this is a real runtime specialist, but it is not started from the generic dashboard `startWork()` endpoint
+Panopticon also has other routed job types that matter for configuration and model selection, but are easier to misunderstand if they are treated as full runtime agent types.
 
-## Post-implementation specialist pipeline
-- `review-agent`
-  - specialist verification/review stage after implementation completion
-- `test-agent`
-  - specialist testing stage after review approval
-- `uat-agent`
-  - browser UAT stage after tests pass
-- `merge-agent`
-  - final merge-prep / merge stage after verification success
+- **Convoy reviewers** are parallel review lenses such as security, performance, correctness, and requirements review.
+- **Subagents** are helper jobs used for focused side tasks such as exploration, planning assistance, or shell-heavy work.
+- **Workflow jobs** like `status-review` are system jobs with their own model slot, not a main Panopticon runtime agent you directly think of as part of the agent roster.
+- **CLI contexts** like `cli:interactive` and `cli:quick-command` describe direct user interaction modes, not autonomous workflow agents.
 
-The shared specialist spawner is:
-- `src/lib/cloister/specialists.ts` — `spawnEphemeralSpecialist()`
+## Typical workflow
 
-## Prompt correlation
+A newcomer-friendly way to think about the normal flow is:
 
-### Primary agents
-- `planning-agent`
-  - prompt file: `src/lib/cloister/prompts/planning.md`
-  - render path: `src/lib/planning/spawn-planning-session.ts`
-- `work-agent`
-  - prompt file: `src/lib/cloister/prompts/work.md`
-  - render path: work-agent prompt building in `src/lib/agents.ts` / work-agent helpers
+1. **planning-agent** turns the issue into a plan.
+2. **work-agent** implements the planned work.
+3. **inspect-agent** may verify progress bead by bead during implementation.
+4. **review-agent** performs a dedicated review pass.
+5. **test-agent** verifies the work through tests.
+6. **uat-agent** checks the result in a real browser.
+7. **merge-agent** handles the final merge-stage checks and completion work.
 
-### Specialists
-- `review-agent` -> `src/lib/cloister/prompts/review.md`
-- `test-agent` -> `src/lib/cloister/prompts/test.md`
-- `merge-agent` -> `src/lib/cloister/prompts/merge.md`
-- `inspect-agent` -> `src/lib/cloister/prompts/inspect-agent.md`
-- `uat-agent` -> `src/lib/cloister/prompts/uat-agent.md`
+Not every project or run will emphasize every stage equally, but this is the core mental model.
 
-Canonical specialist prompt switch:
-- `src/lib/cloister/specialists.ts` — `buildTaskPrompt()`
+## Important distinction: runtime agents vs routed work types
 
-Special case:
-- `inspect-agent` commonly uses a prompt override assembled in `src/lib/cloister/inspect-agent.ts`, which is still grounded in `inspect-agent.md`
+Some names you will see in settings are not part of the main runtime agent roster.
 
-## Routed workflow jobs that are not runtime agent types
-
-These are routable model slots that appear in settings/UI/docs, but they are **not** members of the runtime agent-type inventory above.
-
-| Work type | Kind | Current usage | Guidance |
-|---|---|---|---|
-| `status-review` | workflow job | Used by Mission Control route `POST /api/command-deck/planning/:issueId/status-review` in `src/dashboard/server/routes/mission-control.ts` | Keep as a workflow-routed job, not a runtime agent type |
-| `issue-agent:review-response` | work-agent phase | Used as a routable phase for follow-up fixes after review feedback | Keep documented as a work-agent phase, not a separate agent type |
-| `convoy:requirements-reviewer` | convoy reviewer | Present in routing registry and docs for convoy review flows | Keep as convoy-only, not a Panopticon runtime agent type |
-
-## Legacy / drift that should not be treated as source of truth
-
-## Stale audit document
-- `docs/audits/AGENT_AUDIT_REPORT.md` previously claimed `inspect-agent` / `uat-agent` were not fully wired.
-- Current code shows both exist and are used.
-- Treat that file as an audit narrative, not as the canonical inventory.
-
-## Historical specialist defaults drift
-Before this cleanup, some files only knew about three specialists (`review`, `test`, `merge`) while runtime code already used five (`+ inspect`, `+ uat`). The canonical runtime list is now the five-type `SpecialistType` union in `src/lib/cloister/specialists.ts`.
-
-## What should be disabled or deprecated?
-
-### Not runtime agent types
-The following should **not** be moved into the runtime agent inventory unless new orchestration code is added:
+Examples:
 - `status-review`
+- `convoy:security-reviewer`
 - `convoy:requirements-reviewer`
-- `issue-agent:review-response`
+- `subagent:explore`
+- `cli:interactive`
 
-They are valid routed jobs/phases, but they are not runtime Panopticon agent types.
+These are still real and important, but they are better understood as **routed job types or contexts** than as the primary Panopticon agents a newcomer should picture first.
 
-### Specialist enable/disable state
-Specialist enablement is tracked in:
-- `src/lib/cloister/specialists.ts` registry metadata
-- `src/lib/cloister/config.ts` default Cloister config
+## Where model selection fits
 
-Current intended specialist defaults:
-- `review-agent` — enabled
-- `test-agent` — enabled
-- `inspect-agent` — enabled
-- `uat-agent` — enabled
-- `merge-agent` — enabled
+Model choice is configured separately from this document.
 
-## Recommended future agent types
+Panopticon uses work types and settings to decide which model should handle each kind of job. That is an important system concept, but it is separate from the question of **what each agent type is for**.
 
-These are proposals only — not currently implemented runtime agent types.
+If you want to tune or override models, use the routing/configuration docs rather than this page.
 
-### `requirements-agent`
-Suggested workflow placement:
-- after planning, to verify beads/acceptance criteria fully cover the PRD
-- or before merge, to validate requirement coverage independently from code review
+## Related docs
 
-Why:
-- Panopticon already relies heavily on PRDs, beads, and acceptance criteria
-- a dedicated requirements pass would make spec drift easier to catch early
-
-### `release-readiness-agent`
-Suggested workflow placement:
-- after UAT, before merge, for projects that need release hygiene checks
-
-Why:
-- useful when release notes, migrations, docs, or deployment checks frequently slip
-
-## Maintenance checklist for adding a new runtime agent type
-
-If a new runtime agent type is added, update all of:
-- `src/lib/cloister/specialists.ts` or the relevant primary-agent type definition
-- `src/lib/work-types.ts`
-- `src/lib/settings-api.ts`
-- `src/dashboard/frontend/src/components/Settings/modelDefaults.ts`
-- `docs/WORK-TYPES.md`
-- `docs/AGENT_TYPES_INDEX.md`
-- prompt template under `src/lib/cloister/prompts/`
-- the spawn path and workflow docs in `docs/SPECIALIST_WORKFLOW.md`
+- [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) — deeper explanation of how specialist stages work together
+- [WORK-TYPES.md](./WORK-TYPES.md) — model-routing slots, overrides, and what each routed work type controls
+- [CONFIGURATION.md](./CONFIGURATION.md) — provider setup, overrides, and routing behavior

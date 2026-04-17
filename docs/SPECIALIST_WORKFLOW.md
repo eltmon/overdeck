@@ -1,8 +1,8 @@
 # Specialist Workflow Guide
 
-This document explains how worker agents interact with specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) through the direct dispatch system.
+This document explains how the work agent and specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) interact through Panopticon's validation pipeline.
 
-For the canonical inventory of agent types, prompt templates, routing IDs, and spawn entrypoints, see [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md).
+If you are new to Panopticon, start with [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) for the high-level map of what each agent type is for. This document is the deeper workflow guide.
 
 ## Overview
 
