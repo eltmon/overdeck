@@ -2,6 +2,8 @@
 
 Reference for the job settings Panopticon uses for model routing.
 
+This document is about **routed work types and model-selection slots**, not the high-level roster of Panopticon runtime agents. Use [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) if you want the newcomer-friendly map of what kinds of agents exist.
+
 Each work type is a routable job slot. You can override any of these IDs in `models.overrides` inside `~/.panopticon/config.yaml` or `.pan.yaml`.
 
 ## Overview
