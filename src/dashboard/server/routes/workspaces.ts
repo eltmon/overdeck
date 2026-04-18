@@ -2786,7 +2786,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           `[request-review] Dispatch failed for ${issueId}: ${result.error}`
         );
         setReviewStatus(issueId, {
-          reviewStatus: 'dispatch_failed',
+          reviewStatus: 'failed',
           reviewNotes: `Dispatch failed: ${result.error || result.message}`,
         });
         return jsonResponse(
@@ -2801,7 +2801,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     } catch (error: any) {
       console.error(`[request-review] Error:`, error);
       setReviewStatus(issueId, {
-        reviewStatus: 'dispatch_failed',
+        reviewStatus: 'failed',
         reviewNotes: `Dispatch error: ${error.message}`,
       });
       return jsonResponse(

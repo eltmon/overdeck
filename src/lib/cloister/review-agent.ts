@@ -389,6 +389,17 @@ export async function parseReviewerTemplate(templatePath: string): Promise<Revie
   };
 }
 
+/**
+ * Claude CLI shorthand aliases that can appear in agent template frontmatter.
+ * Resolve these to concrete model IDs before passing to claude --model or
+ * getProviderEnvForModel, which expect fully-qualified IDs.
+ */
+const CLAUDE_ALIAS_TO_MODEL_ID: Record<string, string> = {
+  opus: 'claude-opus-4-6',
+  sonnet: 'claude-sonnet-4-6',
+  haiku: 'claude-haiku-4-5',
+};
+
 /** Map reviewer role name to the work-type ID used for model routing */
 function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | null {
   const map: Record<string, Parameters<typeof getModelId>[0]> = {
@@ -403,16 +414,24 @@ function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | 
 
 /** Resolve the model to use for a reviewer, preferring agent-level override then work-type routing */
 export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: string): string {
-  if (agent.model) return agent.model;
-  const workType = reviewRoleToWorkType(agent.name);
-  if (workType) {
-    try {
-      return getModelId(workType);
-    } catch {
-      // fall through to template default
+  let model: string;
+  if (agent.model) {
+    model = agent.model;
+  } else {
+    const workType = reviewRoleToWorkType(agent.name);
+    if (workType) {
+      try {
+        model = getModelId(workType);
+      } catch {
+        model = defaultModel;
+      }
+    } else {
+      model = defaultModel;
     }
   }
-  return defaultModel;
+  // Resolve shorthand aliases (haiku/sonnet/opus) to concrete IDs required by
+  // getProviderEnvForModel and claude --model. Template frontmatter may use aliases.
+  return CLAUDE_ALIAS_TO_MODEL_ID[model] ?? model;
 }
 
 /** Spawn a single reviewer tmux session and send its prompt */

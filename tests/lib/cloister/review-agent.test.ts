@@ -389,6 +389,32 @@ describe('resolveReviewerModel', () => {
     expect(typeof model).toBe('string');
     expect(model.length).toBeGreaterThan(0);
   });
+
+  // Regression for alias → concrete model ID resolution:
+  // Template frontmatter uses "haiku"/"sonnet"/"opus" but getProviderEnvForModel
+  // and claude --model require fully-qualified IDs (claude-haiku-4-5 etc.).
+  it('resolves "haiku" alias from template default to concrete claude-haiku-4-5', () => {
+    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
+    expect(model).toBe('claude-haiku-4-5');
+    expect(model).toMatch(/^claude-/);
+  });
+
+  it('resolves "sonnet" alias from template default to concrete claude-sonnet-4-6', () => {
+    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'sonnet');
+    expect(model).toBe('claude-sonnet-4-6');
+    expect(model).toMatch(/^claude-/);
+  });
+
+  it('resolves "opus" alias from template default to concrete claude-opus-4-6', () => {
+    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'opus');
+    expect(model).toBe('claude-opus-4-6');
+    expect(model).toMatch(/^claude-/);
+  });
+
+  it('passes through concrete model IDs unchanged', () => {
+    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'claude-haiku-4-5');
+    expect(model).toBe('claude-haiku-4-5');
+  });
 });
 
 // ── parseReviewSynthesis ──────────────────────────────────────────────────────
@@ -496,6 +522,36 @@ describe('selectCompletedReviewers', () => {
     ];
     const selected = selectCompletedReviewers(results)!;
     expect(Object.keys(selected[0])).not.toContain('status');
+  });
+});
+
+// ── reviewStatus type-safety: 'dispatch_failed' must not appear ──────────────
+// Regression: the request-review route previously wrote reviewStatus='dispatch_failed',
+// which is not in the ReviewStatus.reviewStatus union (only testStatus permits it).
+// The route must use 'failed' for reviewStatus so the type contract is maintained.
+
+describe('reviewStatus type-safety regression', () => {
+  it('workspaces.ts request-review route does not write reviewStatus=dispatch_failed', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    // Find the request-review route (between the route definition and the reset route)
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    // 'dispatch_failed' may appear in testStatus assignments (allowed by the type),
+    // but reviewStatus must never be set to 'dispatch_failed'.
+    const reviewStatusDispatchFailed = requestReviewBlock.match(
+      /reviewStatus\s*:\s*['"]dispatch_failed['"]/g,
+    );
+    expect(reviewStatusDispatchFailed).toBeNull();
   });
 });
 
