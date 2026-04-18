@@ -108,9 +108,6 @@ async function rebaseOneRepo(
 
       while (true) {
         const resolution = await tryResolvePlanningConflicts(repoPath);
-        if (resolution.resolved) {
-          break;
-        }
 
         if (resolution.shouldRetry) {
           try {
@@ -125,6 +122,10 @@ async function rebaseOneRepo(
             lastError = continueErr;
             continue;
           }
+        }
+
+        if (resolution.resolved) {
+          break;
         }
 
         await execAsync('git rebase --abort', { cwd: repoPath }).catch(() => {});
