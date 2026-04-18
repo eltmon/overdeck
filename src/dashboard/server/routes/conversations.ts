@@ -119,10 +119,12 @@ const readJsonBody = Effect.gen(function* () {
 
 function decodeUploadBytes(data: string): Buffer | null {
   const trimmed = data.trim();
-  if (!trimmed) return null;
+  if (!trimmed || trimmed.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)) {
+    return null;
+  }
   try {
     const bytes = Buffer.from(trimmed, 'base64');
-    return bytes.length > 0 ? bytes : null;
+    return bytes.length > 0 && bytes.toString('base64') === trimmed ? bytes : null;
   } catch {
     return null;
   }
@@ -133,6 +135,43 @@ function safeUploadExtension(filename: string, mimeType: string): string {
   if (!mimeExtension) return '';
   const originalExtension = extname(filename).toLowerCase();
   return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+}
+
+export async function handleConversationImageUpload(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const filename = typeof body['filename'] === 'string' ? body['filename'].trim() : '';
+  const data = typeof body['data'] === 'string' ? body['data'] : '';
+  const mimeType = typeof body['mimeType'] === 'string' ? body['mimeType'].trim() : '';
+
+  if (!filename || !data || !mimeType) {
+    return jsonResponse({ error: 'filename, data, and mimeType are required' }, { status: 400 });
+  }
+
+  if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
+  }
+
+  const bytes = decodeUploadBytes(data);
+  if (!bytes) {
+    return jsonResponse({ error: 'Invalid base64 image data' }, { status: 400 });
+  }
+
+  const extension = safeUploadExtension(filename, mimeType);
+  if (!extension) {
+    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
+  }
+
+  const path = join(tmpdir(), `panopticon-paste-${randomUUID()}${extension}`);
+  await writeFile(path, bytes);
+
+  return jsonResponse({ path });
 }
 
 /** Generate a default conversation name, e.g. 20260404-1234 */
@@ -744,37 +783,7 @@ const postConversationUploadImageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-
-        const filename = typeof body['filename'] === 'string' ? body['filename'].trim() : '';
-        const data = typeof body['data'] === 'string' ? body['data'] : '';
-        const mimeType = typeof body['mimeType'] === 'string' ? body['mimeType'].trim() : '';
-
-        if (!filename || !data || !mimeType) {
-          return jsonResponse({ error: 'filename, data, and mimeType are required' }, { status: 400 });
-        }
-
-        if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
-          return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
-        }
-
-        const bytes = decodeUploadBytes(data);
-        if (!bytes) {
-          return jsonResponse({ error: 'Invalid base64 image data' }, { status: 400 });
-        }
-
-        const extension = safeUploadExtension(filename, mimeType);
-        if (!extension) {
-          return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
-        }
-
-        const path = join(tmpdir(), `panopticon-paste-${randomUUID()}${extension}`);
-        await writeFile(path, bytes);
-
-        return jsonResponse({ path });
+        return await handleConversationImageUpload(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to upload image: ' + msg }, { status: 500 });

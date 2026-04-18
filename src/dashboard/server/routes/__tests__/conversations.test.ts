@@ -6,7 +6,7 @@
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -65,6 +65,12 @@ async function resetDb() {
   resetDatabase();
 }
 
+function decodeJsonResponse(response: { status: number; body: unknown }) {
+  const payload = response.body as { body: Uint8Array } | null;
+  const text = payload?.body ? new TextDecoder().decode(payload.body) : '{}';
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
 beforeEach(async () => {
   // Close any stale DB connection from a previous test before changing PANOPTICON_HOME
   await resetDb();
@@ -80,6 +86,41 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
+  it('stores uploaded images under tmpdir with the validated extension', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
+    const response = await handleConversationImageUpload('upload-test', {
+      filename: 'evidence.txt',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+
+    const body = decodeJsonResponse(response);
+    expect(response.status).toBe(200);
+    expect(body.path).toEqual(expect.stringMatching(/^\/tmp\/panopticon-paste-.*\.png$/));
+    expect(readFileSync(body.path as string)).toEqual(Buffer.from(Uint8Array.from([137, 80, 78, 71])));
+  });
+
+  it('rejects invalid upload payloads before writing files', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const response = await handleConversationImageUpload('upload-test', {
+      filename: 'evidence.png',
+      data: 'not-base64',
+      mimeType: 'image/png',
+    });
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data' });
+  });
+
   it('creating and listing a conversation returns the right data', async () => {
     const { createConversation, listConversations } = await import('../../../../lib/database/conversations-db.js');
     createConversation({ name: 'integration-test', tmuxSession: 'conv-integration-test', cwd: '/cwd' });

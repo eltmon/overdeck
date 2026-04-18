@@ -2296,7 +2296,7 @@
   padding: var(--mc-space-2);
   border: 1px solid var(--mc-border);
   border-radius: var(--mc-radius);
-  background: var(--mc-bg-elevated);
+  background: var(--mc-bg-secondary);
 }
 
 .composerImageThumb {
@@ -2330,7 +2330,7 @@
 }
 
 .composerImageError {
-  color: var(--mc-danger);
+  color: var(--mc-error);
 }
 
 .composerImageRemoveButton {

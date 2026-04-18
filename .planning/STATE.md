@@ -26,3 +26,5 @@ Finalizing PAN-539 after browser verification: workspace dashboard now starts un
 ## Specialist Feedback
 - None for PAN-539 yet.
 - **[2026-04-15T22:41Z] verification-gate → FAILED** — `.planning/feedback/020-verification-gate-failed.md`
+- **[2026-04-18T12:59Z] verification-gate → FAILED** — `.planning/feedback/021-verification-gate-failed.md`
+- **[2026-04-18T13:48Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/022-review-agent-changes-requested.md`

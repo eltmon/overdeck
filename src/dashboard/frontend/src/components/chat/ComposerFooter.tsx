@@ -69,12 +69,21 @@ interface PendingImage {
   error: string | null;
 }
 
+function encodeImageBytes(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
+}
+
 async function uploadConversationImage(
   conversationName: string,
   file: File,
 ): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const base64 = encodeImageBytes(bytes);
   const res = await fetch(
     `/api/conversations/${encodeURIComponent(conversationName)}/upload-image`,
     {
