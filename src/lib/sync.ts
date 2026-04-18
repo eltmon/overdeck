@@ -678,10 +678,18 @@ function syncDirContents(
     if (entry.isDirectory()) {
       if (syncDirContents(src, dst)) changed = true;
     } else if (entry.isFile()) {
+      const srcStat = lstatSync(src);
+      const srcMode = srcStat.mode & 0o777;
       const srcBuf = readFileSync(src);
-      const dstBuf = existsSync(dst) ? readFileSync(dst) : null;
+      const dstExists = existsSync(dst);
+      const dstBuf = dstExists ? readFileSync(dst) : null;
+      const dstMode = dstExists ? lstatSync(dst).mode & 0o777 : null;
       if (!dstBuf || !srcBuf.equals(dstBuf)) {
         writeFileSync(dst, srcBuf);
+        chmodSync(dst, srcMode);
+        changed = true;
+      } else if (dstMode !== srcMode) {
+        chmodSync(dst, srcMode);
         changed = true;
       }
     }

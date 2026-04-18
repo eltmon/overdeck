@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync, chmodSync, statSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mirrorProjectSkills } from '../../src/lib/sync.js';
@@ -299,6 +299,27 @@ describe('mirrorProjectSkills', () => {
 
     expect(result.updated).toContain('stitch-react');
     expect(existsSync(companionInTarget)).toBe(false);
+  });
+
+  it('preserves executable mode bits on companion scripts (initial sync and update)', () => {
+    const skillDir = join(skillsDir, 'pan-tts');
+    mkdirSync(join(skillDir, 'scripts'), { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), '# TTS\n', 'utf-8');
+    const srcScript = join(skillDir, 'scripts', 'say.sh');
+    writeFileSync(srcScript, '#!/bin/sh\necho hello\n', 'utf-8');
+    chmodSync(srcScript, 0o755);
+
+    // Initial mirror — target script must be executable
+    mirrorProjectSkills(cwd, { manifestDir });
+    const dstScript = join(claudeSkillsDir, 'pan-tts', 'scripts', 'say.sh');
+    expect(statSync(dstScript).mode & 0o111).toBeGreaterThan(0);
+
+    // Update script content — mode must still be preserved after update
+    writeFileSync(srcScript, '#!/bin/sh\necho world\n', 'utf-8');
+    chmodSync(srcScript, 0o755);
+    mirrorProjectSkills(cwd, { manifestDir });
+    expect(readFileSync(dstScript, 'utf-8')).toBe('#!/bin/sh\necho world\n');
+    expect(statSync(dstScript).mode & 0o111).toBeGreaterThan(0);
   });
 
   it('handles multiple skills in a single pass', () => {
