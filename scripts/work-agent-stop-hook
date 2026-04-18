@@ -46,27 +46,47 @@ if [ -f "$COMPLETED_FILE" ]; then
   exit 0
 fi
 
-# Skip if issue is already in the specialist pipeline (review/test/merge).
-# The completed marker may have been removed by a resume, but review-status.json
-# proves the agent entered the pipeline. Never nudge agents mid-pipeline.
+# Skip if issue is actively being processed by specialists (reviewing/passed/queued).
+# DO NOT skip if the agent is blocked, failed, or has verification failures —
+# those agents need to act and may have gone idle without resubmitting.
 REVIEW_STATUS_FILE="$HOME/.panopticon/review-status.json"
 if [ -f "$REVIEW_STATUS_FILE" ]; then
-  # Check if this issue has any entry in review-status.json (case-insensitive)
-  HAS_STATUS=$(python3 -c "
+  # Check if this issue is actively in the specialist pipeline (case-insensitive)
+  IN_ACTIVE_PIPELINE=$(python3 -c "
 import json, sys
 try:
     with open('$REVIEW_STATUS_FILE') as f:
         statuses = json.load(f)
     issue = '$ISSUE_ID'
-    if statuses.get(issue) or statuses.get(issue.lower()) or statuses.get(issue.upper()):
+    status = statuses.get(issue) or statuses.get(issue.lower()) or statuses.get(issue.upper())
+    if not status:
+        print('no')
+        sys.exit(0)
+    review = status.get('reviewStatus', '')
+    test = status.get('testStatus', '')
+    merge = status.get('mergeStatus', '')
+    ready = status.get('readyForMerge', False)
+    verification = status.get('verificationStatus', '')
+    # Active pipeline: review is in progress or passed, tests passed, ready to merge
+    is_active = (
+        review in ('reviewing', 'passed') and
+        test in ('passed', 'reviewing', 'pending') and
+        (ready or merge in ('queued', 'merging', 'verifying'))
+    )
+    # Also NOT active if blocked, failed, or verification failed
+    needs_action = (
+        review in ('blocked', 'failed') or
+        verification == 'failed'
+    )
+    if is_active and not needs_action:
         print('yes')
     else:
         print('no')
 except:
     print('no')
 " 2>/dev/null || echo "no")
-  if [ "$HAS_STATUS" = "yes" ]; then
-    echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID skipped — has review-status entry (in specialist pipeline)" \
+  if [ "$IN_ACTIVE_PIPELINE" = "yes" ]; then
+    echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID skipped — actively in specialist pipeline" \
       >> "$LOG_DIR/hooks.log" 2>/dev/null || true
     exit 0
   fi
