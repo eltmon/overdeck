@@ -189,6 +189,22 @@ describe('buildReviewFeedbackBody', () => {
 // ── waitForReviewer ───────────────────────────────────────────────────────────
 
 describe('waitForReviewer', () => {
+  it('returns completed when output file appears while session still running', async () => {
+    // This is the normal case: Claude writes the file but does not exit.
+    // waitForReviewer must detect the file and kill the session.
+    const sessionExists = vi.fn().mockResolvedValue(true); // session still running
+    const fileExists = vi.fn().mockReturnValue(true);       // output file written
+    const killSession = vi.fn().mockResolvedValue(undefined);
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession,
+    });
+
+    expect(result).toBe('completed');
+    expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
+    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+  });
+
   it('returns completed when session exits with output file present', async () => {
     const sessionExists = vi.fn().mockResolvedValue(false); // session already gone
     const fileExists = vi.fn().mockReturnValue(true);       // output file written
@@ -200,7 +216,8 @@ describe('waitForReviewer', () => {
 
     expect(result).toBe('completed');
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    expect(killSession).not.toHaveBeenCalled();
+    // killSession still called (session exists check never reached when file found first)
+    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
   });
 
   it('returns failed when session exits without output file', async () => {
@@ -436,6 +453,35 @@ describe('parseReviewSynthesis', () => {
     expect(result.filesReviewed).toBeDefined();
     expect(result.filesReviewed!.some(f => f.includes('foo.ts'))).toBe(true);
     expect(result.filesReviewed!.some(f => f.includes('auth.ts'))).toBe(true);
+  });
+});
+
+// ── passed-state rerun uses dispatchParallelReview ───────────────────────────
+// Regression: the passed-state rerun path in /api/review/:issueId/request must
+// use dispatchParallelReview (not wakeSpecialistOrQueue) so review:* model routing
+// and the parallel pipeline are applied consistently.
+
+describe('passed-state rerun regression', () => {
+  it('workspaces.ts request-review route does not call wakeSpecialistOrQueue in the rerun path', async () => {
+    // Read the route source and verify it has no wakeSpecialistOrQueue calls in the
+    // passed-state IIFE (the block between shouldTreatAsRerun and the early return).
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    // Find the passed-state IIFE block: between the shouldTreatAsRerun(existingStatus) call
+    // and the early return that sends rerun:true.
+    const rerunBlockMatch = routeSrc.match(
+      /shouldTreatAsRerun\(existingStatus\)[\s\S]*?rerun:\s*true/,
+    );
+    expect(rerunBlockMatch).not.toBeNull();
+    const rerunBlock = rerunBlockMatch![0];
+
+    expect(rerunBlock).not.toContain('wakeSpecialistOrQueue');
+    expect(rerunBlock).toContain('dispatchParallelReview');
   });
 });
 

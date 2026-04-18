@@ -434,7 +434,7 @@ async function spawnReviewer(
   await sendKeysAsync(sessionName, prompt, 'spawnReviewer');
 }
 
-/** Poll until the tmux session exits and the output file is written, or timeout */
+/** Poll until the output file is written (or the session exits), then kill the session */
 export async function waitForReviewer(
   sessionName: string,
   outputFile: string,
@@ -451,9 +451,14 @@ export async function waitForReviewer(
 ): Promise<'completed' | 'failed'> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    // Output file is the primary completion signal — Claude sessions don't auto-exit.
+    if (fileExists(outputFile)) {
+      try { await killSession(sessionName); } catch { /* ignore */ }
+      return 'completed';
+    }
     if (!await sessionExists(sessionName)) {
-      // Session ended — check if output was produced
-      return fileExists(outputFile) ? 'completed' : 'failed';
+      // Session exited without writing output
+      return 'failed';
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
   }

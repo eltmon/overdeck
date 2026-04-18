@@ -2514,22 +2514,33 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
         (async () => {
           try {
-            transitionIssueToInReview(issueId, workspacePath).catch((err: any) => {
+            // Resolve workspace info locally — outer scope vars (workspacePath, branchName)
+            // are declared after the early return below and must not be relied on here.
+            const issueLowerRerun = issueId.toLowerCase();
+            const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
+            const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+            const branchNameRerun = `feature/${issueLowerRerun}`;
+            const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
+            const workspacePathRerun = wsInfoRerun.isRemote
+              ? wsInfoRerun.remotePath!
+              : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+
+            transitionIssueToInReview(issueId, workspacePathRerun).catch((err: any) => {
               console.warn(`[request-review] Could not transition ${issueId} to in_review: ${err.message}`);
             });
 
             try {
-              if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+              if (wsInfoRerun.isRemote && wsInfoRerun.vmName) {
                 await execAsync(
                   flyExecCmd(
-                    workspaceInfo.vmName,
-                    `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`
+                    wsInfoRerun.vmName,
+                    `cd ${workspacePathRerun} && git push origin ${branchNameRerun} 2>&1 || true`
                   ),
                   { encoding: 'utf-8', timeout: 30000 }
                 );
               } else {
-                await execAsync(`git push origin ${branchName}`, {
-                  cwd: workspacePath,
+                await execAsync(`git push origin ${branchNameRerun}`, {
+                  cwd: workspacePathRerun,
                   encoding: 'utf-8',
                 });
               }
@@ -2537,47 +2548,27 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               console.log(`[request-review] Feature branch push note: ${pushErr.message}`);
             }
 
-            const result = await wakeSpecialistOrQueue(
+            const prUrl = getReviewStatus(issueId)?.prUrl;
+            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+            const result = await dispatchParallelReview({
               issueId,
-              workspacePath,
-              branchName,
-              'request-review'
-            );
+              workspace: workspacePathRerun,
+              branch: branchNameRerun,
+              prUrl,
+            });
 
             if (result.success) {
-              if (result.dispatched || result.spawned || result.position || result.alreadyRunning) {
-                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-              }
-              if (result.position) {
-                console.log(`[request-review] Review specialist queued for ${issueId} at position ${result.position}`);
-              } else {
-                console.log(`[request-review] Spawned review specialist for ${issueId}`);
-              }
+              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+              console.log(`[request-review] Parallel review dispatched for ${issueId}`);
             } else {
-              if (result.busy) {
-                console.log(
-                  `[request-review] Review specialist busy for ${issueId} — leaving pending for deacon retry`
-                );
-                setReviewStatus(issueId, { reviewStatus: 'pending' });
-              } else {
-                const errorMsg = result.error || 'Failed to dispatch review specialist';
-                console.error(
-                  `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${errorMsg}`
-                );
-                setReviewStatus(issueId, {
-                  reviewStatus: 'pending',
-                  mergeStatus: existingStatus.mergeStatus,
-                  readyForMerge: existingStatus.readyForMerge,
-                  reviewNotes: errorMsg,
-                });
-              }
+              const errorMsg = result.error || result.message || 'Failed to dispatch review';
+              console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
+              setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: errorMsg });
             }
           } catch (error: any) {
             console.error(`[request-review] Error:`, error);
             setReviewStatus(issueId, {
               reviewStatus: 'pending',
-              mergeStatus: existingStatus.mergeStatus,
-              readyForMerge: existingStatus.readyForMerge,
               reviewNotes: error.message || 'Unknown error',
             });
           }
