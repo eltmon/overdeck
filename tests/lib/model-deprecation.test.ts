@@ -10,8 +10,8 @@ describe('Model Deprecation System', () => {
       expect(typeof MODEL_DEPRECATIONS).toBe('object');
     });
 
-    it('should map claude-opus-4-5 to claude-opus-4-6', () => {
-      expect(MODEL_DEPRECATIONS['claude-opus-4-5']).toBe('claude-opus-4-6');
+    it('should map claude-opus-4-5 to claude-opus-4-7', () => {
+      expect(MODEL_DEPRECATIONS['claude-opus-4-5']).toBe('claude-opus-4-7');
     });
 
     it('should map claude-sonnet-4-5 to claude-sonnet-4-6', () => {
@@ -29,7 +29,7 @@ describe('Model Deprecation System', () => {
 
   describe('resolveModelId()', () => {
     it('should resolve deprecated model IDs to current ones', () => {
-      expect(resolveModelId('claude-opus-4-5')).toBe('claude-opus-4-6');
+      expect(resolveModelId('claude-opus-4-5')).toBe('claude-opus-4-7');
       expect(resolveModelId('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
     });
 
@@ -75,7 +75,7 @@ describe('Model Deprecation System', () => {
       expect(result.valid).toBe(true); // Deprecated IDs are warnings, not errors
       expect(result.warnings.length).toBeGreaterThan(0);
       expect(result.warnings.some(w => w.includes('claude-opus-4-5'))).toBe(true);
-      expect(result.warnings.some(w => w.includes('claude-opus-4-6'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('claude-opus-4-7'))).toBe(true);
     });
 
     it('should not warn for current model IDs', () => {
