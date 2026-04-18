@@ -25,6 +25,7 @@ import {
   buildReviewFeedbackBody,
   waitForReviewer,
   getFilesChangedFromPR,
+  selectCompletedReviewers,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -453,6 +454,48 @@ describe('parseReviewSynthesis', () => {
     expect(result.filesReviewed).toBeDefined();
     expect(result.filesReviewed!.some(f => f.includes('foo.ts'))).toBe(true);
     expect(result.filesReviewed!.some(f => f.includes('auth.ts'))).toBe(true);
+  });
+});
+
+// ── selectCompletedReviewers ──────────────────────────────────────────────────
+// Regression: any reviewer failure must abort synthesis (not produce partial results).
+// selectCompletedReviewers is the hard gate between phase 2 and phase 3.
+
+describe('selectCompletedReviewers', () => {
+  it('returns null when any reviewer failed — synthesis must not run', () => {
+    const results = [
+      { role: 'correctness', status: 'completed' as const, outputFile: '/a/correctness.md' },
+      { role: 'security', status: 'failed' as const, outputFile: '/a/security.md' },
+      { role: 'performance', status: 'completed' as const, outputFile: '/a/performance.md' },
+    ];
+    expect(selectCompletedReviewers(results)).toBeNull();
+  });
+
+  it('returns null when all reviewers failed', () => {
+    const results = [
+      { role: 'correctness', status: 'failed' as const, outputFile: '/a/correctness.md' },
+      { role: 'security', status: 'failed' as const, outputFile: '/a/security.md' },
+    ];
+    expect(selectCompletedReviewers(results)).toBeNull();
+  });
+
+  it('returns completed outputs when all reviewers succeeded', () => {
+    const results = [
+      { role: 'correctness', status: 'completed' as const, outputFile: '/a/correctness.md' },
+      { role: 'security', status: 'completed' as const, outputFile: '/a/security.md' },
+    ];
+    const selected = selectCompletedReviewers(results);
+    expect(selected).not.toBeNull();
+    expect(selected!.map(r => r.role)).toEqual(['correctness', 'security']);
+    expect(selected!.map(r => r.outputFile)).toEqual(['/a/correctness.md', '/a/security.md']);
+  });
+
+  it('returned list omits the status field (synthesis only needs role + outputFile)', () => {
+    const results = [
+      { role: 'correctness', status: 'completed' as const, outputFile: '/a/correctness.md' },
+    ];
+    const selected = selectCompletedReviewers(results)!;
+    expect(Object.keys(selected[0])).not.toContain('status');
   });
 });
 

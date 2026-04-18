@@ -467,6 +467,20 @@ export async function waitForReviewer(
   return 'failed';
 }
 
+type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string };
+
+/**
+ * Returns completed reviewer outputs, or null if any reviewer failed.
+ * Synthesis must not run on partial reviewer input — caller must treat null as a hard failure.
+ */
+export function selectCompletedReviewers(
+  results: ReviewerOutcome[],
+): Array<{ role: string; outputFile: string }> | null {
+  const failed = results.filter(r => r.status === 'failed');
+  if (failed.length > 0) return null;
+  return results.map(r => ({ role: r.role, outputFile: r.outputFile }));
+}
+
 /**
  * Run parallel code review using N reviewer agents followed by a synthesis agent.
  *
@@ -522,12 +536,22 @@ async function runParallelReview(
     ),
   );
 
-  const failedReviewers = reviewerResults.filter(r => r.status === 'failed');
-  if (failedReviewers.length > 0) {
-    console.warn(`[review-agent] ${failedReviewers.length} reviewer(s) failed or timed out: ${failedReviewers.map(r => r.role).join(', ')}`);
+  // ── Phase 3: Synthesis ────────────────────────────────────────────────────
+  const completedReviewers = selectCompletedReviewers(reviewerResults);
+  if (!completedReviewers) {
+    const failed = reviewerResults.filter(r => r.status === 'failed').map(r => r.role);
+    console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed or timed out: ${failed.join(', ')}`);
+    return {
+      result: {
+        success: false,
+        reviewResult: 'COMMENTED',
+        notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
+        output: `Review ${reviewId}`,
+      },
+      reviewId,
+    };
   }
 
-  // ── Phase 3: Synthesis ────────────────────────────────────────────────────
   const synthTemplatePath = join(CACHE_AGENTS_DIR, 'code-review-synthesis.md');
   const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
@@ -535,8 +559,7 @@ async function runParallelReview(
   const synthSessionName = `${reviewId}-synthesis`;
 
   // Build synthesis context with paths to all reviewer outputs
-  const reviewerOutputsList = reviewerResults
-    .filter(r => r.status === 'completed')
+  const reviewerOutputsList = completedReviewers
     .map(r => `- **${r.role}**: ${r.outputFile}`)
     .join('\n');
 
