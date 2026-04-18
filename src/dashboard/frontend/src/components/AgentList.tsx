@@ -37,11 +37,17 @@ interface AgentListProps {
 interface ProjectSpecialistStatus {
   projectKey: string;
   specialistType: 'merge-agent' | 'review-agent' | 'test-agent';
+  registryKey?: string;
+  issueId?: string;
+  role?: string;
   metadata: {
     runCount: number;
     lastRunAt: string | null;
     lastRunStatus: 'passed' | 'failed' | 'blocked' | null;
     currentRun: string | null;
+    currentActivity?: string | null;
+    model?: string | null;
+    writeScope?: 'full' | 'readonly-plus-output';
   };
   isRunning: boolean;
   tmuxSession: string;
@@ -267,26 +273,44 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   ps.tmuxSession === selectedAgent ? 'bg-surface-overlay' : 'hover:bg-surface-emphasis'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Brain className="w-5 h-5 text-success" />
-                  <div>
-                    <div className="font-medium text-content flex items-center gap-2">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Brain className="w-5 h-5 text-success flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-content flex items-center gap-2 flex-wrap">
                       <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                         {ps.projectKey.toUpperCase()}
                       </span>
+                      {ps.issueId && (
+                        <span className="text-xs font-mono text-content-muted">{ps.issueId}</span>
+                      )}
                       {ps.specialistType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      {ps.role && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-emphasis text-content-muted font-mono">
+                          :{ps.role}
+                        </span>
+                      )}
                       {ps.isRunning ? (
-                        <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Running" />
+                        <span className="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0" title="Running" />
                       ) : (
-                        <span className="w-2 h-2 rounded-full bg-content-muted" title="Completed" />
+                        <span className="w-2 h-2 rounded-full bg-content-muted flex-shrink-0" title="Completed" />
                       )}
                     </div>
-                    <div className="text-xs text-content-muted font-mono mt-0.5">
-                      {ps.metadata?.currentRun ? `Run: ${ps.metadata.currentRun.split('-').slice(-1)[0] || ps.metadata.currentRun}` : ps.tmuxSession}
+                    {ps.metadata?.currentActivity && ps.isRunning && (
+                      <div className="text-xs text-content-muted mt-0.5 truncate" title={ps.metadata.currentActivity}>
+                        {ps.metadata.currentActivity}
+                      </div>
+                    )}
+                    <div className="text-xs text-content-subtle font-mono mt-0.5 flex items-center gap-2">
+                      {ps.metadata?.model && (
+                        <span className="text-content-muted">{ps.metadata.model.split('/').pop()?.replace('claude-', '')}</span>
+                      )}
+                      {ps.metadata?.currentRun && (
+                        <span>{ps.metadata.currentRun.split('-').slice(-1)[0] || ps.metadata.currentRun}</span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                   <div className="text-right text-xs text-content-subtle">
                     <div className={ps.isRunning ? 'text-success' : 'text-content-muted'}>
                       {ps.isRunning ? '● Running' : '○ Completed'}

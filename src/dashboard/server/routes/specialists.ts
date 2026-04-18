@@ -1133,8 +1133,18 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const tmuxSession = getTmuxSessionName(type, project);
+    const { getTmuxSessionName, makeSpecialistRegistryKey, findActiveRegistryKey, getRunMetadata } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+
+    // Look up the active issueId from the registry to find the correct session name (PAN-754)
+    const activeKey = findActiveRegistryKey(project, type) ?? type;
+    const { issueId: activeIssueId } = activeKey.includes(':')
+      ? { issueId: activeKey.split(':')[1] }
+      : { issueId: undefined };
+
+    const tmuxSession = getRunMetadata(project, activeKey).tmuxSession
+      ?? getTmuxSessionName(type, project, activeIssueId);
+
     yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
     // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
     saveAgentRuntimeState(tmuxSession, {
@@ -1537,7 +1547,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
     const body = yield* readJsonBody;
-    const { status, notes } = body as { status?: string; notes?: string };
+    const { status, notes, issueId } = body as { status?: string; notes?: string; issueId?: string };
 
     if (!status || !['passed', 'failed', 'blocked'].includes(status)) {
       return jsonResponse(
@@ -1555,7 +1565,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
 
     const { signalSpecialistCompletion } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    signalSpecialistCompletion(project, type, { status, notes });
+    signalSpecialistCompletion(project, type, { status, notes }, issueId);
     return jsonResponse({
       success: true,
       message: 'Specialist completion signaled, grace period started',
