@@ -1,6 +1,6 @@
 import { ModelId, WorkTypeId } from './types';
 
-export const FALLBACK_DEFAULT_MODEL: ModelId = 'gpt-5.4-mini';
+export const FALLBACK_DEFAULT_MODEL: ModelId = 'gpt-4o-mini';
 
 export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<WorkTypeId, ModelId>> = {
   'issue-agent:exploration': 'claude-opus-4-6',

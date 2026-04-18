@@ -182,6 +182,7 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // Anthropic models
   if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
+  if (idLower.includes('sonnet') && idLower.includes('4.6')) return models.find(m => m.id === 'claude-sonnet-4-6');
   if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-5');
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
   if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-5');

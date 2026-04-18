@@ -32,7 +32,6 @@ export interface ReviewContext {
   branch: string;
   workspace?: string;
   filesChanged?: string[];
-  context?: Record<string, any>;
 }
 
 /**

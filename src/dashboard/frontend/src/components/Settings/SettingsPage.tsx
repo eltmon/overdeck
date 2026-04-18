@@ -52,7 +52,7 @@ import {
   MODELS_BY_PROVIDER,
   OpenRouterFavoriteModel,
 } from './AgentCards/ModelOverrideModal';
-import { FALLBACK_DEFAULT_MODEL } from './modelDefaults';
+import { FALLBACK_DEFAULT_MODEL, getEffectiveModelId } from './modelDefaults';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -1474,7 +1474,7 @@ export function SettingsPage() {
       {modalWorkType && (
         <ModelOverrideModal
           workType={modalWorkType}
-          currentModel={(formData.models.overrides[modalWorkType] || FALLBACK_DEFAULT_MODEL) as ModelId}
+          currentModel={getEffectiveModelId(modalWorkType, formData.models.overrides)}
           isOverride={!!formData.models.overrides[modalWorkType]}
           enabledProviders={Object.entries(formData.models.providers)
             .filter(([_, enabled]) => enabled)
