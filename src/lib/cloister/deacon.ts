@@ -857,7 +857,10 @@ const ACTIVE_STATUS_PATTERNS = [
 
 /**
  * Check if agent tmux output indicates active work (not idle)
- * Parses last 5 lines of tmux capture-pane output for status indicators
+ * Checks the last 8 non-blank lines of pane output for status indicators.
+ * Claude Code's live status bar (◆ Bash, ◆ Thinking, ⏵⏵) appears at the
+ * bottom of the pane — only those lines are relevant, not the full visible
+ * area which may contain completed tool calls like "● Bash(...)" from prior output.
  */
 export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
   try {
@@ -865,12 +868,18 @@ export async function isAgentActiveInTmux(sessionName: string): Promise<boolean>
 
     if (!stdout.trim()) return false;
 
+    // Only scan the bottom of the pane where Claude Code's live status bar lives.
+    // Scanning the full visible area causes false positives: completed tool calls
+    // like "● Bash(npm run typecheck...)" are visible but the agent may be idle.
+    const lines = stdout.split('\n').filter(l => l.trim().length > 0);
+    const tail = lines.slice(-8).join('\n');
+
     for (const pattern of ACTIVE_STATUS_PATTERNS) {
-      if (pattern.test(stdout)) {
+      if (pattern.test(tail)) {
         // "Thinking" with a duration over the threshold is NOT active — it's stuck.
         // Don't let stuck agents masquerade as active.
-        if (/thinking/i.test(stdout)) {
-          const thinkingMs = parseThinkingDuration(stdout);
+        if (/thinking/i.test(tail)) {
+          const thinkingMs = parseThinkingDuration(tail);
           if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
             return false; // Stuck, not active
           }
@@ -1888,8 +1897,10 @@ export async function checkDeadEndAgents(): Promise<string[]> {
     const now = Date.now();
 
     for (const [key, status] of Object.entries(statuses)) {
-      // Only act on blocked reviews, failed tests, or CI-blocked merges
-      const isReviewBlocked = status.reviewStatus === 'blocked';
+      // Only act on blocked/failed reviews, failed tests, or CI-blocked merges.
+      // 'failed' covers verification gate errors (e.g. JSON parse error in plan.vbrief.json)
+      // that prevent the review specialist from running at all.
+      const isReviewBlocked = status.reviewStatus === 'blocked' || status.reviewStatus === 'failed';
       const isTestFailed = status.testStatus === 'failed';
       const isMergeCiFailed = status.mergeStatus === 'failed' &&
         typeof status.mergeNotes === 'string' &&
@@ -1935,7 +1946,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       // Agent is idle with a blocked/failed status — this is a dead end
       let statusType: string;
       if (isReviewBlocked) {
-        statusType = 'review blocked';
+        statusType = status.reviewStatus === 'failed' ? 'review failed' : 'review blocked';
       } else if (isTestFailed) {
         statusType = 'tests failed';
       } else {
@@ -1962,9 +1973,12 @@ export async function checkDeadEndAgents(): Promise<string[]> {
 
       // Send the agent a nudge message with the correct resubmit command
       try {
+        const reviewFailedMsg = status.reviewStatus === 'failed'
+          ? `Review verification failed for ${issueId}. Check .planning/feedback/ for details. Common cause: merge conflict markers in .planning/plan.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
+          : `The review agent found issues in your code. Read .planning/feedback/ for the latest blocked feedback, fix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`;
         const nudgeMessage = isReviewBlocked
-          ? `The review agent found issues in your code. Read .planning/feedback/ for details, fix the issues, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan work request-review\` has completed successfully (this is the re-review path, not \`pan work done\`).`
-          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until \`pan work request-review\` has completed successfully (this is the re-review path, not \`pan work done\`).`;
+          ? reviewFailedMsg
+          : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
@@ -2019,7 +2033,10 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 
       // Check if agent is idle
       const runtimeState = getAgentRuntimeState(agent.id);
-      if (!runtimeState || runtimeState.state !== 'idle') continue;
+      if (!runtimeState) continue;
+      // Allow 'active' through — hook may not have fired to update state to 'idle'
+      // after the agent returned to the prompt. The pane check below is ground truth.
+      if (runtimeState.state === 'suspended' || runtimeState.state === 'completed') continue;
 
       // Check idle duration
       const lastActivity = new Date(runtimeState.lastActivity);
@@ -2605,6 +2622,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const failedMergeRetryActions = await checkFailedMergeRetry();
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
+
+  // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
+  // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
+  // 7-requeue circuit breaker to avoid runaway API credit consumption.
+  const deadEndActions = await checkDeadEndAgents();
+  actions.push(...deadEndActions);
+  for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
 
   // Resolution patrol DISABLED — auto-completing and poking agents consumes
   // API credits and is unreliable. Human operator can take action via dashboard.

@@ -18,6 +18,7 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath } from '../projects.js';
 import { getVBriefACStatus } from '../vbrief/beads.js';
+import { VBriefMergeConflictError } from '../vbrief/io.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -265,7 +266,46 @@ export async function runVerificationForIssue(
     }
 
     // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
-    const acStatus = getVBriefACStatus(workspacePath);
+    // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
+    // actionable feedback rather than falling through to a generic infrastructure error.
+    let acStatus: ReturnType<typeof getVBriefACStatus>;
+    try {
+      acStatus = getVBriefACStatus(workspacePath);
+    } catch (vbriefErr: any) {
+      if (vbriefErr instanceof VBriefMergeConflictError) {
+        const newCycleCount = currentCycles + 1;
+        const failedCheck = 'vbrief-conflicts';
+        const summary = `plan.vbrief.json has unresolved git merge conflict markers. Resolve all conflict markers in .planning/plan.vbrief.json and commit before resubmitting.`;
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: summary,
+          verificationCycleCount: newCycleCount,
+          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+        });
+        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in plan.vbrief.json BEFORE resubmitting\n\n1. Open .planning/plan.vbrief.json\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved plan.vbrief.json merge conflict"\n\nDo NOT resubmit until plan.vbrief.json parses cleanly.`;
+        try {
+          const fileResult = await writeFeedbackFile({
+            issueId,
+            workspacePath,
+            specialist: 'verification-gate',
+            outcome: 'failed',
+            summary: `vBRIEF plan has merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+            markdownBody: feedbackBody,
+          });
+          if (fileResult.success) {
+            const agentId = `agent-${issueId.toLowerCase()}`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers\nRead and address: ${fileResult.relativePath}`;
+            await messageAgent(agentId, msg);
+            console.log(`[${logPrefix}] vBRIEF conflict detected for ${issueId} — sent feedback to ${agentId}`);
+          }
+        } catch (feedbackErr: any) {
+          console.error(`[${logPrefix}] Failed to write vBRIEF conflict feedback for ${issueId}:`, feedbackErr);
+        }
+        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      }
+      throw vbriefErr;
+    }
     if (acStatus && !acStatus.allCompleted) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = 'vbrief-ac';
