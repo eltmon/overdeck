@@ -43,6 +43,7 @@ export function registerConversationsCommands(program: Command): void {
     .option('--similar <id>', 'Find sessions similar to this session ID (semantic)')
     .option('--format <fmt>', 'Output format: table | json | brief | ids', 'table')
     .option('--limit <n>', 'Maximum results', '20')
+    .option('--offset <n>', 'Pagination offset', '0')
     .action((query: string | undefined, opts: Record<string, string | boolean | undefined>) =>
       searchAction(query, opts),
     );

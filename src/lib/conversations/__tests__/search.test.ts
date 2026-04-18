@@ -281,6 +281,69 @@ describe('FTS total is not derived from the capped candidate slice', () => {
   });
 });
 
+// ─── FTS/semantic+FTS pagination with non-zero offset ─────────────────────────
+
+describe('FTS pagination with non-zero offset', () => {
+  beforeEach(async () => {
+    // Seed 8 sessions with the same keyword so FTS matches all of them
+    for (let i = 1; i <= 8; i++) {
+      const s = upsertDiscoveredSession({
+        jsonlPath: `/fts-page/${i}.jsonl`,
+        workspacePath: `/home/user/Projects/page${i}`,
+        workspaceHash: `hpg${i}`,
+        messageCount: 2,
+        firstTs: '2025-03-01T00:00:00Z',
+        lastTs: '2025-03-01T01:00:00Z',
+        modelsUsed: ['claude-sonnet-4-6'],
+        primaryModel: 'claude-sonnet-4-6',
+        tokenInput: 50,
+        tokenOutput: 100,
+        estimatedCost: 0.005,
+        toolsUsed: [],
+        filesTouched: [],
+        panopticonManaged: false,
+        panIssueId: null,
+        panAgentId: null,
+        fileSize: 512,
+        fileMtime: '2025-03-01T00:00:00Z',
+        tags: [],
+      });
+      updateEnrichment(s.id, {
+        enrichmentLevel: 1,
+        enrichmentModel: 'claude-haiku-4-5',
+        summary: `pagination regression test session ${i}`,
+      });
+    }
+  });
+
+  it('page 2 (offset=3, limit=3) returns 3 distinct results', () => {
+    const page1 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
+    const page2 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 3 });
+
+    expect(page1.sessions.length).toBe(3);
+    expect(page2.sessions.length).toBe(3);
+    // No overlap between pages
+    const ids1 = new Set(page1.sessions.map((s) => s.id));
+    const ids2 = new Set(page2.sessions.map((s) => s.id));
+    const overlap = [...ids1].filter((id) => ids2.has(id));
+    expect(overlap.length).toBe(0);
+  });
+
+  it('total is consistent across pages', () => {
+    const page1 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
+    const page2 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 3 });
+    expect(page1.total).toBe(8);
+    expect(page2.total).toBe(8);
+  });
+
+  it('last page returns remaining items without truncation', () => {
+    // 8 sessions, limit=5 → page 2 starts at offset=5, should return 3
+    const page2 = searchSessions({ q: 'pagination regression test', limit: 5, offset: 5 });
+    expect(page2.sessions.length).toBe(3);
+    expect(page2.total).toBe(8);
+  });
+});
+
 // ─── Strategy 4: semantic+FTS with filter (regression for PAN-457 review) ─────
 
 describe('semantic+FTS search respects filter constraints', () => {

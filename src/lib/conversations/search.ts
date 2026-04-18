@@ -228,7 +228,8 @@ export function searchSessions(query: SearchQuery): SearchResult {
 
   // ── Strategy 2: FTS5 only or FTS5 + filter ───────────────────────────────
   if (hasQ && !hasSimilarTo) {
-    const ftsMatches = searchFts(query.q!, limit * 3); // over-fetch for intersection
+    // FTS+filter needs all matches for correct intersection; FTS-only needs offset+limit
+    const ftsMatches = hasFilter ? searchFts(query.q!) : searchFts(query.q!, offset + limit);
     if (ftsMatches.length === 0) {
       return { sessions: [], total: 0, mode: 'fts', durationMs: Date.now() - start };
     }
@@ -283,8 +284,9 @@ export function searchSessions(query: SearchQuery): SearchResult {
 
   // ── Strategy 4: FTS + semantic re-ranking ─────────────────────────────────
   // similarTo + q: get FTS candidates, re-rank by cosine similarity
+  // Fetch all FTS matches — semantic re-ranking changes order so we need the full set
   const refEmbedding = getEmbedding(query.similarTo!, embeddingModel);
-  const ftsMatches = searchFts(query.q!, limit * 5);
+  const ftsMatches = searchFts(query.q!);
 
   let candidates: DiscoveredSession[];
   let ftsTotal: number;

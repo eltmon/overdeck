@@ -450,18 +450,15 @@ export function syncFts(_id: number): void {
  * Returns [] for malformed queries instead of throwing — FTS5 MATCH rejects invalid
  * syntax (unbalanced parens, trailing operators, column: prefixes, etc.) at runtime.
  */
-export function searchFts(query: string, limit = 50): FtsSearchResult[] {
+export function searchFts(query: string, limit?: number): FtsSearchResult[] {
   const db = getDatabase();
   try {
-    const rows = db
-      .prepare(
-        `SELECT rowid AS id, rank
-         FROM sessions_fts
-         WHERE sessions_fts MATCH ?
-         ORDER BY rank
-         LIMIT ?`,
-      )
-      .all(query, limit) as Array<{ id: number; rank: number }>;
+    const sql =
+      `SELECT rowid AS id, rank FROM sessions_fts WHERE sessions_fts MATCH ? ORDER BY rank` +
+      (limit != null ? ' LIMIT ?' : '');
+    const rows = (
+      limit != null ? db.prepare(sql).all(query, limit) : db.prepare(sql).all(query)
+    ) as Array<{ id: number; rank: number }>;
     return rows.map((r) => ({ id: r.id, rank: r.rank }));
   } catch {
     return [];

@@ -12,6 +12,7 @@ export async function searchAction(
   opts: Record<string, string | boolean | undefined>,
 ): Promise<void> {
   const limit = parseInt((opts['limit'] as string) ?? '20', 10);
+  const offset = parseInt((opts['offset'] as string) ?? '0', 10);
   const format = (opts['format'] as string) ?? 'table';
 
   const filter: RawFilter = {};
@@ -31,6 +32,7 @@ export async function searchAction(
     similarTo,
     filter,
     limit,
+    offset,
   });
 
   if (result.sessions.length === 0) {
@@ -48,8 +50,14 @@ export async function searchAction(
     case 'ids':
       formatIds(result.sessions);
       break;
-    default:
+    default: {
       formatTable(result.sessions);
-      console.log(chalk.dim(`  Mode: ${result.mode} · ${result.sessions.length} results · ${result.durationMs}ms`));
+      const showing = `${offset + 1}–${offset + result.sessions.length} of ${result.total}`;
+      const moreHint = result.total > offset + result.sessions.length
+        ? chalk.dim(` (--offset ${offset + result.sessions.length} for next page)`)
+        : '';
+      console.log(chalk.dim(`  Mode: ${result.mode} · showing ${showing} · ${result.durationMs}ms`) + moreHint);
+      break;
+    }
   }
 }

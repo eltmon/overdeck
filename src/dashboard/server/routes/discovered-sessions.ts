@@ -137,9 +137,11 @@ const searchRoute = HttpRouter.add(
     const similarTo = rawSimilarTo !== undefined && Number.isFinite(rawSimilarTo) ? rawSimilarTo : undefined;
     const rawLimit = parseInt(params.get('limit') ?? '20', 10);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 20;
+    const rawOffset = parseInt(params.get('offset') ?? '0', 10);
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
     const filter = parseSearchParams(params);
-    const result = searchSessions({ q, similarTo, filter, limit });
+    const result = searchSessions({ q, similarTo, filter, limit, offset });
     return jsonResponse(result);
   })),
 );

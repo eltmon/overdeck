@@ -84,8 +84,9 @@ async function fetchSearch(
   q: string,
   filterParams: URLSearchParams,
   limit = 50,
+  offset = 0,
 ): Promise<SearchResponse> {
-  const params = new URLSearchParams({ q, limit: String(limit) });
+  const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
   for (const [key, value] of filterParams) {
     params.set(key, value);
   }
@@ -117,6 +118,7 @@ export function ConversationsPage() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showFacets, setShowFacets] = useState(false);
+  const [searchOffset, setSearchOffset] = useState(0);
   const [filters, setFilters] = useState<{
     workspace?: string;
     since?: string;
@@ -138,9 +140,11 @@ export function ConversationsPage() {
     enabled: !trimmedQuery,
   });
 
+  const SEARCH_PAGE_SIZE = 50;
+
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    queryKey: ['discovered-sessions-search', trimmedQuery, filterParams.toString()],
-    queryFn: () => fetchSearch(trimmedQuery, filterParams),
+    queryKey: ['discovered-sessions-search', trimmedQuery, filterParams.toString(), searchOffset],
+    queryFn: () => fetchSearch(trimmedQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset),
     enabled: !!trimmedQuery,
   });
 
@@ -165,8 +169,14 @@ export function ConversationsPage() {
 
   const selected = selectedId != null ? sessions.find((s) => s.id === selectedId) ?? null : null;
 
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
+    setSearchOffset(0);
+  }, []);
+
   const handleFilterChange = useCallback((key: string, value: string | boolean | undefined) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setSearchOffset(0);
   }, []);
 
   return (
@@ -193,7 +203,7 @@ export function ConversationsPage() {
             type="text"
             placeholder="Search sessions…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             className="w-full bg-gray-900 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -240,11 +250,36 @@ export function ConversationsPage() {
               )}
             </div>
           ) : (
-            <SessionTable
-              sessions={sessions}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-            />
+            <>
+              <SessionTable
+                sessions={sessions}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+              {trimmedQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 shrink-0 text-xs text-gray-400">
+                  <span>
+                    {searchOffset + 1}–{searchOffset + sessions.length} of {searchData.total} results
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={searchOffset === 0}
+                      onClick={() => setSearchOffset((o) => Math.max(0, o - SEARCH_PAGE_SIZE))}
+                      className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      disabled={searchOffset + SEARCH_PAGE_SIZE >= searchData.total}
+                      onClick={() => setSearchOffset((o) => o + SEARCH_PAGE_SIZE)}
+                      className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
