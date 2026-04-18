@@ -46,6 +46,32 @@ export function buildAgentIssueMap(
   );
 }
 
+// ─── Exported helper: union stuck count ──────────────────────────────────────
+// Exported for unit testing — used by both /api/metrics/summary and
+// /api/metrics/stuck to ensure consistent stuck counts across both endpoints.
+
+export function computeStuckCount(
+  agentsNeedingAttention: string[],
+  getAgentHealth: (id: string) => { state: string } | null | undefined,
+  agentIdToIssueId: Map<string, string>,
+  reviewStatuses: Record<string, { stuck?: boolean; issueId: string }>,
+): number {
+  const persistentSet = new Set(
+    Object.values(reviewStatuses)
+      .filter((rs) => rs.stuck === true)
+      .map((rs) => rs.issueId.toUpperCase()),
+  );
+  const healthSet = new Set<string>();
+  for (const agentId of agentsNeedingAttention) {
+    const health = getAgentHealth(agentId);
+    if (health?.state === 'stuck') {
+      const issueId = agentIdToIssueId.get(agentId);
+      if (issueId) healthSet.add(issueId);
+    }
+  }
+  return new Set([...healthSet, ...persistentSet]).size;
+}
+
 // ─── Route: GET /api/metrics/summary ─────────────────────────────────────────
 
 const getMetricsSummaryRoute = HttpRouter.add(
@@ -76,27 +102,12 @@ const getMetricsSummaryRoute = HttpRouter.add(
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 5);
 
-      // Compute stuck count as union of:
-      //   1. Agents with inactivity-based health.state === 'stuck'
-      //   2. Workspaces with persistent review_status.stuck = true (divergence guard)
-      // Deduped by issueId — an issue with both flags set must count as 1, not 2.
-      const reviewStatuses = loadReviewStatuses();
-      const persistentStuckIssueIds = new Set(
-        Object.values(reviewStatuses)
-          .filter((rs) => rs.stuck === true)
-          .map((rs) => rs.issueId.toUpperCase())
+      const stuckCount = computeStuckCount(
+        status.agentsNeedingAttention,
+        (id) => service.getAgentHealth(id),
+        buildAgentIssueMap(listRunningAgents()),
+        loadReviewStatuses(),
       );
-      // Map agentId → issueId for running agents, then check health state per agent.
-      const agentIdToIssueId = buildAgentIssueMap(listRunningAgents());
-      const healthStuckIssueIds = new Set<string>();
-      for (const agentId of status.agentsNeedingAttention) {
-        const health = service.getAgentHealth(agentId);
-        if (health?.state === 'stuck') {
-          const issueId = agentIdToIssueId.get(agentId);
-          if (issueId) healthStuckIssueIds.add(issueId);
-        }
-      }
-      const stuckCount = new Set([...healthStuckIssueIds, ...persistentStuckIssueIds]).size;
 
       return jsonResponse({
         today: {
@@ -149,8 +160,15 @@ const getMetricsStuckRoute = HttpRouter.add(
   '/api/metrics/stuck',
   httpHandler(Effect.try({
     try: () => {
-      const status = getCloisterService().getStatus();
-      return jsonResponse({ current: status.summary.stuck, incidents: [] });
+      const service = getCloisterService();
+      const status = service.getStatus();
+      const current = computeStuckCount(
+        status.agentsNeedingAttention,
+        (id) => service.getAgentHealth(id),
+        buildAgentIssueMap(listRunningAgents()),
+        loadReviewStatuses(),
+      );
+      return jsonResponse({ current, incidents: [] });
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),

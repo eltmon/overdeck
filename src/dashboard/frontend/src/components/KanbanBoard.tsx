@@ -31,7 +31,7 @@ import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import type { ReviewStatusSnapshot, DomainEvent } from '@panopticon/contracts';
+import type { ReviewStatusSnapshot } from '@panopticon/contracts';
 
 
 // Difficulty badge colors
@@ -1990,7 +1990,6 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 
 /** Diverged badge with Unstick button — shown when main diverged during git push */
 export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifier: string; stuckReason?: string | null }) {
-  const applyEvent = useDashboardStore((s) => s.applyEvent);
   return (
     <span
       className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
@@ -2010,17 +2009,20 @@ export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifie
               const body = await res.json().catch(() => ({}));
               alert(`Unstick failed: ${body.error ?? res.statusText}`);
             } else {
-              // Optimistic update: clear stuck flag immediately without waiting for WS round-trip
+              // Optimistic update: write directly to store so the badge disappears
+              // immediately without waiting for the WS round-trip
               const state = useDashboardStore.getState();
-              const current = state.reviewStatusByIssueId[issueIdentifier.toUpperCase()]
+              const upperKey = issueIdentifier.toUpperCase();
+              const current = state.reviewStatusByIssueId[upperKey]
                 ?? state.reviewStatusByIssueId[issueIdentifier];
               if (current) {
-                applyEvent({
-                  type: 'review.status_changed',
-                  sequence: 0,
-                  timestamp: new Date().toISOString(),
-                  payload: { issueId: issueIdentifier, status: { ...current, stuck: undefined, stuckReason: undefined } },
-                } as DomainEvent);
+                const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
+                useDashboardStore.setState((s) => ({
+                  reviewStatusByIssueId: {
+                    ...s.reviewStatusByIssueId,
+                    [key]: { ...current, stuck: undefined, stuckReason: undefined },
+                  },
+                }));
               }
             }
           } catch (err: unknown) {

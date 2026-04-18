@@ -52,9 +52,9 @@ vi.mock('../../../src/dashboard/server/services/domain-services.js', () => ({
   EventStoreService: {},
 }));
 
-// Import the REAL buildAgentIssueMap from the route module so this test
-// exercises the actual production code path, not a copied helper.
-import { buildAgentIssueMap } from '../../../src/dashboard/server/routes/metrics.js';
+// Import REAL helpers from the route module so tests exercise actual production
+// code, not copied mirrors.
+import { buildAgentIssueMap, computeStuckCount as realComputeStuckCount } from '../../../src/dashboard/server/routes/metrics.js';
 
 // ---------------------------------------------------------------------------
 // Tests: buildAgentIssueMap (real route module — exercises guard directly)
@@ -97,13 +97,13 @@ describe('buildAgentIssueMap (real route code)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Helper — build the stuckCount the same way metrics.ts does
-// (extracted so we can unit-test it without spinning up Effect HTTP)
+// Helper — thin adapter over the REAL computeStuckCount from metrics.ts
 // ---------------------------------------------------------------------------
 
 /**
- * Mirror of the stuckCount computation in metrics.ts so we can unit-test it.
- * If you change the logic in metrics.ts, update this too.
+ * Thin adapter so existing tests keep their DSL while calling the REAL
+ * production computeStuckCount exported from metrics.ts. Both
+ * /api/metrics/summary and /api/metrics/stuck use this same function.
  */
 function computeStuckCount(opts: {
   agentsNeedingAttention: string[];
@@ -111,15 +111,12 @@ function computeStuckCount(opts: {
   agentIdToIssueId: Record<string, string>;
   persistentStuckIssueIds: string[];
 }): number {
-  const persistentSet = new Set(opts.persistentStuckIssueIds.map(id => id.toUpperCase()));
-  const healthStuckSet = new Set<string>();
-  for (const agentId of opts.agentsNeedingAttention) {
-    if (opts.agentIdToHealth[agentId] === 'stuck') {
-      const issueId = opts.agentIdToIssueId[agentId];
-      if (issueId) healthStuckSet.add(issueId.toUpperCase());
-    }
-  }
-  return new Set([...healthStuckSet, ...persistentSet]).size;
+  return realComputeStuckCount(
+    opts.agentsNeedingAttention,
+    (id) => ({ state: opts.agentIdToHealth[id] ?? 'active' }),
+    new Map(Object.entries(opts.agentIdToIssueId).map(([k, v]) => [k, v.toUpperCase()])),
+    Object.fromEntries(opts.persistentStuckIssueIds.map(id => [id, { stuck: true as const, issueId: id }])),
+  );
 }
 
 // ---------------------------------------------------------------------------
