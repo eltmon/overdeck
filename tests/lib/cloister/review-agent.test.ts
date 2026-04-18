@@ -91,6 +91,24 @@ describe('dispatchParallelReview', () => {
       reviewNotes: 'Fix required',
     });
   });
+
+  it('reviewing→pending: background spawn failure overwrites optimistic reviewing status', async () => {
+    // This covers the deacon/service recovery path: dispatchParallelReview returns immediately,
+    // the caller optimistically sets 'reviewing', then the background .catch resets to 'pending'.
+    const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
+
+    await dispatchParallelReview(baseOpts, { spawnFn });
+    // Simulate what deacon/service does after dispatch: optimistically mark reviewing
+    mockSetReviewStatus('PAN-999', { reviewStatus: 'reviewing' });
+
+    // Flush the microtask queue so the background .catch() fires
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const calls = mockSetReviewStatus.mock.calls;
+    expect(calls.length).toBe(2);
+    expect(calls[0]).toEqual(['PAN-999', { reviewStatus: 'reviewing' }]);
+    expect(calls[1]).toEqual(['PAN-999', { reviewStatus: 'pending' }]);
+  });
 });
 
 // ── helpers ───────────────────────────────────────────────────────────────────

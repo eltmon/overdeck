@@ -265,6 +265,37 @@ describe('settings-api', () => {
       expect(settings).toHaveProperty('api_keys');
       expect(settings).toHaveProperty('tracker_keys');
     });
+
+    it('getMiniMaxDefaultsApi result passes validateSettingsApi (save path is valid)', () => {
+      const settings = getMiniMaxDefaultsApi();
+      const result = validateSettingsApi(settings);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+  });
+
+  describe('validateSettingsApi provider constraints', () => {
+    it('rejects settings with all providers disabled', () => {
+      const settings = getMiniMaxDefaultsApi();
+      const allDisabled = {
+        ...settings,
+        models: {
+          ...settings.models,
+          providers: {
+            anthropic: false,
+            openai: false,
+            google: false,
+            zai: false,
+            kimi: false,
+            minimax: false,
+            openrouter: false,
+          },
+        },
+      };
+      const result = validateSettingsApi(allDisabled);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('At least one provider must be enabled');
+    });
   });
 
   describe('saveSettingsApi', () => {

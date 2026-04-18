@@ -362,9 +362,10 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   if (!settings.models?.providers) {
     errors.push('Missing providers configuration');
   } else {
-    // Anthropic must always be enabled
-    if (settings.models.providers.anthropic !== true) {
-      errors.push('Anthropic provider must be enabled');
+    // At least one provider must be enabled
+    const enabledCount = Object.values(settings.models.providers).filter(Boolean).length;
+    if (enabledCount === 0) {
+      errors.push('At least one provider must be enabled');
     }
   }
 
