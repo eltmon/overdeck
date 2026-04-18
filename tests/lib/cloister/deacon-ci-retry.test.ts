@@ -300,6 +300,8 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
 describe('checkDeadEndAgents — dead-end CI recovery path', () => {
   let originalContent: string | null = null;
   let checkDeadEndAgents: () => Promise<string[]>;
+  let checkFailedMergeRetry: () => Promise<string[]>;
+  let ciRetryMap: Map<string, { count: number; lastAttempt: number }>;
   let tempProjectPath: string;
 
   const DEAD_END_ISSUE_ID = 'PAN-714-DEAD-END-TEST';
@@ -322,6 +324,9 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkDeadEndAgents = mod.checkDeadEndAgents;
+    checkFailedMergeRetry = mod.checkFailedMergeRetry;
+    ciRetryMap = mod.ciRetryMap;
+    ciRetryMap.clear();
   });
 
   afterEach(() => {
@@ -379,5 +384,47 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Dead-end recovery/);
     expect(actions[0]).toContain(DEAD_END_ISSUE_ID);
+  });
+
+  it('resets ciRetryMap on dead-end recovery so next CI failure re-enters at attempt 1/5', async () => {
+    // Create a workspace so clearStaleCiFeedback has somewhere to look
+    tempProjectPath = mkdtempSync(join(tmpdir(), 'pan-dead-end-ci-reset-'));
+    mkdirSync(
+      join(tempProjectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback'),
+      { recursive: true },
+    );
+
+    const ciBlockedStatus = {
+      issueId: DEAD_END_ISSUE_ID,
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'failed',
+      mergeNotes: 'Merge failed: failing required checks',
+      readyForMerge: false,
+      updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 min ago
+    };
+    writeStatusFile({ [DEAD_END_ISSUE_ID]: ciBlockedStatus });
+
+    mockSessionExists.mockReturnValue(true); // idle agent session
+    mockResolveProjectFromIssue.mockReturnValue({ projectPath: tempProjectPath });
+
+    // Seed ciRetryMap past exhaustion (count=6)
+    ciRetryMap.set(DEAD_END_ISSUE_ID, { count: 6, lastAttempt: Date.now() - 5 * 60_000 });
+    expect(ciRetryMap.has(DEAD_END_ISSUE_ID)).toBe(true);
+
+    // Dead-end recovery resets merge status and must clear ciRetryMap
+    await checkDeadEndAgents();
+
+    expect(ciRetryMap.has(DEAD_END_ISSUE_ID)).toBe(false);
+
+    // Now simulate the next CI failure for this issue
+    writeStatusFile({ [DEAD_END_ISSUE_ID]: ciBlockedStatus });
+    const retryActions = await checkFailedMergeRetry();
+
+    // Should re-enter at attempt 1/5, not silently dead-end
+    expect(retryActions).toHaveLength(1);
+    expect(retryActions[0]).toMatch(/CI failure notification/);
+    expect(retryActions[0]).toMatch(/attempt 1\/5/);
+    expect(ciRetryMap.get(DEAD_END_ISSUE_ID)?.count).toBe(1);
   });
 });

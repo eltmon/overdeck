@@ -2034,6 +2034,9 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           mergeStatus: 'pending',
           readyForMerge: true,
         });
+        // Reset CI retry counter so the next CI failure re-enters at attempt 1/5
+        // instead of silently dead-ending due to the exhausted retry count.
+        ciRetryMap.delete(issueId);
         // Clean up accumulated stale feedback so the work agent doesn't read them
         await clearStaleCiFeedback(issueId).catch(() => {});
         console.log(`[deacon] Cleared stale CI-blocked merge for ${issueId} — reset to readyForMerge`);
