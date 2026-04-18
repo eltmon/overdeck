@@ -193,8 +193,20 @@ async function runSynthesis(): Promise<void> {
     const filingResult = await fileFlywheelIssues(result.proposals);
     console.log(`[flywheel-daemon] Filed ${filingResult.filed.length} issues, deferred ${filingResult.deferred.length}`);
 
-    // Archive processed retros
-    const archiveResult = await archiveProcessedRetros(result.processedRetros);
+    // Archive only retros that contributed to successfully filed proposals.
+    // Watchlist retros (below the 3-signal threshold) must remain in docs/flywheel/retros/
+    // so they can accumulate signals across future synthesis cycles and eventually
+    // cross the threshold. Archiving them would permanently destroy the signal history.
+    const filedRetros = new Set<string>();
+    for (const filed of filingResult.filed) {
+      const proposal = result.proposals.find(p =>
+        `${p.signature.targetSkill}|${p.signature.audience}|${p.signature.gapDescription}` === filed.proposalSignature
+      );
+      if (proposal) {
+        for (const r of proposal.triggeringRetros) filedRetros.add(r);
+      }
+    }
+    const archiveResult = await archiveProcessedRetros([...filedRetros]);
     console.log(`[flywheel-daemon] Archived ${archiveResult.archived.length} retros, wontfixed ${archiveResult.wontfixed.length}`);
 
     // Determine run number from archive state
