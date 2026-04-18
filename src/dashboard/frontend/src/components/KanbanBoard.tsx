@@ -31,7 +31,7 @@ import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import type { ReviewStatusSnapshot } from '@panopticon/contracts';
+import type { ReviewStatusSnapshot, DomainEvent } from '@panopticon/contracts';
 
 
 // Difficulty badge colors
@@ -1990,6 +1990,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 
 /** Diverged badge with Unstick button — shown when main diverged during git push */
 export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifier: string; stuckReason?: string | null }) {
+  const applyEvent = useDashboardStore((s) => s.applyEvent);
   return (
     <span
       className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
@@ -2008,6 +2009,19 @@ export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifie
             if (!res.ok) {
               const body = await res.json().catch(() => ({}));
               alert(`Unstick failed: ${body.error ?? res.statusText}`);
+            } else {
+              // Optimistic update: clear stuck flag immediately without waiting for WS round-trip
+              const state = useDashboardStore.getState();
+              const current = state.reviewStatusByIssueId[issueIdentifier.toUpperCase()]
+                ?? state.reviewStatusByIssueId[issueIdentifier];
+              if (current) {
+                applyEvent({
+                  type: 'review.status_changed',
+                  sequence: 0,
+                  timestamp: new Date().toISOString(),
+                  payload: { issueId: issueIdentifier, status: { ...current, stuck: undefined, stuckReason: undefined } },
+                } as DomainEvent);
+              }
             }
           } catch (err: unknown) {
             alert(`Unstick request failed: ${err instanceof Error ? err.message : String(err)}`);

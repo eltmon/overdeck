@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
 import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
+import { useDashboardStore } from '../lib/store';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -683,5 +684,24 @@ describe('DivergedBadge', () => {
       '/api/workspaces/PAN%2099/unstick',
       { method: 'POST' }
     );
+  });
+
+  it('clears stuck flag in store immediately on successful unstick', async () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-42': { issueId: 'PAN-42', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<DivergedBadge issueIdentifier="PAN-42" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+
+    await waitFor(() => {
+      expect(useDashboardStore.getState().reviewStatusByIssueId['PAN-42']?.stuck).toBeFalsy();
+    });
+  });
+
+  afterEach(() => {
+    useDashboardStore.setState({ reviewStatusByIssueId: {} } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 });

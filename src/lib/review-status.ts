@@ -420,6 +420,8 @@ export function markWorkspaceStuck(
   try {
     dbMarkStuck(issueId, reason, details);
     console.log(`[review-status] Marked ${issueId} as stuck: ${reason}`);
+    const updated = getReviewStatus(issueId);
+    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to mark ${issueId} as stuck:`, err);
   }
@@ -434,6 +436,8 @@ export function clearWorkspaceStuck(issueId: string): void {
   try {
     dbClearStuck(issueId);
     console.log(`[review-status] Cleared stuck state for ${issueId}`);
+    const updated = getReviewStatus(issueId);
+    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to clear stuck state for ${issueId}:`, err);
   }
