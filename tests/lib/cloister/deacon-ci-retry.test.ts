@@ -292,3 +292,90 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     }
   });
 });
+
+// ── Dead-end CI recovery path ────────────────────────────────────────────────
+
+describe('checkDeadEndAgents — dead-end CI recovery path', () => {
+  let originalContent: string | null = null;
+  let checkDeadEndAgents: () => Promise<string[]>;
+  let tempProjectPath: string;
+
+  const DEAD_END_ISSUE_ID = 'PAN-714-DEAD-END-TEST';
+  const issueLower = DEAD_END_ISSUE_ID.toLowerCase();
+
+  beforeEach(async () => {
+    vi.resetModules();
+    mockSetReviewStatus.mockReset();
+    mockLoadReviewStatuses.mockReset().mockReturnValue({});
+    mockSessionExists.mockReset().mockReturnValue(false);
+    mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
+    mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
+    mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
+
+    if (existsSync(REVIEW_STATUS_FILE)) {
+      originalContent = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+    } else {
+      originalContent = null;
+    }
+
+    const mod = await import('../../../src/lib/cloister/deacon.js');
+    checkDeadEndAgents = mod.checkDeadEndAgents;
+  });
+
+  afterEach(() => {
+    if (originalContent !== null) {
+      writeFileSync(REVIEW_STATUS_FILE, originalContent, 'utf-8');
+    } else if (existsSync(REVIEW_STATUS_FILE)) {
+      unlinkSync(REVIEW_STATUS_FILE);
+    }
+    if (tempProjectPath) {
+      rmSync(tempProjectPath, { recursive: true, force: true });
+    }
+  });
+
+  it('clears stale CI feedback file and resets merge status for idle CI-blocked agent', async () => {
+    // Create a temp workspace with a stale merge-agent ci-failure feedback file
+    tempProjectPath = mkdtempSync(join(tmpdir(), 'pan-dead-end-test-'));
+    const feedbackDir = join(
+      tempProjectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback',
+    );
+    mkdirSync(feedbackDir, { recursive: true });
+    const staleFeedbackFile = join(feedbackDir, '013-merge-agent-ci-failure.md');
+    writeFileSync(staleFeedbackFile, 'CI checks failed', 'utf-8');
+
+    // Write a CI-blocked merge status that is old enough (> 5 min staleness threshold)
+    writeStatusFile({
+      [DEAD_END_ISSUE_ID]: {
+        issueId: DEAD_END_ISSUE_ID,
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'failed',
+        mergeNotes: 'Merge failed: failing required checks',
+        readyForMerge: false,
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 min ago
+      },
+    });
+
+    // Agent session exists; capturePaneAsync returns undefined → isAgentActiveInTmux = false (idle)
+    mockSessionExists.mockReturnValue(true);
+    // resolveProjectFromIssue returns our temp project so the workspace path resolves
+    mockResolveProjectFromIssue.mockReturnValue({ projectPath: tempProjectPath });
+
+    const actions = await checkDeadEndAgents();
+
+    // Merge status must be reset to allow re-entry into the merge flow
+    expect(mockSetReviewStatus).toHaveBeenCalledOnce();
+    const [calledId, update] = mockSetReviewStatus.mock.calls[0];
+    expect(calledId).toBe(DEAD_END_ISSUE_ID);
+    expect(update.mergeStatus).toBe('pending');
+    expect(update.readyForMerge).toBe(true);
+
+    // Stale CI feedback file must be deleted so the work agent cannot read it on resume
+    expect(existsSync(staleFeedbackFile)).toBe(false);
+
+    // Action entry must be recorded for audit/logging
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Dead-end recovery/);
+    expect(actions[0]).toContain(DEAD_END_ISSUE_ID);
+  });
+});
