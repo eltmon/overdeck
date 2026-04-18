@@ -104,9 +104,29 @@ async function rebaseOneRepo(
         env: { ...process.env, GIT_EDITOR: 'true' },
       });
     } catch (rebaseErr: any) {
-      const resolution = await tryResolvePlanningConflicts(repoPath);
+      let lastError = rebaseErr;
 
-      if (!resolution.resolved) {
+      while (true) {
+        const resolution = await tryResolvePlanningConflicts(repoPath);
+        if (resolution.resolved) {
+          break;
+        }
+
+        if (resolution.shouldRetry) {
+          try {
+            await execAsync('git rebase --continue', {
+              cwd: repoPath,
+              encoding: 'utf-8',
+              timeout: 60000,
+              env: { ...process.env, GIT_EDITOR: 'true' },
+            });
+            break;
+          } catch (continueErr: any) {
+            lastError = continueErr;
+            continue;
+          }
+        }
+
         await execAsync('git rebase --abort', { cwd: repoPath }).catch(() => {});
         if (resolution.remainingConflicts.length > 0) {
           return {
@@ -119,7 +139,7 @@ async function rebaseOneRepo(
         return {
           repoKey,
           outcome: 'error',
-          message: `Rebase failed: ${rebaseErr.message?.trim() || rebaseErr.message}`,
+          message: `Rebase failed: ${lastError.message?.trim() || lastError.message}`,
         };
       }
     }
@@ -146,7 +166,7 @@ async function rebaseOneRepo(
  */
 async function tryResolvePlanningConflicts(
   repoPath: string
-): Promise<{ resolved: boolean; remainingConflicts: string[] }> {
+): Promise<{ resolved: boolean; shouldRetry: boolean; remainingConflicts: string[] }> {
   try {
     const { stdout } = await execAsync('git status --porcelain', {
       cwd: repoPath,
@@ -160,12 +180,12 @@ async function tryResolvePlanningConflicts(
       .map(l => l.substring(3).trim());
 
     if (conflictFiles.length === 0) {
-      return { resolved: false, remainingConflicts: [] };
+      return { resolved: false, shouldRetry: false, remainingConflicts: [] };
     }
 
     const nonPlanningConflicts = conflictFiles.filter(f => !f.startsWith('.planning/'));
     if (nonPlanningConflicts.length > 0) {
-      return { resolved: false, remainingConflicts: nonPlanningConflicts };
+      return { resolved: false, shouldRetry: false, remainingConflicts: nonPlanningConflicts };
     }
 
     for (const file of conflictFiles) {
@@ -173,15 +193,8 @@ async function tryResolvePlanningConflicts(
       await execAsync(`git add "${file}"`, { cwd: repoPath, encoding: 'utf-8', timeout: 10000 });
     }
 
-    await execAsync('git rebase --continue', {
-      cwd: repoPath,
-      encoding: 'utf-8',
-      timeout: 60000,
-      env: { ...process.env, GIT_EDITOR: 'true' },
-    });
-
-    return { resolved: true, remainingConflicts: [] };
+    return { resolved: true, shouldRetry: true, remainingConflicts: [] };
   } catch {
-    return { resolved: false, remainingConflicts: ['(error checking rebase status)'] };
+    return { resolved: false, shouldRetry: false, remainingConflicts: ['(error checking rebase status)'] };
   }
 }

@@ -27,6 +27,7 @@ describe('rebaseAndPushRepos', () => {
 
     await mkdir(join(repoDir, '.planning'), { recursive: true });
     await writeFile(join(repoDir, '.planning', 'plan.vbrief.json'), '{"version":1}\n');
+    await writeFile(join(repoDir, '.planning', 'PLANNING_PROMPT.md.archived'), 'base archived prompt\n');
     await writeFile(join(repoDir, 'README.md'), 'base\n');
     await execAsync('git add .', { cwd: repoDir });
     await execAsync('git commit -m "base"', { cwd: repoDir });
@@ -34,15 +35,25 @@ describe('rebaseAndPushRepos', () => {
     await execAsync('git push -u origin main', { cwd: repoDir });
 
     await execAsync('git checkout -b feature/pan-711', { cwd: repoDir });
+    await writeFile(join(repoDir, '.planning', 'STATE.md'), '# local state\n');
     await writeFile(join(repoDir, '.planning', 'plan.vbrief.json'), '{"version":2,"local":"keep-me"}\n');
-    await execAsync('git add .planning/plan.vbrief.json', { cwd: repoDir });
+    await execAsync('git add .planning/STATE.md .planning/plan.vbrief.json', { cwd: repoDir });
     await execAsync('git commit -m "local planning change"', { cwd: repoDir });
+
+    await writeFile(join(repoDir, '.planning', 'PLANNING_PROMPT.md.archived'), 'local archived prompt\n');
+    await execAsync('git add .planning/PLANNING_PROMPT.md.archived', { cwd: repoDir });
+    await execAsync('git commit -m "local archived planning artifact"', { cwd: repoDir });
     await execAsync('git push -u origin feature/pan-711', { cwd: repoDir });
 
     await execAsync('git checkout main', { cwd: repoDir });
+    await execAsync('git rm .planning/STATE.md', { cwd: repoDir }).catch(() => {});
     await writeFile(join(repoDir, '.planning', 'plan.vbrief.json'), '{"version":3,"upstream":"discard-me"}\n');
     await execAsync('git add .planning/plan.vbrief.json', { cwd: repoDir });
     await execAsync('git commit -m "upstream planning change"', { cwd: repoDir });
+
+    await writeFile(join(repoDir, '.planning', 'PLANNING_PROMPT.md.archived'), 'upstream archived prompt\n');
+    await execAsync('git add .planning/PLANNING_PROMPT.md.archived', { cwd: repoDir });
+    await execAsync('git commit -m "upstream archived planning artifact"', { cwd: repoDir });
     await execAsync('git push origin main', { cwd: repoDir });
 
     await execAsync('git checkout feature/pan-711', { cwd: repoDir });
