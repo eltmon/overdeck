@@ -73,11 +73,10 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
 }
 
 export function extractConversationAttachmentPaths(message: string): string[] {
-  return message
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('@/'))
-    .map((line) => line.slice(1));
+  return Array.from(
+    message.matchAll(/(?:^|\s)@((?:\/)[^\s]+)/g),
+    ([, attachmentPath]) => attachmentPath,
+  );
 }
 
 export function isManagedConversationAttachmentPath(attachmentPath: string): boolean {

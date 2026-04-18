@@ -155,21 +155,21 @@ describe('conversations route — DB integration', () => {
     const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
 
     const { extractConversationAttachmentPaths, hasConversationAttachment } = await import('../../services/conversation-attachments.js');
-    expect(extractConversationAttachmentPaths(`@${uploadedPath}\nhello`)).toEqual([uploadedPath]);
+    expect(extractConversationAttachmentPaths(`hello\n@${uploadedPath}`)).toEqual([uploadedPath]);
     expect(hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
     expect(hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
 
     const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
-    const manualAttachmentResponse = await handleConversationMessage('owner-conv', { message: `@${manualPath}\nhello` }, vi.fn().mockResolvedValue(undefined));
+    const manualAttachmentResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, vi.fn().mockResolvedValue(undefined));
     expect(manualAttachmentResponse.status).toBe(200);
 
     const delivery = vi.fn().mockResolvedValue(undefined);
-    const sendResponse = await handleConversationMessage('owner-conv', { message: `@${uploadedPath}\nhello` }, delivery);
+    const sendResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${uploadedPath}` }, delivery);
     expect(sendResponse.status).toBe(200);
-    expect(delivery).toHaveBeenCalledWith('conv-owner-conv', `@${uploadedPath}\nhello`, 'conversation-message');
+    expect(delivery).toHaveBeenCalledWith('conv-owner-conv', `hello\n@${uploadedPath}`, 'conversation-message');
     expect(existsSync(uploadedPath)).toBe(true);
 
-    const rejectedResponse = await handleConversationMessage('other-conv', { message: `@${uploadedPath}\nhello` }, delivery);
+    const rejectedResponse = await handleConversationMessage('other-conv', { message: `hello\n@${uploadedPath}` }, delivery);
     expect(rejectedResponse.status).toBe(400);
     expect(decodeJsonResponse(rejectedResponse)).toEqual({ error: 'One or more attached images are unavailable for this conversation' });
     expect(existsSync(uploadedPath)).toBe(true);
@@ -198,7 +198,7 @@ describe('conversations route — DB integration', () => {
     expect(existsSync(uploadedPath)).toBe(false);
   });
 
-  it('archive prunes unreferenced uploads while preserving referenced ones', async () => {
+  it('archive prunes unreferenced uploads while preserving prose-first referenced ones', async () => {
     const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
@@ -222,7 +222,7 @@ describe('conversations route — DB integration', () => {
 
     const keptPath = decodeJsonResponse(keptUpload).path as string;
     const prunedPath = decodeJsonResponse(prunedUpload).path as string;
-    writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `@${keptPath}\nkeep this` }] } })}\n`);
+    writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `keep this\n@${keptPath}` }] } })}\n`);
 
     markConversationEnded('archived-conv');
     archiveConversation('archived-conv');
