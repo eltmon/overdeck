@@ -262,6 +262,22 @@ describe('settings-api', () => {
       }
     });
 
+    it('should cover all specialist work types including inspect and UAT', () => {
+      const settings = getMiniMaxDefaultsApi();
+      const overrides = settings.models.overrides as Record<string, string>;
+
+      const requiredSpecialists = [
+        'specialist-review-agent',
+        'specialist-test-agent',
+        'specialist-merge-agent',
+        'specialist-inspect-agent',
+        'specialist-uat-agent',
+      ];
+      for (const workType of requiredSpecialists) {
+        expect(overrides).toHaveProperty(workType, 'minimax-m2.7-highspeed');
+      }
+    });
+
     it('should return a valid ApiSettingsConfig shape', () => {
       const settings = getMiniMaxDefaultsApi();
 

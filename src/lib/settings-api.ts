@@ -524,6 +524,8 @@ function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
     'specialist-review-agent': 'minimax-m2.7-highspeed',
     'specialist-test-agent': 'minimax-m2.7-highspeed',
     'specialist-merge-agent': 'minimax-m2.7-highspeed',
+    'specialist-inspect-agent': 'minimax-m2.7-highspeed',
+    'specialist-uat-agent': 'minimax-m2.7-highspeed',
     'review:security': 'minimax-m2.7-highspeed',
     'review:performance': 'minimax-m2.7-highspeed',
     'review:correctness': 'minimax-m2.7-highspeed',
