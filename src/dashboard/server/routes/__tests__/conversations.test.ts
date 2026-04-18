@@ -143,6 +143,10 @@ describe('conversations route — DB integration', () => {
     expect(hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
     expect(hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
 
+    const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
+    const manualAttachmentResponse = await handleConversationMessage('owner-conv', { message: `@${manualPath}\nhello` }, vi.fn().mockResolvedValue(undefined));
+    expect(manualAttachmentResponse.status).toBe(200);
+
     const delivery = vi.fn().mockResolvedValue(undefined);
     const sendResponse = await handleConversationMessage('owner-conv', { message: `@${uploadedPath}\nhello` }, delivery);
     expect(sendResponse.status).toBe(200);
@@ -154,6 +158,29 @@ describe('conversations route — DB integration', () => {
     expect(decodeJsonResponse(rejectedResponse)).toEqual({ error: 'One or more attached images are unavailable for this conversation' });
 
     await cleanupConversationAttachments('owner-conv');
+    expect(existsSync(uploadedPath)).toBe(false);
+  });
+
+  it('delete-image removes only conversation-owned uploads', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { removeConversationAttachment } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
+    createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
+
+    const pngData = Buffer.from(Uint8Array.from([4, 3, 2, 1])).toString('base64');
+    const uploadResponse = await handleConversationImageUpload('owner-conv', {
+      filename: 'owned.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+    const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
+
+    expect(await removeConversationAttachment('other-conv', uploadedPath)).toBe(false);
+    expect(existsSync(uploadedPath)).toBe(true);
+
+    expect(await removeConversationAttachment('owner-conv', uploadedPath)).toBe(true);
     expect(existsSync(uploadedPath)).toBe(false);
   });
 

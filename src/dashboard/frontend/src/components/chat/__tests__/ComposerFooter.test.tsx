@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { ComposerFooter } from '../ComposerFooter';
 
 const { editorState, mockFocus, mockToastError, mockSaveStoredModel } = vi.hoisted(() => ({
@@ -95,6 +95,7 @@ describe('ComposerFooter image attachments', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
   });
 
@@ -192,6 +193,107 @@ describe('ComposerFooter image attachments', () => {
       );
     });
     expect(await screen.findByText('drop.png')).toBeInTheDocument();
+  });
+
+  it('deletes uploaded images when the user removes them before sending', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/delete-image')) {
+        return new Response('{}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['png-bytes'], 'remove-me.png', { type: 'image/png' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([1, 2, 3, 4]).buffer),
+    });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => file }],
+      },
+    });
+
+    expect(await screen.findByText('remove-me.png')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Uploaded')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Remove remove-me.png'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/delete-image',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }),
+        }),
+      );
+    });
+    expect(screen.queryByText('remove-me.png')).not.toBeInTheDocument();
+  });
+
+  it('deletes uploaded images when the composer unmounts before send', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-abandoned.png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/delete-image')) {
+        return new Response('{}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const view = render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['png-bytes'], 'abandon.png', { type: 'image/png' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([5, 6, 7, 8]).buffer),
+    });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => file }],
+      },
+    });
+
+    expect(await screen.findByText('abandon.png')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Uploaded')).toBeInTheDocument();
+    });
+
+    view.unmount();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/delete-image',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ path: '/tmp/panopticon-paste-abandoned.png' }),
+        }),
+      );
+    });
   });
 
   it('blocks send when any pending image upload has failed', async () => {

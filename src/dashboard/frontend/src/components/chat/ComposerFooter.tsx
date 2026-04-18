@@ -10,7 +10,7 @@
  *   └───────────────────────────────────────┘
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { SendHorizontal, X } from 'lucide-react';
 import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
@@ -61,12 +61,36 @@ async function sendConversationMessage(
   }
 }
 
+async function deleteConversationImage(
+  conversationName: string,
+  path: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/conversations/${encodeURIComponent(conversationName)}/delete-image`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to delete image (${res.status})${body ? `: ${body}` : ''}`);
+  }
+}
+
 interface PendingImage {
   id: string;
   file: File;
   previewUrl: string;
   serverPath: string | null;
   error: string | null;
+}
+
+function revokePreviewUrl(previewUrl: string): void {
+  if (typeof URL.revokeObjectURL === 'function') {
+    URL.revokeObjectURL(previewUrl);
+  }
 }
 
 function encodeImageBytes(bytes: Uint8Array): string {
@@ -124,23 +148,46 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const editorRef = useRef<LexicalEditor | null>(null);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
+  const removedImageIdsRef = useRef<Set<string>>(new Set());
+  const mountedRef = useRef(true);
 
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
 
+  const deleteUploadedImage = useCallback((path: string) => {
+    void deleteConversationImage(conversation.name, path).catch((err: unknown) => {
+      console.error('[ComposerFooter] Failed to delete image:', err);
+    });
+  }, [conversation.name]);
+
   const updatePendingImage = useCallback((id: string, updates: Partial<PendingImage>) => {
-    setPendingImages((images) => images.map((image) => (image.id === id ? { ...image, ...updates } : image)));
+    setPendingImages((images) => {
+      const next = images.map((image) => (image.id === id ? { ...image, ...updates } : image));
+      pendingImagesRef.current = next;
+      return next;
+    });
   }, []);
 
+  useEffect(() => {
+    pendingImagesRef.current = pendingImages;
+  }, [pendingImages]);
+
   const removePendingImage = useCallback((id: string) => {
+    removedImageIdsRef.current.add(id);
     setPendingImages((images) => {
       const image = images.find((candidate) => candidate.id === id);
       if (image) {
-        URL.revokeObjectURL(image.previewUrl);
+        revokePreviewUrl(image.previewUrl);
+        if (image.serverPath) {
+          deleteUploadedImage(image.serverPath);
+        }
       }
-      return images.filter((candidate) => candidate.id !== id);
+      const next = images.filter((candidate) => candidate.id !== id);
+      pendingImagesRef.current = next;
+      return next;
     });
-  }, []);
+  }, [deleteUploadedImage]);
 
   const enqueueImages = useCallback((files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
@@ -154,19 +201,30 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       error: null,
     } satisfies PendingImage));
 
-    setPendingImages((images) => [...images, ...newImages]);
+    setPendingImages((images) => {
+      const next = [...images, ...newImages];
+      pendingImagesRef.current = next;
+      return next;
+    });
 
     for (const image of newImages) {
       void uploadConversationImage(conversation.name, image.file)
         .then((serverPath) => {
+          if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
+            deleteUploadedImage(serverPath);
+            return;
+          }
           updatePendingImage(image.id, { serverPath, error: null });
         })
         .catch((err: unknown) => {
+          if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
+            return;
+          }
           const message = err instanceof Error ? err.message : 'Failed to upload image';
           updatePendingImage(image.id, { error: message });
         });
     }
-  }, [conversation.name, updatePendingImage]);
+  }, [conversation.name, deleteUploadedImage, updatePendingImage]);
 
   // Send /model command to tmux when model is changed on an active conversation
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
@@ -262,8 +320,10 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       });
       setText('');
       for (const image of pendingImages) {
-        URL.revokeObjectURL(image.previewUrl);
+        revokePreviewUrl(image.previewUrl);
       }
+      pendingImagesRef.current = [];
+      removedImageIdsRef.current.clear();
       setPendingImages([]);
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
@@ -274,6 +334,21 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       editor.focus();
     }
   }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, pendingImages]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const images = pendingImagesRef.current;
+      pendingImagesRef.current = [];
+      for (const image of images) {
+        revokePreviewUrl(image.previewUrl);
+        if (image.serverPath) {
+          deleteUploadedImage(image.serverPath);
+        }
+      }
+    };
+  }, [conversation.name, deleteUploadedImage]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {

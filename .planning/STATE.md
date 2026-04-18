@@ -30,3 +30,4 @@ Finalizing PAN-539 after browser verification: workspace dashboard now starts un
 - **[2026-04-18T13:48Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/022-review-agent-changes-requested.md`
 - **[2026-04-18T14:09Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/023-review-agent-changes-requested.md`
 - **[2026-04-18T14:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/024-review-agent-changes-requested.md`
+- **[2026-04-18T14:41Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/025-review-agent-changes-requested.md`

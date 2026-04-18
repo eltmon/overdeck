@@ -7,8 +7,12 @@ import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
+export function getConversationAttachmentsRoot(): string {
+  return join(getPanopticonHome(), CONVERSATION_ATTACHMENTS_DIR);
+}
+
 export function getConversationAttachmentDir(name: string): string {
-  return join(getPanopticonHome(), CONVERSATION_ATTACHMENTS_DIR, name);
+  return join(getConversationAttachmentsRoot(), name);
 }
 
 export async function ensureConversationAttachmentDir(name: string): Promise<string> {
@@ -34,6 +38,12 @@ export function extractConversationAttachmentPaths(message: string): string[] {
     .map((line) => line.slice(1));
 }
 
+export function isManagedConversationAttachmentPath(attachmentPath: string): boolean {
+  const attachmentsRoot = resolve(getConversationAttachmentsRoot());
+  const candidate = resolve(attachmentPath);
+  return candidate.startsWith(`${attachmentsRoot}${sep}`);
+}
+
 export function isConversationAttachmentPath(name: string, attachmentPath: string): boolean {
   const attachmentDir = resolve(getConversationAttachmentDir(name));
   const candidate = resolve(attachmentPath);
@@ -42,4 +52,10 @@ export function isConversationAttachmentPath(name: string, attachmentPath: strin
 
 export function hasConversationAttachment(name: string, attachmentPath: string): boolean {
   return isConversationAttachmentPath(name, attachmentPath) && existsSync(attachmentPath);
+}
+
+export async function removeConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {
+  if (!isConversationAttachmentPath(name, attachmentPath)) return false;
+  await rm(attachmentPath, { force: true });
+  return true;
 }
