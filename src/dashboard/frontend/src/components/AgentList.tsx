@@ -322,11 +322,11 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      fetch(`/api/specialists/${ps.projectKey}/${ps.specialistType}/kill`, { method: 'POST' })
+                      fetch(`/api/specialists/${ps.projectKey}/${ps.issueId}/${ps.specialistType}/kill`, { method: 'POST' })
                         .then(() => queryClient.invalidateQueries({ queryKey: ['project-specialists-running'] }));
                     }}
                     className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-emphasis rounded"
-                    title={`Kill ${ps.specialistType} (${ps.projectKey})`}
+                    title={`Kill ${ps.specialistType} (${ps.projectKey}/${ps.issueId ?? 'unknown'})`}
                   >
                     <XCircle className="w-4 h-4" />
                   </button>

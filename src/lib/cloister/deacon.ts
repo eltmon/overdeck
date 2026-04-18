@@ -839,9 +839,6 @@ const ACTIVE_STATUS_PATTERNS = [
   /computing/i,
   /fermenting/i,
   /thinking/i,
-  /forming/i,     // Claude Code "Forming…" computation status
-  /embellish/i,   // Claude Code "Embellishing…" computation status
-  /baking/i,      // Claude Code "Baking…" computation status
   /reading/i,
   /writing/i,
   /editing/i,
@@ -879,9 +876,9 @@ export async function isAgentActiveInTmux(sessionName: string): Promise<boolean>
 
     for (const pattern of ACTIVE_STATUS_PATTERNS) {
       if (pattern.test(tail)) {
-        // Extended computation (Thinking/Forming/Embellishing/Baking) over threshold = stuck.
+        // Extended computation (Thinking/Fermenting) over threshold = stuck.
         // Don't let stuck agents masquerade as active.
-        if (/thinking|forming|embellish|baking|fermenting/i.test(tail)) {
+        if (/thinking|fermenting/i.test(tail)) {
           const thinkingMs = parseThinkingDuration(tail);
           if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
             return false; // Stuck, not active
@@ -895,6 +892,33 @@ export async function isAgentActiveInTmux(sessionName: string): Promise<boolean>
   } catch {
     return false;
   }
+}
+
+/**
+ * Determine if an agent is idle based on its runtime.json hook state.
+ *
+ * The Stop hook (fired by Claude Code's Stop lifecycle event) writes state='idle'
+ * to runtime.json whenever Claude finishes a turn and returns to the prompt. This
+ * is the authoritative idle signal — no pane parsing needed.
+ *
+ * Stale-active fallback: if Stop hook never fired (state='active' persists), treat
+ * the agent as idle once the heartbeat is older than staleActiveThresholdMs. The
+ * heartbeat-hook fires on PostToolUse, so a stale heartbeat means no tool calls
+ * and therefore no active computation.
+ *
+ * Returns false if: no runtime state, suspended, completed, or recently active.
+ */
+function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 1000): boolean {
+  const runtimeState = getAgentRuntimeState(agentId);
+  if (!runtimeState) {
+    console.log(`[deacon] ${agentId}: no runtime.json — skipping (hook not yet fired)`);
+    return false;
+  }
+  if (runtimeState.state === 'suspended' || runtimeState.state === 'stopped') return false;
+  if (runtimeState.state === 'idle') return true;
+  // Stale-active: heartbeat hasn't fired in staleActiveThresholdMs (state='active'/'uninitialized')
+  const ageMs = Date.now() - new Date(runtimeState.lastActivity).getTime();
+  return ageMs > staleActiveThresholdMs;
 }
 
 // ============================================================================
@@ -925,9 +949,9 @@ const stuckRecoveryState: Map<string, { lastAttempt: number; attempts: number }>
  * Returns duration in milliseconds, or null if not currently thinking.
  */
 function parseThinkingDuration(tmuxOutput: string): number | null {
-  // Match Claude Code computation status phrases followed by a duration.
-  // Handles: "Thinking… (22m 41s", "Forming… (5s", "Embellishing… (20m 1s", "Baking… (3m"
-  const match = tmuxOutput.match(/(?:[Tt]hinking|[Ff]orming|[Ee]mbellish\w*|[Bb]aking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
+  // Match Claude Code thinking/fermenting status phrases followed by a duration.
+  // Handles: "Thinking… (22m 41s", "Fermenting… (5m 10s"
+  const match = tmuxOutput.match(/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
   if (!match) return null;
 
   const minutes = match[1] ? parseInt(match[1], 10) : 0;
@@ -1195,12 +1219,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     for (const projSpec of projectStatuses) {
       if (!projSpec.isRunning) continue;
       const rState = getAgentRuntimeState(projSpec.tmuxSession);
-      // Include specialists with state=active OR state=waiting-on-human.
-      // The notification-hook previously set specialists to waiting-on-human on
-      // startup (PAN-760), causing false-positive orphan detection that reset
-      // review/test statuses before the specialist could complete its work.
-      // The hook is now fixed, but existing sessions may still have the stale state.
-      const isWorking = rState?.state === 'active' || rState?.state === 'waiting-on-human';
+      const isWorking = rState?.state === 'active';
       if (isWorking && rState.currentIssue) {
         if (projSpec.specialistType === 'review-agent') {
           activeReviewSessions.add(rState.currentIssue.toUpperCase());
@@ -1315,7 +1334,11 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
         if (existsSync(completedProcessedFile)) {
-          const agentState = getAgentState(agentIdForCheck);
+          const agentState = getAgentState(agentIdForCheck) as (ReturnType<typeof getAgentState> & { stoppedByUser?: boolean }) | null;
+          if (agentState?.status === 'stopped' && agentState.stoppedByUser) {
+            actions.push(`Skipped pending review for ${issueId}: work agent was explicitly stopped`);
+            continue;
+          }
           const { resolveProjectFromIssue } = await import('../projects.js');
           const resolved = resolveProjectFromIssue(issueId);
           const issueLower = issueId.toLowerCase();
@@ -1516,6 +1539,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // the work agent pushes a fix (e.g. to address a CI check failure).
         mergeRetryCount: 0,
       });
+      ciRetryMap.delete(issueId);
       actions.push(
         `Reset review for ${issueId}: new commits after review passed ` +
         `(${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`,
@@ -1669,8 +1693,14 @@ const timeoutNudgeCooldowns = new Map<string, number>();
 const FAILED_MERGE_RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 // Minimum time (ms) between timeout nudges to the same work agent
 const TIMEOUT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+// Shorter cooldown for CI-transient failures (pending checks that may resolve quickly)
+const CI_TRANSIENT_RETRY_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 // Max number of automatic retries before requiring manual intervention
 const FAILED_MERGE_MAX_RETRIES = 3;
+
+// In-memory CI failure retry tracking — separate from mergeRetryCount because
+// CI failures are transient and should not permanently block merge attempts.
+export const ciRetryMap = new Map<string, { count: number; lastAttempt: number }>();
 
 /**
  * Auto-retry issues whose mergeStatus='failed' due to transient post-rebase
@@ -1711,40 +1741,65 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
       if (status.mergeStatus !== 'failed') continue;
       if (status.reviewStatus !== 'passed' || status.testStatus !== 'passed') continue;
 
-      // CI check failures are permanent until the work agent pushes a fix — retrying
-      // the merge won't help. Write feedback to the workspace so the agent knows what
-      // to fix, then saturate the circuit breaker so we don't re-enter this branch.
-      // checkPostReviewCommits() will reset the retry count once new commits are pushed.
       const isCiCheckFailure = typeof status.mergeNotes === 'string' &&
         status.mergeNotes.includes('failing required checks');
+      const issueId = status.issueId || key;
+
       if (isCiCheckFailure) {
-        const retryCountCi = status.mergeRetryCount || 0;
-        if (retryCountCi >= FAILED_MERGE_MAX_RETRIES) continue; // already processed
-        console.log(`[deacon] CI check failure for ${key} — routing to work agent, not retrying merge`);
-        setReviewStatus(key, {
-          mergeRetryCount: FAILED_MERGE_MAX_RETRIES, // saturate to suppress future re-entry
-          readyForMerge: false,
-        });
-        const issueIdForFb = status.issueId || key;
-        const ciNotes = status.mergeNotes!;
+        const ciEntry = ciRetryMap.get(issueId) ?? { count: 0, lastAttempt: 0 };
+        const timeSinceLastCi = now - ciEntry.lastAttempt;
+
+        if (ciEntry.count >= 5) {
+          if (ciEntry.count === 5) {
+            console.log(`[deacon] CI check failure for ${issueId} — retries exhausted, notifying work agent`);
+            const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
+            const { writeFeedbackFile } = await import('./feedback-writer.js');
+            await writeFeedbackFile({
+              issueId,
+              specialist: 'merge-agent',
+              outcome: 'ci-failure',
+              summary: 'CI checks still failing after 5 transient retries — merge blocked',
+              markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
+            }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
+            const agentSession = `agent-${issueId.toLowerCase()}`;
+            if (sessionExists(agentSession)) {
+              await sendKeysAsync(agentSession,
+                `CI checks are failing on the PR after 5 retries. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan done has completed successfully.`
+              );
+            }
+            ciEntry.count++;
+            ciRetryMap.set(issueId, ciEntry);
+            actions.push(`CI retry exhausted for ${issueId} — wrote feedback, notified agent`);
+          } else {
+            console.log(`[deacon] CI check failure for ${issueId} — max retries (5) exhausted, awaiting agent fix`);
+          }
+          continue;
+        }
+        if (timeSinceLastCi < CI_TRANSIENT_RETRY_COOLDOWN_MS) {
+          continue;
+        }
+
+        ciEntry.count++;
+        ciEntry.lastAttempt = now;
+        ciRetryMap.set(issueId, ciEntry);
+
+        console.log(`[deacon] CI check failure for ${issueId} — notifying agent to re-submit (attempt ${ciEntry.count}/5)`);
+        const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
         const { writeFeedbackFile } = await import('./feedback-writer.js');
         await writeFeedbackFile({
-          issueId: issueIdForFb,
+          issueId,
           specialist: 'merge-agent',
           outcome: 'ci-failure',
-          summary: 'CI checks are failing — merge blocked until CI passes',
-          markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan work done ${issueIdForFb}\n\`\`\``,
-        }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueIdForFb}:`, err.message));
-        // Nudge the work agent session if it's running. Use the /rebase-and-submit
-        // skill as the atomic task contract so Claude doesn't stop partway through
-        // the submit flow (the failure mode that caused PAN-509 to sit idle).
-        const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
-        if (sessionExists(agentSession)) {
-          await sendKeysAsync(agentSession,
-            `CI checks are failing on the PR. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueIdForFb}. The skill is an atomic task — do not stop until pan work done has completed successfully.`
+          summary: 'CI checks failed at merge — re-submit to re-enter merge queue',
+          markdownBody: `## CI Check Failure\n\n${ciNotes}\n\nCI checks failed at merge time. This may be transient (pending checks, GitHub status lag). Re-submit to re-enter the merge queue:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
+        }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
+        const agentSessionCi = `agent-${issueId.toLowerCase()}`;
+        if (sessionExists(agentSessionCi)) {
+          await sendKeysAsync(agentSessionCi,
+            `CI checks failed on the PR for ${issueId}. This may be transient. Read .planning/feedback/ for details, then invoke the /rebase-and-submit skill for ${issueId}.`
           );
         }
-        actions.push(`CI check failure for ${issueIdForFb} — wrote feedback, saturated merge retry counter`);
+        actions.push(`CI failure notification for ${issueId} (attempt ${ciEntry.count}/5)`);
         continue;
       }
 
@@ -1798,7 +1853,6 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
 
       failedMergeRetryCooldowns.set(key, now);
 
-      const issueId = status.issueId || key;
       const nextRetry = retryCount + 1;
       console.log(`[deacon] Auto-retrying failed merge for ${issueId} (attempt ${nextRetry}/${FAILED_MERGE_MAX_RETRIES})`);
 
@@ -1842,15 +1896,16 @@ async function clearStaleCiFeedback(issueId: string): Promise<void> {
 
   try {
     if (!existsSync(candidateFeedbackDir)) return;
-    const files = readdirSync(candidateFeedbackDir);
+    const files = await readdir(candidateFeedbackDir);
     for (const file of files) {
       if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
         await rm(join(candidateFeedbackDir, file));
         console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
       }
     }
-  } catch (err: any) {
-    console.log(`[deacon] Could not clear stale CI feedback for ${issueId}: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(`[deacon] Could not clear stale CI feedback for ${issueId}: ${message}`);
   }
 }
 
@@ -1931,6 +1986,13 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         continue;
       }
 
+      // CI-blocked merges have their own retry circuit breaker in checkFailedMergeRetry().
+      // Once that counter is saturated, only a new commit should reset the merge path.
+      if (isMergeCiFailed && (status.mergeRetryCount || 0) >= FAILED_MERGE_MAX_RETRIES) {
+        console.log(`[deacon] Dead-end detected for ${key} but merge retry ceiling is saturated (${status.mergeRetryCount}/${FAILED_MERGE_MAX_RETRIES})`);
+        continue;
+      }
+
       // Check if the work agent exists and is idle
       const issueId = status.issueId || key;
       const agentSessionName = `agent-${issueId.toLowerCase()}`;
@@ -1940,10 +2002,9 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         continue;
       }
 
-      // Check if agent is actively working (don't interrupt active agents)
-      const isActive = await isAgentActiveInTmux(agentSessionName);
-      if (isActive) {
-        // Agent is still working on fixes — let it finish
+      // Check if agent is idle via Stop hook state (authoritative idle signal)
+      if (!isAgentIdleForNudge(agentSessionName)) {
+        // Agent is still working or has no hook state — let it finish
         continue;
       }
 
@@ -2035,33 +2096,15 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       const completedFile = join(AGENTS_DIR, agent.id, 'completed');
       if (existsSync(completedFile)) continue;
 
-      // Check if agent is idle
-      const runtimeState = getAgentRuntimeState(agent.id);
-      if (!runtimeState) continue;
-      // Allow 'active' through — hook may not have fired to update state to 'idle'
-      // after the agent returned to the prompt. The pane check below is ground truth.
-      if (runtimeState.state === 'suspended' || runtimeState.state === 'completed') continue;
+      // Check idle duration and idle state via Stop hook
+      // isAgentIdleForNudge uses FIRST_COMPLETION_IDLE_MS as the stale-active threshold:
+      // if the agent's heartbeat is older than the idle minimum, it's safe to treat as idle.
+      if (!isAgentIdleForNudge(agent.id, FIRST_COMPLETION_IDLE_MS)) continue;
 
-      // Check idle duration
+      const runtimeState = getAgentRuntimeState(agent.id)!;
       const lastActivity = new Date(runtimeState.lastActivity);
       const idleMs = now - lastActivity.getTime();
       if (idleMs < FIRST_COMPLETION_IDLE_MS) continue;
-
-      // Verify agent is at an idle prompt (not computing/thinking)
-      // Don't use isAgentActiveInTmux here — it checks last 5 lines which may
-      // contain stale tool call names (e.g., "Bash(...)") from prior output.
-      // Instead, check the very last line for the Claude Code idle prompt marker.
-      try {
-        const lastLines = await capturePaneAsync(agent.id, 3);
-        // Check the last few non-empty lines for idle prompt indicators
-        const lines = lastLines.split('\n').filter(l => l.trim().length > 0);
-        const tail = lines.slice(-3).join('\n');
-        // Claude Code shows "❯" prompt and "bypass permissions" status bar when idle
-        const isAtPrompt = /❯/.test(tail) || /bypass permissions/.test(tail) || /Worked for/.test(tail);
-        if (!isAtPrompt) continue; // Agent is actively working
-      } catch {
-        continue;
-      }
 
       // Check cooldown
       const lastNudge = firstCompletionCooldowns.get(agent.id);

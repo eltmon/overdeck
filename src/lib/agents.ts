@@ -327,6 +327,7 @@ function markAgentRunning(state: AgentState): void {
 function markAgentStopped(state: AgentState): void {
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
+  (state as AgentState & { stoppedByUser?: boolean }).stoppedByUser = true;
 }
 
 // ============================================================================

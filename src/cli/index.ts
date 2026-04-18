@@ -41,6 +41,7 @@ import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { forkCommand } from './commands/fork.js';
+import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
 import { resumeCommand } from './commands/resume.js';
 import { recoverCommand } from './commands/recover.js';
 import { syncMainCommand } from './commands/sync-main.js';
@@ -239,6 +240,11 @@ program
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
   .action(forkCommand);
+
+program
+  .command('unarchive-conversation <query>')
+  .description('Restore an archived conversation by exact name or matching title')
+  .action(unarchiveConversationCommand);
 
 program
   .command('resume <id>')

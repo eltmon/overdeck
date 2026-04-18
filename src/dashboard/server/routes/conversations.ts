@@ -36,6 +36,7 @@ import {
   updateConversationCost,
   updateConversationModel,
   archiveConversation,
+  unarchiveConversation,
   canReplaceTitle,
   listFavoritedIds,
   setFavorite,
@@ -811,6 +812,34 @@ const postConversationArchiveRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/unarchive ─────────────────────────
+
+const postConversationUnarchiveRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/unarchive',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        if (!conv.archivedAt) {
+          return jsonResponse({ error: 'Conversation is not archived' }, { status: 400 });
+        }
+
+        unarchiveConversation(name);
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to unarchive conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: POST /api/conversations/restart-all ─────────────────────────────
 //
 // Kill all active conversation tmux sessions and re-spawn them with
@@ -1029,6 +1058,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationSwitchModelRoute,
   postConversationRestartAllRoute,
   postConversationArchiveRoute,
+  postConversationUnarchiveRoute,
   getConversationMessagesRoute,
   postConversationMessageRoute,
   postConversationFavoriteRoute,
