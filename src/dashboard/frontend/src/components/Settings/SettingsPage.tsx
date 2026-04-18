@@ -52,7 +52,7 @@ import {
   MODELS_BY_PROVIDER,
   OpenRouterFavoriteModel,
 } from './AgentCards/ModelOverrideModal';
-import { FALLBACK_FALLBACK_DEFAULT_MODEL } from './modelDefaults';
+import { FALLBACK_DEFAULT_MODEL } from './modelDefaults';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
