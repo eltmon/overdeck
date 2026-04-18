@@ -94,9 +94,9 @@ export interface ModelSelectionConfig {
     expert: 'opus' | 'sonnet' | 'haiku';
   };
   specialist_models: {
-    merge_agent: 'opus' | 'sonnet' | 'haiku';
-    review_agent: 'opus' | 'sonnet' | 'haiku';
-    test_agent: 'opus' | 'sonnet' | 'haiku';
+    merge_agent?: 'opus' | 'sonnet' | 'haiku';
+    review_agent?: 'opus' | 'sonnet' | 'haiku';
+    test_agent?: 'opus' | 'sonnet' | 'haiku';
     inspect_agent?: 'opus' | 'sonnet' | 'haiku';
     uat_agent?: 'opus' | 'sonnet' | 'haiku';
   };
@@ -242,11 +242,8 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       expert: 'opus',
     },
     specialist_models: {
-      merge_agent: 'sonnet',
-      review_agent: 'sonnet',
-      test_agent: 'haiku',
-      inspect_agent: 'sonnet',
-      uat_agent: 'sonnet',
+      // PAN-754: no hardcoded defaults. User config.yaml overrides are authoritative.
+      // Resolution falls through to work-type-router, then to the global fallback model.
     },
   },
   handoffs: {
