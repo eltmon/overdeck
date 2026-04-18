@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Issue, Agent } from '../types';
+import type { Issue } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
 import { DialogProvider } from './DialogProvider';
 import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
@@ -531,18 +531,10 @@ describe('FeatureCard', () => {
 
   const renderFeatureCard = ({
     feature = createFeature(),
-    agents = [],
-    onPlan = vi.fn(),
     onToggle = vi.fn(),
-    onViewBeads = vi.fn(),
-    onViewVBrief = vi.fn(),
   }: {
     feature?: Issue;
-    agents?: Agent[];
-    onPlan?: ReturnType<typeof vi.fn>;
     onToggle?: ReturnType<typeof vi.fn>;
-    onViewBeads?: ReturnType<typeof vi.fn>;
-    onViewVBrief?: ReturnType<typeof vi.fn>;
   } = {}) => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -559,34 +551,21 @@ describe('FeatureCard', () => {
             childCount={feature.totalChildCount ?? 0}
             isExpanded={false}
             onToggle={onToggle}
-            agents={agents}
-            onPlan={onPlan}
-            onViewBeads={onViewBeads}
-            onViewVBrief={onViewVBrief}
+            agents={[]}
+            onPlan={vi.fn()}
+            onViewBeads={vi.fn()}
+            onViewVBrief={vi.fn()}
           />
         </DialogProvider>
       </QueryClientProvider>
     );
 
-    return { feature, onPlan, onToggle, onViewBeads, onViewVBrief };
+    return { feature, onToggle };
   };
 
   beforeEach(() => {
-    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith('/planning-state')) {
-        return {
-          ok: true,
-          json: async () => ({ hasPlan: true, hasBeads: true, beadsCount: 2 }),
-        } as Response;
-      }
-      if (url.endsWith('/generate-tasks')) {
-        return {
-          ok: true,
-          json: async () => ({ success: true, created: ['b1'], count: 1 }),
-        } as Response;
-      }
-      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    global.fetch = vi.fn(async () => {
+      throw new Error('Feature cards must not call planning routes for Rally feature identifiers');
     }) as typeof fetch;
   });
 
@@ -595,49 +574,21 @@ describe('FeatureCard', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders chips and routes clicks without toggling the feature', async () => {
-    const { feature, onPlan, onToggle, onViewBeads, onViewVBrief } = renderFeatureCard();
+  it('does not render workspace-backed planning actions for Rally feature identifiers like F1234', () => {
+    renderFeatureCard();
 
-    expect(await screen.findByText('See Plan')).toBeDefined();
-    expect(screen.getByRole('button', { name: /tasks/i })).toBeDefined();
-    expect(screen.getByRole('button', { name: /vbrief/i })).toBeDefined();
-
-    fireEvent.click(screen.getByTestId(`action-plan-${feature.identifier}`));
-    expect(onPlan).toHaveBeenCalledWith(feature);
-
-    fireEvent.click(screen.getByRole('button', { name: /tasks/i }));
-    expect(onViewBeads).toHaveBeenCalledWith(feature);
-
-    fireEvent.click(screen.getByRole('button', { name: /vbrief/i }));
-    expect(onViewVBrief).toHaveBeenCalledWith(feature);
-
-    expect(onToggle).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /plan/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /tasks/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /vbrief/i })).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('shows the watch planning button while a planning agent is active', async () => {
-    const feature = createFeature({ labels: [] });
-    const planningAgent: Agent = {
-      id: 'agent-1',
-      issueId: feature.identifier,
-      runtime: 'claude',
-      model: 'claude-opus-4-6',
-      status: 'healthy',
-      startedAt: new Date().toISOString(),
-      consecutiveFailures: 0,
-      killCount: 0,
-      agentPhase: 'planning',
-    };
-    const onPlan = vi.fn();
-    const onToggle = vi.fn();
+  it('still toggles the feature card open without attempting workspace lookups', () => {
+    const { onToggle } = renderFeatureCard();
 
-    renderFeatureCard({ feature, agents: [planningAgent], onPlan, onToggle });
-
-    const watchButton = await screen.findByTestId(`action-watch-planning-${feature.identifier}`);
-    expect(watchButton).toBeDefined();
-
-    fireEvent.click(watchButton);
-    expect(onPlan).toHaveBeenCalledWith(feature);
-    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Feature title'));
+    expect(onToggle).toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 

@@ -632,7 +632,8 @@ export function FeatureCard({
   const total = feature.totalChildCount ?? childCount;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const featureIdLower = feature.identifier.toLowerCase();
-  const isPlanningActive = agents.some(
+  const canUseWorkspaceActions = !(feature.source === 'rally' && feature.artifactType?.includes('PortfolioItem'));
+  const isPlanningActive = canUseWorkspaceActions && agents.some(
     (agent) =>
       agent.issueId?.toLowerCase() === featureIdLower &&
       agent.agentPhase === 'planning' &&
@@ -705,11 +706,13 @@ export function FeatureCard({
             </div>
           )}
 
-          <div className={actionBarClass}>
-            <PlanChip issue={feature} onPlan={onPlan} isPlanningActive={isPlanningActive} />
-            <TasksChip issue={feature} onViewBeads={onViewBeads} />
-            <VBriefChip issue={feature} onViewVBrief={onViewVBrief} />
-          </div>
+          {canUseWorkspaceActions && (
+            <div className={actionBarClass}>
+              <PlanChip issue={feature} onPlan={onPlan} isPlanningActive={isPlanningActive} />
+              <TasksChip issue={feature} onViewBeads={onViewBeads} />
+              <VBriefChip issue={feature} onViewVBrief={onViewVBrief} />
+            </div>
+          )}
         </div>
       </div>
       {/* Child stories rendered inside the card */}
