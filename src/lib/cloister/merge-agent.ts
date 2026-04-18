@@ -35,7 +35,7 @@ import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
-import { appendGitOperation } from '../../dashboard/server/services/git-activity.js';
+import { appendGitOperation, type GitOperationType } from '../../dashboard/server/services/git-activity.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -655,7 +655,7 @@ async function captureTmuxOutput(sessionName: string): Promise<string> {
 }
 
 /** Patterns to match in tmux capture-pane output (git push/fetch lines) */
-const GIT_PATTERNS: Array<{ re: RegExp; operation: string; level: 'info' | 'warn' | 'error' }> = [
+export const GIT_PATTERNS: Array<{ re: RegExp; operation: GitOperationType; level: 'info' | 'warn' | 'error' }> = [
   { re: /git push/i,                     operation: 'push_attempt',    level: 'info' },
   { re: /git fetch/i,                    operation: 'fetch_attempt',   level: 'info' },
   { re: /\[rejected\]/i,                 operation: 'push_rejected',   level: 'error' },
@@ -670,7 +670,7 @@ const GIT_PATTERNS: Array<{ re: RegExp; operation: string; level: 'info' | 'warn
  * Scan tmux capture-pane output for git push/fetch patterns and emit each
  * as a git_operations row. Uses seenLineHashes to dedupe within a session.
  */
-function scanGitPatterns(
+export function scanGitPatterns(
   output: string,
   seenLineHashes: Set<string>,
   issueId: string,
@@ -689,7 +689,7 @@ function scanGitPatterns(
       if (re.test(trimmed)) {
         seenLineHashes.add(hash);
         appendGitOperation({
-          operation: operation as any,
+          operation,
           branch,
           issueId,
           status: level === 'error' ? 'failure' : 'success',

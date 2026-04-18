@@ -18,7 +18,16 @@ export type GitOperationType =
   | 'fetch'
   | 'merge'
   | 'rev_parse'
-  | 'main_diverged';
+  | 'main_diverged'
+  // Scan-pattern types detected from tmux capture-pane output
+  | 'push_attempt'
+  | 'fetch_attempt'
+  | 'push_rejected'
+  | 'non_ff'
+  | 'force_push_cmd'
+  | 'retry'
+  | 'remote_rejected'
+  | 'push_noop';
 
 /** Status of the git operation */
 export type GitOperationStatus = 'success' | 'failure' | 'aborted';

@@ -319,7 +319,8 @@ const getGitActivityRoute = HttpRouter.add(
     const since   = params.get('since')   ?? undefined;
     const issueId = params.get('issueId') ?? undefined;
     const limitRaw = params.get('limit');
-    const limit   = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 500) : 200;
+    const limitParsed = limitRaw ? parseInt(limitRaw, 10) : NaN;
+    const limit   = !isNaN(limitParsed) ? Math.min(Math.max(1, limitParsed), 500) : 200;
 
     const ops = listGitOperations({ since, issueId, limit });
     // Map to ActivityPanel-compatible format
