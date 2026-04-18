@@ -92,7 +92,15 @@ export async function readPackageVersion(): Promise<string> {
   return '0.0.0';
 }
 
-const panopticonVersion: string = await readPackageVersion();
+// Lazy-initialized to avoid top-level await (which would make misc.ts an async ESM module,
+// risking ERR_REQUIRE_ASYNC_MODULE for any module that require()-chains through here).
+let _panopticonVersion: string | null = null;
+async function getPanopticonVersion(): Promise<string> {
+  if (_panopticonVersion === null) {
+    _panopticonVersion = await readPackageVersion();
+  }
+  return _panopticonVersion;
+}
 
 // Dev mode: true when running from the repo checkout (src/ directory exists)
 const panopticonDevMode: boolean = (() => {
@@ -755,7 +763,7 @@ const postDeaconPatrolRoute = HttpRouter.add(
 const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
-  Effect.sync(() => jsonResponse({ version: panopticonVersion, isDev: panopticonDevMode })),
+  Effect.promise(() => getPanopticonVersion().then(version => jsonResponse({ version, isDev: panopticonDevMode }))),
 );
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────
