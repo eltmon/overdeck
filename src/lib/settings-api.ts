@@ -187,7 +187,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
   return {
     models: {
       providers: {
-        anthropic: true, // Always enabled
+        anthropic: config.enabledProviders.has('anthropic'),
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
         minimax: config.enabledProviders.has('minimax'),

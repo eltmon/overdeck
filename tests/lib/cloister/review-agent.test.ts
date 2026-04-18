@@ -21,6 +21,7 @@ import {
   getReviewAgents,
   reviewResultToReviewStatus,
   dispatchParallelReview,
+  getActiveParallelReviewIssues,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -108,6 +109,41 @@ describe('dispatchParallelReview', () => {
     expect(calls.length).toBe(2);
     expect(calls[0]).toEqual(['PAN-999', { reviewStatus: 'reviewing' }]);
     expect(calls[1]).toEqual(['PAN-999', { reviewStatus: 'pending' }]);
+  });
+});
+
+// ── getActiveParallelReviewIssues ─────────────────────────────────────────────
+// Regression coverage for orphan-detection fix: deacon/service must not
+// reset reviewing→pending while ad-hoc parallel review sessions are running.
+
+describe('getActiveParallelReviewIssues', () => {
+  it('extracts issue IDs from running parallel review session names', () => {
+    const sessions = [
+      'review-PAN-999-1713456789000-correctness',
+      'review-PAN-999-1713456789000-security',
+      'review-MIN-42-1713456789001-performance',
+      'agent-pan-999',
+      'panopticon-review-agent',
+    ];
+    const result = getActiveParallelReviewIssues(sessions);
+    expect(result.has('PAN-999')).toBe(true);
+    expect(result.has('MIN-42')).toBe(true);
+    expect(result.size).toBe(2);
+  });
+
+  it('returns empty set when no parallel review sessions exist', () => {
+    const result = getActiveParallelReviewIssues(['agent-pan-999', 'panopticon-review-agent']);
+    expect(result.size).toBe(0);
+  });
+
+  it('prevents false orphan detection: reviewing issue with active session is not orphaned', () => {
+    // Deacon marks an issue orphaned only if its id is NOT in activeReviewSessions.
+    // This test verifies getActiveParallelReviewIssues correctly identifies the active issue
+    // so that the orphan check sees it as active (not orphaned).
+    const activeSessions = ['review-PAN-540-1713456789000-correctness'];
+    const active = getActiveParallelReviewIssues(activeSessions);
+    // PAN-540 should appear as active — deacon would see it and skip the orphan reset
+    expect(active.has('PAN-540')).toBe(true);
   });
 });
 

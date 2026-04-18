@@ -1229,6 +1229,19 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
     }
 
+    // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
+    // These never register runtime state, so they're invisible to the specialist checks above.
+    try {
+      const { listSessionNamesAsync } = await import('../tmux.js');
+      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
+      const allSessions = await listSessionNamesAsync();
+      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
+        activeReviewSessions.add(issueId);
+      }
+    } catch {
+      // Non-fatal: fall back to specialist-only detection
+    }
+
     let modified = false;
 
     const latestHistoryEntry = (

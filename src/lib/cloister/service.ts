@@ -355,6 +355,15 @@ export class CloisterService {
         if (globalRs?.state === 'active' && globalRs.currentIssue) {
           activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
         }
+
+        // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
+        // These never register runtime state, so they're invisible to the checks above.
+        const { listSessionNamesAsync } = await import('../tmux.js');
+        const { getActiveParallelReviewIssues } = await import('./review-agent.js');
+        const allSessions = await listSessionNamesAsync();
+        for (const issueId of getActiveParallelReviewIssues(allSessions)) {
+          activeReviewIssues.add(issueId);
+        }
       } catch {
         // Non-fatal: if we can't check active sessions, re-dispatch all orphaned
       }

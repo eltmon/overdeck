@@ -76,6 +76,23 @@ const DEFAULT_REVIEW_AGENTS: ReviewAgentConfig[] = [
 ];
 
 /**
+ * Extracts issue IDs from ad-hoc parallel review tmux session names.
+ * Sessions spawned by dispatchParallelReview follow the pattern:
+ *   review-<issueId>-<timestamp>-<role>
+ * e.g. review-PAN-540-1713456789000-correctness
+ */
+export function getActiveParallelReviewIssues(sessionNames: string[]): Set<string> {
+  const active = new Set<string>();
+  for (const name of sessionNames) {
+    const match = name.match(/^review-([A-Z0-9]+-\d+)-\d+-/);
+    if (match) {
+      active.add(match[1].toUpperCase());
+    }
+  }
+  return active;
+}
+
+/**
  * Returns the list of enabled reviewer agents from config, falling back to defaults.
  */
 export function getReviewAgents(): ReviewAgentConfig[] {
