@@ -95,7 +95,7 @@ If `.planning/plan.vbrief.json` exists:
 
 ## Output Format
 
-Write to `.claude/reviews/<timestamp>-requirements.md`:
+Write to the path specified in `**Output file**` in the Review Context:
 
 ```markdown
 # Requirements Coverage Review - <timestamp>

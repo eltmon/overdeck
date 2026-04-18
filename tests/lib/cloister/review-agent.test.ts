@@ -439,6 +439,85 @@ describe('parseReviewSynthesis', () => {
   });
 });
 
+// ── template/output contract ──────────────────────────────────────────────────
+// Regression coverage for PAN-540: reviewer templates must write to the **Output file**
+// injected by runParallelReview, NOT to hardcoded .claude/reviews/ paths.
+// The synthesis template must instruct the agent to emit REVIEW_RESULT markers
+// so parseAgentOutput can parse a real review result instead of falling back to COMMENTED.
+
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+function readTemplate(name: string): string {
+  // Templates live at agents/<name>.md, two directories up from tests/lib/cloister/
+  const templatePath = resolve(import.meta.dirname, '../../../agents', `${name}.md`);
+  return readFileSync(templatePath, 'utf-8');
+}
+
+describe('template/output contract', () => {
+  const reviewerTemplates = [
+    { name: 'code-review-correctness', role: 'correctness' },
+    { name: 'code-review-security', role: 'security' },
+    { name: 'code-review-performance', role: 'performance' },
+    { name: 'code-review-requirements', role: 'requirements' },
+  ];
+
+  describe('reviewer templates write to injected Output file', () => {
+    for (const { name, role } of reviewerTemplates) {
+      it(`${role}: does NOT hardcode .claude/reviews/ path`, () => {
+        const content = readTemplate(name);
+        expect(content).not.toContain('.claude/reviews/');
+      });
+
+      it(`${role}: instructs agent to write to the **Output file** from Review Context`, () => {
+        const content = readTemplate(name);
+        expect(content).toMatch(/\*\*Output file\*\*/);
+      });
+    }
+  });
+
+  describe('synthesis template reads from Reviewer Output Files context', () => {
+    it('does NOT reference .claude/reviews/ glob for input', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).not.toContain('.claude/reviews/');
+    });
+
+    it('instructs agent to read from ## Reviewer Output Files context section', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).toContain('Reviewer Output Files');
+    });
+
+    it('instructs agent to write to the **Output file** from Synthesis Context', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).toMatch(/\*\*Output file\*\*/);
+    });
+  });
+
+  describe('synthesis template output markers (enables parseAgentOutput to return real result)', () => {
+    it('instructs agent to emit REVIEW_RESULT marker', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).toContain('REVIEW_RESULT:');
+    });
+
+    it('instructs agent to emit NOTES marker', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).toContain('NOTES:');
+    });
+
+    it('instructs agent to emit FILES_REVIEWED marker', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).toContain('FILES_REVIEWED:');
+    });
+
+    it('REVIEW_RESULT options cover all three outcomes parseAgentOutput expects', () => {
+      const content = readTemplate('code-review-synthesis');
+      expect(content).toContain('APPROVED');
+      expect(content).toContain('CHANGES_REQUESTED');
+      expect(content).toContain('COMMENTED');
+    });
+  });
+});
+
 // ── getReviewAgents ───────────────────────────────────────────────────────────
 
 describe('getReviewAgents', () => {

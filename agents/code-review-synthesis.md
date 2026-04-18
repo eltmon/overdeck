@@ -16,7 +16,7 @@ You are a synthesis agent responsible for **combining multiple code review findi
 
 You run **after** the four parallel review agents (correctness, security, performance, requirements) have completed their work. Your job is to:
 
-1. **Read all review files** from `.claude/reviews/`
+1. **Read all review files** from the paths listed in `## Reviewer Output Files` in the Synthesis Context
 2. **Combine findings** from all reviewers
 3. **Remove duplicates** - Same issue found by multiple reviewers
 4. **Prioritize issues** - Rank by severity and impact
@@ -25,20 +25,17 @@ You run **after** the four parallel review agents (correctness, security, perfor
 
 ## Input Files
 
-Read these review files from `.claude/reviews/`:
-- `<timestamp>-correctness.md` - Logic errors, edge cases, type safety
-- `<timestamp>-security.md` - Security vulnerabilities, OWASP Top 10
-- `<timestamp>-performance.md` - Performance bottlenecks, optimizations
-- `<timestamp>-requirements.md` - Requirements coverage against issue and vBRIEF
+The Synthesis Context above contains a `## Reviewer Output Files` section listing the absolute paths to each reviewer's output file. Read each file listed there.
 
 ## Synthesis Process
 
 ### Step 1: Read All Reviews
 
-Use Glob to find all review files:
-```typescript
-const reviewFiles = glob('.claude/reviews/*-{correctness,security,performance,requirements}.md');
-```
+Read each file listed under `## Reviewer Output Files` in the Synthesis Context:
+- **correctness** — logic errors, edge cases, type safety
+- **security** — security vulnerabilities, OWASP Top 10
+- **performance** — performance bottlenecks, optimizations
+- **requirements** — requirements coverage against issue and vBRIEF
 
 Read each file to extract findings.
 
@@ -274,11 +271,15 @@ To fix identified issues:
 
 ## Appendix: Individual Reviews
 
-Links to detailed reviews:
-- [Correctness Review](.claude/reviews/<timestamp>-correctness.md)
-- [Security Review](.claude/reviews/<timestamp>-security.md)
-- [Performance Review](.claude/reviews/<timestamp>-performance.md)
-- [Requirements Review](.claude/reviews/<timestamp>-requirements.md)
+Individual review files are listed in the `## Reviewer Output Files` section of the Synthesis Context provided above.
+
+---
+
+REVIEW_RESULT: APPROVED|CHANGES_REQUESTED|COMMENTED
+NOTES: <one-paragraph summary of findings and overall recommendation>
+FILES_REVIEWED: <comma-separated list of source files reviewed, not the review output files>
+SECURITY_ISSUES: <comma-separated list of security issue titles, or omit if none>
+PERFORMANCE_ISSUES: <comma-separated list of performance issue titles, or omit if none>
 ```
 
 ## Important Guidelines
@@ -372,8 +373,7 @@ Your report is the **final deliverable** that users see. Make it:
 
 ## Output Location
 
-Write your synthesis report to:
-- `.claude/reviews/<timestamp>-synthesis.md`
+Write your synthesis report to the path specified in `**Output file**` in the Synthesis Context above.
 
 Also present a summary to the user in the console.
 
