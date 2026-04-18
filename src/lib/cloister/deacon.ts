@@ -961,6 +961,24 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
 
     if (!tmuxOutput.trim()) continue;
 
+    // Detect agents stuck on Claude Code's "exclude from context" interactive dialog.
+    // This dialog fires when Claude Code wants to add a file to .claudeignore and waits
+    // for user input (Esc to cancel, Tab to amend). The notification-hook sets runtime
+    // state to 'waiting-on-human', but no automated recovery was wired up for this case.
+    const isExcludeDialog = tmuxOutput.includes('Do you want to make this edit to exclude')
+      || tmuxOutput.includes('Esc to cancel') && tmuxOutput.includes('Tab to amend');
+    if (isExcludeDialog) {
+      console.log(`[deacon] Work agent ${agent.id} stuck on exclude-from-context dialog — dismissing with Escape`);
+      try {
+        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'Escape'])} 2>/dev/null || true`);
+        saveAgentRuntimeState(agent.id, { state: 'active' });
+        actions.push(`Stuck recovery: dismissed exclude-from-context dialog for ${agent.id}`);
+      } catch (err) {
+        console.error(`[deacon] Failed to send Escape to ${agent.id}:`, err);
+      }
+      continue;
+    }
+
     // Parse thinking duration
     const thinkingMs = parseThinkingDuration(tmuxOutput);
     if (thinkingMs === null || thinkingMs < STUCK_THINKING_THRESHOLD_MS) {
@@ -1164,7 +1182,13 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     for (const projSpec of projectStatuses) {
       if (!projSpec.isRunning) continue;
       const rState = getAgentRuntimeState(projSpec.tmuxSession);
-      if (rState?.state === 'active' && rState.currentIssue) {
+      // Include specialists with state=active OR state=waiting-on-human.
+      // The notification-hook previously set specialists to waiting-on-human on
+      // startup (PAN-760), causing false-positive orphan detection that reset
+      // review/test statuses before the specialist could complete its work.
+      // The hook is now fixed, but existing sessions may still have the stale state.
+      const isWorking = rState?.state === 'active' || rState?.state === 'waiting-on-human';
+      if (isWorking && rState.currentIssue) {
         if (projSpec.specialistType === 'review-agent') {
           activeReviewSessions.add(rState.currentIssue.toUpperCase());
         } else if (projSpec.specialistType === 'test-agent') {
