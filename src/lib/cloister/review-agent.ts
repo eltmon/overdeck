@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from 'fs';
-import { readFile, writeFile, unlink, mkdir, appendFile } from 'fs/promises';
+import { readFile, writeFile, unlink, mkdir, appendFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { exec } from 'child_process';
@@ -516,7 +516,7 @@ async function runParallelReview(
   await waitForReviewer(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
-  const result = await parseReviewSynthesis(outputDir);
+  const result = await parseReviewSynthesis(outputDir, agents);
   result.output = `Review ${reviewId}`;
 
   await postGitHubPRReview(context, result, outputDir);
@@ -527,7 +527,10 @@ async function runParallelReview(
 /**
  * Parse synthesis output and individual reviewer files into a ReviewResult.
  */
-export async function parseReviewSynthesis(reviewOutputDir: string): Promise<ReviewResult> {
+export async function parseReviewSynthesis(
+  reviewOutputDir: string,
+  agents?: ReviewAgentConfig[],
+): Promise<ReviewResult> {
   const synthesisPath = join(reviewOutputDir, 'synthesis.md');
 
   if (!existsSync(synthesisPath)) {
@@ -541,10 +544,18 @@ export async function parseReviewSynthesis(reviewOutputDir: string): Promise<Rev
   const synthesisContent = await readFile(synthesisPath, 'utf-8');
   const result = parseAgentOutput(synthesisContent);
 
-  // Collect file references from all reviewer outputs
-  const reviewerFiles = getReviewAgents().map(a => `${a.name}.md`);
-  const filesReviewed: string[] = [];
+  // Collect file references from reviewer outputs.
+  // Use provided agents list when available; otherwise scan directory for *.md
+  // files (excluding synthesis.md) so parse stays independent of current config.
+  let reviewerFiles: string[];
+  if (agents) {
+    reviewerFiles = agents.map(a => `${a.name}.md`);
+  } else {
+    const entries = await readdir(reviewOutputDir);
+    reviewerFiles = entries.filter(f => f.endsWith('.md') && f !== 'synthesis.md');
+  }
 
+  const filesReviewed: string[] = [];
   await Promise.all(reviewerFiles.map(async filename => {
     const filePath = join(reviewOutputDir, filename);
     if (existsSync(filePath)) {
@@ -578,12 +589,10 @@ export function reviewResultToReviewStatus(
  * with `{ success: true }` while the review runs in the background. The caller
  * must set `reviewStatus: 'reviewing'` after receiving `success: true`.
  */
-export async function dispatchParallelReview(opts: {
-  issueId: string;
-  workspace: string;
-  branch: string;
-  prUrl?: string;
-}): Promise<{ success: boolean; message: string; error?: string }> {
+export async function dispatchParallelReview(
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string },
+  { spawnFn = spawnReviewAgent }: { spawnFn?: typeof spawnReviewAgent } = {},
+): Promise<{ success: boolean; message: string; error?: string }> {
   const { getReviewStatus, setReviewStatus } = await import('../review-status.js');
   const prUrl = opts.prUrl || getReviewStatus(opts.issueId)?.prUrl || '';
   const context: ReviewContext = {
@@ -594,7 +603,7 @@ export async function dispatchParallelReview(opts: {
     workspace: opts.workspace,
   };
 
-  spawnReviewAgent(context)
+  spawnFn(context)
     .then(result => {
       setReviewStatus(opts.issueId, {
         reviewStatus: reviewResultToReviewStatus(result.reviewResult),

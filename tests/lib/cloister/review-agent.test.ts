@@ -9,7 +9,7 @@
  *   - reviewResultToReviewStatus: maps review outcome to reviewStatus (CHANGES_REQUESTED → 'blocked')
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -20,7 +20,78 @@ import {
   parseReviewSynthesis,
   getReviewAgents,
   reviewResultToReviewStatus,
+  dispatchParallelReview,
+  type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
+
+// ── dispatchParallelReview ────────────────────────────────────────────────────
+// vi.mock is hoisted, so mock fns must be defined with vi.hoisted() before they
+// are referenced in the factory.
+
+const { mockSetReviewStatus, mockGetReviewStatus } = vi.hoisted(() => ({
+  mockSetReviewStatus: vi.fn(),
+  mockGetReviewStatus: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('../../../src/lib/review-status.js', () => ({
+  setReviewStatus: mockSetReviewStatus,
+  getReviewStatus: mockGetReviewStatus,
+}));
+
+describe('dispatchParallelReview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const baseOpts = {
+    issueId: 'PAN-999',
+    workspace: '/workspaces/feature-pan-999',
+    branch: 'feature/pan-999',
+    prUrl: 'https://github.com/org/repo/pull/1',
+  };
+
+  it('calls setReviewStatus with mapped status when spawnFn resolves', async () => {
+    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
+    const spawnFn = vi.fn().mockResolvedValue(approvedResult);
+
+    const ret = await dispatchParallelReview(baseOpts, { spawnFn });
+
+    expect(ret.success).toBe(true);
+    // Fire-and-forget: flush the microtask queue so .then() runs
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(spawnFn).toHaveBeenCalledOnce();
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
+      reviewStatus: 'passed',
+      reviewNotes: 'LGTM',
+    });
+  });
+
+  it('calls setReviewStatus with pending when spawnFn rejects', async () => {
+    const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
+
+    const ret = await dispatchParallelReview(baseOpts, { spawnFn });
+
+    expect(ret.success).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(spawnFn).toHaveBeenCalledOnce();
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', { reviewStatus: 'pending' });
+  });
+
+  it('maps CHANGES_REQUESTED to blocked status on success path', async () => {
+    const blockedResult: ReviewResult = { success: true, reviewResult: 'CHANGES_REQUESTED', notes: 'Fix required' };
+    const spawnFn = vi.fn().mockResolvedValue(blockedResult);
+
+    await dispatchParallelReview(baseOpts, { spawnFn });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'Fix required',
+    });
+  });
+});
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

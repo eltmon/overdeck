@@ -143,7 +143,7 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelId('claude-sonnet-4-6');
 }
 
-/** One-time silent migration: convoy:* override keys → review:* equivalents */
+/** convoy:* override keys → review:* equivalents (translated on every read) */
 const CONVOY_TO_REVIEW_MIGRATION: Partial<Record<string, WorkTypeId>> = {
   'convoy:security-reviewer': 'review:security',
   'convoy:performance-reviewer': 'review:performance',
@@ -155,8 +155,8 @@ const CONVOY_TO_REVIEW_MIGRATION: Partial<Record<string, WorkTypeId>> = {
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
-  // Auto-migrate persisted convoy:* override keys to review:* equivalents.
-  // This is a one-time silent rename so existing user model overrides are preserved.
+  // Translate persisted convoy:* override keys to review:* equivalents on every read.
+  // The rename is applied in-memory; it persists to disk only when the user calls saveSettingsApi.
   const migratedOverrides: Partial<Record<WorkTypeId, ModelId>> = {};
   let migrationNeeded = false;
   for (const [workType, modelId] of Object.entries(config.overrides)) {
