@@ -1,5 +1,5 @@
 // Vendored from https://github.com/JuliusBrussee/caveman at commit 63e797cd753b301374947a5ed975c21775d962b9
-// Do not edit — update by re-running 'pan setup hooks' after bumping the pinned commit hash.
+// Do not edit — update by re-running 'pan admin hooks install' after bumping the pinned commit hash.
 // caveman — shared configuration resolver
 //
 // Resolution order for default mode:

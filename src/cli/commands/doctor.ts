@@ -177,11 +177,11 @@ export async function doctorCommand(): Promise<void> {
   const legacyPatterns = [
     'pan work ',
     'pan plan-finalize',
-    'pan setup hooks',
+    'pan admin hooks install',
     'pan sync-costs',
     'pan cloister ',
     'pan specialists ',
-    'pan migrate-config',
+    'pan admin migrate-config',
   ];
   const shellRcFiles = [
     join(homedir(), '.bashrc'),

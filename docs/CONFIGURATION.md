@@ -589,9 +589,14 @@ For non-model settings:
 
 ### Debugging model resolution
 
+Use the Settings page and the documented YAML files as the source of truth for model routing. Panopticon does not currently expose a `pan admin config show|get|set|validate` CLI for router inspection.
+
+For the older TOML-backed runtime config, the currently supported admin CLI surface is shadow mode only:
+
 ```bash
-pan config show
-pan config get issue-agent:implementation
+pan admin config shadow --status
+pan admin config shadow --tracker github --enable
+pan admin config shadow --tracker github --disable
 ```
 
 ### Validation
@@ -751,7 +756,7 @@ External service integrations follow a common pattern:
 
 ## Getting Help
 
-- validate configuration: `pan config validate`
+- inspect shadow-mode config: `pan admin config shadow --status`
 - inspect work-type coverage: [WORK-TYPES.md](./WORK-TYPES.md)
 - review higher-level guidance: [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md)
 - file issues: [panopticon-cli/issues](https://github.com/eltmon/panopticon-cli/issues)

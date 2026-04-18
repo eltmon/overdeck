@@ -100,7 +100,7 @@ Use these patterns after you have already decided the right owning document and 
 4. **Verification**:
    ```bash
    # Test the configuration
-   pan config show
+   pan admin config shadow --status
    ```
 
 **Example - New Preset**:
@@ -333,7 +333,7 @@ What are the implications?
 
    **Automatic migration**:
    ```bash
-   pan migrate-config
+   pan admin migrate-config
    ```​
    ```
 

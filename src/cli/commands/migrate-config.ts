@@ -1,8 +1,8 @@
 /**
- * CLI Command: pan migrate-config
+ * CLI Command: pan admin migrate-config
  *
- * Migrates from legacy settings.json to new config.yaml format
- * Now uses smart (capability-based) model selection - no presets
+ * Migrates from legacy settings.json to new config.yaml format.
+ * Now uses smart (capability-based) model selection - no presets.
  */
 
 import chalk from 'chalk';

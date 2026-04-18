@@ -4,7 +4,7 @@
  * Copies vendored caveman JS hook files and SKILL.md content to
  * ~/.panopticon/hooks/caveman/ and ~/.panopticon/hooks/skills/.
  *
- * Called from 'pan setup hooks' to ensure caveman hooks are available
+ * Called from 'pan admin hooks install' to ensure caveman hooks are available
  * before workspace creation injects them into .claude/settings.json.
  *
  * File layout after build (tsdown bundles to dist/cli/index.js):
@@ -53,7 +53,7 @@ function findVendoredDir(): string {
  * into ~/.panopticon/hooks/caveman/.
  *
  * CLI-only — sync FS is acceptable here; this function is only called from
- * 'pan setup hooks' and is never imported by any dashboard server route.
+ * 'pan admin hooks install' and is never imported by any dashboard server route.
  *
  * Safe to call multiple times (idempotent).
  * Returns true if installation succeeded, false if source files not found.
@@ -124,7 +124,7 @@ export function setupCavemanHooks(): boolean {
  * These scripts let users manually compress static reference docs via pan caveman-compress.
  *
  * CLI-only — sync FS is acceptable here; this function is only called from
- * 'pan setup hooks' and is never imported by any dashboard server route.
+ * 'pan admin hooks install' and is never imported by any dashboard server route.
  *
  * Safe to call multiple times (idempotent).
  * Returns true if installation succeeded, false if source files not found.

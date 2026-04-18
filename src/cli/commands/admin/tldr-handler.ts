@@ -179,7 +179,7 @@ async function statusCommand(options: TldrOptions): Promise<void> {
 
   if (results.length === 0) {
     console.log(chalk.dim('No TLDR daemons found (no .venv directories)'));
-    console.log(chalk.dim('Run `pan setup` to configure TLDR\n'));
+    console.log(chalk.dim('Create a project .venv, then run `pan admin tldr start`\n'));
     return;
   }
 
@@ -231,7 +231,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
 
     if (!existsSync(venvPath)) {
       console.error(chalk.red('Error: No .venv found in project root'));
-      console.error(chalk.dim('Run `pan setup` to configure TLDR'));
+      console.error(chalk.dim('Create a project .venv, then run `pan admin tldr start`'));
       process.exit(1);
     }
 
@@ -322,7 +322,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
 
     if (!existsSync(venvPath)) {
       console.error(chalk.red('Error: No .venv found in project root'));
-      console.error(chalk.dim('Run `pan setup` to configure TLDR'));
+      console.error(chalk.dim('Create a project .venv, then run `pan admin tldr start`'));
       process.exit(1);
     }
 
@@ -342,7 +342,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
 }
 
 function showHelp(): void {
-  console.log(chalk.bold('pan tldr - TLDR daemon management\n'));
+  console.log(chalk.bold('pan admin tldr - TLDR daemon management\n'));
   console.log('Commands:');
   console.log('  ' + chalk.cyan('status') + '              Show status of all TLDR daemons');
   console.log('  ' + chalk.cyan('start [workspace]') + '   Start TLDR daemon (main or workspace)');
@@ -352,9 +352,9 @@ function showHelp(): void {
   console.log('Options:');
   console.log('  ' + chalk.cyan('--json') + '              Output as JSON\n');
   console.log('Examples:');
-  console.log('  pan tldr status');
-  console.log('  pan tldr start');
-  console.log('  pan tldr start feature-pan-123');
-  console.log('  pan tldr warm feature-pan-123');
-  console.log('  pan tldr stop\n');
+  console.log('  pan admin tldr status');
+  console.log('  pan admin tldr start');
+  console.log('  pan admin tldr start feature-pan-123');
+  console.log('  pan admin tldr warm feature-pan-123');
+  console.log('  pan admin tldr stop\n');
 }

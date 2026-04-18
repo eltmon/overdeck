@@ -62,12 +62,12 @@ export async function injectCavemanSettings(workspacePath: string, variant: Cave
   const activateScript = join(hooksDir, 'panopticon-caveman-activate.js');
   const modeTrackerScript = join(hooksDir, 'caveman-mode-tracker.js');
 
-  // If hooks aren't installed yet (pan setup hooks not run), skip injection
+  // If hooks aren't installed yet (pan admin hooks install not run), skip injection
   // and warn — workspace will work without caveman compression
   if (!existsSync(activateScript)) {
     console.warn(
       `⚠ Caveman hook files not found at ${hooksDir}. ` +
-      `Run 'pan setup hooks' to install them, then recreate the workspace.`
+      `Run 'pan admin hooks install' to install them, then recreate the workspace.`
     );
     return;
   }
