@@ -887,3 +887,37 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+// ── spawnReviewer claudish routing regression (PAN-540) ───────────────────────
+// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so claudish
+// providers (OpenAI, Google) get routed correctly instead of using the old
+// hardcoded `claude --model` which only works for direct Anthropic-compatible providers.
+describe('spawnReviewer runtime command routing regression', () => {
+  it('review-agent.ts imports getAgentRuntimeBaseCommand from agents.js', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+    expect(src).toMatch(/import\s*\{[^}]*getAgentRuntimeBaseCommand[^}]*\}\s*from\s*['"]\.\.\/agents\.js['"]/);
+  });
+
+  it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    // Isolate the spawnReviewer function body
+    const spawnReviewerMatch = src.match(/async function spawnReviewer[\s\S]*?^}/m);
+    expect(spawnReviewerMatch).not.toBeNull();
+    const fn = spawnReviewerMatch![0];
+
+    // Must use the routing helper — not a bare `claude --model` string
+    expect(fn).toContain('getAgentRuntimeBaseCommand(');
+    expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
+  });
+});

@@ -11,7 +11,7 @@ import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
-import { getProviderEnvForModel } from '../agents.js';
+import { getProviderEnvForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -442,7 +442,7 @@ async function spawnReviewer(
   promptFile: string,
   projectPath: string,
 ): Promise<void> {
-  const claudeCmd = `claude --dangerously-skip-permissions --model ${model}`;
+  const claudeCmd = getAgentRuntimeBaseCommand(model);
   const providerEnv = getProviderEnvForModel(model);
 
   await createSessionAsync(sessionName, projectPath, claudeCmd, { env: providerEnv });
