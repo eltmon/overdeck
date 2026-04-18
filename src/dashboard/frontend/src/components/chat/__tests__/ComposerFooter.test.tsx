@@ -81,6 +81,14 @@ const conversation = {
   effort: 'medium',
 };
 
+const secondConversation = {
+  ...conversation,
+  id: 2,
+  name: 'other-conv',
+  tmuxSession: 'conv-other-conv',
+  title: 'Other Conversation',
+};
+
 describe('ComposerFooter image attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -244,6 +252,57 @@ describe('ComposerFooter image attachments', () => {
       );
     });
     expect(screen.queryByText('remove-me.png')).not.toBeInTheDocument();
+  });
+
+  it('deletes uploaded images when the conversation prop changes without remounting', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-switched.png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/delete-image')) {
+        return new Response('{}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const view = render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['png-bytes'], 'switch-me.png', { type: 'image/png' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([5, 6, 7, 8]).buffer),
+    });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => file }],
+      },
+    });
+
+    expect(await screen.findByText('switch-me.png')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Uploaded')).toBeInTheDocument();
+    });
+
+    view.rerender(<ComposerFooter conversation={secondConversation} />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/delete-image',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ path: '/tmp/panopticon-paste-switched.png' }),
+        }),
+      );
+    });
+    expect(screen.queryByText('switch-me.png')).not.toBeInTheDocument();
   });
 
   it('deletes uploaded images when the composer unmounts before send', async () => {

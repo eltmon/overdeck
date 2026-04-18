@@ -151,15 +151,16 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const pendingImagesRef = useRef<PendingImage[]>([]);
   const removedImageIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
+  const previousConversationNameRef = useRef(conversation.name);
 
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
 
-  const deleteUploadedImage = useCallback((path: string) => {
-    void deleteConversationImage(conversation.name, path).catch((err: unknown) => {
+  const deleteUploadedImage = useCallback((conversationName: string, path: string) => {
+    void deleteConversationImage(conversationName, path).catch((err: unknown) => {
       console.error('[ComposerFooter] Failed to delete image:', err);
     });
-  }, [conversation.name]);
+  }, []);
 
   const updatePendingImage = useCallback((id: string, updates: Partial<PendingImage>) => {
     setPendingImages((images) => {
@@ -180,19 +181,20 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       if (image) {
         revokePreviewUrl(image.previewUrl);
         if (image.serverPath) {
-          deleteUploadedImage(image.serverPath);
+          deleteUploadedImage(conversation.name, image.serverPath);
         }
       }
       const next = images.filter((candidate) => candidate.id !== id);
       pendingImagesRef.current = next;
       return next;
     });
-  }, [deleteUploadedImage]);
+  }, [conversation.name, deleteUploadedImage]);
 
   const enqueueImages = useCallback((files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
 
+    const ownerConversationName = conversation.name;
     const newImages = imageFiles.map((file) => ({
       id: crypto.randomUUID(),
       file,
@@ -208,10 +210,14 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     });
 
     for (const image of newImages) {
-      void uploadConversationImage(conversation.name, image.file)
+      void uploadConversationImage(ownerConversationName, image.file)
         .then((serverPath) => {
-          if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
-            deleteUploadedImage(serverPath);
+          if (
+            removedImageIdsRef.current.has(image.id)
+            || !mountedRef.current
+            || ownerConversationName !== previousConversationNameRef.current
+          ) {
+            deleteUploadedImage(ownerConversationName, serverPath);
             return;
           }
           updatePendingImage(image.id, { serverPath, error: null });
@@ -336,19 +342,47 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, pendingImages]);
 
   useEffect(() => {
+    const previousConversationName = previousConversationNameRef.current;
+    if (previousConversationName === conversation.name) {
+      return;
+    }
+
+    previousConversationNameRef.current = conversation.name;
+    const images = pendingImagesRef.current;
+    pendingImagesRef.current = [];
+    for (const image of images) {
+      removedImageIdsRef.current.add(image.id);
+      revokePreviewUrl(image.previewUrl);
+      if (image.serverPath) {
+        deleteUploadedImage(previousConversationName, image.serverPath);
+      }
+    }
+
+    setPendingImages([]);
+    setText('');
+    setSending(false);
+    setModel(conversation.model ?? getDefaultConversationModel());
+    editorRef.current?.update(() => {
+      $getRoot().clear();
+    });
+  }, [conversation.name, conversation.model, deleteUploadedImage]);
+
+  useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       const images = pendingImagesRef.current;
+      const conversationName = previousConversationNameRef.current;
       pendingImagesRef.current = [];
       for (const image of images) {
+        removedImageIdsRef.current.add(image.id);
         revokePreviewUrl(image.previewUrl);
         if (image.serverPath) {
-          deleteUploadedImage(image.serverPath);
+          deleteUploadedImage(conversationName, image.serverPath);
         }
       }
     };
-  }, [conversation.name, deleteUploadedImage]);
+  }, [deleteUploadedImage]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
