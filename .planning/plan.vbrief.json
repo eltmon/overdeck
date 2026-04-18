@@ -4,7 +4,7 @@
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility",
-    "updated": "2026-04-18T14:38:48.522Z"
+    "updated": "2026-04-18T14:39:23.000Z"
   },
   "plan": {
     "id": "pan-653",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "3102731e-c901-43ed-9595-545316061952",
     "author": "agent:claude-opus-4-6",
-    "sequence": 43,
+    "sequence": 44,
     "created": "2026-04-12T00:00:00Z",
-    "updated": "2026-04-18T14:38:48.522Z",
+    "updated": "2026-04-18T14:39:23.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/653",
@@ -57,7 +57,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.517Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "deacon-respect.ac2",
@@ -66,7 +66,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.517Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "deacon-respect.ac3",
@@ -75,10 +75,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.517Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.517Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "stuck-schema",
@@ -101,7 +101,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.516Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "stuck-schema.ac2",
@@ -110,7 +110,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.516Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "stuck-schema.ac3",
@@ -119,10 +119,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.516Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.516Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "git-operations-table",
@@ -145,7 +145,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.518Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "git-operations-table.ac2",
@@ -154,7 +154,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.518Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "git-operations-table.ac3",
@@ -163,10 +163,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.519Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.518Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "git-helper-wrapper",
@@ -189,7 +189,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.515Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "git-helper-wrapper.ac2",
@@ -198,7 +198,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.515Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "git-helper-wrapper.ac3",
@@ -207,10 +207,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.515Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.514Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "approve-divergence-guard",
@@ -233,7 +233,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.513Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "approve-divergence-guard.ac2",
@@ -242,7 +242,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.514Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "approve-divergence-guard.ac3",
@@ -251,15 +251,15 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.514Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.513Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "salvage-divergence-guard",
         "title": "Same guard in salvageStrandedMerge + merge-agent push sites",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -273,20 +273,23 @@
           {
             "id": "salvage-divergence-guard.ac1",
             "title": "salvageStrandedMerge aborts and marks stuck when origin/main has advanced beyond what it intended to push",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "salvage-divergence-guard.ac2",
             "title": "Rebase force-push and auto-revert force-push both emit git.force_push activity events",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-15T03:25:52.482Z"
           }
-        ]
+        ],
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "unstick-api-ui",
@@ -299,7 +302,7 @@
           "issueLabel": "pan-653"
         },
         "narrative": {
-          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane — card stays where it is per the issue comment clarification."
+          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane \u2014 card stays where it is per the issue comment clarification."
         },
         "subItems": [
           {
@@ -309,7 +312,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.512Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "unstick-api-ui.ac2",
@@ -318,7 +321,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.512Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "unstick-api-ui.ac3",
@@ -327,10 +330,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.512Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.512Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "tmux-stream-patterns",
@@ -348,12 +351,12 @@
         "subItems": [
           {
             "id": "tmux-stream-patterns.ac1",
-            "title": "User sees 'pushing…', 'rejected non-fast-forward', 'retrying…' events live in the activity panel during an approve",
+            "title": "User sees 'pushing\u2026', 'rejected non-fast-forward', 'retrying\u2026' events live in the activity panel during an approve",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.522Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "tmux-stream-patterns.ac2",
@@ -362,10 +365,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.522Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.521Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "concurrent-merge-detection",
@@ -388,7 +391,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.522Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "concurrent-merge-detection.ac2",
@@ -397,10 +400,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.522Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.522Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "activity-panel-ux",
@@ -423,7 +426,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.519Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "activity-panel-ux.ac2",
@@ -432,7 +435,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.519Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "activity-panel-ux.ac3",
@@ -441,10 +444,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.520Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.519Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "kanban-stuck-count-union",
@@ -467,7 +470,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.520Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "kanban-stuck-count-union.ac2",
@@ -476,7 +479,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.521Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "kanban-stuck-count-union.ac3",
@@ -485,10 +488,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.521Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.520Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       },
       {
         "id": "integration-tests",
@@ -511,7 +514,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.510Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "integration-tests.ac2",
@@ -520,7 +523,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.510Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           },
           {
             "id": "integration-tests.ac3",
@@ -529,10 +532,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-18T14:38:48.511Z"
+            "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-18T14:38:48.509Z"
+        "completed": "2026-04-15T03:25:52.482Z"
       }
     ],
     "edges": [
