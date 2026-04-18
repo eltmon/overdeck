@@ -11,7 +11,8 @@
 import type Database from 'better-sqlite3';
 import { createRequire } from 'module';
 import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync } from 'fs';
+import { mkdir } from 'fs/promises';
 import { homedir } from 'os';
 
 declare const Bun: unknown;
@@ -81,13 +82,15 @@ export class CacheService {
   private readonly l1TtlMs = 10_000; // 10 seconds
 
   constructor() {
-    if (!existsSync(PANOPTICON_HOME)) {
-      mkdirSync(PANOPTICON_HOME, { recursive: true });
-    }
-
     this.db = openSqliteDb(CACHE_DB_PATH);
     this.db.pragma('journal_mode = WAL');
     this.createSchema();
+  }
+
+  static async initHome(): Promise<void> {
+    if (!existsSync(PANOPTICON_HOME)) {
+      await mkdir(PANOPTICON_HOME, { recursive: true });
+    }
   }
 
   private createSchema(): void {

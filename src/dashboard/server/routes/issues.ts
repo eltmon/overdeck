@@ -25,8 +25,8 @@ import { httpHandler } from './http-handler.js';
  */
 
 import { exec, spawn } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, writeFile, access } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -812,8 +812,8 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
 
     yield* Effect.promise(async () => {
       try {
-        if (existsSync(agentStateDir)) rmSync(agentStateDir, { recursive: true, force: true });
-        if (existsSync(workAgentStateDir)) rmSync(workAgentStateDir, { recursive: true, force: true });
+        if (existsSync(agentStateDir)) await rm(agentStateDir, { recursive: true, force: true });
+        if (existsSync(workAgentStateDir)) await rm(workAgentStateDir, { recursive: true, force: true });
       } catch (cleanupErr) {
         console.log('[abort-planning] Warning: Could not clean up agent state:', cleanupErr);
       }
@@ -1388,7 +1388,7 @@ const postIssueReopenRoute = HttpRouter.add(
         for (const marker of ['completed', 'completed.processed']) {
           const markerPath = join(agentDir, marker);
           if (existsSync(markerPath)) {
-            rmSync(markerPath);
+            await rm(markerPath);
             console.log(`[reopen] Cleared ${marker} marker for ${id}`);
           }
         }

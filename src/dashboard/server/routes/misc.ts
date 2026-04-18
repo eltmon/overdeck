@@ -40,7 +40,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -76,14 +76,14 @@ const execAsync = promisify(exec);
 
 // ─── Package version ──────────────────────────────────────────────────────────
 
-function readPackageVersion(): string {
+async function readPackageVersion(): Promise<string> {
   // Walk up from the running script to find the nearest package.json.
   // Works for both source (src/dashboard/server/routes/) and bundled (dist/dashboard/) layouts.
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 8; i++) {
     const candidate = join(dir, 'package.json');
     try {
-      return JSON.parse(readFileSync(candidate, 'utf-8')).version;
+      return JSON.parse(await readFile(candidate, 'utf-8')).version;
     } catch { /* try parent */ }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -92,7 +92,7 @@ function readPackageVersion(): string {
   return '0.0.0';
 }
 
-const panopticonVersion: string = readPackageVersion();
+const panopticonVersion: string = await readPackageVersion();
 
 // Dev mode: true when running from the repo checkout (src/ directory exists)
 const panopticonDevMode: boolean = (() => {
