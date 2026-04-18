@@ -2630,6 +2630,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...deadEndActions);
   for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
 
+  // First-completion gap detection: nudge work agents that finished implementation
+  // but never called pan done. Only fires for agents idle >10min with commits and
+  // no completion marker or review status entry. Has 15-min cooldown per agent.
+  const firstCompletionActions = await checkFirstCompletionAgents();
+  actions.push(...firstCompletionActions);
+  for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
+
   // Resolution patrol DISABLED — auto-completing and poking agents consumes
   // API credits and is unreliable. Human operator can take action via dashboard.
 
