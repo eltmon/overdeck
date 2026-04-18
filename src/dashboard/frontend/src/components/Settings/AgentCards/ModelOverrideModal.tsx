@@ -52,15 +52,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
       { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
-      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous gen Sonnet, strong coding performance' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },
   openai: {
     name: 'OpenAI',
     models: [
-      { id: 'gpt-5.2-codex' as ModelId, name: 'GPT-5.2 Codex', icon: Code2, tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math'], description: '80% SWE-bench, premium coding' },
-      { id: 'o3-deep-research' as ModelId, name: 'O3 Deep Research', icon: Brain, tier: 'premium', capabilities: ['reasoning', 'complex-math'], description: 'Deep reasoning model for debugging' },
       { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: FlaskConical, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
       { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
     ],
@@ -68,24 +65,21 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-3-pro-preview' as ModelId, name: 'Gemini 3 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: '1M context, first >1500 Elo on LMArena' },
-      { id: 'gemini-3-flash-preview' as ModelId, name: 'Gemini 3 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Extremely fast with 1M context' },
-      { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', icon: Layers, tier: 'balanced', capabilities: ['reasoning', 'large-context', 'code'], description: 'Advanced reasoning, 1M context' },
-      { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and efficient with large context' },
+      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
+      { id: 'gemini-3-flash' as ModelId, name: 'Gemini 3 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and cheap with 1M context' },
+      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
     ],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
-      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: Coins, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Strong value, 65.8% SWE-bench, 128K context' },
     ],
   },
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-4.7' as ModelId, name: 'GLM 4.7', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Top open-source for agentic coding, 73.8% SWE-bench, 200K context' },
-      { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
+      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 128K context, strong agentic coding' },
     ],
   },
   minimax: {
@@ -182,30 +176,28 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // Anthropic models
   if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
-  if (idLower.includes('sonnet') && idLower.includes('4.6')) return models.find(m => m.id === 'claude-sonnet-4-6');
-  if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-5');
+  if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-6');
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
-  if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-5');
+  if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-6');
 
   // OpenAI models
   if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
-  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3-deep-research');
-  if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.2-codex');
+  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3');
+  if (idLower.includes('o4') || idLower.includes('mini')) return models.find(m => m.id === 'o4-mini');
+  if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.4');
 
   // Google models
-  if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-2.5-flash');
-  if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-2.5-pro');
+  if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');
+  if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
 
   // Kimi models
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
-    if (idLower.includes('k2.5') || idLower.includes('2.5')) return models.find(m => m.id === 'kimi-k2.5');
-    return models.find(m => m.id === 'kimi-k2');
+    return models.find(m => m.id === 'kimi-k2.5');
   }
 
   // GLM models
   if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
-    if (idLower.includes('flash')) return models.find(m => m.id === 'glm-4.7-flash');
-    return models.find(m => m.id === 'glm-4.7');
+    return models.find(m => m.id === 'glm-5.1');
   }
 
   // MiniMax models

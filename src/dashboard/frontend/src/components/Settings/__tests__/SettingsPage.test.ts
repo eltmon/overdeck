@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
+import { MODELS_BY_PROVIDER } from '../AgentCards/ModelOverrideModal';
 import type { SettingsConfig } from '../types';
 
 const MINIMAX_DEFAULTS: SettingsConfig = {
@@ -21,6 +22,30 @@ const MINIMAX_DEFAULTS: SettingsConfig = {
   api_keys: {},
   tracker_keys: {},
 };
+
+// Deprecated model IDs that must not appear in the UI model catalog.
+// When adding new deprecations, add them here too.
+const DEPRECATED_MODEL_IDS = [
+  'claude-opus-4-5',
+  'claude-sonnet-4-5',
+  'gpt-5.2-codex',
+  'o3-deep-research',
+  'gemini-3-pro-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'kimi-k2',
+  'glm-4.7',
+  'glm-4.7-flash',
+];
+
+describe('MODELS_BY_PROVIDER', () => {
+  it('contains no deprecated model IDs', () => {
+    const allModelIds = Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models.map(m => m.id));
+    const found = DEPRECATED_MODEL_IDS.filter(dep => allModelIds.includes(dep as never));
+    expect(found).toEqual([]);
+  });
+});
 
 describe('buildMiniMaxFormData', () => {
   it('applies MiniMax providers and overrides', () => {

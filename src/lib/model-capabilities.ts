@@ -45,6 +45,9 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'gemini-2.5-flash': 'gemini-3-flash',
   // Kimi deprecated
   'kimi-k2': 'kimi-k2.5',
+  // Z.AI deprecated
+  'glm-4.7': 'glm-5.1',
+  'glm-4.7-flash': 'glm-5.1',
 };
 
 /**
