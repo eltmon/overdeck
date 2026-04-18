@@ -139,6 +139,9 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('openai')) {
     return resolveModelId('gpt-5.4');
   }
+  if (config.enabledProviders.has('minimax')) {
+    return resolveModelId('minimax-m2.7-highspeed');
+  }
 
   return resolveModelId('claude-sonnet-4-6');
 }

@@ -119,6 +119,25 @@ async function fetchMiniMaxDefaults(): Promise<SettingsConfig> {
   return res.json();
 }
 
+/** Pure merge: apply MiniMax model preset while preserving all non-model settings. */
+export function buildMiniMaxFormData(
+  formData: SettingsConfig | null,
+  miniMaxDefaults: SettingsConfig,
+): SettingsConfig {
+  return {
+    models: {
+      providers: { ...miniMaxDefaults.models.providers },
+      overrides: { ...miniMaxDefaults.models.overrides },
+      gemini_thinking_level: formData?.models.gemini_thinking_level,
+    },
+    api_keys: { ...(formData?.api_keys || {}) },
+    tracker_keys: { ...(formData?.tracker_keys || {}) },
+    conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
+    tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
+    openrouter: { ...(formData?.openrouter || miniMaxDefaults.openrouter || {}) },
+  };
+}
+
 interface TestApiKeyResult {
   success: boolean;
   error: string | null;
@@ -487,16 +506,7 @@ export function SettingsPage() {
   const handleRestoreMiniMaxDefaults = async () => {
     try {
       const miniMaxDefaults = await fetchMiniMaxDefaults();
-      const newFormData: SettingsConfig = {
-        models: {
-          providers: { ...miniMaxDefaults.models.providers },
-          overrides: { ...miniMaxDefaults.models.overrides },
-          gemini_thinking_level: formData?.models.gemini_thinking_level,
-        },
-        api_keys: { ...(formData?.api_keys || {}) },
-        tracker_keys: { ...(formData?.tracker_keys || {}) },
-      };
-      setFormData(newFormData);
+      setFormData(buildMiniMaxFormData(formData, miniMaxDefaults));
     } catch (error) {
       console.error('Failed to fetch MiniMax defaults:', error);
       showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });

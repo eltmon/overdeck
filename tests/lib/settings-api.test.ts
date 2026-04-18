@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { loadConfig } from '../../src/lib/config-yaml.js';
-import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi } from '../../src/lib/settings-api.js';
+import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
 // Mock the config-yaml module
@@ -341,6 +341,44 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('minimax: minimax-test-123');
       expect(yamlContent).toContain('zai: zai-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
+    });
+  });
+
+  describe('getDefaultConversationModelApi', () => {
+    it('returns a MiniMax model when only MiniMax is enabled', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['minimax']),
+          apiKeys: { minimax: 'minimax-test-key' },
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toContain('minimax');
+    });
+
+    it('returns an OpenAI model when OpenAI is enabled (takes precedence over MiniMax)', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['openai', 'minimax']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toContain('gpt');
     });
   });
 });
