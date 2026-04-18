@@ -129,8 +129,8 @@ Panopticon develops on `main`, then publishes intentionally by tag.
 
 ```
 pan release check                         Verify branch, tree, build, tests, CLI
-pan release stable --version <x.y.z>      Create stable release commit + tag locally
-pan release canary --version <x.y.z-canary.n>
+pan release stable [--version <x.y.z>]    Create stable release commit + tag locally
+pan release canary [--version <x.y.z-canary.n>]
                                           Create canary release commit + tag locally
 pan release notes [from] [to]             Draft notes from git history
                                           (use --write to save a release body file)

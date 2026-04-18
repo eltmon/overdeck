@@ -12,8 +12,8 @@ function buildProgram() {
   const release = program.command('release');
   release
     .command('stable')
-    .requiredOption('--version <version>')
-    .action((options: { version: string }) => {
+    .option('--version <version>')
+    .action((options: { version?: string }) => {
       captured = options.version;
     });
 
@@ -27,5 +27,13 @@ describe('release command parsing', () => {
     await program.parseAsync(['node', 'pan', 'release', 'stable', '--version', '0.7.1'], { from: 'node' });
 
     expect(getCaptured()).toBe('0.7.1');
+  });
+
+  it('allows release subcommands to omit the version flag entirely', async () => {
+    const { program, getCaptured } = buildProgram();
+
+    await program.parseAsync(['node', 'pan', 'release', 'stable'], { from: 'node' });
+
+    expect(getCaptured()).toBeUndefined();
   });
 });

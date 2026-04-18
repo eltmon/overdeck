@@ -57,14 +57,20 @@ This verifies:
 Stable:
 
 ```bash
+pan release stable
 pan release stable --version 0.7.1
 ```
 
 Canary:
 
 ```bash
+pan release canary
 pan release canary --version 0.8.0-canary.1
 ```
+
+When `--version` is omitted, Panopticon infers the next version from `package.json`:
+- stable: next patch release (for example `0.7.0` → `0.7.1`)
+- canary: next canary release (for example `0.7.0` → `0.7.1-canary.1`, `0.7.1-canary.1` → `0.7.1-canary.2`)
 
 This command:
 - validates the version format
