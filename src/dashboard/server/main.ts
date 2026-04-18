@@ -28,7 +28,6 @@ import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
-import { cleanupInactiveConversationAttachments } from './services/conversation-attachments.js';
 
 declare const Bun: unknown;
 
@@ -41,15 +40,6 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // `start-server`/`source-file` round-trips. Critical for terminal attach latency
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
-
-async function cleanupEndedConversationAttachments(): Promise<void> {
-  try {
-    await cleanupInactiveConversationAttachments();
-  } catch (err) {
-    console.warn('[panopticon] Failed to clean conversation attachments:', err);
-  }
-}
-
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 void initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .panopticon.env:', err.message);
@@ -142,9 +132,6 @@ startTtsSummarizer();
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
 console.log('[panopticon] CLIProxy watchdog started (30s interval)');
-
-void cleanupEndedConversationAttachments();
-console.log('[panopticon] Conversation attachment cleanup initialized');
 
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {

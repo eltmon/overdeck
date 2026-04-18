@@ -201,47 +201,25 @@ describe('conversations route — DB integration', () => {
     expect(existsSync(uploadedPath)).toBe(false);
   });
 
-  it('startup cleanup preserves ended conversations and removes only archived attachments', async () => {
+  it('archive preserves uploaded attachments after archive and across restart cleanup', async () => {
     const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
-    const { cleanupInactiveConversationAttachments } = await import('../../services/conversation-attachments.js');
 
-    createConversation({ name: 'active-conv', tmuxSession: 'conv-active-conv', cwd: '/cwd' });
-    createConversation({ name: 'ended-conv', tmuxSession: 'conv-ended-conv', cwd: '/cwd' });
     createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
-    markConversationEnded('ended-conv');
-    markConversationEnded('archived-conv');
-    archiveConversation('archived-conv');
 
     const pngData = Buffer.from(Uint8Array.from([7, 8, 9, 10])).toString('base64');
-    const activeUpload = await handleConversationImageUpload('active-conv', {
-      filename: 'active.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
-    const endedUpload = await handleConversationImageUpload('ended-conv', {
-      filename: 'ended.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
     const archivedUpload = await handleConversationImageUpload('archived-conv', {
       filename: 'archived.png',
       data: pngData,
       mimeType: 'image/png',
     });
-
-    const activePath = decodeJsonResponse(activeUpload).path as string;
-    const endedPath = decodeJsonResponse(endedUpload).path as string;
     const archivedPath = decodeJsonResponse(archivedUpload).path as string;
-    expect(existsSync(activePath)).toBe(true);
-    expect(existsSync(endedPath)).toBe(true);
     expect(existsSync(archivedPath)).toBe(true);
 
-    await cleanupInactiveConversationAttachments();
+    markConversationEnded('archived-conv');
+    archiveConversation('archived-conv');
 
-    expect(existsSync(activePath)).toBe(true);
-    expect(existsSync(endedPath)).toBe(true);
-    expect(existsSync(archivedPath)).toBe(false);
+    expect(existsSync(archivedPath)).toBe(true);
   });
 
   it('creating and listing a conversation returns the right data', async () => {

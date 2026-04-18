@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 
-import { listArchivedConversationNames } from '../../../lib/database/conversations-db.js';
 import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
@@ -23,11 +22,6 @@ export async function ensureConversationAttachmentDir(name: string): Promise<str
 
 export async function cleanupConversationAttachments(name: string): Promise<void> {
   await rm(getConversationAttachmentDir(name), { recursive: true, force: true });
-}
-
-export async function cleanupInactiveConversationAttachments(): Promise<void> {
-  const names = listArchivedConversationNames();
-  await Promise.all(names.map((name) => cleanupConversationAttachments(name)));
 }
 
 export function extractConversationAttachmentPaths(message: string): string[] {

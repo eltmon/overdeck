@@ -21,7 +21,6 @@ const {
   mockSetAgentStoppedNotifier,
   mockSetMergeReadyNotifier,
   mockResumeQueuedMerges,
-  mockCleanupInactiveConversationAttachments,
   mockResetProcessingToQueued,
   mockRepairMergedLabels,
   mockRepairAlreadyMergedPRs,
@@ -51,7 +50,6 @@ const {
   mockSetAgentStoppedNotifier: vi.fn(),
   mockSetMergeReadyNotifier: vi.fn(),
   mockResumeQueuedMerges: vi.fn().mockResolvedValue(undefined),
-  mockCleanupInactiveConversationAttachments: vi.fn().mockResolvedValue(undefined),
   mockResetProcessingToQueued: vi.fn(() => 0),
   mockRepairMergedLabels: vi.fn().mockResolvedValue(undefined),
   mockRepairAlreadyMergedPRs: vi.fn().mockResolvedValue(undefined),
@@ -133,10 +131,6 @@ vi.mock('../services/merge-queue-service.js', () => ({
   resumeQueuedMerges: mockResumeQueuedMerges,
 }));
 
-vi.mock('../services/conversation-attachments.js', () => ({
-  cleanupInactiveConversationAttachments: mockCleanupInactiveConversationAttachments,
-}));
-
 vi.mock('../../../lib/database/merge-queue-db.js', () => ({
   resetProcessingToQueued: mockResetProcessingToQueued,
 }));
@@ -166,17 +160,15 @@ describe('dashboard main boot', () => {
     mockInitTrackerConfigCache.mockResolvedValue(undefined);
     mockProcessPendingLifecycle.mockResolvedValue(undefined);
     mockResumeQueuedMerges.mockResolvedValue(undefined);
-    mockCleanupInactiveConversationAttachments.mockResolvedValue(undefined);
     mockResetProcessingToQueued.mockReturnValue(0);
     mockClearStuckForks.mockReturnValue(0);
     mockShouldAutoStart.mockReturnValue(false);
   });
 
-  it('runs startup attachment cleanup as part of boot', async () => {
+  it('boots without any startup attachment cleanup', async () => {
     await import('../main.ts');
 
     expect(mockStartConversationLifecycleService).toHaveBeenCalledTimes(1);
-    expect(mockCleanupInactiveConversationAttachments).toHaveBeenCalledTimes(1);
     expect(mockProcessPendingLifecycle).toHaveBeenCalledTimes(1);
     expect(mockNodeRunMain).toHaveBeenCalledWith('main-effect');
   });

@@ -77,7 +77,6 @@ import {
   ensureConversationAttachmentDir,
   extractConversationAttachmentPaths,
   hasConversationAttachment,
-  cleanupConversationAttachments,
   isManagedConversationAttachmentPath,
   removeConversationAttachment,
 } from '../services/conversation-attachments.js';
@@ -944,7 +943,6 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Mark as ended and archived
         markConversationEnded(name);
         archiveConversation(name);
-        await cleanupConversationAttachments(name);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
