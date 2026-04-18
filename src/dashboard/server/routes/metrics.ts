@@ -12,10 +12,8 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/activity/:id
  */
 
-import { readFile } from 'node:fs/promises';
-
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';

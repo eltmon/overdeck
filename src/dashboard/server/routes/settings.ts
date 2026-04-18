@@ -44,23 +44,6 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-/** Determine provider from model ID */
-function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'zai' {
-  if (modelId.startsWith('claude-')) return 'anthropic';
-  if (
-    modelId.startsWith('gpt-')
-    || modelId === 'o3'
-    || modelId.startsWith('o3-')
-    || modelId === 'o4-mini'
-    || modelId.startsWith('o1')
-  ) return 'openai';
-  if (modelId.startsWith('gemini-')) return 'google';
-  if (modelId.startsWith('kimi-') || modelId === 'K2.6-code-preview') return 'kimi';
-  if (modelId.startsWith('minimax-')) return 'minimax';
-  if (modelId.startsWith('glm-')) return 'zai';
-  return 'anthropic'; // default
-}
-
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models — gpt-5.4 family maps to real API model names
