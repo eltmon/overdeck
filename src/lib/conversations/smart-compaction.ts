@@ -11,6 +11,8 @@ export interface CompactionOptions {
   keepRecentTokens?: number;
   reserveTokens?: number;
   richMode?: boolean;
+  /** 'compact' = native compaction (returns stub if nothing to summarize). 'fork' = always produce a real summary for conversation forks. */
+  mode?: 'compact' | 'fork';
 }
 
 export interface CompactionResult {
@@ -302,8 +304,14 @@ function findCutPoint(
     }
   }
 
-  // Scan backwards to include non-message metadata entries after a boundary
-  while (cutIndex > startIndex) {
+  // Scan backwards to include non-message metadata entries after a boundary.
+  // Never scan past the previous valid cut point (or the original cut point
+  // itself if it's the first valid one).
+  const originalCutIndex = cutIndex;
+  const cutPointArrayIndex = cutPoints.findIndex((cp) => cp === originalCutIndex);
+  const minCutIndex = cutPointArrayIndex > 0 ? cutPoints[cutPointArrayIndex - 1]! + 1 : originalCutIndex;
+
+  while (cutIndex > startIndex && cutIndex > minCutIndex) {
     const prev = entries[cutIndex - 1];
     if (prev.type === 'system' && prev.subtype === 'compact_boundary') break;
     if (isUserMessageEntry(prev) || isAssistantEntry(prev)) break;
@@ -591,7 +599,7 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 // LLM call
 // ============================================================================
 
-export async function runModelSummary(prompt: string, model?: string): Promise<string> {
+export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   const args = [
     '-p',
@@ -607,12 +615,13 @@ export async function runModelSummary(prompt: string, model?: string): Promise<s
 
   let stdout = '';
   let stderr = '';
+  const effectiveTimeout = timeoutMs ?? SUMMARY_TIMEOUT_MS;
 
   return await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
       child.kill('SIGTERM');
-      reject(new Error(`Summary generation timed out after ${SUMMARY_TIMEOUT_MS}ms`));
-    }, SUMMARY_TIMEOUT_MS);
+      reject(new Error(`Summary generation timed out after ${effectiveTimeout}ms`));
+    }, effectiveTimeout);
 
     child.stdin.end(prompt);
     child.stdout.setEncoding('utf-8');
@@ -645,6 +654,7 @@ async function generateSummaryFromPrompt(
   previousSummary: string | undefined,
   model: string | undefined,
   richMode: boolean,
+  timeoutMs?: number,
 ): Promise<string> {
   const conversationText = `<conversation>\n${serialized}\n</conversation>`;
   let promptText = `${conversationText}\n\n`;
@@ -667,16 +677,17 @@ async function generateSummaryFromPrompt(
 
   // Wrap in system prompt via claude -p
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${messages[0].content[0].text}`;
-  return runModelSummary(fullPrompt, model);
+  return runModelSummary(fullPrompt, model, timeoutMs);
 }
 
 async function generateTurnPrefixSummary(
   serialized: string,
   model: string | undefined,
+  timeoutMs?: number,
 ): Promise<string> {
   const promptText = `<conversation>\n${serialized}\n</conversation>\n\n${TURN_PREFIX_PROMPT}`;
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${promptText}`;
-  return runModelSummary(fullPrompt, model);
+  return runModelSummary(fullPrompt, model, timeoutMs);
 }
 
 // ============================================================================
@@ -689,7 +700,10 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
     throw new Error(`Session file is empty: ${options.jsonlPath}`);
   }
 
-  const keepRecentTokens = options.keepRecentTokens ?? 20000;
+  const isFork = options.mode === 'fork';
+  // Forks summarize the entire conversation (no "kept" recent portion);
+  // compaction keeps recent entries verbatim and only summarizes older history.
+  const keepRecentTokens = options.keepRecentTokens ?? (isFork ? Number.MAX_SAFE_INTEGER : 20000);
   const reserveTokens = options.reserveTokens ?? 16384;
   const model = options.model || DEFAULT_SUMMARY_MODEL;
   const richMode = options.richMode ?? false;
@@ -738,32 +752,61 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   recentOps.edited.forEach(f => fileOps.edited.add(f));
 
   // Generate summaries
+  const llmTimeoutMs = isFork ? 120_000 : undefined;
   let summary: string;
-  const hasHistory = messagesToSummarize.length > 0;
+  let serializedHistory = serializeConversation(messagesToSummarize);
+  let hasHistory = serializedHistory.trim().length > 0;
+
+  // For forks, always produce a real summary. If the selected history slice is
+  // empty (e.g. only metadata entries before the first valid cut point), fall
+  // back to serializing the entire conversation.
+  if (isFork && !hasHistory && !cutPoint.isSplitTurn) {
+    const allMessages = entries.slice(boundaryStart, cutPoint.firstKeptEntryIndex);
+    if (allMessages.length > 0) {
+      serializedHistory = serializeConversation(allMessages);
+      hasHistory = serializedHistory.trim().length > 0;
+    }
+  }
+
   const hasPrefix = cutPoint.isSplitTurn && turnPrefixMessages.length > 0;
 
   if (!hasHistory && !hasPrefix) {
-    // Nothing to summarize — return previous summary or a minimal stub
-    const minimalStub = richMode
-      ? '## Primary Request and Intent\nContinue the current task.\n\n## Key Technical Concepts\n- (none)\n\n## Files and Code Sections\n- (none)\n\n## Errors and fixes\n- (none)\n\n## Problem Solving\nNo issues encountered.\n\n## All user messages\n- (none)\n\n## Pending Tasks\n- (none)\n\n## Current Work\nAwaiting next instruction.\n\n## Optional Next Step\nAwait user instruction.'
-      : '## Goal\nContinue the current task.\n\n## Constraints & Preferences\n- (none)\n\n## Progress\n### Done\n- (none)\n\n### In Progress\n- [ ] Awaiting next instruction\n\n### Blocked\n- (none)\n\n## Key Decisions\n- (none)\n\n## Next Steps\n1. Await user instruction\n\n## Critical Context\n- (none)';
-    summary = previousSummary || minimalStub;
+    // Nothing to summarize — return previous summary or a minimal stub.
+    // For forks, serialize the entire conversation as a last resort.
+    if (isFork) {
+      const allSerialized = serializeConversation(entries);
+      if (allSerialized.trim().length > 0) {
+        try {
+          summary = await generateSummaryFromPrompt(allSerialized, previousSummary, model, richMode, llmTimeoutMs);
+        } catch (error) {
+          throw new Error(`Smart summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else {
+        summary = previousSummary || '## Goal\nContinue the current task.\n\n## Constraints & Preferences\n- (none)\n\n## Progress\n### Done\n- (none)\n\n### In Progress\n- [ ] Awaiting next instruction\n\n### Blocked\n- (none)\n\n## Key Decisions\n- (none)\n\n## Next Steps\n1. Await user instruction\n\n## Critical Context\n- (none)';
+      }
+    } else {
+      const minimalStub = richMode
+        ? '## Primary Request and Intent\nContinue the current task.\n\n## Key Technical Concepts\n- (none)\n\n## Files and Code Sections\n- (none)\n\n## Errors and fixes\n- (none)\n\n## Problem Solving\nNo issues encountered.\n\n## All user messages\n- (none)\n\n## Pending Tasks\n- (none)\n\n## Current Work\nAwaiting next instruction.\n\n## Optional Next Step\nAwait user instruction.'
+        : '## Goal\nContinue the current task.\n\n## Constraints & Preferences\n- (none)\n\n## Progress\n### Done\n- (none)\n\n### In Progress\n- [ ] Awaiting next instruction\n\n### Blocked\n- (none)\n\n## Key Decisions\n- (none)\n\n## Next Steps\n1. Await user instruction\n\n## Critical Context\n- (none)';
+      summary = previousSummary || minimalStub;
+    }
   } else {
     try {
       if (hasPrefix) {
         const [historyResult, turnPrefixResult] = await Promise.all([
           hasHistory
-            ? generateSummaryFromPrompt(serializeConversation(messagesToSummarize), previousSummary, model, richMode)
+            ? generateSummaryFromPrompt(serializedHistory, previousSummary, model, richMode, llmTimeoutMs)
             : Promise.resolve('No prior history.'),
-          generateTurnPrefixSummary(serializeConversation(turnPrefixMessages), model),
+          generateTurnPrefixSummary(serializeConversation(turnPrefixMessages), model, llmTimeoutMs),
         ]);
         summary = `${historyResult}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixResult}`;
       } else {
         summary = await generateSummaryFromPrompt(
-          serializeConversation(messagesToSummarize),
+          serializedHistory,
           previousSummary,
           model,
           richMode,
+          llmTimeoutMs,
         );
       }
     } catch (error) {
