@@ -20,9 +20,12 @@ export async function checkOpenBeads(workspacePath: string, issueId: string): Pr
       { cwd: workspacePath }
     ));
   } catch (error: unknown) {
-    const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
-    // ENOENT: bd binary not found via execFile/spawn path
-    // 127: shell "command not found" (exec runs through /bin/sh)
+    // exec() runs through /bin/sh: missing bd is exit 127 (numeric code on the error).
+    // execFile/spawn path: missing binary is ENOENT (string code).
+    // Read code as unknown so TypeScript allows comparison to both types.
+    const code: unknown = error instanceof Error
+      ? (error as unknown as Record<string, unknown>).code
+      : undefined;
     if (code === 'ENOENT' || code === 127) return [];
     return ['  Open beads check failed — run `bd list --status open` to diagnose'];
   }
