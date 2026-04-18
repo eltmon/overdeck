@@ -2740,9 +2740,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     );
 
     try {
-      const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import(
-        '../../../lib/cloister/specialists.js'
-      ));
       const resolved = resolveProjectFromIssue(issueId);
 
       if (!resolved) {
