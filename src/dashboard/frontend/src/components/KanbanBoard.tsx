@@ -24,6 +24,7 @@ import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, 
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
+import { parseIssueId } from '../../../../lib/issue-id.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
@@ -632,7 +633,8 @@ export function FeatureCard({
   const total = feature.totalChildCount ?? childCount;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const featureIdLower = feature.identifier.toLowerCase();
-  const canUseWorkspaceActions = !(feature.source === 'rally' && feature.artifactType?.includes('PortfolioItem'));
+  const parsedFeatureId = parseIssueId(feature.identifier);
+  const canUseWorkspaceActions = parsedFeatureId?.format === 'standard';
   const isPlanningActive = canUseWorkspaceActions && agents.some(
     (agent) =>
       agent.issueId?.toLowerCase() === featureIdLower &&

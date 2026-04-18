@@ -583,6 +583,21 @@ describe('FeatureCard', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it('does not render workspace-backed planning actions for non-standard feature identifiers', () => {
+    renderFeatureCard({
+      feature: createFeature({
+        identifier: 'FEATURE-ALPHA',
+        source: 'github',
+        artifactType: 'Grouping',
+      }),
+    });
+
+    expect(screen.queryByRole('button', { name: /plan/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /tasks/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /vbrief/i })).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('still toggles the feature card open without attempting workspace lookups', () => {
     const { onToggle } = renderFeatureCard();
 

@@ -41,10 +41,6 @@ function usePlanningState(issue: Issue) {
 }
 
 export function PlanChip({ issue, onPlan, isPlanningActive = false }: PlanChipProps) {
-  const planningStateQuery = usePlanningState(issue);
-  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
-  const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
-
   if (isPlanningActive) {
     return (
       <button
@@ -61,6 +57,14 @@ export function PlanChip({ issue, onPlan, isPlanningActive = false }: PlanChipPr
       </button>
     );
   }
+
+  return <PlanChipState issue={issue} onPlan={onPlan} />;
+}
+
+function PlanChipState({ issue, onPlan }: Pick<PlanChipProps, 'issue' | 'onPlan'>) {
+  const planningStateQuery = usePlanningState(issue);
+  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
+  const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
 
   return (
     <button
