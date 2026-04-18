@@ -221,7 +221,7 @@ describe('doneCommand shadow mode', () => {
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
     await doneCommand('PAN-714');
 
-    expect(mockUpdateShadowState).toHaveBeenCalledWith('PAN-714', 'closed', 'pan done');
+    expect(mockUpdateShadowState).toHaveBeenCalledWith('PAN-714', 'in_review', 'pan done');
   });
 });
 

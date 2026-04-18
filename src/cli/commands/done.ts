@@ -221,7 +221,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (skipTrackerUpdate) {
       shadowModeActive = true;
       spinner.text = 'Updating shadow state...';
-      await updateShadowState(issueId, 'closed', 'pan done');
+      await updateShadowState(issueId, 'in_review', 'pan done');
       console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
     } else if (isGitHubIssue) {
       // GitHub issue - update labels

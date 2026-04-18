@@ -77,10 +77,11 @@ export interface MigrationResult {
  *
  * This is safe to run multiple times — it's a no-op if nothing remains to clean up.
  *
- * Removes two kinds of stale Panopticon content from ~/.claude/:
- * 1. Symlinks pointing to .panopticon or panopticon-cli (legacy sync method)
- * 2. Plain directories that also exist in the devroot (stale copies from before
- *    the devroot migration — these cause duplicate skill listings)
+ * Removes stale Panopticon content from ~/.claude/:
+ * - Symlinks pointing to .panopticon or panopticon-cli (legacy sync method)
+ *
+ * Plain directories are always preserved as user content — there is no reliable
+ * way to prove a plain directory was created by Panopticon vs the user.
  */
 export function migrateStalePersonalContent(): MigrationResult {
   const claudeDir = join(homedir(), '.claude');
@@ -89,25 +90,6 @@ export function migrateStalePersonalContent(): MigrationResult {
     preservedUserContent: [],
     errors: [],
   };
-
-  // Build a set of skill/agent/command names that exist in the devroot
-  // so we can identify stale copies in ~/.claude/
-  const devrootNames = new Set<string>();
-  const devroot = getDevrootPath();
-  if (devroot) {
-    for (const subdir of ['skills', 'commands', 'agents']) {
-      const devrootDir = join(devroot, '.claude', subdir);
-      if (existsSync(devrootDir)) {
-        try {
-          for (const entry of readdirSync(devrootDir)) {
-            devrootNames.add(`${subdir}/${entry}`);
-          }
-        } catch {
-          // Ignore read errors on devroot
-        }
-      }
-    }
-  }
 
   for (const subdir of ['skills', 'commands', 'agents']) {
     const dir = join(claudeDir, subdir);
@@ -128,14 +110,8 @@ export function migrateStalePersonalContent(): MigrationResult {
               // Symlink to somewhere else — leave it
               result.preservedUserContent.push(`${subdir}/${entry}`);
             }
-          } else if (stats.isDirectory() && devrootNames.has(`${subdir}/${entry}`)) {
-            // Plain directory that also exists in devroot — stale Panopticon copy.
-            // The devroot copy is the canonical one; this personal copy causes
-            // duplicate listings and violates principle #4 (never touch ~/.claude/).
-            rmSync(entryPath, { recursive: true, force: true });
-            result.removedSymlinks.push(`${subdir}/${entry} (stale copy)`);
           } else {
-            // Real file/directory with no devroot counterpart — user content, never touch
+            // Plain file or directory — user content, never touch
             result.preservedUserContent.push(`${subdir}/${entry}`);
           }
         } catch (err: any) {
