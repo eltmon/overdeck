@@ -56,11 +56,13 @@ Clicking an agent card opens a modal with:
 
 ## Real-time Data
 
-| Event | Frequency | Description |
-|-------|-----------|-------------|
-| `godview:agent-output` | 2s debounce | Last 30 lines of tmux output per agent |
-| `godview:status-change` | 3s poll | Agent status transitions |
-| `godview:activity` | 5s | Last 20 global activity events |
+God View now consumes the shared dashboard read model instead of a God-View-specific event stream.
+
+- **Agent output** comes from `agent.output_received` domain events stored in `DashboardStore.agentOutputById`
+- **Agent status** comes from `agent.status_changed` domain events stored in `DashboardStore.agentsById`
+- **Activity feed** comes from `activity.entry` / `activity.updated` events stored in `DashboardStore.recentActivity`
+- **Activity bootstrap** also reads `GET /api/activity` on load so historical activity appears immediately before the next live event arrives
+- **System health** still comes from `/api/godview/system-health`
 
 ## REST Endpoints
 

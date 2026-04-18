@@ -7,7 +7,7 @@
  * Data sources:
  *   - agent output → DashboardStore.agentOutputById (from agent.output_received events)
  *   - agent status → DashboardStore.agentsById (from agent.status_changed events)
- *   - activity → DashboardStore.recentActivity (from activity.updated events)
+ *   - activity → DashboardStore.recentActivity (from activity.entry / activity.updated events)
  *   - system health → REST polling /api/godview/system-health (unchanged)
  */
 
@@ -15,11 +15,14 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 
 export interface GodViewActivityEvent {
-  agentId: string;
-  issueId?: string;
+  id: string;
+  agentId?: string | null;
   timestamp: string;
-  type: string;
+  source: string;
+  level: 'info' | 'warn' | 'error' | 'success';
   message: string;
+  details?: string | null;
+  issueId?: string | null;
 }
 
 export interface GodViewStore {
