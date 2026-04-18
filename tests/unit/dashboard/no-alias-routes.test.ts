@@ -32,7 +32,7 @@ async function getTypeScriptFiles(dir: string): Promise<string[]> {
         return getTypeScriptFiles(fullPath);
       }
 
-      if (entry.isFile() && fullPath.endsWith('.ts')) {
+      if (entry.isFile() && (fullPath.endsWith('.ts') || fullPath.endsWith('.tsx'))) {
         return [fullPath];
       }
 
