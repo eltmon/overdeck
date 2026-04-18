@@ -384,9 +384,10 @@ pan release canary --version 0.8.0-canary.1
 # Draft release notes from git history
 pan release notes
 pan release notes v0.7.0 HEAD
+pan release notes v0.7.0 v0.7.1 --write .release/v0.7.1.md
 ```
 
-Panopticon develops directly on `main`. Releases are intentional promotions by tag, not automatic publishes from every commit.
+Panopticon develops directly on `main`. Releases are intentional promotions by tag, not automatic publishes from every commit. GitHub Releases now use a structured body generated from these notes instead of the bare default compare-only text.
 
 ---
 

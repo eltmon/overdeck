@@ -99,7 +99,15 @@ Use git history to draft notes:
 ```bash
 pan release notes
 pan release notes v0.7.0 HEAD
+pan release notes v0.7.0 v0.7.1 --write .release/v0.7.1.md
 ```
+
+The generated notes use a structured format:
+- Summary
+- Highlights
+- Breaking changes
+- Install
+- Full changelog
 
 ## Workflow behavior
 
@@ -113,6 +121,7 @@ For tags like `v0.7.1` the workflow will:
 - smoke-test the CLI
 - publish to npm `latest`
 - build the Linux desktop app
+- generate a structured release body from git history
 - create a normal GitHub Release
 
 ### Canary tags
@@ -123,6 +132,7 @@ For tags like `v0.8.0-canary.1` the workflow will:
 - smoke-test the CLI
 - publish to npm with `--tag canary`
 - build the Linux desktop app
+- generate a structured release body from git history
 - create a GitHub prerelease
 
 ## When to cut stable vs canary

@@ -70,10 +70,15 @@ jobs:
       - name: Build desktop app (Linux)
         run: bun run build:desktop:linux
 
+      - name: Generate structured release notes
+        run: |
+          mkdir -p .release
+          node dist/cli/index.js release notes "$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)" "${GITHUB_REF_NAME}" --write ".release/${GITHUB_REF_NAME}.md"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          generate_release_notes: true
+          body_path: .release/${{ github.ref_name }}.md
           prerelease: ${{ steps.channel.outputs.prerelease }}
           files: |
             apps/desktop/dist/*.AppImage
