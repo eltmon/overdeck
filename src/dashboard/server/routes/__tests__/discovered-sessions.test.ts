@@ -74,6 +74,16 @@ describe('scan (route logic)', () => {
     expect(result.inserted + result.updated + result.skipped).toBe(0);
   });
 
+  it('watched mode with parent watchDir discovers child workspace sessions', async () => {
+    // watchDirs typically point to parent roots like ~/Projects.
+    // Sessions inside ~/Projects/myapp must be discovered.
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'child.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    const result = await scan({ mode: 'watched', watchDirs: ['/home/user/Projects'] });
+    expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
+  });
+
   it('targeted mode with dirs scans only matching sessions', async () => {
     const pA = join(fakeClaudeDir, '-home-user-Projects-myapp', 'a.jsonl');
     const pB = join(fakeClaudeDir, '-home-user-Projects-otherapp', 'b.jsonl');

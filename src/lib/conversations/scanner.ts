@@ -272,11 +272,22 @@ function filterByMode(
   // watched/targeted with no configured dirs scans nothing (not everything)
   if (targetDirs.length === 0) return [];
 
-  // Encode each target workspace path to its Claude project hash so we can
-  // match against the hash-named directories under ~/.claude/projects/.
-  const targetHashes = new Set(targetDirs.map(encodeClaudeProjectDir));
+  const targetEncodings = targetDirs.map(encodeClaudeProjectDir);
 
-  return files.filter(({ projectDir }) => targetHashes.has(basename(projectDir)));
+  if (opts.mode === 'targeted') {
+    // targeted: dirs are the exact workspace paths — match the hash exactly
+    const targetHashes = new Set(targetEncodings);
+    return files.filter(({ projectDir }) => targetHashes.has(basename(projectDir)));
+  }
+
+  // watched: watchDirs are parent roots — include sessions whose workspace lives
+  // under any of the watched directories. Since Claude encodes the full path as a
+  // hash (replacing '/' with '-'), a child workspace hash always starts with the
+  // parent hash followed by '-' (the encoded path separator).
+  return files.filter(({ projectDir }) => {
+    const hash = basename(projectDir);
+    return targetEncodings.some((enc) => hash === enc || hash.startsWith(enc + '-'));
+  });
 }
 
 function normalizeDir(dir: string): string {

@@ -169,6 +169,16 @@ describe('scanner', () => {
     expect(result.inserted + result.updated + result.skipped).toBe(0);
   });
 
+  it('watched mode with parent watchDir discovers child workspace sessions', async () => {
+    // The session hash '-home-user-Projects-myapp' is a child of '/home/user/Projects'.
+    // Watched mode must include it when '/home/user/Projects' is in watchDirs.
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'watched-child.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    const result = await scan({ mode: 'watched', watchDirs: ['/home/user/Projects'] });
+    expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
+  });
+
   it('scan persists sessionId from JSONL into discovered_sessions', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'with-session-id.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');
