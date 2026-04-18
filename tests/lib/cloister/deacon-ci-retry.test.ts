@@ -300,6 +300,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
 describe('checkDeadEndAgents — dead-end CI recovery path', () => {
   let originalContent: string | null = null;
   let checkDeadEndAgents: () => Promise<string[]>;
+  let ciRetryMap: Map<string, { count: number; lastAttempt: number }>;
   let tempProjectPath: string;
 
   const DEAD_END_ISSUE_ID = 'PAN-714-DEAD-END-TEST';
@@ -322,6 +323,8 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkDeadEndAgents = mod.checkDeadEndAgents;
+    ciRetryMap = mod.ciRetryMap;
+    ciRetryMap.clear();
   });
 
   afterEach(() => {
@@ -379,5 +382,39 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Dead-end recovery/);
     expect(actions[0]).toContain(DEAD_END_ISSUE_ID);
+  });
+
+  it('does not reset merge status when ciRetryMap retries are exhausted (circuit breaker guard)', async () => {
+    // Regression test: checkDeadEndAgents() must not re-enter the merge flow when
+    // checkFailedMergeRetry() has already exhausted its CI retry budget (count >= 5).
+    // Without this guard, dead-end recovery would reset readyForMerge every 10 minutes
+    // indefinitely, defeating the CI retry circuit breaker.
+    writeStatusFile({
+      [DEAD_END_ISSUE_ID]: {
+        issueId: DEAD_END_ISSUE_ID,
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'failed',
+        mergeNotes: 'Merge failed: failing required checks',
+        readyForMerge: false,
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 min ago
+      },
+    });
+
+    // Simulate exhausted CI retries (count >= 5 means circuit breaker is engaged)
+    ciRetryMap.set(DEAD_END_ISSUE_ID, { count: 6, lastAttempt: Date.now() - 5 * 60_000 });
+
+    mockSessionExists.mockReturnValue(true); // agent is present and idle
+
+    const actions = await checkDeadEndAgents();
+
+    // Guard must block the merge reset — setReviewStatus must NOT be called
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+
+    // The skip must be logged as an action (not a silent no-op)
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/skipped/);
+    expect(actions[0]).toContain(DEAD_END_ISSUE_ID);
+    expect(actions[0]).toMatch(/exhausted/);
   });
 });
