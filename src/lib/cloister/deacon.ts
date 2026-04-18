@@ -1347,25 +1347,16 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
             const { dispatchParallelReview } = await import('./review-agent.js');
-            const result = await dispatchParallelReview({ issueId, workspace, branch });
-            if (result.success) {
-              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-              status.reviewStatus = 'reviewing';
-              modified = true;
-              actions.push(
-                `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
-              );
-              console.log(
-                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
-              );
-            } else {
-              actions.push(
-                `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-              );
-              console.log(
-                `[deacon] Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-              );
-            }
+            await dispatchParallelReview({ issueId, workspace, branch });
+            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+            status.reviewStatus = 'reviewing';
+            modified = true;
+            actions.push(
+              `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
+            );
+            console.log(
+              `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
+            );
           } else if (!resolved) {
             actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
           } else {

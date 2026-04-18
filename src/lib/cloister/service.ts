@@ -384,15 +384,9 @@ export class CloisterService {
           }
 
           const branch = `feature/${issueId.toLowerCase()}`;
-          const result = await dispatchParallelReview({ issueId, workspace, branch });
-          if (result.success) {
-            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-            console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
-          } else {
-            // Failed — reset to pending so deacon patrol picks it up
-            console.log(`  ⚠ ${issueId}: recovery dispatch failed (${result.message}) — resetting to pending`);
-            setReviewStatus(issueId, { reviewStatus: 'pending' });
-          }
+          await dispatchParallelReview({ issueId, workspace, branch });
+          setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+          console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
         }
       }
     } catch (error) {

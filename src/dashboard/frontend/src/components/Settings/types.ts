@@ -94,13 +94,6 @@ export interface SettingsConfig {
   };
 }
 
-export interface AvailableModels {
-  anthropic: string[];
-  openai: string[];
-  google: string[];
-  zai: string[];
-  kimi: string[];
-}
 
 export interface WorkTypeInfo {
   id: WorkTypeId;

@@ -474,7 +474,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         google: false,
         minimax: false,
         zai: false,
-        kimi: true, // Kimi K2.5 used for implementation work agent
+        kimi: true, // Kimi K2.6 (K2.6-code-preview) used for exploration, testing, and documentation
         openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
