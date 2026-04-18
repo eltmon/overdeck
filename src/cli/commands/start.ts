@@ -218,8 +218,8 @@ async function handleRemoteWorkspace(
   if (!config.remote?.enabled) {
     spinner.fail('Remote workspaces not enabled');
     console.log('');
-    console.log(chalk.dim('Run: pan config set remote.enabled true'));
-    console.log(chalk.dim('Then: pan remote setup'));
+    console.log(chalk.dim('Run: pan admin remote setup'));
+    console.log(chalk.dim('This writes the required remote settings to ~/.panopticon/config.toml'));
     process.exit(1);
   }
 

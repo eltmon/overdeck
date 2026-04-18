@@ -15,7 +15,7 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-/** Path where pan setup hooks installs caveman-compress Python scripts */
+/** Path where pan admin hooks install places caveman-compress Python scripts */
 function getCavemanCompressDir(): string {
   return join(homedir(), '.panopticon', 'hooks', 'caveman-compress');
 }
@@ -41,7 +41,7 @@ async function cavemanCompressCommand(file: string): Promise<void> {
   if (!existsSync(compressDir)) {
     console.error(chalk.red(`✗ caveman-compress scripts not installed at ${compressDir}`));
     console.error(chalk.dim('\nTo install, run:'));
-    console.error(chalk.dim('  pan setup hooks'));
+    console.error(chalk.dim('  pan admin hooks install'));
     console.error(chalk.dim('\nOr download manually from:'));
     console.error(chalk.dim('  https://github.com/JuliusBrussee/caveman/tree/main/caveman-compress'));
     console.error(chalk.dim(`  → place at ${compressDir}/`));

@@ -9,7 +9,7 @@
 | Document | Description |
 |----------|-------------|
 | [README.md](../README.md) | Project overview, installation, and quickstart guide |
-| [QUICK-REFERENCE.md](./QUICK-REFERENCE.md) | Command taxonomy cheat sheet — all `pan` commands, organized by bucket (lifecycle, observation, nouns, system, admin) plus the legacy→new migration table |
+| [QUICK-REFERENCE.md](./QUICK-REFERENCE.md) | Command taxonomy cheat sheet — all `pan` commands, organized by bucket (lifecycle, observation, nouns, system, admin), including current `pan admin config` scope |
 | [USAGE.md](./USAGE.md) | Detailed CLI usage examples |
 | [RELEASING.md](./RELEASING.md) | Stable vs canary release policy and intentional tag-driven workflow |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Contribution guidelines and development setup |
@@ -127,6 +127,7 @@
 
 ### Configuration & Models
 - **"model routing"** / **"smart selection"** → CONFIGURATION.md, WORK-TYPES.md, MODEL_RECOMMENDATIONS.md
+- **"shadow mode"** / **"pan admin config shadow"** → CONFIGURATION.md, QUICK-REFERENCE.md
 - **"API keys"** / **"environment variables"** / **"subscription auth"** → CONFIGURATION.md
 - **"providers"** / **"Kimi"** / **"Anthropic"** → CONFIGURATION.md, TESTING-PROVIDERS.md
 - **"work types"** → WORK-TYPES.md

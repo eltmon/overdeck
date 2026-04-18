@@ -57,7 +57,7 @@ Each daemon is a background process managing a TLDR index for its directory. Sta
 | Agent spawn | Health-checks workspace daemon, starts it if not running |
 | 10 code file edits | Post-edit hook triggers background re-warm |
 | `pan approve` (merge) | Merge-agent calls `notifyTldrDaemon()` to re-warm main |
-| `pan tldr warm` | Manual trigger |
+| `pan admin tldr warm` | Manual trigger |
 
 ### Index Sharing (Copy-on-Create)
 
@@ -112,7 +112,7 @@ Tracks code file edits in `.tldr/dirty-files`. After 10 edits, triggers a backgr
 
 ### 3. MCP Server
 
-**Configured in**: `~/.claude/settings.json` (via `pan setup hooks`)
+**Configured in**: `~/.claude/settings.json` (via `pan admin hooks install`)
 
 ```json
 {
@@ -131,17 +131,17 @@ The relative path `.` resolves to the current working directory, so it works in 
 
 ```bash
 # Show status of all TLDR daemons
-pan tldr status
+pan admin tldr status
 
 # Start main daemon
-pan tldr start
+pan admin tldr start
 
 # Stop main daemon
-pan tldr stop
+pan admin tldr stop
 
 # Warm (rebuild) index — defaults to main, specify workspace for workspace
-pan tldr warm
-pan tldr warm feature-pan-173
+pan admin tldr warm
+pan admin tldr warm feature-pan-173
 ```
 
 ### Direct TLDR CLI
@@ -177,7 +177,7 @@ Response includes: `running`, `pid`, `healthy`, `fileCount`, `edgeCount`, `index
 
 ## Setup
 
-TLDR is set up automatically during `pan setup hooks` if Python 3 is available:
+TLDR is set up automatically during `pan admin hooks install` if Python 3 is available:
 1. Detects Python 3
 2. Configures TLDR MCP server in `~/.claude/settings.json`
 3. Registers read-enforcer and post-edit hooks
@@ -366,10 +366,10 @@ The read-enforcer applies quality gates to prevent useless summaries:
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| No TLDR data in dashboard | Main branch has no `.tldr/` | Run `pan tldr warm` or `.venv/bin/tldr warm .` |
+| No TLDR data in dashboard | Main branch has no `.tldr/` | Run `pan admin tldr warm` or `.venv/bin/tldr warm .` |
 | New workspace has empty index | Main index missing, auto-warm didn't run | Run `.venv/bin/tldr warm .` in the workspace |
 | `tldr: command not found` | Not in venv | Use `.venv/bin/tldr` or activate venv |
-| Stale index (old file count) | Edits didn't trigger re-warm | `pan tldr warm` or edit 10+ files to trigger auto-warm |
+| Stale index (old file count) | Edits didn't trigger re-warm | `pan admin tldr warm` or edit 10+ files to trigger auto-warm |
 | Daemon not starting | PID file stale | Delete `~/.panopticon/tldr/*/daemon.json` and restart |
 | `.tsx` files get "Module not found" | Upstream llm-tldr `_get_module_exports()` only checks `.ts` | Fixed by local patch (`scripts/patches/llm-tldr-tsx-support.py`); upstream PR [#53](https://github.com/parcadei/llm-tldr/pull/53) pending |
 | Context returns "~25 tokens" | Module path includes file extension | Pass without extension: `src/lib/agents` not `src/lib/agents.ts` |

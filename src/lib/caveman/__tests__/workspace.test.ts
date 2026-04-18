@@ -103,7 +103,7 @@ describe('injectCavemanSettings', () => {
     // hooksDir exists but has no panopticon-caveman-activate.js
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await injectCavemanSettings(workspaceDir, 'enabled');
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pan setup hooks'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pan admin hooks install'));
     expect(existsSync(join(workspaceDir, '.claude', 'settings.json'))).toBe(false);
   });
 

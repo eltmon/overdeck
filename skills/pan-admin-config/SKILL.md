@@ -22,22 +22,25 @@ pan admin config <subcommand>
 ## Usage
 
 ```
-pan admin config show              # Print current config
-pan admin config edit              # Open config in editor
-pan admin config get <key>         # Get a specific value
-pan admin config set <key> <val>   # Set a value
+pan admin config shadow --status
+pan admin config shadow --enable
+pan admin config shadow --disable
+pan admin config shadow --tracker github --enable
 ```
 
 ## What It Does
 
-Views and edits the Panopticon `config.yaml` file that controls project settings,
-tracker integrations, workspace defaults, and agent behavior.
+Manages the legacy TOML-backed shadow-mode CLI settings.
+
+This command does **not** currently expose general-purpose `show`, `edit`, `get`, or `set`
+subcommands for the YAML router config. For model routing and provider settings, use the
+Settings page or edit `~/.panopticon/config.yaml` directly.
 
 ## When to Use
 
-- Connecting a new issue tracker
-- Adjusting workspace settings
-- Viewing current configuration
+- Checking current shadow mode status
+- Enabling or disabling global shadow mode
+- Overriding shadow mode for a specific tracker
 
 ## See Also
 

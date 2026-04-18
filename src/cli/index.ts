@@ -68,7 +68,6 @@ import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { registerCavemanCommands } from './commands/caveman.js';
-import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerReleaseCommands } from './commands/release.js';
 
 const program = new Command();
@@ -326,16 +325,6 @@ registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);
-
-// Config migration
-program
-  .command('migrate-config')
-  .description('Migrate from settings.json to config.yaml')
-  .option('--force', 'Force migration even if config.yaml exists')
-  .option('--preview', 'Preview migration without applying changes')
-  .option('--no-backup', 'Do not back up settings.json')
-  .option('--delete-legacy', 'Delete settings.json after migration')
-  .action(migrateConfigCommand);
 
 // Shorthand: pan status = pan status
 program

@@ -221,7 +221,7 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
 
   if (mainEntries.length === 0 && workspaceEntries.length === 0) {
     console.log(chalk.dim('\nNo TLDR indexes found (no .venv directories)'));
-    console.log(chalk.dim('Run `pan setup` to configure TLDR'));
+    console.log(chalk.dim('Run `pan admin tldr start` after creating a project .venv for TLDR support'));
     return;
   }
 
