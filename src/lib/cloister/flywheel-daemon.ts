@@ -34,6 +34,7 @@ const DEFAULT_CONFIG: FlywheelConfig = {
 
 const FLYWHEEL_LOCK_FILE = join(PANOPTICON_HOME, 'flywheel.lock');
 const FLYWHEEL_STATE_FILE = join(homedir(), 'docs', 'FLYWHEEL-STATE.md');
+const FLYWHEEL_PENDING_RETROS_FILE = join(PANOPTICON_HOME, 'flywheel-pending-retros.json');
 
 // ============================================================================
 // State
@@ -253,17 +254,62 @@ export async function readCyclingAlerts(): Promise<string[]> {
   }
 }
 
-/**
- * File a substrate-improvement issue for a cycling issue.
- * Non-blocker tier: always files an issue, never edits inline.
- */
-async function fileSubstrateIssue(cyclingIssueId: string): Promise<void> {
-  console.log(`[flywheel-daemon] Filing substrate-improvement issue for cycling ${cyclingIssueId} — stub`);
-  // TODO: use gh CLI to file a GitHub issue with label "substrate-improvement"
+// ============================================================================
+// Pending-retro queue (persists merge-complete events that arrive during quiet hours)
+// ============================================================================
+
+async function loadPendingRetros(): Promise<string[]> {
+  try {
+    const content = await readFile(FLYWHEEL_PENDING_RETROS_FILE, 'utf-8');
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function savePendingRetros(items: string[]): Promise<void> {
+  await writeFile(FLYWHEEL_PENDING_RETROS_FILE, JSON.stringify([...new Set(items)]), 'utf-8');
 }
 
 /**
- * Check how many flywheel-change issues are in Awaiting Merge.
+ * File a substrate-improvement issue for a cycling issue.
+ * Idempotent: skips filing if an open substrate-improvement issue already exists for this cycling issue.
+ */
+export async function fileSubstrateIssue(cyclingIssueId: string): Promise<void> {
+  try {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+
+    // Check for existing open substrate-improvement issue to avoid filing on every tick
+    const { stdout: existingJson } = await execFileAsync('gh', [
+      'issue', 'list',
+      '--label', 'substrate-improvement',
+      '--state', 'open',
+      '--search', `cycling ${cyclingIssueId} in:title`,
+      '--json', 'number',
+    ]);
+    const existing: Array<{ number: number }> = JSON.parse(existingJson);
+    if (existing.length > 0) {
+      console.log(`[flywheel-daemon] Substrate-improvement issue already exists for cycling ${cyclingIssueId} — skipping`);
+      return;
+    }
+
+    await execFileAsync('gh', [
+      'issue', 'create',
+      '--title', `substrate: cycling detected in ${cyclingIssueId}`,
+      '--body', `The flywheel daemon detected cycling behavior in ${cyclingIssueId}.\n\nThis issue tracks the substrate improvement needed to break the cycle. Filed automatically by flywheel-daemon.`,
+      '--label', 'substrate-improvement',
+    ]);
+    console.log(`[flywheel-daemon] Filed substrate-improvement issue for cycling ${cyclingIssueId}`);
+  } catch (err) {
+    console.warn(`[flywheel-daemon] Failed to file substrate-improvement issue for ${cyclingIssueId}:`, err);
+  }
+}
+
+/**
+ * Check how many flywheel-change issues are in Awaiting Merge (readyForMerge=true).
  * Returns the count or 0 if unable to determine.
  */
 async function getFlywheelAwaitingMergeCount(): Promise<number> {
@@ -271,14 +317,33 @@ async function getFlywheelAwaitingMergeCount(): Promise<number> {
     const { execFile } = await import('child_process');
     const { promisify } = await import('util');
     const execFileAsync = promisify(execFile);
+
+    // Get all open flywheel-change issue numbers from GitHub
     const { stdout } = await execFileAsync('gh', [
       'issue', 'list',
       '--label', 'flywheel-change',
       '--state', 'open',
       '--json', 'number',
     ]);
-    const issues: unknown[] = JSON.parse(stdout);
-    return issues.length;
+    const ghIssues: Array<{ number: number }> = JSON.parse(stdout);
+    if (ghIssues.length === 0) return 0;
+    const ghNumbers = new Set(ghIssues.map(i => i.number));
+
+    // Cross-reference with review-status.json to find which are readyForMerge=true
+    const statusFile = join(homedir(), '.panopticon', 'review-status.json');
+    let statuses: Record<string, { readyForMerge?: boolean }> = {};
+    try {
+      statuses = JSON.parse(await readFile(statusFile, 'utf-8'));
+    } catch { /* no status file or parse error */ }
+
+    let count = 0;
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (!status.readyForMerge) continue;
+      const numMatch = issueId.match(/(\d+)$/);
+      if (!numMatch) continue;
+      if (ghNumbers.has(parseInt(numMatch[1], 10))) count++;
+    }
+    return count;
   } catch {
     return 0;
   }
@@ -315,6 +380,22 @@ async function daemonTick(): Promise<void> {
   if (config.backoff_on_active_session && await hasActiveClaudeSession()) {
     console.log('[flywheel-daemon] Active Claude Code session detected — backing off');
     return;
+  }
+
+  // Drain retros that were queued during quiet hours
+  try {
+    const pending = await loadPendingRetros();
+    if (pending.length > 0) {
+      await savePendingRetros([]); // Clear before spawning to prevent re-processing on next tick
+      for (const pendingIssueId of pending) {
+        console.log(`[flywheel-daemon] Draining pending retro for ${pendingIssueId}`);
+        spawnRetroAgentForIssue(pendingIssueId).catch(err =>
+          console.warn(`[flywheel-daemon] Failed to drain pending retro for ${pendingIssueId}:`, err)
+        );
+      }
+    }
+  } catch (err) {
+    console.warn('[flywheel-daemon] Failed to drain pending retros:', err);
   }
 
   // Check awaiting-merge threshold (no mutex needed — just a count query)
@@ -384,7 +465,12 @@ export function notifyFlywheelMergeComplete(issueId: string): void {
   const config = loadFlywheelConfig();
   if (!config.autonomous) return;
   if (isQuietHours(config)) {
-    console.log(`[flywheel-daemon] Quiet hours — queuing retro for ${issueId} until next tick`);
+    console.log(`[flywheel-daemon] Quiet hours — persisting retro for ${issueId} to pending queue`);
+    loadPendingRetros().then(pending => {
+      if (!pending.includes(issueId)) {
+        return savePendingRetros([...pending, issueId]);
+      }
+    }).catch(err => console.warn('[flywheel-daemon] Failed to enqueue pending retro:', err));
     return;
   }
   spawnRetroAgentForIssue(issueId).catch((err) => {

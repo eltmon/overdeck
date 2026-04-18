@@ -13,7 +13,7 @@ import { readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
 // ---------------------------------------------------------------------------
 
 vi.mock('../config.js', () => ({
-  loadCloisterConfig: () => ({}),
+  loadCloisterConfig: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('fs', async () => {
@@ -32,6 +32,13 @@ vi.mock('fs/promises', () => ({
   stat: vi.fn().mockResolvedValue({ mtimeMs: 0 }),
 }));
 
+vi.mock('child_process', () => ({
+  execFile: vi.fn((...args: unknown[]) => {
+    const cb = args[args.length - 1] as (err: Error | null, result: { stdout: string; stderr: string }) => void;
+    if (typeof cb === 'function') setImmediate(() => cb(null, { stdout: '[]', stderr: '' }));
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Import after mocks
 // ---------------------------------------------------------------------------
@@ -42,11 +49,18 @@ import {
   isFlywheelDaemonRunning,
   getFlywheelDaemonStatus,
   setFlywheelMergeCompleteHandler,
+  notifyFlywheelMergeComplete,
   acquireLock,
   releaseLock,
   readCyclingAlerts,
   hasActiveClaudeSession,
+  fileSubstrateIssue,
 } from '../flywheel-daemon.js';
+import { loadCloisterConfig } from '../config.js';
+import { execFile } from 'child_process';
+
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
+const mockExecFile = vi.mocked(execFile);
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFile = vi.mocked(readFile);
@@ -67,6 +81,7 @@ describe('flywheelDaemon — start/stop/status', () => {
     mockWriteFile.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
     mockReaddir.mockResolvedValue([]);
+    mockLoadCloisterConfig.mockReturnValue({});
   });
 
   afterEach(() => {
@@ -267,5 +282,97 @@ describe('hasActiveClaudeSession', () => {
     mockReadFile.mockResolvedValue(JSON.stringify({ state: 'idle' }) as unknown as Buffer);
     const result = await hasActiveClaudeSession();
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: notifyFlywheelMergeComplete — quiet-hours queue
+// ---------------------------------------------------------------------------
+
+describe('notifyFlywheelMergeComplete — quiet-hours queue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExistsSync.mockReturnValue(false);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockReadFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    mockLoadCloisterConfig.mockReturnValue({});
+  });
+
+  it('persists issue to queue file when called during quiet hours', async () => {
+    // Force always-quiet-hours via mocked config
+    mockLoadCloisterConfig.mockReturnValue({
+      flywheel: { quiet_hours: '00:00-23:59', autonomous: true },
+    } as ReturnType<typeof loadCloisterConfig>);
+
+    notifyFlywheelMergeComplete('PAN-999');
+
+    // Wait for the async queue write to complete
+    await vi.waitFor(() => expect(mockWriteFile).toHaveBeenCalled());
+
+    const writtenContent = mockWriteFile.mock.calls[0][1] as string;
+    expect(JSON.parse(writtenContent)).toContain('PAN-999');
+  });
+
+  it('does not duplicate an issue already in the queue', async () => {
+    mockLoadCloisterConfig.mockReturnValue({
+      flywheel: { quiet_hours: '00:00-23:59', autonomous: true },
+    } as ReturnType<typeof loadCloisterConfig>);
+    // Queue already has PAN-999
+    mockReadFile.mockResolvedValue(JSON.stringify(['PAN-999']) as unknown as Buffer);
+
+    notifyFlywheelMergeComplete('PAN-999');
+
+    // No write should happen (issue already queued)
+    await new Promise(r => setTimeout(r, 50));
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: fileSubstrateIssue — idempotency
+// ---------------------------------------------------------------------------
+
+describe('fileSubstrateIssue', () => {
+  function makeExecFileCallback(stdout: string) {
+    return (...args: unknown[]) => {
+      const cb = args[args.length - 1] as (err: Error | null, result: { stdout: string; stderr: string }) => void;
+      if (typeof cb === 'function') setImmediate(() => cb(null, { stdout, stderr: '' }));
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('skips filing when an open substrate-improvement issue already exists', async () => {
+    // First call (list check) returns an existing issue; second call (create) should NOT happen
+    mockExecFile.mockImplementation(
+      makeExecFileCallback(JSON.stringify([{ number: 42 }])) as unknown as typeof execFile,
+    );
+
+    await fileSubstrateIssue('PAN-001');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(1); // only the list check, not create
+    const [, args] = mockExecFile.mock.calls[0] as [string, string[]];
+    expect(args).toContain('list');
+  });
+
+  it('files a new issue when none exists', async () => {
+    // First call (list check) returns empty; second call (create) should happen
+    mockExecFile
+      .mockImplementationOnce(
+        makeExecFileCallback(JSON.stringify([])) as unknown as typeof execFile,
+      )
+      .mockImplementationOnce(
+        makeExecFileCallback('') as unknown as typeof execFile,
+      );
+
+    await fileSubstrateIssue('PAN-001');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+    const createArgs = mockExecFile.mock.calls[1][1] as string[];
+    expect(createArgs).toContain('create');
+    expect(createArgs).toContain('--label');
+    expect(createArgs).toContain('substrate-improvement');
   });
 });

@@ -9,7 +9,8 @@
  *   spawn → run → write retro file → exit → kill session
  */
 
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { writeFileSync, mkdirSync } from 'fs';
+import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -100,8 +101,12 @@ exec script -qfaec "bash '${innerScript}'" "${logFile}"
 
     console.log(`[retro-agent] Spawned session ${sessionName} for ${issueId}`);
 
+    // Snapshot the retros dir before polling so we can detect newly-written files
+    const retroOutputDir = join(cwd, 'docs', 'flywheel', 'retros');
+    const existingRetroFiles = new Set(await readdir(retroOutputDir).catch(() => [] as string[]));
+
     // Wait for completion or timeout
-    const result = await waitForRetroCompletion(sessionName, issueId, RETRO_TIMEOUT_MS);
+    const result = await waitForRetroCompletion(sessionName, issueId, RETRO_TIMEOUT_MS, retroOutputDir, existingRetroFiles);
     return result;
 
   } catch (err: any) {
@@ -121,11 +126,14 @@ exec script -qfaec "bash '${innerScript}'" "${logFile}"
 /**
  * Wait for the retro session to exit, up to the timeout.
  * Polls every 10 seconds to check if the session still exists.
+ * Exported for testability.
  */
-async function waitForRetroCompletion(
+export async function waitForRetroCompletion(
   sessionName: string,
   issueId: string,
   timeoutMs: number,
+  retroOutputDir: string,
+  existingFiles: Set<string>,
 ): Promise<RetroAgentResult> {
   const deadline = Date.now() + timeoutMs;
   const POLL_INTERVAL_MS = 10_000;
@@ -133,12 +141,18 @@ async function waitForRetroCompletion(
   while (Date.now() < deadline) {
     const exists = await sessionExistsAsync(sessionName).catch(() => false);
     if (!exists) {
-      // Session exited on its own — check if retro was written
       console.log(`[retro-agent] Session ${sessionName} exited`);
-      return {
-        success: true,
-        issueId,
-      };
+      // Verify a retro file was actually written — session can exit without writing (Claude failures, validation errors)
+      const afterFiles = await readdir(retroOutputDir).catch(() => [] as string[]);
+      const prefix = `${issueId.toLowerCase()}-`;
+      const newFile = afterFiles.find(f => f.startsWith(prefix) && !existingFiles.has(f));
+      if (!newFile) {
+        console.warn(`[retro-agent] Session exited but no retro file found in ${retroOutputDir}`);
+        return { success: false, issueId, error: 'No retro file written by agent' };
+      }
+      const retroFilePath = join(retroOutputDir, newFile);
+      console.log(`[retro-agent] Retro file written: ${retroFilePath}`);
+      return { success: true, issueId, retroFilePath };
     }
     // Wait before polling again
     await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
