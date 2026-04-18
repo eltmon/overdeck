@@ -21,6 +21,10 @@ import { MergeSet } from './merge-set.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.trim() : String(error).trim();
+}
+
 export interface RebaseResult {
   repoKey: string;
   outcome: 'rebased' | 'already-current' | 'conflict' | 'error';
@@ -76,8 +80,8 @@ async function rebaseOneRepo(
       encoding: 'utf-8',
       timeout: 60000,
     });
-  } catch (err: any) {
-    return { repoKey, outcome: 'error', message: `Failed to fetch origin/${targetBranch}: ${err.message?.trim() || err.message}` };
+  } catch (err: unknown) {
+    return { repoKey, outcome: 'error', message: `Failed to fetch origin/${targetBranch}: ${getErrorMessage(err)}` };
   }
 
   // Is the branch already rebased onto target?
@@ -104,7 +108,7 @@ async function rebaseOneRepo(
         timeout: 120000,
         env: { ...process.env, GIT_EDITOR: 'true' },
       });
-    } catch (rebaseErr: any) {
+    } catch (rebaseErr: unknown) {
       let lastError = rebaseErr;
 
       while (true) {
@@ -124,7 +128,7 @@ async function rebaseOneRepo(
             }
 
             break;
-          } catch (continueErr: any) {
+          } catch (continueErr: unknown) {
             lastError = continueErr;
             continue;
           }
@@ -134,7 +138,7 @@ async function rebaseOneRepo(
           return {
             repoKey,
             outcome: 'error',
-            message: `Rebase failed: ${lastError.message?.trim() || lastError.message}`,
+            message: `Rebase failed: ${getErrorMessage(lastError)}`,
           };
         }
 
@@ -150,7 +154,7 @@ async function rebaseOneRepo(
         return {
           repoKey,
           outcome: 'error',
-          message: `Rebase failed: ${lastError.message?.trim() || lastError.message}`,
+          message: `Rebase failed: ${getErrorMessage(lastError)}`,
         };
       }
     }
@@ -163,8 +167,8 @@ async function rebaseOneRepo(
       `git push --force-with-lease origin HEAD:refs/heads/${sourceBranch}`,
       { cwd: repoPath, encoding: 'utf-8', timeout: 60000 }
     );
-  } catch (err: any) {
-    return { repoKey, outcome: 'error', message: `Push failed: ${err.message?.trim() || err.message}` };
+  } catch (err: unknown) {
+    return { repoKey, outcome: 'error', message: `Push failed: ${getErrorMessage(err)}` };
   }
 
   return { repoKey, outcome: alreadyRebased ? 'already-current' : 'rebased' };
@@ -193,7 +197,7 @@ async function isRebaseInProgress(repoPath: string): Promise<boolean> {
 
 async function tryResolvePlanningConflicts(
   repoPath: string
-): Promise<{ resolved: boolean; shouldRetry: boolean; remainingConflicts: string[] }> {
+): Promise<{ shouldRetry: boolean; remainingConflicts: string[] }> {
   try {
     const { stdout } = await execFileAsync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
       cwd: repoPath,
@@ -207,12 +211,12 @@ async function tryResolvePlanningConflicts(
       .filter(Boolean);
 
     if (conflictFiles.length === 0) {
-      return { resolved: false, shouldRetry: false, remainingConflicts: [] };
+      return { shouldRetry: false, remainingConflicts: [] };
     }
 
     const nonPlanningConflicts = conflictFiles.filter(f => !f.startsWith('.planning/'));
     if (nonPlanningConflicts.length > 0) {
-      return { resolved: false, shouldRetry: false, remainingConflicts: nonPlanningConflicts };
+      return { shouldRetry: false, remainingConflicts: nonPlanningConflicts };
     }
 
     for (const file of conflictFiles) {
@@ -228,8 +232,8 @@ async function tryResolvePlanningConflicts(
       });
     }
 
-    return { resolved: true, shouldRetry: true, remainingConflicts: [] };
+    return { shouldRetry: true, remainingConflicts: [] };
   } catch {
-    return { resolved: false, shouldRetry: false, remainingConflicts: ['(error checking rebase status)'] };
+    return { shouldRetry: false, remainingConflicts: ['(error checking rebase status)'] };
   }
 }
