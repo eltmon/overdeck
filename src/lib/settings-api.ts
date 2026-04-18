@@ -15,10 +15,11 @@ import { reloadGlobalRouter } from './work-type-router.js';
 
 /**
  * Optimal model defaults — multi-provider distribution (see docs/research/)
- * - GPT-5.4: Planning, review, security (best non-Anthropic reasoning)
- * - Kimi K2.6: Exploration, testing, docs, UAT, convoy review (strong coding + vision)
- * - GLM-5.1: Implementation, review-response, correctness (SWE-Bench Pro #1)
- * - MiniMax M2.7: Procedural specialists — test, merge, inspect, synthesis
+ * - Kimi K2.6: Exploration, testing, docs, UAT, general-purpose subagent
+ * - GLM-5.1: Implementation, review-response (SWE-Bench Pro #1)
+ * - GPT-5.4: Specialist review agent (high-stakes code review)
+ * - MiniMax M2.7: Procedural specialists — test, merge, inspect
+ * - Claude Opus/Sonnet: All parallel review agents (security, correctness, etc.)
  * - GPT-5.4 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
  *
  * NOTE: All model IDs are automatically resolved through deprecation mapping

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -52,6 +52,7 @@ import {
   MODELS_BY_PROVIDER,
   OpenRouterFavoriteModel,
 } from './AgentCards/ModelOverrideModal';
+import { FALLBACK_FALLBACK_DEFAULT_MODEL } from './modelDefaults';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -227,17 +228,6 @@ const AGENT_CATEGORIES: AgentCategory[] = [
   },
 ];
 
-// Section navigation definitions
-const SETTINGS_SECTIONS = [
-  { id: 'smart-selection', label: 'Smart Selection', icon: Route },
-  { id: 'providers', label: 'Providers', icon: Key },
-  { id: 'openrouter', label: 'OpenRouter', icon: Globe },
-  { id: 'conversations', label: 'Conversations', icon: MessageCircle },
-  { id: 'tmux', label: 'Terminal', icon: Terminal },
-  { id: 'trackers', label: 'Tracker Keys', icon: GitBranch },
-  { id: 'model-assignments', label: 'Model Assignments', icon: Brain },
-  { id: 'maintenance', label: 'Maintenance', icon: Settings },
-] as const;
 
 function getModelDisplay(modelId?: string): string {
   if (!modelId) return 'Default';
@@ -1307,7 +1297,7 @@ export function SettingsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {category.agents.map((agent) => {
-                  const currentModelId = (formData.models.overrides[agent.id] || DEFAULT_MODEL) as ModelId;
+                  const currentModelId = (formData.models.overrides[agent.id] || FALLBACK_DEFAULT_MODEL) as ModelId;
                   const modelDisplay = getModelDisplay(currentModelId);
                   const { score, matched, missing } = getCapabilityMatchScore(currentModelId, agent.id);
                   const requiredCaps = WORK_TYPE_CAPABILITIES[agent.id] || [];
@@ -1484,7 +1474,7 @@ export function SettingsPage() {
       {modalWorkType && (
         <ModelOverrideModal
           workType={modalWorkType}
-          currentModel={(formData.models.overrides[modalWorkType] || DEFAULT_MODEL) as ModelId}
+          currentModel={(formData.models.overrides[modalWorkType] || FALLBACK_DEFAULT_MODEL) as ModelId}
           isOverride={!!formData.models.overrides[modalWorkType]}
           enabledProviders={Object.entries(formData.models.providers)
             .filter(([_, enabled]) => enabled)
