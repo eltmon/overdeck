@@ -1357,10 +1357,15 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
     const model = agentState.model || 'claude-sonnet-4-6';
     const providerExports = getProviderExportsForModel(model);
+    // Non-Anthropic models route through a proxy (ANTHROPIC_BASE_URL). Without an explicit
+    // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
+    // requests through the proxy → "unknown provider" 502. Always include --model when
+    // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
+    const resumeModelFlag = providerExports.includes('ANTHROPIC_BASE_URL') ? ` --model ${model}` : '';
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     const launcherContent = `#!/bin/bash
 export CI=1
-${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permissions --permission-mode bypassPermissions
+${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --dangerously-skip-permissions --permission-mode bypassPermissions
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
