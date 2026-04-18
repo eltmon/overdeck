@@ -563,7 +563,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const { messageAgent } = await import('../../../lib/agents.js');
 
           if (sessionExists(workAgentId)) {
-            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"`;
+            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then re-request review with: pan review request ${normalizedIssueId} -m "Fixed review issues"`;
             await messageAgent(workAgentId, reviewMsg);
             console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
           }
