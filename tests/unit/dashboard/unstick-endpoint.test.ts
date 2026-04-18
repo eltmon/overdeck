@@ -1,0 +1,134 @@
+/**
+ * Tests for the unstick endpoint business logic (PAN-653).
+ *
+ * POST /api/workspaces/:issueId/unstick clears the persistent stuck flag
+ * set by markWorkspaceStuck() so Deacon resumes normal patrol.
+ *
+ * We test the underlying database round-trip directly (not the Effect HTTP
+ * handler) because Effect route integration tests require a full server stack.
+ * The route itself is thin: validate workspace exists → check stuck flag →
+ * call clearWorkspaceStuck. These tests verify the stuck-flag lifecycle.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { initSchema } from '../../../src/lib/database/schema.js';
+
+// ============== In-memory DB injection ==============
+
+let testDb: Database.Database;
+
+vi.mock('../../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
+}));
+
+beforeEach(() => {
+  testDb = new Database(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
+});
+
+afterEach(() => {
+  testDb.close();
+});
+
+// ============== Imports (after mock is set up) ==============
+
+import {
+  markWorkspaceStuck,
+  clearWorkspaceStuck,
+  getReviewStatusFromDb,
+} from '../../../src/lib/database/review-status-db.js';
+
+// ============== Tests ==============
+
+describe('markWorkspaceStuck', () => {
+  it('sets stuck=1 with reason, stuckAt, and details', () => {
+    markWorkspaceStuck('PAN-100', 'main_diverged', { beforeSha: 'aaa', remoteSha: 'bbb' });
+
+    const row = getReviewStatusFromDb('PAN-100');
+    expect(row).not.toBeNull();
+    expect(row!.stuck).toBe(true);
+    expect(row!.stuckReason).toBe('main_diverged');
+    expect(row!.stuckAt).toBeTruthy();
+    expect(row!.stuckDetails).toContain('beforeSha');
+  });
+
+  it('creates a minimal placeholder row when no prior status exists', () => {
+    markWorkspaceStuck('PAN-FRESH', 'main_diverged');
+
+    const row = getReviewStatusFromDb('PAN-FRESH');
+    expect(row).not.toBeNull();
+    expect(row!.stuck).toBe(true);
+    expect(row!.reviewStatus).toBe('pending');
+    expect(row!.testStatus).toBe('pending');
+  });
+
+  it('overwrites an existing status without resetting other columns', () => {
+    // First, give the issue a passing review
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-200', 'passed', 'passed', datetime('now'), 1)
+    `).run();
+
+    markWorkspaceStuck('PAN-200', 'main_diverged');
+
+    const row = getReviewStatusFromDb('PAN-200');
+    expect(row!.stuck).toBe(true);
+    expect(row!.reviewStatus).toBe('passed');   // not reset
+    expect(row!.testStatus).toBe('passed');     // not reset
+  });
+});
+
+describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
+  it('clears stuck=0 and nullifies reason/details', () => {
+    markWorkspaceStuck('PAN-300', 'main_diverged', { sha: 'abc' });
+    expect(getReviewStatusFromDb('PAN-300')!.stuck).toBe(true);
+
+    clearWorkspaceStuck('PAN-300');
+
+    const row = getReviewStatusFromDb('PAN-300');
+    expect(row!.stuck).toBeUndefined();  // stuck=0 → undefined
+    expect(row!.stuckReason).toBeUndefined();
+    expect(row!.stuckAt).toBeUndefined();
+    expect(row!.stuckDetails).toBeUndefined();
+  });
+
+  it('is idempotent — clearing an already-not-stuck workspace does not error', () => {
+    // Insert a non-stuck row
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-400', 'pending', 'pending', datetime('now'), 0)
+    `).run();
+
+    // Should not throw
+    expect(() => clearWorkspaceStuck('PAN-400')).not.toThrow();
+
+    const row = getReviewStatusFromDb('PAN-400');
+    // stuck=0 in DB maps to undefined (not false) — workspace is not stuck
+    expect(row!.stuck).toBeUndefined();
+  });
+
+  it('round-trip: mark stuck → verify → clear → verify', () => {
+    markWorkspaceStuck('PAN-500', 'main_diverged');
+    expect(getReviewStatusFromDb('PAN-500')!.stuck).toBe(true);
+
+    clearWorkspaceStuck('PAN-500');
+    // After clearing, stuck is undefined (not stuck)
+    expect(getReviewStatusFromDb('PAN-500')!.stuck).toBeUndefined();
+
+    // Can be stuck again after clearing
+    markWorkspaceStuck('PAN-500', 'main_diverged');
+    expect(getReviewStatusFromDb('PAN-500')!.stuck).toBe(true);
+  });
+
+  it('clearing one issue does not affect another', () => {
+    markWorkspaceStuck('PAN-600', 'main_diverged');
+    markWorkspaceStuck('PAN-601', 'main_diverged');
+
+    clearWorkspaceStuck('PAN-600');
+
+    expect(getReviewStatusFromDb('PAN-600')!.stuck).toBeUndefined();  // cleared
+    expect(getReviewStatusFromDb('PAN-601')!.stuck).toBe(true);       // still stuck
+  });
+});

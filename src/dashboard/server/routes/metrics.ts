@@ -25,6 +25,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
+import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { listGitOperations } from '../services/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
@@ -64,15 +65,26 @@ const getMetricsSummaryRoute = HttpRouter.add(
       // Compute stuck count as union of:
       //   1. Agents with inactivity-based health.state === 'stuck'
       //   2. Workspaces with persistent review_status.stuck = true (divergence guard)
-      // Deduped by issueId to avoid double-counting when both flags are set.
+      // Deduped by issueId — an issue with both flags set must count as 1, not 2.
       const reviewStatuses = loadReviewStatuses();
       const persistentStuckIssueIds = new Set(
         Object.values(reviewStatuses)
           .filter((rs) => rs.stuck === true)
-          .map((rs) => rs.issueId)
+          .map((rs) => rs.issueId.toUpperCase())
       );
-      // health-based count is agent-level; add any extra diverged issues not in that count
-      const stuckCount = status.summary.stuck + persistentStuckIssueIds.size;
+      // Map agentId → issueId for running agents, then check health state per agent.
+      const agentIdToIssueId = new Map(
+        listRunningAgents().filter((a) => a.tmuxActive).map((a) => [a.id, a.issueId.toUpperCase()])
+      );
+      const healthStuckIssueIds = new Set<string>();
+      for (const agentId of status.agentsNeedingAttention) {
+        const health = service.getAgentHealth(agentId);
+        if (health?.state === 'stuck') {
+          const issueId = agentIdToIssueId.get(agentId);
+          if (issueId) healthStuckIssueIds.add(issueId);
+        }
+      }
+      const stuckCount = new Set([...healthStuckIssueIds, ...persistentStuckIssueIds]).size;
 
       return jsonResponse({
         today: {
