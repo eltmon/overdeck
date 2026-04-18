@@ -22,6 +22,7 @@ import {
   reviewResultToReviewStatus,
   dispatchParallelReview,
   getActiveParallelReviewIssues,
+  buildReviewFeedbackBody,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -144,6 +145,42 @@ describe('getActiveParallelReviewIssues', () => {
     const active = getActiveParallelReviewIssues(activeSessions);
     // PAN-540 should appear as active — deacon would see it and skip the orphan reset
     expect(active.has('PAN-540')).toBe(true);
+  });
+});
+
+// ── buildReviewFeedbackBody ───────────────────────────────────────────────────
+// Regression coverage: verifies the resubmit command emitted to work agents
+// points at the real resubmit flow, not a non-existent route.
+
+describe('buildReviewFeedbackBody', () => {
+  const changesRequested: ReviewResult = {
+    success: true,
+    reviewResult: 'CHANGES_REQUESTED',
+    notes: 'Fix the linting issues.',
+  };
+
+  it('CHANGES_REQUESTED body instructs agent to use pan done (not a curl URL)', () => {
+    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
+    // Must reference pan done / rebase-and-submit skill
+    expect(body).toMatch(/pan done|rebase-and-submit/);
+  });
+
+  it('CHANGES_REQUESTED body does NOT reference the non-existent /api/workspaces request-review route', () => {
+    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
+    expect(body).not.toContain('/api/workspaces/');
+    expect(body).not.toContain('request-review');
+  });
+
+  it('CHANGES_REQUESTED body includes the issue ID', () => {
+    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
+    expect(body).toContain('PAN-999');
+  });
+
+  it('APPROVED body does not include resubmit instructions', () => {
+    const approved: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
+    const body = buildReviewFeedbackBody('PAN-999', approved);
+    expect(body).toContain('approved');
+    expect(body).not.toMatch(/pan done|rebase-and-submit|request-review/);
   });
 });
 

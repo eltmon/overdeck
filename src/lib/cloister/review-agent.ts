@@ -215,14 +215,11 @@ function parseAgentOutput(output: string): ReviewResult {
  * Writes feedback to .planning/feedback/ in the workspace, updates STATE.md,
  * and sends a short reference via tmux.
  */
-async function sendFeedbackToWorkAgent(
-  context: ReviewContext,
-  result: ReviewResult
-): Promise<void> {
-  const agentSession = `agent-${context.issueId.toLowerCase()}`;
-  const outcome = result.reviewResult.toLowerCase().replace(/_/g, '-');
-
-  // Build the full markdown body
+/**
+ * Builds the markdown body for the feedback file written to the work agent.
+ * Exported for testing so the resubmit command contract can be verified.
+ */
+export function buildReviewFeedbackBody(issueId: string, result: ReviewResult): string {
   let body = `# Review: ${result.reviewResult}\n\n`;
   body += `## Summary\n\n${result.notes || 'No details provided.'}\n`;
 
@@ -235,11 +232,22 @@ async function sendFeedbackToWorkAgent(
   }
 
   if (result.reviewResult === 'CHANGES_REQUESTED') {
-    const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-    body += `\n## REQUIRED: Fix ALL issues above BEFORE resubmitting\n\n1. Read each issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests to verify your fixes\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\n\`\`\`bash\ncurl -X POST ${apiUrl}/api/workspaces/${context.issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\`\`\`\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.\n`;
+    body += `\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.\n`;
   } else if (result.reviewResult === 'APPROVED') {
     body += `\n## Next Steps\n\nCode approved. It will proceed to testing.\n`;
   }
+
+  return body;
+}
+
+async function sendFeedbackToWorkAgent(
+  context: ReviewContext,
+  result: ReviewResult
+): Promise<void> {
+  const agentSession = `agent-${context.issueId.toLowerCase()}`;
+  const outcome = result.reviewResult.toLowerCase().replace(/_/g, '-');
+
+  const body = buildReviewFeedbackBody(context.issueId, result);
 
   // Write feedback file to workspace (use workspace path, not project root)
   const fileResult = await writeFeedbackFile({
