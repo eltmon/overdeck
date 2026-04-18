@@ -23,8 +23,13 @@ import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
+import { mkdir } from 'node:fs/promises';
+import { getPanopticonHome } from '../../lib/paths.js';
 
 declare const Bun: unknown;
+
+// Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
+await mkdir(getPanopticonHome(), { recursive: true });
 
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 void initTrackerConfigCache().catch(err => {
