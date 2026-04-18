@@ -139,6 +139,24 @@ describe('model-fallback', () => {
         expect(getModelProvider(model)).not.toBe('anthropic');
       }
     });
+
+    it('applyFallback does not fall back to Anthropic when Anthropic is disabled (MiniMax-only)', () => {
+      // Regression: with anthropic=false and minimax=true, a disabled-provider model must NOT
+      // silently rewrite to claude-sonnet-4-6. The original model is returned with a warning.
+      const minimaxOnly = new Set<ModelProvider>(['minimax']);
+      // minimax-m2.7 is enabled — should pass through unchanged
+      expect(applyFallback('minimax-m2.7' as ModelId, minimaxOnly)).toBe('minimax-m2.7');
+      // gpt-5.4 is disabled (openai not in set) AND Anthropic is also disabled —
+      // must NOT return claude-sonnet-4-6
+      const result = applyFallback('gpt-5.4' as ModelId, minimaxOnly);
+      expect(getModelProvider(result)).not.toBe('anthropic');
+    });
+
+    it('applyFallback falls back to Anthropic when Anthropic IS enabled and provider is disabled', () => {
+      // Standard path: openai disabled, anthropic enabled → Anthropic fallback applied
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallback('gpt-5.4' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
   });
 
   describe('applyFallback', () => {

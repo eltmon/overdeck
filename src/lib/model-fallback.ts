@@ -238,13 +238,20 @@ export function applyTierAwareFallback(
 ): ModelId {
   const provider = getModelProvider(modelId);
 
-  // Case 1: Provider disabled — use Anthropic equivalent
+  // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {
     const fallback = getFallbackModel(modelId);
+    if (isProviderEnabled('anthropic', enabledProviders)) {
+      console.warn(
+        `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
+      );
+      return fallback;
+    }
+    // Anthropic is also disabled — return original model and warn; caller must handle
     console.warn(
-      `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
+      `Model ${modelId} requires ${provider} API key which is not configured, and Anthropic is also disabled — keeping original model`
     );
-    return fallback;
+    return modelId;
   }
 
   // Case 2: API key auth (userTier undefined) — no tier restriction
@@ -278,12 +285,19 @@ export function applyTierAwareFallback(
     return downgraded;
   }
 
-  // Case 5: No same-tier model available — fall back to Anthropic equivalent
-  const fallback = getBestAnthropicAtTier(userTier, modelId);
+  // Case 5: No same-tier model available — fall back to Anthropic equivalent if available
+  if (isProviderEnabled('anthropic', enabledProviders)) {
+    const fallback = getBestAnthropicAtTier(userTier, modelId);
+    console.warn(
+      `No ${provider} model available at tier ${userTier}, falling back to ${fallback}`
+    );
+    return fallback;
+  }
+  // Anthropic is also disabled — return original model and warn; caller must handle
   console.warn(
-    `No ${provider} model available at tier ${userTier}, falling back to ${fallback}`
+    `No ${provider} model available at tier ${userTier}, and Anthropic is also disabled — keeping original model`
   );
-  return fallback;
+  return modelId;
 }
 
 /**
