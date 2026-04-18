@@ -4,7 +4,7 @@
     "created": "2026-04-15T03:12:26Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-540: Remove convoy abstraction, inline parallel review directly into review-agent",
-    "updated": "2026-04-18T22:07:41.553Z"
+    "updated": "2026-04-18T22:18:35.860Z"
   },
   "plan": {
     "id": "pan-540",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "5c1e64f2-29e5-4560-a802-68cad6d5d797",
     "author": "agent:claude-opus-4-6",
-    "sequence": 363,
+    "sequence": 372,
     "created": "2026-04-15T03:12:26Z",
-    "updated": "2026-04-18T22:07:41.553Z",
+    "updated": "2026-04-18T22:18:35.860Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/540",
@@ -116,7 +116,7 @@
             "completed": "2026-04-15T04:01:21.075Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.553Z"
+        "completed": "2026-04-18T22:18:35.860Z"
       },
       {
         "id": "rename-work-types",
@@ -196,7 +196,7 @@
             "completed": "2026-04-15T04:01:21.073Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.552Z"
+        "completed": "2026-04-18T22:18:35.859Z"
       },
       {
         "id": "configurable-review-agents",
@@ -276,7 +276,7 @@
             "completed": "2026-04-15T04:01:21.060Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.549Z"
+        "completed": "2026-04-18T22:18:35.857Z"
       },
       {
         "id": "delete-cli-convoy-commands",
@@ -329,7 +329,7 @@
             "completed": "2026-04-15T04:01:21.070Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.552Z"
+        "completed": "2026-04-18T22:18:35.859Z"
       },
       {
         "id": "delete-convoy-api-routes",
@@ -382,7 +382,7 @@
             "completed": "2026-04-15T04:01:21.069Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.551Z"
+        "completed": "2026-04-18T22:18:35.859Z"
       },
       {
         "id": "delete-convoy-frontend-panel",
@@ -435,7 +435,7 @@
             "completed": "2026-04-15T04:01:21.067Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.551Z"
+        "completed": "2026-04-18T22:18:35.859Z"
       },
       {
         "id": "remove-convoys-nav-route",
@@ -488,7 +488,7 @@
             "completed": "2026-04-15T04:01:21.066Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.551Z"
+        "completed": "2026-04-18T22:18:35.859Z"
       },
       {
         "id": "delete-convoy-lib-and-templates",
@@ -550,7 +550,7 @@
             "completed": "2026-04-15T04:01:21.062Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.550Z"
+        "completed": "2026-04-18T22:18:35.858Z"
       },
       {
         "id": "update-docs",
@@ -612,7 +612,7 @@
             "completed": "2026-04-15T04:01:21.064Z"
           }
         ],
-        "completed": "2026-04-18T22:07:41.550Z"
+        "completed": "2026-04-18T22:18:35.858Z"
       }
     ],
     "edges": [
