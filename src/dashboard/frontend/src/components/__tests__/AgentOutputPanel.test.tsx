@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { deriveAgentIssueId } from '../AgentOutputPanel';
 
@@ -82,6 +82,7 @@ describe('deriveAgentIssueId', () => {
   // Non-matching ids
   it('returns null for specialist session names', () => {
     expect(deriveAgentIssueId('specialist-pan-review-agent')).toBeNull();
+    expect(deriveAgentIssueId('specialist-panopticon-PAN-509-review-agent')).toBeNull();
   });
 
   it('returns null for unrecognized id formats', () => {
@@ -96,6 +97,7 @@ describe('deriveAgentIssueId', () => {
 describe('AgentOutputPanel — planning agent rendering (AC4)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ isRunning: true }) })));
     // Default: store returns null (no agent in store, fall back to id-based derivation)
     (useDashboardStore as ReturnType<typeof vi.fn>).mockReturnValue(null);
   });
@@ -124,5 +126,16 @@ describe('AgentOutputPanel — planning agent rendering (AC4)', () => {
     expect(screen.queryByTestId('activity-view')).not.toBeInTheDocument();
     expect(screen.queryByTestId('xterm')).not.toBeInTheDocument();
     expect(screen.getByText(/No issue associated/)).toBeInTheDocument();
+  });
+
+  it('fetches specialist status with project and issue scoped route', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ isRunning: true }) }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPanel('specialist-panopticon-PAN-509-review-agent');
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/specialists/panopticon/PAN-509/review-agent/status');
+    });
   });
 });

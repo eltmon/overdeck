@@ -33,7 +33,7 @@ TEMP_FILE="$RUNTIME_FILE.tmp"
 if [ -f "$RUNTIME_FILE" ]; then
   # Merge with existing runtime state (preserves contextPercent, sessionId, etc.)
   jq --arg ts "$(date -Iseconds)" \
-    '.state = "idle" | .lastActivity = $ts | del(.currentTool)' \
+    '.state = "idle" | .lastActivity = $ts | del(.currentTool) | del(.waitingReason) | del(.waitingStartedAt) | del(.waitingNotification)' \
     "$RUNTIME_FILE" > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
 else
   # Create initial runtime state

@@ -117,6 +117,22 @@ export function getConversationById(id: number): Conversation | null {
   return row ? rowToConversation(row) : null;
 }
 
+export function listArchivedConversations(): Conversation[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT id, name, tmux_session, status, cwd, issue_id,
+              created_at, ended_at, last_attached_at, session_file, title,
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
+       FROM conversations
+       WHERE archived_at IS NOT NULL
+       ORDER BY archived_at DESC, created_at DESC`,
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map(rowToConversation);
+}
+
 // ─── Write operations ─────────────────────────────────────────────────────────
 
 export function createConversation(opts: {

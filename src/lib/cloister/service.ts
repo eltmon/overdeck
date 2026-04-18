@@ -62,6 +62,7 @@ import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renam
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
+import { sessionExistsAsync } from '../tmux.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
@@ -88,6 +89,31 @@ export function identifyOrphanedReviewingIssues(
     orphaned.push(issueId);
   }
   return orphaned;
+}
+
+export function parseSpecialistAgentSession(name: string): {
+  projectKey: string;
+  specialistType: 'review-agent' | 'test-agent' | 'merge-agent';
+  issueId?: string;
+} | null {
+  const issueScoped = name.match(/^specialist-(.+)-([A-Z]+-\d+)-(review-agent|test-agent|merge-agent)$/);
+  if (issueScoped) {
+    return {
+      projectKey: issueScoped[1],
+      issueId: issueScoped[2],
+      specialistType: issueScoped[3] as 'review-agent' | 'test-agent' | 'merge-agent',
+    };
+  }
+
+  const legacy = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+  if (legacy) {
+    return {
+      projectKey: legacy[1],
+      specialistType: legacy[2] as 'review-agent' | 'test-agent' | 'merge-agent',
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -270,14 +296,11 @@ export class CloisterService {
     try {
       if (existsSync(AGENTS_DIR)) {
         const { isRunning: isSpecialistRunning } = await import('./specialists.js');
-        const specialistPattern = /^specialist-(.+)-(review-agent|test-agent|merge-agent)$/;
         const entries = readdirSync(AGENTS_DIR, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
-          const match = specialistPattern.exec(entry.name);
-          if (!match) continue;
-          const projectKey = match[1];
-          const specialistType = match[2] as 'review-agent' | 'test-agent' | 'merge-agent';
+          const parsed = parseSpecialistAgentSession(entry.name);
+          if (!parsed) continue;
           const runtimeState = getAgentRuntimeState(entry.name);
           if (!runtimeState?.currentIssue) continue;
 
@@ -285,8 +308,12 @@ export class CloisterService {
             saveAgentRuntimeState(entry.name, { currentIssue: undefined });
             console.log(`  ✓ Cleared stale currentIssue '${runtimeState.currentIssue}' from idle ${entry.name}`);
           } else if (runtimeState.state === 'active') {
-            // Check if the process is actually alive — if not, the state is stale from a crash
-            const stillRunning = await isSpecialistRunning(specialistType, projectKey);
+            // Check if the process is actually alive — if not, the state is stale from a crash.
+            // For issue-scoped specialists, check the exact tmux session instead of the legacy
+            // project/type singleton lookup, which cannot represent PAN-754 session identity.
+            const stillRunning = parsed.issueId
+              ? await sessionExistsAsync(entry.name)
+              : await isSpecialistRunning(parsed.specialistType, parsed.projectKey);
             if (!stillRunning) {
               saveAgentRuntimeState(entry.name, {
                 state: 'idle',

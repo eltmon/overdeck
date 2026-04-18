@@ -21,8 +21,8 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   DELETE /api/specialists/:name/queue/:itemId
  *   PUT    /api/specialists/:name/queue/reorder
  *   POST   /api/specialists/:name/auto-complete
- *   GET    /api/specialists/:project/:type/status
- *   POST   /api/specialists/:project/:type/kill
+ *   GET    /api/specialists/:project/:issueId/:type/status
+ *   POST   /api/specialists/:project/:issueId/:type/kill
  *   GET    /api/specialists/:project/:type/queue
  *   POST   /api/specialists/:project/:type/spawn
  *   GET    /api/specialists/:project/:type/runs
@@ -1093,14 +1093,15 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/specialists/:project/:type/status ────────────────────────
+// ─── Route: GET /api/specialists/:project/:issueId/:type/status ───────────────
 
 const getProjectSpecialistStatusRoute = HttpRouter.add(
   'GET',
-  '/api/specialists/:project/:type/status',
+  '/api/specialists/:project/:issueId/:type/status',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
@@ -1110,20 +1111,41 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       );
     }
 
-    const { getSpecialistStatus } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const status = yield* Effect.promise(() => getSpecialistStatus(type, project));
-    return jsonResponse(status);
+    const {
+      makeSpecialistRegistryKey,
+      getRunMetadata,
+      getTmuxSessionName,
+      isProjectSpecialistActivelyRunning,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const { getAgentRuntimeState } = yield* Effect.promise(() => import('../../../lib/agents.js'));
+
+    const registryKey = makeSpecialistRegistryKey(type, issueId);
+    const metadata = getRunMetadata(project, registryKey);
+    const tmuxSession = metadata.tmuxSession ?? getTmuxSessionName(type, project, issueId);
+    const runtimeState = getAgentRuntimeState(tmuxSession);
+    const isRunning = isProjectSpecialistActivelyRunning(runtimeState, metadata.currentRun !== null);
+
+    return jsonResponse({
+      name: type,
+      state: isRunning ? 'active' : 'sleeping',
+      isRunning,
+      tmuxSession,
+      currentIssue: issueId,
+      sessionId: metadata.sessionId,
+      contextTokens: undefined,
+    });
   })),
 );
 
-// ─── Route: POST /api/specialists/:project/:type/kill ────────────────────────
+// ─── Route: POST /api/specialists/:project/:issueId/:type/kill ───────────────
 
 const postProjectSpecialistKillRoute = HttpRouter.add(
   'POST',
-  '/api/specialists/:project/:type/kill',
+  '/api/specialists/:project/:issueId/:type/kill',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
@@ -1133,17 +1155,12 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    const { getTmuxSessionName, makeSpecialistRegistryKey, findActiveRegistryKey, getRunMetadata } =
+    const { getTmuxSessionName, makeSpecialistRegistryKey, getRunMetadata } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-    // Look up the active issueId from the registry to find the correct session name (PAN-754)
-    const activeKey = findActiveRegistryKey(project, type) ?? type;
-    const { issueId: activeIssueId } = activeKey.includes(':')
-      ? { issueId: activeKey.split(':')[1] }
-      : { issueId: undefined };
-
-    const tmuxSession = getRunMetadata(project, activeKey).tmuxSession
-      ?? getTmuxSessionName(type, project, activeIssueId);
+    const registryKey = makeSpecialistRegistryKey(type, issueId);
+    const tmuxSession = getRunMetadata(project, registryKey).tmuxSession
+      ?? getTmuxSessionName(type, project, issueId);
 
     yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
     // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
@@ -1153,7 +1170,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     });
     return jsonResponse({
       success: true,
-      message: `Killed ${type} (${project})`,
+      message: `Killed ${type} (${project}/${issueId})`,
     });
   })),
 );
