@@ -799,8 +799,8 @@ export function mirrorProjectSkills(
     // No manifest yet — nothing was previously managed, nothing to delete
   }
 
-  // sourceNames: all valid source skills (used for removal guard — never remove non-source)
-  // mirroredNames: skills we actually synced this run (written to manifest)
+  // sourceNames: all valid source skills (used to guard against removing non-source dirs)
+  // mirroredNames: skills actually synced this run (written to manifest)
   const sourceNames = new Set<string>();
   const mirroredNames = new Set<string>();
 
@@ -815,10 +815,6 @@ export function mirrorProjectSkills(
     sourceNames.add(entry.name);
     const targetPath = join(targetDir, entry.name);
     const targetExists = existsSync(targetPath);
-
-    // Skip user-managed dirs: target pre-exists and was never mirror-managed.
-    // We may update dirs we previously mirrored (in manifest), but never touch foreign dirs.
-    if (targetExists && !manifestNames.has(entry.name)) continue;
 
     // Track whether the target already had a SKILL.md (to distinguish added vs updated)
     const targetHadSkillMd = targetExists && (

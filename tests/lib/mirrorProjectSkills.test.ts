@@ -346,6 +346,27 @@ describe('mirrorProjectSkills', () => {
     expect(result.removed).toContain('old-removed');
   });
 
+  it('bootstraps and normalizes a source-backed skill that pre-exists in target before first manifest', () => {
+    // Mirrors the workspace-add-repo scenario: source uses lowercase skill.md,
+    // .claude/skills/ already has the dir (checked in) but no manifest exists yet.
+    createSkill('workspace-add-repo', '# Workspace\nContent.', 'skill.md');
+    mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), '# Workspace\nContent.', 'utf-8');
+    // No manifest — simulates first pan sync run after feature was added
+
+    const result = mirrorProjectSkills(cwd, { manifestDir });
+
+    // skill.md must be normalized to SKILL.md even without a prior manifest entry
+    expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'))).toBe(false);
+    // Must be recorded in manifest so future removals are tracked correctly
+    const manifest = readFileSync(join(manifestDir, 'manifest'), 'utf-8');
+    expect(manifest).toContain('workspace-add-repo');
+    // Classified as updated (target had skill.md) not added
+    expect(result.updated).toContain('workspace-add-repo');
+    expect(result.added).not.toContain('workspace-add-repo');
+  });
+
   it('mirrors skills when called from a subdirectory (walks up to repo root)', () => {
     createSkill('pan-help', '# Help\nContent.');
 
