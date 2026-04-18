@@ -52,6 +52,22 @@ describe('CacheService constructor', () => {
   });
 });
 
+describe('startup/import chain regression', () => {
+  it('getSharedIssueService() constructs IssueDataService(CacheService) when PANOPTICON_HOME pre-exists', async () => {
+    // Simulate main.ts startup order: mkdir PANOPTICON_HOME first, then service construction.
+    // This is the real production chain: routes/issues.ts:65 and routes/misc.ts:114 call
+    // require('../services/issue-service-singleton.js'), which statically imports cache-service.
+    // CacheService opens SQLite at PANOPTICON_HOME/cache.db — fails if the dir doesn't exist.
+    mkdirSync(panopticonHome, { recursive: true });
+
+    const { getSharedIssueService } = await import('../../src/dashboard/server/services/issue-service-singleton.js');
+    let svc: any;
+    expect(() => { svc = getSharedIssueService(); }).not.toThrow();
+    expect(svc).toBeTruthy();
+    svc?.cache?.close?.();
+  });
+});
+
 describe('CacheService sync require() integration', () => {
   it('cache-service.ts has no top-level await (prevents ERR_REQUIRE_ASYNC_MODULE in require() chain)', () => {
     // If this module has top-level await, it becomes async ESM.
