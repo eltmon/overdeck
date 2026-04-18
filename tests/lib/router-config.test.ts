@@ -70,6 +70,7 @@ describe('router-config', () => {
       expect(config.providers[0].baseURL).toBe('https://api.anthropic.com/v1');
       expect(config.providers[0].apiKey).toBe('$ANTHROPIC_API_KEY');
       expect(config.providers[0].models).toEqual([
+        'claude-opus-4-7',
         'claude-opus-4-6',
         'claude-sonnet-4-6',
         'claude-haiku-4-5',

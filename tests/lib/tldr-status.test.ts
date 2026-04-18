@@ -47,7 +47,7 @@ describe('tldrIndexStatusCommand', () => {
     await tldrIndexStatusCommand(tempDir);
     const output = consoleLogs.join('\n');
     expect(output).toContain('No TLDR indexes found');
-    expect(output).toContain('pan setup');
+    expect(output).toContain('pan admin tldr start');
   });
 
   it('shows main index stats when .venv and .tldr exist', async () => {
