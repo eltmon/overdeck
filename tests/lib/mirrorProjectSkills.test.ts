@@ -91,9 +91,12 @@ describe('mirrorProjectSkills', () => {
 
   it('removes a .claude/skills/ dir that no longer exists in skills/ (reports 1 removed)', () => {
     createSkill('pan-help', '# Help');
-    // Target has an extra stale dir from an old skill
+    // Target has a stale dir that was previously managed by the mirror
     mkdirSync(join(claudeSkillsDir, 'old-skill'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'old-skill', 'SKILL.md'), '# Old\n', 'utf-8');
+    // Manifest records it as previously mirrored
+    mkdirSync(claudeSkillsDir, { recursive: true });
+    writeFileSync(join(claudeSkillsDir, '.mirror-manifest'), 'old-skill\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd);
 
@@ -168,12 +171,31 @@ describe('mirrorProjectSkills', () => {
     expect(existsSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'))).toBe(true);
   });
 
+  it('preserves canonical .claude/skills entries not tracked in the mirror manifest', () => {
+    createSkill('pan-help', '# Help');
+    // Canonical checked-in skills (never mirrored — not in manifest)
+    mkdirSync(join(claudeSkillsDir, 'conv-lookup'), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, 'conv-lookup', 'SKILL.md'), '# Conv Lookup\n', 'utf-8');
+    mkdirSync(join(claudeSkillsDir, 'test-specialist-workflow'), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, 'test-specialist-workflow', 'SKILL.md'), '# Test Specialist\n', 'utf-8');
+
+    const result = mirrorProjectSkills(cwd);
+
+    expect(result.removed).not.toContain('conv-lookup');
+    expect(result.removed).not.toContain('test-specialist-workflow');
+    expect(existsSync(join(claudeSkillsDir, 'conv-lookup'))).toBe(true);
+    expect(existsSync(join(claudeSkillsDir, 'test-specialist-workflow'))).toBe(true);
+  });
+
   it('handles multiple skills in a single pass', () => {
     createSkill('pan-help', '# Help');
     createSkill('commit', '# Commit');
-    // Pre-existing stale skill in target
+    // Stale mirror-managed skill in target
     mkdirSync(join(claudeSkillsDir, 'old-removed'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'old-removed', 'SKILL.md'), '# Old\n', 'utf-8');
+    // Manifest records it as previously mirrored
+    mkdirSync(claudeSkillsDir, { recursive: true });
+    writeFileSync(join(claudeSkillsDir, '.mirror-manifest'), 'old-removed\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd);
 

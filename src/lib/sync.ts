@@ -741,11 +741,25 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
     }
   }
 
-  // Remove target dirs that no longer exist in source (skip .gitignore and files)
+  // Read manifest of previously mirrored skills so we only delete mirror-managed entries,
+  // leaving canonical .claude/skills/ dirs (e.g. checked-in skills) untouched.
+  const manifestPath = join(targetDir, '.mirror-manifest');
+  const manifestNames = new Set<string>();
+  try {
+    const content = readFileSync(manifestPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const name = line.trim();
+      if (name) manifestNames.add(name);
+    }
+  } catch {
+    // No manifest yet — nothing was previously managed, nothing to delete
+  }
+
+  // Remove mirror-managed dirs that no longer exist in source
   try {
     for (const entry of readdirSync(targetDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      if (!sourceNames.has(entry.name)) {
+      if (manifestNames.has(entry.name) && !sourceNames.has(entry.name)) {
         rmSync(join(targetDir, entry.name), { recursive: true, force: true });
         result.removed.push(entry.name);
       }
@@ -753,6 +767,9 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
   } catch {
     // Non-fatal — target may not exist or be unreadable
   }
+
+  // Update manifest to reflect current source skills
+  writeFileSync(manifestPath, Array.from(sourceNames).sort().join('\n') + '\n', 'utf-8');
 
   return result;
 }
