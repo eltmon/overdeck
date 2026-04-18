@@ -79,6 +79,7 @@ import {
   hasConversationAttachment,
   isManagedConversationAttachmentPath,
   removeConversationAttachment,
+  cleanupUnreferencedConversationAttachments,
 } from '../services/conversation-attachments.js';
 
 const execAsync = promisify(exec);
@@ -615,6 +616,7 @@ const postConversationStopRoute = HttpRouter.add(
 
         await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
+        await cleanupUnreferencedConversationAttachments(conv);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
@@ -943,6 +945,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Mark as ended and archived
         markConversationEnded(name);
         archiveConversation(name);
+        await cleanupUnreferencedConversationAttachments(conv);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {

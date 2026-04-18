@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the conversations-db module
 const mockListConversations = vi.fn();
 const mockMarkConversationEnded = vi.fn();
-const mockCleanupConversationAttachments = vi.fn();
+const mockCleanupUnreferencedConversationAttachments = vi.fn();
 
 vi.mock('../../../../lib/database/conversations-db.js', () => ({
   listConversations: mockListConversations,
@@ -11,7 +11,7 @@ vi.mock('../../../../lib/database/conversations-db.js', () => ({
 }));
 
 vi.mock('../conversation-attachments.js', () => ({
-  cleanupConversationAttachments: mockCleanupConversationAttachments,
+  cleanupUnreferencedConversationAttachments: mockCleanupUnreferencedConversationAttachments,
 }));
 
 // Mock node:child_process so no real tmux processes are spawned
@@ -35,7 +35,9 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     expect(checker).toHaveBeenCalledWith('conv-gone-session');
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
-    expect(mockCleanupConversationAttachments).not.toHaveBeenCalled();
+    expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'gone-session' }),
+    );
   });
 
   it('does NOT mark conversations as ended when session checker returns true', async () => {
@@ -49,7 +51,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     await pollConversations(checker);
 
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
-    expect(mockCleanupConversationAttachments).not.toHaveBeenCalled();
+    expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
   });
 
   it('skips conversations with status "ended"', async () => {
@@ -65,7 +67,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     // checker should not be called — ended sessions are skipped
     expect(checker).not.toHaveBeenCalled();
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
-    expect(mockCleanupConversationAttachments).not.toHaveBeenCalled();
+    expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
   });
 
   it('handles empty conversation list without errors', async () => {
@@ -93,7 +95,10 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
-    expect(mockCleanupConversationAttachments).not.toHaveBeenCalled();
+    expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledTimes(1);
+    expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'gone' }),
+    );
   });
 
   it('does not throw when listConversations errors', async () => {

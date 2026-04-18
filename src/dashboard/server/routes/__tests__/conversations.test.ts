@@ -139,10 +139,9 @@ describe('conversations route — DB integration', () => {
     expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data or payload exceeds 5242880 bytes' });
   });
 
-  it('rejects attachment reuse across conversations and cleans up when explicitly archived', async () => {
+  it('rejects attachment reuse across conversations while preserving referenced uploads', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
-    const { cleanupConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
@@ -173,9 +172,7 @@ describe('conversations route — DB integration', () => {
     const rejectedResponse = await handleConversationMessage('other-conv', { message: `@${uploadedPath}\nhello` }, delivery);
     expect(rejectedResponse.status).toBe(400);
     expect(decodeJsonResponse(rejectedResponse)).toEqual({ error: 'One or more attached images are unavailable for this conversation' });
-
-    await cleanupConversationAttachments('owner-conv');
-    expect(existsSync(uploadedPath)).toBe(false);
+    expect(existsSync(uploadedPath)).toBe(true);
   });
 
   it('delete-image removes only conversation-owned uploads', async () => {
@@ -201,25 +198,38 @@ describe('conversations route — DB integration', () => {
     expect(existsSync(uploadedPath)).toBe(false);
   });
 
-  it('archive preserves uploaded attachments after archive and across restart cleanup', async () => {
-    const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+  it('archive prunes unreferenced uploads while preserving referenced ones', async () => {
+    const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
+    const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
 
+    const sessionFile = join(TEST_HOME, 'archived-session.jsonl');
+    updateSessionFile('archived-conv', sessionFile);
+
     const pngData = Buffer.from(Uint8Array.from([7, 8, 9, 10])).toString('base64');
-    const archivedUpload = await handleConversationImageUpload('archived-conv', {
-      filename: 'archived.png',
+    const keptUpload = await handleConversationImageUpload('archived-conv', {
+      filename: 'kept.png',
       data: pngData,
       mimeType: 'image/png',
     });
-    const archivedPath = decodeJsonResponse(archivedUpload).path as string;
-    expect(existsSync(archivedPath)).toBe(true);
+    const prunedUpload = await handleConversationImageUpload('archived-conv', {
+      filename: 'pruned.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+
+    const keptPath = decodeJsonResponse(keptUpload).path as string;
+    const prunedPath = decodeJsonResponse(prunedUpload).path as string;
+    writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `@${keptPath}\nkeep this` }] } })}\n`);
 
     markConversationEnded('archived-conv');
     archiveConversation('archived-conv');
+    await cleanupUnreferencedConversationAttachments({ name: 'archived-conv', sessionFile });
 
-    expect(existsSync(archivedPath)).toBe(true);
+    expect(existsSync(keptPath)).toBe(true);
+    expect(existsSync(prunedPath)).toBe(false);
   });
 
   it('creating and listing a conversation returns the right data', async () => {
