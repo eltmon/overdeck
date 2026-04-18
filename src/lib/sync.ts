@@ -816,6 +816,10 @@ export function mirrorProjectSkills(
     const targetPath = join(targetDir, entry.name);
     const targetExists = existsSync(targetPath);
 
+    // Ownership guard: if the target dir already exists but is not in the mirror manifest,
+    // it is user-managed — leave it untouched.
+    if (targetExists && !manifestNames.has(entry.name)) continue;
+
     // Track whether the target already had a SKILL.md (to distinguish added vs updated)
     const targetHadSkillMd = targetExists && (
       existsSync(join(targetPath, 'SKILL.md')) || existsSync(join(targetPath, 'skill.md'))
