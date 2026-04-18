@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync } from 'fs';
+import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, mkdtempSync } from 'fs';
 import { join } from 'path';
-import { TEMP_DIR } from '../setup.js';
+import { tmpdir } from 'os';
 
 /**
  * E2E tests for the work command flow
@@ -36,20 +36,24 @@ vi.mock('@linear/sdk', () => ({
 }));
 
 describe('E2E: Work Flow', () => {
-  const workspaceRoot = join(TEMP_DIR, 'workspaces');
-  const testWorkspace = join(workspaceRoot, 'TEST-42');
+  let tempDir: string;
+  let workspaceRoot: string;
+  let testWorkspace: string;
 
   beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'panopticon-work-flow-'));
+    workspaceRoot = join(tempDir, 'workspaces');
+    testWorkspace = join(workspaceRoot, 'TEST-42');
     mkdirSync(workspaceRoot, { recursive: true });
   });
 
   afterEach(() => {
-    if (existsSync(TEMP_DIR)) {
+    if (existsSync(tempDir)) {
       try {
-        rmSync(TEMP_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        rmSync(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
       } catch (error) {
         // Ignore cleanup errors in tests
-        console.warn('Failed to clean up TEMP_DIR:', error);
+        console.warn('Failed to clean up work flow temp dir:', error);
       }
     }
     vi.clearAllMocks();

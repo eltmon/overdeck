@@ -194,8 +194,8 @@ export function HealthDashboard() {
         {health.map((agent) => {
           const config = STATUS_CONFIG[agent.status];
           const Icon = config.icon;
-          // Parse per-project specialist session name: specialist-{projectKey}-{type}
-          const ephemeralMatch = agent.agentId.match(/^specialist-([a-z0-9]+)-(merge-agent|review-agent|test-agent)$/);
+          // Parse issue-scoped specialist session name: specialist-{projectKey}-{issueId}-{type}
+          const ephemeralMatch = agent.agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(merge-agent|review-agent|test-agent)$/);
           return (
             <div
               key={agent.agentId}
@@ -205,9 +205,14 @@ export function HealthDashboard() {
                 <div>
                   <div className="font-medium text-content flex items-center gap-2 flex-wrap">
                     {ephemeralMatch && (
-                      <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
-                        {ephemeralMatch[1].toUpperCase()}
-                      </span>
+                      <>
+                        <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
+                          {ephemeralMatch[1].toUpperCase()}
+                        </span>
+                        <span className="badge-bg-secondary text-primary px-1.5 py-0.5 rounded text-xs font-mono">
+                          {ephemeralMatch[2]}
+                        </span>
+                      </>
                     )}
                     {agent.agentId}
                   </div>

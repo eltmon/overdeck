@@ -141,7 +141,7 @@ describe('DetailPanelLayout', () => {
 
   describe('Issue 1 — specialist tab streaming with dead work agent', () => {
     it('renders TerminalPanel keyed to the review specialist session when the review phase is active, even when the work agent is stopped', async () => {
-      const reviewSession = 'specialist-panopticon-review-agent';
+      const reviewSession = 'specialist-panopticon-PAN-509-review-agent';
       mockPipelineResult = {
         phase: 'reviewing',
         activeSession: reviewSession,
@@ -343,7 +343,7 @@ describe('DetailPanelLayout', () => {
           {
             id: 'merging',
             label: 'Merge',
-            sessionName: 'specialist-panopticon-merge-agent',
+            sessionName: 'specialist-panopticon-PAN-509-merge-agent',
             isActive: false,
             disabled: false,
           } satisfies TerminalTab,
@@ -360,7 +360,7 @@ describe('DetailPanelLayout', () => {
     });
 
     it('clicking "View last specialist log" replaces MergedSummaryCard with TerminalPanel for the merge session', async () => {
-      const mergeSession = 'specialist-panopticon-merge-agent';
+      const mergeSession = 'specialist-panopticon-PAN-509-merge-agent';
       mockPipelineResult = {
         phase: 'merged',
         activeSession: null,

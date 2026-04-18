@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -42,15 +42,17 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 
 const mockGetAgentRuntimeState = vi.fn();
 const mockGetAgentState = vi.fn();
+const mockGetAgentDir = vi.fn();
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
-  getAgentDir: vi.fn().mockReturnValue('/tmp'),
+  getAgentDir: (...args: unknown[]) => mockGetAgentDir(...args),
   getAgentState: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
+  getReviewStatus: vi.fn().mockReturnValue(null),
 }));
 
 const mockResolveProjectFromIssue = vi.fn();
@@ -61,7 +63,7 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 // Import after mocks are in place
-import { checkOrphanedReviewStatuses } from '../../../src/lib/cloister/deacon.js';
+import { checkDeadEndAgents, checkOrphanedReviewStatuses } from '../../../src/lib/cloister/deacon.js';
 
 // ---------------------------------------------------------------------------
 // Test data and helpers
@@ -92,6 +94,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockGetAgentDir.mockImplementation((agentId: string) => join(homedir(), '.panopticon', 'agents', agentId));
+
     // Back up any existing review-status.json so tests are non-destructive
     if (existsSync(REVIEW_STATUS_FILE)) {
       originalContent = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
@@ -106,6 +110,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   });
 
   afterEach(() => {
+    rmSync(join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`), { recursive: true, force: true });
+
     // Restore original state to avoid polluting real Panopticon data
     if (originalContent !== null) {
       writeFileSync(REVIEW_STATUS_FILE, originalContent, 'utf-8');
@@ -274,5 +280,70 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(content[ISSUE_ID].reviewStatus).toBe('passed');
     expect(content[ISSUE_ID].testStatus).toBe('passed');
     expect(content[ISSUE_ID].readyForMerge).toBeTypeOf('boolean');
+  });
+
+  it('does not re-arm CI-blocked merge when merge retry ceiling is saturated', async () => {
+    const updatedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    writeStatusFile({
+      [ISSUE_ID]: {
+        issueId: ISSUE_ID,
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'failed',
+        mergeNotes: 'Merge blocked: failing required checks on PR',
+        mergeRetryCount: 3,
+        readyForMerge: false,
+        updatedAt,
+        history: [],
+      },
+    });
+
+    mockSessionExists.mockImplementation((sessionName: string) => sessionName === `agent-${ISSUE_ID.toLowerCase()}`);
+    mockGetAgentRuntimeState.mockReturnValue({
+      status: 'waiting',
+      lastHeartbeat: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    });
+
+    const actions = await checkDeadEndAgents();
+
+    expect(actions).toEqual([]);
+
+    const content = readStatusFile();
+    expect(content[ISSUE_ID].mergeStatus).toBe('failed');
+    expect(content[ISSUE_ID].readyForMerge).toBe(false);
+    expect(content[ISSUE_ID].mergeRetryCount).toBe(3);
+  });
+
+  it('does not re-dispatch pending review when the work agent was explicitly stopped', async () => {
+    const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'completed.processed'), 'done\n', 'utf-8');
+
+    writeStatusFile({
+      [ISSUE_ID]: {
+        issueId: ISSUE_ID,
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        mergeStatus: 'pending',
+        readyForMerge: false,
+        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/999',
+        history: [],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue({
+      workspace: '/workspaces/feature-pan-369-test',
+      status: 'stopped',
+      stoppedByUser: true,
+    });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(mockSpawnEphemeralSpecialist).not.toHaveBeenCalled();
+    expect(actions).toContain(`Skipped pending review for ${ISSUE_ID}: work agent was explicitly stopped`);
+
+    const content = readStatusFile();
+    expect(content[ISSUE_ID].reviewStatus).toBe('pending');
   });
 });

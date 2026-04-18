@@ -78,7 +78,10 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     staleTime: 60000,
   });
 
-  const projectKey = issue?.project?.id;
+  // Use repo name from sourceRepo (e.g. "eltmon/panopticon-cli" → "panopticon-cli")
+  // as the specialist session key. project.id includes "github-{owner}-" prefix which
+  // doesn't match the tmux session naming used by getTmuxSessionName.
+  const projectKey = issue?.sourceRepo ? issue.sourceRepo.split('/')[1] : undefined;
   const { phase, activeSession, availableTerminals, markSessionDead } = usePipelinePhase({
     issueId,
     agent,

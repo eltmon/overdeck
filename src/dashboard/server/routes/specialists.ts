@@ -21,8 +21,8 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   DELETE /api/specialists/:name/queue/:itemId
  *   PUT    /api/specialists/:name/queue/reorder
  *   POST   /api/specialists/:name/auto-complete
- *   GET    /api/specialists/:project/:type/status
- *   POST   /api/specialists/:project/:type/kill
+ *   GET    /api/specialists/:project/:issueId/:type/status
+ *   POST   /api/specialists/:project/:issueId/:type/kill
  *   GET    /api/specialists/:project/:type/queue
  *   POST   /api/specialists/:project/:type/spawn
  *   GET    /api/specialists/:project/:type/runs
@@ -563,7 +563,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const { messageAgent } = await import('../../../lib/agents.js');
 
           if (sessionExists(workAgentId)) {
-            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"`;
+            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then re-request review with: pan review request ${normalizedIssueId} -m "Fixed review issues"`;
             await messageAgent(workAgentId, reviewMsg);
             console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
           }
@@ -1093,14 +1093,15 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/specialists/:project/:type/status ────────────────────────
+// ─── Route: GET /api/specialists/:project/:issueId/:type/status ───────────────
 
 const getProjectSpecialistStatusRoute = HttpRouter.add(
   'GET',
-  '/api/specialists/:project/:type/status',
+  '/api/specialists/:project/:issueId/:type/status',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
@@ -1110,20 +1111,41 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       );
     }
 
-    const { getSpecialistStatus } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const status = yield* Effect.promise(() => getSpecialistStatus(type, project));
-    return jsonResponse(status);
+    const {
+      makeSpecialistRegistryKey,
+      getRunMetadata,
+      getTmuxSessionName,
+      isProjectSpecialistActivelyRunning,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const { getAgentRuntimeState } = yield* Effect.promise(() => import('../../../lib/agents.js'));
+
+    const registryKey = makeSpecialistRegistryKey(type, issueId);
+    const metadata = getRunMetadata(project, registryKey);
+    const tmuxSession = metadata.tmuxSession ?? getTmuxSessionName(type, project, issueId);
+    const runtimeState = getAgentRuntimeState(tmuxSession);
+    const isRunning = isProjectSpecialistActivelyRunning(runtimeState, metadata.currentRun !== null);
+
+    return jsonResponse({
+      name: type,
+      state: isRunning ? 'active' : 'sleeping',
+      isRunning,
+      tmuxSession,
+      currentIssue: issueId,
+      sessionId: metadata.sessionId,
+      contextTokens: undefined,
+    });
   })),
 );
 
-// ─── Route: POST /api/specialists/:project/:type/kill ────────────────────────
+// ─── Route: POST /api/specialists/:project/:issueId/:type/kill ───────────────
 
 const postProjectSpecialistKillRoute = HttpRouter.add(
   'POST',
-  '/api/specialists/:project/:type/kill',
+  '/api/specialists/:project/:issueId/:type/kill',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
@@ -1133,8 +1155,13 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const tmuxSession = getTmuxSessionName(type, project);
+    const { getTmuxSessionName, makeSpecialistRegistryKey, getRunMetadata } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+
+    const registryKey = makeSpecialistRegistryKey(type, issueId);
+    const tmuxSession = getRunMetadata(project, registryKey).tmuxSession
+      ?? getTmuxSessionName(type, project, issueId);
+
     yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
     // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
     saveAgentRuntimeState(tmuxSession, {
@@ -1143,7 +1170,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     });
     return jsonResponse({
       success: true,
-      message: `Killed ${type} (${project})`,
+      message: `Killed ${type} (${project}/${issueId})`,
     });
   })),
 );
@@ -1537,7 +1564,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
     const body = yield* readJsonBody;
-    const { status, notes } = body as { status?: string; notes?: string };
+    const { status, notes, issueId } = body as { status?: string; notes?: string; issueId?: string };
 
     if (!status || !['passed', 'failed', 'blocked'].includes(status)) {
       return jsonResponse(
@@ -1555,7 +1582,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
 
     const { signalSpecialistCompletion } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    signalSpecialistCompletion(project, type, { status, notes });
+    signalSpecialistCompletion(project, type, { status, notes }, issueId);
     return jsonResponse({
       success: true,
       message: 'Specialist completion signaled, grace period started',

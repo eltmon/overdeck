@@ -21,11 +21,11 @@ interface AgentOutputPanelProps {
   agentId: string;
 }
 
-// Parse specialist tmux session name: specialist-{projectKey}-{type}
-function parseSpecialistSession(agentId: string): { projectKey: string; type: string } | null {
-  const match = agentId.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+// Parse specialist tmux session name: specialist-{projectKey}-{issueId}-{type}
+function parseSpecialistSession(agentId: string): { projectKey: string; issueId: string; type: string } | null {
+  const match = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(review-agent|test-agent|merge-agent)$/);
   if (!match) return null;
-  return { projectKey: match[1], type: match[2] };
+  return { projectKey: match[1], issueId: match[2], type: match[3] };
 }
 
 // Derive issueId for work and planning agents: agent-pan-505 → PAN-505, planning-pan-503 → PAN-503
@@ -56,7 +56,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     queryKey: ['specialist-panel-status', agentId],
     queryFn: async () => {
       if (!specialist) return null;
-      const res = await fetch(`/api/specialists/${specialist.projectKey}/${specialist.type}/status`);
+      const res = await fetch(`/api/specialists/${specialist.projectKey}/${specialist.issueId}/${specialist.type}/status`);
       if (!res.ok) return null;
       return res.json() as Promise<{ isRunning: boolean; sessionId?: string }>;
     },

@@ -227,8 +227,10 @@ function clearReadySignal(agentId: string): void {
 }
 
 /**
- * Wait for SessionStart hook to signal ready (async - non-blocking)
- * Returns true if ready signal received, false if timeout
+ * Wait for agent to be ready (async - non-blocking).
+ * Primary: ready.json written by SessionStart hook.
+ * Fallback: tmux pane shows Claude's interactive prompt indicator.
+ * Returns true if ready signal received, false if timeout.
  */
 async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
@@ -247,6 +249,16 @@ async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise
         // File exists but invalid - keep waiting
       }
     }
+
+    // Fallback: check tmux pane for Claude's interactive prompt indicator.
+    // ready.json is currently not written by any hook (PAN-759), so this is the
+    // primary detection path for resumed/fresh-started agents.
+    try {
+      const pane = await capturePaneAsync(agentId, 200);
+      if (pane.includes('bypass permissions on') || pane.includes('⏵⏵')) {
+        return true;
+      }
+    } catch { /* non-fatal — session may not exist yet */ }
   }
 
   return false;
@@ -315,6 +327,7 @@ function markAgentRunning(state: AgentState): void {
 function markAgentStopped(state: AgentState): void {
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
+  (state as AgentState & { stoppedByUser?: boolean }).stoppedByUser = true;
 }
 
 // ============================================================================
@@ -1357,10 +1370,15 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
     const model = agentState.model || 'claude-sonnet-4-6';
     const providerExports = getProviderExportsForModel(model);
+    // Non-Anthropic models route through a proxy (ANTHROPIC_BASE_URL). Without an explicit
+    // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
+    // requests through the proxy → "unknown provider" 502. Always include --model when
+    // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
+    const resumeModelFlag = providerExports.includes('ANTHROPIC_BASE_URL') ? ` --model ${model}` : '';
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     const launcherContent = `#!/bin/bash
 export CI=1
-${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permissions --permission-mode bypassPermissions
+${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --dangerously-skip-permissions --permission-mode bypassPermissions
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;

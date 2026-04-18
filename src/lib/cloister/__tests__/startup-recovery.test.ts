@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { identifyOrphanedReviewingIssues } from '../service.js';
+import { identifyOrphanedReviewingIssues, parseSpecialistAgentSession } from '../service.js';
+
+describe('parseSpecialistAgentSession', () => {
+  it('parses issue-scoped specialist sessions', () => {
+    expect(parseSpecialistAgentSession('specialist-panopticon-cli-PAN-714-review-agent')).toEqual({
+      projectKey: 'panopticon-cli',
+      issueId: 'PAN-714',
+      specialistType: 'review-agent',
+    });
+  });
+
+  it('parses legacy project-scoped specialist sessions', () => {
+    expect(parseSpecialistAgentSession('specialist-panopticon-cli-review-agent')).toEqual({
+      projectKey: 'panopticon-cli',
+      specialistType: 'review-agent',
+    });
+  });
+
+  it('returns null for non-specialist sessions', () => {
+    expect(parseSpecialistAgentSession('agent-pan-714')).toBeNull();
+  });
+});
 
 describe('identifyOrphanedReviewingIssues', () => {
   it('returns empty array when no statuses exist', () => {
