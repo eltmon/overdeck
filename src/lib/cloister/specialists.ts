@@ -21,7 +21,8 @@ import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { loadCloisterConfig } from './config.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
-import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
+import { getProviderEnvForModel } from '../agents.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -78,31 +79,6 @@ async function resolveWorkspaceGitInfo(workspace: string | undefined, taskBranch
 }
 
 /**
- * Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for a model.
- * For non-Anthropic providers (Kimi, Z.AI, etc.), returns env vars needed
- * to redirect Claude Code API calls to the correct endpoint.
- */
-function getProviderEnvForModel(model: string): Record<string, string> {
-  const provider = getProviderForModel(model as ModelId);
-  if (provider.name === 'anthropic') return {};
-
-  // OpenRouter has its own key path
-  if (provider.name === 'openrouter') {
-    const { config } = loadYamlConfig();
-    const apiKey = config.apiKeys.openrouter;
-    if (apiKey) return getProviderEnv(provider, apiKey);
-    throw new Error(`OpenRouter API key not configured. Add your key in Settings before using model "${model}".`);
-  }
-
-  const { config } = loadYamlConfig();
-  const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
-  if (apiKey) {
-    return getProviderEnv(provider, apiKey);
-  }
-  throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
-}
-
-/**
  * Shell fragment that unsets every provider-routing env var a parent tmux server
  * may have leaked into its child sessions. The panopticon tmux server is long-lived
  * and inherits whatever env existed when it was spawned — so fresh Anthropic-model
@@ -120,6 +96,17 @@ const PROVIDER_ENV_UNSETS = [
 ];
 const PROVIDER_UNSET_LINES = PROVIDER_ENV_UNSETS.map(k => `unset ${k}`).join('\n');
 const PROVIDER_UNSET_CMD = `unset ${PROVIDER_ENV_UNSETS.join(' ')}`;
+
+/**
+ * Convert a providerEnv dict to bash export lines (re-export after PROVIDER_UNSET_LINES).
+ * Non-Anthropic models (e.g. gpt-5.4 via cliproxy) need ANTHROPIC_BASE_URL set in the
+ * script body — tmux -e flags are wiped by PROVIDER_UNSET_LINES before claude runs.
+ */
+function buildProviderExportLines(providerEnv: Record<string, string>): string {
+  const entries = Object.entries(providerEnv);
+  if (entries.length === 0) return '';
+  return entries.map(([k, v]) => `export ${k}="${v}"`).join('\n') + '\n';
+}
 
 /**
  * Build tmux -e flags for environment variables
@@ -993,11 +980,12 @@ ${basePrompt}`;
       loadYamlConfig().config.caveman
     );
 
+    const providerExportLines = buildProviderExportLines(providerEnv);
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
 ${PROVIDER_UNSET_LINES}
-export CI=1
+${providerExportLines}export CI=1
 export PANOPTICON_AGENT_ID="${tmuxSession}"
 export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
@@ -2195,10 +2183,11 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
 
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
+    const initProviderExportLines = buildProviderExportLines(providerEnv);
     writeFileSync(launcherScript, `#!/bin/bash
 cd "${cwd}"
 ${PROVIDER_UNSET_LINES}
-prompt=$(cat "${promptFile}")
+${initProviderExportLines}prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "${newSessionId}" --model ${model} "$prompt"
 `, { mode: 0o755 });
     setSessionId(name, newSessionId);
@@ -2423,7 +2412,11 @@ export async function wakeSpecialist(
       // signatures, making resumed sessions permanently fail (PAN-612).
       const effectiveSessionId = sessionId || randomUUID();
       if (!sessionId) setSessionId(name, effectiveSessionId);
-      const claudeCmd = `${PROVIDER_UNSET_CMD}; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      const providerExportCmd = Object.entries(providerEnv)
+        .map(([k, v]) => `export ${k}="${v}"`)
+        .join('; ');
+      const providerSetupCmd = providerExportCmd ? `${providerExportCmd}; ` : '';
+      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });
