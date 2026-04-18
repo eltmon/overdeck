@@ -14,6 +14,7 @@
 
 import { promises as fs } from 'fs';
 import { join, basename } from 'path';
+import { encodeClaudeProjectDir } from '../paths.js';
 import { homedir } from 'os';
 
 import {
@@ -259,20 +260,16 @@ function filterByMode(
     return files;
   }
 
-  const targetDirs =
-    opts.mode === 'targeted'
-      ? (opts.dirs ?? []).map(normalizeDir)
-      : (opts.watchDirs ?? []).map(normalizeDir);
+  const rawDirs = opts.mode === 'targeted' ? (opts.dirs ?? []) : (opts.watchDirs ?? []);
+  const targetDirs = rawDirs.map(normalizeDir);
 
   if (targetDirs.length === 0) return files;
 
-  return files.filter(({ projectDir }) => {
-    // projectDir is the hash dir; we need to match against resolved workspaces.
-    // Without resolving (which is expensive here), filter by directory prefix
-    // using the hash dir name — this is a best-effort filter that over-includes.
-    // The scanner tasks will skip those that don't match after full resolution.
-    return targetDirs.some((dir) => projectDir.startsWith(dir));
-  });
+  // Encode each target workspace path to its Claude project hash so we can
+  // match against the hash-named directories under ~/.claude/projects/.
+  const targetHashes = new Set(targetDirs.map(encodeClaudeProjectDir));
+
+  return files.filter(({ projectDir }) => targetHashes.has(basename(projectDir)));
 }
 
 function normalizeDir(dir: string): string {

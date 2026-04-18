@@ -8,7 +8,7 @@
  *   - Reports progress via optional callback
  */
 
-import { findDiscoveredSessions } from '../../database/discovered-sessions-db.js';
+import { findDiscoveredSessions, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
 import type { DiscoveredSession } from '../../database/discovered-sessions-db.js';
 import { runWithPool } from '../work-pool.js';
 import { enrichSession } from './enrich-session.js';
@@ -27,6 +27,8 @@ export interface EnrichOptions {
   maxParallel?: number;
   /** If true, skip sessions already enriched at this tier or higher */
   skipAlreadyEnriched?: boolean;
+  /** If true, bypass the cost confirmation threshold */
+  force?: boolean;
   /** Injected API caller for testing */
   callApi?: EnrichSessionOptions['callApi'];
   /** Progress callback */
@@ -72,7 +74,7 @@ function selectSessionsForEnrichment(
   if (opts.sessionIds && opts.sessionIds.length > 0) {
     // Explicit session list
     return opts.sessionIds
-      .map((id) => findDiscoveredSessions({ limit: 1, offset: 0 }).find((s) => s.id === id))
+      .map((id) => getDiscoveredSessionById(id))
       .filter((s): s is DiscoveredSession => s != null);
   }
 
@@ -119,7 +121,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   // Cost gate: check against threshold
   const estimatedCost = estimateEnrichmentCost(sessions.length, tier);
   const threshold = config.enrichment.costConfirmThreshold;
-  if (estimatedCost > threshold) {
+  if (estimatedCost > threshold && !opts.force) {
     // Callers can check the threshold themselves before calling.
     // We throw to make the gate explicit — CLI will catch and prompt user.
     throw new CostThresholdError(estimatedCost, threshold, sessions.length);

@@ -6,7 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, RefreshCw, Zap, BarChart2, Filter } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 import { SessionTable } from './SessionTable';
 import { SessionDetail } from './SessionDetail';
 import { ScanButton } from './ScanButton';
@@ -228,7 +228,3 @@ export function ConversationsPage() {
   );
 }
 
-// Suppress unused import warnings
-void BarChart2;
-void Zap;
-void RefreshCw;

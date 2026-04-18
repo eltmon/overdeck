@@ -75,6 +75,7 @@ export async function enrichAction(opts: Record<string, string | boolean | undef
         tier,
         sessionIds,
         maxParallel,
+        force: true,
       });
       console.log(`  Enriched: ${chalk.green(result.enriched)}, Errors: ${chalk.red(result.errors)}`);
     } else {
