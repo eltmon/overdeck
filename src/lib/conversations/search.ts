@@ -20,6 +20,8 @@
 import {
   findDiscoveredSessions,
   countDiscoveredSessions,
+  countFts,
+  countFtsInSet,
   searchFts,
   loadEmbeddings,
   getEmbedding,
@@ -237,19 +239,20 @@ export function searchSessions(query: SearchQuery): SearchResult {
     let sessions: DiscoveredSession[];
     let total: number;
     if (hasFilter) {
-      // Apply structured filter then intersect with FTS result IDs
+      // Apply structured filter then intersect with FTS result IDs.
+      // Total = count of filter results that also match the FTS query (true intersection).
       const filter = normalizeFilter(query.filter, undefined, undefined);
       const allFiltered = findDiscoveredSessions(filter);
-      // Preserve FTS rank order
+      total = countFtsInSet(query.q!, allFiltered.map((s) => s.id));
+      // Preserve FTS rank order for the page
       const rankMap = new Map(ftsMatches.map((m, i) => [m.id, i]));
-      const matched = allFiltered
+      sessions = allFiltered
         .filter((s) => ftsIds.has(s.id))
-        .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999));
-      total = matched.length;
-      sessions = matched.slice(offset, offset + limit);
+        .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999))
+        .slice(offset, offset + limit);
     } else {
-      // FTS only — total is the number of FTS matches (bounded by over-fetch cap)
-      total = ftsMatches.length;
+      // FTS only — use COUNT query for true total (not bounded by over-fetch cap)
+      total = countFts(query.q!);
       sessions = ftsMatches
         .slice(offset, offset + limit)
         .map((m) => getDiscoveredSessionById(m.id))
@@ -288,12 +291,15 @@ export function searchSessions(query: SearchQuery): SearchResult {
     .map((id) => getDiscoveredSessionById(id))
     .filter((s): s is DiscoveredSession => s != null);
 
+  // True FTS match count for total — not bounded by the over-fetch cap
+  const ftsTotal = countFts(query.q!);
+
   if (!refEmbedding || candidates.length === 0) {
     // Fall back to FTS order
     const sessions = candidates.slice(offset, offset + limit);
     return {
       sessions,
-      total: candidates.length,
+      total: ftsTotal,
       mode: 'semantic+fts',
       durationMs: Date.now() - start,
     };
@@ -314,7 +320,7 @@ export function searchSessions(query: SearchQuery): SearchResult {
   const sessions = scored.slice(offset, offset + limit).map((x) => x.session);
   return {
     sessions,
-    total: scored.length,
+    total: ftsTotal,
     mode: 'semantic+fts',
     durationMs: Date.now() - start,
   };

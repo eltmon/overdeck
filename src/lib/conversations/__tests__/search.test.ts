@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 import { parseRelativeTime, cosineSimilarity, searchSessions } from '../search.js';
-import { upsertDiscoveredSession } from '../../database/discovered-sessions-db.js';
+import { upsertDiscoveredSession, updateEnrichment } from '../../database/discovered-sessions-db.js';
 
 let TEST_HOME: string;
 
@@ -186,6 +186,13 @@ describe('searchSessions', () => {
     expect(result.sessions[0].tags).toContain('large');
   });
 
+  it('filter total reflects unpaginated match count (not page size)', () => {
+    // 3 sessions seeded in beforeEach; request page of 1
+    const result = searchSessions({ limit: 1, offset: 0 });
+    expect(result.sessions.length).toBe(1);
+    expect(result.total).toBe(3); // true count, not the page
+  });
+
   it('since=yesterday with recent sessions finds them', async () => {
     const { resetDatabase } = await import('../../database/index.js');
     resetDatabase();
@@ -214,5 +221,62 @@ describe('searchSessions', () => {
     });
     const result = searchSessions({ filter: { since: 'today' } });
     expect(result.sessions.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ─── FTS total accuracy (not bounded by over-fetch cap) ───────────────────────
+
+describe('FTS total is not derived from the capped candidate slice', () => {
+  beforeEach(async () => {
+    // Seed 5 sessions all with the same distinctive keyword in their summaries
+    for (let i = 1; i <= 5; i++) {
+      const s = upsertDiscoveredSession({
+        jsonlPath: `/fts-total/${i}.jsonl`,
+        workspacePath: `/home/user/Projects/proj${i}`,
+        workspaceHash: `hfts${i}`,
+        messageCount: 2,
+        firstTs: '2025-01-01T00:00:00Z',
+        lastTs: '2025-01-01T01:00:00Z',
+        modelsUsed: ['claude-sonnet-4-6'],
+        primaryModel: 'claude-sonnet-4-6',
+        tokenInput: 50,
+        tokenOutput: 100,
+        estimatedCost: 0.005,
+        toolsUsed: [],
+        filesTouched: [],
+        panopticonManaged: false,
+        panIssueId: null,
+        panAgentId: null,
+        fileSize: 512,
+        fileMtime: '2025-01-01T00:00:00Z',
+        tags: [],
+      });
+      updateEnrichment(s.id, {
+        enrichmentLevel: 1,
+        enrichmentModel: 'claude-haiku-4-5',
+        summary: `cache eviction bugfix in session ${i}`,
+      });
+    }
+  });
+
+  it('FTS total reflects true match count, not the paginated slice', () => {
+    // Request only 2 of the 5 matching sessions
+    const result = searchSessions({ q: 'cache eviction bugfix', limit: 2, offset: 0 });
+    expect(result.sessions.length).toBeLessThanOrEqual(2);
+    // total must be 5 (all matching sessions), not 2 (page size)
+    expect(result.total).toBe(5);
+  });
+
+  it('FTS with filter: total uses true intersection count, not over-fetch cap', () => {
+    // Only 3 of the 5 sessions are in proj1/proj2/proj3 workspaces
+    const result = searchSessions({
+      q: 'cache eviction bugfix',
+      filter: { workspacePath: '/home/user/Projects/proj1' },
+      limit: 1,
+      offset: 0,
+    });
+    expect(result.sessions.length).toBeLessThanOrEqual(1);
+    // total = sessions matching both the FTS query AND the workspace filter
+    expect(result.total).toBe(1);
   });
 });

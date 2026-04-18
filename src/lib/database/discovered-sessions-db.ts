@@ -459,6 +459,45 @@ export function searchFts(query: string, limit = 50): FtsSearchResult[] {
   }
 }
 
+/**
+ * Count total FTS5 matches for a query without a LIMIT.
+ * Returns 0 for malformed queries instead of throwing.
+ */
+export function countFts(query: string): number {
+  const db = getDatabase();
+  try {
+    const row = db
+      .prepare(`SELECT COUNT(*) AS cnt FROM sessions_fts WHERE sessions_fts MATCH ?`)
+      .get(query) as { cnt: number } | undefined;
+    return row?.cnt ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Count sessions that match both a FTS5 query and a restricted set of row IDs.
+ * Queries discovered_sessions (not the FTS virtual table) to avoid FTS5 quirks
+ * with COUNT(*) and rowid IN constraints on content= tables.
+ */
+export function countFtsInSet(query: string, ids: number[]): number {
+  if (ids.length === 0) return 0;
+  const db = getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  try {
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS cnt FROM discovered_sessions
+         WHERE id IN (${placeholders})
+         AND id IN (SELECT rowid FROM sessions_fts WHERE sessions_fts MATCH ?)`,
+      )
+      .get(...ids, query) as { cnt: number } | undefined;
+    return row?.cnt ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 // ─── Embedding operations ─────────────────────────────────────────────────────
 
 /**
