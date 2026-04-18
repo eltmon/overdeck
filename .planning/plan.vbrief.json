@@ -4,7 +4,7 @@
     "created": "2026-04-14T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-539: feat: image paste support in activity view conversation",
-    "updated": "2026-04-18T15:18:09.455Z"
+    "updated": "2026-04-18T15:32:48.715Z"
   },
   "plan": {
     "id": "pan-539",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "98b075a7-1b94-424a-a207-2f08a540f02b",
     "author": "agent:claude-sonnet-4-6",
-    "sequence": 47,
+    "sequence": 52,
     "created": "2026-04-14T00:00:00.000Z",
-    "updated": "2026-04-18T15:18:09.455Z",
+    "updated": "2026-04-18T15:32:48.715Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/539",
@@ -93,7 +93,7 @@
             "completed": "2026-04-15T22:40:48.096Z"
           }
         ],
-        "completed": "2026-04-18T15:18:09.455Z"
+        "completed": "2026-04-18T15:32:48.715Z"
       },
       {
         "id": "server-cleanup-interval",
@@ -137,7 +137,7 @@
             "completed": "2026-04-15T22:40:48.096Z"
           }
         ],
-        "completed": "2026-04-18T15:18:09.455Z"
+        "completed": "2026-04-18T15:32:48.715Z"
       },
       {
         "id": "frontend-paste-drop",
@@ -199,7 +199,7 @@
             "completed": "2026-04-15T22:40:48.094Z"
           }
         ],
-        "completed": "2026-04-18T15:18:09.455Z"
+        "completed": "2026-04-18T15:32:48.715Z"
       },
       {
         "id": "frontend-thumbnail-preview",
@@ -252,7 +252,7 @@
             "completed": "2026-04-15T22:40:48.094Z"
           }
         ],
-        "completed": "2026-04-18T15:18:09.455Z"
+        "completed": "2026-04-18T15:32:48.715Z"
       },
       {
         "id": "frontend-message-injection",
@@ -305,7 +305,7 @@
             "completed": "2026-04-15T22:40:48.093Z"
           }
         ],
-        "completed": "2026-04-18T15:18:09.454Z"
+        "completed": "2026-04-18T15:32:48.714Z"
       }
     ],
     "edges": [
