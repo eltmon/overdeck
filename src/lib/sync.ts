@@ -667,7 +667,10 @@ export interface SkillsMirrorResult {
  *
  * @param cwd Working directory to check (defaults to process.cwd())
  */
-export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorResult {
+export function mirrorProjectSkills(
+  cwd: string = process.cwd(),
+  opts?: { manifestDir?: string },
+): SkillsMirrorResult {
   const result: SkillsMirrorResult = { added: [], updated: [], removed: [] };
   const sourceDir = join(cwd, 'skills');
   const targetDir = join(cwd, '.claude', 'skills');
@@ -692,6 +695,26 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
 
   mkdirSync(targetDir, { recursive: true });
 
+  // If .claude/skills/.gitignore lists skill-name-like entries, treat the dir as
+  // "gitignore-managed": only create NEW dirs for skills already listed there.
+  // This prevents pan sync from creating untracked files in repos (like panopticon-cli
+  // itself) where .claude/skills/ has a mix of tracked and gitignored content.
+  // Existing dirs (already tracked or gitignored) are always updated regardless.
+  const gitignorePath = join(targetDir, '.gitignore');
+  const gitignoreSkillEntries = new Set<string>();
+  const skillNameRe = /^[a-z][a-z0-9-]+$/;
+  try {
+    if (existsSync(gitignorePath)) {
+      for (const line of readFileSync(gitignorePath, 'utf-8').split('\n')) {
+        const entry = line.trim();
+        if (entry && !entry.startsWith('#') && skillNameRe.test(entry)) {
+          gitignoreSkillEntries.add(entry);
+        }
+      }
+    }
+  } catch { /* non-fatal */ }
+  const gitignoreManaged = gitignoreSkillEntries.size > 0;
+
   // Mirror source skill dirs → target
   const sourceNames = new Set<string>();
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
@@ -710,6 +733,12 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
     const sourceContent = readFileSync(sourceSkillMd, 'utf-8');
 
     if (!existsSync(targetPath)) {
+      if (gitignoreManaged && !gitignoreSkillEntries.has(entry.name)) {
+        // Skip: creating this dir would leave an untracked file in a gitignore-managed
+        // .claude/skills/ dir. Exclude it from the manifest too.
+        sourceNames.delete(entry.name);
+        continue;
+      }
       mkdirSync(targetPath, { recursive: true });
       writeFileSync(targetSkillMd, sourceContent, 'utf-8');
       result.added.push(entry.name);
@@ -741,9 +770,18 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
     }
   }
 
+  const sortedNames = Array.from(sourceNames).sort();
+
+  // Manifest lives outside the repo to avoid creating untracked files in .claude/skills/.
+  // Default: ~/.panopticon/state/mirrors/<escaped-cwd>/manifest
+  // Testable via opts.manifestDir.
+  const manifestDir =
+    opts?.manifestDir ??
+    join(homedir(), '.panopticon', 'state', 'mirrors', cwd.replace(/[/\\:]/g, '_'));
+  mkdirSync(manifestDir, { recursive: true });
   // Read manifest of previously mirrored skills so we only delete mirror-managed entries,
   // leaving canonical .claude/skills/ dirs (e.g. checked-in skills) untouched.
-  const manifestPath = join(targetDir, '.mirror-manifest');
+  const manifestPath = join(manifestDir, 'manifest');
   const manifestNames = new Set<string>();
   try {
     const content = readFileSync(manifestPath, 'utf-8');
@@ -769,7 +807,7 @@ export function mirrorProjectSkills(cwd: string = process.cwd()): SkillsMirrorRe
   }
 
   // Update manifest to reflect current source skills
-  writeFileSync(manifestPath, Array.from(sourceNames).sort().join('\n') + '\n', 'utf-8');
+  writeFileSync(manifestPath, sortedNames.join('\n') + '\n', 'utf-8');
 
   return result;
 }

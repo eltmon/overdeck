@@ -6,9 +6,11 @@
  *  - no-op when skills/ has no SKILL.md files
  *  - adds new skill dirs (with SKILL.md)
  *  - updates a SKILL.md when source content changes (reports 1 updated)
- *  - removes a .claude/skills/ dir that no longer exists in skills/
- *  - preserves .claude/skills/.gitignore untouched
+ *  - removes a .claude/skills/ dir that was previously mirrored but no longer in source
+ *  - preserves .claude/skills/.gitignore untouched (mirror does not write to it)
  *  - skills with lowercase skill.md are recognised and mirrored
+ *  - manifest stored outside .claude/skills/ — no untracked files created in the repo
+ *  - idempotent: repeated runs with same skills produce no new files
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -21,11 +23,13 @@ describe('mirrorProjectSkills', () => {
   let cwd: string;
   let skillsDir: string;
   let claudeSkillsDir: string;
+  let manifestDir: string;
 
   beforeEach(() => {
     cwd = mkdtempSync(join(tmpdir(), 'pan-mirror-test-'));
     skillsDir = join(cwd, 'skills');
     claudeSkillsDir = join(cwd, '.claude', 'skills');
+    manifestDir = join(cwd, '_manifest'); // outside .claude/skills/ — simulates external storage
   });
 
   afterEach(() => {
@@ -39,7 +43,7 @@ describe('mirrorProjectSkills', () => {
   }
 
   it('is a no-op when skills/ directory does not exist', () => {
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
     expect(result).toEqual({ added: [], updated: [], removed: [] });
     expect(existsSync(claudeSkillsDir)).toBe(false);
   });
@@ -48,7 +52,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(skillsDir, 'not-a-skill'), { recursive: true });
     writeFileSync(join(skillsDir, 'not-a-skill', 'README.md'), '# not a skill', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
     expect(result).toEqual({ added: [], updated: [], removed: [] });
     expect(existsSync(claudeSkillsDir)).toBe(false);
   });
@@ -56,7 +60,7 @@ describe('mirrorProjectSkills', () => {
   it('adds a new skill directory and SKILL.md when missing from target', () => {
     createSkill('pan-help', '# Help\nUse pan help.');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.added).toEqual(['pan-help']);
     expect(result.updated).toEqual([]);
@@ -71,7 +75,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'), '# Help\nStale.', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.added).toEqual([]);
     expect(result.updated).toEqual(['pan-help']);
@@ -84,7 +88,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'), '# Help\nSame content.', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result).toEqual({ added: [], updated: [], removed: [] });
   });
@@ -94,22 +98,22 @@ describe('mirrorProjectSkills', () => {
     // Target has a stale dir that was previously managed by the mirror
     mkdirSync(join(claudeSkillsDir, 'old-skill'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'old-skill', 'SKILL.md'), '# Old\n', 'utf-8');
-    // Manifest records it as previously mirrored
-    mkdirSync(claudeSkillsDir, { recursive: true });
-    writeFileSync(join(claudeSkillsDir, '.mirror-manifest'), 'old-skill\n', 'utf-8');
+    // Manifest records it as previously mirrored (written to external manifestDir)
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'manifest'), 'old-skill\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.removed).toContain('old-skill');
     expect(existsSync(join(claudeSkillsDir, 'old-skill'))).toBe(false);
   });
 
-  it('preserves .claude/skills/.gitignore untouched', () => {
+  it('preserves .claude/skills/.gitignore untouched (mirror does not write to it)', () => {
     createSkill('pan-help', '# Help');
     mkdirSync(claudeSkillsDir, { recursive: true });
     writeFileSync(join(claudeSkillsDir, '.gitignore'), '*.log\n', 'utf-8');
 
-    mirrorProjectSkills(cwd);
+    mirrorProjectSkills(cwd, { manifestDir });
 
     expect(existsSync(join(claudeSkillsDir, '.gitignore'))).toBe(true);
     expect(readFileSync(join(claudeSkillsDir, '.gitignore'), 'utf-8')).toBe('*.log\n');
@@ -118,7 +122,7 @@ describe('mirrorProjectSkills', () => {
   it('recognises lowercase skill.md and mirrors it as SKILL.md in target', () => {
     createSkill('workspace-add-repo', '# Workspace\nAdd repo.', 'skill.md');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.added).toContain('workspace-add-repo');
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
@@ -132,7 +136,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), content, 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     // Filename must be normalized: SKILL.md created, skill.md removed
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
@@ -148,7 +152,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), '# Workspace\nStale content.', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.updated).toEqual(['workspace-add-repo']);
     // New canonical SKILL.md must exist with updated content
@@ -164,7 +168,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'pan-help', 'README.md'), '# Other\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.added).toEqual(['pan-help']);
     expect(result.updated).toEqual([]);
@@ -179,12 +183,58 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'test-specialist-workflow'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'test-specialist-workflow', 'SKILL.md'), '# Test Specialist\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.removed).not.toContain('conv-lookup');
     expect(result.removed).not.toContain('test-specialist-workflow');
     expect(existsSync(join(claudeSkillsDir, 'conv-lookup'))).toBe(true);
     expect(existsSync(join(claudeSkillsDir, 'test-specialist-workflow'))).toBe(true);
+  });
+
+  it('does not create new dirs for skills not listed in a managed .gitignore', () => {
+    // Simulates panopticon-cli repo: .claude/skills/.gitignore lists known skills,
+    // a new skill (not yet listed) must not be created as an untracked file.
+    createSkill('pan-help', '# Help');
+    createSkill('new-unlisted-skill', '# New');
+    mkdirSync(claudeSkillsDir, { recursive: true });
+    // .gitignore lists pan-help (gitignore-managed) but NOT new-unlisted-skill
+    writeFileSync(join(claudeSkillsDir, '.gitignore'), 'pan-help\n', 'utf-8');
+
+    const result = mirrorProjectSkills(cwd, { manifestDir });
+
+    expect(result.added).toContain('pan-help');
+    expect(result.added).not.toContain('new-unlisted-skill');
+    expect(existsSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(claudeSkillsDir, 'new-unlisted-skill'))).toBe(false);
+  });
+
+  it('does not create .mirror-manifest inside .claude/skills/ (no untracked repo files)', () => {
+    createSkill('pan-help', '# Help');
+
+    mirrorProjectSkills(cwd, { manifestDir });
+
+    // Manifest must NOT appear inside the target skills dir (would create untracked repo files)
+    expect(existsSync(join(claudeSkillsDir, '.mirror-manifest'))).toBe(false);
+    // Manifest IS written to the external manifestDir
+    expect(existsSync(join(manifestDir, 'manifest'))).toBe(true);
+  });
+
+  it('does not modify files in .claude/skills/ on repeated runs with unchanged skills (idempotent)', () => {
+    createSkill('pan-help', '# Help\nContent.');
+
+    mirrorProjectSkills(cwd, { manifestDir });
+
+    // Record all files in claudeSkillsDir after first run
+    const skillMdPath = join(claudeSkillsDir, 'pan-help', 'SKILL.md');
+    const contentAfterFirst = readFileSync(skillMdPath, 'utf-8');
+    const manifestAfterFirst = readFileSync(join(manifestDir, 'manifest'), 'utf-8');
+
+    mirrorProjectSkills(cwd, { manifestDir });
+
+    expect(readFileSync(skillMdPath, 'utf-8')).toBe(contentAfterFirst);
+    expect(readFileSync(join(manifestDir, 'manifest'), 'utf-8')).toBe(manifestAfterFirst);
+    // No new entries in .claude/skills/
+    expect(existsSync(join(claudeSkillsDir, '.mirror-manifest'))).toBe(false);
   });
 
   it('handles multiple skills in a single pass', () => {
@@ -193,11 +243,11 @@ describe('mirrorProjectSkills', () => {
     // Stale mirror-managed skill in target
     mkdirSync(join(claudeSkillsDir, 'old-removed'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'old-removed', 'SKILL.md'), '# Old\n', 'utf-8');
-    // Manifest records it as previously mirrored
-    mkdirSync(claudeSkillsDir, { recursive: true });
-    writeFileSync(join(claudeSkillsDir, '.mirror-manifest'), 'old-removed\n', 'utf-8');
+    // Manifest records it as previously mirrored (written to external manifestDir)
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'manifest'), 'old-removed\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd);
+    const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.added.sort()).toEqual(['commit', 'pan-help']);
     expect(result.removed).toContain('old-removed');
