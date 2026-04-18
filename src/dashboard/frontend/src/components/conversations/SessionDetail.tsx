@@ -47,6 +47,8 @@ export function SessionDetail({ session, onClose }: Props) {
     mutationFn: (tier: number) => enrichSession(session.id, tier),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
+      void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-search'] });
+      void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
     },
   });
 

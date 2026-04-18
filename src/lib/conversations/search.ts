@@ -285,14 +285,23 @@ export function searchSessions(query: SearchQuery): SearchResult {
   // similarTo + q: get FTS candidates, re-rank by cosine similarity
   const refEmbedding = getEmbedding(query.similarTo!, embeddingModel);
   const ftsMatches = searchFts(query.q!, limit * 5);
-  const ftsIds = ftsMatches.map((m) => m.id);
 
-  const candidates = ftsIds
-    .map((id) => getDiscoveredSessionById(id))
-    .filter((s): s is DiscoveredSession => s != null);
-
-  // True FTS match count for total — not bounded by the over-fetch cap
-  const ftsTotal = countFts(query.q!);
+  let candidates: DiscoveredSession[];
+  let ftsTotal: number;
+  if (hasFilter) {
+    // Intersect FTS candidates with filter constraints so results respect all filters
+    const filter = normalizeFilter(query.filter, undefined, undefined);
+    const allFiltered = findDiscoveredSessions(filter);
+    const ftsIdSet = new Set(ftsMatches.map((m) => m.id));
+    candidates = allFiltered.filter((s) => ftsIdSet.has(s.id));
+    ftsTotal = countFtsInSet(query.q!, allFiltered.map((s) => s.id));
+  } else {
+    const ftsIds = ftsMatches.map((m) => m.id);
+    candidates = ftsIds
+      .map((id) => getDiscoveredSessionById(id))
+      .filter((s): s is DiscoveredSession => s != null);
+    ftsTotal = countFts(query.q!);
+  }
 
   if (!refEmbedding || candidates.length === 0) {
     // Fall back to FTS order

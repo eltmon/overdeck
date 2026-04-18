@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 import { parseRelativeTime, cosineSimilarity, searchSessions } from '../search.js';
-import { upsertDiscoveredSession, updateEnrichment } from '../../database/discovered-sessions-db.js';
+import { upsertDiscoveredSession, updateEnrichment, insertEmbedding } from '../../database/discovered-sessions-db.js';
 
 let TEST_HOME: string;
 
@@ -278,5 +278,72 @@ describe('FTS total is not derived from the capped candidate slice', () => {
     expect(result.sessions.length).toBeLessThanOrEqual(1);
     // total = sessions matching both the FTS query AND the workspace filter
     expect(result.total).toBe(1);
+  });
+});
+
+// ─── Strategy 4: semantic+FTS with filter (regression for PAN-457 review) ─────
+
+describe('semantic+FTS search respects filter constraints', () => {
+  const MODEL = 'text-embedding-3-small';
+
+  beforeEach(async () => {
+    // Seed 4 sessions: 2 in workspace-A, 2 in workspace-B
+    // All share a distinctive keyword in summaries
+    for (let i = 1; i <= 4; i++) {
+      const workspace = i <= 2 ? '/home/user/Projects/workspace-A' : '/home/user/Projects/workspace-B';
+      const s = upsertDiscoveredSession({
+        jsonlPath: `/semantic-filter/${i}.jsonl`,
+        workspacePath: workspace,
+        workspaceHash: `hsf${i}`,
+        messageCount: 3,
+        firstTs: '2025-02-01T00:00:00Z',
+        lastTs: '2025-02-01T01:00:00Z',
+        modelsUsed: ['claude-sonnet-4-6'],
+        primaryModel: 'claude-sonnet-4-6',
+        tokenInput: 100,
+        tokenOutput: 200,
+        estimatedCost: 0.01,
+        toolsUsed: [],
+        filesTouched: [],
+        panopticonManaged: false,
+        panIssueId: null,
+        panAgentId: null,
+        fileSize: 512,
+        fileMtime: '2025-02-01T00:00:00Z',
+        tags: [],
+      });
+      updateEnrichment(s.id, {
+        enrichmentLevel: 1,
+        enrichmentModel: 'claude-haiku-4-5',
+        summary: `tokenizer refactor session ${i}`,
+      });
+      // Insert a simple embedding so semantic re-ranking can run
+      const emb = new Float32Array(4).fill(i * 0.1);
+      insertEmbedding(s.id, MODEL, emb);
+    }
+  });
+
+  it('filter excludes sessions outside requested workspace', () => {
+    // similarTo=session 1 (workspace-A); q matches all 4; filter restricts to workspace-A
+    const result = searchSessions({
+      q: 'tokenizer refactor',
+      similarTo: 1,
+      embeddingModel: MODEL,
+      filter: { workspacePath: '/home/user/Projects/workspace-A' },
+    });
+    expect(result.mode).toBe('semantic+fts');
+    expect(result.sessions.length).toBeGreaterThanOrEqual(1);
+    expect(result.sessions.every((s) => s.workspacePath === '/home/user/Projects/workspace-A')).toBe(true);
+  });
+
+  it('total reflects filtered intersection, not global FTS count', () => {
+    const result = searchSessions({
+      q: 'tokenizer refactor',
+      similarTo: 1,
+      embeddingModel: MODEL,
+      filter: { workspacePath: '/home/user/Projects/workspace-A' },
+    });
+    // Only 2 of 4 sessions are in workspace-A
+    expect(result.total).toBe(2);
   });
 });
