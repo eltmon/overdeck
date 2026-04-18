@@ -23,6 +23,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import {
   findDiscoveredSessions,
+  countDiscoveredSessions,
   getDiscoveredSessionById,
   getDiscoveredStats,
 } from '../../../lib/database/discovered-sessions-db.js';
@@ -74,7 +75,8 @@ const listRoute = HttpRouter.add(
     if (params.has('not_enriched')) filter.notEnriched = true;
 
     const sessions = findDiscoveredSessions(filter);
-    return jsonResponse({ sessions, count: sessions.length });
+    const total = countDiscoveredSessions({ ...filter, limit: undefined, offset: undefined });
+    return jsonResponse({ sessions, count: sessions.length, total });
   })),
 );
 
@@ -203,6 +205,7 @@ const postScanRoute = HttpRouter.add(
       mode?: string;
       dryRun?: boolean;
       maxParallel?: number;
+      dirs?: string[];
     };
 
     const VALID_MODES = new Set(['system', 'watched', 'targeted']);
@@ -211,6 +214,11 @@ const postScanRoute = HttpRouter.add(
       return jsonResponse({ error: `Invalid mode: must be one of system, watched, targeted` }, { status: 400 });
     }
     const mode = rawMode as 'system' | 'watched' | 'targeted';
+
+    if (mode === 'targeted' && (!Array.isArray(body.dirs) || body.dirs.length === 0)) {
+      return jsonResponse({ error: 'targeted mode requires a non-empty dirs array' }, { status: 400 });
+    }
+
     const maxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
 
     const watchDirs = getConversationsConfig().watchDirs;
@@ -218,6 +226,7 @@ const postScanRoute = HttpRouter.add(
       scan({
         mode,
         watchDirs,
+        dirs: body.dirs,
         dryRun: body.dryRun,
         maxParallel,
       }),

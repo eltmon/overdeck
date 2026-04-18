@@ -19,6 +19,7 @@
 
 import {
   findDiscoveredSessions,
+  countDiscoveredSessions,
   searchFts,
   loadEmbeddings,
   getEmbedding,
@@ -212,11 +213,12 @@ export function searchSessions(query: SearchQuery): SearchResult {
 
   // ── Strategy 1: filter only ──────────────────────────────────────────────
   if (!hasQ && !hasSimilarTo) {
+    const total = countDiscoveredSessions(normalizeFilter(query.filter, undefined, undefined));
     const filter = normalizeFilter(query.filter, limit, offset);
     const sessions = findDiscoveredSessions(filter);
     return {
       sessions,
-      total: sessions.length,
+      total,
       mode: 'filter',
       durationMs: Date.now() - start,
     };
@@ -233,18 +235,21 @@ export function searchSessions(query: SearchQuery): SearchResult {
 
     // Fetch sessions in FTS rank order
     let sessions: DiscoveredSession[];
+    let total: number;
     if (hasFilter) {
       // Apply structured filter then intersect with FTS result IDs
       const filter = normalizeFilter(query.filter, undefined, undefined);
       const allFiltered = findDiscoveredSessions(filter);
       // Preserve FTS rank order
       const rankMap = new Map(ftsMatches.map((m, i) => [m.id, i]));
-      sessions = allFiltered
+      const matched = allFiltered
         .filter((s) => ftsIds.has(s.id))
-        .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999))
-        .slice(offset, offset + limit);
+        .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999));
+      total = matched.length;
+      sessions = matched.slice(offset, offset + limit);
     } else {
-      // FTS only — fetch each session by ID preserving rank order
+      // FTS only — total is the number of FTS matches (bounded by over-fetch cap)
+      total = ftsMatches.length;
       sessions = ftsMatches
         .slice(offset, offset + limit)
         .map((m) => getDiscoveredSessionById(m.id))
@@ -253,7 +258,7 @@ export function searchSessions(query: SearchQuery): SearchResult {
 
     return {
       sessions,
-      total: sessions.length,
+      total,
       mode: hasFilter ? 'fts+filter' : 'fts',
       durationMs: Date.now() - start,
     };
@@ -263,10 +268,11 @@ export function searchSessions(query: SearchQuery): SearchResult {
   if (hasSimilarTo && !hasQ) {
     const filter = normalizeFilter(query.filter, undefined, undefined);
     const allSessions = findDiscoveredSessions(filter);
-    const sessions = semanticSearch(query.similarTo!, embeddingModel, allSessions, limit);
+    // Rank ALL sessions (no limit cap) so pagination is correct
+    const allRanked = semanticSearch(query.similarTo!, embeddingModel, allSessions, allSessions.length);
     return {
-      sessions: sessions.slice(offset, offset + limit),
-      total: sessions.length,
+      sessions: allRanked.slice(offset, offset + limit),
+      total: allRanked.length,
       mode: 'semantic',
       durationMs: Date.now() - start,
     };

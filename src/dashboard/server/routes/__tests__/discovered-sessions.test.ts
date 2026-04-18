@@ -235,4 +235,71 @@ describe('search (route logic)', () => {
     const result = searchSessions({ limit: 2 });
     expect(result.sessions.length).toBeLessThanOrEqual(2);
   });
+
+  it('searchSessions total reflects unpaginated match count', () => {
+    // Seed 4 more sessions (5 total after beforeEach)
+    for (let i = 2; i <= 5; i++) {
+      upsertDiscoveredSession({
+        jsonlPath: `/route/total-test-${i}.jsonl`,
+        workspacePath: `/home/user/Projects/item${i}`,
+        workspaceHash: `hash-total-${i}`,
+        messageCount: 1,
+        firstTs: '2025-01-01T00:00:00Z',
+        lastTs: '2025-01-01T00:01:00Z',
+        modelsUsed: [],
+        primaryModel: null,
+        tokenInput: 0,
+        tokenOutput: 0,
+        estimatedCost: 0,
+        toolsUsed: [],
+        filesTouched: [],
+        tags: [],
+        panopticonManaged: false,
+        panIssueId: null,
+        panAgentId: null,
+        fileSize: null,
+        fileMtime: null,
+      });
+    }
+
+    const page = searchSessions({ limit: 2, offset: 0 });
+    expect(page.sessions.length).toBeLessThanOrEqual(2);
+    // total must reflect ALL 5 sessions, not just the 2-session page
+    expect(page.total).toBeGreaterThanOrEqual(5);
+  });
+});
+
+// ─── Scan targeted mode with dirs ─────────────────────────────────────────────
+
+describe('scan targeted mode with dirs', () => {
+  it('targeted mode with dirs scans only the specified workspace sessions', async () => {
+    const pA = join(fakeClaudeDir, '-home-user-Projects-myapp', 'a.jsonl');
+    const pB = join(fakeClaudeDir, '-home-user-Projects-otherapp', 'b.jsonl');
+    mkdirSync(join(fakeClaudeDir, '-home-user-Projects-otherapp'), { recursive: true });
+    writeFileSync(pA, SESSION_JSONL, 'utf8');
+    writeFileSync(pB, SESSION_JSONL, 'utf8');
+
+    // Route passes dirs when mode is targeted
+    const result = await scan({
+      mode: 'targeted',
+      dirs: ['/home/user/Projects/myapp'],
+      watchDirs: [],
+    });
+
+    expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
+
+    const { findDiscoveredSessions } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const sessions = findDiscoveredSessions();
+    // Only myapp sessions should be indexed (otherapp not in dirs)
+    expect(sessions.some((s) => s.jsonlPath === pA)).toBe(true);
+    expect(sessions.some((s) => s.jsonlPath === pB)).toBe(false);
+  });
+
+  it('targeted mode without dirs scans zero files (route must require dirs)', async () => {
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'no-dirs.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    const result = await scan({ mode: 'targeted', dirs: [], watchDirs: [] });
+    expect(result.inserted + result.updated + result.skipped).toBe(0);
+  });
 });
