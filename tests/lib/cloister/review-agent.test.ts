@@ -849,3 +849,41 @@ describe('runParallelReview', () => {
     expect(result.notes).toContain('correctness');
   });
 });
+
+// ── dispatch failure sets 'pending' not 'failed' ─────────────────────────────
+// Regression: dispatch failures must set reviewStatus='pending' so the deacon
+// can retry. The deacon at deacon.ts only re-dispatches when reviewStatus===
+// 'pending'; setting 'failed' leaves reviews permanently stuck after a transient
+// dispatch error (e.g., tmux not ready, file-system issue).
+
+describe('dispatch failure reviewStatus regression', () => {
+  it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    // Extract the request-review route block
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    // reviewStatus must never be set to 'failed' in a dispatch error/catch path
+    // (it may still be set to 'failed' for explicit semantic failures like blocked)
+    const dispatchFailedMatches = requestReviewBlock.match(
+      /(?:Dispatch failed|Dispatch error|Failed to start review)[\s\S]{0,200}reviewStatus\s*:\s*['"]failed['"]/g,
+    );
+    expect(dispatchFailedMatches).toBeNull();
+
+    // Verify the dispatch error paths explicitly set 'pending'
+    const pendingMatches = requestReviewBlock.match(
+      /reviewStatus\s*:\s*['"]pending['"]/g,
+    );
+    expect(pendingMatches).not.toBeNull();
+    expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
+  });
+});

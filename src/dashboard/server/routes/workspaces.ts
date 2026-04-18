@@ -2445,7 +2445,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               );
               completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
               setReviewStatus(issueId, {
-                reviewStatus: 'failed',
+                reviewStatus: 'pending',
                 reviewNotes: reviewResult.message,
               });
               return;
@@ -2458,7 +2458,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
             completePendingOperation(issueId, error.message);
-            setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
+            setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: error.message });
           }
         })();
 
@@ -2786,7 +2786,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           `[request-review] Dispatch failed for ${issueId}: ${result.error}`
         );
         setReviewStatus(issueId, {
-          reviewStatus: 'failed',
+          reviewStatus: 'pending',
           reviewNotes: `Dispatch failed: ${result.error || result.message}`,
         });
         return jsonResponse(
@@ -2801,7 +2801,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     } catch (error: any) {
       console.error(`[request-review] Error:`, error);
       setReviewStatus(issueId, {
-        reviewStatus: 'failed',
+        reviewStatus: 'pending',
         reviewNotes: `Dispatch error: ${error.message}`,
       });
       return jsonResponse(

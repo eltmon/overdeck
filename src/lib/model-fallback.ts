@@ -191,9 +191,6 @@ export function isProviderEnabled(
   provider: ModelProvider,
   enabledProviders: Set<ModelProvider>
 ): boolean {
-  // Anthropic is always enabled (required)
-  if (provider === 'anthropic') return true;
-
   return enabledProviders.has(provider);
 }
 

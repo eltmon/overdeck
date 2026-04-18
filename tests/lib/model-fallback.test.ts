@@ -102,9 +102,10 @@ describe('model-fallback', () => {
   });
 
   describe('isProviderEnabled', () => {
-    it('should always return true for Anthropic', () => {
-      expect(isProviderEnabled('anthropic', new Set())).toBe(true);
-      expect(isProviderEnabled('anthropic', new Set(['openai']))).toBe(true);
+    it('respects enabledProviders set for all providers including Anthropic', () => {
+      expect(isProviderEnabled('anthropic', new Set())).toBe(false);
+      expect(isProviderEnabled('anthropic', new Set<ModelProvider>(['anthropic']))).toBe(true);
+      expect(isProviderEnabled('anthropic', new Set<ModelProvider>(['openai']))).toBe(false);
     });
 
     it('should return true if provider is in enabled set', () => {
@@ -116,6 +117,27 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       expect(isProviderEnabled('openai', enabled)).toBe(false);
       expect(isProviderEnabled('google', enabled)).toBe(false);
+    });
+  });
+
+  describe('Anthropic-disabled provider behavior', () => {
+    it('filterAvailableModels excludes Claude models when Anthropic is disabled', () => {
+      const noAnthropic = new Set<ModelProvider>(['openai']);
+      const filtered = filterAvailableModels(
+        ['claude-opus-4-6', 'claude-sonnet-4-6', 'gpt-5.4'] as ModelId[],
+        noAnthropic
+      );
+      expect(filtered).not.toContain('claude-opus-4-6');
+      expect(filtered).not.toContain('claude-sonnet-4-6');
+      expect(filtered).toContain('gpt-5.4');
+    });
+
+    it('getAvailableModels excludes Claude models when Anthropic is disabled', () => {
+      const noAnthropic = new Set<ModelProvider>(['openai']);
+      const available = getAvailableModels(noAnthropic);
+      for (const model of available) {
+        expect(getModelProvider(model)).not.toBe('anthropic');
+      }
     });
   });
 
