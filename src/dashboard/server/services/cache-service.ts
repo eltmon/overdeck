@@ -12,7 +12,6 @@ import type Database from 'better-sqlite3';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { mkdir } from 'fs/promises';
 import { homedir } from 'os';
 
 declare const Bun: unknown;
@@ -39,10 +38,6 @@ function openSqliteDb(dbPath: string): Database.Database {
 
 const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
 const CACHE_DB_PATH = join(PANOPTICON_HOME, 'cache.db');
-
-if (!existsSync(PANOPTICON_HOME)) {
-  await mkdir(PANOPTICON_HOME, { recursive: true });
-}
 
 // Default TTLs per tracker (seconds)
 export const DEFAULT_TTLS: Record<string, number> = {
