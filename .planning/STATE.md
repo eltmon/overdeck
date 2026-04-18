@@ -20,3 +20,4 @@ None
 - D4: `rmSync` calls in issues.ts (abort-planning + reopen) replaced with `rm` from `fs/promises` inside existing `Effect.promise(async...)` wrappers
 
 ## Specialist Feedback
+- **[2026-04-18T22:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/020-review-agent-changes-requested.md`
