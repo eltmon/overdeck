@@ -264,21 +264,38 @@ export async function repairClosedWontfixIssues(): Promise<void> {
         const hasWontfixLabel = (parsed.labels as string[]).some(
           (l: string) => l === 'wontfix' || l === 'won\'t fix' || l === 'not planned',
         );
-        if (!hasWontfixLabel) continue;
+        if (hasWontfixLabel) {
+          console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} is CLOSED (wontfix) — clearing stale readyForMerge state`);
+          setReviewStatus(s.issueId, {
+            readyForMerge: false,
+            mergeStatus: 'failed',
+            mergeNotes: 'GitHub issue was closed as wontfix (not via Panopticon merge flow)',
+          } as any);
 
-        console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} is CLOSED (wontfix) — clearing stale readyForMerge state`);
-        setReviewStatus(s.issueId, {
-          readyForMerge: false,
-          mergeStatus: 'failed',
-          mergeNotes: 'GitHub issue was closed as wontfix (not via Panopticon merge flow)',
-        } as any);
+          // Remove workflow labels if present
+          for (const label of ['in-review', 'in-progress']) {
+            await execAsync(
+              `gh issue edit ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --remove-label "${label}" 2>/dev/null || true`,
+              { encoding: 'utf-8' },
+            );
+          }
+          continue;
+        }
 
-        // Remove workflow labels if present
-        for (const label of ['in-review', 'in-progress']) {
-          await execAsync(
-            `gh issue edit ${resolved.number} --repo ${resolved.owner}/${resolved.repo} --remove-label "${label}" 2>/dev/null || true`,
-            { encoding: 'utf-8' },
-          );
+        // Also handle issues closed with 'merged' label but internal state not updated
+        // (e.g. merged outside Panopticon flow, or PR merged but post-merge lifecycle
+        // cleared prUrl before updating mergeStatus).
+        const hasMergedLabel = (parsed.labels as string[]).some(
+          (l: string) => l === 'merged',
+        );
+        if (hasMergedLabel) {
+          console.log(`[label-cleanup] ${s.issueId} GitHub issue #${resolved.number} is CLOSED (merged) — repairing internal state`);
+          setReviewStatus(s.issueId, {
+            readyForMerge: false,
+            mergeStatus: 'merged',
+            mergeNotes: 'Repaired by startup sweep — issue was merged on GitHub',
+          } as any);
+          continue;
         }
       } catch {
         // non-fatal — best-effort
