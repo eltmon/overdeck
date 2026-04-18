@@ -1135,6 +1135,9 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     if (!result.success) {
       throw new Error(`Failed to auto-resume agent: ${result.error}`);
     }
+    if (result.messageDelivered === false) {
+      throw new Error(`Agent resumed but ready signal did not fire — message not delivered. Feedback is in the mail queue.`);
+    }
     // Message already sent during resume
     return;
   }
@@ -1167,17 +1170,20 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       `# Message\n\n${message}\n`
     );
 
-    if (resumeResult.success) {
+    if (resumeResult.success && resumeResult.messageDelivered !== false) {
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
       return;
     }
 
-    // Resume failed — most commonly because no saved session id exists (never recorded
-    // a claudeSessionId via the heartbeat hook). Fall back to a fresh launch so feedback
-    // is not silently dropped. This path intentionally mirrors spawnAgent's launcher
-    // (provider exports + unset of leaked env vars) so the fallback doesn't inherit
-    // stale ANTHROPIC_BASE_URL / OPENAI_API_KEY from the parent process.
-    console.warn(`[agents] Resume failed for ${normalizedId}: ${resumeResult.error} — falling back to fresh launch`);
+    // Resume failed OR message was not delivered (ready signal timed out). Fall back to
+    // a fresh launch so feedback is not silently dropped. This path intentionally mirrors
+    // spawnAgent's launcher (provider exports + unset of leaked env vars) so the fallback
+    // doesn't inherit stale ANTHROPIC_BASE_URL / OPENAI_API_KEY from the parent process.
+    if (!resumeResult.success) {
+      console.warn(`[agents] Resume failed for ${normalizedId}: ${resumeResult.error} — falling back to fresh launch`);
+    } else {
+      console.warn(`[agents] Resume succeeded for ${normalizedId} but message not delivered (ready signal timed out) — falling back to fresh launch`);
+    }
 
     const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
@@ -1271,7 +1277,7 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
@@ -1369,6 +1375,7 @@ ${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permiss
     });
 
     // If there's a message, wait for ready signal then send
+    let messageDelivered = false;
     if (message) {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
@@ -1376,6 +1383,7 @@ ${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permiss
       if (ready) {
         // Send message
         await sendKeysAsync(normalizedId, message);
+        messageDelivered = true;
       } else {
         console.error('Claude SessionStart hook did not fire during resume, message not sent');
       }
@@ -1393,7 +1401,7 @@ ${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permiss
       saveAgentState(agentState);
     }
 
-    return { success: true };
+    return { success: true, messageDelivered };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     return {
