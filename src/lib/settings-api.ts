@@ -136,13 +136,15 @@ export interface ApiSettingsConfig {
 export function getDefaultConversationModelApi(): ModelId {
   const { config } = loadConfig();
 
-  if (config.enabledProviders.has('openai')) {
-    return resolveModelId('gpt-5.4');
+  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.4');
+  if (config.enabledProviders.has('minimax')) return resolveModelId('minimax-m2.7-highspeed');
+  if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
+  if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');
+  if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
+  if (config.enabledProviders.has('openrouter')) {
+    const fav = config.openrouterFavorites[0];
+    if (fav) return resolveModelId(fav);
   }
-  if (config.enabledProviders.has('minimax')) {
-    return resolveModelId('minimax-m2.7-highspeed');
-  }
-
   return resolveModelId('claude-sonnet-4-6');
 }
 

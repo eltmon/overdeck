@@ -374,11 +374,89 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          openrouterFavorites: [],
         } as any,
         migration: null,
       });
       const model = getDefaultConversationModelApi();
       expect(model).toContain('gpt');
+    });
+
+    it('returns a Google model when only Google is enabled', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['google']),
+          apiKeys: { google: 'google-test-key' },
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          openrouterFavorites: [],
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toContain('gemini');
+    });
+
+    it('returns a Kimi model when only Kimi is enabled', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['kimi']),
+          apiKeys: { kimi: 'kimi-test-key' },
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          openrouterFavorites: [],
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toContain('kimi');
+    });
+
+    it('returns a ZAI model when only ZAI is enabled', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['zai']),
+          apiKeys: { zai: 'zai-test-key' },
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          openrouterFavorites: [],
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toContain('glm');
+    });
+
+    it('does not return claude-sonnet-4-6 when Anthropic is disabled and Google is enabled', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['google']),
+          apiKeys: { google: 'google-test-key' },
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          openrouterFavorites: [],
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).not.toContain('claude');
+      expect(model).not.toContain('sonnet');
     });
   });
 });
