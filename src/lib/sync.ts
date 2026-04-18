@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync, readFileSync, writeFileSync } from 'fs';
+import { execSync } from 'child_process';
 import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
 import {
@@ -723,6 +724,30 @@ function resolveSkillsRoot(startDir: string): string | null {
  *
  * @param cwd Working directory to check (defaults to process.cwd())
  */
+
+/** Returns names of subdirs inside targetDir that are tracked by git in projectRoot. */
+function getGitTrackedSkillDirNames(targetDir: string, projectRoot: string): Set<string> {
+  const names = new Set<string>();
+  try {
+    const rel = relative(projectRoot, targetDir).replace(/\\/g, '/');
+    const output = execSync(
+      `git ls-files --full-name -- "${rel}/"`,
+      { cwd: projectRoot, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 }
+    );
+    const prefix = rel + '/';
+    for (const line of output.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const rest = trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed;
+      const name = rest.split('/')[0];
+      if (name) names.add(name);
+    }
+  } catch {
+    // Not a git repo or git unavailable — fall back to manifest-only ownership check
+  }
+  return names;
+}
+
 export function mirrorProjectSkills(
   cwd: string = process.cwd(),
   opts?: { manifestDir?: string },
@@ -775,6 +800,10 @@ export function mirrorProjectSkills(
     // No manifest yet — nothing was previously managed, nothing to delete
   }
 
+  // Git-tracked names: dirs inside targetDir that are committed in the repo.
+  // These are canonical repo content — safe to mirror even on first run, before any manifest entry.
+  const gitTrackedNames = getGitTrackedSkillDirNames(targetDir, resolvedCwd);
+
   // sourceNames: all valid source skills (used to guard against removing non-source dirs)
   // mirroredNames: skills actually synced this run (written to manifest)
   const sourceNames = new Set<string>();
@@ -792,9 +821,9 @@ export function mirrorProjectSkills(
     const targetPath = join(targetDir, entry.name);
     const targetExists = existsSync(targetPath);
 
-    // Ownership guard: if the target dir already exists but is not in the mirror manifest,
-    // it is user-managed — leave it untouched.
-    if (targetExists && !manifestNames.has(entry.name)) continue;
+    // Ownership guard: if the target dir already exists but is neither in the mirror manifest
+    // nor git-tracked (canonical repo content), treat it as user-managed — leave it untouched.
+    if (targetExists && !manifestNames.has(entry.name) && !gitTrackedNames.has(entry.name)) continue;
 
     // Track whether the target already had a SKILL.md (to distinguish added vs updated)
     const targetHadSkillMd = targetExists && (

@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync, chmodSync, statSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mirrorProjectSkills } from '../../src/lib/sync.js';
@@ -419,5 +420,48 @@ describe('mirrorProjectSkills', () => {
     expect(result.added).not.toContain('pan-help');
     expect(result.updated).not.toContain('pan-help');
     expect(result.removed).not.toContain('pan-help');
+  });
+
+  it('mirrors a pre-existing .claude/skills/<name> dir that is git-tracked (bootstrap / first-run case)', () => {
+    // Simulate a repo where .claude/skills/pan-help is already checked in (canonical content).
+    // On first run there is no manifest, but git ls-files reveals the dir is tracked — it is
+    // repo-managed, not user-managed, so the ownership guard must NOT skip it.
+    const gitCwd = mkdtempSync(join(tmpdir(), 'pan-mirror-git-test-'));
+    try {
+      // Initialise a real git repo so git ls-files works
+      execSync('git init', { cwd: gitCwd, stdio: 'pipe' });
+      execSync('git config user.email "test@test.com"', { cwd: gitCwd, stdio: 'pipe' });
+      execSync('git config user.name "Test"', { cwd: gitCwd, stdio: 'pipe' });
+
+      // Source skill
+      const srcSkillDir = join(gitCwd, 'skills', 'pan-help');
+      mkdirSync(srcSkillDir, { recursive: true });
+      writeFileSync(join(srcSkillDir, 'SKILL.md'), '# Help\nSource content.', 'utf-8');
+
+      // Pre-existing target dir with stale content — git-tracked (canonical checked-in)
+      const targetSkillDir = join(gitCwd, '.claude', 'skills', 'pan-help');
+      mkdirSync(targetSkillDir, { recursive: true });
+      writeFileSync(join(targetSkillDir, 'SKILL.md'), '# Help\nOld canonical content.', 'utf-8');
+
+      // Stage the target dir so git ls-files reports it as tracked
+      execSync('git add .claude/skills/pan-help', { cwd: gitCwd, stdio: 'pipe' });
+
+      // No manifest — simulates first-run in a fresh checkout
+      const gitManifestDir = join(gitCwd, 'manifest-store');
+      mkdirSync(gitManifestDir, { recursive: true });
+
+      const result = mirrorProjectSkills(gitCwd, { manifestDir: gitManifestDir });
+
+      // Git-tracked dir must be mirrored (updated) — not skipped by the ownership guard
+      const updatedContent = readFileSync(join(targetSkillDir, 'SKILL.md'), 'utf-8');
+      expect(updatedContent).toBe('# Help\nSource content.');
+      // pan-help should appear in added or updated
+      expect(result.added.concat(result.updated)).toContain('pan-help');
+      // pan-help must be written to manifest
+      const manifest = readFileSync(join(gitManifestDir, 'manifest'), 'utf-8');
+      expect(manifest).toContain('pan-help');
+    } finally {
+      rmSync(gitCwd, { recursive: true, force: true });
+    }
   });
 });
