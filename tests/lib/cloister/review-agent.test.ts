@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -26,6 +26,8 @@ import {
   waitForReviewer,
   getFilesChangedFromPR,
   selectCompletedReviewers,
+  resolveTemplatePath,
+  runParallelReview,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -750,5 +752,100 @@ describe('runParallelReview configuration regressions', () => {
       'utf-8',
     );
     expect(src).toContain('existsSync(templatePath)');
+  });
+});
+
+// ── resolveTemplatePath ───────────────────────────────────────────────────────
+
+describe('resolveTemplatePath', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'pan-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns workspace agents/ path when template exists in the project', () => {
+    mkdirSync(join(tmpDir, 'agents'), { recursive: true });
+    writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), 'template content');
+    const result = resolveTemplatePath('code-review-correctness', tmpDir);
+    expect(result).toBe(join(tmpDir, 'agents', 'code-review-correctness.md'));
+  });
+
+  it('falls back to CACHE_AGENTS_DIR when template is absent from workspace', () => {
+    // No agents/ dir in tmpDir → must fall back to the global cache path
+    const result = resolveTemplatePath('code-review-correctness', tmpDir);
+    expect(result).toContain('agent-definitions');
+    expect(result).toContain('code-review-correctness.md');
+  });
+});
+
+// ── runParallelReview orchestration ──────────────────────────────────────────
+
+describe('runParallelReview', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'pan-review-'));
+    // Create workspace agents/ dir with minimal templates so resolveTemplatePath
+    // finds them in the workspace (proving branch templates take precedence).
+    mkdirSync(join(tmpDir, 'agents'), { recursive: true });
+    const frontmatter = '---\nmodel: sonnet\n---\nReview the code.\n';
+    writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), frontmatter);
+    writeFileSync(join(tmpDir, 'agents', 'code-review-synthesis.md'), frontmatter);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const baseContext = () => ({
+    projectPath: tmpDir,
+    prUrl: 'https://github.com/org/repo/pull/1',
+    issueId: 'PAN-999',
+    branch: 'feature/pan-999',
+  });
+
+  it('happy path: all reviewers succeed → synthesis runs → result returned', async () => {
+    const spawnFn = vi.fn().mockResolvedValue(undefined);
+    const waitFn = vi.fn().mockResolvedValue('completed');
+    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
+    const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
+    const postReviewFn = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = await runParallelReview(
+      baseContext(),
+      ['src/foo.ts'],
+      [{ name: 'correctness', focus: ['logic'] }],
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn },
+    );
+
+    expect(spawnFn).toHaveBeenCalledTimes(2); // 1 reviewer + 1 synthesis
+    expect(waitFn).toHaveBeenCalledTimes(2);
+    expect(parseSynthesisFn).toHaveBeenCalledOnce();
+    expect(postReviewFn).toHaveBeenCalledOnce();
+    expect(result.reviewResult).toBe('APPROVED');
+  });
+
+  it('failure path: reviewer failure aborts synthesis → COMMENTED returned', async () => {
+    const spawnFn = vi.fn().mockResolvedValue(undefined);
+    const waitFn = vi.fn().mockResolvedValue('failed'); // all reviewers fail
+    const parseSynthesisFn = vi.fn();
+    const postReviewFn = vi.fn();
+
+    const { result } = await runParallelReview(
+      baseContext(),
+      [],
+      [{ name: 'correctness' }],
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn },
+    );
+
+    expect(parseSynthesisFn).not.toHaveBeenCalled();
+    expect(postReviewFn).not.toHaveBeenCalled();
+    expect(result.reviewResult).toBe('COMMENTED');
+    expect(result.notes).toContain('correctness');
   });
 });

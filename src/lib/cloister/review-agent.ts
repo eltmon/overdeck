@@ -502,6 +502,24 @@ export function selectCompletedReviewers(
 }
 
 /**
+ * Resolve the template path for a reviewer subagent.
+ * Workspace agents/ directory takes precedence over the global cache so that
+ * branch changes to agent definitions are picked up immediately.
+ */
+export function resolveTemplatePath(subagentName: string, projectPath: string): string {
+  const workspacePath = join(projectPath, 'agents', `${subagentName}.md`);
+  if (existsSync(workspacePath)) return workspacePath;
+  return join(CACHE_AGENTS_DIR, `${subagentName}.md`);
+}
+
+type RunParallelReviewDeps = {
+  spawnFn?: (session: string, model: string, promptFile: string, cwd: string) => Promise<void>;
+  waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
+  parseSynthesisFn?: typeof parseReviewSynthesis;
+  postReviewFn?: typeof postGitHubPRReview;
+};
+
+/**
  * Run parallel code review using N reviewer agents followed by a synthesis agent.
  *
  * Writes outputs to .pan/review/<reviewId>/.
@@ -510,10 +528,16 @@ export function selectCompletedReviewers(
  *   - Security issues from any reviewer always surfaced
  *   - Findings attributed to source reviewer
  */
-async function runParallelReview(
+export async function runParallelReview(
   context: ReviewContext,
   filesChanged: string[],
   agents: ReviewAgentConfig[],
+  {
+    spawnFn = spawnReviewer,
+    waitFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs),
+    parseSynthesisFn = parseReviewSynthesis,
+    postReviewFn = postGitHubPRReview,
+  }: RunParallelReviewDeps = {},
 ): Promise<{ result: ReviewResult; reviewId: string }> {
   const reviewId = `review-${context.issueId}-${Date.now()}`;
 
@@ -533,7 +557,7 @@ async function runParallelReview(
   // Guard: validate all reviewer templates exist before spawning any sessions
   for (const agent of agents) {
     const subagentName = `code-review-${agent.name}`;
-    const templatePath = join(CACHE_AGENTS_DIR, `${subagentName}.md`);
+    const templatePath = resolveTemplatePath(subagentName, context.projectPath);
     if (!existsSync(templatePath)) {
       return {
         result: {
@@ -561,7 +585,7 @@ async function runParallelReview(
 
   await Promise.all(agents.map(async agent => {
     const subagentName = `code-review-${agent.name}`;
-    const templatePath = join(CACHE_AGENTS_DIR, `${subagentName}.md`);
+    const templatePath = resolveTemplatePath(subagentName, context.projectPath);
     const template = await parseReviewerTemplate(templatePath);
     const model = resolveReviewerModel(agent, template.model);
     const outputFile = join(outputDir, `${agent.name}.md`);
@@ -574,7 +598,7 @@ async function runParallelReview(
     await writeFile(promptFile, prompt);
 
     reviewerSessions.push({ sessionName, outputFile, role: agent.name });
-    await spawnReviewer(sessionName, model, promptFile, context.projectPath);
+    await spawnFn(sessionName, model, promptFile, context.projectPath);
   }));
 
   console.log(`[review-agent] Spawned ${reviewerSessions.length} reviewer sessions for review ${reviewId}`);
@@ -582,7 +606,7 @@ async function runParallelReview(
   // ── Phase 2: Wait for all reviewers ───────────────────────────────────────
   const reviewerResults = await Promise.all(
     reviewerSessions.map(({ sessionName, outputFile, role }) =>
-      waitForReviewer(sessionName, outputFile, REVIEW_TIMEOUT_MS)
+      waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
         .then(status => ({ role, status, outputFile })),
     ),
   );
@@ -603,7 +627,7 @@ async function runParallelReview(
     };
   }
 
-  const synthTemplatePath = join(CACHE_AGENTS_DIR, 'code-review-synthesis.md');
+  const synthTemplatePath = resolveTemplatePath('code-review-synthesis', context.projectPath);
   const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
   const synthOutputFile = join(outputDir, 'synthesis.md');
@@ -626,14 +650,14 @@ async function runParallelReview(
   const synthPromptFile = join(outputDir, 'synthesis-prompt.md');
   await writeFile(synthPromptFile, synthPrompt);
 
-  await spawnReviewer(synthSessionName, synthModel, synthPromptFile, context.projectPath);
-  await waitForReviewer(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
+  await spawnFn(synthSessionName, synthModel, synthPromptFile, context.projectPath);
+  await waitFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
-  const result = await parseReviewSynthesis(outputDir, agents);
+  const result = await parseSynthesisFn(outputDir, agents);
   result.output = `Review ${reviewId}`;
 
-  await postGitHubPRReview(context, result, outputDir);
+  await postReviewFn(context, result, outputDir);
 
   return { result, reviewId };
 }
