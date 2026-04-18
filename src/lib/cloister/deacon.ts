@@ -1625,9 +1625,13 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 
 // Track per-issue cooldowns for failed-merge retry to avoid rapid re-queuing
 const failedMergeRetryCooldowns = new Map<string, number>();
+// Track per-issue cooldowns for timeout nudges to avoid spamming the work agent
+const timeoutNudgeCooldowns = new Map<string, number>();
 
 // Minimum time (ms) after merge failure before attempting a retry
 const FAILED_MERGE_RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+// Minimum time (ms) between timeout nudges to the same work agent
+const TIMEOUT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 // Max number of automatic retries before requiring manual intervention
 const FAILED_MERGE_MAX_RETRIES = 3;
 
@@ -1714,22 +1718,28 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         (status.mergeNotes.includes('did not push') || status.mergeNotes.includes('stopped before completing'));
       if (isTimeoutFailure) {
         const issueIdForFb = status.issueId || key;
-        const timeoutNotes = status.mergeNotes!;
-        const { writeFeedbackFile } = await import('./feedback-writer.js');
-        await writeFeedbackFile({
-          issueId: issueIdForFb,
-          specialist: 'merge-agent',
-          outcome: 'timeout',
-          summary: 'Merge timed out waiting for rebase — please rebase and push',
-          markdownBody: `## Merge Timed Out — Rebase Required\n\n${timeoutNotes}\n\n### Action Required\n\nThe merge was requested but the rebased branch was not pushed in time. Please:\n\n1. Run \`git fetch origin\` and \`git rebase origin/main\` (or the target branch)\n2. Resolve any conflicts\n3. Run \`git push --force-with-lease\`\n4. Invoke the /rebase-and-submit skill or run \`pan work done ${issueIdForFb}\`\n\nAfter pushing, the merge will be retried automatically.`,
-        }).catch((err: Error) => console.error(`[deacon] Failed to write timeout feedback for ${issueIdForFb}:`, err.message));
-        const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
-        if (sessionExists(agentSession)) {
-          await sendKeysAsync(agentSession,
-            `Merge timed out — the rebased branch was not pushed in time. Please rebase onto the target branch, resolve any conflicts, push with --force-with-lease, then run "pan work done ${issueIdForFb}". After pushing, the merge will proceed automatically.`
-          );
+        const lastNudge = timeoutNudgeCooldowns.get(issueIdForFb);
+        if (!lastNudge || (now - lastNudge) >= TIMEOUT_NUDGE_COOLDOWN_MS) {
+          const timeoutNotes = status.mergeNotes!;
+          const { writeFeedbackFile } = await import('./feedback-writer.js');
+          await writeFeedbackFile({
+            issueId: issueIdForFb,
+            specialist: 'merge-agent',
+            outcome: 'timeout',
+            summary: 'Merge timed out waiting for rebase — please rebase and push',
+            markdownBody: `## Merge Timed Out — Rebase Required\n\n${timeoutNotes}\n\n### Action Required\n\nThe merge was requested but the rebased branch was not pushed in time. Please:\n\n1. Run \`git fetch origin\` and \`git rebase origin/main\` (or the target branch)\n2. Resolve any conflicts\n3. Run \`git push --force-with-lease\`\n4. Invoke the /rebase-and-submit skill or run \`pan work done ${issueIdForFb}\`\n\nAfter pushing, the merge will be retried automatically.`,
+          }).catch((err: Error) => console.error(`[deacon] Failed to write timeout feedback for ${issueIdForFb}:`, err.message));
+          const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
+          if (sessionExists(agentSession)) {
+            await sendKeysAsync(agentSession,
+              `Merge timed out — the rebased branch was not pushed in time. Please rebase onto the target branch, resolve any conflicts, push with --force-with-lease, then run "pan work done ${issueIdForFb}". After pushing, the merge will proceed automatically.`
+            );
+          }
+          timeoutNudgeCooldowns.set(issueIdForFb, now);
+          actions.push(`Timeout failure for ${issueIdForFb} — wrote feedback, nudged work agent`);
+        } else {
+          actions.push(`Timeout failure for ${issueIdForFb} — nudge on cooldown (${Math.round((now - lastNudge) / 60000)}m ago)`);
         }
-        actions.push(`Timeout failure for ${issueIdForFb} — wrote feedback, nudged work agent`);
       }
 
       // Circuit breaker: max retries to avoid infinite loop on permanent failures
