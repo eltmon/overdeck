@@ -40,7 +40,7 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
   const isPlaceholder = !!agentState && agentStatus === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
-  const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
+  const isStopped = agentStatus === 'stopped' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
   const isRunning = (agentStatus === 'running' || isPlaceholder) && hasLiveTmuxSession;
   const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
   const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
