@@ -1,0 +1,74 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import { rebaseAndPushRepos } from '../../../src/lib/rebase-helper.js';
+
+const execAsync = promisify(exec);
+
+describe('rebaseAndPushRepos', () => {
+  let tempDir: string;
+  let remoteDir: string;
+  let repoDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'pan-rebase-helper-'));
+    remoteDir = join(tempDir, 'remote.git');
+    repoDir = join(tempDir, 'repo');
+
+    await execAsync(`git init --bare "${remoteDir}"`);
+    await mkdir(repoDir, { recursive: true });
+    await execAsync('git init', { cwd: repoDir });
+    await execAsync('git config user.name "Test User"', { cwd: repoDir });
+    await execAsync('git config user.email "test@example.com"', { cwd: repoDir });
+    await execAsync(`git remote add origin "${remoteDir}"`, { cwd: repoDir });
+
+    await mkdir(join(repoDir, '.planning'), { recursive: true });
+    await writeFile(join(repoDir, '.planning', 'plan.vbrief.json'), '{"version":1}\n');
+    await writeFile(join(repoDir, 'README.md'), 'base\n');
+    await execAsync('git add .', { cwd: repoDir });
+    await execAsync('git commit -m "base"', { cwd: repoDir });
+    await execAsync('git branch -M main', { cwd: repoDir });
+    await execAsync('git push -u origin main', { cwd: repoDir });
+
+    await execAsync('git checkout -b feature/pan-711', { cwd: repoDir });
+    await writeFile(join(repoDir, '.planning', 'plan.vbrief.json'), '{"version":2,"local":"keep-me"}\n');
+    await execAsync('git add .planning/plan.vbrief.json', { cwd: repoDir });
+    await execAsync('git commit -m "local planning change"', { cwd: repoDir });
+    await execAsync('git push -u origin feature/pan-711', { cwd: repoDir });
+
+    await execAsync('git checkout main', { cwd: repoDir });
+    await writeFile(join(repoDir, '.planning', 'plan.vbrief.json'), '{"version":3,"upstream":"discard-me"}\n');
+    await execAsync('git add .planning/plan.vbrief.json', { cwd: repoDir });
+    await execAsync('git commit -m "upstream planning change"', { cwd: repoDir });
+    await execAsync('git push origin main', { cwd: repoDir });
+
+    await execAsync('git checkout feature/pan-711', { cwd: repoDir });
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('keeps the rebased branch version when only .planning files conflict', async () => {
+    const result = await rebaseAndPushRepos(repoDir, {
+      workspaceType: 'monorepo',
+      repos: [
+        {
+          repoKey: 'panopticon-cli',
+          sourceBranch: 'feature/pan-711',
+          targetBranch: 'main',
+        },
+      ],
+    } as any);
+
+    expect(result.success).toBe(true);
+    expect(result.results[0]?.outcome).toBe('rebased');
+
+    const planningFile = await readFile(join(repoDir, '.planning', 'plan.vbrief.json'), 'utf-8');
+    expect(planningFile).toContain('"local":"keep-me"');
+    expect(planningFile).not.toContain('"upstream":"discard-me"');
+  });
+});

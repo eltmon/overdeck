@@ -7,8 +7,8 @@
  * submit as a multi-step task that they sometimes drop partway.
  *
  * Conflict handling:
- *   - `.planning/*` files: auto-resolved with `--ours` (local plan state wins
- *     since these are workspace-local artifacts, never shared in main).
+ *   - `.planning/*` files: auto-resolved with `--theirs` (the rebased local
+ *     branch wins; during rebase, "theirs" is the commit being replayed).
  *   - Any other conflicts: abort rebase, surface error, agent resolves manually.
  */
 
@@ -141,8 +141,8 @@ async function rebaseOneRepo(
 
 /**
  * Auto-resolve rebase conflicts if they are limited to `.planning/*` files.
- * Uses `--ours` (local wins) — planning artifacts are workspace-local and
- * should never collide with upstream main in practice.
+ * Uses `--theirs` so the rebased local branch wins. During a rebase, "ours"
+ * is the target branch state and "theirs" is the commit being replayed.
  */
 async function tryResolvePlanningConflicts(
   repoPath: string
@@ -169,7 +169,7 @@ async function tryResolvePlanningConflicts(
     }
 
     for (const file of conflictFiles) {
-      await execAsync(`git checkout --ours "${file}"`, { cwd: repoPath, encoding: 'utf-8', timeout: 10000 });
+      await execAsync(`git checkout --theirs "${file}"`, { cwd: repoPath, encoding: 'utf-8', timeout: 10000 });
       await execAsync(`git add "${file}"`, { cwd: repoPath, encoding: 'utf-8', timeout: 10000 });
     }
 
