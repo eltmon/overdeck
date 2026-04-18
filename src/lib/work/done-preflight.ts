@@ -20,9 +20,10 @@ export async function checkOpenBeads(workspacePath: string, issueId: string): Pr
       { cwd: workspacePath }
     ));
   } catch (error: unknown) {
-    const isNotInstalled =
-      error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT';
-    if (isNotInstalled) return [];
+    const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
+    // ENOENT: bd binary not found via execFile/spawn path
+    // 127: shell "command not found" (exec runs through /bin/sh)
+    if (code === 'ENOENT' || code === 127) return [];
     return ['  Open beads check failed — run `bd list --status open` to diagnose'];
   }
 

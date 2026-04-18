@@ -100,6 +100,18 @@ describe('checkOpenBeads', () => {
     expect(result).toEqual([]);
   });
 
+  it('returns empty array when bd CLI is not installed (shell exit 127)', async () => {
+    // exec() runs through /bin/sh; missing command exits 127 (not ENOENT)
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      const err = Object.assign(new Error('Command failed: bd list --status open'), { code: 127 });
+      cb(err, { stdout: '', stderr: '/bin/sh: bd: not found' });
+    });
+
+    const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
+    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    expect(result).toEqual([]);
+  });
+
   it('returns failure message when bd command fails with non-ENOENT error', async () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
       cb(new Error('bd exited with code 1'), { stdout: '', stderr: 'error' });

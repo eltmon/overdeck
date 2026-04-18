@@ -1,14 +1,14 @@
 /**
- * Tests for checkFailedMergeRetry — CI transient retry state machine.
+ * Tests for checkFailedMergeRetry — CI failure notification state machine.
  * Tests for checkPostReviewCommits — ciRetryMap.delete on new-commit detection.
  *
  * Covers:
- *  - CI transient retry attempts merge (sets readyForMerge=true)
- *  - Respects 2-minute cooldown between retries
+ *  - CI failure: notifies work agent to re-submit via pan done (no status mutation)
+ *  - Respects 2-minute cooldown between notifications
  *  - Exhausts at count=5, writes feedback + notifies agent exactly once
  *  - count>5 (post-exhaustion): just logs, no duplicate feedback
  *  - checkPostReviewCommits clears ciRetryMap when new commits arrive, enabling
- *    subsequent transient retries from checkFailedMergeRetry
+ *    fresh notifications on next patrol
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -143,23 +143,25 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     }
   });
 
-  it('(a) CI transient retry: sets readyForMerge=true when cooldown has passed', async () => {
+  it('(a) CI failure: notifies agent to re-submit when cooldown has passed', async () => {
     writeStatusFile({ [ISSUE_ID]: CI_FAILED_STATUS });
     // ciRetryMap is empty → count=0, lastAttempt=0 → cooldown of 0ms has "passed"
 
     const actions = await checkFailedMergeRetry();
 
     expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatch(/CI transient retry/);
+    expect(actions[0]).toMatch(/CI failure notification/);
     expect(actions[0]).toContain(ISSUE_ID);
     expect(actions[0]).toMatch(/attempt 1\/5/);
 
-    expect(mockSetReviewStatus).toHaveBeenCalledOnce();
-    const [calledIssueId, update] = mockSetReviewStatus.mock.calls[0];
-    expect(calledIssueId).toBe(ISSUE_ID);
-    expect(update.mergeStatus).toBe('pending');
-    expect(update.readyForMerge).toBe(true);
-    expect(update.mergeRetryCount).toBe(0); // must not touch main counter
+    // writeFeedbackFile must have been called to notify the agent
+    expect(mockWriteFeedbackFile).toHaveBeenCalledOnce();
+    const feedbackArg = mockWriteFeedbackFile.mock.calls[0][0];
+    expect(feedbackArg.issueId).toBe(ISSUE_ID);
+    expect(feedbackArg.outcome).toBe('ci-failure');
+
+    // setReviewStatus must NOT be called — deacon does not mutate merge status
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
 
     // ciRetryMap should have recorded count=1
     expect(ciRetryMap.get(ISSUE_ID)?.count).toBe(1);
@@ -284,7 +286,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       const retryActions = await checkFailedMergeRetry();
 
       expect(retryActions).toHaveLength(1);
-      expect(retryActions[0]).toMatch(/CI transient retry/);
+      expect(retryActions[0]).toMatch(/CI failure notification/);
       expect(retryActions[0]).toMatch(/attempt 1\/5/); // count starts at 1, not blocked at 6
       expect(ciRetryMap.get(ISSUE_ID)?.count).toBe(1);
     } finally {

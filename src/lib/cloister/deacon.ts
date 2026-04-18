@@ -1784,14 +1784,26 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         ciEntry.lastAttempt = now;
         ciRetryMap.set(issueId, ciEntry);
 
-        console.log(`[deacon] CI check failure for ${issueId} — transient CI issue, retrying merge (attempt ${ciEntry.count}/5)`);
-        setReviewStatus(issueId, {
-          mergeStatus: 'pending',
-          readyForMerge: true,
-          mergeRetryCount: status.mergeRetryCount || 0, // Don't touch main counter
-        });
-
-        actions.push(`CI transient retry for ${issueId} (attempt ${ciEntry.count}/5)`);
+        // Notify the work agent to re-submit via pan done, which re-enters the merge
+        // queue from scratch. Merge is user-triggered (PAN-354) — deacon cannot
+        // auto-retry; the agent must run pan done to create a fresh merge attempt.
+        console.log(`[deacon] CI check failure for ${issueId} — notifying agent to re-submit (attempt ${ciEntry.count}/5)`);
+        const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
+        const { writeFeedbackFile } = await import('./feedback-writer.js');
+        await writeFeedbackFile({
+          issueId,
+          specialist: 'merge-agent',
+          outcome: 'ci-failure',
+          summary: 'CI checks failed at merge — re-submit to re-enter merge queue',
+          markdownBody: `## CI Check Failure\n\n${ciNotes}\n\nCI checks failed at merge time. This may be transient (pending checks, GitHub status lag). Re-submit to re-enter the merge queue:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
+        }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
+        const agentSessionCi = `agent-${issueId.toLowerCase()}`;
+        if (sessionExists(agentSessionCi)) {
+          await sendKeysAsync(agentSessionCi,
+            `CI checks failed on the PR for ${issueId}. This may be transient. Read .planning/feedback/ for details, then invoke the /rebase-and-submit skill for ${issueId}.`
+          );
+        }
+        actions.push(`CI failure notification for ${issueId} (attempt ${ciEntry.count}/5)`);
         continue;
       }
 
