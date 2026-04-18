@@ -1,12 +1,12 @@
 /**
- * Tests for CacheService constructor home-dir bootstrap (PAN-446)
+ * Tests for CacheService home-dir bootstrap (PAN-446)
  *
- * The constructor ensures PANOPTICON_HOME exists before opening cache.db,
- * so that any construction path (not just main.ts startup) is safe when
- * the directory has not yet been created.
+ * cache-service.ts uses a module-level top-level await to create PANOPTICON_HOME
+ * before any constructor runs. This guarantees safety for every construction path,
+ * not just the main.ts startup sequence.
  *
- * PANOPTICON_HOME is read at module-load time, so we use vi.resetModules() +
- * vi.stubEnv() to point it at a temp dir before importing.
+ * PANOPTICON_HOME is evaluated at module load time, so we use vi.resetModules() +
+ * vi.stubEnv() to redirect it to a temp dir before each dynamic import.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -29,32 +29,31 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
-describe('CacheService constructor with missing PANOPTICON_HOME', () => {
-  it('creates PANOPTICON_HOME when it does not exist before opening the database', async () => {
+describe('CacheService module-level home-dir init', () => {
+  it('creates PANOPTICON_HOME on import when it does not exist', async () => {
+    expect(existsSync(panopticonHome)).toBe(false);
+
+    // Importing the real module triggers the top-level await that creates the dir
+    await import('../../src/dashboard/server/services/cache-service.js');
+
+    expect(existsSync(panopticonHome)).toBe(true);
+  });
+
+  it('is a no-op when PANOPTICON_HOME already exists', async () => {
+    mkdirSync(panopticonHome, { recursive: true });
+    const marker = join(panopticonHome, 'sentinel.txt');
+    require('fs').writeFileSync(marker, 'present');
+
+    await import('../../src/dashboard/server/services/cache-service.js');
+
+    expect(existsSync(marker)).toBe(true);
+  });
+
+  it('constructor succeeds after module import with missing dir', async () => {
     expect(existsSync(panopticonHome)).toBe(false);
 
     const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
-    // Construction must not throw even when the directory is absent
+    // Dir was created by module-level await; constructor should not throw
     expect(() => new CacheService()).not.toThrow();
-
-    expect(existsSync(panopticonHome)).toBe(true);
-  });
-
-  it('constructs successfully when PANOPTICON_HOME already exists', async () => {
-    mkdirSync(panopticonHome, { recursive: true });
-
-    const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
-    expect(() => new CacheService()).not.toThrow();
-  });
-
-  it('is safe to construct multiple times (idempotent dir creation)', async () => {
-    const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
-
-    expect(() => {
-      new CacheService();
-      new CacheService();
-    }).not.toThrow();
-
-    expect(existsSync(panopticonHome)).toBe(true);
   });
 });

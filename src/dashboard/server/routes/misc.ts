@@ -76,7 +76,7 @@ const execAsync = promisify(exec);
 
 // ─── Package version ──────────────────────────────────────────────────────────
 
-async function readPackageVersion(): Promise<string> {
+export async function readPackageVersion(): Promise<string> {
   // Walk up from the running script to find the nearest package.json.
   // Works for both source (src/dashboard/server/routes/) and bundled (dist/dashboard/) layouts.
   let dir = dirname(fileURLToPath(import.meta.url));
