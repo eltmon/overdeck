@@ -71,6 +71,7 @@ import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 
 const program = new Command();
+program.enablePositionalOptions();
 
 const ensureDashboardBundle = async (
   bundledServer: string,

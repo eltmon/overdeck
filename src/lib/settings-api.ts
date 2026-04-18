@@ -14,52 +14,53 @@ import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveMode
 import { reloadGlobalRouter } from './work-type-router.js';
 
 /**
- * Optimal model defaults based on research (see docs/MODEL_RECOMMENDATIONS.md)
- * - Opus 4.6: Critical thinking tasks (planning, PRDs, security review, exploration)
- * - Kimi K2.5: Implementation work agent (76.8% SWE-bench, excellent value)
- * - Sonnet 4.6: Quality specialist tasks (review responses, testing, documentation)
- * - Haiku 4.5: Speed-critical tasks (subagents, triage, quick CLI)
+ * Optimal model defaults — multi-provider distribution (see docs/research/)
+ * - GPT-5.4: Planning, review, security (best non-Anthropic reasoning)
+ * - Kimi K2.6: Exploration, testing, docs, UAT, convoy review (strong coding + vision)
+ * - GLM-5.1: Implementation, review-response, correctness (SWE-Bench Pro #1)
+ * - MiniMax M2.7: Procedural specialists — test, merge, inspect, synthesis
+ * - GPT-5.4 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
  *
  * NOTE: All model IDs are automatically resolved through deprecation mapping
  * to ensure this function never returns deprecated models.
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   const rawDefaults: Partial<Record<WorkTypeId, string>> = {
-    // High-complexity phases - Opus 4.6 for deep analysis and planning
-    'issue-agent:exploration': 'claude-opus-4-6',
+    // Planning & high-stakes review — GPT-5.4
+    'issue-agent:exploration': 'K2.6-code-preview',
 
-    // Implementation phases - Kimi K2.5 for excellent coding at great value
-    'issue-agent:implementation': 'kimi-k2.5',
-    'issue-agent:testing': 'claude-sonnet-4-6',
-    'issue-agent:documentation': 'claude-sonnet-4-6',
-    'issue-agent:review-response': 'claude-sonnet-4-6',
+    // Implementation — GLM-5.1 (SWE-Bench Pro #1, 8-hour autonomous sessions)
+    'issue-agent:implementation': 'glm-5.1',
+    'issue-agent:testing': 'K2.6-code-preview',
+    'issue-agent:documentation': 'K2.6-code-preview',
+    'issue-agent:review-response': 'glm-5.1',
 
-    // Specialist agents - quality critical
-    'specialist-review-agent': 'claude-opus-4-6',
-    'specialist-test-agent': 'claude-sonnet-4-6',
-    'specialist-merge-agent': 'claude-sonnet-4-6',
-    'specialist-inspect-agent': 'claude-sonnet-4-6',
-    'specialist-uat-agent': 'claude-sonnet-4-6',
+    // Specialist agents
+    'specialist-review-agent': 'gpt-5.4',
+    'specialist-test-agent': 'minimax-m2.7',
+    'specialist-merge-agent': 'minimax-m2.7',
+    'specialist-inspect-agent': 'minimax-m2.7-highspeed',
+    'specialist-uat-agent': 'K2.6-code-preview',
 
-    // Convoy reviewers - mixed based on criticality
-    'convoy:security-reviewer': 'claude-opus-4-6', // SAFETY CRITICAL
-    'convoy:performance-reviewer': 'claude-sonnet-4-6',
-    'convoy:correctness-reviewer': 'claude-sonnet-4-6',
-    'convoy:requirements-reviewer': 'claude-sonnet-4-6',
-    'convoy:synthesis-agent': 'claude-sonnet-4-6',
+    // Convoy reviewers
+    'convoy:security-reviewer': 'gpt-5.4',
+    'convoy:performance-reviewer': 'K2.6-code-preview',
+    'convoy:correctness-reviewer': 'glm-5.1',
+    'convoy:requirements-reviewer': 'K2.6-code-preview',
+    'convoy:synthesis-agent': 'minimax-m2.7',
 
-    // Subagents - speed-optimized (Haiku 2x faster, 1/3 cost)
-    'subagent:explore': 'claude-haiku-4-5',
-    'subagent:plan': 'claude-haiku-4-5',
-    'subagent:bash': 'claude-haiku-4-5',
-    'subagent:general-purpose': 'claude-sonnet-4-6',
+    // Subagents — GPT-5.4 Nano (155 tok/s, Tau2-Bench 92.5% tool use)
+    'subagent:explore': 'gpt-5.4-nano',
+    'subagent:plan': 'gpt-5.4-nano',
+    'subagent:bash': 'gpt-5.4-nano',
+    'subagent:general-purpose': 'K2.6-code-preview',
 
     // Workflow jobs
-    'status-review': 'claude-sonnet-4-6',
+    'status-review': 'gpt-5.4-nano',
 
-    // CLI modes - speed for quick, quality for interactive
-    'cli:interactive': 'claude-sonnet-4-6',
-    'cli:quick-command': 'claude-haiku-4-5',
+    // CLI modes
+    'cli:interactive': 'gpt-5.4-mini',
+    'cli:quick-command': 'gpt-5.4-nano',
   };
 
   // Apply deprecation resolution to all model IDs
