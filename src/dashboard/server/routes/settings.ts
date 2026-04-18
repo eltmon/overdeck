@@ -74,6 +74,8 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
   // Z.AI models
   'glm-5.1': { apiModel: 'glm-5.1' },
+  'glm-4.7': { apiModel: 'glm-4.7' },
+  'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────

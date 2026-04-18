@@ -483,7 +483,7 @@ describe('work-type-router', () => {
 
       // Smart selector picks best implementation model from anthropic+google
       const impl = router.getModel('issue-agent:implementation');
-      expect(impl.model).toBe('claude-opus-4-6'); // Opus scores highest for implementation
+      expect(impl.model).toBe('claude-opus-4-7'); // Opus 4.7 scores highest for implementation
       expect(impl.usedFallback).toBe(false);
     });
   });

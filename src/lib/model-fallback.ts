@@ -20,6 +20,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minima
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Anthropic models
+  'claude-opus-4-7': 'anthropic',
   'claude-opus-4-6': 'anthropic',
   'claude-sonnet-4-6': 'anthropic',
   'claude-sonnet-4-5': 'anthropic',
@@ -52,6 +53,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Kimi models
   'kimi-k2.5': 'kimi',
+  'kimi-k2': 'kimi',
   'K2.6-code-preview': 'kimi',
 
   // MiniMax models
@@ -60,6 +62,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Z.AI models
   'glm-5.1': 'zai',
+  'glm-4.7': 'zai',
+  'glm-4.7-flash': 'zai',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -100,11 +104,16 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Kimi → Anthropic
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
+  'kimi-k2': 'claude-sonnet-4-6', // Previous gen
   'K2.6-code-preview': 'claude-sonnet-4-6',
 
   // MiniMax → Anthropic
   'minimax-m2.7': 'claude-sonnet-4-6', // Near-Opus performance → Sonnet
   'minimax-m2.7-highspeed': 'claude-sonnet-4-6', // Same quality, faster → Sonnet
+
+  // Z.AI → Anthropic
+  'glm-4.7': 'claude-sonnet-4-6', // Top open-source → Sonnet
+  'glm-4.7-flash': 'claude-haiku-4-5', // Fast/affordable → Haiku
 };
 
 /**

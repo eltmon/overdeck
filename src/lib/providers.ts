@@ -64,7 +64,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     authType: 'credential-file',
     credentialFile: '~/.kimi/credentials/kimi-code.json',
     credentialHelper: '~/.panopticon/bin/kimi-token-helper.sh',
-    models: ['kimi-k2.5', 'K2.6-code-preview'],
+    models: ['kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tested: true,
     description: 'Anthropic-compatible API via Kimi Code Plan (OAuth token refresh)',
   },
@@ -102,9 +102,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Z.AI',
     compatibility: 'direct',
     baseUrl: 'https://api.z.ai/api/anthropic',
-    models: ['glm-5.1'],
+    models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
     tested: true,
-    description: 'Anthropic-compatible API via Z.AI GLM 5.1',
+    description: 'Anthropic-compatible API via Z.AI GLM models',
   },
 
   openrouter: {
@@ -128,17 +128,17 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Anthropic models
-  if (['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 
   // Check OpenAI models
-  if (['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'].includes(modelId)) {
+  if (['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini', 'gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 
   // Check Google models
-  if (['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'].includes(modelId)) {
+  if (['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
@@ -148,12 +148,12 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Kimi models
-  if (['kimi-k2.5', 'K2.6-code-preview'].includes(modelId)) {
+  if (['kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 
   // Check Z.AI models
-  if (['glm-5.1'].includes(modelId)) {
+  if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
   }
 
