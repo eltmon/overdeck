@@ -4,7 +4,7 @@
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility",
-    "updated": "2026-04-18T14:39:23.000Z"
+    "updated": "2026-04-18T14:40:43.885Z"
   },
   "plan": {
     "id": "pan-653",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "3102731e-c901-43ed-9595-545316061952",
     "author": "agent:claude-opus-4-6",
-    "sequence": 44,
+    "sequence": 55,
     "created": "2026-04-12T00:00:00Z",
-    "updated": "2026-04-18T14:39:23.000Z",
+    "updated": "2026-04-18T14:40:43.885Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/653",
@@ -78,7 +78,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.884Z"
       },
       {
         "id": "stuck-schema",
@@ -122,7 +122,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.884Z"
       },
       {
         "id": "git-operations-table",
@@ -166,7 +166,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.884Z"
       },
       {
         "id": "git-helper-wrapper",
@@ -210,7 +210,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.883Z"
       },
       {
         "id": "approve-divergence-guard",
@@ -254,7 +254,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.883Z"
       },
       {
         "id": "salvage-divergence-guard",
@@ -302,7 +302,7 @@
           "issueLabel": "pan-653"
         },
         "narrative": {
-          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane \u2014 card stays where it is per the issue comment clarification."
+          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane — card stays where it is per the issue comment clarification."
         },
         "subItems": [
           {
@@ -333,7 +333,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.883Z"
       },
       {
         "id": "tmux-stream-patterns",
@@ -351,7 +351,7 @@
         "subItems": [
           {
             "id": "tmux-stream-patterns.ac1",
-            "title": "User sees 'pushing\u2026', 'rejected non-fast-forward', 'retrying\u2026' events live in the activity panel during an approve",
+            "title": "User sees 'pushing…', 'rejected non-fast-forward', 'retrying…' events live in the activity panel during an approve",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -368,7 +368,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.885Z"
       },
       {
         "id": "concurrent-merge-detection",
@@ -403,7 +403,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.885Z"
       },
       {
         "id": "activity-panel-ux",
@@ -447,7 +447,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.884Z"
       },
       {
         "id": "kanban-stuck-count-union",
@@ -491,7 +491,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.884Z"
       },
       {
         "id": "integration-tests",
@@ -535,7 +535,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-15T03:25:52.482Z"
+        "completed": "2026-04-18T14:40:43.882Z"
       }
     ],
     "edges": [
