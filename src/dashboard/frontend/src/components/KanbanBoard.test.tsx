@@ -5,7 +5,9 @@ import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
 import { DialogProvider } from './DialogProvider';
 import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
+import { TasksChip } from './PlanningChips';
 import { useDashboardStore } from '../lib/store';
+import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -495,6 +497,10 @@ describe('ListIssueRow', () => {
   });
 });
 
+vi.mock('../lib/refresh-dashboard-state', () => ({
+  refreshDashboardState: vi.fn(async () => {}),
+}));
+
 describe('FeatureCard', () => {
   const originalFetch = global.fetch;
 
@@ -632,6 +638,156 @@ describe('FeatureCard', () => {
     fireEvent.click(watchButton);
     expect(onPlan).toHaveBeenCalledWith(feature);
     expect(onToggle).not.toHaveBeenCalled();
+  });
+});
+
+describe('TasksChip', () => {
+  const originalFetch = global.fetch;
+
+  const createIssue = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'issue-1',
+    identifier: 'TEST-123',
+    title: 'Test Issue',
+    description: '',
+    status: 'Todo',
+    priority: 3,
+    labels: [],
+    url: 'https://test.com/TEST-123',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+    ...overrides,
+  });
+
+  const renderTasksChip = ({
+    issue = createIssue(),
+    onViewBeads = vi.fn(),
+    queryClient,
+  }: {
+    issue?: Issue;
+    onViewBeads?: ReturnType<typeof vi.fn>;
+    queryClient?: QueryClient;
+  } = {}) => {
+    const client = queryClient ?? new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <TasksChip issue={issue} onViewBeads={onViewBeads} />
+        </DialogProvider>
+      </QueryClientProvider>
+    );
+
+    return { issue, onViewBeads, queryClient: client };
+  };
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.clearAllMocks();
+  });
+
+  it('generates tasks when a plan exists but beads have not been created yet', async () => {
+    const issue = createIssue();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: true, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      if (url.endsWith('/generate-tasks')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, created: ['bead-1'], count: 1 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderTasksChip({ issue });
+
+    const button = await screen.findByRole('button', { name: 'Generate Tasks' });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/issues/${issue.identifier}/generate-tasks`, { method: 'POST' });
+    });
+    expect(await screen.findByText('Tasks generated')).toBeDefined();
+    expect(screen.getByText('Created 1 bead from the vBRIEF plan.')).toBeDefined();
+  });
+
+  it('refreshes planning state and dashboard state after generating tasks', async () => {
+    const issue = createIssue();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: true, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      if (url.endsWith('/generate-tasks')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, created: ['bead-1', 'bead-2'], count: 2 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+    const invalidateQueries = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+
+    renderTasksChip({ issue });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate Tasks' }));
+
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['planning-state', issue.identifier] });
+      expect(refreshDashboardState).toHaveBeenCalled();
+    });
+    expect(await screen.findByText('Tasks generated')).toBeDefined();
+    expect(screen.getByText('Created 2 beads from the vBRIEF plan.')).toBeDefined();
+  });
+
+  it('shows an error alert when task generation fails', async () => {
+    const issue = createIssue();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: true, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      if (url.endsWith('/generate-tasks')) {
+        return {
+          ok: false,
+          json: async () => ({ success: false, error: 'Planner exploded' }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderTasksChip({ issue });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate Tasks' }));
+
+    expect(await screen.findByText('Generate tasks failed')).toBeDefined();
+    expect(screen.getByText('Planner exploded')).toBeDefined();
   });
 });
 
