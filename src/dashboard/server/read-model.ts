@@ -160,10 +160,9 @@ export const ReadModelServiceLive = Layer.effect(
 
           // Also pick up agents created after the last cache save (new state files not in cache)
           const cachedIds = new Set(validAgents.map((a: any) => a.id));
-          const { readdirSync: readdirSyncFs } = yield* Effect.promise(() => import('node:fs'));
           const newAgentIds: string[] = [];
           try {
-            const entries = readdirSyncFs(agentsDir);
+            const entries: string[] = yield* Effect.promise(() => import('node:fs/promises').then(fs => fs.readdir(agentsDir)));
             for (const entry of entries) {
               if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
                 newAgentIds.push(entry);
@@ -172,11 +171,10 @@ export const ReadModelServiceLive = Layer.effect(
           } catch { /* agentsDir may not exist on first boot */ }
 
           // Load new agent state files and add them to the snapshot
-          const { readFileSync: readFileSyncFs } = yield* Effect.promise(() => import('node:fs'));
           const newAgents: any[] = [];
           for (const agentId of newAgentIds) {
             try {
-              const raw = readFileSyncFs(joinPath(agentsDir, agentId, 'state.json'), 'utf-8');
+              const raw: string = yield* Effect.promise(() => import('node:fs/promises').then(fs => fs.readFile(joinPath(agentsDir, agentId, 'state.json'), 'utf-8')));
               newAgents.push(JSON.parse(raw));
             } catch { /* skip unreadable state files */ }
           }
