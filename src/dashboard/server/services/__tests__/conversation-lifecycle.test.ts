@@ -35,7 +35,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     expect(checker).toHaveBeenCalledWith('conv-gone-session');
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
-    expect(mockCleanupConversationAttachments).toHaveBeenCalledWith('gone-session');
+    expect(mockCleanupConversationAttachments).not.toHaveBeenCalled();
   });
 
   it('does NOT mark conversations as ended when session checker returns true', async () => {
@@ -93,8 +93,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
-    expect(mockCleanupConversationAttachments).toHaveBeenCalledTimes(1);
-    expect(mockCleanupConversationAttachments).toHaveBeenCalledWith('gone');
+    expect(mockCleanupConversationAttachments).not.toHaveBeenCalled();
   });
 
   it('does not throw when listConversations errors', async () => {

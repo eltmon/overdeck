@@ -83,6 +83,7 @@ import {
 } from '../services/conversation-attachments.js';
 
 const execAsync = promisify(exec);
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
@@ -132,7 +133,10 @@ function decodeUploadBytes(data: string): Buffer | null {
   }
   try {
     const bytes = Buffer.from(trimmed, 'base64');
-    return bytes.length > 0 && bytes.toString('base64') === trimmed ? bytes : null;
+    if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) {
+      return null;
+    }
+    return bytes.toString('base64') === trimmed ? bytes : null;
   } catch {
     return null;
   }
@@ -168,7 +172,7 @@ export async function handleConversationImageUpload(
 
   const bytes = decodeUploadBytes(data);
   if (!bytes) {
-    return jsonResponse({ error: 'Invalid base64 image data' }, { status: 400 });
+    return jsonResponse({ error: `Invalid base64 image data or payload exceeds ${MAX_UPLOAD_BYTES} bytes` }, { status: 400 });
   }
 
   const extension = safeUploadExtension(filename, mimeType);
@@ -612,7 +616,6 @@ const postConversationStopRoute = HttpRouter.add(
 
         await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
-        await cleanupConversationAttachments(name);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {

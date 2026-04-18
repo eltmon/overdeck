@@ -296,6 +296,69 @@ describe('ComposerFooter image attachments', () => {
     });
   });
 
+  it('blocks send while image uploads are still in progress', async () => {
+    const fetchMock = vi.mocked(fetch);
+    let resolveUpload: ((response: Response) => void) | null = null;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Promise<Response>((resolve) => {
+          resolveUpload = resolve;
+        });
+      }
+      if (url.includes('/delete-image')) {
+        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      if (url.includes('/message')) {
+        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const onSend = vi.fn();
+    render(<ComposerFooter conversation={conversation} onSend={onSend} />);
+
+    const file = new File(['png-bytes'], 'slow.png', { type: 'image/png' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([1, 2, 3, 4]).buffer),
+    });
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello world' } });
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => file }],
+      },
+    });
+
+    expect(await screen.findByText('slow.png')).toBeInTheDocument();
+    expect(screen.getByText('Uploading…')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    expect(mockToastError).toHaveBeenCalledWith('Please wait for image uploads to finish');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.anything(),
+    );
+    expect(onSend).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTitle('Remove slow.png'));
+    resolveUpload?.(new Response(JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/delete-image',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }),
+        }),
+      );
+    });
+  });
+
   it('blocks send when any pending image upload has failed', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {

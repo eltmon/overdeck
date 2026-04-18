@@ -8,7 +8,6 @@
 
 import { listConversations, markConversationEnded } from '../../../lib/database/conversations-db.js';
 import { sessionExistsAsync } from '../../../lib/tmux.js';
-import { cleanupConversationAttachments } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -36,7 +35,6 @@ export async function pollConversations(
         if (!alive) {
           console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
           markConversationEnded(conv.name);
-          await cleanupConversationAttachments(conv.name);
         }
       }),
     );

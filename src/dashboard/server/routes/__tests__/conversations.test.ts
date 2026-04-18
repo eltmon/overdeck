@@ -119,10 +119,27 @@ describe('conversations route — DB integration', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data' });
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data or payload exceeds 5242880 bytes' });
   });
 
-  it('rejects attachment reuse across conversations and cleans up when explicitly ended', async () => {
+  it('rejects oversized upload payloads before writing files', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const oversizedData = Buffer.alloc(5 * 1024 * 1024 + 1, 1).toString('base64');
+    const response = await handleConversationImageUpload('upload-test', {
+      filename: 'oversized.png',
+      data: oversizedData,
+      mimeType: 'image/png',
+    });
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data or payload exceeds 5242880 bytes' });
+  });
+
+  it('rejects attachment reuse across conversations and cleans up when explicitly archived', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
     const { cleanupConversationAttachments } = await import('../../services/conversation-attachments.js');
@@ -184,14 +201,17 @@ describe('conversations route — DB integration', () => {
     expect(existsSync(uploadedPath)).toBe(false);
   });
 
-  it('startup cleanup removes attachments for inactive conversations only', async () => {
-    const { createConversation, markConversationEnded } = await import('../../../../lib/database/conversations-db.js');
+  it('startup cleanup preserves ended conversations and removes only archived attachments', async () => {
+    const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
     const { cleanupInactiveConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'active-conv', tmuxSession: 'conv-active-conv', cwd: '/cwd' });
     createConversation({ name: 'ended-conv', tmuxSession: 'conv-ended-conv', cwd: '/cwd' });
+    createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
     markConversationEnded('ended-conv');
+    markConversationEnded('archived-conv');
+    archiveConversation('archived-conv');
 
     const pngData = Buffer.from(Uint8Array.from([7, 8, 9, 10])).toString('base64');
     const activeUpload = await handleConversationImageUpload('active-conv', {
@@ -204,16 +224,24 @@ describe('conversations route — DB integration', () => {
       data: pngData,
       mimeType: 'image/png',
     });
+    const archivedUpload = await handleConversationImageUpload('archived-conv', {
+      filename: 'archived.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
 
     const activePath = decodeJsonResponse(activeUpload).path as string;
     const endedPath = decodeJsonResponse(endedUpload).path as string;
+    const archivedPath = decodeJsonResponse(archivedUpload).path as string;
     expect(existsSync(activePath)).toBe(true);
     expect(existsSync(endedPath)).toBe(true);
+    expect(existsSync(archivedPath)).toBe(true);
 
     await cleanupInactiveConversationAttachments();
 
     expect(existsSync(activePath)).toBe(true);
-    expect(existsSync(endedPath)).toBe(false);
+    expect(existsSync(endedPath)).toBe(true);
+    expect(existsSync(archivedPath)).toBe(false);
   });
 
   it('creating and listing a conversation returns the right data', async () => {

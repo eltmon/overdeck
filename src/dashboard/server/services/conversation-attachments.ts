@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 
-import { listInactiveConversationNames } from '../../../lib/database/conversations-db.js';
+import { listArchivedConversationNames } from '../../../lib/database/conversations-db.js';
 import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
@@ -26,7 +26,7 @@ export async function cleanupConversationAttachments(name: string): Promise<void
 }
 
 export async function cleanupInactiveConversationAttachments(): Promise<void> {
-  const names = listInactiveConversationNames();
+  const names = listArchivedConversationNames();
   await Promise.all(names.map((name) => cleanupConversationAttachments(name)));
 }
 
