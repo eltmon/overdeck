@@ -20,6 +20,11 @@ vi.mock('../../src/lib/config-yaml.js', () => ({
       tmux: {
         configMode: 'managed',
       },
+      conversations: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: false,
+      },
       trackerKeys: {},
     },
     migration: null,
@@ -83,6 +88,11 @@ describe('settings-api', () => {
           },
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
+          conversations: {
+            compactionModel: 'claude-haiku-4-5',
+            manualCompactMode: 'claude-code',
+            richCompaction: false,
+          },
           trackerKeys: {},
         },
         migration: null,
