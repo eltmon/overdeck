@@ -130,7 +130,11 @@ async function rebaseOneRepo(
         }
 
         if (!await isRebaseInProgress(repoPath)) {
-          break;
+          return {
+            repoKey,
+            outcome: 'error',
+            message: `Rebase failed: ${lastError.message?.trim() || lastError.message}`,
+          };
         }
 
         await execAsync('git rebase --abort', { cwd: repoPath }).catch(() => {});

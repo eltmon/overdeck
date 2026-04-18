@@ -138,4 +138,28 @@ describe('rebaseAndPushRepos', () => {
     expect(existsSync(join(repoDir, rebaseMergePath.trim()))).toBe(false);
     expect(existsSync(join(repoDir, rebaseApplyPath.trim()))).toBe(false);
   });
+
+  it('fails immediately when git rebase cannot start a rebase state', async () => {
+    await writeFile(join(repoDir, 'README.md'), 'dirty worktree\n');
+
+    const result = await rebaseAndPushRepos(repoDir, createMergeSet());
+
+    expect(result.success).toBe(false);
+    expect(result.firstFailure?.outcome).toBe('error');
+    expect(result.firstFailure?.message).toContain('cannot rebase: You have unstaged changes');
+
+    const { stdout: rebaseMergePath } = await execAsync('git rev-parse --git-path rebase-merge', {
+      cwd: repoDir,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const { stdout: rebaseApplyPath } = await execAsync('git rev-parse --git-path rebase-apply', {
+      cwd: repoDir,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+
+    expect(existsSync(join(repoDir, rebaseMergePath.trim()))).toBe(false);
+    expect(existsSync(join(repoDir, rebaseApplyPath.trim()))).toBe(false);
+  });
 });

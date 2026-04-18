@@ -91,7 +91,7 @@ git push -u origin "feature/pan-$ISSUE_NUM"
 
 ```bash
 # Trigger the approval - this kicks off review-agent
-RESULT=$(curl -s -X POST "http://localhost:3011/api/workspaces/PAN-$ISSUE_NUM/approve" \
+RESULT=$(curl -s -X POST "http://localhost:3011/api/issues/PAN-$ISSUE_NUM/approve" \
   -H "Content-Type: application/json")
 echo "$RESULT" | jq .
 
