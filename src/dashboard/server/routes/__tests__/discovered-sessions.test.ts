@@ -13,6 +13,7 @@ import { tmpdir } from 'os';
 import { scan } from '../../../../lib/conversations/scanner.js';
 import { searchSessions } from '../../../../lib/conversations/search.js';
 import { upsertDiscoveredSession } from '../../../../lib/database/discovered-sessions-db.js';
+import { parseSearchParams } from '../discovered-sessions.js';
 
 let TEST_HOME: string;
 let fakeClaudeDir: string;
@@ -87,6 +88,80 @@ describe('scan (route logic)', () => {
       watchDirs: [],
     });
     expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ─── parseSearchParams filter parsing ────────────────────────────────────────
+
+describe('parseSearchParams', () => {
+  it('parses workspace and since', () => {
+    const params = new URLSearchParams('workspace=/home/user/Projects/alpha&since=7d');
+    const filter = parseSearchParams(params);
+    expect(filter.workspacePath).toBe('/home/user/Projects/alpha');
+    expect(filter.since).toBeTruthy();
+  });
+
+  it('parses model filter', () => {
+    const params = new URLSearchParams('model=claude-sonnet-4-6');
+    const filter = parseSearchParams(params);
+    expect(filter.primaryModel).toBe('claude-sonnet-4-6');
+  });
+
+  it('parses managed=true', () => {
+    const filter = parseSearchParams(new URLSearchParams('managed=true'));
+    expect(filter.managed).toBe(true);
+  });
+
+  it('parses managed=false as false', () => {
+    const filter = parseSearchParams(new URLSearchParams('managed=false'));
+    expect(filter.managed).toBe(false);
+  });
+
+  it('parses enriched flag', () => {
+    const filter = parseSearchParams(new URLSearchParams('enriched=1'));
+    expect(filter.enriched).toBe(true);
+  });
+
+  it('parses not_enriched flag', () => {
+    const filter = parseSearchParams(new URLSearchParams('not_enriched=1'));
+    expect(filter.notEnriched).toBe(true);
+  });
+
+  it('parses comma-separated tags', () => {
+    const filter = parseSearchParams(new URLSearchParams('tags=auth,refactor'));
+    expect(filter.tags).toEqual(['auth', 'refactor']);
+  });
+
+  it('parses min_cost and max_cost', () => {
+    const filter = parseSearchParams(new URLSearchParams('min_cost=0.01&max_cost=1.5'));
+    expect(filter.minCost).toBeCloseTo(0.01);
+    expect(filter.maxCost).toBeCloseTo(1.5);
+  });
+
+  it('ignores invalid min_cost', () => {
+    const filter = parseSearchParams(new URLSearchParams('min_cost=notanumber'));
+    expect(filter.minCost).toBeUndefined();
+  });
+
+  it('parses min_messages', () => {
+    const filter = parseSearchParams(new URLSearchParams('min_messages=10'));
+    expect(filter.minMessages).toBe(10);
+  });
+
+  it('parses before and after', () => {
+    const filter = parseSearchParams(new URLSearchParams('before=1d&after=30d'));
+    expect(filter.before).toBeTruthy();
+    expect(filter.after).toBeTruthy();
+  });
+
+  it('parses issue_id', () => {
+    const filter = parseSearchParams(new URLSearchParams('issue_id=PAN-123'));
+    expect(filter.issueId).toBe('PAN-123');
+  });
+
+  it('returns empty object for empty params', () => {
+    const filter = parseSearchParams(new URLSearchParams());
+    expect(Object.keys(filter).length).toBe(0);
   });
 });
 

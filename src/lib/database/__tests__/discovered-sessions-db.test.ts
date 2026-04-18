@@ -177,6 +177,45 @@ describe('discovered-sessions-db', () => {
     expect(results.length).toBe(0);
   });
 
+  it('updateEnrichment per-row FTS sync: re-enriching a session does not corrupt FTS for other sessions', async () => {
+    const { upsertDiscoveredSession, updateEnrichment, searchFts } = await import(
+      '../discovered-sessions-db.js'
+    );
+
+    // Enrich two sessions with distinct summaries
+    const s1 = upsertDiscoveredSession({ jsonlPath: '/fts-session-A.jsonl' });
+    const s2 = upsertDiscoveredSession({ jsonlPath: '/fts-session-B.jsonl' });
+
+    updateEnrichment(s1.id, {
+      enrichmentLevel: 1,
+      enrichmentModel: 'claude-haiku-4-5',
+      summary: 'session A: memory leak fix in cache layer',
+    });
+    updateEnrichment(s2.id, {
+      enrichmentLevel: 1,
+      enrichmentModel: 'claude-haiku-4-5',
+      summary: 'session B: authentication refactor',
+    });
+
+    // Both are searchable
+    expect(searchFts('memory leak').some((r) => r.id === s1.id)).toBe(true);
+    expect(searchFts('authentication refactor').some((r) => r.id === s2.id)).toBe(true);
+
+    // Re-enrich session A with updated summary
+    updateEnrichment(s1.id, {
+      enrichmentLevel: 2,
+      enrichmentModel: 'claude-sonnet-4-6',
+      summary: 'session A: database connection pooling',
+    });
+
+    // Old summary for A is no longer in FTS
+    expect(searchFts('memory leak').some((r) => r.id === s1.id)).toBe(false);
+    // New summary for A is in FTS
+    expect(searchFts('connection pooling').some((r) => r.id === s1.id)).toBe(true);
+    // Session B is untouched
+    expect(searchFts('authentication refactor').some((r) => r.id === s2.id)).toBe(true);
+  });
+
   // ─── Embedding storage round-trip ─────────────────────────────────────────
 
   it('insertEmbedding and getEmbedding round-trip correctly', async () => {

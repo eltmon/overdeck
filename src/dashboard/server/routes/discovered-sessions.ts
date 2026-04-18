@@ -78,6 +78,49 @@ const listRoute = HttpRouter.add(
   })),
 );
 
+// ─── Shared filter parser ─────────────────────────────────────────────────────
+
+/**
+ * Parse all ConversationFilter fields from URLSearchParams.
+ * Exported for unit testing.
+ */
+export function parseSearchParams(
+  params: URLSearchParams,
+): Parameters<typeof findDiscoveredSessions>[0] {
+  const filter: Parameters<typeof findDiscoveredSessions>[0] = {};
+  if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
+  if (params.has('model')) filter.primaryModel = params.get('model')!;
+  if (params.has('since')) filter.since = parseRelativeTime(params.get('since')!);
+  if (params.has('before')) filter.before = parseRelativeTime(params.get('before')!);
+  if (params.has('after')) filter.after = parseRelativeTime(params.get('after')!);
+  if (params.has('managed')) filter.managed = params.get('managed') === 'true';
+  if (params.has('unmanaged')) filter.unmanaged = params.get('unmanaged') === 'true';
+  if (params.has('enriched')) filter.enriched = true;
+  if (params.has('not_enriched')) filter.notEnriched = true;
+  if (params.has('issue_id')) filter.issueId = params.get('issue_id')!;
+  if (params.has('tags')) {
+    const raw = params.get('tags')!;
+    filter.tags = raw.split(',').map((t) => t.trim()).filter(Boolean);
+  }
+  if (params.has('tools')) {
+    const raw = params.get('tools')!;
+    filter.tools = raw.split(',').map((t) => t.trim()).filter(Boolean);
+  }
+  if (params.has('min_cost')) {
+    const v = parseFloat(params.get('min_cost')!);
+    if (Number.isFinite(v)) filter.minCost = v;
+  }
+  if (params.has('max_cost')) {
+    const v = parseFloat(params.get('max_cost')!);
+    if (Number.isFinite(v)) filter.maxCost = v;
+  }
+  if (params.has('min_messages')) {
+    const v = parseInt(params.get('min_messages')!, 10);
+    if (Number.isFinite(v) && v >= 0) filter.minMessages = v;
+  }
+  return filter;
+}
+
 // ─── GET /api/discovered-sessions/search ─────────────────────────────────────
 
 const searchRoute = HttpRouter.add(
@@ -93,10 +136,7 @@ const searchRoute = HttpRouter.add(
     const rawLimit = parseInt(params.get('limit') ?? '20', 10);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 20;
 
-    const filter: Parameters<typeof searchSessions>[0]['filter'] = {};
-    if (params.has('workspace')) filter!.workspacePath = params.get('workspace')!;
-    if (params.has('since')) filter!.since = parseRelativeTime(params.get('since')!);
-
+    const filter = parseSearchParams(params);
     const result = searchSessions({ q, similarTo, filter, limit });
     return jsonResponse(result);
   })),

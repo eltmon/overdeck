@@ -60,14 +60,35 @@ interface ScanResult {
   durationMs: number;
 }
 
+function buildFilterParams(filters: {
+  workspace?: string;
+  since?: string;
+  managed?: boolean;
+  enriched?: boolean;
+}): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.workspace) params.set('workspace', filters.workspace);
+  if (filters.since) params.set('since', filters.since);
+  if (filters.managed) params.set('managed', 'true');
+  if (filters.enriched) params.set('enriched', 'true');
+  return params;
+}
+
 async function fetchSessions(params: URLSearchParams): Promise<ListResponse> {
   const resp = await fetch(`/api/discovered-sessions?${params}`);
   if (!resp.ok) throw new Error('Failed to fetch sessions');
   return resp.json() as Promise<ListResponse>;
 }
 
-async function fetchSearch(q: string, limit = 50): Promise<SearchResponse> {
+async function fetchSearch(
+  q: string,
+  filterParams: URLSearchParams,
+  limit = 50,
+): Promise<SearchResponse> {
   const params = new URLSearchParams({ q, limit: String(limit) });
+  for (const [key, value] of filterParams) {
+    params.set(key, value);
+  }
   const resp = await fetch(`/api/discovered-sessions/search?${params}`);
   if (!resp.ok) throw new Error('Search failed');
   return resp.json() as Promise<SearchResponse>;
@@ -104,12 +125,12 @@ export function ConversationsPage() {
   }>({});
 
   const trimmedQuery = query.trim();
+  const filterParams = buildFilterParams(filters);
 
   const listParams = new URLSearchParams({ limit: '50' });
-  if (filters.workspace) listParams.set('workspace', filters.workspace);
-  if (filters.since) listParams.set('since', filters.since);
-  if (filters.managed) listParams.set('managed', 'true');
-  if (filters.enriched) listParams.set('enriched', 'true');
+  for (const [key, value] of filterParams) {
+    listParams.set(key, value);
+  }
 
   const { data: listData, isLoading: isListLoading } = useQuery({
     queryKey: ['discovered-sessions', listParams.toString()],
@@ -118,8 +139,8 @@ export function ConversationsPage() {
   });
 
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    queryKey: ['discovered-sessions-search', trimmedQuery],
-    queryFn: () => fetchSearch(trimmedQuery),
+    queryKey: ['discovered-sessions-search', trimmedQuery, filterParams.toString()],
+    queryFn: () => fetchSearch(trimmedQuery, filterParams),
     enabled: !!trimmedQuery,
   });
 

@@ -350,6 +350,22 @@ export function updateEnrichment(
   },
 ): void {
   const db = getDatabase();
+
+  // Read old FTS-relevant values before UPDATE so we can delete the stale FTS entry.
+  // enrichment_level > 0 means the session was previously enriched and has a FTS row.
+  const oldRow = db
+    .prepare(
+      `SELECT enrichment_level, summary, summary_detailed, tags, files_touched
+       FROM discovered_sessions WHERE id = ?`,
+    )
+    .get(id) as {
+    enrichment_level: number;
+    summary: string | null;
+    summary_detailed: string | null;
+    tags: string | null;
+    files_touched: string | null;
+  } | undefined;
+
   db.prepare(
     `UPDATE discovered_sessions SET
        enrichment_level  = ?,
@@ -374,8 +390,27 @@ export function updateEnrichment(
     id,
   );
 
-  // Sync FTS5 after enrichment
-  syncFts(id);
+  // Per-row FTS sync: delete stale entry (if any), then insert current values.
+  if (oldRow && oldRow.enrichment_level > 0) {
+    db.prepare(
+      `INSERT INTO sessions_fts(sessions_fts, rowid, summary, summary_detailed, tags, files_touched)
+       VALUES('delete', ?, ?, ?, ?, ?)`,
+    ).run(id, oldRow.summary, oldRow.summary_detailed, oldRow.tags, oldRow.files_touched);
+  }
+  const newRow = db
+    .prepare(
+      `SELECT summary, summary_detailed, tags, files_touched FROM discovered_sessions WHERE id = ?`,
+    )
+    .get(id) as {
+    summary: string | null;
+    summary_detailed: string | null;
+    tags: string | null;
+    files_touched: string | null;
+  };
+  db.prepare(
+    `INSERT INTO sessions_fts(rowid, summary, summary_detailed, tags, files_touched)
+     VALUES(?, ?, ?, ?, ?)`,
+  ).run(id, newRow.summary, newRow.summary_detailed, newRow.tags, newRow.files_touched);
 }
 
 /**
@@ -391,17 +426,9 @@ export function markEnrichmentFailed(id: number): void {
 // ─── FTS5 operations ──────────────────────────────────────────────────────────
 
 /**
- * Sync the FTS5 index for a single session using the content= rebuild mechanism.
- *
- * FTS5 content= tables in SQLite require manual sync — direct INSERT/DELETE on the
- * virtual table modifies the FTS index but not the content table, and vice versa.
- * The safest per-row sync is:
- *   1. Delete the stale FTS entry using the special 'delete' command row (needs old values)
- *   2. Insert the current row into FTS
- *
- * Because we often don't have the old values readily available, we instead trigger a
- * full `rebuild` which re-reads all rows from discovered_sessions. This is O(n) but
- * safe and correct at expected scale (thousands of sessions, <1s).
+ * Rebuild the entire FTS5 index from discovered_sessions. O(n) — use sparingly.
+ * Useful after direct SQL edits that bypass updateEnrichment (e.g. in tests).
+ * Normal enrichment uses per-row sync inside updateEnrichment instead.
  */
 export function syncFts(_id: number): void {
   const db = getDatabase();

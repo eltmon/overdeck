@@ -1,12 +1,24 @@
 /**
- * Tests for ConversationsPage search-vs-list endpoint switching (PAN-457).
+ * Tests for ConversationsPage search-vs-list endpoint switching and filter
+ * preservation during search (PAN-457).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationsPage } from '../ConversationsPage';
 
-// Mock child components — only the data-fetching logic is under test
+// ─── FacetPanel mock captures onChange so tests can drive filter state ─────
+
+type FilterOnChange = (key: string, val: string | boolean | undefined) => void;
+let capturedOnChange: FilterOnChange | null = null;
+
+vi.mock('../FacetPanel', () => ({
+  FacetPanel: ({ onChange }: { onChange: FilterOnChange }) => {
+    capturedOnChange = onChange;
+    return null;
+  },
+}));
+
 vi.mock('../SessionTable', () => ({
   SessionTable: ({ sessions }: { sessions: unknown[] }) => (
     <div data-testid="session-table">sessions:{sessions.length}</div>
@@ -18,7 +30,6 @@ vi.mock('../ScanButton', () => ({
     <button data-testid="scan-btn" onClick={onScan}>Scan</button>
   ),
 }));
-vi.mock('../FacetPanel', () => ({ FacetPanel: () => null }));
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +75,7 @@ describe('ConversationsPage endpoint selection', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    capturedOnChange = null;
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -119,10 +131,76 @@ describe('ConversationsPage endpoint selection', () => {
       expect(searchCalls.length).toBeGreaterThan(0);
     });
 
-    // The search call should include the query param
     const searchCall = fetchMock.mock.calls.find(
       ([url]: [string]) => url.includes('/search'),
     );
     expect(searchCall![0]).toContain('q=auth+bug');
+  });
+
+  it('search URL includes active facet filters', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('/stats')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(STATS_RESPONSE) });
+      }
+      if (url.includes('/search')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(SEARCH_RESPONSE) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(LIST_RESPONSE) });
+    });
+
+    renderPage(makeClient());
+
+    // Open facets to mount FacetPanel and capture the onChange handler
+    const filterBtn = screen.getByText('Filters');
+    fireEvent.click(filterBtn);
+
+    // Apply a workspace filter via the captured onChange
+    await waitFor(() => expect(capturedOnChange).not.toBeNull());
+    act(() => {
+      capturedOnChange!('workspace', '/home/user/Projects/alpha');
+    });
+
+    // Now type a search query
+    const input = screen.getByPlaceholderText('Search sessions…');
+    fireEvent.change(input, { target: { value: 'memory leak' } });
+
+    await waitFor(() => {
+      const searchCalls = fetchMock.mock.calls.filter(
+        ([url]: [string]) => url.includes('/api/discovered-sessions/search'),
+      );
+      expect(searchCalls.length).toBeGreaterThan(0);
+      // Filter must be forwarded to the search endpoint
+      const searchUrl: string = searchCalls[searchCalls.length - 1][0] as string;
+      expect(searchUrl).toContain('q=memory+leak');
+      expect(searchUrl).toContain('workspace=');
+    });
+  });
+
+  it('list URL includes active facet filters', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('/stats')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(STATS_RESPONSE) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(LIST_RESPONSE) });
+    });
+
+    renderPage(makeClient());
+
+    // Open facets to mount FacetPanel and capture the onChange handler
+    const filterBtn = screen.getByText('Filters');
+    fireEvent.click(filterBtn);
+
+    await waitFor(() => expect(capturedOnChange).not.toBeNull());
+    act(() => {
+      capturedOnChange!('managed', true);
+    });
+
+    await waitFor(() => {
+      const listCalls = fetchMock.mock.calls.filter(
+        ([url]: [string]) => url.includes('/api/discovered-sessions?'),
+      );
+      const hasManaged = listCalls.some(([url]: [string]) => url.includes('managed=true'));
+      expect(hasManaged).toBe(true);
+    });
   });
 });
