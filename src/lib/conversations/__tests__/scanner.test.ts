@@ -1,8 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { scan } from '../scanner.js';
+
+// Allow individual tests to inject a parse failure for a specific file path
+let failParseForPath: string | null = null;
+
+vi.mock('../jsonl-async.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../jsonl-async.js')>();
+  return {
+    ...actual,
+    parseSessionJsonl: vi.fn().mockImplementation((filePath: string) => {
+      if (failParseForPath && filePath.includes(failParseForPath)) {
+        throw new Error('Simulated parse failure');
+      }
+      return actual.parseSessionJsonl(filePath);
+    }),
+  };
+});
 
 let TEST_HOME: string;
 let fakeClaudeDir: string;
@@ -164,5 +180,31 @@ describe('scanner', () => {
     const sess = sessions.find((s) => s.jsonlPath === p);
     expect(sess).toBeDefined();
     expect(sess!.sessionId).toBe('sess-1');
+  });
+
+  it('a file that fails to parse increments errors and still emits progress for that file', async () => {
+    const good = join(fakeClaudeDir, '-home-user-Projects-myapp', 'good-parse.jsonl');
+    const bad = join(fakeClaudeDir, '-home-user-Projects-myapp', 'fail-parse.jsonl');
+    writeFileSync(good, SESSION_JSONL, 'utf8');
+    writeFileSync(bad, SESSION_JSONL, 'utf8');
+
+    // Make parseSessionJsonl throw for 'fail-parse.jsonl'
+    failParseForPath = 'fail-parse';
+
+    const progressCalls: Array<{ dirsProcessed: number }> = [];
+    const result = await scan({
+      mode: 'system',
+      watchDirs: [],
+      onProgress: (p) => progressCalls.push({ dirsProcessed: p.dirsProcessed }),
+    });
+
+    failParseForPath = null;
+
+    // The failing file must appear in errors, not silently vanish
+    expect(result.errors).toBeGreaterThanOrEqual(1);
+    // dirsProcessed must equal inserted+updated+skipped+errors (all files accounted for)
+    expect(result.inserted + result.updated + result.skipped + result.errors).toBe(
+      progressCalls[progressCalls.length - 1]?.dirsProcessed ?? 0,
+    );
   });
 });

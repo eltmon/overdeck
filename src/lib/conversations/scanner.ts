@@ -163,52 +163,57 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
       return;
     }
 
-    // Parse the JSONL
-    const meta = await parseSessionJsonl(jsonlPath);
+    // Parse, resolve, and upsert — wrap so one bad file can't leave progress incomplete.
+    try {
+      const meta = await parseSessionJsonl(jsonlPath);
 
-    // Resolve workspace path
-    const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
+      // Resolve workspace path
+      const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
 
-    // Correlation (managed by Panopticon?)
-    const correlation = correlationMap.get(jsonlPath) ?? {
-      panopticonManaged: false,
-      panIssueId: null,
-      panAgentId: null,
-    };
+      // Correlation (managed by Panopticon?)
+      const correlation = correlationMap.get(jsonlPath) ?? {
+        panopticonManaged: false,
+        panIssueId: null,
+        panAgentId: null,
+      };
 
-    // Estimate cost from token counts using model-capabilities pricing
-    const estimatedCost = estimateCost(meta.primaryModel, meta.tokenInput, meta.tokenOutput);
+      // Estimate cost from token counts using model-capabilities pricing
+      const estimatedCost = estimateCost(meta.primaryModel, meta.tokenInput, meta.tokenOutput);
 
-    // Upsert into DB
-    const wasExisting = !!existing;
-    upsertDiscoveredSession({
-      jsonlPath,
-      sessionId: meta.sessionId,
-      workspacePath: resolved.workspacePath,
-      workspaceHash: resolved.workspaceHash,
-      messageCount: meta.messageCount,
-      firstTs: meta.firstTs,
-      lastTs: meta.lastTs,
-      modelsUsed: meta.modelsUsed,
-      primaryModel: meta.primaryModel,
-      tokenInput: meta.tokenInput,
-      tokenOutput: meta.tokenOutput,
-      estimatedCost,
-      toolsUsed: meta.toolsUsed,
-      filesTouched: meta.filesTouched,
-      panopticonManaged: correlation.panopticonManaged,
-      panIssueId: correlation.panIssueId,
-      panAgentId: correlation.panAgentId,
-      fileSize: stat.size,
-      fileMtime,
-    });
+      // Upsert into DB
+      const wasExisting = !!existing;
+      upsertDiscoveredSession({
+        jsonlPath,
+        sessionId: meta.sessionId,
+        workspacePath: resolved.workspacePath,
+        workspaceHash: resolved.workspaceHash,
+        messageCount: meta.messageCount,
+        firstTs: meta.firstTs,
+        lastTs: meta.lastTs,
+        modelsUsed: meta.modelsUsed,
+        primaryModel: meta.primaryModel,
+        tokenInput: meta.tokenInput,
+        tokenOutput: meta.tokenOutput,
+        estimatedCost,
+        toolsUsed: meta.toolsUsed,
+        filesTouched: meta.filesTouched,
+        panopticonManaged: correlation.panopticonManaged,
+        panIssueId: correlation.panIssueId,
+        panAgentId: correlation.panAgentId,
+        fileSize: stat.size,
+        fileMtime,
+      });
 
-    sessionsFound++;
-    if (wasExisting) {
-      result.updated++;
-    } else {
-      result.inserted++;
+      sessionsFound++;
+      if (wasExisting) {
+        result.updated++;
+      } else {
+        result.inserted++;
+      }
+    } catch {
+      result.errors++;
     }
+
     dirsProcessed++;
     opts.onProgress?.({
       dirsProcessed,

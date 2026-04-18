@@ -163,6 +163,16 @@ describe('discovered-sessions-db', () => {
     expect(results[0].id).toBe(s.id);
   });
 
+  it('searchFts returns [] for malformed FTS query instead of throwing', async () => {
+    const { searchFts } = await import('../discovered-sessions-db.js');
+    // SQLite FTS5 MATCH rejects invalid syntax at runtime; we must not propagate
+    const malformed = ['', 'foo OR', '(', 'a:b', '"unclosed', 'AND OR'];
+    for (const q of malformed) {
+      expect(() => searchFts(q)).not.toThrow();
+      expect(searchFts(q)).toEqual([]);
+    }
+  });
+
   it('searchFts returns empty array for non-matching query', async () => {
     const { upsertDiscoveredSession, syncFts, searchFts } = await import(
       '../discovered-sessions-db.js'

@@ -438,19 +438,25 @@ export function syncFts(_id: number): void {
 /**
  * Full-text search using FTS5 BM25 ranking.
  * Returns session IDs with their BM25 rank (lower = better match in SQLite FTS5).
+ * Returns [] for malformed queries instead of throwing — FTS5 MATCH rejects invalid
+ * syntax (unbalanced parens, trailing operators, column: prefixes, etc.) at runtime.
  */
 export function searchFts(query: string, limit = 50): FtsSearchResult[] {
   const db = getDatabase();
-  const rows = db
-    .prepare(
-      `SELECT rowid AS id, rank
-       FROM sessions_fts
-       WHERE sessions_fts MATCH ?
-       ORDER BY rank
-       LIMIT ?`,
-    )
-    .all(query, limit) as Array<{ id: number; rank: number }>;
-  return rows.map((r) => ({ id: r.id, rank: r.rank }));
+  try {
+    const rows = db
+      .prepare(
+        `SELECT rowid AS id, rank
+         FROM sessions_fts
+         WHERE sessions_fts MATCH ?
+         ORDER BY rank
+         LIMIT ?`,
+      )
+      .all(query, limit) as Array<{ id: number; rank: number }>;
+    return rows.map((r) => ({ id: r.id, rank: r.rank }));
+  } catch {
+    return [];
+  }
 }
 
 // ─── Embedding operations ─────────────────────────────────────────────────────
