@@ -4,7 +4,7 @@
     "created": "2026-04-15T00:44:09Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-714: clean up stale .claude/skills/ references and add unit tests for doneCommand/approveCommand",
-    "updated": "2026-04-18T17:58:43.298Z"
+    "updated": "2026-04-18T18:12:28.676Z"
   },
   "plan": {
     "id": "pan-714",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "163808ab-c659-4110-8ab8-3b50aeb510cf",
     "author": "agent:claude-opus-4-6",
-    "sequence": 261,
+    "sequence": 270,
     "created": "2026-04-15T00:44:09Z",
-    "updated": "2026-04-18T17:58:43.298Z",
+    "updated": "2026-04-18T18:12:28.676Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/714",
@@ -98,7 +98,7 @@
             "completed": "2026-04-15T02:59:53.925Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.298Z"
+        "completed": "2026-04-18T18:12:28.675Z"
       },
       {
         "id": "pan-sync-project-skills",
@@ -169,7 +169,7 @@
             "completed": "2026-04-15T02:59:53.926Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.298Z"
+        "completed": "2026-04-18T18:12:28.676Z"
       },
       {
         "id": "extract-done-preflight",
@@ -222,7 +222,7 @@
             "completed": "2026-04-15T02:59:53.924Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.298Z"
+        "completed": "2026-04-18T18:12:28.675Z"
       },
       {
         "id": "test-done-preflight-beads",
@@ -266,7 +266,7 @@
             "completed": "2026-04-15T02:59:53.923Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.298Z"
+        "completed": "2026-04-18T18:12:28.675Z"
       },
       {
         "id": "test-done-preflight-git",
@@ -319,7 +319,7 @@
             "completed": "2026-04-15T02:59:53.920Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.296Z"
+        "completed": "2026-04-18T18:12:28.673Z"
       },
       {
         "id": "test-done-preflight-ac",
@@ -363,7 +363,7 @@
             "completed": "2026-04-15T02:59:53.921Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.297Z"
+        "completed": "2026-04-18T18:12:28.674Z"
       },
       {
         "id": "export-test-approve-helpers",
@@ -407,7 +407,7 @@
             "completed": "2026-04-15T02:59:53.923Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.298Z"
+        "completed": "2026-04-18T18:12:28.675Z"
       },
       {
         "id": "test-done-command-behavior",
@@ -469,7 +469,7 @@
             "completed": "2026-04-15T02:59:53.922Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.297Z"
+        "completed": "2026-04-18T18:12:28.674Z"
       },
       {
         "id": "test-approve-command-behavior",
@@ -504,7 +504,7 @@
             "completed": "2026-04-15T02:59:53.922Z"
           }
         ],
-        "completed": "2026-04-18T17:58:43.297Z"
+        "completed": "2026-04-18T18:12:28.674Z"
       }
     ],
     "edges": [
