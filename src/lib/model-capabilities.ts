@@ -27,17 +27,17 @@ import type { SubscriptionPlan } from './subscription-types.js';
  * When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
  * add the mapping here to enable automatic migration.
  *
- * Strategy: Single-hop only. When a newer version arrives (e.g., 4-7),
- * add both old→new mappings (4-5→4-7 and 4-6→4-7).
+ * Strategy: Single-hop only. Only add models here when the provider has
+ * actually retired them — not just because a newer version exists.
  */
 export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
-  'claude-opus-4-5': 'claude-opus-4-6',
+  'claude-opus-4-5': 'claude-opus-4-7',
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
   // OpenAI retired models (Feb 2026)
   'gpt-5.2-codex': 'gpt-5.4',
   'o3-deep-research': 'o3',
-  'gpt-4o': 'gpt-5.4-mini',
-  'gpt-4o-mini': 'gpt-5.4-nano',
+  // NOTE: gpt-5.4 family is Panopticon's abstraction over real OpenAI models.
+  // Do NOT treat gpt-4o/gpt-4o-mini as deprecated — they are the actual API names.
   // Google deprecated models
   'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
   'gemini-3-flash-preview': 'gemini-3-flash',
@@ -112,6 +112,28 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  'claude-opus-4-7': {
+    model: 'claude-opus-4-7',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 4.7',
+    costPer1MTokens: 45.0, // Same pricing tier as Opus 4.6 — verify at launch
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 98,
+      'code-review': 99,
+      debugging: 98,
+      planning: 99,
+      documentation: 96,
+      testing: 94,
+      security: 99,
+      performance: 92,
+      synthesis: 99,
+      speed: 38,
+      'context-length': 95,
+    },
+    notes: 'Successor to Opus 4.6. Supports xhigh and max effort levels for extended thinking. Best for deepest reasoning and long-horizon coding tasks.',
+  },
 
   'claude-opus-4-6': {
     model: 'claude-opus-4-6',

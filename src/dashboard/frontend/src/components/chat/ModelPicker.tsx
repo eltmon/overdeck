@@ -37,10 +37,11 @@ interface ModelGroup {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
+  'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
   'claude-sonnet-4-6': ['low', 'medium', 'high'],
   'claude-haiku-4-5-20251001': [],
@@ -67,6 +68,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
+      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', effortLevels: ['low', 'medium', 'high'] },
       { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'max'] },
       { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', effortLevels: [] },

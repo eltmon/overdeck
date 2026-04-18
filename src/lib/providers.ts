@@ -51,7 +51,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'anthropic',
     displayName: 'Anthropic',
     compatibility: 'direct',
-    models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
