@@ -12,7 +12,14 @@ import { tmpdir } from 'os';
 
 import { scan } from '../../../../lib/conversations/scanner.js';
 import { searchSessions } from '../../../../lib/conversations/search.js';
-import { upsertDiscoveredSession } from '../../../../lib/database/discovered-sessions-db.js';
+import {
+  upsertDiscoveredSession,
+  getDiscoveredStats,
+  getDiscoveredSessionById,
+  findDiscoveredSessions,
+} from '../../../../lib/database/discovered-sessions-db.js';
+import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
+import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
 import { parseSearchParams } from '../discovered-sessions.js';
 
 let TEST_HOME: string;
@@ -311,5 +318,127 @@ describe('scan targeted mode with dirs', () => {
 
     const result = await scan({ mode: 'targeted', dirs: [], watchDirs: [] });
     expect(result.inserted + result.updated + result.skipped).toBe(0);
+  });
+});
+
+// ─── GET /api/discovered-sessions/stats ──────────────────────────────────────
+
+const SEED_SESSION = {
+  jsonlPath: '/stats/1.jsonl',
+  workspacePath: '/home/user/Projects/alpha',
+  workspaceHash: 'hash-stats',
+  messageCount: 3,
+  firstTs: '2025-01-01T00:00:00Z',
+  lastTs: '2025-01-01T01:00:00Z',
+  modelsUsed: ['claude-sonnet-4-6'],
+  primaryModel: 'claude-sonnet-4-6',
+  tokenInput: 100,
+  tokenOutput: 200,
+  estimatedCost: 0.05,
+  toolsUsed: [],
+  filesTouched: [],
+  tags: [],
+  panopticonManaged: false,
+  panIssueId: null,
+  panAgentId: null,
+  fileSize: 512,
+  fileMtime: '2025-01-01T00:00:00Z',
+} as const;
+
+describe('getDiscoveredStats (GET /api/discovered-sessions/stats logic)', () => {
+  it('returns zero counts on empty database', () => {
+    const stats = getDiscoveredStats();
+    expect(stats).toMatchObject({ total: 0, enriched: 0, embedded: 0, managedCount: 0 });
+  });
+
+  it('increments total after session is inserted', () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/a.jsonl', workspaceHash: 'stats-a' });
+    const stats = getDiscoveredStats();
+    expect(stats.total).toBeGreaterThanOrEqual(1);
+  });
+
+  it('managedCount counts only panopticonManaged sessions', () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/b.jsonl', workspaceHash: 'stats-b', panopticonManaged: true });
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/c.jsonl', workspaceHash: 'stats-c', panopticonManaged: false });
+    const stats = getDiscoveredStats();
+    expect(stats.managedCount).toBeGreaterThanOrEqual(1);
+    expect(stats.total).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── GET /api/discovered-sessions/cost ───────────────────────────────────────
+
+describe('cost aggregation (GET /api/discovered-sessions/cost logic)', () => {
+  it('returns zero cost on empty database', () => {
+    const sessions = findDiscoveredSessions({});
+    const totalCost = sessions.reduce((sum, s) => sum + s.estimatedCost, 0);
+    expect(totalCost).toBe(0);
+  });
+
+  it('aggregates cost from all sessions', () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/cost/1.jsonl', workspaceHash: 'cost-1', estimatedCost: 0.10 });
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/cost/2.jsonl', workspaceHash: 'cost-2', estimatedCost: 0.20 });
+    const sessions = findDiscoveredSessions({});
+    const totalCost = sessions.reduce((sum, s) => sum + s.estimatedCost, 0);
+    expect(totalCost).toBeCloseTo(0.30, 5);
+  });
+
+  it('filters cost by workspacePath', () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/cost/3.jsonl', workspaceHash: 'cost-3', workspacePath: '/home/user/Projects/alpha', estimatedCost: 0.10 });
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/cost/4.jsonl', workspaceHash: 'cost-4', workspacePath: '/home/user/Projects/beta', estimatedCost: 0.50 });
+    const sessions = findDiscoveredSessions({ workspacePath: '/home/user/Projects/alpha' });
+    const totalCost = sessions.reduce((sum, s) => sum + s.estimatedCost, 0);
+    expect(totalCost).toBeCloseTo(0.10, 5);
+  });
+});
+
+// ─── GET /api/discovered-sessions/:id ────────────────────────────────────────
+
+describe('getDiscoveredSessionById (GET /api/discovered-sessions/:id logic)', () => {
+  it('returns null for unknown id', () => {
+    const session = getDiscoveredSessionById(999999);
+    expect(session).toBeNull();
+  });
+
+  it('returns the session with correct fields after insert', () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/byid/1.jsonl', workspaceHash: 'byid-1' });
+    const all = findDiscoveredSessions({ workspacePath: '/home/user/Projects/alpha' });
+    const inserted = all.find((s) => s.jsonlPath === '/byid/1.jsonl');
+    expect(inserted).toBeTruthy();
+
+    const fetched = getDiscoveredSessionById(inserted!.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.jsonlPath).toBe('/byid/1.jsonl');
+    expect(fetched!.workspacePath).toBe('/home/user/Projects/alpha');
+  });
+});
+
+// ─── POST /api/discovered-sessions/enrich ────────────────────────────────────
+
+describe('enrichSessions (POST /api/discovered-sessions/enrich logic)', () => {
+  it('returns zero enriched when sessionIds is empty', async () => {
+    const result = await enrichSessions({ tier: 1, sessionIds: [] });
+    expect(result).toMatchObject({ enriched: 0, skipped: 0, errors: 0 });
+    expect(typeof result.durationMs).toBe('number');
+  });
+
+  it('returns zero enriched when no sessions match the given IDs', async () => {
+    const result = await enrichSessions({ tier: 1, sessionIds: [999999] });
+    expect(result.enriched).toBe(0);
+  });
+});
+
+// ─── POST /api/discovered-sessions/embed ─────────────────────────────────────
+
+describe('embedSessions (POST /api/discovered-sessions/embed logic)', () => {
+  it('returns zero embedded when sessionIds is empty', async () => {
+    const result = await embedSessions({ sessionIds: [] });
+    expect(result).toMatchObject({ embedded: 0, skipped: 0, errors: 0 });
+    expect(typeof result.durationMs).toBe('number');
+  });
+
+  it('returns zero embedded when no sessions match the given IDs', async () => {
+    const result = await embedSessions({ sessionIds: [999999] });
+    expect(result.embedded).toBe(0);
   });
 });

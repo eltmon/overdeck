@@ -3,7 +3,7 @@
  */
 
 import { X, ExternalLink, Sparkles } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface Session {
   id: number;
@@ -32,20 +32,35 @@ interface Props {
 }
 
 async function enrichSession(sessionId: number, tier: number): Promise<void> {
-  const resp = await fetch('/api/discovered-sessions/enrich', {
+  const resp = await fetch(`/api/discovered-sessions/${sessionId}/enrich`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionIds: [sessionId], tier }),
+    body: JSON.stringify({ tier }),
   });
   if (!resp.ok) throw new Error('Enrichment failed');
+}
+
+async function fetchSession(sessionId: number): Promise<Session> {
+  const resp = await fetch(`/api/discovered-sessions/${sessionId}`);
+  if (!resp.ok) throw new Error('Failed to fetch session');
+  return resp.json() as Promise<Session>;
 }
 
 export function SessionDetail({ session, onClose }: Props) {
   const queryClient = useQueryClient();
 
+  const { data: freshSession } = useQuery({
+    queryKey: ['discovered-session', session.id],
+    queryFn: () => fetchSession(session.id),
+    staleTime: Infinity,
+    placeholderData: session,
+  });
+  const displaySession = freshSession ?? session;
+
   const enrichMutation = useMutation({
     mutationFn: (tier: number) => enrichSession(session.id, tier),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['discovered-session', session.id] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-search'] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
@@ -63,7 +78,7 @@ export function SessionDetail({ session, onClose }: Props) {
     <div className="flex flex-col h-full border-l border-gray-800 bg-gray-950">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
-        <span className="text-xs font-semibold text-gray-300">Session #{session.id}</span>
+        <span className="text-xs font-semibold text-gray-300">Session #{displaySession.id}</span>
         <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors">
           <X className="h-4 w-4" />
         </button>
@@ -72,32 +87,32 @@ export function SessionDetail({ session, onClose }: Props) {
       {/* Content */}
       <div className="flex-1 overflow-auto px-3 py-2 space-y-4">
         {/* Summary */}
-        {session.summary && (
+        {displaySession.summary && (
           <div>
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
               Summary
             </div>
-            <p className="text-xs text-gray-300 leading-relaxed">{session.summary}</p>
+            <p className="text-xs text-gray-300 leading-relaxed">{displaySession.summary}</p>
           </div>
         )}
 
-        {session.summaryDetailed && (
+        {displaySession.summaryDetailed && (
           <div>
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
               Detailed
             </div>
-            <p className="text-xs text-gray-400 leading-relaxed">{session.summaryDetailed}</p>
+            <p className="text-xs text-gray-400 leading-relaxed">{displaySession.summaryDetailed}</p>
           </div>
         )}
 
         {/* Tags */}
-        {session.tags.length > 0 && (
+        {displaySession.tags.length > 0 && (
           <div>
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
               Tags
             </div>
             <div className="flex flex-wrap gap-1">
-              {session.tags.map((tag) => (
+              {displaySession.tags.map((tag) => (
                 <span key={tag} className="px-1.5 py-0.5 bg-gray-800 text-cyan-400 rounded text-[10px]">
                   {tag}
                 </span>
@@ -111,26 +126,26 @@ export function SessionDetail({ session, onClose }: Props) {
           <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
             Metadata
           </div>
-          {field('Workspace', session.workspacePath)}
-          {field('Model', session.primaryModel)}
-          {field('Messages', session.messageCount)}
-          {field('Input tokens', session.tokenInput.toLocaleString())}
-          {field('Output tokens', session.tokenOutput.toLocaleString())}
-          {field('Est. cost', session.estimatedCost > 0 ? `$${session.estimatedCost.toFixed(6)}` : null)}
-          {field('First active', session.firstTs ? formatDate(session.firstTs) : null)}
-          {field('Last active', session.lastTs ? formatDate(session.lastTs) : null)}
-          {session.panIssueId && field('Issue', session.panIssueId)}
-          {field('Enrichment', session.enrichmentLevel === 0 ? 'None' : `L${session.enrichmentLevel}`)}
+          {field('Workspace', displaySession.workspacePath)}
+          {field('Model', displaySession.primaryModel)}
+          {field('Messages', displaySession.messageCount)}
+          {field('Input tokens', displaySession.tokenInput.toLocaleString())}
+          {field('Output tokens', displaySession.tokenOutput.toLocaleString())}
+          {field('Est. cost', displaySession.estimatedCost > 0 ? `$${displaySession.estimatedCost.toFixed(6)}` : null)}
+          {field('First active', displaySession.firstTs ? formatDate(displaySession.firstTs) : null)}
+          {field('Last active', displaySession.lastTs ? formatDate(displaySession.lastTs) : null)}
+          {displaySession.panIssueId && field('Issue', displaySession.panIssueId)}
+          {field('Enrichment', displaySession.enrichmentLevel === 0 ? 'None' : `L${displaySession.enrichmentLevel}`)}
         </div>
 
         {/* Tools */}
-        {session.toolsUsed.length > 0 && (
+        {displaySession.toolsUsed.length > 0 && (
           <div>
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
               Tools Used
             </div>
             <div className="flex flex-wrap gap-1">
-              {session.toolsUsed.map((tool) => (
+              {displaySession.toolsUsed.map((tool) => (
                 <span key={tool} className="px-1.5 py-0.5 bg-gray-900 text-gray-400 rounded text-[10px] font-mono">
                   {tool}
                 </span>
@@ -146,17 +161,17 @@ export function SessionDetail({ session, onClose }: Props) {
           </div>
           <div className="flex items-start gap-1">
             <ExternalLink className="h-3 w-3 text-gray-600 mt-0.5 shrink-0" />
-            <span className="text-[10px] text-gray-600 font-mono break-all">{session.jsonlPath}</span>
+            <span className="text-[10px] text-gray-600 font-mono break-all">{displaySession.jsonlPath}</span>
           </div>
         </div>
       </div>
 
       {/* Enrichment controls */}
-      {session.enrichmentLevel < 2 && !session.enrichmentFailed && (
+      {displaySession.enrichmentLevel < 2 && !displaySession.enrichmentFailed && (
         <div className="px-3 py-2 border-t border-gray-800 shrink-0">
           <div className="text-[10px] text-gray-500 mb-1.5">Enrich this session</div>
           <div className="flex gap-2">
-            {session.enrichmentLevel < 1 && (
+            {displaySession.enrichmentLevel < 1 && (
               <button
                 onClick={() => enrichMutation.mutate(1)}
                 disabled={enrichMutation.isPending}

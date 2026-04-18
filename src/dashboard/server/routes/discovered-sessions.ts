@@ -196,6 +196,54 @@ const getByIdRoute = HttpRouter.add(
   })),
 );
 
+// ─── POST /api/discovered-sessions/:id/enrich ────────────────────────────────
+
+const postEnrichByIdRoute = HttpRouter.add(
+  'POST',
+  '/api/discovered-sessions/:id/enrich',
+  httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const params = req.params as { id?: string };
+    const id = parseInt(params.id ?? '', 10);
+
+    if (isNaN(id)) {
+      return jsonResponse({ error: 'Invalid session ID' }, { status: 400 });
+    }
+
+    const session = getDiscoveredSessionById(id);
+    if (!session) {
+      return jsonResponse({ error: `Session ${id} not found` }, { status: 404 });
+    }
+
+    const body = (yield* req.json) as { tier?: number };
+    const rawTier = body.tier ?? 1;
+    if (rawTier !== 1 && rawTier !== 2 && rawTier !== 3) {
+      return jsonResponse({ error: 'Invalid tier: must be 1, 2, or 3' }, { status: 400 });
+    }
+    const tier = rawTier as 1 | 2 | 3;
+
+    try {
+      const result = yield* Effect.promise(() =>
+        enrichSessions({ tier, sessionIds: [id] }),
+      );
+      return jsonResponse(result);
+    } catch (err) {
+      if (err instanceof CostThresholdError) {
+        return jsonResponse(
+          {
+            error: 'Cost threshold exceeded',
+            estimatedCost: err.estimatedCost,
+            threshold: err.threshold,
+            sessionCount: err.sessionCount,
+          },
+          { status: 402 },
+        );
+      }
+      throw err;
+    }
+  })),
+);
+
 // ─── POST /api/discovered-sessions/scan ──────────────────────────────────────
 
 const postScanRoute = HttpRouter.add(
@@ -327,6 +375,7 @@ export const discoveredSessionsRouteLayer = Layer.mergeAll(
   searchRoute,
   getCostRoute,
   getByIdRoute,
+  postEnrichByIdRoute,
   postScanRoute,
   postEnrichRoute,
   postEmbedRoute,
