@@ -21,7 +21,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
-import { setReviewStatus, loadReviewStatuses } from '../review-status.js';
+import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-status.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 
 // Review status file location (same as dashboard server)
@@ -52,7 +52,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 
 // ============================================================================
@@ -2829,6 +2829,61 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * Auto-resume work agents that were stopped by a system crash/reboot
+ * but still have incomplete work. Scans all agent state directories for
+ * stopped implementation-phase agents and resumes them if they were not
+ * deliberately stopped by a user (detected via runtime.state === 'stopped').
+ */
+async function autoResumeStoppedWorkAgents(): Promise<string[]> {
+  const resumed: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return resumed;
+
+  let dirs: string[];
+  try {
+    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch { return resumed; }
+
+  for (const agentId of dirs) {
+    const state = getAgentState(agentId);
+    if (!state) continue;
+    if (state.status !== 'stopped') continue;
+    if (state.phase !== 'implementation') continue;
+
+    // Skip if the agent has a completed marker
+    const completedFile = join(getAgentDir(agentId), 'completed');
+    if (existsSync(completedFile)) continue;
+
+    // Skip if workspace is missing
+    if (!state.workspace || !existsSync(state.workspace)) continue;
+
+    // Skip if already merge-ready (review+test passed)
+    const review = getReviewStatus(state.issueId);
+    if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') continue;
+
+    // Skip if the agent was deliberately stopped by a user (runtime state is 'stopped')
+    const runtimeState = getAgentRuntimeState(agentId);
+    if (runtimeState?.state === 'stopped' || runtimeState?.state === 'idle') continue;
+
+    try {
+      const result = await resumeAgent(agentId);
+      if (result.success) {
+        resumed.push(agentId);
+        console.log(`[deacon] Auto-resumed ${agentId} (was orphaned by system event)`);
+      } else {
+        console.warn(`[deacon] Failed to auto-resume ${agentId}: ${result.error}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[deacon] Auto-resume error for ${agentId}: ${msg}`);
+    }
+  }
+  if (resumed.length > 0) {
+    console.log(`[deacon] Auto-resumed ${resumed.length} work agent(s): ${resumed.join(', ')}`);
+  }
+  return resumed;
+}
+
 export function startDeacon(): void {
   if (deaconInterval) {
     console.log('[deacon] Already running');
@@ -2839,7 +2894,10 @@ export function startDeacon(): void {
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
   // Recover agents whose tmux sessions were killed by a system crash
-  void recoverOrphanedAgents('Startup recovery');
+  recoverOrphanedAgents('Startup recovery').catch((err) => console.error('[deacon] Startup recovery error:', err));
+
+  // Auto-resume work agents that were stopped by a crash/reboot
+  void autoResumeStoppedWorkAgents();
 
   // Run initial patrol
   runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));

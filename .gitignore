@@ -101,3 +101,6 @@ temp/
 .dolt/
 *.db
 .beads-credential-key
+
+# Release notes generated during version bumps
+.release/
