@@ -839,6 +839,9 @@ const ACTIVE_STATUS_PATTERNS = [
   /computing/i,
   /fermenting/i,
   /thinking/i,
+  /forming/i,     // Claude Code "Forming…" computation status
+  /embellish/i,   // Claude Code "Embellishing…" computation status
+  /baking/i,      // Claude Code "Baking…" computation status
   /reading/i,
   /writing/i,
   /editing/i,
@@ -876,9 +879,9 @@ export async function isAgentActiveInTmux(sessionName: string): Promise<boolean>
 
     for (const pattern of ACTIVE_STATUS_PATTERNS) {
       if (pattern.test(tail)) {
-        // "Thinking" with a duration over the threshold is NOT active — it's stuck.
+        // Extended computation (Thinking/Forming/Embellishing/Baking) over threshold = stuck.
         // Don't let stuck agents masquerade as active.
-        if (/thinking/i.test(tail)) {
+        if (/thinking|forming|embellish|baking|fermenting/i.test(tail)) {
           const thinkingMs = parseThinkingDuration(tail);
           if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
             return false; // Stuck, not active
@@ -922,8 +925,9 @@ const stuckRecoveryState: Map<string, { lastAttempt: number; attempts: number }>
  * Returns duration in milliseconds, or null if not currently thinking.
  */
 function parseThinkingDuration(tmuxOutput: string): number | null {
-  // Match patterns like "Thinking… (22m 41s" or "Thinking… (5s"
-  const match = tmuxOutput.match(/[Tt]hinking[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
+  // Match Claude Code computation status phrases followed by a duration.
+  // Handles: "Thinking… (22m 41s", "Forming… (5s", "Embellishing… (20m 1s", "Baking… (3m"
+  const match = tmuxOutput.match(/(?:[Tt]hinking|[Ff]orming|[Ee]mbellish\w*|[Bb]aking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
   if (!match) return null;
 
   const minutes = match[1] ? parseInt(match[1], 10) : 0;
