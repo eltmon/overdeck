@@ -35,7 +35,7 @@ vi.mock('../../../../lib/flywheel/retro-writer.js', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { computeFlywheelMetrics, readNonArchivedRetroFiles, issueIdFromFilename } from '../flywheel.js';
+import { computeFlywheelMetrics, readNonArchivedRetroFiles, issueIdFromFilename, buildRollbackPreviewDiff } from '../flywheel.js';
 import { parseRetroMarkdown } from '../../../../lib/flywheel/retro-writer.js';
 
 const mockReaddir = vi.mocked(readdir);
@@ -96,7 +96,7 @@ describe('computeFlywheelMetrics', () => {
       frontmatter: {
         surprise: true,
         friction_score: 8,
-        proposed_changes: [{ type: 'skill_change', name: 'pan-review', description: 'fix X' }],
+        proposed_changes: [{ type: 'update_skill', name: 'pan-review', section: 'guidance', change: 'fix X' }],
       },
       body: 'surprise!',
     } as ReturnType<typeof parseRetroMarkdown>);
@@ -115,7 +115,7 @@ describe('computeFlywheelMetrics', () => {
       frontmatter: {
         surprise: true,
         friction_score: 5,
-        proposed_changes: [{ type: 'skill_change', name: patterns[callCount++ % patterns.length], description: '' }],
+        proposed_changes: [{ type: 'update_skill', name: patterns[callCount++ % patterns.length], section: '', change: '' }],
       },
       body: '',
     } as ReturnType<typeof parseRetroMarkdown>));
@@ -129,7 +129,7 @@ describe('computeFlywheelMetrics', () => {
       frontmatter: {
         surprise: true,
         friction_score: 1,
-        proposed_changes: [{ type: 'no_op', name: 'pan-review', description: '' }],
+        proposed_changes: [{ type: 'no_op', reason: 'no change needed' }],
       },
       body: '',
     } as ReturnType<typeof parseRetroMarkdown>);
@@ -178,5 +178,32 @@ describe('readNonArchivedRetroFiles', () => {
     const result = await readNonArchivedRetroFiles();
     expect(result[0].filename).toBe('PAN-042-999.md');
     expect(result[0].content).toBe('retro body');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildRollbackPreviewDiff
+// ---------------------------------------------------------------------------
+
+describe('buildRollbackPreviewDiff', () => {
+  it('returns the raw diff unchanged — must not invert +/- content lines', () => {
+    // Regression: old code manually inverted +/- lines but left file headers (---/+++)
+    // intact, producing a malformed patch.  The correct fix is to call
+    // `git diff commitSha commitSha^` (reversed order) so git itself produces
+    // the revert diff.  This helper must be a pure pass-through.
+    const raw = [
+      'diff --git a/SKILL.md b/SKILL.md',
+      '--- a/SKILL.md',
+      '+++ b/SKILL.md',
+      '@@ -1,3 +1,3 @@',
+      ' context line',
+      '-removed line',
+      '+added line',
+    ].join('\n');
+    expect(buildRollbackPreviewDiff(raw)).toBe(raw);
+  });
+
+  it('handles empty diff (no commit found or no changes)', () => {
+    expect(buildRollbackPreviewDiff('')).toBe('');
   });
 });

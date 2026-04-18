@@ -374,7 +374,7 @@ function loadFlywheelConfig(): FlywheelConfig {
   }
 }
 
-async function daemonTick(): Promise<void> {
+export async function daemonTick(): Promise<void> {
   const config = loadFlywheelConfig();
 
   if (!config.autonomous) {
@@ -433,31 +433,29 @@ async function daemonTick(): Promise<void> {
     console.warn('[flywheel-daemon] Failed to process cycling alerts:', err);
   }
 
-  // Scheduled synthesis (every 30 min)
+  // Scheduled synthesis (every 30 min) and full cycle (every 24h)
+  // Both checks are computed before any lock is acquired so that when both are
+  // due simultaneously (e.g. on startup when both timestamps are 0) we acquire
+  // the lock exactly once and run synthesis exactly once.
   const nowMs = Date.now();
   const synthIntervalMs = config.trigger_interval_minutes * 60 * 1000;
-  if (nowMs - lastSynthesisAt > synthIntervalMs) {
-    if (!await acquireLock()) return;
-    try {
-      lastSynthesisAt = nowMs;
-      await runSynthesis();
-    } catch (err) {
-      console.warn('[flywheel-daemon] Synthesis step failed:', err);
-    } finally {
-      await releaseLock();
-    }
-  }
-
-  // Scheduled full cycle (every 24h)
   const fullCycleIntervalMs = config.full_cycle_interval_hours * 60 * 60 * 1000;
-  if (nowMs - lastFullCycleAt > fullCycleIntervalMs) {
+  const doSynthesis = nowMs - lastSynthesisAt > synthIntervalMs;
+  const doFullCycle = nowMs - lastFullCycleAt > fullCycleIntervalMs;
+
+  if (doSynthesis || doFullCycle) {
     if (!await acquireLock()) return;
     try {
-      lastFullCycleAt = nowMs;
-      console.log('[flywheel-daemon] Full 24h flywheel cycle — running synthesis');
+      if (doFullCycle) {
+        lastFullCycleAt = nowMs;
+        console.log('[flywheel-daemon] Full 24h flywheel cycle — running synthesis');
+      }
+      if (doSynthesis) {
+        lastSynthesisAt = nowMs;
+      }
       await runSynthesis();
     } catch (err) {
-      console.warn('[flywheel-daemon] Full cycle failed:', err);
+      console.warn('[flywheel-daemon] Scheduled synthesis failed:', err);
     } finally {
       await releaseLock();
     }

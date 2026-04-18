@@ -215,6 +215,15 @@ const getFlywheelMetricsRoute = HttpRouter.add(
 // Route: GET /api/flywheel/rollback-preview/:issueId
 // ============================================================================
 
+/**
+ * Returns the raw output of `git diff commitSha commitSha^`, which is already
+ * a correct revert preview (changes needed to go from the commit back to its
+ * parent). Exported for unit-testing the no-inversion contract.
+ */
+export function buildRollbackPreviewDiff(rawDiff: string): string {
+  return rawDiff;
+}
+
 const getRollbackPreviewRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/rollback-preview/:issueId',
@@ -241,18 +250,10 @@ const getRollbackPreviewRoute = HttpRouter.add(
         const { stdout: diffOut } = yield* Effect.promise(() =>
           execFileAsync('git', [
             '-C', join(homedir(), 'docs'),
-            'diff', `${commitSha}^`, commitSha,
+            'diff', commitSha, `${commitSha}^`,
           ])
         );
-        // Invert the diff to show what a revert would produce
-        diff = diffOut
-          .split('\n')
-          .map((line) => {
-            if (line.startsWith('+') && !line.startsWith('+++')) return `-${line.slice(1)}`;
-            if (line.startsWith('-') && !line.startsWith('---')) return `+${line.slice(1)}`;
-            return line;
-          })
-          .join('\n');
+        diff = buildRollbackPreviewDiff(diffOut);
       }
     } catch {
       // No commit found or git error — return empty diff

@@ -39,6 +39,22 @@ vi.mock('child_process', () => ({
   }),
 }));
 
+vi.mock('../../flywheel/synthesis.js', () => ({
+  runSynthesis: vi.fn().mockResolvedValue({ proposals: [], watchlist: [], processedRetros: [], filterRatio: 1 }),
+}));
+
+vi.mock('../../flywheel/issue-filer.js', () => ({
+  fileFlywheelIssues: vi.fn().mockResolvedValue({ filed: [], deferred: [], errors: [] }),
+}));
+
+vi.mock('../../flywheel/retro-archiver.js', () => ({
+  archiveProcessedRetros: vi.fn().mockResolvedValue({ archived: [], wontfixed: [], errors: [] }),
+}));
+
+vi.mock('../../flywheel/flywheel-report.js', () => ({
+  appendFlywheelReport: vi.fn().mockResolvedValue('/tmp/test'),
+}));
+
 // ---------------------------------------------------------------------------
 // Import after mocks
 // ---------------------------------------------------------------------------
@@ -55,6 +71,7 @@ import {
   readCyclingAlerts,
   hasActiveClaudeSession,
   fileSubstrateIssue,
+  daemonTick,
 } from '../flywheel-daemon.js';
 import { loadCloisterConfig } from '../config.js';
 import { execFile } from 'child_process';
@@ -374,5 +391,74 @@ describe('fileSubstrateIssue', () => {
     expect(createArgs).toContain('create');
     expect(createArgs).toContain('--label');
     expect(createArgs).toContain('substrate-improvement');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: daemonTick — double-scheduled path
+// ---------------------------------------------------------------------------
+
+/** Far-future timestamp: ensures nowMs - lastSynthesisAt is always > any interval, regardless
+ *  of what a background tick from another test suite set lastSynthesisAt to. */
+const FAR_FUTURE_MS = new Date('2099-01-01T11:00:00Z').getTime();
+
+describe('daemonTick — double-scheduled path', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Spy on Date.now so the intervals are always "overdue" regardless of module state.
+    // quiet_hours is '' so isQuietHours bypasses new Date() check entirely (parseQuietHours returns null).
+    vi.spyOn(Date, 'now').mockReturnValue(FAR_FUTURE_MS);
+    mockExistsSync.mockReturnValue(false); // no lock file
+    mockWriteFile.mockResolvedValue(undefined);
+    mockUnlink.mockResolvedValue(undefined);
+    mockReaddir.mockResolvedValue([]);
+    mockReadFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    mockLoadCloisterConfig.mockReturnValue({
+      flywheel: {
+        autonomous: true,
+        trigger_interval_minutes: 30,
+        full_cycle_interval_hours: 24,
+        quiet_hours: '', // empty string → parseQuietHours returns null → isQuietHours returns false
+        backoff_on_active_session: false,
+        awaiting_merge_notify_threshold: 5,
+      },
+    } as ReturnType<typeof loadCloisterConfig>);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('acquires the lock exactly once when both synthesis and full-cycle are due (startup: both timestamps at 0)', async () => {
+    // On first startup lastSynthesisAt=0 and lastFullCycleAt=0 — both intervals are
+    // overdue. The old buggy code acquired the lock TWICE (one per if-block) and the
+    // second acquire returned early, skipping the full-cycle path entirely. The fixed
+    // code computes both booleans upfront and acquires the lock exactly once.
+    await daemonTick();
+
+    // Exactly one writeFile call = the lock was acquired exactly once.
+    // In the old double-lock code, mockExistsSync=false means both acquires succeed
+    // and writeFile is called twice.
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+  });
+
+  it('does not acquire the lock when neither interval is due', async () => {
+    // Use intervals that exceed any plausible Date.now() value (even from epoch 0)
+    // so doSynthesis and doFullCycle are always false regardless of module state.
+    mockLoadCloisterConfig.mockReturnValue({
+      flywheel: {
+        autonomous: true,
+        trigger_interval_minutes: Number.MAX_SAFE_INTEGER,
+        full_cycle_interval_hours: Number.MAX_SAFE_INTEGER,
+        quiet_hours: '03:00-03:01',
+        backoff_on_active_session: false,
+        awaiting_merge_notify_threshold: 5,
+      },
+    } as ReturnType<typeof loadCloisterConfig>);
+
+    await daemonTick();
+
+    // No lock should be acquired (no writeFile call for lock file)
+    expect(mockWriteFile).not.toHaveBeenCalled();
   });
 });

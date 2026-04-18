@@ -9,8 +9,7 @@
  *   spawn → run → write retro file → exit → kill session
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
-import { readdir } from 'fs/promises';
+import { mkdir, writeFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -62,15 +61,15 @@ export async function spawnRetroAgent(issueId: string): Promise<RetroAgentResult
 
     // Build the retro prompt from the skill + inputs
     const promptFilePath = join(agentDir, 'retro-prompt.md');
-    mkdirSync(agentDir, { recursive: true });
+    await mkdir(agentDir, { recursive: true });
     const retroPrompt = buildRetroPrompt(issueId, inputs);
-    writeFileSync(promptFilePath, retroPrompt, 'utf-8');
+    await writeFile(promptFilePath, retroPrompt, 'utf-8');
 
     // Build launcher scripts
     const innerScript = join(agentDir, 'run-retro.sh');
     const launcherScript = join(agentDir, 'launcher-retro.sh');
 
-    writeFileSync(innerScript, `#!/bin/bash
+    await writeFile(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
 ${PROVIDER_UNSET_LINES}
@@ -84,11 +83,11 @@ claude --permission-mode acceptEdits --model ${RETRO_MODEL} "$prompt"
 
 echo ""
 echo "## Retro-agent completed"
-`, { mode: 0o755 });
+`, { encoding: 'utf-8', mode: 0o755 });
 
-    writeFileSync(launcherScript, `#!/bin/bash
+    await writeFile(launcherScript, `#!/bin/bash
 exec script -qfaec "bash '${innerScript}'" "${logFile}"
-`, { mode: 0o755 });
+`, { encoding: 'utf-8', mode: 0o755 });
 
     // Kill any stale retro session for this issue
     await killSessionAsync(sessionName).catch(() => { /* no stale session */ });
