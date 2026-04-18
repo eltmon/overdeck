@@ -111,14 +111,18 @@ export function getReviewAgents(): ReviewAgentConfig[] {
 /**
  * Get files changed in PR using gh CLI (non-blocking)
  */
-async function getFilesChangedFromPR(prUrl: string, projectPath: string): Promise<string[]> {
+export async function getFilesChangedFromPR(
+  prUrl: string,
+  projectPath: string,
+  { execFn = execAsync }: { execFn?: typeof execAsync } = {},
+): Promise<string[]> {
   try {
-    const { stdout } = await execAsync(`gh pr view ${prUrl} --json files --jq '.files[].path'`, {
+    const { stdout } = await execFn(`gh pr view ${prUrl} --json files --jq '.files[].path'`, {
       cwd: projectPath,
       encoding: 'utf-8',
     });
 
-    return stdout
+    return (stdout as string)
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
@@ -431,21 +435,30 @@ async function spawnReviewer(
 }
 
 /** Poll until the tmux session exits and the output file is written, or timeout */
-async function waitForReviewer(
+export async function waitForReviewer(
   sessionName: string,
   outputFile: string,
   timeoutMs: number,
+  {
+    sessionExists = sessionExistsAsync,
+    fileExists = existsSync,
+    killSession = killSessionAsync,
+  }: {
+    sessionExists?: (name: string) => Promise<boolean>;
+    fileExists?: (path: string) => boolean;
+    killSession?: (name: string) => Promise<void>;
+  } = {},
 ): Promise<'completed' | 'failed'> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!await sessionExistsAsync(sessionName)) {
+    if (!await sessionExists(sessionName)) {
       // Session ended — check if output was produced
-      return existsSync(outputFile) ? 'completed' : 'failed';
+      return fileExists(outputFile) ? 'completed' : 'failed';
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
   // Timeout — kill and report failed
-  try { await killSessionAsync(sessionName); } catch { /* ignore */ }
+  try { await killSession(sessionName); } catch { /* ignore */ }
   return 'failed';
 }
 

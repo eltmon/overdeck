@@ -23,6 +23,8 @@ import {
   dispatchParallelReview,
   getActiveParallelReviewIssues,
   buildReviewFeedbackBody,
+  waitForReviewer,
+  getFilesChangedFromPR,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -181,6 +183,87 @@ describe('buildReviewFeedbackBody', () => {
     const body = buildReviewFeedbackBody('PAN-999', approved);
     expect(body).toContain('approved');
     expect(body).not.toMatch(/pan done|rebase-and-submit|request-review/);
+  });
+});
+
+// ── waitForReviewer ───────────────────────────────────────────────────────────
+
+describe('waitForReviewer', () => {
+  it('returns completed when session exits with output file present', async () => {
+    const sessionExists = vi.fn().mockResolvedValue(false); // session already gone
+    const fileExists = vi.fn().mockReturnValue(true);       // output file written
+    const killSession = vi.fn().mockResolvedValue(undefined);
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession,
+    });
+
+    expect(result).toBe('completed');
+    expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
+    expect(killSession).not.toHaveBeenCalled();
+  });
+
+  it('returns failed when session exits without output file', async () => {
+    const sessionExists = vi.fn().mockResolvedValue(false);
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession,
+    });
+
+    expect(result).toBe('failed');
+    expect(killSession).not.toHaveBeenCalled();
+  });
+
+  it('kills session and returns failed on timeout', async () => {
+    const sessionExists = vi.fn().mockResolvedValue(true); // session always running
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+
+    // timeoutMs = 0 → deadline already passed → loop never enters → timeout path
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 0, {
+      sessionExists, fileExists, killSession,
+    });
+
+    expect(result).toBe('failed');
+    expect(sessionExists).not.toHaveBeenCalled(); // never entered loop
+    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+  });
+});
+
+// ── getFilesChangedFromPR ─────────────────────────────────────────────────────
+
+describe('getFilesChangedFromPR', () => {
+  it('parses gh CLI output into file list', async () => {
+    const execFn = vi.fn().mockResolvedValue({
+      stdout: 'src/foo.ts\nsrc/bar.ts\n',
+      stderr: '',
+    });
+
+    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
+
+    expect(files).toEqual(['src/foo.ts', 'src/bar.ts']);
+    expect(execFn).toHaveBeenCalledWith(
+      expect.stringContaining('gh pr view'),
+      expect.objectContaining({ cwd: '/proj' }),
+    );
+  });
+
+  it('returns empty array when gh CLI fails', async () => {
+    const execFn = vi.fn().mockRejectedValue(new Error('gh: command not found'));
+
+    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
+
+    expect(files).toEqual([]);
+  });
+
+  it('filters blank lines from gh output', async () => {
+    const execFn = vi.fn().mockResolvedValue({ stdout: '\nsrc/a.ts\n\nsrc/b.ts\n\n', stderr: '' });
+
+    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
+
+    expect(files).toEqual(['src/a.ts', 'src/b.ts']);
   });
 });
 

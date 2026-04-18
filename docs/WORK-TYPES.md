@@ -21,7 +21,7 @@ Example:
 models:
   overrides:
     issue-agent:implementation: gpt-5.4
-    convoy:security-reviewer: claude-opus-4-6
+    review:security: claude-opus-4-6
     cli:quick-command: claude-haiku-4-5
 ```
 
@@ -84,25 +84,25 @@ These are smaller helper jobs spawned for focused tasks.
 
 ---
 
-## Convoy Reviewers
+## Review Lanes
 
-Convoy work types are routing slots for **parallel review lanes**, not additional members of the main runtime agent roster.
+Review work types are routing slots for **parallel review lanes**, not additional members of the main runtime agent roster.
 
-A convoy run fans out into multiple review lenses in parallel, then combines those results into a final synthesis step. These entries matter because you can route each lane to a different model, but they should be understood as configuration slots inside the review system rather than standalone Panopticon runtime agents.
+A parallel review fans out into multiple review lenses simultaneously, then combines those results into a final synthesis step. These entries matter because you can route each lane to a different model, but they should be understood as configuration slots inside the review system rather than standalone Panopticon runtime agents.
 
 | Work type | When it runs | Typical default | Why you might override it |
 |-----------|--------------|-----------------|---------------------------|
-| `convoy:security-reviewer` | Security-focused parallel review | `claude-opus-4-6` | Only lower this if you knowingly accept more review risk |
-| `convoy:performance-reviewer` | Performance-focused parallel review | `claude-sonnet-4-6` | Use Gemini Pro if you want cheaper algorithm and perf analysis |
-| `convoy:correctness-reviewer` | Logic and correctness review | `claude-sonnet-4-6` | Raise to Opus for bug-prone or safety-critical code |
-| `convoy:requirements-reviewer` | Requirement/design alignment review | capability-based | Pin Sonnet or Opus when requirement drift is a recurring issue |
-| `convoy:synthesis-agent` | Final combined summary of convoy findings | `claude-sonnet-4-6` | Raise to Opus when you want the most careful synthesis pass |
+| `review:security` | Security-focused parallel review | `claude-opus-4-6` | Only lower this if you knowingly accept more review risk |
+| `review:performance` | Performance-focused parallel review | `claude-sonnet-4-6` | Use Gemini Pro if you want cheaper algorithm and perf analysis |
+| `review:correctness` | Logic and correctness review | `claude-sonnet-4-6` | Raise to Opus for bug-prone or safety-critical code |
+| `review:requirements` | Requirement/design alignment review | capability-based | Pin Sonnet or Opus when requirement drift is a recurring issue |
+| `review:synthesis` | Final combined summary of review findings | `claude-sonnet-4-6` | Raise to Opus when you want the most careful synthesis pass |
 
 ### Guidance
 
-- Security and synthesis are the convoy slots most worth upgrading.
+- Security and synthesis are the review slots most worth upgrading.
 - Performance review is often a good place to save cost if you already trust your benchmark/test loop.
-- If you are trying to understand the main Panopticon workflow, read convoy entries as review configuration lanes, not as part of the core runtime agent inventory.
+- If you are trying to understand the main Panopticon workflow, read review lane entries as model configuration slots, not as part of the core runtime agent inventory.
 
 ---
 
@@ -155,7 +155,7 @@ models:
 models:
   overrides:
     specialist-review-agent: claude-opus-4-6
-    convoy:security-reviewer: claude-opus-4-6
+    review:security: claude-opus-4-6
     subagent:explore: claude-haiku-4-5
     cli:quick-command: claude-haiku-4-5
 ```
@@ -186,7 +186,7 @@ models:
 If you want the smallest useful set of overrides:
 
 1. Override `issue-agent:implementation`
-2. Override `convoy:security-reviewer`
+2. Override `review:security`
 3. Override `cli:quick-command`
 
 That covers the three most noticeable user tradeoffs:
