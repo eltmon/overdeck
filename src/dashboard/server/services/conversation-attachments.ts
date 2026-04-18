@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, mkdir, rm } from 'node:fs/promises';
+import { readdir, mkdir, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve, sep } from 'node:path';
 
 import type { Conversation } from '../../../lib/database/conversations-db.js';
@@ -57,18 +57,36 @@ async function readSessionAttachmentBasenames(sessionFile: string): Promise<Set<
 
 export async function cleanupUnreferencedConversationAttachments(conversation: Pick<Conversation, 'name' | 'sessionFile'>): Promise<void> {
   const attachmentPaths = await listConversationAttachmentPaths(conversation.name);
-  if (attachmentPaths.length === 0) {
+  if (attachmentPaths.length === 0 || !conversation.sessionFile) {
     return;
   }
 
-  const referencedBasenames = conversation.sessionFile
-    ? await readSessionAttachmentBasenames(conversation.sessionFile)
-    : new Set<string>();
+  let sessionMtimeMs: number;
+  try {
+    sessionMtimeMs = (await stat(conversation.sessionFile)).mtimeMs;
+  } catch {
+    return;
+  }
+
+  const referencedBasenames = await readSessionAttachmentBasenames(conversation.sessionFile);
 
   await Promise.all(
-    attachmentPaths
-      .filter((attachmentPath) => !referencedBasenames.has(basename(attachmentPath)))
-      .map((attachmentPath) => rm(attachmentPath, { force: true })),
+    attachmentPaths.map(async (attachmentPath) => {
+      if (referencedBasenames.has(basename(attachmentPath))) {
+        return;
+      }
+
+      try {
+        const attachmentMtimeMs = (await stat(attachmentPath)).mtimeMs;
+        if (attachmentMtimeMs > sessionMtimeMs) {
+          return;
+        }
+      } catch {
+        return;
+      }
+
+      await rm(attachmentPath, { force: true });
+    }),
   );
 }
 

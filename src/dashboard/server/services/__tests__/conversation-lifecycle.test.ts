@@ -25,7 +25,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
   it('marks active conversations as ended when session checker returns false', async () => {
     mockListConversations.mockReturnValue([
-      { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active' },
+      { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active', sessionFile: '/tmp/gone.jsonl' },
     ]);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
@@ -36,7 +36,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(checker).toHaveBeenCalledWith('conv-gone-session');
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'gone-session' }),
+      expect.objectContaining({ name: 'gone-session', sessionFile: '/tmp/gone.jsonl' }),
     );
   });
 
@@ -82,8 +82,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
   it('marks only gone sessions when multiple active conversations', async () => {
     mockListConversations.mockReturnValue([
-      { name: 'alive', tmuxSession: 'conv-alive', status: 'active' },
-      { name: 'gone', tmuxSession: 'conv-gone', status: 'active' },
+      { name: 'alive', tmuxSession: 'conv-alive', status: 'active', sessionFile: '/tmp/alive.jsonl' },
+      { name: 'gone', tmuxSession: 'conv-gone', status: 'active', sessionFile: '/tmp/gone.jsonl' },
     ]);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');

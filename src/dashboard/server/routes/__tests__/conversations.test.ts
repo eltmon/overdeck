@@ -198,6 +198,36 @@ describe('conversations route — DB integration', () => {
     expect(existsSync(uploadedPath)).toBe(false);
   });
 
+  it('ended and archived cleanup preserve unsent uploads newer than session history', async () => {
+    const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'unsent-conv', tmuxSession: 'conv-unsent-conv', cwd: '/cwd' });
+
+    const sessionFile = join(TEST_HOME, 'unsent-session.jsonl');
+    writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'existing history' }] } })}\n`);
+    updateSessionFile('unsent-conv', sessionFile);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const pngData = Buffer.from(Uint8Array.from([5, 6, 7, 8])).toString('base64');
+    const uploadResponse = await handleConversationImageUpload('unsent-conv', {
+      filename: 'draft.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+    const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
+
+    markConversationEnded('unsent-conv');
+    await cleanupUnreferencedConversationAttachments({ name: 'unsent-conv', sessionFile });
+    expect(existsSync(uploadedPath)).toBe(true);
+
+    archiveConversation('unsent-conv');
+    await cleanupUnreferencedConversationAttachments({ name: 'unsent-conv', sessionFile });
+    expect(existsSync(uploadedPath)).toBe(true);
+  });
+
   it('archive prunes unreferenced uploads while preserving prose-first referenced ones', async () => {
     const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
