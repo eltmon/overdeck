@@ -154,11 +154,9 @@ export function getDiscoveredSessionById(id: number): DiscoveredSession | null {
   return row ? rowToSession(row) : null;
 }
 
-/**
- * Find sessions matching structured filters. Returns rows ordered by last_ts DESC.
- */
-export function findDiscoveredSessions(filter: ConversationFilter = {}): DiscoveredSession[] {
-  const db = getDatabase();
+// ─── Filter SQL builder (shared by find + count) ─────────────────────────────
+
+function buildFilterSql(filter: ConversationFilter): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
 
@@ -215,7 +213,6 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
     params.push(filter.enrichmentLevelLessThan);
   }
   if (filter.tags && filter.tags.length > 0) {
-    // JSON array overlap: any tag in the filter matches
     const tagConditions = filter.tags.map(() => `tags LIKE ? ESCAPE '\\'`);
     conditions.push(`(${tagConditions.join(' OR ')})`);
     for (const tag of filter.tags) {
@@ -237,7 +234,15 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
     }
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '', params };
+}
+
+/**
+ * Find sessions matching structured filters. Returns rows ordered by last_ts DESC.
+ */
+export function findDiscoveredSessions(filter: ConversationFilter = {}): DiscoveredSession[] {
+  const db = getDatabase();
+  const { where, params } = buildFilterSql(filter);
   const safeLimit = Number.isFinite(filter.limit) && filter.limit! >= 0 ? filter.limit! : undefined;
   const safeOffset = Number.isFinite(filter.offset) && filter.offset! >= 0 ? filter.offset! : undefined;
   const limit = safeLimit !== undefined ? `LIMIT ${safeLimit}` : '';
@@ -255,11 +260,15 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
 }
 
 /**
- * Count sessions matching filters (without fetching rows).
+ * Count sessions matching filters using a SQL COUNT(*) — no rows materialized.
  */
 export function countDiscoveredSessions(filter: ConversationFilter = {}): number {
-  const rows = findDiscoveredSessions({ ...filter, limit: undefined, offset: undefined });
-  return rows.length;
+  const db = getDatabase();
+  const { where, params } = buildFilterSql(filter);
+  const row = db
+    .prepare(`SELECT COUNT(*) AS cnt FROM discovered_sessions ${where}`)
+    .get(...params) as { cnt: number };
+  return row.cnt;
 }
 
 // ─── Write operations ─────────────────────────────────────────────────────────
