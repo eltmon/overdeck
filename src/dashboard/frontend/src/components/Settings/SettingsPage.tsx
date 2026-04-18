@@ -169,7 +169,7 @@ const AGENT_CATEGORIES: AgentCategory[] = [
       { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation', icon: Code, description: 'Write the code', implemented: true },
       { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing', icon: Beaker, description: 'Write & run tests', implemented: true },
       { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation', icon: FileText, description: 'Update docs', implemented: true },
-      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: false },
+      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: true },
     ],
   },
   {

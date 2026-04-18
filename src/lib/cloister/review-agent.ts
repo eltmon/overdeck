@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
@@ -401,11 +401,8 @@ async function spawnReviewer(
   // Wait for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));
 
-  // Send prompt via load-buffer + paste-buffer (reliable delivery)
-  await execAsync(`tmux load-buffer "${promptFile}"`);
-  await execAsync(`tmux paste-buffer -t ${sessionName}`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  await execAsync(`tmux send-keys -t ${sessionName} C-m`);
+  const prompt = await readFile(promptFile, 'utf-8');
+  await sendKeysAsync(sessionName, prompt, 'spawnReviewer');
 }
 
 /** Poll until the tmux session exits and the output file is written, or timeout */
