@@ -133,9 +133,10 @@ pan release stable --version <x.y.z>      Create stable release commit + tag loc
 pan release canary --version <x.y.z-canary.n>
                                           Create canary release commit + tag locally
 pan release notes [from] [to]             Draft notes from git history
+                                          (use --write to save a release body file)
 ```
 
-Stable tags publish npm `latest`; canary tags publish npm `canary` and create GitHub prereleases.
+Stable tags publish npm `latest`; canary tags publish npm `canary` and create GitHub prereleases. GitHub release pages use a structured body with Summary, Highlights, Breaking changes, Install, and Full changelog.
 
 ## 6. First-run & maintenance
 
@@ -202,8 +203,6 @@ linear-cleanup        Archive old Linear custom states
 ### `pan admin config` — configuration
 ```
 shadow                Manage shadow mode settings
-edit                  Open config.yaml in $EDITOR
-show                  Print resolved config
 ```
 
 ### `pan admin hooks` — Claude Code hooks

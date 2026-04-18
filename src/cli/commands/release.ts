@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,6 +16,10 @@ type PreflightResult = {
   name: string;
   ok: boolean;
   detail: string;
+};
+
+type ReleaseNotesOptions = {
+  write?: string;
 };
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +51,10 @@ export function registerReleaseCommands(program: Command): void {
   release
     .command('notes [from] [to]')
     .description('Draft release notes from git history')
-    .action(releaseNotesCommand);
+    .option('--write <path>', 'Write the generated notes to a file')
+    .action((from: string | undefined, to: string | undefined, options: ReleaseNotesOptions) =>
+      releaseNotesCommand(from, to, options)
+    );
 }
 
 function readPackageJson(): PackageJson {
@@ -95,6 +102,62 @@ function getLatestTag(repoRoot: string): string | null {
   } catch {
     return null;
   }
+}
+
+function getCommitSubjects(repoRoot: string, range: string): string[] {
+  try {
+    const output = run(`git log ${range} --pretty=format:%s`, repoRoot);
+    return output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch {
+    throw new Error(`Could not generate release notes for range: ${range}`);
+  }
+}
+
+function buildReleaseNotesMarkdown(params: {
+  channel: ReleaseChannel;
+  version: string;
+  from: string | null;
+  to: string;
+  entries: string[];
+}): string {
+  const { channel, version, from, to, entries } = params;
+  const range = from ? `${from}...${to}` : to;
+  const installCommand = channel === 'stable'
+    ? 'npm install -g panopticon-cli'
+    : `npm install -g panopticon-cli@${channel}`;
+
+  const bullets = entries.length > 0
+    ? entries.map((entry) => `- ${entry}`).join('\n')
+    : '- No commit subjects found in the selected range.';
+
+  return `## Summary
+- Release ${version} (${channel})
+- Built from ${range}
+- Published intentionally from main via tag promotion
+
+## Highlights
+${bullets}
+
+## Breaking changes
+- None explicitly called out in commit subjects. Review the full changelog before upgrading across versions.
+
+## Install
+\`\`\`bash
+${installCommand}
+\`\`\`
+
+## Full changelog
+${from ? `- https://github.com/eltmon/panopticon-cli/compare/${from}...${to}` : '- First tagged release in this range'}
+`;
+}
+
+function writeTextFile(filePath: string, content: string): void {
+  const dir = dirname(filePath);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(filePath, content);
 }
 
 function validateVersion(channel: ReleaseChannel, version: string): void {
@@ -226,8 +289,10 @@ async function releaseCheckCommand(): Promise<void> {
 async function releaseCreateCommand(channel: ReleaseChannel, version: string): Promise<void> {
   const repoRoot = getRepoRoot();
   const currentVersion = getCurrentVersion();
+  const previousTag = getLatestTag(repoRoot);
   const pkg = readPackageJson();
   const tagName = `v${version}`;
+  const releaseNotesPath = join(repoRoot, '.release', `${tagName}.md`);
 
   validateVersion(channel, version);
   ensureMainBranch(repoRoot);
@@ -249,6 +314,17 @@ async function releaseCreateCommand(channel: ReleaseChannel, version: string): P
   pkg.version = version;
   writePackageJson(pkg);
 
+  const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
+  const releaseNotes = buildReleaseNotesMarkdown({
+    channel,
+    version,
+    from: previousTag,
+    to: tagName,
+    entries,
+  });
+
+  writeTextFile(releaseNotesPath, releaseNotes);
+
   run('git add package.json', repoRoot);
   run(`git commit -m "chore: release ${version}"`, repoRoot);
   run(`git tag -a ${tagName} -m "Release ${version}"`, repoRoot);
@@ -261,10 +337,15 @@ async function releaseCreateCommand(channel: ReleaseChannel, version: string): P
   console.log(`  ${chalk.dim('git push origin main')}`);
   console.log(`  ${chalk.dim(`git push origin ${tagName}`)}`);
   console.log('');
+  console.log(`Release notes: ${chalk.cyan(releaseNotesPath)}`);
   console.log(chalk.dim(`The GitHub release workflow will publish ${channel === 'stable' ? 'latest' : 'canary'} when the tag is pushed.`));
 }
 
-async function releaseNotesCommand(from?: string, to?: string): Promise<void> {
+async function releaseNotesCommand(
+  from?: string,
+  to?: string,
+  options: ReleaseNotesOptions = {}
+): Promise<void> {
   const repoRoot = getRepoRoot();
   const resolvedTo = to ?? 'HEAD';
   const resolvedFrom = from ?? getLatestTag(repoRoot);
@@ -274,28 +355,21 @@ async function releaseNotesCommand(from?: string, to?: string): Promise<void> {
     range = `${resolvedFrom}..${resolvedTo}`;
   }
 
-  let logOutput = '';
-  try {
-    logOutput = run(`git log ${range} --pretty=format:%s`, repoRoot);
-  } catch {
-    throw new Error(`Could not generate release notes for range: ${range}`);
-  }
+  const entries = getCommitSubjects(repoRoot, range);
+  const markdown = buildReleaseNotesMarkdown({
+    channel: resolvedTo.includes('canary') ? 'canary' : 'stable',
+    version: resolvedTo.replace(/^v/, ''),
+    from: resolvedFrom,
+    to: resolvedTo,
+    entries,
+  });
 
-  const entries = logOutput
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  console.log(chalk.bold('Release Notes\n'));
-  console.log(`Range: ${chalk.cyan(resolvedFrom ? `${resolvedFrom}..${resolvedTo}` : resolvedTo)}`);
-  console.log('');
-
-  if (entries.length === 0) {
-    console.log(chalk.dim('No commits found in the requested range.'));
+  if (options.write) {
+    const filePath = join(repoRoot, options.write);
+    writeTextFile(filePath, markdown);
+    console.log(chalk.green(`Wrote release notes to ${filePath}`));
     return;
   }
 
-  for (const entry of entries) {
-    console.log(`- ${entry}`);
-  }
+  console.log(markdown);
 }
