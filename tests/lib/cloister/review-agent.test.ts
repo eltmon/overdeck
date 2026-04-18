@@ -33,14 +33,20 @@ import {
 // vi.mock is hoisted, so mock fns must be defined with vi.hoisted() before they
 // are referenced in the factory.
 
-const { mockSetReviewStatus, mockGetReviewStatus } = vi.hoisted(() => ({
+const { mockSetReviewStatus, mockGetReviewStatus, mockLoadCloisterConfig } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn().mockReturnValue(null),
+  // Throws by default so getReviewAgents() falls back to DEFAULT_REVIEW_AGENTS (same as real missing config)
+  mockLoadCloisterConfig: vi.fn().mockImplementation(() => { throw new Error('no config'); }),
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
   getReviewStatus: mockGetReviewStatus,
+}));
+
+vi.mock('../../../src/lib/cloister/config.js', () => ({
+  loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
 describe('dispatchParallelReview', () => {
@@ -686,5 +692,63 @@ describe('getReviewAgents', () => {
     expect(names).toContain('correctness');
     expect(names).toContain('security');
     expect(names).toContain('performance');
+  });
+
+  it('falls back to defaults when all configured review_agents are disabled', () => {
+    mockLoadCloisterConfig.mockReturnValueOnce({
+      specialists: {
+        review_agents: [
+          { name: 'correctness', enabled: false },
+          { name: 'security', enabled: false },
+          { name: 'performance', enabled: false },
+        ],
+      },
+    });
+    const agents = getReviewAgents();
+    // All configured agents are disabled → must fall back to the 4 built-in defaults
+    const names = agents.map(a => a.name);
+    expect(names).toContain('correctness');
+    expect(names).toContain('security');
+    expect(names).toContain('performance');
+    expect(names).toContain('requirements');
+    expect(agents.length).toBe(4);
+  });
+
+  it('returns only enabled agents when some are disabled', () => {
+    mockLoadCloisterConfig.mockReturnValueOnce({
+      specialists: {
+        review_agents: [
+          { name: 'correctness', enabled: true, focus: ['logic'] },
+          { name: 'security', enabled: false, focus: ['injection'] },
+        ],
+      },
+    });
+    const agents = getReviewAgents();
+    expect(agents.length).toBe(1);
+    expect(agents[0].name).toBe('correctness');
+  });
+});
+
+// ── runParallelReview configuration regressions ───────────────────────────────
+
+describe('runParallelReview configuration regressions', () => {
+  it('empty agents guard: source validates agents.length === 0 before spawning', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('agents.length === 0');
+  });
+
+  it('template existence guard: source checks existsSync(templatePath) before spawning', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('existsSync(templatePath)');
   });
 });

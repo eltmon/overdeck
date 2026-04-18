@@ -100,7 +100,8 @@ export function getReviewAgents(): ReviewAgentConfig[] {
     const config = loadCloisterConfig();
     const configured = config.specialists?.review_agents;
     if (configured && configured.length > 0) {
-      return configured.filter(a => a.enabled !== false);
+      const active = configured.filter(a => a.enabled !== false);
+      return active.length > 0 ? active : DEFAULT_REVIEW_AGENTS;
     }
   } catch {
     // Config load failure → use defaults
@@ -515,6 +516,37 @@ async function runParallelReview(
   agents: ReviewAgentConfig[],
 ): Promise<{ result: ReviewResult; reviewId: string }> {
   const reviewId = `review-${context.issueId}-${Date.now()}`;
+
+  // Guard: fail fast if no reviewers are enabled
+  if (agents.length === 0) {
+    return {
+      result: {
+        success: false,
+        reviewResult: 'COMMENTED',
+        notes: 'Review aborted: no reviewers are enabled.',
+        output: `Review ${reviewId}`,
+      },
+      reviewId,
+    };
+  }
+
+  // Guard: validate all reviewer templates exist before spawning any sessions
+  for (const agent of agents) {
+    const subagentName = `code-review-${agent.name}`;
+    const templatePath = join(CACHE_AGENTS_DIR, `${subagentName}.md`);
+    if (!existsSync(templatePath)) {
+      return {
+        result: {
+          success: false,
+          reviewResult: 'COMMENTED',
+          notes: `Review aborted: no template found for reviewer '${agent.name}'. Built-in names: correctness, security, performance, requirements.`,
+          output: `Review ${reviewId}`,
+        },
+        reviewId,
+      };
+    }
+  }
+
   const outputDir = join(context.projectPath, '.pan', 'review', reviewId);
   await mkdir(outputDir, { recursive: true });
 
