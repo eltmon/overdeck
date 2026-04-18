@@ -5,7 +5,7 @@ import type { Issue } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
 import { DialogProvider } from './DialogProvider';
 import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
-import { TasksChip } from './PlanningChips';
+import { PlanChip, TasksChip, VBriefChip } from './PlanningChips';
 import { useDashboardStore } from '../lib/store';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 
@@ -592,7 +592,7 @@ describe('FeatureCard', () => {
   });
 });
 
-describe('TasksChip', () => {
+describe('PlanningChips', () => {
   const originalFetch = global.fetch;
 
   const createIssue = (overrides: Partial<Issue> = {}): Issue => ({
@@ -616,15 +616,7 @@ describe('TasksChip', () => {
     ...overrides,
   });
 
-  const renderTasksChip = ({
-    issue = createIssue(),
-    onViewBeads = vi.fn(),
-    queryClient,
-  }: {
-    issue?: Issue;
-    onViewBeads?: ReturnType<typeof vi.fn>;
-    queryClient?: QueryClient;
-  } = {}) => {
+  const renderWithProviders = (ui: React.ReactNode, queryClient?: QueryClient) => {
     const client = queryClient ?? new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -634,10 +626,59 @@ describe('TasksChip', () => {
 
     render(
       <QueryClientProvider client={client}>
-        <DialogProvider>
-          <TasksChip issue={issue} onViewBeads={onViewBeads} />
-        </DialogProvider>
+        <DialogProvider>{ui}</DialogProvider>
       </QueryClientProvider>
+    );
+
+    return client;
+  };
+
+  const renderPlanChip = ({
+    issue = createIssue(),
+    onPlan = vi.fn(),
+    isPlanningActive = false,
+    queryClient,
+  }: {
+    issue?: Issue;
+    onPlan?: ReturnType<typeof vi.fn>;
+    isPlanningActive?: boolean;
+    queryClient?: QueryClient;
+  } = {}) => {
+    const client = renderWithProviders(
+      <PlanChip issue={issue} onPlan={onPlan} isPlanningActive={isPlanningActive} />,
+      queryClient,
+    );
+    return { issue, onPlan, queryClient: client };
+  };
+
+  const renderVBriefChip = ({
+    issue = createIssue(),
+    onViewVBrief = vi.fn(),
+    queryClient,
+  }: {
+    issue?: Issue;
+    onViewVBrief?: ReturnType<typeof vi.fn>;
+    queryClient?: QueryClient;
+  } = {}) => {
+    const client = renderWithProviders(
+      <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />,
+      queryClient,
+    );
+    return { issue, onViewVBrief, queryClient: client };
+  };
+
+  const renderTasksChip = ({
+    issue = createIssue(),
+    onViewBeads = vi.fn(),
+    queryClient,
+  }: {
+    issue?: Issue;
+    onViewBeads?: ReturnType<typeof vi.fn>;
+    queryClient?: QueryClient;
+  } = {}) => {
+    const client = renderWithProviders(
+      <TasksChip issue={issue} onViewBeads={onViewBeads} />,
+      queryClient,
     );
 
     return { issue, onViewBeads, queryClient: client };
@@ -646,6 +687,105 @@ describe('TasksChip', () => {
   afterEach(() => {
     global.fetch = originalFetch;
     vi.clearAllMocks();
+  });
+
+  it('renders Plan when no plan exists and calls onPlan', async () => {
+    const issue = createIssue();
+    const onPlan = vi.fn();
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: false, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    }) as typeof fetch;
+
+    renderPlanChip({ issue, onPlan });
+
+    const button = await screen.findByTestId(`action-plan-${issue.identifier}`);
+    expect(button.textContent).toContain('Plan');
+
+    fireEvent.click(button);
+    expect(onPlan).toHaveBeenCalledWith(issue);
+  });
+
+  it('renders See Plan when planning-state reports an existing plan', async () => {
+    const issue = createIssue();
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: true, hasBeads: true, beadsCount: 2 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    }) as typeof fetch;
+
+    renderPlanChip({ issue });
+
+    expect(await screen.findByText('See Plan')).toBeDefined();
+  });
+
+  it('renders Watch Planning when planning is active and bypasses planning-state rendering', async () => {
+    const issue = createIssue();
+    const onPlan = vi.fn();
+    global.fetch = vi.fn(async () => {
+      throw new Error('Watch Planning state should not need planning-state fetch to render correctly');
+    }) as typeof fetch;
+
+    renderPlanChip({ issue, onPlan, isPlanningActive: true });
+
+    const button = screen.getByTestId(`action-watch-planning-${issue.identifier}`);
+    expect(button.textContent).toContain('Watch Planning');
+    fireEvent.click(button);
+    expect(onPlan).toHaveBeenCalledWith(issue);
+  });
+
+  it('renders vBRIEF with success styling when a plan exists and calls onViewVBrief', async () => {
+    const issue = createIssue();
+    const onViewVBrief = vi.fn();
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: true, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    }) as typeof fetch;
+
+    renderVBriefChip({ issue, onViewVBrief });
+
+    const button = await screen.findByRole('button', { name: 'vBRIEF' });
+    await waitFor(() => {
+      expect(button.className).toContain('text-success');
+    });
+    fireEvent.click(button);
+    expect(onViewVBrief).toHaveBeenCalledWith(issue);
+  });
+
+  it('renders vBRIEF muted when no plan exists', async () => {
+    const issue = createIssue();
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: false, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
+    }) as typeof fetch;
+
+    renderVBriefChip({ issue });
+
+    const button = await screen.findByRole('button', { name: 'vBRIEF' });
+    expect(button.className).toContain('text-muted-foreground');
   });
 
   it('generates tasks when a plan exists but beads have not been created yet', async () => {
