@@ -1,0 +1,225 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-15T15:05:26Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-704: Rally Features missing action buttons in kanban (Plan / See Plan / vBRIEF / Tasks)"
+  },
+  "plan": {
+    "id": "pan-704",
+    "title": "Rally Features missing action buttons in kanban (Plan / See Plan / vBRIEF / Tasks)",
+    "status": "approved",
+    "uid": "d24af558-ed94-4de4-91d6-eaa557db9adc",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-15T15:05:26Z",
+    "updated": "2026-04-15T15:05:26Z",
+    "references": [
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/704", "label": "PAN-704", "type": "issue" },
+      { "uri": "docs/HIERARCHICAL-PLANNING.md", "label": "Hierarchical planning docs", "type": "doc" }
+    ],
+    "tags": ["frontend", "kanban", "rally", "hierarchical-planning"],
+    "narratives": {
+      "Problem": "Rally Features (PortfolioItem/Feature) render via FeatureCard in the kanban with no action bar, so there is no UI affordance to trigger feature-level planning, view the vBRIEF, or view tasks. The backend supports `pan work plan <feature-id>` already; the dashboard is the gap.",
+      "Proposal": "Extract the existing Plan/vBRIEF/Tasks chips from IssueCard into reusable components, then render them on FeatureCard at the bottom of the header row (visible collapsed and expanded). Wire onPlan/onViewVBrief/onViewBeads props through the hierarchical render path. No Start Agent chip — work happens per-story. CompactChildCard unchanged."
+    },
+    "items": [
+      {
+        "id": "extract-planning-chips",
+        "title": "Extract PlanChip / VBriefChip / TasksChip into reusable components",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-15T15:05:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-704"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/kanban/PlanningChips.tsx` exporting three components: PlanChip, VBriefChip, TasksChip. Each takes `{ issue, onPlan | onViewVBrief | onViewBeads }` and owns its own `useQuery(['planning-state', issue.identifier])` with the existing refetchInterval: 30000 / staleTime: 15000 settings. TasksChip also owns the `generate-tasks` mutation and click logic. The chips must render pixel-identical JSX/styling to the current inline chips in IssueCard. Then update IssueCard to consume the extracted components, removing its inline `planChip`/`vbriefChip`/`tasksChip` JSX but keeping its own `planningStateQuery` (React Query dedupes by key so no extra network cost) since IssueCard still needs `beadsCount` for the Start Agent gate."
+        },
+        "subItems": [
+          {
+            "id": "extract-planning-chips.ac1",
+            "title": "New file PlanningChips.tsx exports PlanChip, VBriefChip, TasksChip with identical styling/behavior to the current inline chips",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "extract-planning-chips.ac2",
+            "title": "Each chip hosts its own useQuery(['planning-state', issue.identifier]) with refetchInterval: 30000 and staleTime: 15000",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "extract-planning-chips.ac3",
+            "title": "TasksChip owns the generate-tasks mutation and shows 'Generate Tasks' (red/destructive) when hasPlan && beadsCount === 0",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "extract-planning-chips.ac4",
+            "title": "IssueCard is refactored to consume the extracted components; its existing Plan/vBRIEF/Tasks rendering in backlog/todo/in_progress/done action bars remains visually identical",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "extract-planning-chips.ac5",
+            "title": "Existing KanbanBoard tests (if any) still pass; typecheck and lint pass",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "feature-card-action-bar",
+        "title": "Add Plan / vBRIEF / Tasks action bar to FeatureCard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-15T15:05:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-704"
+        },
+        "narrative": {
+          "Action": "Add `onPlan`, `onViewVBrief`, `onViewBeads`, and `agents` props to FeatureCard. Render a new action bar at the bottom of the clickable header `<div>` in FeatureCard (after the progress bar, before the expanded children region) containing `<PlanChip>`, `<VBriefChip>`, `<TasksChip>` from the extracted components. Each chip's onClick must call e.stopPropagation() so the click does not toggle expand/collapse. PlanChip must support the existing `isPlanningActive` variant from IssueCard — when a planning agent is running for the feature (derived from the `agents` prop by matching `agent.issueId === feature.identifier && agent.agentPhase === 'planning' && agent.status !== 'dead'`), render the pulsing Eye 'Watch Planning' button in place of the Plan chip, identical to IssueCard lines 2711-2722. Update the hierarchical render path in IssueColumn (`renderIssueCard`) to pass `onPlan={() => onPlan(feature)}`, `onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}`, `onViewBeads={(i) => onViewBeads(i)}`, and `agents={agents}` through to the `<FeatureCard>` at KanbanBoard.tsx:1675. CompactChildCard must remain unchanged."
+        },
+        "subItems": [
+          {
+            "id": "feature-card-action-bar.ac1",
+            "title": "FeatureCard accepts onPlan, onViewVBrief, onViewBeads props",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac2",
+            "title": "FeatureCard renders an action bar containing PlanChip, VBriefChip, TasksChip in its header (visible when the feature is collapsed AND expanded)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac3",
+            "title": "Rally Features in backlog, todo, and in_progress columns show all three chips on the kanban",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac4",
+            "title": "Clicking Plan opens PlanDialog targeting the Feature identifier via onPlan(feature)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac5",
+            "title": "Clicking vBRIEF invokes onViewVBrief(feature) and opens the existing VBriefViewer",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac6",
+            "title": "Clicking Tasks invokes onViewBeads(feature) (or generate-tasks when hasPlan && beadsCount === 0)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac7",
+            "title": "'See Plan' (green) appears on FeatureCard once a feature-level vBRIEF exists (hasPlan === true)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac8",
+            "title": "Chip clicks do not toggle the feature's expand/collapse state (stopPropagation verified)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac9",
+            "title": "No Start Agent button on FeatureCard",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac10",
+            "title": "CompactChildCard is unchanged (no new buttons, no new props)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac11",
+            "title": "When a planning agent is running for the feature (isPlanningActive), the Plan chip is replaced by a pulsing Eye 'Watch Planning' button identical to IssueCard's isPlanningActive variant; clicking it invokes onPlan(feature)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-action-bar.ac12",
+            "title": "FeatureCard receives an `agents` prop from IssueColumn used to derive isPlanningActive for the feature",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "feature-card-rtl-test",
+        "title": "Add RTL component test for FeatureCard action bar",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-15T15:05:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-704"
+        },
+        "narrative": {
+          "Action": "Add a Vitest + React Testing Library test (colocated with the existing KanbanBoard frontend tests, or as a new `FeatureCard.test.tsx`) that renders FeatureCard wrapped in a QueryClientProvider, mocks the /api/issues/:id/planning-state response via MSW or a fetch stub, and asserts the rendered chips + click behavior. Note: FeatureCard is currently not exported from KanbanBoard.tsx — export it (named export) as part of this bead so the test can import it directly."
+        },
+        "subItems": [
+          {
+            "id": "feature-card-rtl-test.ac1",
+            "title": "Test renders FeatureCard with Plan, vBRIEF, Tasks chips visible",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-rtl-test.ac2",
+            "title": "Test verifies 'See Plan' (green) appears when planning-state returns hasPlan: true",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-rtl-test.ac3",
+            "title": "Test verifies clicking Plan calls onPlan with the feature",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-rtl-test.ac4",
+            "title": "Test verifies clicking vBRIEF calls onViewVBrief with the feature",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-rtl-test.ac5",
+            "title": "Test verifies clicking Tasks calls onViewBeads with the feature (when beadsCount > 0)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-rtl-test.ac6",
+            "title": "Test verifies chip clicks do NOT call onToggle (stopPropagation)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "feature-card-rtl-test.ac7",
+            "title": "Test passes under `npm test` (frontend vitest)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "extract-planning-chips", "to": "feature-card-action-bar", "type": "blocks" },
+      { "from": "feature-card-action-bar", "to": "feature-card-rtl-test", "type": "blocks" }
+    ]
+  }
+}
