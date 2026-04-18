@@ -42,6 +42,19 @@ Fix the four defects at their root without a broader rearchitecture:
 
 Strict rule: every bug above is fixed in one issue, not split across follow-ups (per `CLAUDE.md`: "Deliver Complete Features").
 
+## Agent Activity Visibility
+
+The Agents page currently shows a specialist row with project, type, and run status but not *what the agent is actively working on*. PAN-754 adds:
+
+- **`currentActivity: string | null`** — set at dispatch time (e.g., `"Reviewing PAN-754 — correctness"`, `"Testing PAN-754"`). Static at spawn time; represents intent, not live progress.
+- **`model: string | null`** — which model was resolved for this run (e.g., `"gpt-5.4"`).
+- **`issueId: string`** — displayed prominently on each row.
+- **"resolved via" tooltip** on the model name showing the resolution trace (e.g., `work-type-router → models.overrides`).
+
+**Live progress:** click any row → terminal panel opens the live tmux output for that session. No additional backend work needed; this already exists in the dashboard.
+
+The `currentActivity` field is descriptive enough for at-a-glance understanding without requiring a streaming capture of tmux output. Periodic tmux pane capture is explicitly out of scope for this PRD.
+
 ## Non-Goals (explicit)
 
 Documented here so they are not drifted into during implementation. See `docs/research/specialist-redesign.md` for the broader design exploration — these are future work, not this PRD:
