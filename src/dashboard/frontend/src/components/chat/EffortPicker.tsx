@@ -15,6 +15,7 @@ const EFFORT_LEVELS = [
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium (default)' },
   { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'Extra High' },
   { id: 'max', label: 'Max' },
 ] as const;
 

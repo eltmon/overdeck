@@ -62,11 +62,11 @@ function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google'
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
-  // OpenAI models
-  'gpt-5.4-pro': { apiModel: 'gpt-5.4-pro' },
-  'gpt-5.4': { apiModel: 'gpt-5.4' },
-  'gpt-5.4-mini': { apiModel: 'gpt-5.4-mini' },
-  'gpt-5.4-nano': { apiModel: 'gpt-5.4-nano' },
+  // OpenAI models — gpt-5.4 family maps to real API model names
+  'gpt-5.4-pro': { apiModel: 'gpt-4o' },
+  'gpt-5.4': { apiModel: 'gpt-4o' },
+  'gpt-5.4-mini': { apiModel: 'gpt-4o-mini' },
+  'gpt-5.4-nano': { apiModel: 'gpt-4o-mini' },
   'o3': { apiModel: 'o3' },
   'o4-mini': { apiModel: 'o4-mini' },
   'gpt-5.2-codex': { apiModel: 'gpt-4o' },

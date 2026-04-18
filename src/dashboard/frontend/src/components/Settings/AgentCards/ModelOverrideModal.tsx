@@ -47,7 +47,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
+      { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — xhigh/max effort, deepest reasoning' },
+      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
       { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
       { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous gen Sonnet, strong coding performance' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
