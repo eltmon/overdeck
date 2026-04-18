@@ -24,8 +24,21 @@ export function findPlan(workspacePath: string): string | null {
  * ({ issue, title, items, edges? }) produced by some planning prompts.
  * Throws if the file does not exist or is invalid JSON.
  */
+export class VBriefMergeConflictError extends Error {
+  constructor(planPath: string) {
+    super(
+      `plan.vbrief.json at ${planPath} contains unresolved git merge conflict markers. ` +
+      `Resolve all <<<<<<</=======/>>>>>>> markers in that file and commit the result before re-requesting review.`
+    );
+    this.name = 'VBriefMergeConflictError';
+  }
+}
+
 export function readPlan(planPath: string): VBriefDocument {
   const raw = readFileSync(planPath, 'utf-8');
+  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+    throw new VBriefMergeConflictError(planPath);
+  }
   const parsed = JSON.parse(raw);
 
   // vBRIEF v0.5 requires exactly two top-level keys: vBRIEFInfo and plan

@@ -29,12 +29,12 @@ export function derivePipelinePhase(
   input: PipelinePhaseInput,
   deadSessions: ReadonlySet<string> = new Set(),
 ): PipelinePhaseResult {
-  const { agent, reviewStatus, projectKey } = input;
+  const { agent, reviewStatus, projectKey, issueId } = input;
 
   // Session name helpers
   const workSession = agent?.id ?? null;
   const specialistSession = (role: string): string =>
-    projectKey ? `specialist-${projectKey}-${role}` : `specialist-${role}`;
+    projectKey ? `specialist-${projectKey}-${issueId}-${role}` : `specialist-${role}`;
 
   const reviewSession = specialistSession('review-agent');
   const testSession = specialistSession('test-agent');
