@@ -227,8 +227,10 @@ function clearReadySignal(agentId: string): void {
 }
 
 /**
- * Wait for SessionStart hook to signal ready (async - non-blocking)
- * Returns true if ready signal received, false if timeout
+ * Wait for agent to be ready (async - non-blocking).
+ * Primary: ready.json written by SessionStart hook.
+ * Fallback: tmux pane shows Claude's interactive prompt indicator.
+ * Returns true if ready signal received, false if timeout.
  */
 async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
@@ -247,6 +249,16 @@ async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise
         // File exists but invalid - keep waiting
       }
     }
+
+    // Fallback: check tmux pane for Claude's interactive prompt indicator.
+    // ready.json is currently not written by any hook (PAN-759), so this is the
+    // primary detection path for resumed/fresh-started agents.
+    try {
+      const pane = await capturePaneAsync(agentId, 200);
+      if (pane.includes('bypass permissions on') || pane.includes('⏵⏵')) {
+        return true;
+      }
+    } catch { /* non-fatal — session may not exist yet */ }
   }
 
   return false;
