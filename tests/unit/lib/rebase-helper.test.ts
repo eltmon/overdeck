@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import type { MergeSet } from '../../../src/lib/merge-set.js';
 import { rebaseAndPushRepos } from '../../../src/lib/rebase-helper.js';
 
 const execAsync = promisify(exec);
@@ -64,16 +65,33 @@ describe('rebaseAndPushRepos', () => {
   });
 
   it('keeps the rebased branch version when only .planning files conflict', async () => {
-    const result = await rebaseAndPushRepos(repoDir, {
+    const mergeSet: MergeSet = {
+      issueId: 'PAN-711',
+      projectKey: 'panopticon-cli',
+      projectPath: repoDir,
       workspaceType: 'monorepo',
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       repos: [
         {
           repoKey: 'panopticon-cli',
+          repoPath: repoDir,
+          forge: 'github',
           sourceBranch: 'feature/pan-711',
           targetBranch: 'main',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          rebaseStatus: 'pending',
+          verificationStatus: 'pending',
+          mergeStatus: 'pending',
+          mergeOrder: 1,
+          required: true,
         },
       ],
-    } as any);
+    };
+
+    const result = await rebaseAndPushRepos(repoDir, mergeSet);
 
     expect(result.success).toBe(true);
     expect(result.results[0]?.outcome).toBe('rebased');

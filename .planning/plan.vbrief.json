@@ -1,199 +1,130 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-15T09:15:36Z",
+    "created": "2026-04-15T01:58:14Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-711: PAN-705 follow-up: remove transitional route aliases after merge",
-    "updated": "2026-04-15T22:47:11.108Z"
+    "description": "Plan for PAN-712: fix stale pan work/cloister/specialists refs in .claude/skills/",
+    "updated": "2026-04-15T08:50:53.303Z"
   },
   "plan": {
-    "id": "pan-711",
-    "title": "PAN-705 follow-up: remove transitional route aliases after merge",
+    "id": "pan-712",
+    "title": "fix: stale pan work/cloister/specialists refs in .claude/skills/",
     "status": "approved",
-    "uid": "523a1875-a300-485a-9d2f-3f1d81572c35",
+    "uid": "bf82ed53-bd83-4fcb-952f-f027a47b06d2",
     "author": "agent:claude-opus-4-6",
-    "sequence": 16,
-    "created": "2026-04-15T09:15:36Z",
-    "updated": "2026-04-15T22:47:11.108Z",
+    "sequence": 17,
+    "created": "2026-04-15T01:58:14Z",
+    "updated": "2026-04-15T08:50:53.303Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/711",
-        "label": "PAN-711",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/712",
+        "label": "PAN-712",
         "type": "issue"
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
-        "label": "PAN-705 (parent rename)",
+        "label": "PAN-705",
         "type": "issue"
-      },
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/pull/708",
-        "label": "PAN-705 PR (#708)",
-        "type": "pr"
       }
     ],
     "tags": [
-      "cleanup",
-      "dashboard",
-      "routes",
       "docs",
-      "regression-guard"
+      "skills",
+      "cleanup",
+      "pan-705-followup"
     ],
     "narratives": {
-      "Problem": "PAN-705 originally landed with backward-compat alias routes that mirrored the old /api/workspaces/:id/{review-status,approve,merge,...} paths to the renamed /api/review/* and /api/issues/* handlers. The aliases were intentional tech debt to let specialists run on the PAN-705 branch against a stale main-built dashboard. PAN-711 was filed to delete them once main was rebuilt. During PAN-705 review (feedback round #007), the review agent flagged the aliases as a 'no bandaids' violation and they were deleted in commit d18c74cc, which was squashed into the merged PR #708. Source on main is already alias-free. What remains is (a) preventing them from being reintroduced and (b) sweeping a handful of living docs that still cite the old paths as authoritative.",
-      "Proposal": "Two narrow, independent beads: (1) add a Vitest regression guard that fails if any of the eight deleted alias path literals reappear under src/, locking in the cleanup; (2) update five stale path references in four living docs (TESTING.md, PRD-CLOISTER.md, FIX-ALL-PRD.md, prds/active/pan-509/STATE.md). Explicitly leave historical incident logs and completed PRD archives alone — they're time-locked snapshots, not current reference docs. No live pipeline test is required; PAN-711's own merge cycle exercises the new routes end-to-end."
+      "Problem": "Project-level skill files under .claude/skills/ still reference the pre-PAN-705 command taxonomy (pan work <verb>, pan cloister, pan specialists). These references mislead any agent that loads the affected skills about correct CLI syntax. A grep audit found 5 stale occurrences in exactly 2 files: .claude/skills/test-specialist-workflow/SKILL.md (4 refs) and .claude/skills/update-panopticon-docs/resources/EXAMPLES.md (1 ref).",
+      "Proposal": "Two trivial, independent doc edits — one bead per file. Bead 1 rewrites the test-specialist-workflow skill to use `pan admin cloister start` and `pan admin specialists wake ...`. Bead 2 rewrites the pan-work example in the update-panopticon-docs skill to reflect the flat lifecycle taxonomy (no `pan work` namespace). A final anchored grep (\\bpan (work|cloister|specialists)\\b) over .claude/skills/ must return zero hits; `pan workspace` references are intentionally preserved because that command group still exists post-PAN-705."
     },
     "items": [
       {
-        "id": "regression-guard",
-        "title": "Add Vitest guard that fails if deleted alias routes reappear in src/",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-15T09:15:36Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-711"
-        },
-        "narrative": {
-          "Action": "Create tests/unit/dashboard/no-alias-routes.test.ts (or extend an existing routes test if a natural home exists). Test walks every .ts file under src/ and asserts that none of the eight deleted alias path literals appear, in either :id or :issueId form. The list is hardcoded inside the test — the test itself documents which paths are forbidden. Forbidden literals: '/api/workspaces/:id/review-status', '/api/workspaces/:issueId/review-status', '/api/workspaces/:id/approve', '/api/workspaces/:issueId/approve', '/api/workspaces/:id/merge', '/api/workspaces/:issueId/merge', '/api/workspaces/:id/review-trigger', '/api/workspaces/:issueId/review-trigger', '/api/workspaces/:id/review-reset', '/api/workspaces/:issueId/review-reset', '/api/workspaces/:id/review-request', '/api/workspaces/:issueId/review-request', '/api/workspaces/:id/request-review', '/api/workspaces/:issueId/request-review', '/api/workspaces/:id/review', '/api/workspaces/:issueId/review'. The test must use full path literal matches (not substring fragments) so it does not false-positive on legitimate routes that happen to share a token like 'review' or 'merge'. Test file itself and any test fixtures are excluded from the scan. Test runs as part of the existing 'npm test' Vitest invocation — no new package, no new script."
-        },
-        "subItems": [
-          {
-            "id": "regression-guard.ac1",
-            "title": "Test file exists at tests/unit/dashboard/no-alias-routes.test.ts and runs as part of `npm test`",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
-          },
-          {
-            "id": "regression-guard.ac2",
-            "title": "Test fails (red) if any of the 16 forbidden path literals (8 paths × :id and :issueId variants) is reintroduced anywhere under src/",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
-          },
-          {
-            "id": "regression-guard.ac3",
-            "title": "Test passes (green) on the current branch with no production code changes — confirming the cleanup from PAN-705 commit d18c74cc is in fact complete",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
-          },
-          {
-            "id": "regression-guard.ac4",
-            "title": "Test uses full quoted path literal matching, not substring search; legitimate routes such as `/api/workspaces/:issueId/plan`, `/api/workspaces/:issueId/tldr`, `/api/workspaces/:issueId/refresh-db`, `/api/review/:issueId/status` continue to exist in src/ without triggering the test",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
-          },
-          {
-            "id": "regression-guard.ac5",
-            "title": "Test scans every .ts file under src/ recursively (excluding the test file itself and any node_modules); list of forbidden literals is hardcoded inline so it self-documents which paths are forbidden",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.108Z"
-          },
-          {
-            "id": "regression-guard.ac6",
-            "title": "`npm run typecheck`, `npm run lint`, and `npm test` all pass after the test is added",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.108Z"
-          }
-        ],
-        "completed": "2026-04-15T22:47:11.107Z"
-      },
-      {
-        "id": "doc-sweep",
-        "title": "Update stale alias-path references in four living docs",
+        "id": "fix-test-specialist-workflow-skill",
+        "title": "Update test-specialist-workflow SKILL.md to pan admin cloister/specialists",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-15T09:15:36Z",
+        "created": "2026-04-15T01:58:14Z",
         "metadata": {
           "difficulty": "trivial",
-          "issueLabel": "pan-711"
+          "issueLabel": "pan-712"
         },
         "narrative": {
-          "Action": "String-replace five lines across four living docs that still cite the renamed paths as if they were current. Pure substitution — do not rewrite surrounding paragraphs, do not 'modernize' adjacent prose, do not touch any other file. Specifically: docs/TESTING.md:132 — `POST /api/workspaces/:id/review-status` becomes `POST /api/review/:id/status`. docs/PRD-CLOISTER.md:178 — `GET /api/workspaces/:issueId/review-status` becomes `GET /api/review/:issueId/status`. docs/PRD-CLOISTER.md:179 — `POST /api/workspaces/:issueId/review-status` becomes `POST /api/review/:issueId/status`. docs/FIX-ALL-PRD.md:124 — `POSTs to /api/workspaces/:id/merge` becomes `POSTs to /api/issues/:id/merge`. docs/prds/active/pan-509/STATE.md:17 — `/api/workspaces/:issueId/review-status` becomes `/api/review/:issueId/status`. EXCLUDED — DO NOT TOUCH: docs/OPERATION-FIX-ALL.md (historical incident log, time-locked), docs/prds/completed/*.md (completed PRD archives, time-locked), docs/research/t3code-drift-plan.md (references different non-renamed routes), and any file mentioning `/api/workspaces/:issueId/plan`, `/api/workspaces/:issueId/tldr`, `/api/workspaces/:issueId/start-agent`, `/api/workspaces/:issueId/refresh-db` — those endpoints still exist at those paths and are not renamed."
+          "Action": "Edit .claude/skills/test-specialist-workflow/SKILL.md. Replace `pan cloister start` (line 40) with `pan admin cloister start`. Replace the three `pan specialists wake <agent>` lines (163, 164, 165) and the `pan specialists wake test-agent --task \"...\"` line (174) with their `pan admin specialists wake ...` equivalents. Do not change any other content. Verify by running `pan admin cloister --help` and `pan admin specialists --help` against the resulting command strings."
         },
         "subItems": [
           {
-            "id": "doc-sweep.ac1",
-            "title": "docs/TESTING.md line 132 references `/api/review/:id/status` (not `/api/workspaces/:id/review-status`)",
+            "id": "fix-test-specialist-workflow-skill.ac1",
+            "title": "File .claude/skills/test-specialist-workflow/SKILL.md contains zero occurrences of `pan cloister` or `pan specialists` (as standalone commands, not `pan admin cloister`/`pan admin specialists`)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T22:47:11.106Z"
+            "completed": "2026-04-15T03:29:24.294Z"
           },
           {
-            "id": "doc-sweep.ac2",
-            "title": "docs/PRD-CLOISTER.md lines 178 and 179 reference `/api/review/:issueId/status` (not `/api/workspaces/:issueId/review-status`)",
+            "id": "fix-test-specialist-workflow-skill.ac2",
+            "title": "Every rewritten command in the file is a valid subcommand of `pan admin cloister` or `pan admin specialists` as shown by `pan admin cloister --help` and `pan admin specialists --help`",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T22:47:11.106Z"
+            "completed": "2026-04-15T03:29:24.294Z"
           },
           {
-            "id": "doc-sweep.ac3",
-            "title": "docs/FIX-ALL-PRD.md line 124 references `/api/issues/:id/merge` (not `/api/workspaces/:id/merge`)",
+            "id": "fix-test-specialist-workflow-skill.ac3",
+            "title": "No unrelated changes in the file (diff is limited to the 5 stale command references and minimal surrounding whitespace)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T22:47:11.106Z"
-          },
-          {
-            "id": "doc-sweep.ac4",
-            "title": "docs/prds/active/pan-509/STATE.md line 17 references `/api/review/:issueId/status` (not `/api/workspaces/:issueId/review-status`)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.106Z"
-          },
-          {
-            "id": "doc-sweep.ac5",
-            "title": "docs/OPERATION-FIX-ALL.md is unchanged — the historical incident log entry referencing the old path is preserved as-written, since rewriting it would falsify the time-locked record",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
-          },
-          {
-            "id": "doc-sweep.ac6",
-            "title": "No file under docs/prds/completed/ is modified",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
-          },
-          {
-            "id": "doc-sweep.ac7",
-            "title": "No source file under src/ is modified by this bead — it is documentation-only",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:47:11.107Z"
+            "completed": "2026-04-15T03:29:24.294Z"
           }
         ],
-        "completed": "2026-04-15T22:47:11.106Z"
+        "completed": "2026-04-15T08:50:53.303Z"
+      },
+      {
+        "id": "fix-update-panopticon-docs-examples",
+        "title": "Update update-panopticon-docs EXAMPLES.md Pattern 6 to drop pan work namespace",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T01:58:14Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-712"
+        },
+        "narrative": {
+          "Action": "Edit .claude/skills/update-panopticon-docs/resources/EXAMPLES.md. Replace the `pan work --help` verify step (line 294) with `pan --help` (or a more specific command like `pan start --help` if the surrounding example is about the `start` verb). Review Pattern 6's surrounding prose and update any wording that still implies a `pan work` command namespace — after PAN-705, lifecycle verbs (`start`, `done`, `kill`, `recover`, `tell`, `resume`, `approve`, `close`, `reopen`, `sync-main`, `wipe`) are top-level, not subcommands of `pan work`. Keep the example's original teaching intent intact."
+        },
+        "subItems": [
+          {
+            "id": "fix-update-panopticon-docs-examples.ac1",
+            "title": "File .claude/skills/update-panopticon-docs/resources/EXAMPLES.md contains zero occurrences of `pan work ` (trailing space, to exclude `pan workspace`)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T03:29:24.293Z"
+          },
+          {
+            "id": "fix-update-panopticon-docs-examples.ac2",
+            "title": "Pattern 6 prose and example commands are consistent with the post-PAN-705 flat lifecycle taxonomy — no text implies lifecycle verbs live under a `pan work` group",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T03:29:24.293Z"
+          },
+          {
+            "id": "fix-update-panopticon-docs-examples.ac3",
+            "title": "Repo-wide audit `grep -rn -E '\\bpan (work|cloister|specialists)\\b' .claude/skills/` returns zero hits across all files under .claude/skills/ (this is the issue-level acceptance criterion and must be re-run after both beads land)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T03:29:24.293Z"
+          }
+        ],
+        "completed": "2026-04-15T08:50:53.302Z"
       }
     ],
     "edges": []
