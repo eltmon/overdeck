@@ -71,9 +71,11 @@ describe('mirrorProjectSkills', () => {
 
   it('updates SKILL.md when source content has changed (reports 1 updated)', () => {
     createSkill('pan-help', '# Help\nOriginal.');
-    // Pre-populate target with stale content
+    // Pre-populate target with stale content — simulate a previous mirror run
     mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'), '# Help\nStale.', 'utf-8');
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'manifest'), 'pan-help\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd, { manifestDir });
 
@@ -132,9 +134,11 @@ describe('mirrorProjectSkills', () => {
     const content = '# Workspace\nIdentical content.';
     // Source uses SKILL.md (uppercase)
     createSkill('workspace-add-repo', content);
-    // Target has skill.md (lowercase) with the SAME content — triggers the equality path
+    // Target has skill.md (lowercase) with the SAME content — simulate a previous mirror run
     mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), content, 'utf-8');
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'manifest'), 'workspace-add-repo\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd, { manifestDir });
 
@@ -151,6 +155,8 @@ describe('mirrorProjectSkills', () => {
     // Target still has the old lowercase skill.md from a previous mirror run
     mkdirSync(join(claudeSkillsDir, 'workspace-add-repo'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'workspace-add-repo', 'skill.md'), '# Workspace\nStale content.', 'utf-8');
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'manifest'), 'workspace-add-repo\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd, { manifestDir });
 
@@ -164,9 +170,11 @@ describe('mirrorProjectSkills', () => {
 
   it('classifies as added (not updated) when target dir exists but has no SKILL.md', () => {
     createSkill('pan-help', '# Help\nContent.');
-    // Target dir exists but contains no SKILL.md or skill.md — existingContent will be null
+    // Target dir exists (mirror-managed) but contains no SKILL.md — simulates a partial prior run
     mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'pan-help', 'README.md'), '# Other\n', 'utf-8');
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'manifest'), 'pan-help\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd, { manifestDir });
 
@@ -336,5 +344,53 @@ describe('mirrorProjectSkills', () => {
 
     expect(result.added.sort()).toEqual(['commit', 'pan-help']);
     expect(result.removed).toContain('old-removed');
+  });
+
+  it('mirrors skills when called from a subdirectory (walks up to repo root)', () => {
+    createSkill('pan-help', '# Help\nContent.');
+
+    // Call with a subdirectory path — resolveSkillsRoot should walk up to cwd
+    const subdir = join(cwd, 'src', 'lib');
+    mkdirSync(subdir, { recursive: true });
+
+    const result = mirrorProjectSkills(subdir, { manifestDir });
+
+    // Skills must be mirrored into cwd/.claude/skills/, not subdir/.claude/skills/
+    expect(result.added).toContain('pan-help');
+    expect(existsSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'))).toBe(true);
+    // Subdirectory must not have a stray .claude/skills/
+    expect(existsSync(join(subdir, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('does not overwrite a user-managed .claude/skills/<name> dir that pre-exists outside the manifest', () => {
+    createSkill('pan-help', '# Help\nSource content.');
+
+    // Pre-create a user-managed conv-lookup skill that was never mirrored
+    const userSkillDir = join(claudeSkillsDir, 'conv-lookup');
+    mkdirSync(userSkillDir, { recursive: true });
+    const userSkillMd = join(userSkillDir, 'SKILL.md');
+    writeFileSync(userSkillMd, '# User Conv Lookup\nUser content.', 'utf-8');
+    writeFileSync(join(userSkillDir, 'extra-file.txt'), 'user extra', 'utf-8');
+
+    // First run: pan-help is new, conv-lookup is user-managed (not in manifest yet)
+    const result1 = mirrorProjectSkills(cwd, { manifestDir });
+    expect(result1.added).toContain('pan-help');
+    expect(result1.added).not.toContain('conv-lookup');
+
+    // User-managed skill must be completely unchanged
+    expect(readFileSync(userSkillMd, 'utf-8')).toBe('# User Conv Lookup\nUser content.');
+    expect(existsSync(join(userSkillDir, 'extra-file.txt'))).toBe(true);
+
+    // conv-lookup must NOT appear in the manifest (only mirrored skills are written)
+    const manifest = readFileSync(join(manifestDir, 'manifest'), 'utf-8');
+    expect(manifest).not.toContain('conv-lookup');
+
+    // Second run: manifest now exists; conv-lookup still not in it — must still be skipped
+    const result2 = mirrorProjectSkills(cwd, { manifestDir });
+    expect(result2.added).not.toContain('conv-lookup');
+    expect(result2.updated).not.toContain('conv-lookup');
+    expect(result2.removed).not.toContain('conv-lookup');
+    expect(readFileSync(userSkillMd, 'utf-8')).toBe('# User Conv Lookup\nUser content.');
+    expect(existsSync(join(userSkillDir, 'extra-file.txt'))).toBe(true);
   });
 });
