@@ -22,3 +22,4 @@ None
 ## Specialist Feedback
 - **[2026-04-18T22:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/020-review-agent-changes-requested.md`
 - **[2026-04-18T22:26Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/021-review-agent-changes-requested.md`
+- **[2026-04-18T22:35Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/022-review-agent-changes-requested.md`
