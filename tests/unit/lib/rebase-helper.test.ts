@@ -3,12 +3,13 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { MergeSet } from '../../../src/lib/merge-set.js';
 import { rebaseAndPushRepos } from '../../../src/lib/rebase-helper.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 describe('rebaseAndPushRepos', () => {
   let tempDir: string;
@@ -102,6 +103,30 @@ describe('rebaseAndPushRepos', () => {
     const planningFile = await readFile(join(repoDir, '.planning', 'plan.vbrief.json'), 'utf-8');
     expect(planningFile).toContain('"local":"keep-me"');
     expect(planningFile).not.toContain('"upstream":"discard-me"');
+  });
+
+  it('keeps planning conflicts shell-safe for filenames with shell metacharacters', async () => {
+    const hostileFile = '.planning/$(touch injected).md';
+    const injectedPath = join(repoDir, 'injected');
+
+    await writeFile(join(repoDir, hostileFile), 'local hostile planning file\n');
+    await execFileAsync('git', ['add', '--', hostileFile], { cwd: repoDir, encoding: 'utf-8' });
+    await execAsync('git commit -m "local hostile planning file"', { cwd: repoDir });
+
+    await execAsync('git checkout main', { cwd: repoDir });
+    await writeFile(join(repoDir, hostileFile), 'upstream hostile planning file\n');
+    await execFileAsync('git', ['add', '--', hostileFile], { cwd: repoDir, encoding: 'utf-8' });
+    await execAsync('git commit -m "upstream hostile planning file"', { cwd: repoDir });
+    await execAsync('git push origin main', { cwd: repoDir });
+
+    await execAsync('git checkout feature/pan-711', { cwd: repoDir });
+
+    const result = await rebaseAndPushRepos(repoDir, createMergeSet());
+
+    expect(result.success).toBe(true);
+    expect(result.results[0]?.outcome).toBe('rebased');
+    expect(existsSync(injectedPath)).toBe(false);
+    expect(await readFile(join(repoDir, hostileFile), 'utf-8')).toBe('local hostile planning file\n');
   });
 
   it('fails when a later non-planning conflict appears after planning conflicts are auto-resolved', async () => {

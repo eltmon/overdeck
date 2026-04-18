@@ -12,13 +12,14 @@
  *   - Any other conflicts: abort rebase, surface error, agent resolves manually.
  */
 
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 import { MergeSet } from './merge-set.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface RebaseResult {
   repoKey: string;
@@ -194,16 +195,16 @@ async function tryResolvePlanningConflicts(
   repoPath: string
 ): Promise<{ resolved: boolean; shouldRetry: boolean; remainingConflicts: string[] }> {
   try {
-    const { stdout } = await execAsync('git status --porcelain', {
+    const { stdout } = await execFileAsync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 10000,
+      maxBuffer: 1024 * 1024,
     });
 
     const conflictFiles = stdout
-      .split('\n')
-      .filter(l => l.startsWith('UU ') || l.startsWith('AA ') || l.startsWith('DU ') || l.startsWith('UD '))
-      .map(l => l.substring(3).trim());
+      .split('\0')
+      .filter(Boolean);
 
     if (conflictFiles.length === 0) {
       return { resolved: false, shouldRetry: false, remainingConflicts: [] };
@@ -215,8 +216,16 @@ async function tryResolvePlanningConflicts(
     }
 
     for (const file of conflictFiles) {
-      await execAsync(`git checkout --theirs "${file}"`, { cwd: repoPath, encoding: 'utf-8', timeout: 10000 });
-      await execAsync(`git add "${file}"`, { cwd: repoPath, encoding: 'utf-8', timeout: 10000 });
+      await execFileAsync('git', ['checkout', '--theirs', '--', file], {
+        cwd: repoPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      await execFileAsync('git', ['add', '--', file], {
+        cwd: repoPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
     }
 
     return { resolved: true, shouldRetry: true, remainingConflicts: [] };
