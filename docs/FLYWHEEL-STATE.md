@@ -1,6 +1,6 @@
 # Flywheel State
 <!-- LIVING DOCUMENT — overwritten by each /all-up run. History lives in OPERATION-FIX-ALL.md -->
-_Last updated: 2026-04-15 (Run 11) — auto-maintained by the all-up flywheel_
+_Last updated: 2026-04-18 (Run 13) — auto-maintained by the all-up flywheel_
 
 ---
 
@@ -11,14 +11,14 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 
 | Issue | Phase | Root Cause / Blocker | Auto-Requeues | Runs Stuck | Notes |
 |-------|-------|----------------------|---------------|------------|-------|
-| PAN-369-TEST | awaiting merge | Review passed, test passed, readyForMerge=true. | 0 | 0 | Ready for merge |
-| PAN-457 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
-| PAN-540 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
-| PAN-611 | in progress | Merge failed — work agent did not push rebase within 10 min. | 0 | 2 | **Cycling at merge** — polyrepo rebase timeout |
-| PAN-653 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
-| PAN-709 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running — self-improving flywheel epic |
-| PAN-712 | in progress | Review failed at verification gate. Work agent fixing. | 0 | 0 | Agent running |
-| PAN-714 | in progress | Review blocked + merge failed (PR #716 timeout). | 0 | 0 | Back to review after merge timeout |
+| PAN-457 | in progress | Review blocked — work agent fixing verification failures. | 0 | 0 | Agent running, context 81% |
+| PAN-539 | in progress | Review failed — work agent fixing. | 0 | 0 | Agent running, context 58% |
+| PAN-540 | in progress | Merge failed (rebase timeout) — agent notified, timeout extended to 30min. | 0 | 0 | Fix deployed Run 13 |
+| PAN-653 | in progress | Review failed — work agent fixing. | 0 | 0 | Agent running, context 37% |
+| PAN-704 | in progress | Work agent implementing. | 0 | 0 | Agent running, context 34% |
+| PAN-709 | in progress | Review pending — specialist in progress. | 0 | 0 | Agent running, context 82% |
+| PAN-711 | in progress | Work agent implementing. | 0 | 0 | Agent running, context 53% |
+| PAN-714 | in progress | Review failed — work agent fixing. | 0 | 0 | Agent running, context 80% |
 
 ---
 
@@ -26,7 +26,7 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 
 | Issue | Phase | Runs Stuck | Why It Cycles | Candidate Fix | Status |
 |-------|-------|------------|---------------|---------------|--------|
-| PAN-611 | merge | 2 | Polyrepo merge requires work agent to rebase and push all affected repos within a 10-min hard timeout. Agent is running but doesn't always complete the rebase push in time. | Extend timeout, add progress pings, or split rebase coordination from merge button. | Ongoing — merge-agent wrote feedback to work agent |
+| *(none)* | — | — | — | — | All cycling alerts cleared this run |
 
 ---
 
@@ -48,11 +48,15 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | Permission prompts blocking agent launches | Agents hang on TUI permission footer because `--permission-mode bypassPermissions` was missing in most launch paths | Run 10 | No | **FIXED Run 10** (cf311e75 — added to 10 files) |
 | CLI `admin specialists done` bypasses server auto-promotion | `testStatus=passed` set but `readyForMerge` stayed false; merge-agent never woke | Run 10 | No | **FIXED Run 10** (61248742 — CLI now mirrors server route logic; `normalizeReviewStatus` no longer clears readyForMerge based on stale verification) |
 | `setReviewStatus` blocks `readyForMerge` on stale `verificationStatus` | Merge queue/enqueue recomputes readyForMerge=false when verification failed from earlier cycle | Run 11 | No | **FIXED Run 11** (cdc8ffde — removed `verificationSatisfied` from readyForMerge computation) |
+| **Polyrepo rebase 10-minute timeout too short** | Merge fails on complex rebases; work agent not notified; cycles indefinitely | Run 11 | No | **FIXED Run 13** (507cef17 — extended to 30min, added timeout feedback to work agent) |
+| **Mass agent stop after system reboot with no auto-resume** | All tmux sessions die on reboot; recoverOrphanedAgents stops agents but nothing resumes them | Run 13 | No | **FIXED Run 13** (7988a316 — autoResumeStoppedWorkAgents on deacon startup) |
+| **Auto-resume resumes merged agents as zombies** | Agents whose issues already merged or completion processed get resumed after reboot | Run 13 | No | **FIXED Run 13** (d31af9dc — guard on completed.processed + mergeStatus=merged) |
+| **Merged issues with prUrl=null leave stale readyForMerge** | postMergeLifecycle cleared prUrl before mergeStatus; issue persists on Awaiting Merge | Run 13 | No | **FIXED Run 13** (dc8fb30a — merged-label startup repair in repairClosedWontfixIssues) |
 | Deacon re-dispatch gate blocked for issues with prior passed reviews | When prUrl cleared (e.g. repairClosedPRs), deacon won't re-dispatch because hasPassedReview=true | Run 8 | No | Ongoing — mitigation: tell work agent to run pan done |
 | Verification gate runs on dirty workspace, not clean-committed state | Gitignored files or uncommitted changes make local build pass while CI fails | Run 7 | No | Ongoing — mitigated by check-status gate |
 | Review circuit breaker can't self-reset | Manual `pan review reset` after 7 requeues | Run 4 | No | Ongoing |
 | Verification bypass at 3 failures masks root causes | Bypass hides test failures | Run 5 | No | Ongoing |
-| GitHub PR check status not synced back to Panopticon DB when server was down | panopticon/review and panopticon/test pass on GitHub but internal DB shows null; work agent doesn't know it can merge | Run 9 | No | Ongoing — PAN-509 example; mitigation: resume work agent to re-check |
+| GitHub check status not synced back to Panopticon DB when server was down | panopticon/review and panopticon/test pass on GitHub but internal DB shows null; work agent doesn't know it can merge | Run 9 | No | Ongoing — PAN-509 example; mitigation: resume work agent to re-check |
 | Per-project specialist wake via API/CLI | `/api/specialists/:name/wake` and CLI `admin specialists wake` target legacy global specialist, not per-project ephemeral ones | Run 11 | No | Ongoing — discovered while trying to wake `specialist-panopticon-cli-merge-agent` |
 
 ---
@@ -77,6 +81,10 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | Agent permission prompt hangs | Agent sessions alive but no tool use for hours; TUI footer shows `⏵⏵ bypass permissions` | Only `merge-agent` launch path had `--permission-mode bypassPermissions`; all others hung on the footer prompt | Added `--dangerously-skip-permissions --permission-mode bypassPermissions` to ALL agent launch paths (Run 10: cf311e75) |
 | Test-done doesn't promote to readyForMerge | `testStatus=passed` but `readyForMerge=false`; merge queue empty | CLI `admin specialists done` lacked the server route's `readyForMerge=true` side-effect; `normalizeReviewStatus` also overrode it | Mirror server logic in CLI done.ts; remove verification gate from readyForMerge normalization (Run 10: 61248742) |
 | readyForMerge regression on stale verification | `setReviewStatus({ mergeStatus: 'queued' })` clears `readyForMerge` because `verificationStatus: failed` from earlier cycle | `setReviewStatus` re-evaluated `readyForMerge` using `verificationSatisfied(merged)` | Remove `verificationSatisfied` from `readyForMerge` computation in `setReviewStatus` (Run 11: cdc8ffde) |
+| **Polyrepo/single-repo rebase timeout cycling** | `mergeStatus=failed` with "did not push within 10 minutes"; work agent idle; retries fail again | Hardcoded 10-minute timeout too short for conflict resolution; agent never notified of timeout | Extend timeout to 30 minutes; `checkFailedMergeRetry` writes feedback + sends tmux nudge on timeout (Run 13: 507cef17) |
+| **Mass agent stop after system reboot** | All agents `status: stopped` after reboot; dashboard shows no running agents | Machine reboot kills all tmux sessions; `recoverOrphanedAgents` resets status but no resume step exists | `autoResumeStoppedWorkAgents()` scans all agent dirs on deacon startup and resumes orphaned work agents (Run 13: 7988a316) |
+| **Zombie agent resurrection after reboot** | Merged issues' agents resumed as healthy after auto-resume deployed | `autoResumeStoppedWorkAgents` only checked `completed` marker, not `completed.processed`; didn't check `mergeStatus=merged` | Guard on `completed.processed` and `mergeStatus=merged` (Run 13: d31af9dc) |
+| **Stale merged issues without prUrl** | Issue on Awaiting Merge despite being merged; `readyForMerge=true`, `mergeStatus=pending`, `prUrl=null` | `postMergeLifecycle` cleared prUrl before updating mergeStatus | `repairClosedWontfixIssues` now also detects `merged` label and repairs internal state (Run 13: dc8fb30a) |
 
 ---
 
@@ -95,30 +103,46 @@ the issue was blocked at the same phase with the same root cause. ≥2 = cycling
 | Merge-agent error reporting | Silent failures give operators nothing to debug | — | **CLOSED Run 6** |
 | `complete-planning` session cleanup | Orphaned planning sessions accumulate | — | **CLOSED Run 6** |
 | Per-project specialist wake via API/CLI | Wake route only supports legacy global specialists | Medium | Discovered Run 11 |
+| **System-reboot auto-resume for work agents** | Machine reboots orphan all in-progress work agents | High | **CLOSED Run 13** |
 
 ---
 
-## Run 11 Summary
+## Run 13 Summary
 
-**Bugs fixed in code** (1 substrate fix, pushed to `origin/main`):
+**Bugs fixed in code** (4 substrate fixes, pushed to `origin/main`):
 
-1. **`setReviewStatus` blocked `readyForMerge` on stale `verificationStatus`** (`cdc8ffde`):
-   - The merge API queued PAN-714 behind PAN-611, calling `setReviewStatus({ mergeStatus: 'queued' })`.
-   - `setReviewStatus` recomputed `readyForMerge` using `verificationSatisfied(merged)`, and PAN-714 had `verificationStatus: failed` from an earlier cycle.
-   - This regressed `readyForMerge` from `true` to `false`, causing PAN-714 to disappear from Awaiting Merge.
-   - Fix: removed `verificationSatisfied` from `setReviewStatus`'s `readyForMerge` computation, matching the Run 10 fix in `normalizeReviewStatus`.
-   - Updated 3 tests that asserted the old behavior (including 1 unrelated `agents-auth-routing` test that was missing the Run 10 `--permission-mode bypassPermissions` flag).
+1. **`autoResumeStoppedWorkAgents` — mass agent stop after system reboot** (`7988a316`):
+   - Machine reboot at 23:01 killed all tmux sessions. `recoverOrphanedAgents` reset agents to `stopped` on dashboard startup, but nothing resumed them.
+   - Added `autoResumeStoppedWorkAgents()` that scans all agent-* directories on deacon startup, filtering for stopped implementation-phase agents that were NOT deliberately stopped (runtime.state !== 'stopped'/'idle').
+   - Resumed 10 work agents immediately after deployment.
 
-**Issues moved**:
-- **PAN-714** → fell back to `review: blocked` / `merge: failed` after merge-agent timed out waiting for PR #716 to become mergeable. Review-agent provided new blockers.
-- **PAN-611** → `merge: failed` (polyrepo rebase timeout — work agent did not push rebased branches within 10 minutes). Entered cycling alert (2 consecutive runs stuck at merge).
+2. **Polyrepo/single-repo merge rebase timeout too short** (`507cef17`):
+   - Hardcoded 10-minute timeout caused merge failures on complex rebases (PAN-540, PAN-611 cycled). Work agent received no notification after timeout.
+   - Extended timeout to 30 minutes in both polyrepo and single-repo merge paths.
+   - Added timeout failure detection in `checkFailedMergeRetry`: writes feedback file to workspace + sends tmux message to work agent so it knows to finish the rebase and push.
 
-**Ready for your UAT + merge**:
-- PAN-369-TEST — on Awaiting Merge page.
+3. **Stale merged issues with prUrl=null on Awaiting Merge** (`dc8fb30a`):
+   - PAN-369-TEST was Done/merged on GitHub but review-status.json showed `readyForMerge=true`, `mergeStatus=pending`, `prUrl=null`.
+   - Extended `repairClosedWontfixIssues` to also detect GitHub issues with `merged` label and repair internal state to `mergeStatus=merged`.
 
-**Main branch state**: Clean, up-to-date with `origin/main`. 1 substrate fix committed this run.
+4. **Zombie agent resurrection after reboot** (`d31af9dc`):
+   - `autoResumeStoppedWorkAgents` resumed PAN-611 (already merged) because it only checked `completed` marker, not `completed.processed`, and didn't check `mergeStatus=merged`.
+   - Added guards: skip agents with `completed.processed` marker; skip agents whose review status shows `mergeStatus=merged`.
 
-**Next-run priorities**:
-1. Address PAN-611 cycling alert — polyrepo rebase 10-minute timeout is too tight or work agent feedback is insufficient.
-2. Monitor PAN-709 / PAN-712 / PAN-457 / PAN-653 / PAN-540 for review re-submission after agents fix verification failures.
-3. Consider fixing per-project specialist wake API gap.
+**Issues moved:**
+- **PAN-611** → merged (was cycling at merge; now resolved and merged)
+- **PAN-712** → merged (completed during Run 12)
+- **PAN-369** → merged (stale status cleaned up)
+- **PAN-540** → merge retry in progress (timeout fix deployed, agent notified)
+
+**Active pipeline:**
+- 8 PAN issues in In Progress / In Review, all with healthy running work agents
+- 0 issues on Awaiting Merge (all merge-ready issues are MIN)
+
+**Main branch state**: Clean, up-to-date with `origin/main`. 4 substrate fixes committed this run.
+
+**Next-run priorities:**
+1. Monitor PAN-540 for merge retry success after timeout fix.
+2. Monitor PAN-457, PAN-653, PAN-539, PAN-714 for review re-submission after agents fix failures.
+3. Monitor PAN-709 for review specialist completion.
+4. Monitor PAN-704, PAN-711 for work agent completion.

@@ -291,3 +291,28 @@ pan up
 - PAN-539: work agent just started
 
 **Pipeline status:** Autonomous and flowing. Main is clean and pushed. Awaiting Merge page populated with merge-ready issues awaiting user UAT approval.
+
+### Run 13 — 2026-04-18
+
+**Issues inventoried:** 8 active PAN issues (PAN-457, PAN-539, PAN-540, PAN-653, PAN-704, PAN-709, PAN-711, PAN-714). All had work agents running after auto-resume fix.
+- 2 In Progress (PAN-704, PAN-711)
+- 6 In Review (rest of active set)
+
+**Issues moved to Done:** 3 issues merged or cleaned up since last run
+- **PAN-611** → merged (was cycling at merge due to polyrepo rebase timeout)
+- **PAN-712** → merged (completed during prior run)
+- **PAN-369-TEST** → merged (stale readyForMerge state cleaned up)
+
+**Bugs fixed:** 4 substrate bugs
+1. **`autoResumeStoppedWorkAgents`** (`7988a316`) — Machine reboot killed all tmux sessions; `recoverOrphanedAgents` reset agents to `stopped` but nothing resumed them. Added `autoResumeStoppedWorkAgents()` on deacon startup that scans all agent dirs and resumes orphaned work agents (excluding deliberately stopped ones via runtime.state check). Resumed 10 agents immediately.
+2. **Merge rebase timeout too short** (`507cef17`) — Hardcoded 10-minute timeout caused merge failures on complex rebases (PAN-540, PAN-611). Extended to 30 minutes in both polyrepo and single-repo paths. Added timeout failure detection in `checkFailedMergeRetry` that writes feedback to workspace and sends tmux nudge to work agent.
+3. **Stale merged issues with prUrl=null** (`dc8fb30a`) — PAN-369-TEST was Done/merged but review-status.json showed `readyForMerge=true`, `mergeStatus=pending`, `prUrl=null`. Extended `repairClosedWontfixIssues` to also detect `merged` label on GitHub and repair internal state.
+4. **Zombie agent resurrection after reboot** (`d31af9dc`) — `autoResumeStoppedWorkAgents` resumed PAN-611 (already merged) because it only checked `completed` marker, not `completed.processed`, and didn't check `mergeStatus=merged`. Added both guards.
+
+**Friction removed:** All 8 active PAN issues have healthy running work agents. Cycling alert for PAN-611 cleared. No zombie agents.
+
+**Still in pipeline:**
+- PAN-540: merge retry in progress (timeout fix deployed, agent notified)
+- PAN-457, PAN-653, PAN-539, PAN-714: review failed/blocked, agents fixing
+- PAN-709: review pending, specialist in progress
+- PAN-704, PAN-711: work agents implementing
