@@ -39,14 +39,14 @@ export function registerReleaseCommands(program: Command): void {
   release
     .command('stable')
     .description('Create a stable release commit and tag')
-    .requiredOption('--version <version>', 'Stable semver version (x.y.z)')
-    .action((options: { version: string }) => releaseCreateCommand('stable', options.version));
+    .option('--version <version>', 'Stable semver version (x.y.z)')
+    .action((options: { version?: string }) => releaseCreateCommand('stable', options.version));
 
   release
     .command('canary')
     .description('Create a canary release commit and tag')
-    .requiredOption('--version <version>', 'Canary semver version (x.y.z-canary.n)')
-    .action((options: { version: string }) => releaseCreateCommand('canary', options.version));
+    .option('--version <version>', 'Canary semver version (x.y.z-canary.n)')
+    .action((options: { version?: string }) => releaseCreateCommand('canary', options.version));
 
   release
     .command('notes [from] [to]')
@@ -174,6 +174,32 @@ function validateVersion(channel: ReleaseChannel, version: string): void {
   }
 }
 
+function inferNextVersion(channel: ReleaseChannel, currentVersion: string): string {
+  if (channel === 'stable') {
+    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)(?:-canary\.\d+)?$/);
+    if (!match) {
+      throw new Error(`Cannot infer next stable version from current version: ${currentVersion}`);
+    }
+
+    const [, major, minor, patch] = match;
+    return `${major}.${minor}.${Number.parseInt(patch, 10) + 1}`;
+  }
+
+  const canaryMatch = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)-canary\.(\d+)$/);
+  if (canaryMatch) {
+    const [, major, minor, patch, canary] = canaryMatch;
+    return `${major}.${minor}.${patch}-canary.${Number.parseInt(canary, 10) + 1}`;
+  }
+
+  const stableMatch = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!stableMatch) {
+    throw new Error(`Cannot infer next canary version from current version: ${currentVersion}`);
+  }
+
+  const [, major, minor, patch] = stableMatch;
+  return `${major}.${minor}.${Number.parseInt(patch, 10) + 1}-canary.1`;
+}
+
 function ensureMainBranch(repoRoot: string): void {
   const branch = getCurrentBranch(repoRoot);
   if (branch !== 'main') {
@@ -286,22 +312,26 @@ async function releaseCheckCommand(): Promise<void> {
   }
 }
 
-async function releaseCreateCommand(channel: ReleaseChannel, version: string): Promise<void> {
+async function releaseCreateCommand(channel: ReleaseChannel, version?: string): Promise<void> {
   const repoRoot = getRepoRoot();
   const currentVersion = getCurrentVersion();
   const previousTag = getLatestTag(repoRoot);
+  const resolvedVersion = version ?? inferNextVersion(channel, currentVersion);
   const pkg = readPackageJson();
-  const tagName = `v${version}`;
+  const tagName = `v${resolvedVersion}`;
   const releaseNotesPath = join(repoRoot, '.release', `${tagName}.md`);
 
-  validateVersion(channel, version);
+  validateVersion(channel, resolvedVersion);
   ensureMainBranch(repoRoot);
   ensureCleanTree(repoRoot);
   ensureTagDoesNotExist(repoRoot, tagName);
 
   console.log(chalk.bold(`Panopticon ${channel === 'stable' ? 'Stable' : 'Canary'} Release\n`));
   console.log(`Current version: ${chalk.cyan(currentVersion)}`);
-  console.log(`Target version:  ${chalk.cyan(version)}`);
+  console.log(`Target version:  ${chalk.cyan(resolvedVersion)}`);
+  if (!version) {
+    console.log(chalk.dim(`Inferred ${channel} version from current version.`));
+  }
   console.log('');
 
   const results = runPreflight(repoRoot);
@@ -311,13 +341,13 @@ async function releaseCreateCommand(channel: ReleaseChannel, version: string): P
     process.exit(1);
   }
 
-  pkg.version = version;
+  pkg.version = resolvedVersion;
   writePackageJson(pkg);
 
   const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
   const releaseNotes = buildReleaseNotesMarkdown({
     channel,
-    version,
+    version: resolvedVersion,
     from: previousTag,
     to: tagName,
     entries,
@@ -326,8 +356,8 @@ async function releaseCreateCommand(channel: ReleaseChannel, version: string): P
   writeTextFile(releaseNotesPath, releaseNotes);
 
   run('git add package.json', repoRoot);
-  run(`git commit -m "chore: release ${version}"`, repoRoot);
-  run(`git tag -a ${tagName} -m "Release ${version}"`, repoRoot);
+  run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
+  run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
 
   console.log(chalk.green('\n✓ Release commit and tag created'));
   console.log(`Commit: ${chalk.cyan(run('git rev-parse --short HEAD', repoRoot))}`);
