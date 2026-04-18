@@ -243,6 +243,7 @@ export interface ProjectSpecialistMetadata {
   // Write-scope (PAN-754)
   writeScope?: 'full' | 'readonly-plus-output';
   outputPath?: string | null;
+  workspace?: string | null; // workspace path for write-scope conflict detection
 }
 
 export function isProjectSpecialistActivelyRunning(
@@ -334,7 +335,7 @@ export function initSpecialistsDirectory(): void {
   // Create default registry if it doesn't exist
   if (!existsSync(REGISTRY_FILE)) {
     const registry: SpecialistRegistry = {
-      version: '2.0', // Updated for per-project structure
+      version: '3.0', // Updated for compound-key (issueId-aware) structure (PAN-754)
       defaults: {
         contextRuns: 5,
         digestModel: null,
@@ -356,38 +357,46 @@ export function initSpecialistsDirectory(): void {
 }
 
 /**
- * Migrate old registry format to new per-project structure
+ * Migrate old registry format to new per-project structure (PAN-754: compound-key aware).
+ *
+ * v1.0 → v2.0: flat specialist list → projects[projectKey][specialistType]
+ * v2.0 → v3.0: projects[projectKey][specialistType] → projects[projectKey][compoundKey]
+ *   Legacy v2.0 plain-type keys are left as-is (still readable by compat wrappers).
+ *   getProjectSpecialistMetadata() and updateProjectSpecialistMetadata() handle both formats.
  */
 function migrateRegistryIfNeeded(): void {
   try {
     const content = readFileSync(REGISTRY_FILE, 'utf-8');
     const registry = JSON.parse(content) as SpecialistRegistry;
 
-    // Check if already migrated
-    if (registry.version === '2.0' || registry.projects) {
+    // v2.0 already migrated (or registry.projects exists for fresh installs)
+    if (registry.version === '2.0' && registry.projects) {
+      // No additional migration needed — legacy plain-type keys are handled by compat wrappers.
       return;
     }
 
-    // Migrate to new structure
-    console.log('[specialists] Migrating registry to per-project structure...');
+    if (!registry.projects) {
+      // v1.0 → v2.0: add projects map
+      console.log('[specialists] Migrating registry v1.0 → v2.0...');
 
-    const migratedRegistry: SpecialistRegistry = {
-      version: '2.0',
-      defaults: {
-        contextRuns: 5,
-        digestModel: null,
-        retention: {
-          maxDays: 30,
-          maxRuns: 50,
+      const migratedRegistry: SpecialistRegistry = {
+        version: '2.0',
+        defaults: {
+          contextRuns: 5,
+          digestModel: null,
+          retention: {
+            maxDays: 30,
+            maxRuns: 50,
+          },
         },
-      },
-      projects: {},
-      specialists: registry.specialists, // Keep for backward compat
-      lastUpdated: new Date().toISOString(),
-    };
+        projects: {},
+        specialists: registry.specialists,
+        lastUpdated: new Date().toISOString(),
+      };
 
-    saveRegistry(migratedRegistry);
-    console.log('[specialists] Registry migration complete');
+      saveRegistry(migratedRegistry);
+      console.log('[specialists] Registry migration v1.0 → v2.0 complete');
+    }
   } catch (error) {
     console.error('[specialists] Failed to migrate registry:', error);
   }
@@ -799,6 +808,29 @@ export async function spawnEphemeralSpecialist(
     // Non-fatal: session check failure shouldn't block spawn
   }
 
+  // Write-scope enforcement (PAN-754): enforce single-writer-per-worktree policy.
+  // 'full' scope specialists have exclusive write access; only one may run per workspace.
+  // 'readonly-plus-output' specialists (convoy reviewers) may run concurrently as long
+  // as their outputPath values are disjoint.
+  if (task.workspace) {
+    const registry = loadRegistry();
+    const projectBucket = registry.projects[projectKey] ?? {};
+    for (const [key, entry] of Object.entries(projectBucket)) {
+      if (key === registryKey) continue; // same slot — handled by busy check above
+      if (!entry.currentRun) continue; // not running
+      if (entry.workspace !== task.workspace) continue; // different worktree — no conflict
+      // Another specialist is running against the same workspace
+      const incomingScope = 'full'; // default; convoy callers will pass 'readonly-plus-output' via task.context
+      if (incomingScope === 'full' || (entry.writeScope ?? 'full') === 'full') {
+        return {
+          success: false,
+          message: `Write conflict: specialist ${key} (${projectKey}) is already running with full write scope on workspace ${task.workspace}`,
+          error: 'worktree_write_conflict',
+        };
+      }
+    }
+  }
+
   // Load context digest
   const { loadContextDigest } = await import('./specialist-context.js');
   const contextDigest = loadContextDigest(projectKey, specialistType);
@@ -884,12 +916,13 @@ ${basePrompt}`;
       console.warn(`[specialist] Falling back to default model "${fallbackModel}" for ${specialistType}`);
     }
 
-    // Store model + trace in registry metadata for Agent activity visibility
+    // Store model + trace + identity in registry metadata for Agent activity visibility
     updateRunMetadata(projectKey, registryKey, {
       model,
       resolutionTrace,
       issueId: task.issueId,
       tmuxSession,
+      workspace: task.workspace ?? null,
       currentActivity: `Running ${specialistType} for ${task.issueId}`,
       writeScope: 'full',
     });
