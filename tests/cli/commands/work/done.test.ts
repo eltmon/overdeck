@@ -337,4 +337,41 @@ describe('doneCommand preflight failure paths', () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
+
+  it('does NOT exit(1) when only .planning/plan.vbrief.json is dirty (stale from prior run)', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+
+    // Simulate stale plan.vbrief.json: dirty before the pre-preflight commit fires,
+    // clean afterward (all other git status checks pass).
+    let planCommitted = false;
+    const capturedCmds: string[] = [];
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      capturedCmds.push(cmd);
+      if (cmd.includes('bd list')) {
+        cb(null, { stdout: '[]', stderr: '' });
+      } else if (
+        cmd.includes('git status --porcelain .planning/plan.vbrief.json') &&
+        !planCommitted
+      ) {
+        // First check: stale file from prior run
+        cb(null, { stdout: ' M .planning/plan.vbrief.json\n', stderr: '' });
+      } else if (cmd.includes('git commit')) {
+        planCommitted = true;
+        cb(null, { stdout: '', stderr: '' });
+      } else {
+        // git add, git status (no path or post-commit), etc. → clean/success
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714');
+
+    // Pre-flight must NOT block on the stale plan.vbrief.json
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    // The stale file must have been committed before preflight ran
+    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
+  });
 });

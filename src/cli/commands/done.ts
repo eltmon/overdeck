@@ -140,6 +140,21 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const workspacePath = agentState?.workspace;
 
     if (workspacePath && existsSync(workspacePath)) {
+      const execAsync = promisify(exec);
+
+      // Commit stale plan.vbrief.json from a previous interrupted pan done run so
+      // the uncommitted-changes gate in runPreflightChecks doesn't reject it.
+      try {
+        const { stdout: preDirty } = await execAsync(
+          'git status --porcelain .planning/plan.vbrief.json',
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        if (preDirty.trim()) {
+          await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+        }
+      } catch { /* non-fatal */ }
+
       const failures = await runPreflightChecks(workspacePath, issueId);
 
       if (failures.length > 0) {
@@ -154,8 +169,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         process.exit(1);
       }
 
-      // Commit plan.vbrief.json dirtied by the bead→vBRIEF sync in preflight.
-      const execAsync = promisify(exec);
+      // Commit plan.vbrief.json dirtied by the bead→vBRIEF sync in this preflight run.
       try {
         const { stdout: syncDirty } = await execAsync(
           'git status --porcelain .planning/plan.vbrief.json',
