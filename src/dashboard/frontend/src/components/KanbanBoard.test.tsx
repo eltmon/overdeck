@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -631,5 +631,57 @@ describe('groupByCanceledType', () => {
     expect(result[1].name).toBe('Duplicate');
     expect(result[2].name).toBe("Won't Do");
     expect(result[3].name).toBe('Other');
+  });
+});
+
+// ─── DivergedBadge ────────────────────────────────────────────────────────────
+
+describe('DivergedBadge', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    vi.stubGlobal('alert', vi.fn());
+  });
+
+  it('renders "Diverged" text', () => {
+    render(<DivergedBadge issueIdentifier="PAN-1" />);
+    expect(screen.getByText('Diverged')).toBeTruthy();
+  });
+
+  it('renders an "Unstick" button', () => {
+    render(<DivergedBadge issueIdentifier="PAN-1" />);
+    expect(screen.getByRole('button', { name: 'Unstick' })).toBeTruthy();
+  });
+
+  it('shows generic title when no stuckReason', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
+    const span = container.querySelector('span[title]');
+    expect(span?.getAttribute('title')).toContain('divergence from origin/main');
+  });
+
+  it('shows stuckReason in title when provided', () => {
+    render(<DivergedBadge issueIdentifier="PAN-1" stuckReason="main advanced by 3 commits" />);
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckReason="main advanced by 3 commits" />);
+    const span = container.querySelector('span[title]');
+    expect(span?.getAttribute('title')).toContain('main advanced by 3 commits');
+  });
+
+  it('POSTs to /api/workspaces/:issueId/unstick when Unstick is clicked', async () => {
+    render(<DivergedBadge issueIdentifier="PAN-42" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+    await Promise.resolve(); // flush microtasks
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/workspaces/PAN-42/unstick',
+      { method: 'POST' }
+    );
+  });
+
+  it('URL-encodes the issueIdentifier in the unstick request', async () => {
+    render(<DivergedBadge issueIdentifier="PAN 99" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/workspaces/PAN%2099/unstick',
+      { method: 'POST' }
+    );
   });
 });

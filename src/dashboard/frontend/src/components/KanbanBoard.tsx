@@ -1988,6 +1988,38 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
   );
 }
 
+/** Diverged badge with Unstick button — shown when main diverged during git push */
+export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifier: string; stuckReason?: string | null }) {
+  return (
+    <span
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
+      title={stuckReason
+        ? `Push blocked: ${stuckReason}. Click Unstick after syncing main.`
+        : 'Push blocked due to divergence from origin/main. Sync main and click Unstick to retry.'}
+    >
+      <XCircle className="w-3 h-3" />
+      Diverged
+      <button
+        className="ml-1 underline text-red-200 hover:text-white text-xs leading-none"
+        onClick={async (e) => {
+          e.stopPropagation();
+          try {
+            const res = await fetch(`/api/workspaces/${encodeURIComponent(issueIdentifier)}/unstick`, { method: 'POST' });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              alert(`Unstick failed: ${body.error ?? res.statusText}`);
+            }
+          } catch (err: unknown) {
+            alert(`Unstick request failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }}
+      >
+        Unstick
+      </button>
+    </span>
+  );
+}
+
 interface IssueCardProps {
   issue: Issue;
   workAgent?: Agent;
@@ -2655,32 +2687,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             )}
             {/* Diverged / stuck badge — shown when gitPush threw MainDivergedError */}
             {reviewStatus?.stuck && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
-                title={reviewStatus.stuckReason
-                  ? `Push blocked: ${reviewStatus.stuckReason}. Click Unstick after syncing main.`
-                  : 'Push blocked due to divergence from origin/main. Sync main and click Unstick to retry.'}
-              >
-                <XCircle className="w-3 h-3" />
-                Diverged
-                <button
-                  className="ml-1 underline text-red-200 hover:text-white text-xs leading-none"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const res = await fetch(`/api/workspaces/${encodeURIComponent(issue.identifier || '')}/unstick`, { method: 'POST' });
-                      if (!res.ok) {
-                        const body = await res.json().catch(() => ({}));
-                        alert(`Unstick failed: ${body.error ?? res.statusText}`);
-                      }
-                    } catch (err: unknown) {
-                      alert(`Unstick request failed: ${err instanceof Error ? err.message : String(err)}`);
-                    }
-                  }}
-                >
-                  Unstick
-                </button>
-              </span>
+              <DivergedBadge
+                issueIdentifier={issue.identifier || ''}
+                stuckReason={reviewStatus.stuckReason}
+              />
             )}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
             {isMerged && (

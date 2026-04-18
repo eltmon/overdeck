@@ -20,7 +20,7 @@ import { jsonResponse } from "../http-helpers.js";
 
 import { readFile } from 'node:fs/promises';
 
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
@@ -311,30 +311,36 @@ const getConvoyOutputRoute = HttpRouter.add(
 const getGitActivityRoute = HttpRouter.add(
   'GET',
   '/api/git-activity',
-  httpHandler(Effect.try({
-    try: () => {
-      const ops = listGitOperations({ limit: 200 });
-      // Map to ActivityPanel-compatible format
-      const entries = ops.map((op) => ({
-        id: `git-op-${op.id ?? op.ts}`,
-        timestamp: op.ts,
-        source: 'git',
-        level: op.status === 'success' ? 'success'
-          : op.status === 'aborted' ? 'warn'
-          : 'error',
-        message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
-        details: [
-          op.beforeSha && `before: ${op.beforeSha}`,
-          op.afterSha && `after: ${op.afterSha}`,
-          op.remoteSha && `remote: ${op.remoteSha}`,
-          op.error && `error: ${op.error}`,
-        ].filter(Boolean).join('\n') || null,
-        issueId: op.issueId ?? null,
-        category: 'git',
-      }));
-      return jsonResponse(entries);
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const urlOpt = HttpServerRequest.toURL(request);
+    const params = Option.isSome(urlOpt) ? urlOpt.value.searchParams : new URLSearchParams();
+
+    const since   = params.get('since')   ?? undefined;
+    const issueId = params.get('issueId') ?? undefined;
+    const limitRaw = params.get('limit');
+    const limit   = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 500) : 200;
+
+    const ops = listGitOperations({ since, issueId, limit });
+    // Map to ActivityPanel-compatible format
+    const entries = ops.map((op) => ({
+      id: `git-op-${op.id ?? op.ts}`,
+      timestamp: op.ts,
+      source: 'git',
+      level: op.status === 'success' ? 'success'
+        : op.status === 'aborted' ? 'warn'
+        : 'error',
+      message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
+      details: [
+        op.beforeSha && `before: ${op.beforeSha}`,
+        op.afterSha && `after: ${op.afterSha}`,
+        op.remoteSha && `remote: ${op.remoteSha}`,
+        op.error && `error: ${op.error}`,
+      ].filter(Boolean).join('\n') || null,
+      issueId: op.issueId ?? null,
+      category: 'git',
+    }));
+    return jsonResponse(entries);
   }))
 );
 

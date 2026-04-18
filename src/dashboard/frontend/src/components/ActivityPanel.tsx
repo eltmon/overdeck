@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Terminal, XCircle, Loader2, X, Info, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useDashboardStore } from '../lib/store';
 
-interface ActivityEntry {
+export interface ActivityEntry {
   id: string;
   timestamp: string;
   source: string;
@@ -112,13 +112,32 @@ interface FilterState {
 }
 
 /** Infer category from source if not explicitly set */
-function inferCategory(entry: ActivityEntry): string {
+export function inferCategory(entry: ActivityEntry): string {
   if (entry.category) return entry.category;
   const src = entry.source ?? '';
   if (src === 'git') return 'git';
   if (src.includes('specialist') || src.includes('merge-agent') || src.includes('review') || src.includes('test')) return 'specialist';
   if (src.includes('sync') || src.includes('pull')) return 'sync';
   return 'other';
+}
+
+/** Merge activity arrays from multiple sources, deduplicating by id, sorted newest-first */
+export function mergeActivitiesById(...sources: ActivityEntry[][]): ActivityEntry[] {
+  const byId = new Map<string, ActivityEntry>();
+  for (const arr of sources) {
+    for (const a of arr ?? []) byId.set(a.id, a);
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+}
+
+/** Apply pinWarnings: move warn/error entries to the top while preserving order within groups */
+export function applyPinWarnings(matched: ActivityEntry[], pinWarnings: boolean): ActivityEntry[] {
+  if (!pinWarnings) return matched;
+  const pinned = matched.filter((a) => a.level === 'warn' || a.level === 'error');
+  const rest = matched.filter((a) => a.level !== 'warn' && a.level !== 'error');
+  return [...pinned, ...rest];
 }
 
 export function ActivityPanel({ onClose }: ActivityPanelProps) {
@@ -147,15 +166,10 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
     staleTime: 5_000,
   });
 
-  const activities = useMemo<ActivityEntry[]>(() => {
-    const byId = new Map<string, ActivityEntry>();
-    for (const a of recentActivityRaw ?? []) byId.set(a.id, a);
-    for (const a of restActivities) byId.set(a.id, a);
-    for (const a of gitActivities) byId.set(a.id, a);
-    return Array.from(byId.values()).sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-  }, [recentActivityRaw, restActivities, gitActivities]);
+  const activities = useMemo<ActivityEntry[]>(
+    () => mergeActivitiesById(recentActivityRaw ?? [], restActivities, gitActivities),
+    [recentActivityRaw, restActivities, gitActivities]
+  );
 
   const sources = useMemo(() => {
     const set = new Set<string>();
@@ -177,11 +191,7 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
       }
       return true;
     });
-    if (!filters.pinWarnings) return matched;
-    // Pin warn/error to top, preserve timestamp order within each group
-    const pinned = matched.filter((a) => a.level === 'warn' || a.level === 'error');
-    const rest = matched.filter((a) => a.level !== 'warn' && a.level !== 'error');
-    return [...pinned, ...rest];
+    return applyPinWarnings(matched, filters.pinWarnings);
   }, [activities, filters]);
 
   const isLoading = restLoading && activities.length === 0;
