@@ -122,9 +122,9 @@ describe('conversations route — DB integration', () => {
     expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data' });
   });
 
-  it('rejects attachment reuse across conversations and cleans up after send', async () => {
+  it('rejects attachment reuse across conversations and cleans up when explicitly ended', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
     const { cleanupConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
@@ -143,8 +143,50 @@ describe('conversations route — DB integration', () => {
     expect(hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
     expect(hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
 
+    const delivery = vi.fn().mockResolvedValue(undefined);
+    const sendResponse = await handleConversationMessage('owner-conv', { message: `@${uploadedPath}\nhello` }, delivery);
+    expect(sendResponse.status).toBe(200);
+    expect(delivery).toHaveBeenCalledWith('conv-owner-conv', `@${uploadedPath}\nhello`, 'conversation-message');
+    expect(existsSync(uploadedPath)).toBe(true);
+
+    const rejectedResponse = await handleConversationMessage('other-conv', { message: `@${uploadedPath}\nhello` }, delivery);
+    expect(rejectedResponse.status).toBe(400);
+    expect(decodeJsonResponse(rejectedResponse)).toEqual({ error: 'One or more attached images are unavailable for this conversation' });
+
     await cleanupConversationAttachments('owner-conv');
     expect(existsSync(uploadedPath)).toBe(false);
+  });
+
+  it('startup cleanup removes attachments for inactive conversations only', async () => {
+    const { createConversation, markConversationEnded } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { cleanupInactiveConversationAttachments } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'active-conv', tmuxSession: 'conv-active-conv', cwd: '/cwd' });
+    createConversation({ name: 'ended-conv', tmuxSession: 'conv-ended-conv', cwd: '/cwd' });
+    markConversationEnded('ended-conv');
+
+    const pngData = Buffer.from(Uint8Array.from([7, 8, 9, 10])).toString('base64');
+    const activeUpload = await handleConversationImageUpload('active-conv', {
+      filename: 'active.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+    const endedUpload = await handleConversationImageUpload('ended-conv', {
+      filename: 'ended.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+
+    const activePath = decodeJsonResponse(activeUpload).path as string;
+    const endedPath = decodeJsonResponse(endedUpload).path as string;
+    expect(existsSync(activePath)).toBe(true);
+    expect(existsSync(endedPath)).toBe(true);
+
+    await cleanupInactiveConversationAttachments();
+
+    expect(existsSync(activePath)).toBe(true);
+    expect(existsSync(endedPath)).toBe(false);
   });
 
   it('creating and listing a conversation returns the right data', async () => {

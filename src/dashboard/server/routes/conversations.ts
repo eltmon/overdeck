@@ -181,6 +181,39 @@ export async function handleConversationImageUpload(
   return jsonResponse({ path });
 }
 
+export async function handleConversationMessage(
+  name: string,
+  body: Record<string, unknown>,
+  deliverMessage: typeof sendKeysAsync = sendKeysAsync,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
+  if (!message) {
+    return jsonResponse({ error: 'Message is required' }, { status: 400 });
+  }
+
+  if (shouldInterceptManualCompact(message)) {
+    if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+      return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
+    }
+    const result = await compactConversationNative(conv.sessionFile);
+    return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
+  }
+
+  const attachmentPaths = extractConversationAttachmentPaths(message);
+  const missingAttachment = attachmentPaths.find((attachmentPath) => !hasConversationAttachment(conv.name, attachmentPath));
+  if (missingAttachment) {
+    return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
+  }
+
+  await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+  return jsonResponse({ ok: true });
+}
+
 /** Generate a default conversation name, e.g. 20260404-1234 */
 function generateConversationName(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -811,35 +844,7 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-
-        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-        if (!message) {
-          return jsonResponse({ error: 'Message is required' }, { status: 400 });
-        }
-
-        if (shouldInterceptManualCompact(message)) {
-          if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
-            return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
-          }
-          const result = await compactConversationNative(conv.sessionFile);
-          return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
-        }
-
-        const attachmentPaths = extractConversationAttachmentPaths(message);
-        const missingAttachment = attachmentPaths.find((attachmentPath) => !hasConversationAttachment(conv.name, attachmentPath));
-        if (missingAttachment) {
-          return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
-        }
-
-        // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
-        await sendKeysAsync(conv.tmuxSession, message, 'conversation-message');
-        await cleanupConversationAttachments(conv.name);
-
-        return jsonResponse({ ok: true });
+        return await handleConversationMessage(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to send message: ' + msg }, { status: 500 });
