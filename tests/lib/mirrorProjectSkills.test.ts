@@ -237,6 +237,71 @@ describe('mirrorProjectSkills', () => {
     expect(existsSync(join(claudeSkillsDir, '.mirror-manifest'))).toBe(false);
   });
 
+  // ── Companion file tests (recursive copy) ────────────────────────────────
+
+  it('copies companion files alongside SKILL.md (resources/, scripts/, package.json)', () => {
+    // Set up a skill with the same structure as stitch-react-components
+    const skillDir = join(skillsDir, 'stitch-react');
+    mkdirSync(join(skillDir, 'resources'), { recursive: true });
+    mkdirSync(join(skillDir, 'scripts'), { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), '# Stitch React\n', 'utf-8');
+    writeFileSync(join(skillDir, 'package.json'), '{"name":"stitch-react"}', 'utf-8');
+    writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"colors":[]}', 'utf-8');
+    writeFileSync(join(skillDir, 'resources', 'component-template.tsx'), 'export {};\n', 'utf-8');
+    writeFileSync(join(skillDir, 'scripts', 'validate.js'), 'console.log("ok");\n', 'utf-8');
+
+    const result = mirrorProjectSkills(cwd, { manifestDir });
+
+    expect(result.added).toContain('stitch-react');
+
+    const target = join(claudeSkillsDir, 'stitch-react');
+    expect(readFileSync(join(target, 'SKILL.md'), 'utf-8')).toBe('# Stitch React\n');
+    expect(readFileSync(join(target, 'package.json'), 'utf-8')).toBe('{"name":"stitch-react"}');
+    expect(readFileSync(join(target, 'resources', 'style-guide.json'), 'utf-8')).toBe('{"colors":[]}');
+    expect(readFileSync(join(target, 'resources', 'component-template.tsx'), 'utf-8')).toBe('export {};\n');
+    expect(readFileSync(join(target, 'scripts', 'validate.js'), 'utf-8')).toBe('console.log("ok");\n');
+  });
+
+  it('updates a companion file when source content changes (reports updated)', () => {
+    const skillDir = join(skillsDir, 'stitch-react');
+    mkdirSync(join(skillDir, 'resources'), { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), '# Stitch React\n', 'utf-8');
+    writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"version":1}', 'utf-8');
+
+    // First sync — populate target
+    mirrorProjectSkills(cwd, { manifestDir });
+
+    // Update companion file in source
+    writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"version":2}', 'utf-8');
+
+    const result = mirrorProjectSkills(cwd, { manifestDir });
+
+    expect(result.updated).toContain('stitch-react');
+    expect(readFileSync(join(claudeSkillsDir, 'stitch-react', 'resources', 'style-guide.json'), 'utf-8'))
+      .toBe('{"version":2}');
+  });
+
+  it('removes a companion file from target when removed from source', () => {
+    const skillDir = join(skillsDir, 'stitch-react');
+    mkdirSync(join(skillDir, 'resources'), { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), '# Stitch React\n', 'utf-8');
+    writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"colors":[]}', 'utf-8');
+
+    // First sync — populate target including companion file
+    mirrorProjectSkills(cwd, { manifestDir });
+
+    const companionInTarget = join(claudeSkillsDir, 'stitch-react', 'resources', 'style-guide.json');
+    expect(existsSync(companionInTarget)).toBe(true);
+
+    // Remove companion file from source
+    rmSync(join(skillDir, 'resources', 'style-guide.json'));
+
+    const result = mirrorProjectSkills(cwd, { manifestDir });
+
+    expect(result.updated).toContain('stitch-react');
+    expect(existsSync(companionInTarget)).toBe(false);
+  });
+
   it('handles multiple skills in a single pass', () => {
     createSkill('pan-help', '# Help');
     createSkill('commit', '# Commit');

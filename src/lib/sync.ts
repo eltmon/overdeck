@@ -656,11 +656,56 @@ export interface SkillsMirrorResult {
 }
 
 /**
+ * Recursively sync the contents of srcDir into dstDir (full mirror-copy).
+ * nameMap (shallow, top-level only): renames source entries on copy (used to
+ * normalise skill.md → SKILL.md).
+ * Returns true if any file or directory was added, updated, or removed.
+ */
+function syncDirContents(
+  srcDir: string,
+  dstDir: string,
+  nameMap?: Record<string, string>,
+): boolean {
+  mkdirSync(dstDir, { recursive: true });
+  let changed = false;
+  const dstKept = new Set<string>();
+
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    const dstName = nameMap?.[entry.name] ?? entry.name;
+    dstKept.add(dstName);
+    const src = join(srcDir, entry.name);
+    const dst = join(dstDir, dstName);
+    if (entry.isDirectory()) {
+      if (syncDirContents(src, dst)) changed = true;
+    } else if (entry.isFile()) {
+      const srcBuf = readFileSync(src);
+      const dstBuf = existsSync(dst) ? readFileSync(dst) : null;
+      if (!dstBuf || !srcBuf.equals(dstBuf)) {
+        writeFileSync(dst, srcBuf);
+        changed = true;
+      }
+    }
+  }
+
+  try {
+    for (const entry of readdirSync(dstDir, { withFileTypes: true })) {
+      if (!dstKept.has(entry.name)) {
+        rmSync(join(dstDir, entry.name), { recursive: true, force: true });
+        changed = true;
+      }
+    }
+  } catch { /* non-fatal */ }
+
+  return changed;
+}
+
+/**
  * Mirror the top-level skills/ directory into .claude/skills/ when run inside a
  * panopticon-cli-style project that has a skills/ tree with SKILL.md files.
  *
- * - Creates missing skill directories and copies their SKILL.md
- * - Updates out-of-date SKILL.md files when source content has changed
+ * - Creates missing skill directories and recursively copies all their contents
+ * - Updates out-of-date files when source content has changed
+ * - Removes files and directories in .claude/skills/<name>/ that no longer exist in source
  * - Removes directories in .claude/skills/ that no longer exist in skills/
  * - Preserves .claude/skills/.gitignore untouched
  * - No-op for any project without a top-level skills/ directory containing SKILL.md files
@@ -715,22 +760,18 @@ export function mirrorProjectSkills(
   } catch { /* non-fatal */ }
   const gitignoreManaged = gitignoreSkillEntries.size > 0;
 
-  // Mirror source skill dirs → target
+  // Mirror source skill dirs → target (full recursive copy)
   const sourceNames = new Set<string>();
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const sourcePath = join(sourceDir, entry.name);
-    const sourceSkillMd =
-      existsSync(join(sourcePath, 'SKILL.md')) ? join(sourcePath, 'SKILL.md') :
-      existsSync(join(sourcePath, 'skill.md')) ? join(sourcePath, 'skill.md') :
-      null;
-    if (!sourceSkillMd) continue; // skip dirs without a skill definition
+
+    const hasUpperSKILL = existsSync(join(sourcePath, 'SKILL.md'));
+    const hasLowerSkill = !hasUpperSKILL && existsSync(join(sourcePath, 'skill.md'));
+    if (!hasUpperSKILL && !hasLowerSkill) continue; // skip dirs without a skill definition
 
     sourceNames.add(entry.name);
     const targetPath = join(targetDir, entry.name);
-    const targetSkillMd = join(targetPath, 'SKILL.md');
-
-    const sourceContent = readFileSync(sourceSkillMd, 'utf-8');
 
     if (!existsSync(targetPath)) {
       if (gitignoreManaged && !gitignoreSkillEntries.has(entry.name)) {
@@ -739,33 +780,23 @@ export function mirrorProjectSkills(
         sourceNames.delete(entry.name);
         continue;
       }
-      mkdirSync(targetPath, { recursive: true });
-      writeFileSync(targetSkillMd, sourceContent, 'utf-8');
-      result.added.push(entry.name);
-    } else {
-      const lowerTarget = join(targetPath, 'skill.md');
-      const hasUppercase = existsSync(targetSkillMd);
-      const hasLowercase = !hasUppercase && existsSync(lowerTarget);
-      const existingContent = hasUppercase
-        ? readFileSync(targetSkillMd, 'utf-8')
-        : hasLowercase
-          ? readFileSync(lowerTarget, 'utf-8')
-          : null;
+    }
 
-      if (existingContent !== sourceContent) {
-        // Content changed: write new SKILL.md and remove stale lowercase file
-        writeFileSync(targetSkillMd, sourceContent, 'utf-8');
-        if (existsSync(lowerTarget)) rmSync(lowerTarget);
-        if (existingContent === null) {
-          result.added.push(entry.name);
-        } else {
-          result.updated.push(entry.name);
-        }
-      } else if (hasLowercase) {
-        // Content identical but stored as skill.md (lowercase) — normalize filename
-        writeFileSync(targetSkillMd, sourceContent, 'utf-8');
-        rmSync(lowerTarget);
+    // Track whether the target already had a SKILL.md (to distinguish added vs updated)
+    const targetHadSkillMd = existsSync(targetPath) && (
+      existsSync(join(targetPath, 'SKILL.md')) || existsSync(join(targetPath, 'skill.md'))
+    );
+
+    // Rename skill.md → SKILL.md when source uses lowercase
+    const nameMap = hasLowerSkill ? { 'skill.md': 'SKILL.md' } : undefined;
+
+    const changed = syncDirContents(sourcePath, targetPath, nameMap);
+
+    if (changed) {
+      if (targetHadSkillMd) {
         result.updated.push(entry.name);
+      } else {
+        result.added.push(entry.name);
       }
     }
   }
