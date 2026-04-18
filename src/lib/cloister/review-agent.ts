@@ -526,7 +526,6 @@ async function runParallelReview(
 
 /**
  * Parse synthesis output and individual reviewer files into a ReviewResult.
- * Parses synthesis.md and individual reviewer output files into a ReviewResult.
  */
 export async function parseReviewSynthesis(reviewOutputDir: string): Promise<ReviewResult> {
   const synthesisPath = join(reviewOutputDir, 'synthesis.md');
@@ -543,7 +542,7 @@ export async function parseReviewSynthesis(reviewOutputDir: string): Promise<Rev
   const result = parseAgentOutput(synthesisContent);
 
   // Collect file references from all reviewer outputs
-  const reviewerFiles = ['correctness.md', 'security.md', 'performance.md', 'requirements.md'];
+  const reviewerFiles = getReviewAgents().map(a => `${a.name}.md`);
   const filesReviewed: string[] = [];
 
   await Promise.all(reviewerFiles.map(async filename => {
