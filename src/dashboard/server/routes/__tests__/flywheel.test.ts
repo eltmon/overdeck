@@ -31,22 +31,29 @@ vi.mock('../../../../lib/flywheel/retro-writer.js', () => ({
   parseRetroMarkdown: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock('../../../../lib/projects.js', () => ({
+  resolveProjectFromIssue: vi.fn().mockReturnValue(null),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { computeFlywheelMetrics, readNonArchivedRetroFiles, issueIdFromFilename, buildRollbackPreviewDiff } from '../flywheel.js';
+import { computeFlywheelMetrics, readNonArchivedRetroFiles, issueIdFromFilename, buildRollbackPreviewDiff, resolveRollbackRepoDir } from '../flywheel.js';
 import { parseRetroMarkdown } from '../../../../lib/flywheel/retro-writer.js';
+import { resolveProjectFromIssue } from '../../../../lib/projects.js';
 
 const mockReaddir = vi.mocked(readdir);
 const mockReadFile = vi.mocked(readFile);
 const mockParseRetroMarkdown = vi.mocked(parseRetroMarkdown);
+const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockReaddir.mockResolvedValue([]);
   mockReadFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
   mockParseRetroMarkdown.mockReturnValue(null);
+  mockResolveProjectFromIssue.mockReturnValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -205,5 +212,24 @@ describe('buildRollbackPreviewDiff', () => {
 
   it('handles empty diff (no commit found or no changes)', () => {
     expect(buildRollbackPreviewDiff('')).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveRollbackRepoDir — repo selection regression (PAN-709 review-025 fix 3)
+// Old code hardcoded ~/docs as the git repo for rollback preview. Flywheel-change
+// issues are implemented in the panopticon-cli project repo, not ~/docs.
+// Fixed: resolveProjectFromIssue determines the correct repo directory.
+// ---------------------------------------------------------------------------
+
+describe('resolveRollbackRepoDir', () => {
+  it('returns project.projectPath when the issue resolves to a known project', () => {
+    mockResolveProjectFromIssue.mockReturnValue({ projectPath: '/home/user/my-project' } as ReturnType<typeof resolveProjectFromIssue>);
+    expect(resolveRollbackRepoDir('PAN-001')).toBe('/home/user/my-project');
+  });
+
+  it('falls back to process.cwd() when the issue cannot be resolved', () => {
+    mockResolveProjectFromIssue.mockReturnValue(null);
+    expect(resolveRollbackRepoDir('PAN-UNKNOWN')).toBe(process.cwd());
   });
 });

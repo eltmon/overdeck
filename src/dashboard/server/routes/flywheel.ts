@@ -24,6 +24,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getFlywheelDaemonStatus } from '../../../lib/cloister/flywheel-daemon.js';
 import { parseRetroMarkdown } from '../../../lib/flywheel/retro-writer.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -216,6 +217,17 @@ const getFlywheelMetricsRoute = HttpRouter.add(
 // ============================================================================
 
 /**
+ * Resolve the repository directory for a flywheel-change issue.
+ * Flywheel-change issues are implemented on feature branches in the project repo,
+ * not in ~/docs. Falls back to cwd() when the project cannot be resolved.
+ * Exported for unit testing.
+ */
+export function resolveRollbackRepoDir(issueId: string): string {
+  const project = resolveProjectFromIssue(issueId);
+  return project?.projectPath ?? process.cwd();
+}
+
+/**
  * Returns the raw output of `git diff commitSha commitSha^`, which is already
  * a correct revert preview (changes needed to go from the commit back to its
  * parent). Exported for unit-testing the no-inversion contract.
@@ -233,12 +245,13 @@ const getRollbackPreviewRoute = HttpRouter.add(
 
     // Find the most recent commit for this flywheel-change issue
     // Convention: commit message contains the issue ID
+    const repoDir = resolveRollbackRepoDir(issueId);
     let commitSha = '';
     let diff = '';
     try {
       const { stdout: logOut } = yield* Effect.promise(() =>
         execFileAsync('git', [
-          '-C', join(homedir(), 'docs'),
+          '-C', repoDir,
           'log', '--oneline', '--grep', issueId,
           '-1',
         ])
@@ -249,7 +262,7 @@ const getRollbackPreviewRoute = HttpRouter.add(
         // Produce a revert preview diff (read-only, does not modify working tree)
         const { stdout: diffOut } = yield* Effect.promise(() =>
           execFileAsync('git', [
-            '-C', join(homedir(), 'docs'),
+            '-C', repoDir,
             'diff', commitSha, `${commitSha}^`,
           ])
         );

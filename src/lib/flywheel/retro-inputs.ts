@@ -124,7 +124,7 @@ async function readTmuxTails(issueId: string): Promise<Record<string, string>> {
     const entries = await fsPromises.readdir(agentsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      if (!entry.name.startsWith(issueLower)) continue;
+      if (!entry.name.endsWith(`-${issueLower}`) && entry.name !== issueLower) continue;
 
       // Try reading a persisted tmux tail file first
       const tailFile = join(agentsDir, entry.name, 'tmux-tail.txt');
@@ -142,14 +142,15 @@ async function readTmuxTails(issueId: string): Promise<Record<string, string>> {
 /**
  * Fetch PR review comments via gh CLI.
  */
-async function fetchPrComments(issueId: string): Promise<string | null> {
+async function fetchPrComments(issueId: string, workspacePath: string | null): Promise<string | null> {
   try {
+    const branch = `feature/${issueId.toLowerCase()}`;
+    const opts = workspacePath ? { timeout: 15_000, cwd: workspacePath } : { timeout: 15_000 };
     const { stdout } = await execFileAsync('gh', [
-      'pr', 'view',
+      'pr', 'view', branch,
       '--json', 'number,body,comments,reviews',
       '--jq', '.comments[].body + "\n---\n" + .reviews[].body',
-      issueId,
-    ], { timeout: 15_000 });
+    ], opts);
     return stdout.trim() || null;
   } catch {
     // PR may not exist yet or gh may fail — not fatal
@@ -202,7 +203,7 @@ export async function gatherRetroInputs(issueId: string): Promise<RetroInputBund
     workspacePath ? readFeedbackFiles(workspacePath) : {},
     readTmuxTails(issueId),
     extractFlywheelStateRow(issueId),
-    fetchPrComments(issueId),
+    fetchPrComments(issueId, workspacePath),
     workspacePath ? fetchBranchCommits(workspacePath) : null,
   ]);
 
