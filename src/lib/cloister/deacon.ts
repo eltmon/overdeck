@@ -1948,6 +1948,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       readyForMerge?: boolean;
       mergeStatus?: string;
       mergeNotes?: string;
+      mergeRetryCount?: number;
       updatedAt?: string;
       autoRequeueCount?: number;
       history?: Array<{ type: string; status: string; timestamp?: string }>;
