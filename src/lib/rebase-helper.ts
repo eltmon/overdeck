@@ -14,7 +14,7 @@
 
 import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 import { MergeSet } from './merge-set.js';
 
@@ -117,6 +117,11 @@ async function rebaseOneRepo(
               timeout: 60000,
               env: { ...process.env, GIT_EDITOR: 'true' },
             });
+
+            if (await isRebaseInProgress(repoPath)) {
+              continue;
+            }
+
             break;
           } catch (continueErr: any) {
             lastError = continueErr;
@@ -124,7 +129,7 @@ async function rebaseOneRepo(
           }
         }
 
-        if (resolution.resolved) {
+        if (!await isRebaseInProgress(repoPath)) {
           break;
         }
 
@@ -165,6 +170,22 @@ async function rebaseOneRepo(
  * Uses `--theirs` so the rebased local branch wins. During a rebase, "ours"
  * is the target branch state and "theirs" is the commit being replayed.
  */
+async function isRebaseInProgress(repoPath: string): Promise<boolean> {
+  try {
+    const { stdout: gitDirOutput } = await execAsync('git rev-parse --git-dir', {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+
+    const gitDir = gitDirOutput.trim();
+    const resolvedGitDir = isAbsolute(gitDir) ? gitDir : join(repoPath, gitDir);
+    return existsSync(join(resolvedGitDir, 'rebase-merge')) || existsSync(join(resolvedGitDir, 'rebase-apply'));
+  } catch {
+    return false;
+  }
+}
+
 async function tryResolvePlanningConflicts(
   repoPath: string
 ): Promise<{ resolved: boolean; shouldRetry: boolean; remainingConflicts: string[] }> {

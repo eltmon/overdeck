@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,12 +61,8 @@ describe('rebaseAndPushRepos', () => {
     await execAsync('git checkout feature/pan-711', { cwd: repoDir });
   });
 
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('keeps the rebased branch version when only .planning files conflict', async () => {
-    const mergeSet: MergeSet = {
+  function createMergeSet(): MergeSet {
+    return {
       issueId: 'PAN-711',
       projectKey: 'panopticon-cli',
       projectPath: repoDir,
@@ -90,8 +87,14 @@ describe('rebaseAndPushRepos', () => {
         },
       ],
     };
+  }
 
-    const result = await rebaseAndPushRepos(repoDir, mergeSet);
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('keeps the rebased branch version when only .planning files conflict', async () => {
+    const result = await rebaseAndPushRepos(repoDir, createMergeSet());
 
     expect(result.success).toBe(true);
     expect(result.results[0]?.outcome).toBe('rebased');
@@ -99,5 +102,40 @@ describe('rebaseAndPushRepos', () => {
     const planningFile = await readFile(join(repoDir, '.planning', 'plan.vbrief.json'), 'utf-8');
     expect(planningFile).toContain('"local":"keep-me"');
     expect(planningFile).not.toContain('"upstream":"discard-me"');
+  });
+
+  it('fails when a later non-planning conflict appears after planning conflicts are auto-resolved', async () => {
+    await writeFile(join(repoDir, 'README.md'), 'local readme\n');
+    await execAsync('git add README.md', { cwd: repoDir });
+    await execAsync('git commit -m "local readme change"', { cwd: repoDir });
+
+    await execAsync('git checkout main', { cwd: repoDir });
+    await writeFile(join(repoDir, 'README.md'), 'upstream readme\n');
+    await execAsync('git add README.md', { cwd: repoDir });
+    await execAsync('git commit -m "upstream readme change"', { cwd: repoDir });
+    await execAsync('git push origin main', { cwd: repoDir });
+
+    await execAsync('git checkout feature/pan-711', { cwd: repoDir });
+
+    const result = await rebaseAndPushRepos(repoDir, createMergeSet());
+
+    expect(result.success).toBe(false);
+    expect(result.firstFailure?.outcome).toBe('conflict');
+    expect(result.firstFailure?.conflictFiles).toEqual(['README.md']);
+
+    const { stdout: rebaseMergePath } = await execAsync('git rev-parse --git-path rebase-merge', {
+      cwd: repoDir,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const { stdout: rebaseApplyPath } = await execAsync('git rev-parse --git-path rebase-apply', {
+      cwd: repoDir,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+
+    expect(await readFile(join(repoDir, 'README.md'), 'utf-8')).toBe('local readme\n');
+    expect(existsSync(join(repoDir, rebaseMergePath.trim()))).toBe(false);
+    expect(existsSync(join(repoDir, rebaseApplyPath.trim()))).toBe(false);
   });
 });
