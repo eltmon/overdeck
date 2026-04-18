@@ -374,4 +374,36 @@ describe('doneCommand preflight failure paths', () => {
     // The stale file must have been committed before preflight ran
     expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
   });
+
+  it('does NOT exit(1) when stale .planning/STATE.md is dirty (other managed planning artifact)', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+
+    let planningCommitted = false;
+    const capturedCmds: string[] = [];
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      capturedCmds.push(cmd);
+      if (cmd.includes('bd list')) {
+        cb(null, { stdout: '[]', stderr: '' });
+      } else if (
+        cmd.includes('git status --porcelain .planning/') &&
+        !planningCommitted
+      ) {
+        // Stale STATE.md from a prior interrupted run
+        cb(null, { stdout: ' M .planning/STATE.md\n', stderr: '' });
+      } else if (cmd.includes('git commit')) {
+        planningCommitted = true;
+        cb(null, { stdout: '', stderr: '' });
+      } else {
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714');
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
+  });
 });

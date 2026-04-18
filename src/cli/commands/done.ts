@@ -142,15 +142,15 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (workspacePath && existsSync(workspacePath)) {
       const execAsync = promisify(exec);
 
-      // Commit stale plan.vbrief.json from a previous interrupted pan done run so
-      // the uncommitted-changes gate in runPreflightChecks doesn't reject it.
+      // Commit any stale .planning/ artifacts from a previous interrupted pan done run
+      // so the uncommitted-changes gate in runPreflightChecks doesn't reject them.
       try {
         const { stdout: preDirty } = await execAsync(
-          'git status --porcelain .planning/plan.vbrief.json',
+          'git status --porcelain .planning/',
           { cwd: workspacePath, encoding: 'utf-8' }
         );
         if (preDirty.trim()) {
-          await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
+          await execAsync('git add .planning/', { cwd: workspacePath });
           await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
         }
       } catch { /* non-fatal */ }
