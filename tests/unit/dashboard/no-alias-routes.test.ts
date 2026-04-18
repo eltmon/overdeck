@@ -32,6 +32,9 @@ const removedAliasRoutes: RegisteredRoute[] = [
 const canonicalRoutes: RegisteredRoute[] = [
   { method: 'GET', path: '/api/review/:issueId/status' },
   { method: 'POST', path: '/api/review/:issueId/status' },
+  { method: 'POST', path: '/api/review/:issueId/trigger' },
+  { method: 'POST', path: '/api/review/:issueId/request' },
+  { method: 'POST', path: '/api/review/:issueId/reset' },
   { method: 'POST', path: '/api/issues/:issueId/merge' },
 ];
 
