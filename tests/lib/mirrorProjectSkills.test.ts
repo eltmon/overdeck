@@ -191,21 +191,20 @@ describe('mirrorProjectSkills', () => {
     expect(existsSync(join(claudeSkillsDir, 'test-specialist-workflow'))).toBe(true);
   });
 
-  it('does not create new dirs for skills not listed in a managed .gitignore', () => {
-    // Simulates panopticon-cli repo: .claude/skills/.gitignore lists known skills,
-    // a new skill (not yet listed) must not be created as an untracked file.
+  it('creates new dirs for all skills regardless of .gitignore contents', () => {
+    // Skills are always mirrored — .gitignore listing is irrelevant to mirroring.
     createSkill('pan-help', '# Help');
     createSkill('new-unlisted-skill', '# New');
     mkdirSync(claudeSkillsDir, { recursive: true });
-    // .gitignore lists pan-help (gitignore-managed) but NOT new-unlisted-skill
+    // .gitignore lists pan-help but NOT new-unlisted-skill — both must be mirrored
     writeFileSync(join(claudeSkillsDir, '.gitignore'), 'pan-help\n', 'utf-8');
 
     const result = mirrorProjectSkills(cwd, { manifestDir });
 
     expect(result.added).toContain('pan-help');
-    expect(result.added).not.toContain('new-unlisted-skill');
+    expect(result.added).toContain('new-unlisted-skill');
     expect(existsSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'))).toBe(true);
-    expect(existsSync(join(claudeSkillsDir, 'new-unlisted-skill'))).toBe(false);
+    expect(existsSync(join(claudeSkillsDir, 'new-unlisted-skill', 'SKILL.md'))).toBe(true);
   });
 
   it('does not create .mirror-manifest inside .claude/skills/ (no untracked repo files)', () => {

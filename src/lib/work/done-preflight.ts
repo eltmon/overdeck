@@ -13,25 +13,35 @@ const execAsync = promisify(exec);
  * Returns an array of failure lines (empty = pass).
  */
 export async function checkOpenBeads(workspacePath: string, issueId: string): Promise<string[]> {
+  let stdout: string;
   try {
-    const { stdout } = await execAsync(
+    ({ stdout } = await execAsync(
       `bd list --status open -l "${issueId.toLowerCase()}" --limit 0 --json`,
       { cwd: workspacePath }
-    );
-    const beads = JSON.parse(stdout);
-    if (!Array.isArray(beads) || beads.length === 0) return [];
-
-    const lines: string[] = [`  Open beads (${beads.length}):`];
-    for (const bead of beads) {
-      const id = bead.id || bead.beadId || '?';
-      const task = bead.task || bead.subject || bead.title || 'untitled';
-      lines.push(`    - ${id} ${task}`);
-    }
-    return lines;
-  } catch {
-    // beads CLI not installed or not a beads workspace — skip check
-    return [];
+    ));
+  } catch (error: unknown) {
+    const isNotInstalled =
+      error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT';
+    if (isNotInstalled) return [];
+    return ['  Open beads check failed — run `bd list --status open` to diagnose'];
   }
+
+  let beads: unknown;
+  try {
+    beads = JSON.parse(stdout);
+  } catch {
+    return ['  Open beads check produced invalid output — run `bd list --status open` to diagnose'];
+  }
+
+  if (!Array.isArray(beads) || beads.length === 0) return [];
+
+  const lines: string[] = [`  Open beads (${beads.length}):`];
+  for (const bead of beads as Array<Record<string, unknown>>) {
+    const id = String(bead.id ?? bead.beadId ?? '?');
+    const task = String(bead.task ?? bead.subject ?? bead.title ?? 'untitled');
+    lines.push(`    - ${id} ${task}`);
+  }
+  return lines;
 }
 
 /**

@@ -89,9 +89,10 @@ describe('checkOpenBeads', () => {
     expect(capturedCmd).toContain('pan-714');
   });
 
-  it('returns empty array when bd CLI is not installed (exec throws)', async () => {
+  it('returns empty array when bd CLI is not installed (ENOENT)', async () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
-      cb(new Error('bd: command not found'), { stdout: '', stderr: '' });
+      const err = Object.assign(new Error('spawn bd ENOENT'), { code: 'ENOENT' });
+      cb(err, { stdout: '', stderr: '' });
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
@@ -99,13 +100,25 @@ describe('checkOpenBeads', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns empty array when bd returns invalid JSON', async () => {
+  it('returns failure message when bd command fails with non-ENOENT error', async () => {
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(new Error('bd exited with code 1'), { stdout: '', stderr: 'error' });
+    });
+
+    const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
+    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    expect(result.length).toBe(1);
+    expect(result[0]).toMatch(/Open beads check failed/);
+  });
+
+  it('returns failure message when bd returns invalid JSON', async () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
       cb(null, { stdout: 'not-json', stderr: '' });
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
-    expect(result).toEqual([]);
+    expect(result.length).toBe(1);
+    expect(result[0]).toMatch(/invalid output/);
   });
 });

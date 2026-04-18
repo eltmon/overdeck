@@ -740,26 +740,6 @@ export function mirrorProjectSkills(
 
   mkdirSync(targetDir, { recursive: true });
 
-  // If .claude/skills/.gitignore lists skill-name-like entries, treat the dir as
-  // "gitignore-managed": only create NEW dirs for skills already listed there.
-  // This prevents pan sync from creating untracked files in repos (like panopticon-cli
-  // itself) where .claude/skills/ has a mix of tracked and gitignored content.
-  // Existing dirs (already tracked or gitignored) are always updated regardless.
-  const gitignorePath = join(targetDir, '.gitignore');
-  const gitignoreSkillEntries = new Set<string>();
-  const skillNameRe = /^[a-z][a-z0-9-]+$/;
-  try {
-    if (existsSync(gitignorePath)) {
-      for (const line of readFileSync(gitignorePath, 'utf-8').split('\n')) {
-        const entry = line.trim();
-        if (entry && !entry.startsWith('#') && skillNameRe.test(entry)) {
-          gitignoreSkillEntries.add(entry);
-        }
-      }
-    }
-  } catch { /* non-fatal */ }
-  const gitignoreManaged = gitignoreSkillEntries.size > 0;
-
   // Mirror source skill dirs → target (full recursive copy)
   const sourceNames = new Set<string>();
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
@@ -772,15 +752,6 @@ export function mirrorProjectSkills(
 
     sourceNames.add(entry.name);
     const targetPath = join(targetDir, entry.name);
-
-    if (!existsSync(targetPath)) {
-      if (gitignoreManaged && !gitignoreSkillEntries.has(entry.name)) {
-        // Skip: creating this dir would leave an untracked file in a gitignore-managed
-        // .claude/skills/ dir. Exclude it from the manifest too.
-        sourceNames.delete(entry.name);
-        continue;
-      }
-    }
 
     // Track whether the target already had a SKILL.md (to distinguish added vs updated)
     const targetHadSkillMd = existsSync(targetPath) && (
