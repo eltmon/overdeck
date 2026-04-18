@@ -15,7 +15,7 @@ import { jsonResponse } from "../http-helpers.js";
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createReadStream } from 'node:fs';
@@ -73,6 +73,12 @@ import {
 } from '../services/conversation-compaction.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, reserveSummaryForkSession } from '../../../lib/conversations/summary-fork.js';
+import {
+  ensureConversationAttachmentDir,
+  extractConversationAttachmentPaths,
+  hasConversationAttachment,
+  cleanupConversationAttachments,
+} from '../services/conversation-attachments.js';
 
 const execAsync = promisify(exec);
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
@@ -168,7 +174,8 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
 
-  const path = join(tmpdir(), `panopticon-paste-${randomUUID()}${extension}`);
+  const attachmentDir = await ensureConversationAttachmentDir(name);
+  const path = join(attachmentDir, `${randomUUID()}${extension}`);
   await writeFile(path, bytes);
 
   return jsonResponse({ path });
@@ -569,6 +576,7 @@ const postConversationStopRoute = HttpRouter.add(
 
         await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
+        await cleanupConversationAttachments(name);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
@@ -821,8 +829,15 @@ const postConversationMessageRoute = HttpRouter.add(
           return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
         }
 
+        const attachmentPaths = extractConversationAttachmentPaths(message);
+        const missingAttachment = attachmentPaths.find((attachmentPath) => !hasConversationAttachment(conv.name, attachmentPath));
+        if (missingAttachment) {
+          return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
+        }
+
         // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
         await sendKeysAsync(conv.tmuxSession, message, 'conversation-message');
+        await cleanupConversationAttachments(conv.name);
 
         return jsonResponse({ ok: true });
       } catch (error: unknown) {
@@ -892,6 +907,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Mark as ended and archived
         markConversationEnded(name);
         archiveConversation(name);
+        await cleanupConversationAttachments(name);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {

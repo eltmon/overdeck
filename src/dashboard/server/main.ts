@@ -5,8 +5,6 @@
  * Usage (prod):  node dist/dashboard/server.js
  */
 
-import { readdir, stat, unlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { Effect } from 'effect';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
@@ -31,6 +29,7 @@ import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { cleanupInactiveConversationAttachments } from './services/conversation-attachments.js';
 
 declare const Bun: unknown;
 
@@ -44,28 +43,11 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
 
-const PASTE_IMAGE_FILE_PREFIX = 'panopticon-paste-';
-const PASTE_IMAGE_TTL_MS = 5 * 60 * 1000;
-const PASTE_IMAGE_CLEANUP_INTERVAL_MS = 60 * 1000;
-
-async function cleanupStalePastedImages(): Promise<void> {
-  const tempDirectory = tmpdir();
+async function cleanupEndedConversationAttachments(): Promise<void> {
   try {
-    const names = await readdir(tempDirectory);
-    const now = Date.now();
-    await Promise.all(
-      names
-        .filter((name) => name.startsWith(PASTE_IMAGE_FILE_PREFIX))
-        .map(async (name) => {
-          const path = `${tempDirectory}/${name}`;
-          const details = await stat(path).catch(() => null);
-          if (!details) return;
-          if (now - details.mtimeMs <= PASTE_IMAGE_TTL_MS) return;
-          await unlink(path).catch(() => {});
-        }),
-    );
+    await cleanupInactiveConversationAttachments();
   } catch (err) {
-    console.warn('[panopticon] Failed to clean pasted images:', err);
+    console.warn('[panopticon] Failed to clean conversation attachments:', err);
   }
 }
 
@@ -162,11 +144,8 @@ startTtsSummarizer();
 startCliproxyWatchdog();
 console.log('[panopticon] CLIProxy watchdog started (30s interval)');
 
-const pastedImageCleanupTimer = setInterval(() => {
-  void cleanupStalePastedImages();
-}, PASTE_IMAGE_CLEANUP_INTERVAL_MS);
-void cleanupStalePastedImages();
-console.log('[panopticon] Pasted image cleanup started');
+void cleanupEndedConversationAttachments();
+console.log('[panopticon] Conversation attachment cleanup initialized');
 
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
@@ -181,14 +160,12 @@ const emitShutdownActivity = () => {
 };
 process.once('SIGTERM', () => {
   emitShutdownActivity();
-  clearInterval(pastedImageCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
-  clearInterval(pastedImageCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();

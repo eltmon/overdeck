@@ -193,4 +193,47 @@ describe('ComposerFooter image attachments', () => {
     });
     expect(await screen.findByText('drop.png')).toBeInTheDocument();
   });
+
+  it('blocks send when any pending image upload has failed', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response('upload failed', { status: 500 });
+      }
+      if (url.includes('/message')) {
+        return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const onSend = vi.fn();
+    render(<ComposerFooter conversation={conversation} onSend={onSend} />);
+
+    const file = new File(['png-bytes'], 'broken.png', { type: 'image/png' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([9, 9, 9, 9]).buffer),
+    });
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello world' } });
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => file }],
+      },
+    });
+
+    expect(await screen.findByText('broken.png')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to upload image/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    expect(mockToastError).toHaveBeenCalledWith('Remove failed image uploads before sending');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.anything(),
+    );
+    expect(onSend).not.toHaveBeenCalled();
+  });
 });

@@ -227,6 +227,12 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       return;
     }
 
+    const failedImages = pendingImages.filter((image) => image.error);
+    if (failedImages.length > 0) {
+      toast.error('Remove failed image uploads before sending');
+      return;
+    }
+
     const uploadedImages = pendingImages.filter((image) => image.serverPath);
     if (!messageText && uploadedImages.length === 0) return;
 

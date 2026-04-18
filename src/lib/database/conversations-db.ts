@@ -133,6 +133,15 @@ export function listArchivedConversations(): Conversation[] {
   return rows.map(rowToConversation);
 }
 
+export function listInactiveConversationNames(): string[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT name FROM conversations WHERE status = 'ended' OR archived_at IS NOT NULL`,
+    )
+    .all() as Array<{ name: string }>;
+  return rows.map((row) => row.name);
+
 // ─── Write operations ─────────────────────────────────────────────────────────
 
 export function createConversation(opts: {

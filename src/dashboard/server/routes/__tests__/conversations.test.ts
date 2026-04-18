@@ -6,7 +6,7 @@
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -86,9 +86,10 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
-  it('stores uploaded images under tmpdir with the validated extension', async () => {
+  it('stores uploaded images under the owning conversation attachment directory', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
+    const { getConversationAttachmentDir } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -101,7 +102,7 @@ describe('conversations route — DB integration', () => {
 
     const body = decodeJsonResponse(response);
     expect(response.status).toBe(200);
-    expect(body.path).toEqual(expect.stringMatching(/^\/tmp\/panopticon-paste-.*\.png$/));
+    expect(body.path).toEqual(expect.stringMatching(new RegExp(`${getConversationAttachmentDir('upload-test').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.+\\.png$`)));
     expect(readFileSync(body.path as string)).toEqual(Buffer.from(Uint8Array.from([137, 80, 78, 71])));
   });
 
@@ -119,6 +120,31 @@ describe('conversations route — DB integration', () => {
 
     expect(response.status).toBe(400);
     expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data' });
+  });
+
+  it('rejects attachment reuse across conversations and cleans up after send', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { cleanupConversationAttachments } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
+    createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
+
+    const pngData = Buffer.from(Uint8Array.from([1, 2, 3, 4])).toString('base64');
+    const uploadResponse = await handleConversationImageUpload('owner-conv', {
+      filename: 'owned.png',
+      data: pngData,
+      mimeType: 'image/png',
+    });
+    const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
+
+    const { extractConversationAttachmentPaths, hasConversationAttachment } = await import('../../services/conversation-attachments.js');
+    expect(extractConversationAttachmentPaths(`@${uploadedPath}\nhello`)).toEqual([uploadedPath]);
+    expect(hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
+    expect(hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
+
+    await cleanupConversationAttachments('owner-conv');
+    expect(existsSync(uploadedPath)).toBe(false);
   });
 
   it('creating and listing a conversation returns the right data', async () => {
