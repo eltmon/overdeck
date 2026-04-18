@@ -2030,15 +2030,6 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       // For merge CI-blocked: clear the stale merge failure, clean up stale
       // CI-failure feedback files, and set readyForMerge so the merge flow can re-enter.
       if (isMergeCiFailed) {
-        // Guard: if checkFailedMergeRetry has exhausted its CI retry budget for this
-        // issue, do NOT reset mergeStatus/readyForMerge — that would re-queue the issue
-        // on every 10-minute dead-end sweep, defeating the circuit breaker.
-        const ciEntry = ciRetryMap.get(issueId);
-        if (ciEntry && ciEntry.count >= 5) {
-          console.log(`[deacon] Dead-end recovery skipped for ${issueId} — CI retries exhausted (${ciEntry.count} attempts), awaiting agent fix`);
-          actions.push(`Dead-end recovery skipped for ${issueId} — CI retries exhausted, agent must fix CI failures`);
-          continue;
-        }
         setReviewStatus(issueId, {
           mergeStatus: 'pending',
           readyForMerge: true,
