@@ -1707,6 +1707,31 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         continue;
       }
 
+      // Timeout failures: the work agent didn't finish the rebase in time.
+      // Write feedback and nudge the agent so it knows to continue/finish the rebase.
+      // Then retry so the merge can proceed once the agent pushes.
+      const isTimeoutFailure = typeof status.mergeNotes === 'string' &&
+        (status.mergeNotes.includes('did not push') || status.mergeNotes.includes('stopped before completing'));
+      if (isTimeoutFailure) {
+        const issueIdForFb = status.issueId || key;
+        const timeoutNotes = status.mergeNotes!;
+        const { writeFeedbackFile } = await import('./feedback-writer.js');
+        await writeFeedbackFile({
+          issueId: issueIdForFb,
+          specialist: 'merge-agent',
+          outcome: 'timeout',
+          summary: 'Merge timed out waiting for rebase — please rebase and push',
+          markdownBody: `## Merge Timed Out — Rebase Required\n\n${timeoutNotes}\n\n### Action Required\n\nThe merge was requested but the rebased branch was not pushed in time. Please:\n\n1. Run \`git fetch origin\` and \`git rebase origin/main\` (or the target branch)\n2. Resolve any conflicts\n3. Run \`git push --force-with-lease\`\n4. Invoke the /rebase-and-submit skill or run \`pan work done ${issueIdForFb}\`\n\nAfter pushing, the merge will be retried automatically.`,
+        }).catch((err: Error) => console.error(`[deacon] Failed to write timeout feedback for ${issueIdForFb}:`, err.message));
+        const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
+        if (sessionExists(agentSession)) {
+          await sendKeysAsync(agentSession,
+            `Merge timed out — the rebased branch was not pushed in time. Please rebase onto the target branch, resolve any conflicts, push with --force-with-lease, then run "pan work done ${issueIdForFb}". After pushing, the merge will proceed automatically.`
+          );
+        }
+        actions.push(`Timeout failure for ${issueIdForFb} — wrote feedback, nudged work agent`);
+      }
+
       // Circuit breaker: max retries to avoid infinite loop on permanent failures
       const retryCount = status.mergeRetryCount || 0;
       if (retryCount >= FAILED_MERGE_MAX_RETRIES) {

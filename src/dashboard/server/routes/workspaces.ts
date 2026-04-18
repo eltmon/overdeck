@@ -3332,7 +3332,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Rebase and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every rebase, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
       await messageAgent(agentId, rebaseMsg);
 
-      const REBASE_TIMEOUT_MS = 10 * 60 * 1000;
+      const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex polyrepo rebases need time for conflict resolution
       const POLL_INTERVAL_MS = 5000;
       const pushedRepos = new Set<string>();
       const rebaseStart = Date.now();
@@ -3585,7 +3585,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
       );
 
-      const REBASE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+      const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex rebases with conflicts need time
       const POLL_INTERVAL_MS = 5000;
       const startTime = Date.now();
       let newHead: string | null = null;
