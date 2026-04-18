@@ -12,7 +12,6 @@ import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
-import { CacheService } from './services/cache-service.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
@@ -26,11 +25,6 @@ import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 
 declare const Bun: unknown;
-
-// Ensure ~/.panopticon directory exists (async mkdir avoids blocking the event loop)
-await CacheService.initHome().catch(err => {
-  console.warn('[cache-service] Warning: failed to create panopticon home dir:', err.message);
-});
 
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 void initTrackerConfigCache().catch(err => {
