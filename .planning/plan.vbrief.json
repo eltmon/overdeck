@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility"
+    "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility",
+    "updated": "2026-04-18T14:38:48.522Z"
   },
   "plan": {
     "id": "pan-653",
@@ -11,13 +12,25 @@
     "status": "approved",
     "uid": "3102731e-c901-43ed-9595-545316061952",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 43,
     "created": "2026-04-12T00:00:00Z",
-    "updated": "2026-04-12T00:00:00Z",
+    "updated": "2026-04-18T14:38:48.522Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/653", "label": "PAN-653", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/653",
+        "label": "PAN-653",
+        "type": "issue"
+      }
     ],
-    "tags": ["bug", "git", "merge", "kanban", "activity", "deacon", "schema"],
+    "tags": [
+      "bug",
+      "git",
+      "merge",
+      "kanban",
+      "activity",
+      "deacon",
+      "schema"
+    ],
     "narratives": {
       "Problem": "Hotfix commits pushed to origin/main are silently clobbered by concurrent approve-flow merges. Root cause is a check-then-act race in workspaces.ts approve handler (pull, merge, push without re-fetch). The failure is invisible because activity log is in-memory, stuck is a derived heuristic not a flag, and Deacon would infinite-loop respawn any workspace marked stuck.",
       "Proposal": "Ship all three phases as one coupled change. Phase 1 stops the bleed: Deacon-respect first, then persistent stuck columns on review_status, then pre-push divergence guard in approve + salvage paths, then unstick UI. Phase 2 makes it visible: thin git helper wrapper emitting structured git.* events to a new git_operations SQLite table, pattern-matched tmux streaming from the merge-agent specialist, concurrent-merge detection, and activity panel UX (group/filter/pin). Phase 3 fixes the kanban stuck-count to be the union of persistent stuck flag and inactivity heuristic."
@@ -26,7 +39,7 @@
       {
         "id": "deacon-respect",
         "title": "Deacon respect: skip workspaces with stuck=true",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -40,27 +53,37 @@
           {
             "id": "deacon-respect.ac1",
             "title": "patrolWorkAgentResolutions skips iterations where review_status.stuck = 1 for the agent's issueId",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.517Z"
           },
           {
             "id": "deacon-respect.ac2",
             "title": "Ephemeral specialist force-kill/respawn path also checks the flag and bails out",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.517Z"
           },
           {
             "id": "deacon-respect.ac3",
             "title": "Unit test: patrol run with a mocked stuck issue produces zero poke/respawn actions",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.517Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.517Z"
       },
       {
         "id": "stuck-schema",
         "title": "Persistent stuck state: schema + upsert helpers",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -74,27 +97,37 @@
           {
             "id": "stuck-schema.ac1",
             "title": "review_status table has stuck, stuck_reason, stuck_at, stuck_details columns after migration from v16",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.516Z"
           },
           {
             "id": "stuck-schema.ac2",
             "title": "markWorkspaceStuck / clearWorkspaceStuck helpers exist, roundtrip through SQLite, and persist across dashboard restart",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.516Z"
           },
           {
             "id": "stuck-schema.ac3",
             "title": "Migration is idempotent (re-running does not error if columns already exist)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.516Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.516Z"
       },
       {
         "id": "git-operations-table",
         "title": "Create git_operations SQLite table and git-activity service",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -108,27 +141,37 @@
           {
             "id": "git-operations-table.ac1",
             "title": "git_operations table exists with all columns and indexes after fresh init and after migration",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.518Z"
           },
           {
             "id": "git-operations-table.ac2",
             "title": "appendGitOperation and listGitOperations functions work and are used by the activity API",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.518Z"
           },
           {
             "id": "git-operations-table.ac3",
             "title": "Rows survive a dashboard process restart",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.519Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.518Z"
       },
       {
         "id": "git-helper-wrapper",
         "title": "Thin git-operations helper wrapper module",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -142,27 +185,37 @@
           {
             "id": "git-helper-wrapper.ac1",
             "title": "gitPush throws MainDivergedError when origin/main is not an ancestor of local main",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.515Z"
           },
           {
             "id": "git-helper-wrapper.ac2",
             "title": "Every helper call writes exactly one row to git_operations with before/after/remote SHAs populated where applicable",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.515Z"
           },
           {
             "id": "git-helper-wrapper.ac3",
             "title": "Unit tests cover success, non-fast-forward rejection, and divergence cases using mocked execAsync",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.515Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.514Z"
       },
       {
         "id": "approve-divergence-guard",
         "title": "Pre-push divergence guard in approve flow",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -176,22 +229,32 @@
           {
             "id": "approve-divergence-guard.ac1",
             "title": "Approve flow aborts cleanly on divergence without losing the hotfix commit on origin/main",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.513Z"
           },
           {
             "id": "approve-divergence-guard.ac2",
             "title": "review_status.stuck is set to 1 with reason='main_diverged' and both SHAs in stuck_details",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.514Z"
           },
           {
             "id": "approve-divergence-guard.ac3",
             "title": "Integration repro: hotfix push between pull and push is preserved, not clobbered",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.514Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.513Z"
       },
       {
         "id": "salvage-divergence-guard",
@@ -211,20 +274,24 @@
             "id": "salvage-divergence-guard.ac1",
             "title": "salvageStrandedMerge aborts and marks stuck when origin/main has advanced beyond what it intended to push",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "salvage-divergence-guard.ac2",
             "title": "Rebase force-push and auto-revert force-push both emit git.force_push activity events",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
       {
         "id": "unstick-api-ui",
         "title": "Unstick API endpoint and kanban card UI",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -238,27 +305,37 @@
           {
             "id": "unstick-api-ui.ac1",
             "title": "POST /unstick clears stuck flag and re-enables Deacon for that workspace",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.512Z"
           },
           {
             "id": "unstick-api-ui.ac2",
             "title": "Kanban card shows red border + warning badge when stuck=1",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.512Z"
           },
           {
             "id": "unstick-api-ui.ac3",
             "title": "No new kanban lane added; grid remains at 4 columns",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.512Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.512Z"
       },
       {
         "id": "tmux-stream-patterns",
         "title": "Pattern-match specialist tmux output into activity feed",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -272,21 +349,28 @@
           {
             "id": "tmux-stream-patterns.ac1",
             "title": "User sees 'pushing…', 'rejected non-fast-forward', 'retrying…' events live in the activity panel during an approve",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.522Z"
           },
           {
             "id": "tmux-stream-patterns.ac2",
             "title": "Events are deduped and do not flood the activity table with repeated lines",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.522Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.521Z"
       },
       {
         "id": "concurrent-merge-detection",
         "title": "Concurrent-merge detection + divergence preview on approve",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -300,21 +384,28 @@
           {
             "id": "concurrent-merge-detection.ac1",
             "title": "Approve flow shows a warning when another approve pushed to main in the last 30s",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.522Z"
           },
           {
             "id": "concurrent-merge-detection.ac2",
             "title": "Divergence preview displays commit count delta after pull, before merge-agent runs",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.522Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.522Z"
       },
       {
         "id": "activity-panel-ux",
         "title": "Activity panel: grouping, filtering, warning pinning",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -328,27 +419,37 @@
           {
             "id": "activity-panel-ux.ac1",
             "title": "Activity panel groups by issue/workspace and filters by event type",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.519Z"
           },
           {
             "id": "activity-panel-ux.ac2",
             "title": "git.* events survive a dashboard restart and are visible in the panel",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.519Z"
           },
           {
             "id": "activity-panel-ux.ac3",
             "title": "Warning and error entries are pinned to the top of the panel",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.520Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.519Z"
       },
       {
         "id": "kanban-stuck-count-union",
         "title": "Kanban stuck count = union of persistent flag + inactivity heuristic",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -362,27 +463,37 @@
           {
             "id": "kanban-stuck-count-union.ac1",
             "title": "metrics.today.stuckCount reflects the deduped union",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.520Z"
           },
           {
             "id": "kanban-stuck-count-union.ac2",
             "title": "Stat increments by exactly 1 when a divergence-abort fires",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.521Z"
           },
           {
             "id": "kanban-stuck-count-union.ac3",
             "title": "Stat decrements by exactly 1 when the unstick button is clicked",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.521Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.520Z"
       },
       {
         "id": "integration-tests",
         "title": "End-to-end integration tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
         "metadata": {
@@ -396,39 +507,105 @@
           {
             "id": "integration-tests.ac1",
             "title": "Original bug repro test exists and fails on pre-fix code, passes on post-fix",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.510Z"
           },
           {
             "id": "integration-tests.ac2",
             "title": "Restart-mid-stuck test confirms persistence across dashboard restart",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.510Z"
           },
           {
             "id": "integration-tests.ac3",
             "title": "Concurrent approve test confirms second approve aborts and marks stuck",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-18T14:38:48.511Z"
           }
-        ]
+        ],
+        "completed": "2026-04-18T14:38:48.509Z"
       }
     ],
     "edges": [
-      { "from": "deacon-respect", "to": "stuck-schema", "type": "blocks" },
-      { "from": "stuck-schema", "to": "approve-divergence-guard", "type": "blocks" },
-      { "from": "stuck-schema", "to": "salvage-divergence-guard", "type": "blocks" },
-      { "from": "stuck-schema", "to": "unstick-api-ui", "type": "blocks" },
-      { "from": "git-operations-table", "to": "git-helper-wrapper", "type": "blocks" },
-      { "from": "git-helper-wrapper", "to": "approve-divergence-guard", "type": "blocks" },
-      { "from": "git-helper-wrapper", "to": "salvage-divergence-guard", "type": "blocks" },
-      { "from": "git-helper-wrapper", "to": "tmux-stream-patterns", "type": "informs" },
-      { "from": "git-operations-table", "to": "concurrent-merge-detection", "type": "blocks" },
-      { "from": "git-operations-table", "to": "activity-panel-ux", "type": "blocks" },
-      { "from": "stuck-schema", "to": "kanban-stuck-count-union", "type": "blocks" },
-      { "from": "approve-divergence-guard", "to": "integration-tests", "type": "blocks" },
-      { "from": "unstick-api-ui", "to": "integration-tests", "type": "blocks" },
-      { "from": "deacon-respect", "to": "integration-tests", "type": "blocks" }
+      {
+        "from": "deacon-respect",
+        "to": "stuck-schema",
+        "type": "blocks"
+      },
+      {
+        "from": "stuck-schema",
+        "to": "approve-divergence-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "stuck-schema",
+        "to": "salvage-divergence-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "stuck-schema",
+        "to": "unstick-api-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "git-operations-table",
+        "to": "git-helper-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "git-helper-wrapper",
+        "to": "approve-divergence-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "git-helper-wrapper",
+        "to": "salvage-divergence-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "git-helper-wrapper",
+        "to": "tmux-stream-patterns",
+        "type": "informs"
+      },
+      {
+        "from": "git-operations-table",
+        "to": "concurrent-merge-detection",
+        "type": "blocks"
+      },
+      {
+        "from": "git-operations-table",
+        "to": "activity-panel-ux",
+        "type": "blocks"
+      },
+      {
+        "from": "stuck-schema",
+        "to": "kanban-stuck-count-union",
+        "type": "blocks"
+      },
+      {
+        "from": "approve-divergence-guard",
+        "to": "integration-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "unstick-api-ui",
+        "to": "integration-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-respect",
+        "to": "integration-tests",
+        "type": "blocks"
+      }
     ]
   }
 }
