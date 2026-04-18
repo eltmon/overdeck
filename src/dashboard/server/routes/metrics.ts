@@ -32,6 +32,20 @@ import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';
 
+// ─── Exported helper: safe agentId→issueId map ───────────────────────────────
+// Exported for unit testing — skips agents with missing/empty issueId so the
+// route never throws on malformed or legacy persisted agent state.
+
+export function buildAgentIssueMap(
+  agents: Array<{ id: string; issueId?: string; tmuxActive: boolean }>,
+): Map<string, string> {
+  return new Map(
+    agents
+      .filter((a): a is typeof a & { issueId: string } => a.tmuxActive && Boolean(a.issueId))
+      .map((a) => [a.id, a.issueId.toUpperCase()]),
+  );
+}
+
 // ─── Route: GET /api/metrics/summary ─────────────────────────────────────────
 
 const getMetricsSummaryRoute = HttpRouter.add(
@@ -73,9 +87,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
           .map((rs) => rs.issueId.toUpperCase())
       );
       // Map agentId → issueId for running agents, then check health state per agent.
-      const agentIdToIssueId = new Map(
-        listRunningAgents().filter((a) => a.tmuxActive).map((a) => [a.id, a.issueId.toUpperCase()])
-      );
+      const agentIdToIssueId = buildAgentIssueMap(listRunningAgents());
       const healthStuckIssueIds = new Set<string>();
       for (const agentId of status.agentsNeedingAttention) {
         const health = service.getAgentHealth(agentId);

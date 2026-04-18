@@ -237,7 +237,7 @@ export async function gitMerge(
   const flags = opts.noFf ? '--no-ff' : '';
 
   try {
-    await execAsync(`git merge ${flags} ${branch}`.trim(), { cwd, encoding: 'utf-8', timeout: 60000 });
+    await execAsync(`git merge${flags ? ` ${flags}` : ''} ${branch}`, { cwd, encoding: 'utf-8', timeout: 60000 });
     const afterSha = await gitRevParse(cwd, 'HEAD') ?? beforeSha;
     appendGitOperation({
       operation: 'merge',

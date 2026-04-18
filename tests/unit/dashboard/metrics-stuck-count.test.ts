@@ -52,6 +52,50 @@ vi.mock('../../../src/dashboard/server/services/domain-services.js', () => ({
   EventStoreService: {},
 }));
 
+// Import the REAL buildAgentIssueMap from the route module so this test
+// exercises the actual production code path, not a copied helper.
+import { buildAgentIssueMap } from '../../../src/dashboard/server/routes/metrics.js';
+
+// ---------------------------------------------------------------------------
+// Tests: buildAgentIssueMap (real route module — exercises guard directly)
+// ---------------------------------------------------------------------------
+
+describe('buildAgentIssueMap (real route code)', () => {
+  it('maps tmuxActive agents with issueId to uppercase', () => {
+    const map = buildAgentIssueMap([
+      { id: 'agent-1', issueId: 'pan-100', tmuxActive: true },
+    ]);
+    expect(map.get('agent-1')).toBe('PAN-100');
+  });
+
+  it('skips agents where issueId is undefined — no crash', () => {
+    const map = buildAgentIssueMap([
+      { id: 'agent-bad', issueId: undefined, tmuxActive: true },
+      { id: 'agent-ok',  issueId: 'PAN-2',   tmuxActive: true },
+    ]);
+    expect(map.has('agent-bad')).toBe(false);
+    expect(map.get('agent-ok')).toBe('PAN-2');
+  });
+
+  it('skips agents where issueId is empty string', () => {
+    const map = buildAgentIssueMap([
+      { id: 'agent-empty', issueId: '', tmuxActive: true },
+    ]);
+    expect(map.size).toBe(0);
+  });
+
+  it('skips agents where tmuxActive is false', () => {
+    const map = buildAgentIssueMap([
+      { id: 'agent-dead', issueId: 'PAN-3', tmuxActive: false },
+    ]);
+    expect(map.size).toBe(0);
+  });
+
+  it('returns empty map for empty input', () => {
+    expect(buildAgentIssueMap([])).toEqual(new Map());
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Helper — build the stuckCount the same way metrics.ts does
 // (extracted so we can unit-test it without spinning up Effect HTTP)
