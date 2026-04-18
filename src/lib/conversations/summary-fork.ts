@@ -115,7 +115,7 @@ export async function generateSummaryForFork(jsonlPath: string, summaryModel?: s
   const richMode = config.conversations.richCompaction;
 
   try {
-    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode });
+    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork' });
     return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
   } catch (error) {
     console.warn(`[summary-fork] Smart summary failed for ${jsonlPath}:`, error);

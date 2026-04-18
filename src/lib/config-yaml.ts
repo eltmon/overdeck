@@ -8,7 +8,7 @@
  * Uses smart (capability-based) model selection - no legacy presets.
  */
 
-import { readFileSync, existsSync, writeFileSync, copyFileSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -801,14 +801,62 @@ function writeGlobalConfig(config: YamlConfig): void {
   writeFileSync(GLOBAL_CONFIG_PATH, yamlContent, 'utf-8');
 }
 
+// ─── In-memory config cache (invalidated on file mtime change) ───────────────
+
+interface ConfigCache {
+  globalMtime: number;
+  projectMtime: number;
+  result: ConfigLoadResult;
+}
+
+let configCache: ConfigCache | null = null;
+
+function getConfigMtimes(): { global: number; project: number } {
+  let globalMtime = 0;
+  let projectMtime = 0;
+
+  try {
+    if (existsSync(GLOBAL_CONFIG_PATH)) {
+      globalMtime = statSync(GLOBAL_CONFIG_PATH).mtimeMs;
+    }
+  } catch { /* file may race */ }
+
+  const projectRoot = findProjectRoot();
+  if (projectRoot) {
+    for (const name of ['.pan.yaml', '.panopticon.yaml']) {
+      const path = join(projectRoot, name);
+      try {
+        if (existsSync(path)) {
+          projectMtime = statSync(path).mtimeMs;
+          break;
+        }
+      } catch { /* file may race */ }
+    }
+  }
+
+  return { global: globalMtime, project: projectMtime };
+}
+
 /**
  * Load complete configuration (global + project + defaults)
  * Also loads API keys from environment variables as fallback
  *
  * IMPORTANT: This function may modify config.yaml if deprecated model IDs
  * are detected. A backup is created before any modifications.
+ *
+ * Results are cached in memory and invalidated when the underlying config
+ * files change (checked via mtime).
  */
 export function loadConfig(): ConfigLoadResult {
+  const mtimes = getConfigMtimes();
+  if (
+    configCache &&
+    configCache.globalMtime === mtimes.global &&
+    configCache.projectMtime === mtimes.project
+  ) {
+    return configCache.result;
+  }
+
   let globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
 
@@ -901,7 +949,17 @@ export function loadConfig(): ConfigLoadResult {
     config.shadow.enabled = envShadowMode;
   }
 
-  return { config, migration: migrationResult };
+  const result: ConfigLoadResult = { config, migration: migrationResult };
+
+  // Update cache with fresh mtimes (migration may have written global config)
+  const freshMtimes = getConfigMtimes();
+  configCache = {
+    globalMtime: freshMtimes.global,
+    projectMtime: freshMtimes.project,
+    result,
+  };
+
+  return result;
 }
 
 /**
