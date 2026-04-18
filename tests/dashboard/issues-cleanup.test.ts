@@ -1,16 +1,15 @@
 /**
- * Tests for async rm() calls in src/dashboard/server/routes/issues.ts (PAN-446)
+ * Tests for the async cleanup helpers extracted from src/dashboard/server/routes/issues.ts (PAN-446)
  *
- * The abort-planning path uses rm(dir, { recursive: true, force: true })
- * and the reopen path uses rm(markerPath). Both previously used rmSync.
- * These tests verify the async rm() behavior contract.
+ * cleanupAgentStateDirs() and removeCompletionMarker() are the production functions
+ * used by the abort-planning and reopen route handlers respectively.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
-import { rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { cleanupAgentStateDirs, removeCompletionMarker } from '../../src/dashboard/server/routes/issues.js';
 
 let testDir: string;
 
@@ -22,47 +21,57 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
-describe('async rm() — abort-planning path (recursive directory removal)', () => {
-  it('removes an existing directory and all contents', async () => {
-    const dir = join(testDir, 'planning-dir');
-    mkdirSync(dir);
-    writeFileSync(join(dir, 'STATE.md'), 'content');
-    writeFileSync(join(dir, 'plan.json'), '{}');
+describe('cleanupAgentStateDirs() — abort-planning path', () => {
+  it('removes an existing agent state directory and all its contents', async () => {
+    const agentDir = join(testDir, 'agent-xyz');
+    mkdirSync(agentDir);
+    writeFileSync(join(agentDir, 'state.json'), '{}');
 
-    await rm(dir, { recursive: true, force: true });
+    await cleanupAgentStateDirs([agentDir]);
 
-    expect(existsSync(dir)).toBe(false);
+    expect(existsSync(agentDir)).toBe(false);
   });
 
-  it('does not throw when the target directory does not exist (force: true)', async () => {
-    const missing = join(testDir, 'nonexistent-dir');
-    await expect(rm(missing, { recursive: true, force: true })).resolves.toBeUndefined();
+  it('silently skips directories that do not exist', async () => {
+    const missing = join(testDir, 'nonexistent-agent');
+    await expect(cleanupAgentStateDirs([missing])).resolves.toBeUndefined();
   });
 
-  it('removes nested subdirectories recursively', async () => {
-    const dir = join(testDir, 'root');
-    const nested = join(dir, 'a', 'b', 'c');
+  it('removes multiple dirs in a single call', async () => {
+    const dir1 = join(testDir, 'agent-1');
+    const dir2 = join(testDir, 'agent-2');
+    mkdirSync(dir1);
+    mkdirSync(dir2);
+
+    await cleanupAgentStateDirs([dir1, dir2]);
+
+    expect(existsSync(dir1)).toBe(false);
+    expect(existsSync(dir2)).toBe(false);
+  });
+
+  it('removes nested contents recursively', async () => {
+    const nested = join(testDir, 'agent', 'subdir', 'deep');
     mkdirSync(nested, { recursive: true });
     writeFileSync(join(nested, 'file.txt'), 'data');
 
-    await rm(dir, { recursive: true, force: true });
+    await cleanupAgentStateDirs([join(testDir, 'agent')]);
 
-    expect(existsSync(dir)).toBe(false);
+    expect(existsSync(join(testDir, 'agent'))).toBe(false);
   });
 });
 
-describe('async rm() — reopen path (single file removal)', () => {
-  it('removes an existing marker file', async () => {
-    const marker = join(testDir, 'done.marker');
+describe('removeCompletionMarker() — reopen path', () => {
+  it('removes an existing completion marker file', async () => {
+    const marker = join(testDir, 'completed');
     writeFileSync(marker, '');
 
-    await rm(marker);
+    await removeCompletionMarker(marker);
 
     expect(existsSync(marker)).toBe(false);
   });
 
-  it('throws when the marker file does not exist and force is not set', async () => {
-    const missing = join(testDir, 'missing.marker');
-    await expect(rm(missing)).rejects.toThrow();
+  it('is a no-op when the marker does not exist', async () => {
+    const missing = join(testDir, 'completed.processed');
+    await expect(removeCompletionMarker(missing)).resolves.toBeUndefined();
   });
 });

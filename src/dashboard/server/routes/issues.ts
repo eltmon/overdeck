@@ -66,6 +66,18 @@ function getIssueDataService(): IssueDataService {
   return getSharedIssueService();
 }
 
+// ─── Exported async cleanup helpers (used by routes + tests) ─────────────────
+
+export async function cleanupAgentStateDirs(dirs: string[]): Promise<void> {
+  for (const dir of dirs) {
+    if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
+  }
+}
+
+export async function removeCompletionMarker(markerPath: string): Promise<void> {
+  if (existsSync(markerPath)) await rm(markerPath);
+}
+
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
 function isGitHubIssue(issueId: string): {
@@ -810,14 +822,11 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
       ? join(homedir(), '.panopticon', 'agents', `agent-${issueIdentifier.toLowerCase()}`)
       : join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
 
-    yield* Effect.promise(async () => {
-      try {
-        if (existsSync(agentStateDir)) await rm(agentStateDir, { recursive: true, force: true });
-        if (existsSync(workAgentStateDir)) await rm(workAgentStateDir, { recursive: true, force: true });
-      } catch (cleanupErr) {
+    yield* Effect.promise(() =>
+      cleanupAgentStateDirs([agentStateDir, workAgentStateDir]).catch((cleanupErr: unknown) => {
         console.log('[abort-planning] Warning: Could not clean up agent state:', cleanupErr);
-      }
-    });
+      })
+    );
 
     let workspaceDeleted = false;
     let workspaceError: string | undefined;
@@ -1387,10 +1396,8 @@ const postIssueReopenRoute = HttpRouter.add(
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
         for (const marker of ['completed', 'completed.processed']) {
           const markerPath = join(agentDir, marker);
-          if (existsSync(markerPath)) {
-            await rm(markerPath);
-            console.log(`[reopen] Cleared ${marker} marker for ${id}`);
-          }
+          await removeCompletionMarker(markerPath);
+          if (!existsSync(markerPath)) console.log(`[reopen] Cleared ${marker} marker for ${id}`);
         }
       } catch { /* non-fatal */ }
     });
