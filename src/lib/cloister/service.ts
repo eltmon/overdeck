@@ -394,7 +394,7 @@ export class CloisterService {
 
           const branch = `feature/${issueId.toLowerCase()}`;
           await dispatchParallelReview({ issueId, workspace, branch });
-          setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+          // dispatchParallelReview sets reviewStatus='reviewing' internally
           console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
         }
       }

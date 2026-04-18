@@ -105,14 +105,14 @@ describe('dispatchParallelReview', () => {
     });
   });
 
-  it('reviewing→pending: background spawn failure overwrites optimistic reviewing status', async () => {
-    // This covers the deacon/service recovery path: dispatchParallelReview returns immediately,
-    // the caller optimistically sets 'reviewing', then the background .catch resets to 'pending'.
+  it('reviewing→pending: sets reviewing optimistically then resets to pending on spawn failure', async () => {
+    // dispatchParallelReview now manages the status lifecycle internally:
+    // 1. sets 'reviewing' before fire-and-forget
+    // 2. resets to 'pending' in .catch if spawn fails
+    // Callers no longer set reviewStatus themselves, eliminating the race condition.
     const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
 
     await dispatchParallelReview(baseOpts, { spawnFn });
-    // Simulate what deacon/service does after dispatch: optimistically mark reviewing
-    mockSetReviewStatus('PAN-999', { reviewStatus: 'reviewing' });
 
     // Flush the microtask queue so the background .catch() fires
     await new Promise(resolve => setTimeout(resolve, 0));

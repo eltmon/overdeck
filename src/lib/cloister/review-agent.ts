@@ -741,6 +741,10 @@ export async function dispatchParallelReview(
     workspace: opts.workspace,
   };
 
+  // Set reviewing here so callers don't race against the async .catch that resets
+  // to pending on spawn failure. All reviewStatus transitions live in this function.
+  setReviewStatus(opts.issueId, { reviewStatus: 'reviewing' });
+
   spawnFn(context)
     .then(result => {
       setReviewStatus(opts.issueId, {

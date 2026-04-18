@@ -312,8 +312,45 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(actions[0]).toMatch(/Re-dispatched pending review for/);
     expect(actions[0]).toContain(ISSUE_ID);
 
+    // reviewStatus='reviewing' is set inside dispatchParallelReview (not by deacon directly).
+    // Since the mock doesn't call setReviewStatus, we verify dispatch was called — that is
+    // the deacon's responsibility. The status transition is covered by review-agent tests.
+    expect(mockDispatchParallelReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('(d-fail) does not mark reviewing when dispatchParallelReview rejects', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
+    const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
+    const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+    completedProcessedPath = join(agentDir, 'completed.processed');
+
+    writeStatusFile({
+      [ISSUE_ID]: {
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        prUrl: 'https://github.com/test/repo/pull/1',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(completedProcessedPath, '', 'utf-8');
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockDispatchParallelReview.mockRejectedValue(new Error('spawn failed'));
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    // Deacon must not set reviewing on failure — status stays pending
     const content = readStatusFile();
-    expect(content[ISSUE_ID].reviewStatus).toBe('reviewing');
+    expect(content[ISSUE_ID].reviewStatus).toBe('pending');
+
+    // Deacon reports failure in actions without crashing the patrol
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Failed to re-dispatch pending review for/);
+    expect(actions[0]).toContain(ISSUE_ID);
   });
 
   it('restores passed review/test state when top-level status is stuck in reviewing', async () => {
