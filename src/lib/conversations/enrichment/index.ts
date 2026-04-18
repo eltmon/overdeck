@@ -80,8 +80,8 @@ function selectSessionsForEnrichment(
 
   const skipAlready = opts.skipAlreadyEnriched !== false; // default true
   if (skipAlready) {
-    // Only enrich sessions at enrichment_level < tier
-    return findDiscoveredSessions({ notEnriched: true });
+    // Only enrich sessions whose enrichment_level is below the requested tier
+    return findDiscoveredSessions({ enrichmentLevelLessThan: tier });
   }
 
   return findDiscoveredSessions({});

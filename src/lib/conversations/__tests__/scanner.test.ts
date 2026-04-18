@@ -144,4 +144,25 @@ describe('scanner', () => {
     process.env.HOME = '/nonexistent/path/that/does/not/exist';
     await expect(scan({ mode: 'system', watchDirs: [] })).resolves.toBeDefined();
   });
+
+  it('watched mode with empty watchDirs scans zero files', async () => {
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'watched.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    const result = await scan({ mode: 'watched', watchDirs: [] });
+    expect(result.inserted + result.updated + result.skipped).toBe(0);
+  });
+
+  it('scan persists sessionId from JSONL into discovered_sessions', async () => {
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'with-session-id.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    await scan({ mode: 'system', watchDirs: [] });
+
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
+    const sessions = findDiscoveredSessions();
+    const sess = sessions.find((s) => s.jsonlPath === p);
+    expect(sess).toBeDefined();
+    expect(sess!.sessionId).toBe('sess-1');
+  });
 });

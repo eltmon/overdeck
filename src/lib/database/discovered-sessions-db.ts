@@ -61,6 +61,7 @@ export interface UpsertDiscoveredSessionOpts {
   estimatedCost?: number;
   toolsUsed?: string[];
   filesTouched?: string[];
+  tags?: string[];
   panopticonManaged?: boolean;
   panIssueId?: string | null;
   panAgentId?: string | null;
@@ -85,6 +86,8 @@ export interface ConversationFilter {
   issueId?: string;
   enriched?: boolean;
   notEnriched?: boolean;
+  /** Select only sessions with enrichment_level strictly less than this value */
+  enrichmentLevelLessThan?: number;
   limit?: number;
   offset?: number;
 }
@@ -207,6 +210,10 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
   if (filter.notEnriched === true) {
     conditions.push(`enrichment_level = 0`);
   }
+  if (filter.enrichmentLevelLessThan !== undefined) {
+    conditions.push(`enrichment_level < ?`);
+    params.push(filter.enrichmentLevelLessThan);
+  }
   if (filter.tags && filter.tags.length > 0) {
     // JSON array overlap: any tag in the filter matches
     const tagConditions = filter.tags.map(() => `tags LIKE ? ESCAPE '\\'`);
@@ -270,11 +277,11 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        jsonl_path, session_id, workspace_path, workspace_hash,
        message_count, first_ts, last_ts, models_used, primary_model,
        token_input, token_output, estimated_cost,
-       tools_used, files_touched,
+       tools_used, files_touched, tags,
        panopticon_managed, pan_issue_id, pan_agent_id,
        file_size, file_mtime, scanned_at
      ) VALUES (
-       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
      )
      ON CONFLICT(jsonl_path) DO UPDATE SET
        session_id         = excluded.session_id,
@@ -290,6 +297,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        estimated_cost     = excluded.estimated_cost,
        tools_used         = excluded.tools_used,
        files_touched      = excluded.files_touched,
+       tags               = excluded.tags,
        panopticon_managed = excluded.panopticon_managed,
        pan_issue_id       = excluded.pan_issue_id,
        pan_agent_id       = excluded.pan_agent_id,
@@ -311,6 +319,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     opts.estimatedCost ?? 0,
     JSON.stringify(opts.toolsUsed ?? []),
     JSON.stringify(opts.filesTouched ?? []),
+    JSON.stringify(opts.tags ?? []),
     opts.panopticonManaged ? 1 : 0,
     opts.panIssueId ?? null,
     opts.panAgentId ?? null,

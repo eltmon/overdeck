@@ -232,6 +232,47 @@ describe('enrichSessions', () => {
     expect(err.name).toBe('CostThresholdError');
   });
 
+  it('tier 2 bulk enrichment includes sessions already at L1', async () => {
+    // Seed a session and enrich it to L1
+    seedSession();
+    const [sess] = findDiscoveredSessions({});
+    await enrichSession({
+      sessionId: sess.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCall,
+    });
+
+    // L1 session should be selected for tier-2 bulk enrichment
+    const result = await enrichSessions({
+      tier: 2,
+      callApi: mockApiCallL2,
+      maxParallel: 1,
+    });
+    expect(result.enriched).toBe(1);
+  });
+
+  it('tier 1 bulk enrichment skips sessions already at L1', async () => {
+    seedSession();
+    const [sess] = findDiscoveredSessions({});
+    await enrichSession({
+      sessionId: sess.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCall,
+    });
+
+    // L1 session should be excluded from tier-1 bulk enrichment (already at tier)
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: mockApiCall,
+      maxParallel: 1,
+    });
+    expect(result.enriched).toBe(0);
+  });
+
   it('enriches all unenriched sessions with progress callbacks', async () => {
     seedSession();
     const progressCalls: unknown[] = [];

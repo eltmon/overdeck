@@ -180,6 +180,12 @@ describe('searchSessions', () => {
     expect(result.sessions.length).toBe(0);
   });
 
+  it('filter by tag returns only matching sessions', () => {
+    const result = searchSessions({ filter: { tags: ['large'] } });
+    expect(result.sessions.length).toBe(1);
+    expect(result.sessions[0].tags).toContain('large');
+  });
+
   it('since=yesterday with recent sessions finds them', async () => {
     const { resetDatabase } = await import('../../database/index.js');
     resetDatabase();

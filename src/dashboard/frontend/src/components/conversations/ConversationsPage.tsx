@@ -46,6 +46,12 @@ interface StatsResponse {
   managedCount: number;
 }
 
+interface SearchResponse {
+  sessions: DiscoveredSession[];
+  total: number;
+  mode: string;
+}
+
 interface ScanResult {
   inserted: number;
   updated: number;
@@ -58,6 +64,13 @@ async function fetchSessions(params: URLSearchParams): Promise<ListResponse> {
   const resp = await fetch(`/api/discovered-sessions?${params}`);
   if (!resp.ok) throw new Error('Failed to fetch sessions');
   return resp.json() as Promise<ListResponse>;
+}
+
+async function fetchSearch(q: string, limit = 50): Promise<SearchResponse> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const resp = await fetch(`/api/discovered-sessions/search?${params}`);
+  if (!resp.ok) throw new Error('Search failed');
+  return resp.json() as Promise<SearchResponse>;
 }
 
 async function fetchStats(): Promise<StatsResponse> {
@@ -90,15 +103,24 @@ export function ConversationsPage() {
     enriched?: boolean;
   }>({});
 
-  const params = new URLSearchParams({ limit: '50' });
-  if (filters.workspace) params.set('workspace', filters.workspace);
-  if (filters.since) params.set('since', filters.since);
-  if (filters.managed) params.set('managed', 'true');
-  if (filters.enriched) params.set('enriched', 'true');
+  const trimmedQuery = query.trim();
 
-  const { data: listData, isLoading } = useQuery({
-    queryKey: ['discovered-sessions', params.toString()],
-    queryFn: () => fetchSessions(params),
+  const listParams = new URLSearchParams({ limit: '50' });
+  if (filters.workspace) listParams.set('workspace', filters.workspace);
+  if (filters.since) listParams.set('since', filters.since);
+  if (filters.managed) listParams.set('managed', 'true');
+  if (filters.enriched) listParams.set('enriched', 'true');
+
+  const { data: listData, isLoading: isListLoading } = useQuery({
+    queryKey: ['discovered-sessions', listParams.toString()],
+    queryFn: () => fetchSessions(listParams),
+    enabled: !trimmedQuery,
+  });
+
+  const { data: searchData, isLoading: isSearchLoading } = useQuery({
+    queryKey: ['discovered-sessions-search', trimmedQuery],
+    queryFn: () => fetchSearch(trimmedQuery),
+    enabled: !!trimmedQuery,
   });
 
   const { data: stats } = useQuery({
@@ -115,19 +137,10 @@ export function ConversationsPage() {
     },
   });
 
-  const sessions = listData?.sessions ?? [];
-
-  // Client-side filter by search query (summary + workspace path)
-  const filtered = query.trim()
-    ? sessions.filter((s) => {
-        const q = query.toLowerCase();
-        return (
-          (s.summary ?? '').toLowerCase().includes(q) ||
-          (s.workspacePath ?? '').toLowerCase().includes(q) ||
-          s.tags.some((t) => t.toLowerCase().includes(q))
-        );
-      })
-    : sessions;
+  const isLoading = trimmedQuery ? isSearchLoading : isListLoading;
+  const sessions = trimmedQuery
+    ? (searchData?.sessions ?? [])
+    : (listData?.sessions ?? []);
 
   const selected = selectedId != null ? sessions.find((s) => s.id === selectedId) ?? null : null;
 
@@ -198,7 +211,7 @@ export function ConversationsPage() {
             <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
               Loading sessions…
             </div>
-          ) : filtered.length === 0 ? (
+          ) : sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-gray-500 gap-2">
               <span className="text-sm">No sessions found</span>
               {!stats?.total && (
@@ -207,7 +220,7 @@ export function ConversationsPage() {
             </div>
           ) : (
             <SessionTable
-              sessions={filtered}
+              sessions={sessions}
               selectedId={selectedId}
               onSelect={setSelectedId}
             />

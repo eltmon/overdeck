@@ -31,6 +31,7 @@ import { searchSessions } from '../../../lib/conversations/search.js';
 import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
+import { getConversationsConfig } from '../../../lib/config.js';
 
 // ─── GET /api/discovered-sessions/stats ───────────────────────────────────────
 
@@ -172,10 +173,11 @@ const postScanRoute = HttpRouter.add(
     const mode = rawMode as 'system' | 'watched' | 'targeted';
     const maxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
 
+    const watchDirs = getConversationsConfig().watchDirs;
     const result = yield* Effect.promise(() =>
       scan({
         mode,
-        watchDirs: [],
+        watchDirs,
         dryRun: body.dryRun,
         maxParallel,
       }),

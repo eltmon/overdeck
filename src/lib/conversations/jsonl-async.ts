@@ -27,6 +27,8 @@ export interface SessionMetadata {
   tokenOutput: number;
   toolsUsed: string[];
   filesTouched: string[];
+  /** sessionId extracted from the first message's top-level `sessionId` field */
+  sessionId: string | null;
   /** cwd extracted from the first message's `cwd` field (not part of ClaudeMessage spec — set by Claude Code) */
   cwdFromFirstMessage: string | null;
 }
@@ -36,6 +38,7 @@ export interface SessionMetadata {
  * This is an extended type for discovery purposes only.
  */
 interface ClaudeMessageWithCwd extends ClaudeMessage {
+  sessionId?: string;
   cwd?: string;
   /** content can be a string or array of content blocks */
   content?: string | ContentBlock[];
@@ -81,6 +84,7 @@ export async function parseSessionJsonl(filePath: string): Promise<SessionMetada
     tokenOutput: 0,
     toolsUsed: [],
     filesTouched: [],
+    sessionId: null,
     cwdFromFirstMessage: null,
   };
 
@@ -109,9 +113,12 @@ export async function parseSessionJsonl(filePath: string): Promise<SessionMetada
 
       result.messageCount++;
 
-      // Extract cwd from the first parseable message
+      // Extract sessionId and cwd from the first parseable message
       if (isFirstMessage) {
         isFirstMessage = false;
+        if (typeof msg.sessionId === 'string' && msg.sessionId.length > 0) {
+          result.sessionId = msg.sessionId;
+        }
         if (typeof msg.cwd === 'string' && msg.cwd.length > 0) {
           result.cwdFromFirstMessage = msg.cwd;
         }

@@ -183,6 +183,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     const wasExisting = !!existing;
     upsertDiscoveredSession({
       jsonlPath,
+      sessionId: meta.sessionId,
       workspacePath: resolved.workspacePath,
       workspaceHash: resolved.workspaceHash,
       messageCount: meta.messageCount,
@@ -263,7 +264,8 @@ function filterByMode(
   const rawDirs = opts.mode === 'targeted' ? (opts.dirs ?? []) : (opts.watchDirs ?? []);
   const targetDirs = rawDirs.map(normalizeDir);
 
-  if (targetDirs.length === 0) return files;
+  // watched/targeted with no configured dirs scans nothing (not everything)
+  if (targetDirs.length === 0) return [];
 
   // Encode each target workspace path to its Claude project hash so we can
   // match against the hash-named directories under ~/.claude/projects/.
