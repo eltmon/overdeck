@@ -1,13 +1,14 @@
 /**
- * Tests for GET /api/version endpoint logic (PAN-234)
+ * Tests for GET /api/version endpoint logic (PAN-234, PAN-446)
  *
- * The endpoint reads version from package.json at startup.
- * These tests verify the version-reading logic using temp files,
+ * The endpoint reads version from package.json at startup using async readFile.
+ * These tests verify the async version-reading logic using temp files,
  * following the established pattern in tests/dashboard/health-api.test.ts.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -22,48 +23,48 @@ afterEach(() => {
 });
 
 /**
- * Version reading logic extracted from src/dashboard/server/index.ts.
- * The server does this once at startup and caches the result.
+ * Async version-reading logic matching src/dashboard/server/routes/misc.ts.
+ * The server does this once at module load (top-level await) and caches the result.
  */
-function readPackageVersion(pkgPath: string): string {
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+async function readPackageVersion(pkgPath: string): Promise<string> {
+  const pkg = JSON.parse(await readFile(pkgPath, 'utf-8'));
   return pkg.version;
 }
 
 describe('version-api', () => {
-  describe('readPackageVersion', () => {
-    it('returns the version string from a valid package.json', () => {
+  describe('readPackageVersion (async)', () => {
+    it('returns the version string from a valid package.json', async () => {
       const pkgPath = join(testDir, 'package.json');
       writeFileSync(pkgPath, JSON.stringify({ name: 'test', version: '1.2.3' }));
 
-      expect(readPackageVersion(pkgPath)).toBe('1.2.3');
+      expect(await readPackageVersion(pkgPath)).toBe('1.2.3');
     });
 
-    it('returns a semver-like version (digits and dots)', () => {
+    it('returns a semver-like version (digits and dots)', async () => {
       const pkgPath = join(testDir, 'package.json');
       writeFileSync(pkgPath, JSON.stringify({ name: 'test', version: '0.4.32' }));
 
-      const version = readPackageVersion(pkgPath);
+      const version = await readPackageVersion(pkgPath);
       expect(version).toMatch(/^\d+\.\d+\.\d+/);
     });
 
-    it('throws when package.json does not exist', () => {
+    it('rejects when package.json does not exist', async () => {
       const missingPath = join(testDir, 'missing', 'package.json');
-      expect(() => readPackageVersion(missingPath)).toThrow();
+      await expect(readPackageVersion(missingPath)).rejects.toThrow();
     });
 
-    it('throws when package.json is not valid JSON', () => {
+    it('rejects when package.json is not valid JSON', async () => {
       const pkgPath = join(testDir, 'package.json');
       writeFileSync(pkgPath, 'not json {{{');
-      expect(() => readPackageVersion(pkgPath)).toThrow();
+      await expect(readPackageVersion(pkgPath)).rejects.toThrow();
     });
   });
 
   describe('root package.json', () => {
-    it('has a valid semver version string', () => {
+    it('has a valid semver version string', async () => {
       // Verify the actual project package.json that the server reads at startup
       const rootPkgPath = join(__dirname, '..', '..', 'package.json');
-      const version = readPackageVersion(rootPkgPath);
+      const version = await readPackageVersion(rootPkgPath);
 
       expect(typeof version).toBe('string');
       expect(version.length).toBeGreaterThan(0);
