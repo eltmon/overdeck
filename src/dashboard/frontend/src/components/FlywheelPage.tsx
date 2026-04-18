@@ -6,7 +6,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, BookOpen, CheckCircle, XCircle, TrendingUp } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { FlywheelChangesTab } from './FlywheelChangesTab';
 
 // ============================================================================
@@ -14,8 +14,6 @@ import { FlywheelChangesTab } from './FlywheelChangesTab';
 // ============================================================================
 
 interface FlywheelMetrics {
-  skillsAdded: { week: number; month: number; allTime: number };
-  skillsRefined: { week: number; month: number; allTime: number };
   retrosProcessed: number;
   retrosNoOp: number;
   topPatterns: Array<{ pattern: string; issueCount: number }>;
@@ -39,15 +37,7 @@ interface DaemonStatus {
 
 async function fetchFlywheelMetrics(): Promise<FlywheelMetrics> {
   const res = await fetch('/api/flywheel/metrics');
-  if (!res.ok) {
-    return {
-      skillsAdded: { week: 0, month: 0, allTime: 0 },
-      skillsRefined: { week: 0, month: 0, allTime: 0 },
-      retrosProcessed: 0,
-      retrosNoOp: 0,
-      topPatterns: [],
-    };
-  }
+  if (!res.ok) return { retrosProcessed: 0, retrosNoOp: 0, topPatterns: [] };
   return res.json();
 }
 
@@ -128,25 +118,13 @@ export function FlywheelPage() {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            Panopticon self-improvement metrics. Skills added and refined through the retro → synthesis → PR cycle.
+            Panopticon self-improvement metrics. Retros processed through the retro → synthesis → PR cycle.
             {daemon && ` Last synthesis: ${lastSynthesisLabel}.`}
           </p>
         </header>
 
         {/* Metrics panel */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-          <MetricTile
-            label="Skills Added"
-            value={metrics?.skillsAdded.allTime ?? '—'}
-            sub={`${metrics?.skillsAdded.week ?? 0} this week`}
-            icon={<TrendingUp className="w-4 h-4" />}
-          />
-          <MetricTile
-            label="Skills Refined"
-            value={metrics?.skillsRefined.allTime ?? '—'}
-            sub={`${metrics?.skillsRefined.week ?? 0} this week`}
-            icon={<BookOpen className="w-4 h-4" />}
-          />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
           <MetricTile
             label="Retros Processed"
             value={metrics?.retrosProcessed ?? '—'}

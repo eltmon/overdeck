@@ -14,7 +14,8 @@
  *  - Mutex: ~/.panopticon/flywheel.lock prevents concurrent cycles
  */
 
-import { existsSync, writeFileSync, readFileSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { PANOPTICON_HOME } from '../paths.js';
@@ -91,21 +92,22 @@ function isQuietHours(config: FlywheelConfig): boolean {
  * Heuristic: check if any process named "claude" was active in the last 5 minutes
  * by looking at recently-modified jsonl heartbeat files.
  */
-function hasActiveClaudeSession(): boolean {
+export async function hasActiveClaudeSession(): Promise<boolean> {
   try {
     const agentsDir = join(PANOPTICON_HOME, 'agents');
     if (!existsSync(agentsDir)) return false;
     const fiveMinsAgo = Date.now() - 5 * 60 * 1000;
-    const entries = readdirSync(agentsDir, { withFileTypes: true });
+    const entries = await readdir(agentsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const heartbeatFile = join(agentsDir, entry.name, 'runtime.json');
-      if (!existsSync(heartbeatFile)) continue;
-      const mtime = statSync(heartbeatFile).mtimeMs;
-      if (mtime > fiveMinsAgo) {
-        const state = JSON.parse(readFileSync(heartbeatFile, 'utf-8')) as { state?: string };
-        if (state.state === 'active') return true;
-      }
+      try {
+        const { mtimeMs } = await stat(heartbeatFile);
+        if (mtimeMs > fiveMinsAgo) {
+          const state = JSON.parse(await readFile(heartbeatFile, 'utf-8')) as { state?: string };
+          if (state.state === 'active') return true;
+        }
+      } catch { /* file may not exist or be unreadable */ }
     }
     return false;
   } catch {
@@ -117,10 +119,10 @@ function hasActiveClaudeSession(): boolean {
 // Guard: mutex lock
 // ============================================================================
 
-function acquireLock(): boolean {
+export async function acquireLock(): Promise<boolean> {
   if (existsSync(FLYWHEEL_LOCK_FILE)) {
     try {
-      const lockData = JSON.parse(readFileSync(FLYWHEEL_LOCK_FILE, 'utf-8'));
+      const lockData = JSON.parse(await readFile(FLYWHEEL_LOCK_FILE, 'utf-8'));
       const lockAge = Date.now() - lockData.ts;
       // Stale lock older than 30 minutes — take it
       if (lockAge < 30 * 60 * 1000) {
@@ -133,16 +135,16 @@ function acquireLock(): boolean {
     }
   }
   try {
-    writeFileSync(FLYWHEEL_LOCK_FILE, JSON.stringify({ pid: process.pid, ts: Date.now() }), 'utf-8');
+    await writeFile(FLYWHEEL_LOCK_FILE, JSON.stringify({ pid: process.pid, ts: Date.now() }), 'utf-8');
     return true;
   } catch {
     return false;
   }
 }
 
-function releaseLock(): void {
+export async function releaseLock(): Promise<void> {
   try {
-    if (existsSync(FLYWHEEL_LOCK_FILE)) unlinkSync(FLYWHEEL_LOCK_FILE);
+    if (existsSync(FLYWHEEL_LOCK_FILE)) await unlink(FLYWHEEL_LOCK_FILE);
   } catch { /* non-fatal */ }
 }
 
@@ -233,10 +235,10 @@ async function runSynthesis(): Promise<void> {
  * Read FLYWHEEL-STATE.md and return any cycling alerts.
  * Returns a list of issue IDs that appear to be cycling.
  */
-function readCyclingAlerts(): string[] {
+export async function readCyclingAlerts(): Promise<string[]> {
   if (!existsSync(FLYWHEEL_STATE_FILE)) return [];
   try {
-    const content = readFileSync(FLYWHEEL_STATE_FILE, 'utf-8');
+    const content = await readFile(FLYWHEEL_STATE_FILE, 'utf-8');
     // Parse "cycling alerts" section — lines matching "- PAN-NNN"
     const section = content.match(/## Cycling Alerts\n([\s\S]*?)(?:\n##|$)/i);
     if (!section) return [];
@@ -310,7 +312,7 @@ async function daemonTick(): Promise<void> {
   }
 
   // Guard: active session backoff
-  if (config.backoff_on_active_session && hasActiveClaudeSession()) {
+  if (config.backoff_on_active_session && await hasActiveClaudeSession()) {
     console.log('[flywheel-daemon] Active Claude Code session detected — backing off');
     return;
   }
@@ -330,7 +332,7 @@ async function daemonTick(): Promise<void> {
 
   // Check for cycling alerts in FLYWHEEL-STATE
   try {
-    const cycling = readCyclingAlerts();
+    const cycling = await readCyclingAlerts();
     for (const issueId of cycling) {
       await fileSubstrateIssue(issueId);
     }
@@ -342,21 +344,21 @@ async function daemonTick(): Promise<void> {
   const nowMs = Date.now();
   const synthIntervalMs = config.trigger_interval_minutes * 60 * 1000;
   if (nowMs - lastSynthesisAt > synthIntervalMs) {
-    if (!acquireLock()) return;
+    if (!await acquireLock()) return;
     try {
       lastSynthesisAt = nowMs;
       await runSynthesis();
     } catch (err) {
       console.warn('[flywheel-daemon] Synthesis step failed:', err);
     } finally {
-      releaseLock();
+      await releaseLock();
     }
   }
 
   // Scheduled full cycle (every 24h)
   const fullCycleIntervalMs = config.full_cycle_interval_hours * 60 * 60 * 1000;
   if (nowMs - lastFullCycleAt > fullCycleIntervalMs) {
-    if (!acquireLock()) return;
+    if (!await acquireLock()) return;
     try {
       lastFullCycleAt = nowMs;
       console.log('[flywheel-daemon] Full 24h flywheel cycle — running synthesis');
@@ -364,7 +366,7 @@ async function daemonTick(): Promise<void> {
     } catch (err) {
       console.warn('[flywheel-daemon] Full cycle failed:', err);
     } finally {
-      releaseLock();
+      await releaseLock();
     }
   }
 }
@@ -445,7 +447,7 @@ export function stopFlywheelDaemon(): void {
   if (daemonInterval) {
     clearInterval(daemonInterval);
     daemonInterval = null;
-    releaseLock(); // Release any held lock on clean shutdown
+    void releaseLock(); // async fire-and-forget on clean shutdown
     console.log('[flywheel-daemon] Stopped');
   }
 }

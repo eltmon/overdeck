@@ -11,7 +11,7 @@
  * All handlers use fs/promises — ZERO sync calls (CLAUDE.md blocking-call rule).
  */
 
-import { promises as fsPromises } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -35,10 +35,10 @@ const REPORT_PATH = join(homedir(), 'docs', 'FLYWHEEL-REPORT.md');
 // ============================================================================
 
 /** Read all non-archived .md files from the retros directory. */
-async function readNonArchivedRetroFiles(): Promise<Array<{ filename: string; content: string }>> {
+export async function readNonArchivedRetroFiles(): Promise<Array<{ filename: string; content: string }>> {
   let entries: string[];
   try {
-    entries = await fsPromises.readdir(RETROS_DIR);
+    entries = await readdir(RETROS_DIR);
   } catch {
     return [];
   }
@@ -48,15 +48,15 @@ async function readNonArchivedRetroFiles(): Promise<Array<{ filename: string; co
     if (entry === 'archive') continue;
     if (!entry.endsWith('.md')) continue;
     try {
-      const content = await fsPromises.readFile(join(RETROS_DIR, entry), 'utf-8');
+      const content = await readFile(join(RETROS_DIR, entry), 'utf-8');
       results.push({ filename: entry, content });
     } catch { /* skip */ }
   }
   return results;
 }
 
-/** Parse skill name from retro title like "PAN-001-1234567890.md" → "PAN-001". */
-function issueIdFromFilename(filename: string): string {
+/** Parse issue ID from retro filename like "PAN-001-1234567890.md" → "PAN-001". */
+export function issueIdFromFilename(filename: string): string {
   return filename.replace(/-\d+\.md$/, '').toUpperCase();
 }
 
@@ -143,7 +143,7 @@ const getFlywheelReportRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     let content = '';
     try {
-      content = yield* Effect.promise(() => fsPromises.readFile(REPORT_PATH, 'utf-8'));
+      content = yield* Effect.promise(() => readFile(REPORT_PATH, 'utf-8'));
     } catch {
       content = ''; // Not yet created
     }
@@ -168,45 +168,46 @@ const getFlywheelDaemonStatusRoute = HttpRouter.add(
 // Route: GET /api/flywheel/metrics
 // ============================================================================
 
+/** Pure computation — testable without HTTP infrastructure. */
+export function computeFlywheelMetrics(files: Array<{ content: string }>): {
+  retrosProcessed: number;
+  retrosNoOp: number;
+  topPatterns: Array<{ pattern: string; issueCount: number }>;
+} {
+  let processed = 0;
+  let noOp = 0;
+  const patternCounts = new Map<string, number>();
+
+  for (const { content } of files) {
+    processed++;
+    const doc = parseRetroMarkdown(content);
+    if (!doc?.frontmatter.surprise) {
+      noOp++;
+      continue;
+    }
+    for (const change of doc.frontmatter.proposed_changes ?? []) {
+      if (change.type === 'no_op') continue;
+      const pattern = 'name' in change ? (change as { name: string }).name : '';
+      if (pattern) {
+        patternCounts.set(pattern, (patternCounts.get(pattern) ?? 0) + 1);
+      }
+    }
+  }
+
+  const topPatterns = Array.from(patternCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([pattern, issueCount]) => ({ pattern, issueCount }));
+
+  return { retrosProcessed: processed, retrosNoOp: noOp, topPatterns };
+}
+
 const getFlywheelMetricsRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/metrics',
   httpHandler(Effect.gen(function* () {
     const files = yield* Effect.promise(() => readNonArchivedRetroFiles());
-
-    let processed = 0;
-    let noOp = 0;
-    const patternCounts = new Map<string, number>();
-
-    for (const { content } of files) {
-      processed++;
-      const doc = parseRetroMarkdown(content);
-      if (!doc?.frontmatter.surprise) {
-        noOp++;
-        continue;
-      }
-      for (const change of doc.frontmatter.proposed_changes ?? []) {
-        if (change.type === 'no_op') continue;
-        const pattern = 'name' in change ? (change as { name: string }).name : '';
-        if (pattern) {
-          patternCounts.set(pattern, (patternCounts.get(pattern) ?? 0) + 1);
-        }
-      }
-    }
-
-    const topPatterns = Array.from(patternCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([pattern, issueCount]) => ({ pattern, issueCount }));
-
-    // Skills-added/refined come from the flywheel report (placeholder counts for now)
-    return jsonResponse({
-      skillsAdded: { week: 0, month: 0, allTime: 0 },
-      skillsRefined: { week: 0, month: 0, allTime: 0 },
-      retrosProcessed: processed,
-      retrosNoOp: noOp,
-      topPatterns,
-    });
+    return jsonResponse(computeFlywheelMetrics(files));
   })),
 );
 
