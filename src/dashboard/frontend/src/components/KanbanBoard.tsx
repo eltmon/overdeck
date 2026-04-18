@@ -603,6 +603,15 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
   );
 }
 
+type RegisteredProjectSummary = {
+  key: string;
+  name: string;
+  linearTeam: string | null;
+  githubRepo: string | null;
+  linearProject: string | null;
+  issuePattern: string | null;
+};
+
 interface FeatureCardProps {
   feature: Issue;
   childCount: number;
@@ -612,7 +621,29 @@ interface FeatureCardProps {
   onPlan: (issue: Issue) => void;
   onViewBeads: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
+  registeredProjects?: Array<{ issuePattern: string | null }>;
   children?: React.ReactNode;
+}
+
+function canUseWorkspaceActionsForIssue(
+  issue: Pick<Issue, 'identifier' | 'artifactType'>,
+  registeredProjects: Array<{ issuePattern: string | null }> = [],
+): boolean {
+  if (issue.artifactType?.includes('PortfolioItem')) {
+    return false;
+  }
+
+  if (parseIssueId(issue.identifier)?.format === 'standard') {
+    return true;
+  }
+
+  return registeredProjects.some((project) => {
+    if (!project.issuePattern) {
+      return false;
+    }
+
+    return parseIssueId(issue.identifier, { issue_pattern: project.issuePattern } as Parameters<typeof parseIssueId>[1]) !== null;
+  });
 }
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
@@ -626,6 +657,7 @@ export function FeatureCard({
   onPlan,
   onViewBeads,
   onViewVBrief,
+  registeredProjects = [],
   children,
 }: FeatureCardProps) {
   const completed = feature.completedChildCount ?? 0;
@@ -633,8 +665,7 @@ export function FeatureCard({
   const total = feature.totalChildCount ?? childCount;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const featureIdLower = feature.identifier.toLowerCase();
-  const parsedFeatureId = parseIssueId(feature.identifier);
-  const canUseWorkspaceActions = parsedFeatureId?.format === 'standard';
+  const canUseWorkspaceActions = canUseWorkspaceActionsForIssue(feature, registeredProjects);
   const isPlanningActive = canUseWorkspaceActions && agents.some(
     (agent) =>
       agent.issueId?.toLowerCase() === featureIdLower &&
@@ -1224,14 +1255,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   });
 
   // Fetch registered projects from projects.yaml
-  interface RegisteredProject {
-    key: string;
-    name: string;
-    linearTeam: string | null;
-    githubRepo: string | null;
-    linearProject: string | null;
-  }
-  const { data: registeredProjects = [] } = useQuery<RegisteredProject[]>({
+  const { data: registeredProjects = [] } = useQuery<RegisteredProjectSummary[]>({
     queryKey: ['registered-projects'],
     queryFn: async () => {
       const res = await fetch('/api/registered-projects');
@@ -1577,6 +1601,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onViewVBrief={setVbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
                     onToggleFeature={toggleFeature}
+                    registeredProjects={registeredProjects}
                   />
                 </div>
               </DroppableColumn>
@@ -1660,6 +1685,7 @@ function ColumnContent({
   onViewVBrief,
   collapsedFeatures,
   onToggleFeature,
+  registeredProjects,
 }: {
   issues: Issue[];
   agents: Agent[];
@@ -1673,6 +1699,7 @@ function ColumnContent({
   onViewVBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
   onToggleFeature: (featureId: string) => void;
+  registeredProjects: RegisteredProjectSummary[];
 }) {
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
@@ -1753,6 +1780,7 @@ function ColumnContent({
             onPlan={onPlan}
             onViewBeads={onViewBeads}
             onViewVBrief={onViewVBrief}
+            registeredProjects={registeredProjects}
           >
             {group.children.map(child => (
               <CompactChildCard
@@ -2121,7 +2149,7 @@ interface IssueCardProps {
   onViewVBrief?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -2205,6 +2233,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     staleTime: 15000,
   });
   const hasPlan = planningStateQuery.data?.hasPlan ?? false;
+  const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
   const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
 
   // Kill agent mutation
@@ -2804,7 +2833,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
         <div className={actionBarClass}>
           <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} />
-          {hasPlan && (
+          {planLabelExists && (
             <>
               <TasksChip issue={issue} onViewBeads={onViewBeads} />
               <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
 import { DialogProvider } from './DialogProvider';
-import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
+import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
 import { PlanChip, TasksChip, VBriefChip } from './PlanningChips';
 import { useDashboardStore } from '../lib/store';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
@@ -532,9 +532,11 @@ describe('FeatureCard', () => {
   const renderFeatureCard = ({
     feature = createFeature(),
     onToggle = vi.fn(),
+    registeredProjects = [],
   }: {
     feature?: Issue;
     onToggle?: ReturnType<typeof vi.fn>;
+    registeredProjects?: Array<{ issuePattern: string | null }>;
   } = {}) => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -555,6 +557,7 @@ describe('FeatureCard', () => {
             onPlan={vi.fn()}
             onViewBeads={vi.fn()}
             onViewVBrief={vi.fn()}
+            registeredProjects={registeredProjects}
           />
         </DialogProvider>
       </QueryClientProvider>
@@ -583,19 +586,34 @@ describe('FeatureCard', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('does not render workspace-backed planning actions for non-standard feature identifiers', () => {
+  it('renders workspace-backed planning actions for custom-format feature identifiers that match a registered project pattern', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: false, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
     renderFeatureCard({
       feature: createFeature({
-        identifier: 'FEATURE-ALPHA',
+        identifier: 'BUG-123',
         source: 'github',
         artifactType: 'Grouping',
       }),
+      registeredProjects: [{ issuePattern: '^(BUG)-(\\d+)$' }],
     });
 
-    expect(screen.queryByRole('button', { name: /plan/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /tasks/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /vbrief/i })).toBeNull();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: /plan/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /tasks/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /vbrief/i })).toBeDefined();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/BUG-123/planning-state');
+    });
   });
 
   it('still toggles the feature card open without attempting workspace lookups', () => {
@@ -604,6 +622,83 @@ describe('FeatureCard', () => {
     fireEvent.click(screen.getByText('Feature title'));
     expect(onToggle).toHaveBeenCalled();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('IssueCard', () => {
+  const originalFetch = global.fetch;
+
+  const createIssue = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'issue-1',
+    identifier: 'TEST-123',
+    title: 'Test Issue',
+    description: '',
+    status: 'Todo',
+    priority: 3,
+    labels: [],
+    url: 'https://test.com/TEST-123',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+    ...overrides,
+  });
+
+  const renderIssueCard = (issue: Issue) => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <IssueCard
+            issue={issue}
+            specialists={[]}
+            isSelected={false}
+            onSelect={vi.fn()}
+            onPlan={vi.fn()}
+            onViewBeads={vi.fn()}
+            onViewVBrief={vi.fn()}
+          />
+        </DialogProvider>
+      </QueryClientProvider>
+    );
+  };
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.clearAllMocks();
+  });
+
+  it('keeps Tasks, vBRIEF, and Start Agent visible for planned-label-only todo issues before planning state catches up', async () => {
+    const issue = createIssue({ labels: ['planned'] });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: false, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderIssueCard(issue);
+
+    expect(await screen.findByRole('button', { name: /see plan/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /tasks/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /vbrief/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /start agent/i })).toBeDefined();
   });
 });
 

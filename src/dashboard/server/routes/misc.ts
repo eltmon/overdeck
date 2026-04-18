@@ -782,6 +782,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           linearTeam: getIssuePrefix(p.config) || null,
           githubRepo: p.config.github_repo || null,
           linearProject: p.config.linear_project || null,
+          issuePattern: p.config.issue_pattern || null,
         })),
       );
     },
