@@ -96,15 +96,12 @@ describe('runPreflightChecks', () => {
     expect(result.some((l) => l.includes('dirty.ts'))).toBe(true);
   });
 
-  it('attempts to auto-commit .planning/ before the uncommitted-changes check', async () => {
+  it('does NOT issue any git commits (pure validation — no side effects)', async () => {
     const capturedCmds: string[] = [];
     mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
       capturedCmds.push(cmd);
       if (cmd.includes('bd list')) {
         cb(null, { stdout: '[]', stderr: '' });
-      } else if (cmd.includes('git status --porcelain .planning/') && capturedCmds.filter(c => c.includes('.planning/')).length === 1) {
-        // First .planning/ check returns dirty
-        cb(null, { stdout: ' M .planning/STATE.md\n', stderr: '' });
       } else {
         cb(null, { stdout: '', stderr: '' });
       }
@@ -114,9 +111,9 @@ describe('runPreflightChecks', () => {
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await runPreflightChecks(tempDir, 'PAN-714');
 
-    // Auto-commit commands should have been issued
-    expect(capturedCmds.some((c) => c.includes('git add .planning/'))).toBe(true);
-    expect(capturedCmds.some((c) => c.includes('git commit') && c.includes('sync planning artifacts'))).toBe(true);
+    // runPreflightChecks must not write any commits — it is a pure validator
+    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(false);
+    expect(capturedCmds.some((c) => c.includes('git add'))).toBe(false);
   });
 
   it('calls bd list --status closed to sync beads to vBRIEF before AC check', async () => {

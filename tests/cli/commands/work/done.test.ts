@@ -27,6 +27,7 @@ const mockRebaseAndPushRepos = vi.fn();
 const mockCreateReviewArtifactsForIssue = vi.fn().mockResolvedValue({ artifacts: [], mergeSet: null });
 const mockSetReviewStatus = vi.fn();
 const mockGetDashboardApiUrl = vi.fn().mockReturnValue('http://localhost:3000');
+const mockGetVBriefACStatus = vi.fn().mockReturnValue(null);
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
@@ -73,7 +74,7 @@ vi.mock('../../../../src/lib/shadow-utils.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/vbrief/beads.js', () => ({
-  getVBriefACStatus: vi.fn().mockReturnValue(null),
+  getVBriefACStatus: mockGetVBriefACStatus,
   syncBeadStatusToVBrief: vi.fn().mockReturnValue(null),
 }));
 
@@ -262,5 +263,78 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
 
     // Should not throw — dashboard unreachable is handled gracefully
     await expect(doneCommand('PAN-714', { force: true })).resolves.not.toThrow();
+  });
+});
+
+describe('doneCommand preflight failure paths', () => {
+  let tempDir: string;
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockExecFn.mockReset();
+    mockGetAgentState.mockReset();
+    mockShouldSkipTrackerUpdate.mockReset();
+    mockUpdateShadowState.mockReset();
+    mockGetVBriefACStatus.mockReturnValue(null);
+    mockCreateReviewArtifactsForIssue.mockResolvedValue({ artifacts: [], mergeSet: null });
+    mockEnsureMergeSetForIssue.mockReturnValue(null);
+
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-done-preflight-'));
+    mkdirSync(join(tempDir, '.git'));
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    exitSpy.mockRestore();
+  });
+
+  it('calls process.exit(1) when uncommitted changes exist', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      if (cmd.includes('bd list')) {
+        cb(null, { stdout: '[]', stderr: '' });
+      } else if (cmd.includes('git status --porcelain')) {
+        // Dirty working tree — uncommitted changes
+        cb(null, { stdout: ' M src/dirty.ts\n', stderr: '' });
+      } else {
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714');
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('calls process.exit(1) when vBRIEF acceptance criteria are incomplete', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      if (cmd.includes('bd list')) {
+        cb(null, { stdout: '[]', stderr: '' });
+      } else {
+        // Clean git state so uncommitted-changes check passes
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+    mockGetVBriefACStatus.mockReturnValue({
+      allCompleted: false,
+      totalPending: 1,
+      totalCount: 2,
+      items: [
+        {
+          itemTitle: 'Feature X',
+          pending: 1,
+          criteria: [{ title: 'Should do Y', status: 'pending' }],
+        },
+      ],
+    });
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714');
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

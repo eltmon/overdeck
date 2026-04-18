@@ -134,31 +134,17 @@ export function checkVBriefACStatus(workspacePath: string): string[] {
  * Run all pre-flight checks for `pan done`.
  *
  * Performs in order:
- * 1. Auto-commit any .planning/ artifacts dirtied by a prior pan-done run (so
- *    they don't surface as uncommitted changes in Check 2).
- * 2. Check 1: open beads
- * 3. Check 2: uncommitted changes
- * 4. Sync closed bead statuses to vBRIEF (so Check 3 sees latest state).
- * 5. Auto-commit .planning/ artifacts dirtied by the sync above.
- * 6. Check 3: vBRIEF acceptance criteria completion.
+ * 1. Check 1: open beads
+ * 2. Check 2: uncommitted changes
+ * 3. Sync closed bead statuses to vBRIEF (so Check 3 sees latest state).
+ * 4. Check 3: vBRIEF acceptance criteria completion.
+ *
+ * Pure validation — no git mutations. The caller (pan done) is responsible for
+ * committing any planning artifacts dirtied by the sync step.
  *
  * Returns an array of failure lines (empty = all checks passed).
  */
 export async function runPreflightChecks(workspacePath: string, issueId: string): Promise<string[]> {
-  // Auto-commit .planning/ before the uncommitted-changes check.
-  // plan.vbrief.json can be modified by a previous invocation of `pan done`
-  // (vBRIEF sync) and left dirty if that run failed. Commit it so Check 2
-  // doesn't block on workspace-internal state that this command manages.
-  try {
-    const { stdout: preDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
-    if (preDirty.trim()) {
-      await execAsync('git add .planning/', { cwd: workspacePath });
-      await execAsync('git commit -m "chore: sync planning artifacts" --allow-empty-message', { cwd: workspacePath }).catch(() =>
-        execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath })
-      );
-    }
-  } catch { /* non-fatal */ }
-
   const failures: string[] = [];
 
   // Check 1: Open beads
@@ -190,15 +176,6 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
   } catch {
     // Non-fatal — sync failure shouldn't block completion check
   }
-
-  // Auto-commit .planning/ artifacts dirtied by the vBRIEF sync above.
-  try {
-    const { stdout: afterSyncDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
-    if (afterSyncDirty.trim()) {
-      await execAsync('git add .planning/', { cwd: workspacePath });
-      await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
-    }
-  } catch { /* non-fatal */ }
 
   // Check 3: vBRIEF AC status
   const acFailures = checkVBriefACStatus(workspacePath);

@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
@@ -151,6 +153,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.error('');
         process.exit(1);
       }
+
+      // Commit plan.vbrief.json dirtied by the bead→vBRIEF sync in preflight.
+      const execAsync = promisify(exec);
+      try {
+        const { stdout: syncDirty } = await execAsync(
+          'git status --porcelain .planning/plan.vbrief.json',
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        if (syncDirty.trim()) {
+          await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+        }
+      } catch { /* non-fatal */ }
     }
   }
 
