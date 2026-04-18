@@ -2875,16 +2875,18 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     if (state.status !== 'stopped') continue;
     if (state.phase !== 'implementation') continue;
 
-    // Skip if the agent has a completed marker
+    // Skip if the agent has a completed marker (or processed completion)
     const completedFile = join(getAgentDir(agentId), 'completed');
-    if (existsSync(completedFile)) continue;
+    const processedFile = join(getAgentDir(agentId), 'completed.processed');
+    if (existsSync(completedFile) || existsSync(processedFile)) continue;
 
     // Skip if workspace is missing
     if (!state.workspace || !existsSync(state.workspace)) continue;
 
-    // Skip if already merge-ready (review+test passed)
+    // Skip if already merge-ready (review+test passed) or already merged
     const review = getReviewStatus(state.issueId);
     if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') continue;
+    if (review?.mergeStatus === 'merged') continue;
 
     // Skip if the agent was deliberately stopped by a user (runtime state is 'stopped')
     const runtimeState = getAgentRuntimeState(agentId);
