@@ -84,11 +84,12 @@ function buildConversationExcerpt(lines: string[]): string {
   for (const line of lines) {
     try {
       const msg = JSON.parse(line) as {
-        message?: { role?: string };
+        message?: { role?: string; content?: unknown };
         content?: unknown;
       };
       const role = msg.message?.role ?? 'unknown';
-      const content = msg.content;
+      // Real transcripts store content in message.content; legacy fixtures use top-level content
+      const content = msg.message?.content ?? msg.content;
       let text = '';
       if (typeof content === 'string') {
         text = content.slice(0, 500);

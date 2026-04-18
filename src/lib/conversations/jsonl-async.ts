@@ -10,8 +10,6 @@
 
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
-import type { ClaudeMessage } from '../cost-parsers/jsonl-parser.js';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /**
@@ -29,19 +27,38 @@ export interface SessionMetadata {
   filesTouched: string[];
   /** sessionId extracted from the first message's top-level `sessionId` field */
   sessionId: string | null;
-  /** cwd extracted from the first message's `cwd` field (not part of ClaudeMessage spec — set by Claude Code) */
+  /** cwd extracted from the first message's `cwd` field (set by Claude Code on first message) */
   cwdFromFirstMessage: string | null;
 }
 
 /**
- * A Claude Code JSONL line can include a `cwd` field on the first message.
- * This is an extended type for discovery purposes only.
+ * A Claude Code JSONL line — extended for discovery purposes only.
+ *
+ * Real Claude Code transcripts (type=user/assistant) store content blocks in
+ * message.content, not at the top level. Legacy/simplified fixtures may use
+ * top-level content. We try message.content first, then fall back.
  */
-interface ClaudeMessageWithCwd extends ClaudeMessage {
+interface ClaudeMessageWithCwd {
   sessionId?: string;
   cwd?: string;
-  /** content can be a string or array of content blocks */
+  timestamp?: string;
+  model?: string;
+  /** top-level content (legacy fixture format) */
   content?: string | ContentBlock[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+  message?: {
+    role?: 'user' | 'assistant';
+    model?: string;
+    /** real transcript format: content blocks live here */
+    content?: string | ContentBlock[];
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
+    [key: string]: unknown;
+  };
 }
 
 interface ContentBlock {
@@ -144,9 +161,11 @@ export async function parseSessionJsonl(filePath: string): Promise<SessionMetada
         result.tokenOutput += usage.output_tokens ?? 0;
       }
 
-      // Tool usage from content blocks
-      if (Array.isArray(msg.content)) {
-        for (const block of msg.content as ContentBlock[]) {
+      // Tool usage from content blocks.
+      // Real transcripts store blocks in message.content; legacy fixtures use top-level content.
+      const contentBlocks = msg.message?.content ?? msg.content;
+      if (Array.isArray(contentBlocks)) {
+        for (const block of contentBlocks as ContentBlock[]) {
           if (block.type === 'tool_use' && typeof block.name === 'string') {
             toolsSet.add(block.name);
             const filePath_ = block.input

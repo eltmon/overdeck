@@ -65,7 +65,34 @@ export interface ScanResult {
 // ─── Discovery ────────────────────────────────────────────────────────────────
 
 /**
- * Walk ~/.claude/projects/ and return all .jsonl files.
+ * Recursively collect all .jsonl files under a project directory.
+ * Follows subdirectories (e.g. <uuid>/subagents/) so nested subagent transcripts
+ * are discovered alongside top-level session files.
+ * The projectDir (top-level hash dir) is preserved on every result entry for mode filtering.
+ */
+async function collectJsonlFiles(
+  projectDir: string,
+  dir: string,
+  result: Array<{ projectDir: string; jsonlPath: string }>,
+): Promise<void> {
+  let entries: import('fs').Dirent[];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const name = String(entry.name);
+    if (entry.isFile() && name.endsWith('.jsonl')) {
+      result.push({ projectDir, jsonlPath: join(dir, name) });
+    } else if (entry.isDirectory()) {
+      await collectJsonlFiles(projectDir, join(dir, name), result);
+    }
+  }
+}
+
+/**
+ * Walk ~/.claude/projects/ and return all .jsonl files (including nested subagent transcripts).
  * Each entry is { projectDir, jsonlPath }.
  */
 async function discoverAllJsonlFiles(): Promise<
@@ -85,16 +112,7 @@ async function discoverAllJsonlFiles(): Promise<
   }
 
   for (const projectDir of projectDirs) {
-    try {
-      const files = await fs.readdir(projectDir);
-      for (const file of files) {
-        if (file.endsWith('.jsonl')) {
-          result.push({ projectDir, jsonlPath: join(projectDir, file) });
-        }
-      }
-    } catch {
-      // Permission denied — skip
-    }
+    await collectJsonlFiles(projectDir, projectDir, result);
   }
 
   return result;

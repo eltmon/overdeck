@@ -169,6 +169,16 @@ describe('scanner', () => {
     expect(result.inserted + result.updated + result.skipped).toBe(0);
   });
 
+  it('discovers nested subagent JSONL files under <uuid>/subagents/', async () => {
+    // Real Claude Code structure: project-hash/<session-uuid>/subagents/<agent-id>.jsonl
+    const subDir = join(fakeClaudeDir, '-home-user-Projects-myapp', 'session-uuid-001', 'subagents');
+    mkdirSync(subDir, { recursive: true });
+    writeFileSync(join(subDir, 'agent-abc.jsonl'), SESSION_JSONL, 'utf8');
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
+  });
+
   it('watched mode with parent watchDir discovers child workspace sessions', async () => {
     // The session hash '-home-user-Projects-myapp' is a child of '/home/user/Projects'.
     // Watched mode must include it when '/home/user/Projects' is in watchDirs.

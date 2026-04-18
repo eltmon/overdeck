@@ -193,6 +193,70 @@ describe('enrichSession', () => {
 
     expect(result.error).toBeDefined();
   });
+
+  it('real transcript format: excerpt includes text from message.content', async () => {
+    // Real Claude Code JSONL: content lives in message.content, not at top level
+    const realJsonl = [
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'real-enrich-1',
+        timestamp: '2025-04-01T09:00:00Z',
+        cwd: '/home/user/Projects/realapp',
+        message: { role: 'user', content: [{ type: 'text', text: 'Investigate the memory leak' }] },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        sessionId: 'real-enrich-1',
+        timestamp: '2025-04-01T09:01:00Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-sonnet-4-6',
+          content: [{ type: 'text', text: 'I found a retain cycle in the event emitter.' }],
+          usage: { input_tokens: 100, output_tokens: 80 },
+        },
+      }),
+    ].join('\n') + '\n';
+    const realPath = join(TEST_HOME, 'real-sess.jsonl');
+    writeFileSync(realPath, realJsonl, 'utf8');
+
+    const session = upsertDiscoveredSession({
+      jsonlPath: realPath,
+      workspacePath: '/home/user/Projects/realapp',
+      workspaceHash: 'realh',
+      messageCount: 2,
+      firstTs: '2025-04-01T09:00:00Z',
+      lastTs: '2025-04-01T09:01:00Z',
+      modelsUsed: ['claude-sonnet-4-6'],
+      primaryModel: 'claude-sonnet-4-6',
+      tokenInput: 100,
+      tokenOutput: 80,
+      estimatedCost: 0.001,
+      toolsUsed: [],
+      filesTouched: [],
+      panopticonManaged: false,
+      panIssueId: null,
+      panAgentId: null,
+      fileSize: realJsonl.length,
+      fileMtime: '2025-04-01T09:00:00Z',
+      tags: [],
+    });
+
+    let capturedPrompt = '';
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: realPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_m, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Memory leak fix.', tags: ['memory', 'bug'] };
+      },
+    });
+
+    // The excerpt must contain text from message.content, not be empty
+    expect(capturedPrompt).toContain('memory leak');
+    expect(capturedPrompt).toContain('retain cycle');
+  });
 });
 
 // ─── estimateEnrichmentCost ───────────────────────────────────────────────────

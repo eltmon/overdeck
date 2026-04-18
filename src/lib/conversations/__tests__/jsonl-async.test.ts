@@ -154,4 +154,42 @@ describe('parseSessionJsonl', () => {
     const meta = await parseSessionJsonl('/no/such/file/at/all.jsonl');
     expect(meta.messageCount).toBe(0);
   });
+
+  it('real transcript format: extracts tools from message.content (not top-level content)', async () => {
+    // Real Claude Code JSONL has content in message.content, not at the top level
+    const realFormatLines = [
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'real-sess-1',
+        timestamp: '2025-04-01T09:00:00Z',
+        cwd: '/home/user/Projects/realapp',
+        message: { role: 'user', content: [{ type: 'text', text: 'Fix the bug' }] },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        sessionId: 'real-sess-1',
+        timestamp: '2025-04-01T09:01:00Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-sonnet-4-6',
+          content: [
+            { type: 'tool_use', name: 'Read', input: { file_path: '/home/user/Projects/realapp/src/bug.ts' } },
+            { type: 'tool_use', name: 'Edit', input: { file_path: '/home/user/Projects/realapp/src/bug.ts', old_string: 'x', new_string: 'y' } },
+          ],
+          usage: { input_tokens: 200, output_tokens: 150 },
+        },
+      }),
+    ];
+    const file = join(fixtureDir, 'real-format.jsonl');
+    writeFileSync(file, realFormatLines.join('\n') + '\n', 'utf8');
+
+    const meta = await parseSessionJsonl(file);
+
+    expect(meta.toolsUsed).toContain('Read');
+    expect(meta.toolsUsed).toContain('Edit');
+    expect(meta.filesTouched).toContain('/home/user/Projects/realapp/src/bug.ts');
+    expect(meta.cwdFromFirstMessage).toBe('/home/user/Projects/realapp');
+    expect(meta.tokenInput).toBe(200);
+    expect(meta.tokenOutput).toBe(150);
+  });
 });
