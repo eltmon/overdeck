@@ -1007,7 +1007,13 @@ export function SettingsPage() {
           enabled={!!formData.models.providers.openrouter}
           onApiKeyChange={(key) => handleApiKeyChange('openrouter', key)}
           onToggleEnabled={() => handleProviderToggle('openrouter')}
-          onApiKeySaved={handleSave}
+          onApiKeySaved={(savedKey) => {
+            // OpenRouterPage already persisted the key — just sync local form state
+            setFormData(prev => prev ? {
+              ...prev,
+              api_keys: { ...prev.api_keys, openrouter: savedKey },
+            } : prev);
+          }}
         />
       </section>
 

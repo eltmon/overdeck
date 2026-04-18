@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { loadConfig } from '../../src/lib/config-yaml.js';
-import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi } from '../../src/lib/settings-api.js';
+import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi, saveOpenRouterFavorites, getOpenRouterFavorites } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
 // Mock the config-yaml module
@@ -48,6 +48,12 @@ vi.mock('fs/promises', async () => {
     ...actual,
     writeFile: vi.fn(),
   };
+});
+
+// Prevent reloadGlobalRouter from running during save operations
+vi.mock('../../src/lib/work-type-router.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/lib/work-type-router.js')>('../../src/lib/work-type-router.js');
+  return { ...actual, reloadGlobalRouter: vi.fn() };
 });
 
 describe('settings-api', () => {
@@ -457,6 +463,76 @@ describe('settings-api', () => {
       const model = getDefaultConversationModelApi();
       expect(model).not.toContain('claude');
       expect(model).not.toContain('sonnet');
+    });
+  });
+});
+
+// ── OpenRouter favorites persistence ──────────────────────────────────────────
+
+describe('OpenRouter favorites', () => {
+  const baseConfig = {
+    preset: 'balanced' as const,
+    enabledProviders: new Set(['anthropic']) as Set<string>,
+    apiKeys: {},
+    overrides: {},
+    geminiThinkingLevel: 3,
+    tmux: { configMode: 'managed' as const },
+    conversations: {
+      compactionModel: 'claude-haiku-4-5' as any,
+      manualCompactMode: 'claude-code' as const,
+      richCompaction: false,
+    },
+    trackerKeys: {},
+    openrouterFavorites: [] as string[],
+  };
+
+  describe('getOpenRouterFavorites', () => {
+    it('returns favorites stored in config', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: { ...baseConfig, openrouterFavorites: ['openai/gpt-4o', 'openai/o3'] } as any,
+        migration: null,
+      });
+      expect(getOpenRouterFavorites()).toEqual(['openai/gpt-4o', 'openai/o3']);
+    });
+
+    it('returns empty array when no favorites are configured', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: { ...baseConfig, openrouterFavorites: [] } as any,
+        migration: null,
+      });
+      expect(getOpenRouterFavorites()).toEqual([]);
+    });
+  });
+
+  describe('saveOpenRouterFavorites', () => {
+    it('writes config containing the provided favorites', async () => {
+      // loadSettingsApi (called inside saveOpenRouterFavorites) + saveSettingsApi each call loadConfig
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { ...baseConfig, openrouterFavorites: [] } as any,
+        migration: null,
+      });
+
+      await saveOpenRouterFavorites(['openai/gpt-4o', 'openai/o3']);
+
+      const { writeFile } = await import('fs/promises');
+      expect(vi.mocked(writeFile)).toHaveBeenCalled();
+      const [, writtenContent] = vi.mocked(writeFile).mock.calls.at(-1)!;
+      expect(String(writtenContent)).toContain('openai/gpt-4o');
+      expect(String(writtenContent)).toContain('openai/o3');
+    });
+
+    it('persists an empty array when clearing favorites', async () => {
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { ...baseConfig, openrouterFavorites: ['openai/gpt-4o'] } as any,
+        migration: null,
+      });
+
+      await saveOpenRouterFavorites([]);
+
+      const { writeFile } = await import('fs/promises');
+      const [, writtenContent] = vi.mocked(writeFile).mock.calls.at(-1)!;
+      // YAML dump of empty array produces "favorites: []\n" or similar
+      expect(String(writtenContent)).toContain('favorites:');
     });
   });
 });
