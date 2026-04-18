@@ -52,6 +52,30 @@ describe('CacheService constructor', () => {
   });
 });
 
+describe('main.ts startup fix regression (PAN-446)', () => {
+  it('CacheService construction throws when PANOPTICON_HOME does not exist (pre-fix state)', async () => {
+    // Before the fix, main.ts did not mkdir PANOPTICON_HOME. SQLite cannot create
+    // cache.db in a non-existent directory — this is the bug PAN-446 fixed.
+    expect(existsSync(panopticonHome)).toBe(false);
+    const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
+    expect(() => new CacheService()).toThrow();
+  });
+
+  it('mkdir(PANOPTICON_HOME) before CacheService construction fixes the startup failure', async () => {
+    // This mirrors src/dashboard/server/main.ts:31-32 exactly:
+    //   await mkdir(getPanopticonHome(), { recursive: true });
+    // Without this line the test above throws; with it, CacheService succeeds.
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(panopticonHome, { recursive: true });
+
+    vi.resetModules();
+    const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
+    let svc: InstanceType<typeof CacheService> | undefined;
+    expect(() => { svc = new CacheService(); }).not.toThrow();
+    svc?.close();
+  });
+});
+
 describe('startup/import chain regression', () => {
   it('getSharedIssueService() constructs IssueDataService(CacheService) when PANOPTICON_HOME pre-exists', async () => {
     // Simulate main.ts startup order: mkdir PANOPTICON_HOME first, then service construction.
