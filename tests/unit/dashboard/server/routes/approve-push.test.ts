@@ -7,8 +7,13 @@
  * past the local ancestor, gitPush throws MainDivergedError; the handler must:
  *
  *   1. Return HTTP 409 (not 400 or 500)
- *   2. Mark the workspace stuck via markWorkspaceStuck()
- *   3. Include the diverged SHAs in the error message
+ *   2. Reset local main to origin/main (so retry is idempotent)
+ *   3. Mark the workspace stuck via markWorkspaceStuck()
+ *   4. Include the diverged SHAs in the error message
+ *
+ * Regression: approve → divergence → unstick → approve retry.
+ * Without the reset in step 2, the next approve attempt's
+ * `git pull origin main --ff-only` fails because local main is ahead of origin.
  *
  * pushApproveMain() is the extracted testable unit — the route calls it and
  * delegates response-building to the caller, following the project's established
@@ -21,6 +26,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGitPush = vi.fn();
 const mockMarkWorkspaceStuck = vi.fn();
+const mockExec = vi.fn();
 
 // vi.hoisted so class definition is available before vi.mock() resolution
 const { MainDivergedErrorClass } = vi.hoisted(() => {
@@ -35,6 +41,28 @@ const { MainDivergedErrorClass } = vi.hoisted(() => {
     }
   }
   return { MainDivergedErrorClass };
+});
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    exec: (...args: unknown[]) => {
+      // exec(cmd, opts?, cb) — invoke callback based on mockExec result
+      const cb = args[args.length - 1] as Function;
+      const cmdArgs = args.slice(0, -1);
+      const result = mockExec(...cmdArgs);
+      if (result && typeof result.then === 'function') {
+        result.then(
+          () => cb(null, { stdout: '', stderr: '' }),
+          (err: Error) => cb(err),
+        );
+      } else {
+        cb(null, { stdout: '', stderr: '' });
+      }
+      return { unref: vi.fn() };
+    },
+  };
 });
 
 vi.mock('../../../../../src/lib/git/operations.js', () => ({
@@ -81,6 +109,8 @@ const PROJECT_PATH = '/tmp/test-project';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // exec succeeds by default (covers the git reset --hard origin/main call)
+  mockExec.mockResolvedValue(undefined);
 });
 
 describe('pushApproveMain — approve route divergence guard', () => {
@@ -145,6 +175,50 @@ describe('pushApproveMain — approve route divergence guard', () => {
       'origin',
       'main',
       expect.objectContaining({ issueId: ISSUE_ID }),
+    );
+  });
+
+  // Regression: approve → divergence → local main reset → retry idempotent.
+  // Without the reset, local main is ahead of origin/main after a failed push,
+  // and the next approve attempt's `git pull origin main --ff-only` fails.
+  it('resets local main to origin/main before marking stuck on divergence', async () => {
+    const localSha = 'aaa1111aaaa';
+    const remoteSha = 'bbb2222bbbb';
+    mockGitPush.mockRejectedValue(
+      new MainDivergedErrorClass('main diverged', localSha, remoteSha),
+    );
+
+    const result = await pushApproveMain(ISSUE_ID, PROJECT_PATH);
+
+    expect(result.pushed).toBe(false);
+    // The reset must run before marking stuck so the next approve can pull --ff-only
+    expect(mockExec).toHaveBeenCalledWith(
+      'git reset --hard origin/main',
+      expect.objectContaining({ cwd: PROJECT_PATH }),
+    );
+    expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
+      ISSUE_ID,
+      'main_diverged',
+      expect.objectContaining({ localSha, remoteSha }),
+    );
+  });
+
+  it('still marks workspace stuck even when local main reset fails', async () => {
+    mockGitPush.mockRejectedValue(
+      new MainDivergedErrorClass('main diverged', 'aaa', 'bbb'),
+    );
+    // Simulate git reset failing (e.g., detached HEAD state)
+    mockExec.mockRejectedValue(new Error('fatal: could not reset'));
+
+    const result = await pushApproveMain(ISSUE_ID, PROJECT_PATH);
+
+    // Must still return 409 and mark stuck despite the reset failure
+    expect(result.pushed).toBe(false);
+    if (!result.pushed) expect(result.httpStatus).toBe(409);
+    expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
+      ISSUE_ID,
+      'main_diverged',
+      expect.any(Object),
     );
   });
 });

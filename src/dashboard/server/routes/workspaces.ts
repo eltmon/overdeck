@@ -765,6 +765,16 @@ export async function pushApproveMain(
     return { pushed: true };
   } catch (pushErr: any) {
     if (pushErr instanceof MainDivergedError) {
+      // Restore local main to origin/main so the next approve attempt can
+      // re-checkout and git pull --ff-only cleanly. Without this reset, local
+      // main is ahead of origin (has the abandoned merge commit) and the next
+      // attempt's git pull --ff-only fails immediately.
+      try {
+        await execAsync('git reset --hard origin/main', { cwd: projectPath, encoding: 'utf-8' });
+        console.log(`[approve] Restored local main to origin/main after divergence (${issueId})`);
+      } catch (resetErr: any) {
+        console.error(`[approve] Failed to restore local main after divergence (${issueId}): ${resetErr.message}`);
+      }
       markWorkspaceStuck(issueId, 'main_diverged', {
         localSha: pushErr.localSha,
         remoteSha: pushErr.remoteSha,
