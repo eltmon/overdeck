@@ -66,11 +66,9 @@ Before reviewing anything, check if there are actual changes to review:
 **If 0 files changed across all repos:** the branch is stale or already merged into {{DIFF_BASE}}. Do NOT attempt a full review:
 
 ```bash
-curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
+curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \
-  -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to {{DIFF_BASE}} (already merged or stale)"}' | jq .
-
-pan tell {{ISSUE_ID}} "Review complete: branch has 0 diff from {{DIFF_BASE}} — already merged or stale. Marking as passed."
+  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"passed","notes":"No changes to review — branch identical to {{DIFF_BASE}} (already merged or stale)"}' | jq .
 ```
 
 Then STOP — you are done.
@@ -154,43 +152,23 @@ Use whenever you found ANY issue, no matter how trivial. Every finding is a bloc
 
 ## Submitting Your Review
 
-**Step 1** — Update review status via API. You MUST execute these curl commands and verify they return valid JSON — do NOT just describe them.
+Report completion through the specialist lifecycle endpoint. You MUST execute the completion call and verify it returns valid JSON — do NOT just describe it.
 
 **If issues found:**
 ```bash
-curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
+curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \
-  -d '{"reviewStatus":"blocked","reviewNotes":"[describe issues here]"}' | jq .
+  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"failed","notes":"[describe issues here]"}' | jq .
 ```
 
 **If review passes (rare):**
 ```bash
-curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
+curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \
-  -d '{"reviewStatus":"passed"}' | jq .
-
-curl -s -X POST {{API_URL}}/api/specialists/test-agent/queue \
-  -H "Content-Type: application/json" \
-  -d '{"issueId":"{{ISSUE_ID}}","workspace":"{{WORKSPACE}}","branch":"{{BRANCH}}"}' | jq .
+  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"passed"}' | jq .
 ```
 
-**Step 2** — Send feedback to the work agent via `pan tell`. The work agent cannot see your review — they only know what's wrong if you tell them directly.
-
-```bash
-pan tell {{ISSUE_ID}} "CODE REVIEW BLOCKED for {{ISSUE_ID}}:
-
-CRITICAL ISSUES:
-1. [file:line] — description
-2. [file:line] — description
-
-REQUIRED ACTIONS:
-- Fix X in file Y
-- Add tests for Z
-
-Reply when fixes complete."
-```
-
-Use `pan tell` rather than raw `tmux send-keys` — it handles Enter and escaping correctly.
+Do NOT message the work agent directly from this prompt. The `/api/specialists/done` handler is responsible for status updates, downstream specialist handoff, and delivering review feedback to the work agent when needed.
 
 ## Never Close GitHub Issues
 
@@ -199,4 +177,4 @@ You are a specialist agent, not the work agent. You do NOT have permission to cl
 - **NEVER** run `gh issue close` — that is only for humans or the merge-agent
 - **NEVER** say "Merged to main" — merging is done by humans clicking the Merge button
 - **NEVER** move issues to "Done" — the dashboard handles status transitions
-- **ONLY** call the `/api/review/{{ISSUE_ID}}/status` endpoint
+- **ONLY** call the `/api/specialists/done` endpoint for final review results
