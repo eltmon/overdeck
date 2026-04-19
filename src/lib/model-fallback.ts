@@ -85,12 +85,13 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
   'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
-  // Deprecated OpenAI IDs — explicit mappings preserve semantic intent
-  // (gpt-4o was flagship-tier, so → Sonnet; gpt-4o-mini was economy → Haiku)
+  // Retired OpenAI IDs — mappings preserve semantic tier intent
   'gpt-5.2-codex': 'claude-sonnet-4-6',
   'o3-deep-research': 'claude-sonnet-4-6',
-  'gpt-4o': 'claude-sonnet-4-6',
-  'gpt-4o-mini': 'claude-haiku-4-5',
+  // Active OpenAI API names — NOT deprecated. Included here so configs using these
+  // IDs still fall back correctly if the OpenAI provider is disabled.
+  'gpt-4o': 'claude-sonnet-4-6', // flagship-tier → Sonnet
+  'gpt-4o-mini': 'claude-haiku-4-5', // economy-tier → Haiku
 
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
@@ -113,6 +114,11 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Z.AI → Anthropic
   'glm-5.1': 'claude-sonnet-4-6', // Current GLM flagship → Sonnet
+  // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of
+  // MODEL_DEPRECATIONS resolution order (both resolve glm-4.7→glm-5.1 then FALLBACK_MAP,
+  // and direct FALLBACK_MAP lookup; explicit entries make the result deterministic).
+  'glm-4.7': 'claude-sonnet-4-6', // strong-tier → Sonnet
+  'glm-4.7-flash': 'claude-haiku-4-5', // economy-tier → Haiku
 };
 
 /**

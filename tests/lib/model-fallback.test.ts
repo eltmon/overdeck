@@ -431,10 +431,13 @@ describe('model-fallback', () => {
       expect(zaiModels).toContain('glm-5.1');
     });
 
-    it('glm-4.7 and glm-4.7-flash fall back to Sonnet when zai is disabled', () => {
+    it('glm-4.7 falls back to Sonnet and glm-4.7-flash falls back to Haiku when zai is disabled', () => {
+      // glm-4.7 is strong-tier (like Sonnet), glm-4.7-flash is economy-tier (like Haiku).
+      // Explicit FALLBACK_MAP entries ensure tier-correct results regardless of the
+      // MODEL_DEPRECATIONS chain (which previously mapped both through glm-5.1 → Sonnet).
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
       expect(applyFallback('glm-4.7' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
-      expect(applyFallback('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+      expect(applyFallback('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-haiku-4-5');
     });
 
     it('glm-4.7 stays when zai is enabled', () => {

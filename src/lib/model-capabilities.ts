@@ -367,9 +367,11 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
-  // Legacy OpenAI IDs — deprecated aliases kept for backward compat with saved configs
+  // Retired OpenAI model IDs — replaced by newer versions, kept for backward compat
   'gpt-5.2-codex': { model: 'gpt-5.2-codex', provider: 'openai', displayName: 'GPT-5.2 Codex (deprecated)', costPer1MTokens: 20.0, contextWindow: 128000, skills: { 'code-generation': 92, 'code-review': 90, debugging: 88, planning: 85, documentation: 85, testing: 85, security: 80, performance: 82, synthesis: 88, speed: 50, 'context-length': 75 } },
   'o3-deep-research': { model: 'o3-deep-research', provider: 'openai', displayName: 'O3 Deep Research (deprecated)', costPer1MTokens: 5.0, contextWindow: 200000, skills: { 'code-generation': 88, 'code-review': 95, debugging: 98, planning: 95, documentation: 88, testing: 88, security: 92, performance: 92, synthesis: 95, speed: 25, 'context-length': 95 } },
+  // Active OpenAI API names — NOT deprecated. Kept in MODEL_CAPABILITIES for backward compat
+  // with saved configs. These are real OpenAI model IDs that still work via the OpenAI API.
   'gpt-4o': { model: 'gpt-4o', provider: 'openai', displayName: 'GPT-4o', costPer1MTokens: 7.5, contextWindow: 128000, skills: { 'code-generation': 82, 'code-review': 80, debugging: 78, planning: 76, documentation: 80, testing: 76, security: 74, performance: 74, synthesis: 80, speed: 75, 'context-length': 75 } },
   'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'openai', displayName: 'GPT-4o Mini', costPer1MTokens: 0.6, contextWindow: 128000, skills: { 'code-generation': 68, 'code-review': 64, debugging: 60, planning: 56, documentation: 66, testing: 60, security: 52, performance: 56, synthesis: 62, speed: 92, 'context-length': 75 } },
 
