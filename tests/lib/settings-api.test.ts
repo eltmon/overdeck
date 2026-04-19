@@ -76,6 +76,27 @@ describe('settings-api', () => {
       expect(settings.models.providers.anthropic).toBe(true);
     });
 
+    it('reports anthropic:false when Anthropic is not in enabledProviders (PAN-540 behavior change)', () => {
+      // Regression: before PAN-540, Anthropic was always forced on. Now providers
+      // are reported as-is. Verify loadSettingsApi does NOT override the persisted value.
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['kimi']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' },
+          conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
+          trackerKeys: {},
+        },
+        migration: null,
+      } as any);
+      const settings = loadSettingsApi();
+      expect(settings.models.providers.anthropic).toBe(false);
+      expect(settings.models.providers.kimi).toBe(true);
+    });
+
     it('should migrate convoy:* override keys to review:* equivalents', () => {
       // Simulate a persisted config written before PAN-540 removed the convoy abstraction
       vi.mocked(loadConfig).mockReturnValueOnce({

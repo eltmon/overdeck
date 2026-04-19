@@ -173,13 +173,14 @@ export function loadSettingsApi(): ApiSettingsConfig {
       migratedOverrides[workType as WorkTypeId] = modelId as ModelId;
     }
   }
-  if (migrationNeeded) {
-    config.overrides = migratedOverrides as Record<WorkTypeId, ModelId>;
-  }
+  // Use migratedOverrides for the response without mutating the loaded config object.
+  const effectiveOverrides = migrationNeeded
+    ? (migratedOverrides as Record<WorkTypeId, ModelId>)
+    : config.overrides;
 
   // Detect deprecated models in current overrides
   const deprecationWarnings: ApiDeprecationWarning[] = [];
-  for (const [workType, modelId] of Object.entries(config.overrides)) {
+  for (const [workType, modelId] of Object.entries(effectiveOverrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       deprecationWarnings.push({
         workType: workType as WorkTypeId,
@@ -200,7 +201,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         kimi: config.enabledProviders.has('kimi'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
-      overrides: config.overrides,
+      overrides: effectiveOverrides,
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },

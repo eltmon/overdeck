@@ -2558,7 +2558,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             });
 
             if (result.success) {
-              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+              // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
+              // managed entirely inside dispatchParallelReview — do not write here.
               console.log(`[request-review] Parallel review dispatched for ${issueId}`);
             } else {
               const errorMsg = result.error || result.message || 'Failed to dispatch review';

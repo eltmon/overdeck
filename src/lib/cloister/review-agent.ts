@@ -737,8 +737,9 @@ export function reviewResultToReviewStatus(
  * Dispatch a parallel code review asynchronously (fire-and-forget).
  *
  * Replaces `spawnEphemeralSpecialist('review-agent', ...)` — returns immediately
- * with `{ success: true }` while the review runs in the background. The caller
- * must set `reviewStatus: 'reviewing'` after receiving `success: true`.
+ * with `{ success: true }` while the review runs in the background.
+ * All reviewStatus transitions (pending → reviewing → passed/blocked/failed)
+ * are managed exclusively inside this function. Callers must NOT write reviewStatus.
  */
 export async function dispatchParallelReview(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string },
