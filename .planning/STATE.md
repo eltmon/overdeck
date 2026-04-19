@@ -27,3 +27,4 @@ None
 - **[2026-04-18T22:59Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/024-review-agent-changes-requested.md`
 - **[2026-04-18T23:16Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/025-review-agent-changes-requested.md`
 - **[2026-04-18T23:30Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/026-review-agent-changes-requested.md`
+- **[2026-04-19T08:38Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/078-review-agent-changes-requested.md`
