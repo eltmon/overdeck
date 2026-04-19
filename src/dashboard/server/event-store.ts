@@ -15,7 +15,8 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
 import type { DomainEvent } from '@panopticon/contracts';
@@ -107,7 +108,7 @@ declare const Bun: unknown;
 export async function openEventDb(): Promise<DbAdapter> {
   const home = getPanopticonHome();
   if (!existsSync(home)) {
-    mkdirSync(home, { recursive: true });
+    await mkdir(home, { recursive: true });
   }
   const dbPath = join(home, 'panopticon.db');
 

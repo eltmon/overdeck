@@ -40,7 +40,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -76,14 +76,14 @@ const execAsync = promisify(exec);
 
 // ─── Package version ──────────────────────────────────────────────────────────
 
-function readPackageVersion(): string {
+export async function readPackageVersion(): Promise<string> {
   // Walk up from the running script to find the nearest package.json.
   // Works for both source (src/dashboard/server/routes/) and bundled (dist/dashboard/) layouts.
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 8; i++) {
     const candidate = join(dir, 'package.json');
     try {
-      return JSON.parse(readFileSync(candidate, 'utf-8')).version;
+      return JSON.parse(await readFile(candidate, 'utf-8')).version;
     } catch { /* try parent */ }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -92,7 +92,15 @@ function readPackageVersion(): string {
   return '0.0.0';
 }
 
-const panopticonVersion: string = readPackageVersion();
+// Lazy-initialized to avoid top-level await (which would make misc.ts an async ESM module,
+// risking ERR_REQUIRE_ASYNC_MODULE for any module that require()-chains through here).
+let _panopticonVersion: string | null = null;
+async function getPanopticonVersion(): Promise<string> {
+  if (_panopticonVersion === null) {
+    _panopticonVersion = await readPackageVersion();
+  }
+  return _panopticonVersion;
+}
 
 // Dev mode: true when running from the repo checkout (src/ directory exists)
 const panopticonDevMode: boolean = (() => {
@@ -755,7 +763,7 @@ const postDeaconPatrolRoute = HttpRouter.add(
 const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
-  Effect.sync(() => jsonResponse({ version: panopticonVersion, isDev: panopticonDevMode })),
+  Effect.promise(() => getPanopticonVersion().then(version => jsonResponse({ version, isDev: panopticonDevMode }))),
 );
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────

@@ -8,7 +8,7 @@
  * during request handling (PAN-70 type issue). See initTrackerConfigCache().
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
