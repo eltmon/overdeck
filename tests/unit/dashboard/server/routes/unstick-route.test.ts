@@ -6,7 +6,7 @@
  *
  *   404  workspace does not exist
  *   400  workspace exists but is not stuck
- *   200  workspace is stuck → clear flag + reset lifecycle → success body
+ *   200  workspace is stuck → clear stuck flag only (lifecycle preserved) → success body
  *
  * processUnstickRequest() is exported from workspaces.ts following the project's
  * established pattern for route helper extraction (computeStuckCount, parseGitActivityParams,
@@ -121,8 +121,9 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     expect(after?.stuck).toBeFalsy();
   });
 
-  it('200: resets reviewStatus/testStatus/readyForMerge to pending after unstick', () => {
-    // Simulate workspace that passed review but got stuck before merge
+  it('200: preserves reviewStatus/testStatus after unstick (lifecycle not reset)', () => {
+    // Unstick clears only the stuck marker. Previously passed specialist results
+    // are preserved — the user decides whether to re-trigger review separately.
     setReviewStatus('PAN-RESET', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -133,12 +134,12 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
 
     processUnstickRequest('PAN-RESET', true, stuckStatus);
 
-    // Lifecycle must be reset so deacon's orphan-recovery can re-dispatch
     const after = getReviewStatus('PAN-RESET');
-    expect(after?.reviewStatus).toBe('pending');
-    expect(after?.testStatus).toBe('pending');
-    expect(after?.readyForMerge).toBe(false);
+    // Stuck flag cleared — Deacon will process the issue again
     expect(after?.stuck).toBeFalsy();
+    // Lifecycle preserved — specialist results not discarded by unstick
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.testStatus).toBe('passed');
   });
 
   it('200: includes previousReason in the response body', () => {

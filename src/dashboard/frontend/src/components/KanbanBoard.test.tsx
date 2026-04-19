@@ -721,6 +721,25 @@ describe('DivergedBadge', () => {
     });
   });
 
+  it('preserves reviewStatus/testStatus in store after unstick (lifecycle not reset)', async () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-43': { issueId: 'PAN-43', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<DivergedBadge issueIdentifier="PAN-43" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+
+    await waitFor(() => {
+      const s = useDashboardStore.getState().reviewStatusByIssueId['PAN-43'];
+      expect(s?.stuck).toBeFalsy();
+      // Lifecycle preserved — specialist results not discarded by optimistic update
+      expect(s?.reviewStatus).toBe('passed');
+      expect(s?.testStatus).toBe('passed');
+    });
+  });
+
   afterEach(() => {
     useDashboardStore.setState({ reviewStatusByIssueId: {} } as Parameters<typeof useDashboardStore.setState>[0]);
   });

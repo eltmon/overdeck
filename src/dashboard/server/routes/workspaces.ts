@@ -58,6 +58,7 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
+  clearWorkspaceStuck,
 
   type ReviewStatus,
 } from '../../../lib/review-status.js';
@@ -3044,9 +3045,10 @@ export type UnstickResult =
 /**
  * Core logic for POST /api/workspaces/:issueId/unstick.
  *
- * Validates preconditions (workspace exists, workspace is stuck), clears the
- * stuck flag, and resets the review/test lifecycle to 'pending' so Deacon's
- * orphan-recovery patrol will re-dispatch the review automatically.
+ * Validates preconditions (workspace exists, workspace is stuck) and clears
+ * the persistent stuck marker. Does NOT reset the review/test lifecycle — the
+ * user resolves the divergence manually (git reset --hard origin/main), then
+ * decides whether to re-trigger review separately.
  *
  * Exported for unit testing — the route handler calls this and maps the result
  * directly to an HTTP response.
@@ -3062,21 +3064,12 @@ export function processUnstickRequest(
   if (!currentStatus?.stuck) {
     return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
   }
-  // Atomic single-write: clear stuck state and reset the review/test lifecycle
-  // in one setReviewStatus call (one DB upsert, one notifyPipeline event).
-  // Two separate calls (clearWorkspaceStuck + setReviewStatus) would emit an
-  // intermediate non-stuck/passed state that can briefly hide the badge in the UI.
-  setReviewStatus(issueId, {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    readyForMerge: false,
-    stuck: undefined,
-    stuckReason: undefined,
-    stuckAt: undefined,
-    stuckDetails: undefined,
-  });
-  console.log(`[unstick] Atomically cleared stuck flag and reset lifecycle to pending for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'}) — deacon will re-dispatch`);
+  // Clear only the stuck fields — one DB write, one notifyPipeline event.
+  // The review/test/merge lifecycle is preserved so previously passed specialist
+  // results are not discarded. The user resolves the divergence manually before
+  // retrying; re-dispatching review is their explicit choice, not an automatic side-effect.
+  clearWorkspaceStuck(issueId);
+  console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
 }
 

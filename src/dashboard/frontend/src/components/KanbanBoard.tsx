@@ -2036,6 +2036,8 @@ export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { 
                   ?? state.reviewStatusByIssueId[issueIdentifier];
                 if (current) {
                   const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
+                  // Optimistic update: clear only the stuck fields — lifecycle is preserved.
+                  // The WS status_changed event from the server will reconcile the full state.
                   useDashboardStore.setState((s) => ({
                     reviewStatusByIssueId: {
                       ...s.reviewStatusByIssueId,
@@ -2043,10 +2045,7 @@ export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { 
                         ...current,
                         stuck: undefined,
                         stuckReason: undefined,
-                        reviewStatus: 'pending',
-                        testStatus: 'pending',
-                        mergeStatus: 'pending',
-                        readyForMerge: false,
+                        stuckDetails: undefined,
                       },
                     },
                   }));
