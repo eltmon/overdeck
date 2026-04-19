@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../AgentCards/ModelOverrideModal';
+import { getEffectiveModelId, DEFAULT_MODELS_BY_WORK_TYPE, FALLBACK_DEFAULT_MODEL } from '../modelDefaults';
 import type { SettingsConfig } from '../types';
 
 const MINIMAX_DEFAULTS: SettingsConfig = {
@@ -44,6 +45,30 @@ describe('MODELS_BY_PROVIDER', () => {
     const allModelIds = Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models.map(m => m.id));
     const found = DEPRECATED_MODEL_IDS.filter(dep => allModelIds.includes(dep as never));
     expect(found).toEqual([]);
+  });
+});
+
+describe('getEffectiveModelId', () => {
+  it('returns the override when one is set', () => {
+    const result = getEffectiveModelId('issue-agent:implementation', {
+      'issue-agent:implementation': 'minimax-m2.7-highspeed',
+    });
+    expect(result).toBe('minimax-m2.7-highspeed');
+  });
+
+  it('returns the backend optimal default when no override is set', () => {
+    // Without an override, the settings page must show the backend default — NOT
+    // the generic FALLBACK_DEFAULT_MODEL. Regression for the bug where any
+    // unoverridden card showed gpt-4o-mini regardless of actual routing defaults.
+    const result = getEffectiveModelId('issue-agent:exploration', {});
+    expect(result).toBe(DEFAULT_MODELS_BY_WORK_TYPE['issue-agent:exploration']);
+    expect(result).not.toBe(FALLBACK_DEFAULT_MODEL);
+  });
+
+  it('returns FALLBACK_DEFAULT_MODEL only for work types with no backend default', () => {
+    // A work type unknown to the router should fall through to the generic fallback.
+    const result = getEffectiveModelId('unknown-work-type' as never, {});
+    expect(result).toBe(FALLBACK_DEFAULT_MODEL);
   });
 });
 

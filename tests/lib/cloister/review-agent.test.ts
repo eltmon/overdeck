@@ -399,24 +399,26 @@ describe('resolveReviewerModel', () => {
   });
 
   // Regression for alias → concrete model ID resolution:
-  // Template frontmatter uses "haiku"/"sonnet"/"opus" but getProviderEnvForModel
-  // and claude --model require fully-qualified IDs (claude-haiku-4-5 etc.).
-  it('resolves "haiku" alias from template default to concrete claude-haiku-4-5', () => {
+  // Template frontmatter uses "haiku"/"sonnet"/"opus" as shorthand. Aliases must
+  // be resolved through the work-type router (getModelId) — NOT hard-coded to
+  // Anthropic model IDs — so the returned ID is provider-correct when using
+  // claudish, OpenAI, or other providers.
+  it('resolves "haiku" alias via work-type router (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
-    expect(model).toBe('claude-haiku-4-5');
-    expect(model).toMatch(/^claude-/);
+    expect(model).not.toBe('haiku');
+    expect(model.length).toBeGreaterThan(0);
   });
 
-  it('resolves "sonnet" alias from template default to concrete claude-sonnet-4-6', () => {
+  it('resolves "sonnet" alias via work-type router (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'sonnet');
-    expect(model).toBe('claude-sonnet-4-6');
-    expect(model).toMatch(/^claude-/);
+    expect(model).not.toBe('sonnet');
+    expect(model.length).toBeGreaterThan(0);
   });
 
-  it('resolves "opus" alias from template default to concrete claude-opus-4-6', () => {
+  it('resolves "opus" alias via work-type router (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'opus');
-    expect(model).toBe('claude-opus-4-6');
-    expect(model).toMatch(/^claude-/);
+    expect(model).not.toBe('opus');
+    expect(model.length).toBeGreaterThan(0);
   });
 
   it('passes through concrete model IDs unchanged', () => {

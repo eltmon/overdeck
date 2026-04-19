@@ -52,7 +52,7 @@ import {
   MODELS_BY_PROVIDER,
   OpenRouterFavoriteModel,
 } from './AgentCards/ModelOverrideModal';
-import { FALLBACK_DEFAULT_MODEL, getEffectiveModelId } from './modelDefaults';
+import { getEffectiveModelId } from './modelDefaults';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -1313,7 +1313,7 @@ export function SettingsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {category.agents.map((agent) => {
-                  const currentModelId = (formData.models.overrides[agent.id] || FALLBACK_DEFAULT_MODEL) as ModelId;
+                  const currentModelId = getEffectiveModelId(agent.id, formData.models.overrides);
                   const modelDisplay = getModelDisplay(currentModelId);
                   const { score, matched, missing } = getCapabilityMatchScore(currentModelId, agent.id);
                   const requiredCaps = WORK_TYPE_CAPABILITIES[agent.id] || [];

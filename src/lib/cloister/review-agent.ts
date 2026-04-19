@@ -391,15 +391,26 @@ export async function parseReviewerTemplate(templatePath: string): Promise<Revie
 }
 
 /**
- * Claude CLI shorthand aliases that can appear in agent template frontmatter.
- * Resolve these to concrete model IDs before passing to claude --model or
- * getProviderEnvForModel, which expect fully-qualified IDs.
+ * Resolve shorthand aliases (opus/sonnet/haiku) that can appear in agent
+ * template frontmatter to concrete model IDs via the work-type router.
+ * Using getModelId ensures provider-correct routing (Anthropic, claudish, etc.)
+ * instead of blindly emitting Anthropic-specific model IDs.
  */
-const CLAUDE_ALIAS_TO_MODEL_ID: Record<string, string> = {
-  opus: 'claude-opus-4-6',
-  sonnet: 'claude-sonnet-4-6',
-  haiku: 'claude-haiku-4-5',
+const CLAUDE_ALIAS_WORK_TYPE: Record<string, Parameters<typeof getModelId>[0]> = {
+  opus: 'specialist-review-agent',
+  sonnet: 'review:correctness',
+  haiku: 'subagent:bash',
 };
+
+function resolveClaudeAlias(model: string): string {
+  const workType = CLAUDE_ALIAS_WORK_TYPE[model];
+  if (!workType) return model;
+  try {
+    return getModelId(workType);
+  } catch {
+    return model;
+  }
+}
 
 /** Map reviewer role name to the work-type ID used for model routing */
 function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | null {
@@ -430,9 +441,9 @@ export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: str
       model = defaultModel;
     }
   }
-  // Resolve shorthand aliases (haiku/sonnet/opus) to concrete IDs required by
-  // getProviderEnvForModel and claude --model. Template frontmatter may use aliases.
-  return CLAUDE_ALIAS_TO_MODEL_ID[model] ?? model;
+  // Resolve shorthand aliases (haiku/sonnet/opus) via the work-type router so
+  // provider-correct model IDs are used regardless of which providers are active.
+  return resolveClaudeAlias(model);
 }
 
 /** Spawn a single reviewer tmux session and send its prompt */
