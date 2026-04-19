@@ -2718,10 +2718,8 @@ export async function runPatrol(): Promise<PatrolResult> {
           if (projSpec.specialistType === 'merge-agent' && runtimeState.currentIssue) {
             const issueId = runtimeState.currentIssue;
             try {
-              if (!existsSync(REVIEW_STATUS_FILE)) continue;
-              const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-              const rs = statuses[issueId];
-              if (rs?.mergeStatus === 'merging') {
+              const currentStatus = getReviewStatus(issueId);
+              if (currentStatus?.mergeStatus === 'merging') {
                 const { resolveProjectFromIssue } = await import('../projects.js');
                 const resolved = resolveProjectFromIssue(issueId);
                 if (resolved) {
@@ -2732,9 +2730,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                   );
                   if (stdout.trim()) {
                     console.log(`[deacon] PAN-375: merge specialist died but ${issueId} IS merged (${stdout.trim()}). Auto-completing.`);
-                    statuses[issueId].mergeStatus = 'merged';
-                    statuses[issueId].readyForMerge = false;
-                    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+                    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
                     const { postMergeLifecycle } = await import('./merge-agent.js');
                     postMergeLifecycle(issueId, resolved.projectPath).catch(err =>
                       console.warn(`[deacon] postMergeLifecycle failed for ${issueId}: ${err}`)
@@ -2742,8 +2738,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                     actions.push(`Auto-completed stale merge for ${issueId}`);
                   } else {
                     console.log(`[deacon] Merge specialist died and ${issueId} NOT merged. Resetting to readyForMerge.`);
-                    statuses[issueId].mergeStatus = 'pending';
-                    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+                    setReviewStatus(issueId, { mergeStatus: 'pending' });
                   }
                 }
               }
