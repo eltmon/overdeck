@@ -80,12 +80,20 @@ export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<strin
 
 export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
   // SQLite is the authoritative store for the default (server) path.
-  // Callers that load → mutate → save a batch of statuses rely on this to persist changes.
+  // Mirrors the old JSON overwrite semantics: upsert every entry in the map and
+  // delete any SQLite rows whose keys are absent from the map (replace-all).
   if (filePath !== DEFAULT_STATUS_FILE) {
     throw new Error(
       `Non-default review-status paths are not supported in review-status.ts. ` +
       `Import from review-status-json.ts for JSON file operations.`
     );
+  }
+  const incoming = new Set(Object.keys(statuses));
+  const existing = getAllReviewStatusesFromDb();
+  for (const id of Object.keys(existing)) {
+    if (!incoming.has(id)) {
+      dbDelete(id);
+    }
   }
   for (const status of Object.values(statuses)) {
     dbUpsert(status);

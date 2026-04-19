@@ -117,4 +117,23 @@ describe('saveReviewStatuses (default path)', () => {
     expect(after['PAN-100'].reviewStatus).toBe('pending');
     expect(after['PAN-101'].reviewStatus).toBe('pending');
   });
+
+  it('deletes SQLite rows absent from the passed map (replace-all semantics)', () => {
+    // Seed two entries
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-200', 'passed', 'passed', datetime('now'), 1),
+             ('PAN-201', 'passed', 'passed', datetime('now'), 1)
+    `).run();
+
+    // Load, delete one entry from the map, save
+    const statuses = loadReviewStatuses();
+    delete (statuses as Record<string, unknown>)['PAN-201'];
+    saveReviewStatuses(statuses);
+
+    // PAN-200 still present; PAN-201 deleted from SQLite
+    const after = loadReviewStatuses();
+    expect(after['PAN-200']).toBeDefined();
+    expect(after['PAN-201']).toBeUndefined();
+  });
 });
