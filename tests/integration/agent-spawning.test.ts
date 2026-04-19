@@ -45,6 +45,12 @@ vi.mock('../../src/lib/cv.js', () => ({
   getAgentCV: vi.fn().mockReturnValue(null),
 }));
 
+// Mock cliproxy so GPT-routed agents don't require a running sidecar
+vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/cliproxy.js')>();
+  return { ...actual, isCliproxyRunning: vi.fn().mockReturnValue(true) };
+});
+
 // Mock config loading
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal() as any;
