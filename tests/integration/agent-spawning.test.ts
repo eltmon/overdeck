@@ -83,12 +83,19 @@ describe('agent spawning with work types', () => {
     // Override PANOPTICON_HOME for tests (must be set before importing paths module)
     process.env.PANOPTICON_HOME = testPanopticonHome;
 
-    // Clear all mocks
+    // Clear all mocks — note: this resets mock implementations too, so restore
+    // any mocks that must stay active across all tests in this suite.
     vi.clearAllMocks();
 
     // Reset sessionExistsAsync to default false (tests that need true override it)
     const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
     vi.mocked(sessionExistsAsync).mockResolvedValue(false);
+
+    // Restore cliproxy mock: clearAllMocks() drops the mockReturnValue(true) set
+    // during vi.mock() hoisting, so SageOx tests (which route through GPT) would
+    // see isCliproxyRunning() → undefined (falsy) and throw without this restore.
+    const cliproxy = await import('../../src/lib/cliproxy.js');
+    vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
   });
 
   afterEach(() => {
