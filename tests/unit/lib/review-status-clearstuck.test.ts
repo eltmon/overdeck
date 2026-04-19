@@ -38,7 +38,7 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, saveReviewStatuses } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -90,5 +90,31 @@ describe('markWorkspaceStuck (notifyPipeline symmetry)', () => {
     expect(call.type).toBe('status_changed');
     expect(call.issueId).toBe('PAN-NEW');
     expect(call.status.stuck).toBe(true);
+  });
+});
+
+// ============== saveReviewStatuses batch upsert ==============
+
+describe('saveReviewStatuses (default path)', () => {
+  it('persists batch mutations into SQLite — regression: was no-op before fix', () => {
+    // Seed two entries via direct SQL
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-100', 'reviewing', 'pending', datetime('now'), 0),
+             ('PAN-101', 'reviewing', 'pending', datetime('now'), 0)
+    `).run();
+
+    // Simulate what specialists.ts reset flow does: load → mutate → save
+    const statuses = loadReviewStatuses();
+    statuses['PAN-100'].reviewStatus = 'pending';
+    statuses['PAN-100'].updatedAt = new Date().toISOString();
+    statuses['PAN-101'].reviewStatus = 'pending';
+    statuses['PAN-101'].updatedAt = new Date().toISOString();
+    saveReviewStatuses(statuses);
+
+    // Reload from DB and verify the mutations were persisted
+    const after = loadReviewStatuses();
+    expect(after['PAN-100'].reviewStatus).toBe('pending');
+    expect(after['PAN-101'].reviewStatus).toBe('pending');
   });
 });
