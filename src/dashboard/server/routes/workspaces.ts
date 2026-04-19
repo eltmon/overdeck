@@ -3038,6 +3038,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
 export type UnstickResult =
   | { httpStatus: 404; body: { success: false; error: string } }
   | { httpStatus: 400; body: { success: false; error: string } }
+  | { httpStatus: 409; body: { success: false; error: string } }
   | { httpStatus: 200; body: { success: true; issueId: string; previousReason?: string } };
 
 /**
