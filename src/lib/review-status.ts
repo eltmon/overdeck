@@ -1,5 +1,5 @@
 import { access, readFile } from 'fs/promises';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry } from './activity-logger.js';

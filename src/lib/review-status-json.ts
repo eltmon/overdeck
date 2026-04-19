@@ -10,7 +10,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { normalizeReviewStatus } from './review-status-normalize.js';
-import type { ReviewStatus, StatusHistoryEntry } from './review-status.js';
+import type { ReviewStatus } from './review-status.js';
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
