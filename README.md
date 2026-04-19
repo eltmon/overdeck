@@ -26,8 +26,12 @@ Panopticon is an open-source control plane for multi-agent software development.
 ## Quick Start
 
 ```bash
-npx panopticon-cli@latest install && pan up
+npx panctl
 ```
+
+No install step required — Command Deck opens immediately. Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them. For headless and CI, keep using `pan`.
+
+For the power-user path that installs everything up front: `pan install`.
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
