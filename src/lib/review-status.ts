@@ -103,31 +103,16 @@ export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, fileP
 export function setReviewStatus(
   issueId: string,
   update: Partial<ReviewStatus>,
-  filePath = DEFAULT_STATUS_FILE,
 ): ReviewStatus {
-  // For the default (SQLite) path, read only the single row we're updating.
-  // Reading the full table and writing it back is a TOCTOU race: two concurrent
-  // calls for different issue IDs can clobber each other if saveReviewStatuses()
-  // deletes rows absent from the in-memory snapshot.
-  let statuses: Record<string, ReviewStatus> | null = null;
-  const existing: ReviewStatus = filePath === DEFAULT_STATUS_FILE
-    ? (getReviewStatusFromDb(issueId) ?? {
-        issueId,
-        reviewStatus: 'pending' as const,
-        testStatus: 'pending' as const,
-        updatedAt: new Date().toISOString(),
-        readyForMerge: false,
-      })
-    : (() => {
-        statuses = loadReviewStatuses(filePath);
-        return statuses[issueId] || {
-          issueId,
-          reviewStatus: 'pending' as const,
-          testStatus: 'pending' as const,
-          updatedAt: new Date().toISOString(),
-          readyForMerge: false,
-        };
-      })();
+  // Read only the single row we're updating (avoids TOCTOU: bulk read-modify-write
+  // races when two concurrent calls for different issue IDs run concurrently).
+  const existing: ReviewStatus = getReviewStatusFromDb(issueId) ?? {
+    issueId,
+    reviewStatus: 'pending' as const,
+    testStatus: 'pending' as const,
+    updatedAt: new Date().toISOString(),
+    readyForMerge: false,
+  };
 
   // Guard: reject reviewStatus regression from 'passed' to 'reviewing' unless the caller
   // is explicitly resetting the merge lifecycle (update includes mergeStatus).
@@ -214,16 +199,8 @@ export function setReviewStatus(
     })();
   }
 
-  if (filePath === DEFAULT_STATUS_FILE) {
-    // Single-row upsert — atomic, no TOCTOU risk. Never call saveReviewStatuses()
-    // here because it does read-all/delete-missing/write-all which races with
-    // concurrent setReviewStatus() calls for different issue IDs.
-    dbUpsert(updated);
-  } else {
-    // Non-default path: JSON file (tests / CLI tools). statuses was populated above.
-    statuses![issueId] = updated;
-    saveReviewStatuses(statuses!, filePath);
-  }
+  // Single-row upsert — atomic, no TOCTOU risk.
+  dbUpsert(updated);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 
@@ -326,14 +303,7 @@ export function setReviewStatus(
   return updated;
 }
 
-export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
-  // SQLite is the authoritative store for the default (server) path.
-  if (filePath !== DEFAULT_STATUS_FILE) {
-    throw new Error(
-      `Non-default review-status paths are not supported in review-status.ts. ` +
-      `Import from review-status-json.ts for JSON file operations.`
-    );
-  }
+export function getReviewStatus(issueId: string): ReviewStatus | null {
   return getReviewStatusFromDb(issueId) ?? null;
 }
 
@@ -400,14 +370,7 @@ export function fixStuckReadyForMerge(): void {
   }
 }
 
-export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
-  // SQLite is the authoritative store for the default (server) path.
-  if (filePath !== DEFAULT_STATUS_FILE) {
-    throw new Error(
-      `Non-default review-status paths are not supported in review-status.ts. ` +
-      `Import from review-status-json.ts for JSON file operations.`
-    );
-  }
+export function clearReviewStatus(issueId: string): void {
   try {
     dbDelete(issueId);
   } catch (err) {

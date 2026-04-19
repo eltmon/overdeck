@@ -6,7 +6,7 @@
  *
  *   404  workspace does not exist
  *   400  workspace exists but is not stuck
- *   200  workspace is stuck → clear stuck flag only (lifecycle preserved) → success body
+ *   200  workspace is stuck → clear stuck fields + reset lifecycle to pending → success body
  *
  * processUnstickRequest() is exported from workspaces.ts following the project's
  * established pattern for route helper extraction (computeStuckCount, parseGitActivityParams,

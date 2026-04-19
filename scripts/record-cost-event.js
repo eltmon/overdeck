@@ -346,6 +346,7 @@ function initSchema(db) {
       updated_at            TEXT NOT NULL,
       ready_for_merge       INTEGER NOT NULL DEFAULT 0,
       auto_requeue_count    INTEGER DEFAULT 0,
+      merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
       -- PAN-653: persistent stuck state (set when main diverges mid-approve)
       stuck                 INTEGER NOT NULL DEFAULT 0,
