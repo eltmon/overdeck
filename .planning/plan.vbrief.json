@@ -4,7 +4,7 @@
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility",
-    "updated": "2026-04-19T14:49:31.538Z"
+    "updated": "2026-04-19T15:42:19.867Z"
   },
   "plan": {
     "id": "pan-653",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "3102731e-c901-43ed-9595-545316061952",
     "author": "agent:claude-opus-4-6",
-    "sequence": 154,
+    "sequence": 165,
     "created": "2026-04-12T00:00:00Z",
-    "updated": "2026-04-19T14:49:31.538Z",
+    "updated": "2026-04-19T15:42:19.867Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/653",
@@ -78,7 +78,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.537Z"
+        "completed": "2026-04-19T15:42:19.866Z"
       },
       {
         "id": "stuck-schema",
@@ -122,7 +122,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.536Z"
+        "completed": "2026-04-19T15:42:19.866Z"
       },
       {
         "id": "git-operations-table",
@@ -166,7 +166,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.537Z"
+        "completed": "2026-04-19T15:42:19.867Z"
       },
       {
         "id": "git-helper-wrapper",
@@ -210,7 +210,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.536Z"
+        "completed": "2026-04-19T15:42:19.866Z"
       },
       {
         "id": "approve-divergence-guard",
@@ -254,7 +254,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.536Z"
+        "completed": "2026-04-19T15:42:19.866Z"
       },
       {
         "id": "salvage-divergence-guard",
@@ -333,7 +333,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.536Z"
+        "completed": "2026-04-19T15:42:19.866Z"
       },
       {
         "id": "tmux-stream-patterns",
@@ -368,7 +368,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.537Z"
+        "completed": "2026-04-19T15:42:19.867Z"
       },
       {
         "id": "concurrent-merge-detection",
@@ -403,7 +403,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.538Z"
+        "completed": "2026-04-19T15:42:19.867Z"
       },
       {
         "id": "activity-panel-ux",
@@ -447,7 +447,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.537Z"
+        "completed": "2026-04-19T15:42:19.867Z"
       },
       {
         "id": "kanban-stuck-count-union",
@@ -491,7 +491,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.537Z"
+        "completed": "2026-04-19T15:42:19.867Z"
       },
       {
         "id": "integration-tests",
@@ -535,7 +535,7 @@
             "completed": "2026-04-15T03:25:52.482Z"
           }
         ],
-        "completed": "2026-04-19T14:49:31.535Z"
+        "completed": "2026-04-19T15:42:19.865Z"
       }
     ],
     "edges": [
