@@ -342,6 +342,50 @@ describe('settings-api', () => {
   });
 
   describe('saveSettingsApi', () => {
+    it('round-trips default_conversation_model through save', async () => {
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+          },
+          overrides: {},
+          default_conversation_model: 'gpt-5.4',
+        },
+        api_keys: {},
+      };
+      await saveSettingsApi(settings);
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('default_conversation_model: gpt-5.4');
+    });
+
+    it('getDefaultConversationModelApi prefers stored defaultConversationModel over provider heuristics', () => {
+      vi.mocked(loadConfig).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['openai']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          openrouterFavorites: [],
+          defaultConversationModel: 'claude-haiku-4-5',
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toBe('claude-haiku-4-5');
+    });
+
     it('should convert ApiSettingsConfig to YAML format', async () => {
       const { writeFile } = await import('fs/promises');
       const settings: ApiSettingsConfig = {
@@ -373,7 +417,7 @@ describe('settings-api', () => {
 
       // Verify the YAML content contains expected fields
       const { writeFile: mockedWriteFile } = await import('fs/promises');
-      const callArgs = vi.mocked(mockedWriteFile).mock.calls[0];
+      const callArgs = vi.mocked(mockedWriteFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       // Note: preset was removed from the API
             expect(yamlContent).toContain('anthropic: true');

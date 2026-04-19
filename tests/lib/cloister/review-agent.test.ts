@@ -429,6 +429,21 @@ describe('resolveReviewerModel', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'claude-haiku-4-5');
     expect(model).toBe('claude-haiku-4-5');
   });
+
+  // Regression: haiku and sonnet must resolve to distinct concrete model IDs.
+  // Previously both were routed through review:correctness, producing the same model.
+  it('haiku alias resolves to a distinct model from sonnet alias (real reviewer role)', () => {
+    const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
+    const sonnet = resolveReviewerModel({ name: 'correctness', model: 'sonnet', focus: [] }, 'any-default');
+    expect(haiku).toBe('claude-haiku-4-5');
+    expect(sonnet).toBe('claude-sonnet-4-6');
+    expect(haiku).not.toBe(sonnet);
+  });
+
+  it('opus alias resolves to claude-opus-4-7 (real reviewer role)', () => {
+    const model = resolveReviewerModel({ name: 'correctness', model: 'opus', focus: [] }, 'any-default');
+    expect(model).toBe('claude-opus-4-7');
+  });
 });
 
 // ── parseReviewSynthesis ──────────────────────────────────────────────────────

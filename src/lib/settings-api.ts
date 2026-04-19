@@ -136,6 +136,8 @@ export interface ApiSettingsConfig {
 export function getDefaultConversationModelApi(): ModelId {
   const { config } = loadConfig();
 
+  if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
+
   if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.4');
   if (config.enabledProviders.has('minimax')) return resolveModelId('minimax-m2.7-highspeed');
   if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
@@ -256,6 +258,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       },
       overrides: settings.models.overrides,
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
+      default_conversation_model: settings.models.default_conversation_model,
     },
     api_keys: {
       openai: settings.api_keys.openai,
