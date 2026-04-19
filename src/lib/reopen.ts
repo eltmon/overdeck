@@ -8,9 +8,8 @@
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import {
-  loadReviewStatuses,
-  saveReviewStatuses,
-  type ReviewStatus,
+  getReviewStatus,
+  setReviewStatus,
 } from './review-status.js';
 
 export interface ReopenResult {
@@ -54,9 +53,9 @@ export function reopenWorkspaceState(
     reason: options.reason,
   };
 
-  // 1. Reset specialist states
-  const statuses = loadReviewStatuses();
-  const existing: ReviewStatus | undefined = statuses[issueId];
+  // 1. Reset specialist states — single-row atomic update, no TOCTOU risk.
+  // setReviewStatus() reads only this issue's row and upserts only this issue's row.
+  const existing = getReviewStatus(issueId);
 
   if (existing) {
     result.previousReviewStatus = existing.reviewStatus;
@@ -64,41 +63,24 @@ export function reopenWorkspaceState(
     result.previousMergeStatus = existing.mergeStatus ?? null;
   }
 
-  const now = new Date().toISOString();
-  const history = [...(existing?.history ?? [])];
-
-  // Record the reopen transition in history
-  history.push({
-    type: 'review',
-    status: 'pending',
-    timestamp: now,
-    notes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
-  });
-  while (history.length > 10) history.shift();
-
-  statuses[issueId] = {
-    issueId,
+  setReviewStatus(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
     mergeStatus: 'pending',
-    reviewNotes: undefined,
+    reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
     testNotes: undefined,
     mergeNotes: undefined,
-    updatedAt: now,
     readyForMerge: false,
     prUrl: existing?.prUrl,
     autoRequeueCount: 0,
-    history,
-    // PAN-653 fields: clear stuck state so Deacon resumes processing the issue.
-    // reviewedAtCommit is cleared so the next approve cycle records the new commit.
+    // PAN-653: clear stuck state so Deacon resumes processing this issue.
+    // reviewedAtCommit is cleared so the next approve cycle records the new commit SHA.
     stuck: undefined,
     stuckReason: undefined,
     stuckAt: undefined,
     stuckDetails: undefined,
     reviewedAtCommit: undefined,
-  };
-
-  saveReviewStatuses(statuses);
+  });
   result.specialistStatesReset = true;
 
   // 2. Append "Reopened" section to STATE.md
