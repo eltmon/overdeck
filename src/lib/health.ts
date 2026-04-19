@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
-import { recoverAgent, stopAgent, getAgentState } from './agents.js';
+import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeState } from './agents.js';
 import { capturePaneAsync, listSessionNamesAsync, sessionExistsAsync } from './tmux.js';
 
 // Deacon pattern defaults
@@ -21,7 +21,7 @@ export const DEFAULT_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
 
 export interface AgentHealth {
   agentId: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead';
+  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
   lastActivity?: string;
   lastPing?: string;
   lastPingResponse?: string;
@@ -30,6 +30,7 @@ export interface AgentHealth {
   forceKillCount: number;
   recoveryCount: number;
   inCooldown: boolean;
+  reason?: string;
 }
 
 export interface HealthConfig {
@@ -132,44 +133,67 @@ export async function pingAgent(
   }
 ): Promise<AgentHealth> {
   const health = getAgentHealth(agentId);
-  health.lastPing = new Date().toISOString();
+  const now = new Date();
+  health.lastPing = now.toISOString();
 
-  // Check if session is alive
+  const state = getAgentState(agentId);
+  const runtime = getAgentRuntimeState(agentId);
   const alive = await isAgentAlive(agentId);
+  const runtimeLastActivity = runtime?.lastActivity ? new Date(runtime.lastActivity) : null;
+  const stateLastActivity = state?.lastActivity ? new Date(state.lastActivity) : null;
+  const lastActivity = runtimeLastActivity ?? stateLastActivity;
+  health.lastActivity = lastActivity?.toISOString();
+  health.reason = undefined;
 
-  if (!alive) {
-    // Session is dead
+  if (state?.status === 'stopped' || runtime?.state === 'stopped') {
+    health.status = 'stopped';
+    health.consecutiveFailures = 0;
+    health.reason = 'Agent was intentionally stopped';
+  } else if (!alive) {
     health.status = 'dead';
     health.consecutiveFailures++;
-  } else {
-    // Session is alive - check for activity
-    const state = getAgentState(agentId);
-    const lastActivity = state?.lastActivity ? new Date(state.lastActivity) : null;
+    health.reason = 'tmux session is not running';
+  } else if (runtime?.state === 'waiting-on-human') {
+    health.status = 'warning';
+    health.consecutiveFailures = 0;
+    health.reason = runtime.waitingNotification || runtime.waitingReason || 'Waiting for human input';
+    health.lastPingResponse = now.toISOString();
+  } else if (lastActivity) {
+    const ageMs = now.getTime() - lastActivity.getTime();
+    const ageMinutes = ageMs / (1000 * 60);
 
-    if (lastActivity) {
-      const ageMs = Date.now() - lastActivity.getTime();
-      const ageMinutes = ageMs / (1000 * 60);
-
-      if (ageMinutes > 30) {
-        health.status = 'stuck';
-        health.consecutiveFailures++;
-      } else if (ageMinutes > 15) {
-        health.status = 'warning';
-        // Don't increment failures for warning, just monitor
-      } else {
-        health.status = 'healthy';
-        health.consecutiveFailures = 0;
-      }
+    if (ageMinutes > 30) {
+      health.status = 'stuck';
+      health.consecutiveFailures++;
+      health.reason = `No activity for ${Math.round(ageMinutes)} minutes`;
+    } else if (ageMinutes > 15) {
+      health.status = 'warning';
+      health.reason = `Low activity for ${Math.round(ageMinutes)} minutes`;
     } else {
-      // No activity tracking, assume healthy if alive
       health.status = 'healthy';
       health.consecutiveFailures = 0;
+      health.reason = undefined;
     }
 
-    health.lastPingResponse = new Date().toISOString();
+    health.lastPingResponse = now.toISOString();
+  } else {
+    health.status = 'healthy';
+    health.consecutiveFailures = 0;
+    health.reason = alive ? 'Session alive, no activity timestamp available' : undefined;
+    if (alive) {
+      health.lastPingResponse = now.toISOString();
+    }
   }
 
-  // Check cooldown status
+  console.log(
+    `[health] ${agentId} classified as ${health.status}`
+      + ` alive=${alive}`
+      + ` state=${state?.status ?? 'none'}`
+      + ` runtime=${runtime?.state ?? 'none'}`
+      + ` lastActivity=${health.lastActivity ?? 'none'}`
+      + (health.reason ? ` reason=${health.reason}` : '')
+  );
+
   if (health.lastForceKill) {
     const timeSinceKill = Date.now() - new Date(health.lastForceKill).getTime();
     health.inCooldown = timeSinceKill < config.cooldownMs;
@@ -320,6 +344,8 @@ export async function runHealthCheck(
           results.recovered.push(agentId);
         }
         break;
+      case 'stopped':
+        break;
     }
   }
 
@@ -375,14 +401,23 @@ export function formatHealthStatus(health: AgentHealth): string {
     warning: '\u26a0\ufe0f',
     stuck: '\u{1f7e0}',
     dead: '\u274c',
+    stopped: '\u23f9\ufe0f',
   };
 
   const lines: string[] = [
     `${statusIcons[health.status]} ${health.agentId}: ${health.status.toUpperCase()}`,
   ];
 
+  if (health.lastActivity) {
+    lines.push(`  Last activity: ${health.lastActivity}`);
+  }
+
   if (health.lastPing) {
     lines.push(`  Last ping: ${health.lastPing}`);
+  }
+
+  if (health.reason) {
+    lines.push(`  Reason: ${health.reason}`);
   }
 
   if (health.consecutiveFailures > 0) {

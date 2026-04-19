@@ -340,7 +340,7 @@ function markAgentStopped(state: AgentState): void {
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
 export interface AgentRuntimeState {
-  state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized';
+  state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' | 'waiting-on-human';
   lastActivity: string;
   currentTool?: string;
   sessionId?: string;
@@ -351,6 +351,9 @@ export interface AgentRuntimeState {
   resolution?: AgentResolution; // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;     // How many times this resolution was set
   resolutionUpdatedAt?: string; // When resolution was last updated
+  waitingReason?: string;
+  waitingStartedAt?: string;
+  waitingNotification?: string;
 }
 
 /**
@@ -428,7 +431,6 @@ export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRunti
 
   const runtimeFile = getAgentRuntimeFile(agentId);
 
-  // Merge with existing runtime state (read from runtime.json only, not state.json)
   let existing: AgentRuntimeState | null = null;
   if (existsSync(runtimeFile)) {
     try {
@@ -438,12 +440,32 @@ export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRunti
     }
   }
 
+  const previousState = existing?.state;
   const merged: AgentRuntimeState = {
     ...(existing || { state: 'uninitialized', lastActivity: new Date().toISOString() }),
     ...state,
   };
 
+  if (merged.state !== 'waiting-on-human') {
+    merged.waitingReason = undefined;
+    merged.waitingStartedAt = undefined;
+    merged.waitingNotification = undefined;
+  } else if (!merged.waitingStartedAt) {
+    merged.waitingStartedAt = merged.lastActivity;
+  }
+
   writeFileSync(runtimeFile, JSON.stringify(merged, null, 2));
+
+  if (previousState !== merged.state || state.waitingReason || state.waitingNotification || state.resolution || state.currentTool) {
+    console.log(
+      `[agents] runtime ${agentId}: ${previousState ?? 'none'} -> ${merged.state}`
+        + (merged.waitingReason ? ` waitingReason=${merged.waitingReason}` : '')
+        + (merged.waitingNotification ? ` waitingNotification=${merged.waitingNotification}` : '')
+        + (merged.resolution ? ` resolution=${merged.resolution}` : '')
+        + (merged.currentTool ? ` tool=${merged.currentTool}` : '')
+        + ` lastActivity=${merged.lastActivity}`
+    );
+  }
 }
 
 /**
@@ -1105,7 +1127,11 @@ export function stopAgent(agentId: string): void {
   // Also mark runtime.json as stopped so Cloister/Deacon won't auto-restart.
   // state.json and runtime.json are separate files — both must agree the agent
   // was intentionally stopped to prevent race conditions with health check polls.
-  saveAgentRuntimeState(normalizedId, { state: 'stopped' });
+  console.log(`[agents] Stopping ${normalizedId}: tmux=${sessionExists(normalizedId)} stateStatus=${state?.status ?? 'none'}`);
+  saveAgentRuntimeState(normalizedId, {
+    state: 'stopped',
+    lastActivity: new Date().toISOString(),
+  });
 }
 
 export async function stopAgentAsync(agentId: string): Promise<void> {
@@ -1134,7 +1160,11 @@ export async function stopAgentAsync(agentId: string): Promise<void> {
     saveAgentState(state);
   }
 
-  saveAgentRuntimeState(normalizedId, { state: 'stopped' });
+  console.log(`[agents] Stopping ${normalizedId} (async): tmux=${await sessionExistsAsync(normalizedId)} stateStatus=${state?.status ?? 'none'}`);
+  saveAgentRuntimeState(normalizedId, {
+    state: 'stopped',
+    lastActivity: new Date().toISOString(),
+  });
 }
 
 export async function messageAgent(agentId: string, message: string): Promise<void> {
@@ -1408,9 +1438,12 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
     }
 
     // Update runtime state
+    const resumedAt = new Date().toISOString();
+    console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
     saveAgentRuntimeState(normalizedId, {
       state: 'active',
-      resumedAt: new Date().toISOString(),
+      resumedAt,
+      lastActivity: resumedAt,
     });
 
     // Update agent state
