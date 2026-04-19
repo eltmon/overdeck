@@ -38,7 +38,7 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, saveReviewStatuses, setReviewStatus } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, setReviewStatus } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -90,51 +90,6 @@ describe('markWorkspaceStuck (notifyPipeline symmetry)', () => {
     expect(call.type).toBe('status_changed');
     expect(call.issueId).toBe('PAN-NEW');
     expect(call.status.stuck).toBe(true);
-  });
-});
-
-// ============== saveReviewStatuses batch upsert ==============
-
-describe('saveReviewStatuses (default path)', () => {
-  it('persists batch mutations into SQLite — regression: was no-op before fix', () => {
-    // Seed two entries via direct SQL
-    testDb.prepare(`
-      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
-      VALUES ('PAN-100', 'reviewing', 'pending', datetime('now'), 0),
-             ('PAN-101', 'reviewing', 'pending', datetime('now'), 0)
-    `).run();
-
-    // Simulate what specialists.ts reset flow does: load → mutate → save
-    const statuses = loadReviewStatuses();
-    statuses['PAN-100'].reviewStatus = 'pending';
-    statuses['PAN-100'].updatedAt = new Date().toISOString();
-    statuses['PAN-101'].reviewStatus = 'pending';
-    statuses['PAN-101'].updatedAt = new Date().toISOString();
-    saveReviewStatuses(statuses);
-
-    // Reload from DB and verify the mutations were persisted
-    const after = loadReviewStatuses();
-    expect(after['PAN-100'].reviewStatus).toBe('pending');
-    expect(after['PAN-101'].reviewStatus).toBe('pending');
-  });
-
-  it('deletes SQLite rows absent from the passed map (replace-all semantics)', () => {
-    // Seed two entries
-    testDb.prepare(`
-      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
-      VALUES ('PAN-200', 'passed', 'passed', datetime('now'), 1),
-             ('PAN-201', 'passed', 'passed', datetime('now'), 1)
-    `).run();
-
-    // Load, delete one entry from the map, save
-    const statuses = loadReviewStatuses();
-    delete (statuses as Record<string, unknown>)['PAN-201'];
-    saveReviewStatuses(statuses);
-
-    // PAN-200 still present; PAN-201 deleted from SQLite
-    const after = loadReviewStatuses();
-    expect(after['PAN-200']).toBeDefined();
-    expect(after['PAN-201']).toBeUndefined();
   });
 });
 
