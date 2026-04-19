@@ -172,3 +172,40 @@ describe('clearWorkspaceStuck DB helper — clears only stuck fields', () => {
     expect(after?.readyForMerge).toBe(true);
   });
 });
+
+describe('mergeRetryCount persistence (restart-safety regression)', () => {
+  // Regression: mergeRetryCount is Deacon's circuit breaker for failed-merge retries.
+  // It MUST survive a dashboard restart — if it reset to 0 on reload, the retry cap
+  // would be bypassed and the system could retry indefinitely.
+
+  it('persists mergeRetryCount across a simulated restart (re-read from DB)', () => {
+    setReviewStatus('PAN-RC1', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'failed',
+      readyForMerge: false,
+      mergeRetryCount: 3,
+    });
+
+    // Simulate restart: read directly from DB (bypasses any in-memory cache)
+    const row = getReviewStatusFromDb('PAN-RC1');
+    expect(row?.mergeRetryCount).toBe(3);
+  });
+
+  it('mergeRetryCount increments and persists correctly across writes', () => {
+    setReviewStatus('PAN-RC2', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false, mergeRetryCount: 1 });
+    setReviewStatus('PAN-RC2', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true, mergeRetryCount: 2 });
+
+    const row = getReviewStatusFromDb('PAN-RC2');
+    expect(row?.mergeRetryCount).toBe(2);
+  });
+
+  it('mergeRetryCount defaults to undefined (not 0) when never set', () => {
+    setReviewStatus('PAN-RC3', { reviewStatus: 'pending', testStatus: 'pending' });
+
+    const status = getReviewStatus('PAN-RC3');
+    // Deacon uses `status.mergeRetryCount || 0` so undefined and 0 are equivalent —
+    // but the field must not be fabricated as a non-zero value.
+    expect(status?.mergeRetryCount == null || status.mergeRetryCount === 0).toBe(true);
+  });
+});

@@ -27,11 +27,11 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes,
-        updated_at, ready_for_merge, auto_requeue_count, pr_url,
+        updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
         stuck, stuck_reason, stuck_at, stuck_details,
         reviewed_at_commit
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -47,6 +47,7 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         updated_at            = excluded.updated_at,
         ready_for_merge       = excluded.ready_for_merge,
         auto_requeue_count    = excluded.auto_requeue_count,
+        merge_retry_count     = excluded.merge_retry_count,
         pr_url                = excluded.pr_url,
         stuck                 = excluded.stuck,
         stuck_reason          = excluded.stuck_reason,
@@ -68,6 +69,7 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.updatedAt,
       s.readyForMerge ? 1 : 0,
       s.autoRequeueCount ?? null,
+      s.mergeRetryCount ?? null,
       s.prUrl ?? null,
       s.stuck ? 1 : 0,
       s.stuckReason ?? null,
@@ -171,6 +173,7 @@ interface DbReviewStatusRow {
   updated_at: string;
   ready_for_merge: number;
   auto_requeue_count: number | null;
+  merge_retry_count: number | null;
   pr_url: string | null;
   // PAN-653: persistent stuck state
   stuck: number;
@@ -197,6 +200,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     updatedAt: row.updated_at,
     readyForMerge: row.ready_for_merge === 1,
     autoRequeueCount: row.auto_requeue_count ?? undefined,
+    mergeRetryCount: row.merge_retry_count ?? undefined,
     prUrl: row.pr_url ?? undefined,
     stuck: row.stuck === 1 ? true : undefined,
     stuckReason: row.stuck_reason ?? undefined,
