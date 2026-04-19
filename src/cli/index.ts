@@ -65,6 +65,7 @@ import { registerConvoyCommands } from './commands/convoy/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
+import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
@@ -554,7 +555,32 @@ program
     })();
 
     if (electronAppPath) {
-      console.log(chalk.dim(`Launching Panopticon desktop app...`));
+      // Start shared sidecars BEFORE launching the Electron app — otherwise
+      // `pan up` would return early and leave CLIProxy/TLDR down, which is
+      // exactly the "restart did not bring the system back up" failure mode.
+      try {
+        const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
+        console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
+        startCliproxy();
+        console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
+      }
+
+      try {
+        const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
+        const projectRoot = process.cwd();
+        const venvPath = join(projectRoot, '.venv');
+        if (existsSync(venvPath)) {
+          const tldrService = getTldrDaemonService(projectRoot, venvPath);
+          await tldrService.start(true);
+          console.log(chalk.green('✓ TLDR daemon started'));
+        }
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
+      }
+
+      console.log(chalk.dim(`\nLaunching Panopticon desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
       const child = spawn(electronAppPath, [], {
@@ -646,7 +672,19 @@ program
           child.unref();
         }
       }, 100);
-      console.log(chalk.green('✓ Dashboard started in background'));
+
+      // Health-gate: poll /api/health before reporting success so a half-started
+      // dashboard can't masquerade as healthy. On timeout we log a warning but
+      // do NOT tear down CLIProxy/TLDR below — keeping the system in the best
+      // recoverable state (dashboard-side failure, sidecars still usable).
+      try {
+        const { waitForDashboardHealth } = await import('../lib/platform-lifecycle.js');
+        await waitForDashboardHealth(dashboardApiPort, { timeoutMs: 15_000 });
+        console.log(chalk.green('✓ Dashboard started in background and passed /api/health'));
+      } catch (err: any) {
+        console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
+        console.log(chalk.dim('  CLIProxy and Traefik have been left running — recover with `pan restart --dashboard` once the issue is fixed.'));
+      }
       if (traefikEnabled) {
         console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
         console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
@@ -744,12 +782,15 @@ program
       }
     }
 
-    // Stop dashboard
+    // Stop dashboard — SIGTERM first, escalate to SIGKILL only if it refuses to exit.
+    // Uses the shared lifecycle helper so `pan down` and `pan restart --dashboard`
+    // have identical teardown semantics.
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      // Kill processes on dashboard ports
-      execSync(`lsof -ti:${dashboardPort} | xargs kill -9 2>/dev/null || true`, { stdio: 'pipe' });
-      execSync(`lsof -ti:${dashboardApiPort} | xargs kill -9 2>/dev/null || true`, { stdio: 'pipe' });
+      const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+      const platformConfig = readPlatformConfig();
+      // Respect whatever ports this block already parsed out of config.toml.
+      await stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort });
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));
@@ -807,6 +848,19 @@ program
 
     console.log('');
   });
+
+// Scoped restart: `pan restart` defaults to the dashboard only and never
+// touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.
+// See src/cli/commands/restart.ts for the scope contract.
+program
+  .command('restart')
+  .description('Restart a platform component (default: dashboard only — leaves CLIProxy, Traefik, TLDR running)')
+  .option('--dashboard', 'Restart only the dashboard (default)')
+  .option('--cliproxy', 'Restart only the CLIProxy sidecar')
+  .option('--traefik', 'Restart only Traefik')
+  .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
+  .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
+  .action(restartCommand);
 
 // Project management commands
 const project = program.command('project').description('Project registry for multi-project workspace support');

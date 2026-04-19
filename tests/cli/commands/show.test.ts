@@ -190,7 +190,6 @@ describe('showCommand', () => {
 
       await showCommand('PAN-8', { json: true });
 
-      // Capture call state BEFORE restoring — mockRestore clears call history.
       const calls = logSpy.mock.calls.slice();
       logSpy.mockRestore();
 

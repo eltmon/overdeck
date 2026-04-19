@@ -238,7 +238,12 @@ export function isProjectSpecialistActivelyRunning(
   fallbackRunning: boolean = false
 ): boolean {
   if (runtimeState?.state === 'active') return true;
-  if (runtimeState?.state === 'idle' || runtimeState?.state === 'suspended' || runtimeState?.state === 'stopped') {
+  if (
+    runtimeState?.state === 'idle'
+    || runtimeState?.state === 'suspended'
+    || runtimeState?.state === 'stopped'
+    || runtimeState?.state === 'waiting-on-human'
+  ) {
     return false;
   }
   return fallbackRunning;
@@ -2089,7 +2094,7 @@ export async function getSpecialistStatus(
     state,
     isRunning: running,
     tmuxSession: getTmuxSessionName(name, projectKey),
-    currentIssue: runtimeState?.currentIssue,
+    currentIssue: running ? runtimeState?.currentIssue : undefined,
   };
 }
 

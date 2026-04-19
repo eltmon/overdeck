@@ -104,3 +104,4 @@ temp/
 
 # Release notes generated during version bumps
 .release/
+.claude/worktrees/

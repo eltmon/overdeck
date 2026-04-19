@@ -320,6 +320,40 @@ requires:
     });
   });
 
+  describe('live review template', () => {
+    const baseReviewVars = {
+      ISSUE_ID: 'PAN-999',
+      BRANCH: 'feature/pan-999',
+      WORKSPACE: '/tmp/repo',
+      DIFF_BASE: 'main',
+      IS_POLYREPO: false,
+      GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
+      GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
+      API_URL: 'http://localhost:3011',
+    };
+
+    it('reports stale branches through specialists/done instead of direct review status updates', () => {
+      const out = renderPrompt({
+        name: 'review',
+        vars: baseReviewVars,
+      });
+      expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
+      expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"passed"');
+      expect(out).not.toContain('/api/review/PAN-999/status');
+      expect(out).not.toContain('pan tell PAN-999');
+    });
+
+    it('reports blocked review results through specialists/done instead of pan tell', () => {
+      const out = renderPrompt({
+        name: 'review',
+        vars: baseReviewVars,
+      });
+      expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"failed"');
+      expect(out).toContain('Do NOT message the work agent directly');
+      expect(out).not.toContain('pan tell PAN-999');
+    });
+  });
+
   describe('live merge template', () => {
     const baseVars = {
       ISSUE_ID: 'PAN-999',
