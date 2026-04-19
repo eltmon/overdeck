@@ -763,7 +763,7 @@ export async function pushApproveMain(
   try {
     await gitPush(projectPath, 'origin', 'main', { issueId });
     return { pushed: true };
-  } catch (pushErr: any) {
+  } catch (pushErr: unknown) {
     if (pushErr instanceof MainDivergedError) {
       // Mark the workspace stuck so Deacon skips it — no automatic retry.
       // Do NOT hard-reset local main here: that is a destructive operation that
@@ -779,7 +779,8 @@ export async function pushApproveMain(
       const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover: cd ${projectPath} && git reset --hard origin/main, then unstick and retry.`;
       return { pushed: false, httpStatus: 409, error };
     }
-    const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
+    const message = pushErr instanceof Error ? pushErr.message : String(pushErr);
+    const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${message}`;
     return { pushed: false, httpStatus: 400, error };
   }
 }

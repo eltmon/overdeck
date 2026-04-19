@@ -89,6 +89,13 @@ export function reopenWorkspaceState(
     prUrl: existing?.prUrl,
     autoRequeueCount: 0,
     history,
+    // PAN-653 fields: clear stuck state so Deacon resumes processing the issue.
+    // reviewedAtCommit is cleared so the next approve cycle records the new commit.
+    stuck: undefined,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewedAtCommit: undefined,
   };
 
   saveReviewStatuses(statuses);

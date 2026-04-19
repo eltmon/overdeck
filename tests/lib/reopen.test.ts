@@ -36,8 +36,9 @@ function seedStatus(data: Record<string, unknown>) {
     testDb.prepare(`
       INSERT OR REPLACE INTO review_status
         (issue_id, review_status, test_status, merge_status, ready_for_merge,
-         pr_url, auto_requeue_count, stuck, stuck_reason, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         pr_url, auto_requeue_count, stuck, stuck_reason, stuck_at,
+         reviewed_at_commit, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       issueId,
       row.reviewStatus ?? 'pending',
@@ -48,6 +49,8 @@ function seedStatus(data: Record<string, unknown>) {
       row.autoRequeueCount ?? 0,
       row.stuck ? 1 : 0,
       row.stuckReason ?? null,
+      row.stuckAt ?? null,
+      row.reviewedAtCommit ?? null,
       row.updatedAt ?? new Date().toISOString(),
     );
   }
@@ -209,6 +212,49 @@ describe('reopenWorkspaceState', () => {
     const result = reopenWorkspaceState('PAN-999', wsDir);
 
     expect(result.queueItemsRemoved).toEqual({});
+
+    rmSync(wsDir, { recursive: true, force: true });
+  });
+
+  // PAN-653 regression: reopen must clear stuck state and reviewedAtCommit
+  it('clears stuck fields on reopen-after-stuck so Deacon resumes the issue', () => {
+    seedStatus({
+      'PAN-999': {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        stuck: true,
+        stuckReason: 'main_diverged',
+        stuckAt: '2026-04-19T00:00:00Z',
+        readyForMerge: false,
+      },
+    });
+    const wsDir = createWorkspace();
+
+    reopenWorkspaceState('PAN-999', wsDir);
+
+    const row = readStatus('PAN-999')!;
+    expect(row.stuck).toBeFalsy();
+    expect(row.stuck_reason).toBeNull();
+    expect(row.stuck_at).toBeNull();
+
+    rmSync(wsDir, { recursive: true, force: true });
+  });
+
+  it('clears reviewedAtCommit on reopen-after-reviewed so next approve records the new commit', () => {
+    seedStatus({
+      'PAN-999': {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        reviewedAtCommit: 'abc1234',
+        readyForMerge: true,
+      },
+    });
+    const wsDir = createWorkspace();
+
+    reopenWorkspaceState('PAN-999', wsDir);
+
+    const row = readStatus('PAN-999')!;
+    expect(row.reviewed_at_commit).toBeNull();
 
     rmSync(wsDir, { recursive: true, force: true });
   });

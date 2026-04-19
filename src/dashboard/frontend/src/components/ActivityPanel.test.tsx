@@ -7,9 +7,87 @@
  *   - applyPinWarnings(): warn/error pinned to top
  */
 
-import { describe, it, expect } from 'vitest';
-import { inferCategory, mergeActivitiesById, applyPinWarnings } from './ActivityPanel';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { inferCategory, mergeActivitiesById, applyPinWarnings, ActivityPanel } from './ActivityPanel';
 import type { ActivityEntry } from './ActivityPanel';
+
+// ── ActivityPanel component tests ─────────────────────────────────────────────
+
+vi.mock('../lib/store', () => ({
+  useDashboardStore: (selector: (s: { recentActivity: unknown[] }) => unknown) =>
+    selector({ recentActivity: [] }),
+}));
+
+function renderPanel() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+  return render(
+    <QueryClientProvider client={client}>
+      <ActivityPanel onClose={vi.fn()} />
+    </QueryClientProvider>,
+  );
+}
+
+describe('ActivityPanel — Clear button', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+  });
+
+  it('does not show Clear button when all filters are at defaults', () => {
+    renderPanel();
+    fireEvent.click(screen.getByText('Filter'));
+    // Clear is only visible when a non-default filter is active
+    expect(screen.queryByText('Clear')).toBeNull();
+  });
+
+  it('shows Clear button when a filter is set', () => {
+    renderPanel();
+    fireEvent.click(screen.getByText('Filter'));
+    // Change level filter away from 'all'
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'error' } });
+    expect(screen.getByText('Clear')).toBeTruthy();
+  });
+
+  it('Clear resets level/source/category/search but preserves pinWarnings=true', () => {
+    renderPanel();
+    fireEvent.click(screen.getByText('Filter'));
+
+    // Set a non-default filter to make Clear visible
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'error' } });
+    // pinWarnings checkbox starts checked (default true); leave it checked
+    const pinCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(pinCheckbox.checked).toBe(true);
+
+    fireEvent.click(screen.getByText('Clear'));
+
+    // Level reset to 'all'
+    expect((screen.getAllByRole('combobox')[0] as HTMLSelectElement).value).toBe('all');
+    // pinWarnings preserved: checkbox still checked
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    // Clear button gone (all filters back to defaults)
+    expect(screen.queryByText('Clear')).toBeNull();
+  });
+
+  it('Clear preserves pinWarnings=false when user unchecked it', () => {
+    renderPanel();
+    fireEvent.click(screen.getByText('Filter'));
+
+    // Uncheck pinWarnings
+    fireEvent.click(screen.getByRole('checkbox'));
+    // Set a filter to make Clear visible
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'warn' } });
+
+    fireEvent.click(screen.getByText('Clear'));
+
+    // pinWarnings preserved as false
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+    // Other filters reset
+    expect((screen.getAllByRole('combobox')[0] as HTMLSelectElement).value).toBe('all');
+  });
+});
 
 function makeEntry(partial: Partial<ActivityEntry> & { id: string }): ActivityEntry {
   return {
