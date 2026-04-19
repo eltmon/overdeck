@@ -22,6 +22,7 @@
     "dev:electron": "bun run scripts/dev-electron.mjs",
     "build": "tsdown",
     "build:publish": "node scripts/build-for-publish.mjs",
+    "prepublishOnly": "node scripts/build-for-publish.mjs",
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",

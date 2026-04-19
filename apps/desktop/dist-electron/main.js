@@ -375,7 +375,7 @@ function broadcastToRenderers(channel, ...args) {
 * Initialize the auto-updater service.
 * Sets up event handlers and starts periodic update checks.
 */
-function initializeAutoUpdater() {
+function initializeAutoUpdater(channel = "latest") {
 	if (initialized) {
 		console.log("[updater] Already initialized, skipping...");
 		return;
@@ -386,6 +386,7 @@ function initializeAutoUpdater() {
 		owner: "eltmon",
 		repo: "panopticon-cli"
 	});
+	electron_updater.autoUpdater.channel = channel;
 	electron_updater.autoUpdater.autoDownload = false;
 	electron_updater.autoUpdater.autoInstallOnAppQuit = true;
 	electron_updater.autoUpdater.on("checking-for-update", () => {
@@ -889,19 +890,26 @@ let isQuitting = false;
 const terminalWindows = /* @__PURE__ */ new Map();
 function resolveResourcePath(fileName) {
 	const candidates = [
-		node_path.join(__dirname, "../resources", fileName),
 		node_path.join(process.resourcesPath ?? "", "resources", fileName),
+		node_path.join(__dirname, "../resources", fileName),
 		node_path.join(ROOT_DIR, "apps/desktop/resources", fileName)
 	];
 	for (const candidate of candidates) if (node_fs.existsSync(candidate)) return candidate;
 	return null;
 }
 function resolveServerEntry() {
-	if (!electron.app.isPackaged) return node_path.join(ROOT_DIR, "dist/dashboard/server.js");
-	return node_path.join(process.resourcesPath ?? "", "server/server.js");
+	if (electron.app.isPackaged) return node_path.join(process.resourcesPath ?? "", "server/server.js");
+	const npxBundle = node_path.join(__dirname, "../server/server.js");
+	if (node_fs.existsSync(npxBundle)) return npxBundle;
+	return node_path.join(ROOT_DIR, "dist/dashboard/server.js");
 }
 function resolveServerStaticDir() {
-	const candidates = [node_path.join(ROOT_DIR, "dist/dashboard/public"), node_path.join(process.resourcesPath ?? "", "server/public")];
+	const candidates = [];
+	if (electron.app.isPackaged) candidates.push(node_path.join(process.resourcesPath ?? "", "server/public"));
+	else {
+		candidates.push(node_path.join(__dirname, "../server/public"));
+		candidates.push(node_path.join(ROOT_DIR, "dist/dashboard/public"));
+	}
 	for (const candidate of candidates) if (node_fs.existsSync(node_path.join(candidate, "index.html"))) return candidate;
 	return null;
 }
@@ -1064,7 +1072,7 @@ electron.app.on("ready", () => {
 	initializeNotifications();
 	configureApplicationMenu();
 	registerDesktopProtocol();
-	initializeAutoUpdater();
+	initializeAutoUpdater(electron.app.getVersion().includes("-canary") ? "beta" : "latest");
 	if (process.platform === "win32") electron.app.setAppUserModelId(APP_ID);
 	if (process.platform === "darwin" && electron.app.dock) {
 		const iconPath = resolveResourcePath("icon.png");
