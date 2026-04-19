@@ -1989,15 +1989,30 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 }
 
 /** Diverged badge with Unstick button — shown when main diverged during git push */
-export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifier: string; stuckReason?: string | null }) {
+export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { issueIdentifier: string; stuckReason?: string | null; stuckDetails?: string | null }) {
   const [unstickError, setUnstickError] = useState<string | null>(null);
+
+  // Parse SHA details stored by pushApproveMain when MainDivergedError was thrown
+  let shaInfo = '';
+  if (stuckDetails) {
+    try {
+      const d = JSON.parse(stuckDetails) as Record<string, unknown>;
+      const local = typeof d.localSha === 'string' ? d.localSha.slice(0, 7) : null;
+      const remote = typeof d.remoteSha === 'string' ? d.remoteSha.slice(0, 7) : null;
+      if (local && remote) shaInfo = ` (local: ${local}, remote: ${remote})`;
+      else if (remote) shaInfo = ` (remote: ${remote})`;
+    } catch { /* ignore malformed details */ }
+  }
+
+  const titleText = stuckReason
+    ? `Push blocked: ${stuckReason}${shaInfo}. Run: git reset --hard origin/main, then click Unstick to retry.`
+    : `Push blocked due to divergence from origin/main${shaInfo}. Run: git reset --hard origin/main, then click Unstick to retry.`;
+
   return (
     <span className="flex flex-col gap-0.5">
       <span
         className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
-        title={stuckReason
-          ? `Push blocked: ${stuckReason}. Click Unstick after syncing main.`
-          : 'Push blocked due to divergence from origin/main. Sync main and click Unstick to retry.'}
+        title={titleText}
       >
         <XCircle className="w-3 h-3" />
         Diverged
@@ -2724,6 +2739,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <DivergedBadge
                 issueIdentifier={issue.identifier || ''}
                 stuckReason={reviewStatus.stuckReason}
+                stuckDetails={reviewStatus.stuckDetails}
               />
             )}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}

@@ -665,6 +665,27 @@ describe('DivergedBadge', () => {
     expect(span?.getAttribute('title')).toContain('main advanced by 3 commits');
   });
 
+  it('shows abbreviated localSha and remoteSha from stuckDetails in title', () => {
+    const details = JSON.stringify({ localSha: 'aaa1111aaaa', remoteSha: 'bbb2222bbbb' });
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckDetails={details} />);
+    const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
+    expect(title).toContain('aaa1111'); // first 7 chars of localSha
+    expect(title).toContain('bbb2222'); // first 7 chars of remoteSha
+  });
+
+  it('includes recovery instructions in title', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
+    const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
+    expect(title).toContain('git reset --hard origin/main');
+  });
+
+  it('handles malformed stuckDetails gracefully without throwing', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckDetails="not-json" />);
+    const span = container.querySelector('span[title]');
+    // Falls back to the generic message without SHA info
+    expect(span?.getAttribute('title')).toContain('divergence from origin/main');
+  });
+
   it('POSTs to /api/workspaces/:issueId/unstick when Unstick is clicked', async () => {
     render(<DivergedBadge issueIdentifier="PAN-42" />);
     fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));

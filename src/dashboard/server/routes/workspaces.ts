@@ -58,7 +58,7 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
-  clearWorkspaceStuck,
+
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
@@ -3062,19 +3062,21 @@ export function processUnstickRequest(
   if (!currentStatus?.stuck) {
     return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
   }
-  clearWorkspaceStuck(issueId);
-  console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
-  // Reset the review/test lifecycle to 'pending' so Deacon's orphan-recovery patrol
-  // will automatically re-dispatch the review on the next tick. Without this reset,
-  // an issue stranded at reviewStatus=passed/testStatus=passed would remain stuck
-  // indefinitely because no patrol path re-triggers a completed-looking pipeline.
+  // Atomic single-write: clear stuck state and reset the review/test lifecycle
+  // in one setReviewStatus call (one DB upsert, one notifyPipeline event).
+  // Two separate calls (clearWorkspaceStuck + setReviewStatus) would emit an
+  // intermediate non-stuck/passed state that can briefly hide the badge in the UI.
   setReviewStatus(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
     mergeStatus: 'pending',
     readyForMerge: false,
+    stuck: undefined,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
   });
-  console.log(`[unstick] Reset review/test/merge lifecycle to pending for ${issueId} — deacon will re-dispatch`);
+  console.log(`[unstick] Atomically cleared stuck flag and reset lifecycle to pending for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'}) — deacon will re-dispatch`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
 }
 
