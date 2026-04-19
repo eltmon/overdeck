@@ -3094,6 +3094,7 @@ export function processUnstickRequest(
     stuckReason: undefined,
     stuckAt: undefined,
     stuckDetails: undefined,
+    reviewedAtCommit: undefined,
   });
   console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };

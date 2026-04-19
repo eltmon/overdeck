@@ -171,4 +171,23 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     expect(result.httpStatus).toBe(200);
     expect((result.body as { previousReason?: string }).previousReason).toBe('main_diverged');
   });
+
+  it('200: clears reviewedAtCommit so deacon does not re-trigger post-review reset', () => {
+    // Regression: without clearing reviewedAtCommit, Deacon's checkPostReviewCommits()
+    // would detect HEAD != reviewedAtCommit immediately after unstick and reset the
+    // pipeline a second time, causing duplicate invalidation / stale state.
+    setReviewStatus('PAN-RAC-CLEAR', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      reviewedAtCommit: 'sha-before-divergence',
+    });
+    markWorkspaceStuck('PAN-RAC-CLEAR', 'main_diverged');
+    const stuckStatus = getReviewStatus('PAN-RAC-CLEAR');
+
+    processUnstickRequest('PAN-RAC-CLEAR', true, stuckStatus, true);
+
+    const after = getReviewStatus('PAN-RAC-CLEAR');
+    expect(after?.reviewedAtCommit).toBeUndefined();
+  });
 });
