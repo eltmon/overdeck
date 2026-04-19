@@ -431,10 +431,10 @@ describe('model-fallback', () => {
       expect(zaiModels).toContain('glm-5.1');
     });
 
-    it('glm-4.7 falls back to Sonnet when zai is disabled', () => {
+    it('glm-4.7 and glm-4.7-flash fall back to Sonnet when zai is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
       expect(applyFallback('glm-4.7' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
-      expect(applyFallback('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-haiku-4-5');
+      expect(applyFallback('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
     });
 
     it('glm-4.7 stays when zai is enabled', () => {

@@ -112,8 +112,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'minimax-m2.7-highspeed': 'claude-sonnet-4-6', // Same quality, faster → Sonnet
 
   // Z.AI → Anthropic
-  'glm-4.7': 'claude-sonnet-4-6', // Top open-source → Sonnet
-  'glm-4.7-flash': 'claude-haiku-4-5', // Fast/affordable → Haiku
+  'glm-5.1': 'claude-sonnet-4-6', // Current GLM flagship → Sonnet
 };
 
 /**

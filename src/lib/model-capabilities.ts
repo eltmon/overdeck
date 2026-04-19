@@ -370,8 +370,8 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   // Legacy OpenAI IDs — deprecated aliases kept for backward compat with saved configs
   'gpt-5.2-codex': { model: 'gpt-5.2-codex', provider: 'openai', displayName: 'GPT-5.2 Codex (deprecated)', costPer1MTokens: 20.0, contextWindow: 128000, skills: { 'code-generation': 92, 'code-review': 90, debugging: 88, planning: 85, documentation: 85, testing: 85, security: 80, performance: 82, synthesis: 88, speed: 50, 'context-length': 75 } },
   'o3-deep-research': { model: 'o3-deep-research', provider: 'openai', displayName: 'O3 Deep Research (deprecated)', costPer1MTokens: 5.0, contextWindow: 200000, skills: { 'code-generation': 88, 'code-review': 95, debugging: 98, planning: 95, documentation: 88, testing: 88, security: 92, performance: 92, synthesis: 95, speed: 25, 'context-length': 95 } },
-  'gpt-4o': { model: 'gpt-4o', provider: 'openai', displayName: 'GPT-4o (deprecated)', costPer1MTokens: 7.5, contextWindow: 128000, skills: { 'code-generation': 82, 'code-review': 80, debugging: 78, planning: 76, documentation: 80, testing: 76, security: 74, performance: 74, synthesis: 80, speed: 75, 'context-length': 75 } },
-  'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'openai', displayName: 'GPT-4o Mini (deprecated)', costPer1MTokens: 0.6, contextWindow: 128000, skills: { 'code-generation': 68, 'code-review': 64, debugging: 60, planning: 56, documentation: 66, testing: 60, security: 52, performance: 56, synthesis: 62, speed: 92, 'context-length': 75 } },
+  'gpt-4o': { model: 'gpt-4o', provider: 'openai', displayName: 'GPT-4o', costPer1MTokens: 7.5, contextWindow: 128000, skills: { 'code-generation': 82, 'code-review': 80, debugging: 78, planning: 76, documentation: 80, testing: 76, security: 74, performance: 74, synthesis: 80, speed: 75, 'context-length': 75 } },
+  'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'openai', displayName: 'GPT-4o Mini', costPer1MTokens: 0.6, contextWindow: 128000, skills: { 'code-generation': 68, 'code-review': 64, debugging: 60, planning: 56, documentation: 66, testing: 60, security: 52, performance: 56, synthesis: 62, speed: 92, 'context-length': 75 } },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GOOGLE MODELS
@@ -574,7 +574,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   'glm-4.7': {
     model: 'glm-4.7',
     provider: 'zai',
-    displayName: 'GLM-4.7',
+    displayName: 'GLM-4.7 (deprecated)',
     costPer1MTokens: 1.5,
     contextWindow: 200000,
     skills: {
@@ -596,7 +596,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   'glm-4.7-flash': {
     model: 'glm-4.7-flash',
     provider: 'zai',
-    displayName: 'GLM-4.7 Flash',
+    displayName: 'GLM-4.7 Flash (deprecated)',
     costPer1MTokens: 0.3,
     contextWindow: 200000,
     skills: {
