@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { access, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
@@ -66,15 +67,13 @@ function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>)
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
-  // Prefer SQLite when using the default path
+  // SQLite is the authoritative store for the default (server) path.
+  // No JSON fallback — a DB error is a real error, not a graceful degradation path.
   if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      return getAllReviewStatusesFromDb();
-    } catch {
-      // Fall through to JSON on DB error
-    }
+    return getAllReviewStatusesFromDb();
   }
 
+  // Non-default path: legacy JSON file (tests, CLI tools)
   try {
     if (existsSync(filePath)) {
       return JSON.parse(readFileSync(filePath, 'utf-8'));
@@ -86,6 +85,10 @@ export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<strin
 }
 
 export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
+  // SQLite is the authoritative store for the default (server) path — no JSON write.
+  if (filePath === DEFAULT_STATUS_FILE) return;
+
+  // Non-default path: legacy JSON file (tests, CLI tools)
   try {
     const dir = dirname(filePath);
     if (!existsSync(dir)) {
@@ -276,13 +279,13 @@ export function setReviewStatus(
         const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
         let workspace: string | undefined;
         let branch: string | undefined;
-        if (existsSync(workStateFile)) {
-          try {
-            const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
-            workspace = workState.workspace;
-            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-          } catch {}
-        }
+        try {
+          await access(workStateFile);
+          const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
+          workspace = workState.workspace;
+          branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+        } catch {}
+
         const resolved = resolveProjectFromIssue(issueId);
         if (!resolved) {
           console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
@@ -311,15 +314,11 @@ export function setReviewStatus(
 }
 
 export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
-  // Prefer SQLite when using the default path
+  // SQLite is the authoritative store for the default (server) path.
   if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      const fromDb = getReviewStatusFromDb(issueId);
-      if (fromDb) return fromDb;
-    } catch {
-      // Fall through to JSON on DB error
-    }
+    return getReviewStatusFromDb(issueId) ?? null;
   }
+  // Non-default path: legacy JSON file (tests, CLI tools)
   const statuses = loadReviewStatuses(filePath);
   return statuses[issueId] || null;
 }
@@ -388,18 +387,20 @@ export function fixStuckReadyForMerge(): void {
 }
 
 export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
-  const statuses = loadReviewStatuses(filePath);
-  delete statuses[issueId];
-  saveReviewStatuses(statuses, filePath);
-
-  // Dual-delete from SQLite when using the default path
+  // SQLite is the authoritative store for the default (server) path.
   if (filePath === DEFAULT_STATUS_FILE) {
     try {
       dbDelete(issueId);
     } catch (err) {
-      console.error('[review-status] SQLite delete failed (continuing with JSON):', err);
+      console.error('[review-status] SQLite delete failed:', err);
     }
+    return;
   }
+
+  // Non-default path: legacy JSON file (tests, CLI tools)
+  const statuses = loadReviewStatuses(filePath);
+  delete statuses[issueId];
+  saveReviewStatuses(statuses, filePath);
 }
 
 // ============== Stuck state helpers (PAN-653) ==============
