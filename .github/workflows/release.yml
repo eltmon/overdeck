@@ -73,6 +73,18 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Publish panctl to npm
+        run: |
+          cd apps/desktop
+          node scripts/build-for-publish.mjs
+          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
+            npm publish --provenance --access public
+          else
+            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   desktop:
     needs: classify
     strategy:

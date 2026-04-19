@@ -1,0 +1,21 @@
+# Source — not needed at runtime
+src/
+tests/
+tsconfig.json
+tsdown.config.ts
+vitest.config.ts
+scripts/
+
+# Build artifacts excluded from npm but present in git
+dist-electron/**/*.map
+
+# Dev tools
+node_modules/
+
+# electron-builder output
+dist/
+release/
+
+# OS files
+.DS_Store
+Thumbs.db
