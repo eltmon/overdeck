@@ -22,6 +22,19 @@ import {
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panopticon/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 
+// ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
+
+export async function discoverNewAgentIds(agentsDir: string, cachedIds: Set<string>): Promise<string[]> {
+  const { readdir } = await import('node:fs/promises');
+  let entries: string[];
+  try {
+    entries = await readdir(agentsDir);
+  } catch {
+    return [];
+  }
+  return entries.filter(e => !cachedIds.has(e) && existsSync(join(agentsDir, e, 'state.json')));
+}
+
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
 
@@ -160,23 +173,13 @@ export const ReadModelServiceLive = Layer.effect(
 
           // Also pick up agents created after the last cache save (new state files not in cache)
           const cachedIds = new Set(validAgents.map((a: any) => a.id));
-          const { readdirSync: readdirSyncFs } = yield* Effect.promise(() => import('node:fs'));
-          const newAgentIds: string[] = [];
-          try {
-            const entries = readdirSyncFs(agentsDir);
-            for (const entry of entries) {
-              if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
-                newAgentIds.push(entry);
-              }
-            }
-          } catch { /* agentsDir may not exist on first boot */ }
+          const newAgentIds: string[] = yield* Effect.promise(() => discoverNewAgentIds(agentsDir, cachedIds));
 
           // Load new agent state files and add them to the snapshot
-          const { readFileSync: readFileSyncFs } = yield* Effect.promise(() => import('node:fs'));
           const newAgents: any[] = [];
           for (const agentId of newAgentIds) {
             try {
-              const raw = readFileSyncFs(joinPath(agentsDir, agentId, 'state.json'), 'utf-8');
+              const raw: string = yield* Effect.promise(() => import('node:fs/promises').then(fs => fs.readFile(joinPath(agentsDir, agentId, 'state.json'), 'utf-8')));
               newAgents.push(JSON.parse(raw));
             } catch { /* skip unreadable state files */ }
           }

@@ -8,8 +8,8 @@
  * AgentEnrichmentService background poller.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
-import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 import { encodeClaudeProjectDir } from './paths.js'
@@ -42,18 +42,21 @@ export function getClaudeProjectDir(workspacePath: string): string {
   return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
 }
 
-export function getActiveSessionPath(projectDir: string): string | null {
+export async function getActiveSessionPath(projectDir: string): Promise<string | null> {
   if (!existsSync(projectDir)) return null
   try {
-    const files = readdirSync(projectDir)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(f => ({
+    const entries = await readdir(projectDir)
+    const jsonlFiles = entries.filter(f => f.endsWith('.jsonl'))
+    if (jsonlFiles.length === 0) return null
+    const withMtime = await Promise.all(
+      jsonlFiles.map(async f => ({
         name: f,
         path: join(projectDir, f),
-        mtime: statSync(join(projectDir, f)).mtime.getTime(),
+        mtime: (await stat(join(projectDir, f))).mtime.getTime(),
       }))
-      .sort((a, b) => b.mtime - a.mtime)
-    return files.length > 0 ? files[0].path : null
+    )
+    withMtime.sort((a, b) => b.mtime - a.mtime)
+    return withMtime[0].path
   } catch {
     return null
   }
@@ -86,7 +89,7 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
   const stateFile = join(getAgentDir(agentId), 'state.json')
   if (existsSync(stateFile)) {
     try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'))
       if (state.workspace) return state.workspace
     } catch {}
   }
@@ -115,7 +118,7 @@ export async function getAgentJsonlPath(agentId: string): Promise<string | null>
   const workspace = await getAgentWorkspace(agentId)
   if (!workspace) return null
   const projectDir = getClaudeProjectDir(workspace)
-  return getActiveSessionPath(projectDir)
+  return await getActiveSessionPath(projectDir)
 }
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
@@ -169,7 +172,7 @@ export async function getAgentJsonlMtime(agentId: string): Promise<number | null
   const jsonlPath = await getAgentJsonlPath(agentId)
   if (!jsonlPath || !existsSync(jsonlPath)) return null
   try {
-    return statSync(jsonlPath).mtime.getTime()
+    return (await stat(jsonlPath)).mtime.getTime()
   } catch {
     return null
   }
@@ -198,7 +201,7 @@ export async function computeAgentEnrichment(
   let statePhase: string | undefined
   if (existsSync(stateFile)) {
     try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'))
       statePhase = state.phase
     } catch {}
   }

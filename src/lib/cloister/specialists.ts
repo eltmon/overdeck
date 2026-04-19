@@ -234,7 +234,7 @@ export interface ProjectSpecialistMetadata {
 }
 
 export function isProjectSpecialistActivelyRunning(
-  runtimeState?: { state?: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' } | null,
+  runtimeState?: { state?: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' | 'waiting-on-human' } | null,
   fallbackRunning: boolean = false
 ): boolean {
   if (runtimeState?.state === 'active') return true;

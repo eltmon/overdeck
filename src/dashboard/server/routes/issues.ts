@@ -25,8 +25,8 @@ import { httpHandler } from './http-handler.js';
  */
 
 import { exec, spawn } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, writeFile, access } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +64,18 @@ function getIssueDataService(): IssueDataService {
   // Use the shared singleton — started by server.ts on boot
   const { getSharedIssueService } = require('../services/issue-service-singleton.js');
   return getSharedIssueService();
+}
+
+// ─── Exported async cleanup helpers (used by routes + tests) ─────────────────
+
+export async function cleanupAgentStateDirs(dirs: string[]): Promise<void> {
+  for (const dir of dirs) {
+    if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
+  }
+}
+
+export async function removeCompletionMarker(markerPath: string): Promise<void> {
+  if (existsSync(markerPath)) await rm(markerPath);
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -810,14 +822,11 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
       ? join(homedir(), '.panopticon', 'agents', `agent-${issueIdentifier.toLowerCase()}`)
       : join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
 
-    yield* Effect.promise(async () => {
-      try {
-        if (existsSync(agentStateDir)) rmSync(agentStateDir, { recursive: true, force: true });
-        if (existsSync(workAgentStateDir)) rmSync(workAgentStateDir, { recursive: true, force: true });
-      } catch (cleanupErr) {
+    yield* Effect.promise(() =>
+      cleanupAgentStateDirs([agentStateDir, workAgentStateDir]).catch((cleanupErr: unknown) => {
         console.log('[abort-planning] Warning: Could not clean up agent state:', cleanupErr);
-      }
-    });
+      })
+    );
 
     let workspaceDeleted = false;
     let workspaceError: string | undefined;
@@ -1387,10 +1396,8 @@ const postIssueReopenRoute = HttpRouter.add(
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
         for (const marker of ['completed', 'completed.processed']) {
           const markerPath = join(agentDir, marker);
-          if (existsSync(markerPath)) {
-            rmSync(markerPath);
-            console.log(`[reopen] Cleared ${marker} marker for ${id}`);
-          }
+          await removeCompletionMarker(markerPath);
+          if (!existsSync(markerPath)) console.log(`[reopen] Cleared ${marker} marker for ${id}`);
         }
       } catch { /* non-fatal */ }
     });
