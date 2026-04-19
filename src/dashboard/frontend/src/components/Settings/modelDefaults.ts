@@ -18,6 +18,7 @@ export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<WorkTypeId, ModelId>> =
   'review:correctness': 'claude-sonnet-4-6',
   'review:requirements': 'claude-sonnet-4-6',
   'review:synthesis': 'claude-sonnet-4-6',
+  'review:lightweight': 'claude-haiku-4-5',
   'subagent:explore': 'claude-haiku-4-5',
   'subagent:plan': 'claude-haiku-4-5',
   'subagent:bash': 'claude-haiku-4-5',

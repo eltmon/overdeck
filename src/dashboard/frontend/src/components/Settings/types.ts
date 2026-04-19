@@ -27,6 +27,7 @@ export type WorkTypeId =
   | 'review:correctness'
   | 'review:requirements'
   | 'review:synthesis'
+  | 'review:lightweight'
   // Planning
   | 'planning-agent'
   // Workflow
@@ -38,7 +39,7 @@ export type WorkTypeId =
 export type ModelId = string;
 
 export interface ProvidersConfig {
-  anthropic: boolean; // Always true (required)
+  anthropic: boolean;
   openai: boolean;
   google: boolean;
   zai: boolean;
@@ -132,6 +133,7 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'review:correctness', category: 'review', displayName: 'Correctness Reviewer' },
     { id: 'review:requirements', category: 'review', displayName: 'Requirements Reviewer' },
     { id: 'review:synthesis', category: 'review', displayName: 'Synthesis Agent' },
+    { id: 'review:lightweight', category: 'review', displayName: 'Lightweight Reviewer' },
   ],
   'subagent': [
     { id: 'subagent:explore', category: 'subagent', displayName: 'Explore' },

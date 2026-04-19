@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../AgentCards/ModelOverrideModal';
 import { getEffectiveModelId, DEFAULT_MODELS_BY_WORK_TYPE, FALLBACK_DEFAULT_MODEL } from '../modelDefaults';
+import { WORK_TYPE_CATEGORIES } from '../types';
 import type { SettingsConfig } from '../types';
 
 const MINIMAX_DEFAULTS: SettingsConfig = {
@@ -125,5 +126,62 @@ describe('buildMiniMaxFormData', () => {
     expect(result.conversations).toEqual({});
     expect(result.tmux).toEqual({});
     expect(result.openrouter).toEqual({});
+  });
+
+  it('anthropic can be set to false — MiniMax preset sets anthropic=false', () => {
+    // Regression: ProviderPanel previously hard-locked anthropic=true in the UI.
+    // The backend (getMiniMaxDefaultsApi) and this preset both set anthropic=false.
+    // This test verifies the SettingsConfig type allows anthropic=false and that
+    // buildMiniMaxFormData correctly propagates it.
+    const result = buildMiniMaxFormData(null, MINIMAX_DEFAULTS);
+    expect(result.models.providers.anthropic).toBe(false);
+    expect(result.models.providers.minimax).toBe(true);
+  });
+
+  it('review:lightweight can be expressed as a model override in SettingsConfig', () => {
+    // review:lightweight is a real routable backend work type used by the haiku
+    // reviewer alias. The WorkTypeId type must include it so the settings form
+    // can represent and submit overrides — without this, config becomes lossy.
+    const config: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      models: {
+        ...MINIMAX_DEFAULTS.models,
+        overrides: { 'review:lightweight': 'minimax-m2.7-highspeed' },
+      },
+    };
+    expect(config.models.overrides['review:lightweight']).toBe('minimax-m2.7-highspeed');
+  });
+});
+
+describe('WORK_TYPE_CATEGORIES — review:lightweight registration', () => {
+  it('includes review:lightweight in the review category', () => {
+    // review:lightweight is used by the haiku alias in the review pipeline.
+    // It must be listed in the frontend registry so the settings UI can display
+    // and override it — otherwise overrides set by the backend would be silently
+    // dropped by the settings form.
+    const reviewTypes = WORK_TYPE_CATEGORIES['review'];
+    const ids = reviewTypes.map(t => t.id);
+    expect(ids).toContain('review:lightweight');
+  });
+});
+
+describe('DEFAULT_MODELS_BY_WORK_TYPE — review:lightweight default', () => {
+  it('has a haiku-tier default for review:lightweight', () => {
+    const model = DEFAULT_MODELS_BY_WORK_TYPE['review:lightweight'];
+    expect(model).toBeDefined();
+    expect(model).toMatch(/haiku/i);
+  });
+
+  it('getEffectiveModelId returns haiku-tier for review:lightweight with no override', () => {
+    const model = getEffectiveModelId('review:lightweight', {});
+    expect(model).toMatch(/haiku/i);
+    expect(model).not.toBe(FALLBACK_DEFAULT_MODEL);
+  });
+
+  it('getEffectiveModelId returns override when review:lightweight override is set', () => {
+    const result = getEffectiveModelId('review:lightweight', {
+      'review:lightweight': 'minimax-m2.7-highspeed',
+    });
+    expect(result).toBe('minimax-m2.7-highspeed');
   });
 });
