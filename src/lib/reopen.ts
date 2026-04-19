@@ -12,10 +12,6 @@ import {
   saveReviewStatuses,
   type ReviewStatus,
 } from './review-status.js';
-import {
-  loadReviewStatuses as loadReviewStatusesJson,
-  saveReviewStatuses as saveReviewStatusesJson,
-} from './review-status-json.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -30,8 +26,6 @@ export interface ReopenResult {
 export interface ReopenOptions {
   reason?: string;
   trackerContext?: string;
-  /** Override the review-status.json path (used in tests for isolation) */
-  statusFilePath?: string;
 }
 
 /**
@@ -61,9 +55,7 @@ export function reopenWorkspaceState(
   };
 
   // 1. Reset specialist states
-  const statuses = options.statusFilePath
-    ? loadReviewStatusesJson(options.statusFilePath)
-    : loadReviewStatuses();
+  const statuses = loadReviewStatuses();
   const existing: ReviewStatus | undefined = statuses[issueId];
 
   if (existing) {
@@ -99,11 +91,7 @@ export function reopenWorkspaceState(
     history,
   };
 
-  if (options.statusFilePath) {
-    saveReviewStatusesJson(statuses, options.statusFilePath);
-  } else {
-    saveReviewStatuses(statuses);
-  }
+  saveReviewStatuses(statuses);
   result.specialistStatesReset = true;
 
   // 2. Append "Reopened" section to STATE.md
