@@ -25,7 +25,7 @@ type ReleaseNotesOptions = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJsonPath = join(__dirname, '..', '..', 'package.json');
-const desktopPackageJsonPath = join(__dirname, '..', '..', '..', '..', 'apps', 'desktop', 'package.json');
+const desktopPackageJsonPath = join(__dirname, '..', '..', 'apps', 'desktop', 'package.json');
 
 export function registerReleaseCommands(program: Command): void {
   const release = program
