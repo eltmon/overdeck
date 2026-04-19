@@ -8,7 +8,7 @@ description: 'Get Panopticon running in one command'
 ## One Command
 
 ```bash
-npx panctl
+npx @eltmon/panctl
 ```
 
 That's it. `panctl` downloads the Panopticon desktop app (Command Deck), starts the embedded server, and opens the window. No `install`, no `sync`, no Docker — the app opens and you see the UI.
@@ -57,4 +57,4 @@ Prefer a standalone app? Download the latest release for your platform:
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx panctl`; keep `pan` for headless and CI.
+Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx @eltmon/panctl`; keep `pan` for headless and CI.

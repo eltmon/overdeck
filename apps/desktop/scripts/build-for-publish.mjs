@@ -17,7 +17,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -66,6 +66,20 @@ if (existsSync(publicDest)) {
   rmSync(publicDest, { recursive: true });
 }
 cpSync(publicSrc, publicDest, { recursive: true });
+
+// ─── Promote electron to dependencies for the published package ───────────────
+// electron-builder requires electron in devDependencies, but npx/global install
+// users need it in dependencies so the launcher can require("electron").
+
+const pkgPath = join(desktopDir, "package.json");
+const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+if (pkg.devDependencies?.electron) {
+  pkg.dependencies = pkg.dependencies || {};
+  pkg.dependencies.electron = pkg.devDependencies.electron;
+  delete pkg.devDependencies.electron;
+  writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+  console.log("[build-for-publish] Promoted electron to dependencies for publish");
+}
 
 console.log("[build-for-publish] Done. Package is ready to publish:");
 console.log("  cd apps/desktop && npm publish --access public");
