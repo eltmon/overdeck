@@ -660,7 +660,6 @@ describe('DivergedBadge', () => {
   });
 
   it('shows stuckReason in title when provided', () => {
-    render(<DivergedBadge issueIdentifier="PAN-1" stuckReason="main advanced by 3 commits" />);
     const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckReason="main advanced by 3 commits" />);
     const span = container.querySelector('span[title]');
     expect(span?.getAttribute('title')).toContain('main advanced by 3 commits');

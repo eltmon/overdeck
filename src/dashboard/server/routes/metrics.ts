@@ -338,6 +338,16 @@ const getConvoyOutputRoute = HttpRouter.add(
 // Returns recent git_operations rows as ActivityPanel-compatible entries.
 // Supports ?since=ISO&issueId=PAN-XXX&limit=N query params.
 
+/** Parse and validate query params for GET /api/git-activity. Exported for unit testing. */
+export function parseGitActivityParams(params: URLSearchParams): { since?: string; issueId?: string; limit: number } {
+  const since   = params.get('since')   ?? undefined;
+  const issueId = params.get('issueId') ?? undefined;
+  const limitRaw = params.get('limit');
+  const limitParsed = limitRaw ? parseInt(limitRaw, 10) : NaN;
+  const limit   = !isNaN(limitParsed) ? Math.min(Math.max(1, limitParsed), 500) : 200;
+  return { since, issueId, limit };
+}
+
 const getGitActivityRoute = HttpRouter.add(
   'GET',
   '/api/git-activity',
@@ -346,11 +356,7 @@ const getGitActivityRoute = HttpRouter.add(
     const urlOpt = HttpServerRequest.toURL(request);
     const params = Option.isSome(urlOpt) ? urlOpt.value.searchParams : new URLSearchParams();
 
-    const since   = params.get('since')   ?? undefined;
-    const issueId = params.get('issueId') ?? undefined;
-    const limitRaw = params.get('limit');
-    const limitParsed = limitRaw ? parseInt(limitRaw, 10) : NaN;
-    const limit   = !isNaN(limitParsed) ? Math.min(Math.max(1, limitParsed), 500) : 200;
+    const { since, issueId, limit } = parseGitActivityParams(params);
 
     const ops = listGitOperations({ since, issueId, limit });
     // Map to ActivityPanel-compatible format

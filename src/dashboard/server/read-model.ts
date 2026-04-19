@@ -178,13 +178,20 @@ export const ReadModelServiceLive = Layer.effect(
 
           // Also pick up agents created after the last cache save (new state files not in cache)
           const cachedIds = new Set(validAgents.map((a: any) => a.id));
-          const newAgentIds: string[] = yield* Effect.promise(() => discoverNewAgentIds(agentsDir, cachedIds));
+          const { readdir: readdirAsync, readFile: readFileAsync } = yield* Effect.promise(() => import('node:fs/promises'));
+          const newAgentIds: string[] = [];
+          const dirEntries = yield* Effect.promise(() => readdirAsync(agentsDir).catch(() => [] as string[]));
+          for (const entry of dirEntries) {
+            if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
+              newAgentIds.push(entry);
+            }
+          }
 
           // Load new agent state files and add them to the snapshot
           const newAgents: any[] = [];
           for (const agentId of newAgentIds) {
             try {
-              const raw: string = yield* Effect.promise(() => import('node:fs/promises').then(fs => fs.readFile(joinPath(agentsDir, agentId, 'state.json'), 'utf-8')));
+              const raw = yield* Effect.promise(() => readFileAsync(joinPath(agentsDir, agentId, 'state.json'), 'utf-8'));
               newAgents.push(JSON.parse(raw));
             } catch { /* skip unreadable state files */ }
           }
