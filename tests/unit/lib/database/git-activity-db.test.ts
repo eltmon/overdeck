@@ -30,7 +30,7 @@ afterEach(() => {
 import {
   appendGitOperation,
   listGitOperations,
-} from '../../../../src/dashboard/server/services/git-activity.js';
+} from '../../../../src/lib/git-activity.js';
 
 // ============== Tests ==============
 

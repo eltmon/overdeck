@@ -27,7 +27,7 @@ import { EventStoreService } from '../services/domain-services.js';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
-import { listGitOperations, type GitOperation } from '../services/git-activity.js';
+import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';

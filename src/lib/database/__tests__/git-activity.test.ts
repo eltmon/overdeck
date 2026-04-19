@@ -69,7 +69,7 @@ describe('git_operations schema (PAN-653)', () => {
 describe('appendGitOperation + listGitOperations (PAN-653)', () => {
   it('appends a row and reads it back', async () => {
     const { appendGitOperation, listGitOperations } = await import(
-      '../../../dashboard/server/services/git-activity.js'
+      '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
@@ -100,7 +100,7 @@ describe('appendGitOperation + listGitOperations (PAN-653)', () => {
 
   it('filters by operation type', async () => {
     const { appendGitOperation, listGitOperations } = await import(
-      '../../../dashboard/server/services/git-activity.js'
+      '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
@@ -119,7 +119,7 @@ describe('appendGitOperation + listGitOperations (PAN-653)', () => {
 
   it('filters by issueId', async () => {
     const { appendGitOperation, listGitOperations } = await import(
-      '../../../dashboard/server/services/git-activity.js'
+      '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
@@ -133,7 +133,7 @@ describe('appendGitOperation + listGitOperations (PAN-653)', () => {
 
   it('rows survive a simulated restart (new DB connection)', async () => {
     const { appendGitOperation } = await import(
-      '../../../dashboard/server/services/git-activity.js'
+      '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
@@ -144,7 +144,7 @@ describe('appendGitOperation + listGitOperations (PAN-653)', () => {
 
     // Reconnect to the same SQLite file
     const { listGitOperations } = await import(
-      '../../../dashboard/server/services/git-activity.js'
+      '../../../lib/git-activity.js'
     );
     const rows = listGitOperations({ issueId: 'PAN-999' });
     expect(rows).toHaveLength(1);

@@ -11,7 +11,7 @@ import {
   loadReviewStatuses,
   saveReviewStatuses,
   type ReviewStatus,
-} from '../dashboard/server/review-status.js';
+} from '../lib/review-status.js';
 import {
   loadReviewStatuses as loadReviewStatusesJson,
   saveReviewStatuses as saveReviewStatusesJson,

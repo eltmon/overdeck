@@ -17,7 +17,7 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { appendGitOperation } from '../../dashboard/server/services/git-activity.js';
+import { appendGitOperation } from '../git-activity.js';
 
 const execFileAsync = promisify(execFile);
 

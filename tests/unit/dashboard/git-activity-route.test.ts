@@ -15,7 +15,7 @@ import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { parseGitActivityParams, mapGitOperationToActivityEntry } from '../../../src/dashboard/server/routes/metrics.js';
-import type { GitOperation } from '../../../src/dashboard/server/services/git-activity.js';
+import type { GitOperation } from '../../../src/lib/git-activity.js';
 
 let TEST_HOME: string;
 
@@ -98,7 +98,7 @@ describe('GET /api/git-activity — query param parsing', () => {
 describe('GET /api/git-activity — end-to-end DB filtering', () => {
   it('?issueId filters results to only matching rows', async () => {
     const { appendGitOperation, listGitOperations } = await import(
-      '../../../src/dashboard/server/services/git-activity.js'
+      '../../../src/lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
@@ -113,7 +113,7 @@ describe('GET /api/git-activity — end-to-end DB filtering', () => {
 
   it('?since filters out rows before the timestamp', async () => {
     const { appendGitOperation, listGitOperations } = await import(
-      '../../../src/dashboard/server/services/git-activity.js'
+      '../../../src/lib/git-activity.js'
     );
 
     const old = new Date('2026-01-01T00:00:00.000Z').toISOString();
@@ -130,7 +130,7 @@ describe('GET /api/git-activity — end-to-end DB filtering', () => {
 
   it('?limit caps the number of rows returned', async () => {
     const { appendGitOperation, listGitOperations } = await import(
-      '../../../src/dashboard/server/services/git-activity.js'
+      '../../../src/lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();

@@ -62,7 +62,7 @@ import {
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
-import { listGitOperations } from '../../server/services/git-activity.js';
+import { listGitOperations } from '../../../lib/git-activity.js';
 import {
   computeQueuePositionFromStatus,
   findPositionInQueue,

@@ -50,7 +50,7 @@ vi.mock('child_process', () => {
 // ── appendGitOperation mock ───────────────────────────────────────────────────
 
 const mockAppend = vi.fn();
-vi.mock('../../../src/dashboard/server/services/git-activity.js', () => ({
+vi.mock('../../../src/lib/git-activity.js', () => ({
   appendGitOperation: (...args: unknown[]) => mockAppend(...args),
 }));
 

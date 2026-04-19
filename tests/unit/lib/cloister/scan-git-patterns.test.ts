@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Dependency mocks (must precede all imports of merge-agent.ts) ─────────────
 
 const mockAppendGitOperation = vi.fn();
-vi.mock('../../../../src/dashboard/server/services/git-activity.js', () => ({
+vi.mock('../../../../src/lib/git-activity.js', () => ({
   appendGitOperation: (...args: unknown[]) => mockAppendGitOperation(...args),
 }));
 

@@ -84,7 +84,7 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperations } = await import('../../../dashboard/server/services/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-DIV' }))
       .rejects.toThrow();
@@ -106,7 +106,7 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperations } = await import('../../../dashboard/server/services/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OK' }))
       .resolves.not.toThrow();
@@ -126,7 +126,7 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperations } = await import('../../../dashboard/server/services/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-NFF' }))
       .rejects.toThrow('non-fast-forward');

@@ -162,7 +162,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     expect(status?.stuckReason).toBe('main_diverged');
 
     // Step 4: main_diverged event was written to git_operations
-    const { listGitOperations } = await import('../../../dashboard/server/services/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
     const ops = listGitOperations({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
     expect(ops.length).toBeGreaterThan(0);
     expect(ops[0].status).toBe('aborted');
@@ -193,7 +193,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperations } = await import('../../../dashboard/server/services/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' }))
       .rejects.toThrow();

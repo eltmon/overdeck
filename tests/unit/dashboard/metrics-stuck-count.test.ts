@@ -45,7 +45,7 @@ vi.mock('../../../src/lib/convoy.js', () => ({
   getConvoyStatus: vi.fn(),
   listConvoys: vi.fn(() => []),
 }));
-vi.mock('../../../src/dashboard/server/services/git-activity.js', () => ({
+vi.mock('../../../src/lib/git-activity.js', () => ({
   listGitOperations: vi.fn(() => []),
 }));
 vi.mock('../../../src/dashboard/server/services/domain-services.js', () => ({

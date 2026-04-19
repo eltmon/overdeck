@@ -35,7 +35,7 @@ import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
-import { appendGitOperation, type GitOperationType } from '../../dashboard/server/services/git-activity.js';
+import { appendGitOperation, type GitOperationType } from '../git-activity.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
