@@ -121,9 +121,9 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     expect(after?.stuck).toBeFalsy();
   });
 
-  it('200: preserves reviewStatus/testStatus after unstick (lifecycle not reset)', () => {
-    // Unstick clears only the stuck marker. Previously passed specialist results
-    // are preserved — the user decides whether to re-trigger review separately.
+  it('200: resets reviewStatus/testStatus to pending after unstick (lifecycle invalidated)', () => {
+    // Unstick resets lifecycle because recovery requires `git reset --hard origin/main`
+    // which changes HEAD, making prior passed results invalid.
     setReviewStatus('PAN-RESET', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -137,9 +137,10 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     const after = getReviewStatus('PAN-RESET');
     // Stuck flag cleared — Deacon will process the issue again
     expect(after?.stuck).toBeFalsy();
-    // Lifecycle preserved — specialist results not discarded by unstick
-    expect(after?.reviewStatus).toBe('passed');
-    expect(after?.testStatus).toBe('passed');
+    // Lifecycle reset — prior results are invalid after `git reset --hard origin/main`
+    expect(after?.reviewStatus).toBe('pending');
+    expect(after?.testStatus).toBe('pending');
+    expect(after?.readyForMerge).toBe(false);
   });
 
   it('200: includes previousReason in the response body', () => {

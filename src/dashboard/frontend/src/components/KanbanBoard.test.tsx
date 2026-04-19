@@ -721,7 +721,7 @@ describe('DivergedBadge', () => {
     });
   });
 
-  it('preserves reviewStatus/testStatus in store after unstick (lifecycle not reset)', async () => {
+  it('resets reviewStatus/testStatus to pending in store after unstick (lifecycle invalidated)', async () => {
     useDashboardStore.setState({
       reviewStatusByIssueId: {
         'PAN-43': { issueId: 'PAN-43', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
@@ -734,9 +734,10 @@ describe('DivergedBadge', () => {
     await waitFor(() => {
       const s = useDashboardStore.getState().reviewStatusByIssueId['PAN-43'];
       expect(s?.stuck).toBeFalsy();
-      // Lifecycle preserved — specialist results not discarded by optimistic update
-      expect(s?.reviewStatus).toBe('passed');
-      expect(s?.testStatus).toBe('passed');
+      // Lifecycle reset — prior results invalid after `git reset --hard origin/main`
+      expect(s?.reviewStatus).toBe('pending');
+      expect(s?.testStatus).toBe('pending');
+      expect(s?.readyForMerge).toBe(false);
     });
   });
 

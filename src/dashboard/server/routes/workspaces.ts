@@ -58,8 +58,6 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
-  clearWorkspaceStuck,
-
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
@@ -3045,10 +3043,15 @@ export type UnstickResult =
 /**
  * Core logic for POST /api/workspaces/:issueId/unstick.
  *
- * Validates preconditions (workspace exists, workspace is stuck) and clears
- * the persistent stuck marker. Does NOT reset the review/test lifecycle — the
- * user resolves the divergence manually (git reset --hard origin/main), then
- * decides whether to re-trigger review separately.
+ * Validates preconditions (workspace exists, workspace is stuck), clears the
+ * persistent stuck marker, and invalidates stale review/test results by
+ * resetting the lifecycle to pending.
+ *
+ * The recovery path requires `git reset --hard origin/main` which moves the
+ * workspace HEAD away from the reviewed commit, making prior passed results
+ * invalid. Keeping reviewStatus=passed after that would let the UI present
+ * a stale approval. One atomic setReviewStatus() call clears stuck state and
+ * resets the lifecycle in a single DB write and a single notifyPipeline event.
  *
  * Exported for unit testing — the route handler calls this and maps the result
  * directly to an HTTP response.
@@ -3064,12 +3067,20 @@ export function processUnstickRequest(
   if (!currentStatus?.stuck) {
     return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
   }
-  // Clear only the stuck fields — one DB write, one notifyPipeline event.
-  // The review/test/merge lifecycle is preserved so previously passed specialist
-  // results are not discarded. The user resolves the divergence manually before
-  // retrying; re-dispatching review is their explicit choice, not an automatic side-effect.
-  clearWorkspaceStuck(issueId);
-  console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
+  // Single atomic write: clear stuck fields and reset lifecycle to pending.
+  // Recovery requires `git reset --hard origin/main`, which moves HEAD away from
+  // the previously-reviewed commit — prior passed results are invalid after that.
+  setReviewStatusBase(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    readyForMerge: false,
+    stuck: undefined,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+  });
+  console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
 }
 

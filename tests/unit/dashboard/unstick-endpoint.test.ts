@@ -134,11 +134,12 @@ describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
   });
 });
 
-describe('unstick preserves lifecycle state', () => {
-  // Unstick clears only the stuck marker. Previously passed specialist results
-  // must be preserved so the user's approval state is not silently discarded.
+describe('clearWorkspaceStuck DB helper — clears only stuck fields', () => {
+  // clearWorkspaceStuck() is a narrow DB helper: it zeroes stuck/stuckReason/stuckAt/stuckDetails
+  // and leaves all other columns untouched. The lifecycle-reset policy lives in
+  // processUnstickRequest (the route helper), which calls setReviewStatus() atomically.
 
-  it('preserves passed reviewStatus/testStatus after clearing stuck', () => {
+  it('preserves passed reviewStatus/testStatus after clearing stuck via DB helper', () => {
     setReviewStatus('PAN-700', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -150,12 +151,12 @@ describe('unstick preserves lifecycle state', () => {
 
     const after = getReviewStatus('PAN-700');
     expect(after?.stuck).toBeFalsy();
-    // Lifecycle preserved — specialist results not discarded
+    // DB helper preserves lifecycle — only stuck fields cleared
     expect(after?.reviewStatus).toBe('passed');
     expect(after?.testStatus).toBe('passed');
   });
 
-  it('preserves readyForMerge=true after clearing stuck', () => {
+  it('preserves readyForMerge=true after clearing stuck via DB helper', () => {
     setReviewStatus('PAN-800', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -167,7 +168,7 @@ describe('unstick preserves lifecycle state', () => {
 
     const after = getReviewStatus('PAN-800');
     expect(after?.stuck).toBeFalsy();
-    // readyForMerge preserved — user can retry approve without re-running review
+    // DB helper preserves lifecycle — only stuck fields cleared
     expect(after?.readyForMerge).toBe(true);
   });
 });
