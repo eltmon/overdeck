@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 /**
  * Initialize the complete database schema.
@@ -635,6 +635,12 @@ export function runMigrations(db: Database.Database): void {
   // new commits pushed after review and invalidate the approved status.
   if (currentVersion < 22) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`); } catch { /* already exists */ }
+  }
+
+  // v22 → v23: add merge_retry_count column to review_status (PAN-653)
+  // Deacon's circuit breaker for failed-merge retries — must persist across restarts.
+  if (currentVersion < 23) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
