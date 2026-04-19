@@ -11,7 +11,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
-import { createSession, killSession, sendKeysAsync, sessionExists } from './tmux.js';
+import { createSessionAsync, killSessionAsync, sendKeysAsync, sessionExistsAsync } from './tmux.js';
 import { getConvoyTemplate, getExecutionOrder, type ConvoyTemplate, type ConvoyAgent } from './convoy-templates.js';
 import { AGENTS_DIR } from './paths.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
@@ -169,11 +169,12 @@ export function parseAgentTemplate(templatePath: string): AgentTemplate {
  * @param role Convoy role (e.g., 'security', 'performance', 'synthesis')
  * @returns Work type ID or null if no mapping
  */
-function mapConvoyRoleToWorkType(role: string): WorkTypeId | null {
+export function mapConvoyRoleToWorkType(role: string): WorkTypeId | null {
   const roleMap: Record<string, WorkTypeId> = {
     'security': 'convoy:security-reviewer',
     'performance': 'convoy:performance-reviewer',
     'correctness': 'convoy:correctness-reviewer',
+    'requirements': 'convoy:requirements-reviewer',
     'synthesis': 'convoy:synthesis-agent',
   };
 
@@ -249,7 +250,7 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
   const claudeCmd = `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`;
 
   // Create tmux session
-  createSession(agentState.tmuxSession, convoy.context.projectPath, claudeCmd, {
+  await createSessionAsync(agentState.tmuxSession, convoy.context.projectPath, claudeCmd, {
     env: {
       PANOPTICON_CONVOY_ID: convoy.id,
       PANOPTICON_CONVOY_ROLE: role,
@@ -420,7 +421,7 @@ function startPhaseMonitor(
       }
 
       // Update agent statuses based on tmux sessions
-      updateAgentStatuses(state);
+      await updateAgentStatuses(state);
     }
 
     // Check if all agents are done
@@ -446,11 +447,11 @@ function startPhaseMonitor(
   });
 }
 
-function updateAgentStatuses(convoy: ConvoyState): void {
+async function updateAgentStatuses(convoy: ConvoyState): Promise<void> {
   let updated = false;
 
   for (const agent of convoy.agents) {
-    if (agent.status === 'running' && !sessionExists(agent.tmuxSession)) {
+    if (agent.status === 'running' && !(await sessionExistsAsync(agent.tmuxSession))) {
       // Tmux session ended - mark as completed
       agent.status = 'completed';
       agent.completedAt = new Date().toISOString();
@@ -479,8 +480,8 @@ export async function stopConvoy(convoyId: string): Promise<void> {
 
   // Kill all running agent tmux sessions
   for (const agent of state.agents) {
-    if (sessionExists(agent.tmuxSession)) {
-      killSession(agent.tmuxSession);
+    if (await sessionExistsAsync(agent.tmuxSession)) {
+      await killSessionAsync(agent.tmuxSession);
     }
   }
 

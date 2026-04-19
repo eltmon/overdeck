@@ -19,10 +19,14 @@ import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 // Mock tmux module to avoid actual session creation
 vi.mock('../../src/lib/tmux.js', () => ({
   createSession: vi.fn().mockResolvedValue(undefined),
+  createSessionAsync: vi.fn().mockResolvedValue(undefined),
   killSession: vi.fn().mockResolvedValue(undefined),
+  killSessionAsync: vi.fn().mockResolvedValue(undefined),
   sendKeys: vi.fn().mockResolvedValue(undefined),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
   getAgentSessions: vi.fn().mockResolvedValue([]),
+  listPaneValuesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock hooks module
@@ -64,7 +68,7 @@ describe('agent spawning with work types', () => {
   let testAgentsDir: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create unique temp directory for panopticon home
     testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     testAgentsDir = join(testPanopticonHome, 'agents');
@@ -75,6 +79,10 @@ describe('agent spawning with work types', () => {
 
     // Clear all mocks
     vi.clearAllMocks();
+
+    // Reset sessionExistsAsync to default false (tests that need true override it)
+    const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
+    vi.mocked(sessionExistsAsync).mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -268,8 +276,8 @@ describe('agent spawning with work types', () => {
 
   describe('error handling', () => {
     it('should throw error when agent already running', async () => {
-      const { sessionExists } = await import('../../src/lib/tmux.js');
-      vi.mocked(sessionExists).mockReturnValue(true);
+      const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
+      vi.mocked(sessionExistsAsync).mockResolvedValue(true);
 
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-13',
@@ -307,7 +315,7 @@ describe('agent spawning with work types', () => {
     });
 
     it('should pass OX_PROJECT_ROOT when .sageox/ exists', async () => {
-      const { createSession } = await import('../../src/lib/tmux.js');
+      const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-1',
@@ -317,15 +325,15 @@ describe('agent spawning with work types', () => {
 
       await spawnAgent(options);
 
-      expect(createSession).toHaveBeenCalled();
-      const callArgs = vi.mocked(createSession).mock.calls[0];
+      expect(createSessionAsync).toHaveBeenCalled();
+      const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
       expect(envArg.OX_PROJECT_ROOT).toBe(sageoxProjectRoot);
     });
 
     it('should NOT set SageOx vars when .sageox/ does not exist', async () => {
-      const { createSession } = await import('../../src/lib/tmux.js');
+      const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       // Use a workspace path that resolves to a project root without .sageox/
       const noSageoxRoot = join(tmpdir(), `pan-nosageox-${Date.now()}`);
@@ -340,7 +348,7 @@ describe('agent spawning with work types', () => {
 
       await spawnAgent(options);
 
-      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
       // SageOx vars should NOT be present
@@ -355,7 +363,7 @@ describe('agent spawning with work types', () => {
     });
 
     it('should pass PAN_ISSUE_ID and PAN_PHASE for multi-agent pipeline', async () => {
-      const { createSession } = await import('../../src/lib/tmux.js');
+      const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-2',
@@ -365,7 +373,7 @@ describe('agent spawning with work types', () => {
 
       await spawnAgent(options);
 
-      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
       expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-2');
@@ -373,7 +381,7 @@ describe('agent spawning with work types', () => {
     });
 
     it('should include SageOx vars alongside existing env vars', async () => {
-      const { createSession } = await import('../../src/lib/tmux.js');
+      const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-3',
@@ -383,7 +391,7 @@ describe('agent spawning with work types', () => {
 
       await spawnAgent(options);
 
-      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
       // Check existing Panopticon vars are still present
@@ -398,7 +406,7 @@ describe('agent spawning with work types', () => {
     });
 
     it('should not set PAN_PARENT_SESSION for planner agents', async () => {
-      const { createSession } = await import('../../src/lib/tmux.js');
+      const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-4',
@@ -408,7 +416,7 @@ describe('agent spawning with work types', () => {
 
       await spawnAgent(options);
 
-      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
       // Planner agents should not have PAN_PARENT_SESSION
@@ -416,7 +424,7 @@ describe('agent spawning with work types', () => {
     });
 
     it('should attempt to look up planner session for non-planner phases', async () => {
-      const { createSession } = await import('../../src/lib/tmux.js');
+      const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-5',
@@ -428,7 +436,7 @@ describe('agent spawning with work types', () => {
       await expect(spawnAgent(options)).resolves.not.toThrow();
 
       // Verify session was created
-      expect(createSession).toHaveBeenCalled();
+      expect(createSessionAsync).toHaveBeenCalled();
     });
   });
 });
