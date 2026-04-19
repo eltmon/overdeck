@@ -399,7 +399,7 @@ export async function parseReviewerTemplate(templatePath: string): Promise<Revie
 const CLAUDE_ALIAS_WORK_TYPE: Record<string, Parameters<typeof getModelId>[0]> = {
   opus: 'specialist-review-agent',
   sonnet: 'review:correctness',
-  haiku: 'subagent:bash',
+  haiku: 'review:correctness',
 };
 
 function resolveClaudeAlias(model: string): string {

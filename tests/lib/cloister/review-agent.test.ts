@@ -407,6 +407,10 @@ describe('resolveReviewerModel', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
     expect(model).not.toBe('haiku');
     expect(model.length).toBeGreaterThan(0);
+    // haiku must route through a reviewer work type, not subagent:bash.
+    // subagent:bash defaults to gpt-5.4-nano; review:correctness defaults to claude-sonnet-4-6.
+    // Both change under user config but they must be different categories.
+    expect(model).not.toBe('gpt-5.4-nano');
   });
 
   it('resolves "sonnet" alias via work-type router (not passed through verbatim)', () => {
