@@ -351,7 +351,9 @@ function initSchema(db) {
       stuck                 INTEGER NOT NULL DEFAULT 0,
       stuck_reason          TEXT,
       stuck_at              TEXT,
-      stuck_details         TEXT
+      stuck_details         TEXT,
+      -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
+      reviewed_at_commit    TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -556,7 +558,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 20`);
+	db.pragma(`user_version = 22`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -564,7 +566,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 20) return;
+	if (currentVersion === 22) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -767,7 +769,28 @@ function runMigrations(db) {
 		try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`); } catch {}
 		try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch {}
 	}
-	db.pragma(`user_version = 20`);
+	if (currentVersion < 21) db.exec(`
+      CREATE TABLE IF NOT EXISTS git_operations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation   TEXT NOT NULL,
+        branch      TEXT,
+        issue_id    TEXT,
+        before_sha  TEXT,
+        after_sha   TEXT,
+        remote_sha  TEXT,
+        status      TEXT NOT NULL,
+        error       TEXT,
+        ts          TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
+        ON git_operations(issue_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
+        ON git_operations(operation, ts);
+    `);
+	if (currentVersion < 22) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`);
+	} catch {}
+	db.pragma(`user_version = 22`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
