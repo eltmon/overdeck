@@ -10,7 +10,7 @@ import {
   getReviewStatus,
   clearReviewStatus,
   loadReviewStatuses,
-} from '../../src/dashboard/server/review-status.js';
+} from '../../src/lib/review-status-json.js';
 
 let testDir: string;
 let statusFile: string;

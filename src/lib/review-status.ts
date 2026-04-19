@@ -1,4 +1,3 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { access, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
@@ -68,35 +67,24 @@ const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json')
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
   // SQLite is the authoritative store for the default (server) path.
-  // No JSON fallback — a DB error is a real error, not a graceful degradation path.
-  if (filePath === DEFAULT_STATUS_FILE) {
-    return getAllReviewStatusesFromDb();
+  // Non-default JSON paths have been moved to review-status-json.ts so that
+  // dashboard-reachable code never imports sync FS operations.
+  if (filePath !== DEFAULT_STATUS_FILE) {
+    throw new Error(
+      `Non-default review-status paths are not supported in review-status.ts. ` +
+      `Import from review-status-json.ts for JSON file operations.`
+    );
   }
-
-  // Non-default path: legacy JSON file (tests, CLI tools)
-  try {
-    if (existsSync(filePath)) {
-      return JSON.parse(readFileSync(filePath, 'utf-8'));
-    }
-  } catch (err) {
-    console.error('Failed to load review statuses:', err);
-  }
-  return {};
+  return getAllReviewStatusesFromDb();
 }
 
-export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
+export function saveReviewStatuses(_statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
   // SQLite is the authoritative store for the default (server) path — no JSON write.
-  if (filePath === DEFAULT_STATUS_FILE) return;
-
-  // Non-default path: legacy JSON file (tests, CLI tools)
-  try {
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(filePath, JSON.stringify(statuses, null, 2));
-  } catch (err) {
-    console.error('Failed to save review statuses:', err);
+  if (filePath !== DEFAULT_STATUS_FILE) {
+    throw new Error(
+      `Non-default review-status paths are not supported in review-status.ts. ` +
+      `Import from review-status-json.ts for JSON file operations.`
+    );
   }
 }
 
@@ -315,12 +303,13 @@ export function setReviewStatus(
 
 export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
   // SQLite is the authoritative store for the default (server) path.
-  if (filePath === DEFAULT_STATUS_FILE) {
-    return getReviewStatusFromDb(issueId) ?? null;
+  if (filePath !== DEFAULT_STATUS_FILE) {
+    throw new Error(
+      `Non-default review-status paths are not supported in review-status.ts. ` +
+      `Import from review-status-json.ts for JSON file operations.`
+    );
   }
-  // Non-default path: legacy JSON file (tests, CLI tools)
-  const statuses = loadReviewStatuses(filePath);
-  return statuses[issueId] || null;
+  return getReviewStatusFromDb(issueId) ?? null;
 }
 
 /**
@@ -388,19 +377,17 @@ export function fixStuckReadyForMerge(): void {
 
 export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
   // SQLite is the authoritative store for the default (server) path.
-  if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      dbDelete(issueId);
-    } catch (err) {
-      console.error('[review-status] SQLite delete failed:', err);
-    }
-    return;
+  if (filePath !== DEFAULT_STATUS_FILE) {
+    throw new Error(
+      `Non-default review-status paths are not supported in review-status.ts. ` +
+      `Import from review-status-json.ts for JSON file operations.`
+    );
   }
-
-  // Non-default path: legacy JSON file (tests, CLI tools)
-  const statuses = loadReviewStatuses(filePath);
-  delete statuses[issueId];
-  saveReviewStatuses(statuses, filePath);
+  try {
+    dbDelete(issueId);
+  } catch (err) {
+    console.error('[review-status] SQLite delete failed:', err);
+  }
 }
 
 // ============== Stuck state helpers (PAN-653) ==============
