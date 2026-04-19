@@ -149,7 +149,7 @@ function getHistoryFromDb(issueId: string): StatusHistoryEntry[] {
   `).all(issueId) as Array<{ type: string; status: string; timestamp: string; notes: string | null }>;
 
   return rows.map(r => ({
-    type: r.type as 'review' | 'test' | 'merge',
+    type: r.type as 'review' | 'test' | 'merge' | 'inspect' | 'uat',
     status: r.status,
     timestamp: r.timestamp,
     ...(r.notes ? { notes: r.notes } : {}),
