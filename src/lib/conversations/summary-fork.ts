@@ -107,21 +107,16 @@ export async function generateFallbackSummary(jsonlPath: string): Promise<string
 
 export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string): Promise<{ summary: string; summaryModel: string | null }> {
   if (!summaryModel) {
-    // Default to haiku for cost-effective summarization
-    summaryModel = 'claude-haiku-4-5-20251001';
+    // Fork summaries serialize the entire conversation in one shot. Sonnet 4.6's
+    // 1M-token context handles large sessions that would overflow Haiku's 200k.
+    summaryModel = 'claude-sonnet-4-6';
   }
 
   const { config } = loadConfig();
   const richMode = config.conversations.richCompaction;
 
-  try {
-    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork' });
-    return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
-  } catch (error) {
-    console.warn(`[summary-fork] Smart summary failed for ${jsonlPath}:`, error);
-    // Final fallback: heuristic extraction
-    return { summary: await generateFallbackSummary(jsonlPath), summaryModel: null };
-  }
+  const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork' });
+  return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
 }
 
 export async function reserveSummaryForkSession(
