@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * panctl launcher — invoked via `npx panctl` or `panctl` (after global install).
+ * panctl launcher — invoked via `npx @eltmon/panctl` or `panctl` (after global install).
  *
  * Responsibilities:
  *   1. Verify Node 22+ is running (Electron bundles Node 22).
@@ -42,7 +42,7 @@ function checkServerBundle() {
     console.error("[panctl] Dashboard server bundle not found.");
     console.error(`  Expected: ${serverPath}`);
     console.error("  This package may not have been built correctly.");
-    console.error("  Try reinstalling: npm install -g panctl");
+    console.error("  Try reinstalling: npm install -g @eltmon/panctl");
     process.exit(1);
   }
 }
@@ -57,7 +57,7 @@ function resolveElectron() {
     return require("electron");
   } catch {
     console.error("[panctl] electron package not found.");
-    console.error("  Try reinstalling: npm install -g panctl");
+    console.error("  Try reinstalling: npm install -g @eltmon/panctl");
     process.exit(1);
   }
 }
