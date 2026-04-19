@@ -19,6 +19,7 @@ import { healthCommand } from './health.js';
 import { getShadowState } from '../../lib/shadow-state.js';
 import { pingAgent } from '../../lib/health.js';
 import { getAgentCV } from '../../lib/cv.js';
+import { getAgentRuntimeState } from '../../lib/agents.js';
 
 interface ShowOptions {
   shadow?: boolean;
@@ -59,6 +60,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   const healthData = await (async () => {
     try { return await pingAgent(agentId); } catch { return null; }
   })();
+  const runtimeState = getAgentRuntimeState(agentId);
   const cvData = getAgentCV(agentId);
 
   if (json) {
@@ -92,9 +94,16 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       ? chalk.green
       : statusText === 'warning'
         ? chalk.yellow
-        : chalk.red;
-    const beat = healthData.lastPing ?? healthData.lastActivity;
-    console.log(`  ${chalk.dim('health')}   ${statusColor(statusText)}  ${chalk.dim('·')} last activity ${relativeTime(beat)}`);
+        : statusText === 'stopped'
+          ? chalk.gray
+          : chalk.red;
+    const activityAt = healthData.lastActivity ?? runtimeState?.lastActivity;
+    const activityText = activityAt ? relativeTime(activityAt) : 'unknown';
+    const extras: string[] = [`last activity ${activityText}`];
+    if (runtimeState?.state === 'waiting-on-human') {
+      extras.push('waiting on human');
+    }
+    console.log(`  ${chalk.dim('health')}   ${statusColor(statusText)}  ${chalk.dim('·')} ${extras.join(` ${chalk.dim('·')} `)}`);
   } else {
     console.log(`  ${chalk.dim('health')}   ${chalk.dim('(no agent state)')}`);
   }
@@ -104,7 +113,12 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   if (stats.totalIssues > 0) {
     const successPct = (stats.successRate * 100).toFixed(0);
     const avg = stats.avgDuration > 0 ? `${stats.avgDuration}m avg` : '—';
-    console.log(`  ${chalk.dim('cv    ')}   ${stats.totalIssues} completed  ${chalk.dim('·')} ${successPct}% success  ${chalk.dim('·')} ${avg}`);
+    const completedCount = stats.successCount + stats.failureCount + stats.abandonedCount;
+    const inProgressCount = Math.max(0, stats.totalIssues - completedCount);
+    const countsLabel = inProgressCount > 0
+      ? `${stats.totalIssues} total (${completedCount} done, ${inProgressCount} active)`
+      : `${stats.totalIssues} total`;
+    console.log(`  ${chalk.dim('cv    ')}   ${countsLabel}  ${chalk.dim('·')} ${successPct}% success  ${chalk.dim('·')} ${avg}`);
   } else {
     console.log(`  ${chalk.dim('cv    ')}   ${chalk.dim('(no work history)')}`);
   }
@@ -122,7 +136,10 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
           ? chalk.red
           : chalk.dim;
       const label = (entry.issueId ?? '(unknown)').slice(0, 60);
-      console.log(`    ${outcomeColor(outcome.padEnd(11))} ${chalk.dim(relativeTime(entry.completedAt).padEnd(8))} ${label}`);
+      const when = outcome === 'in_progress'
+        ? `${relativeTime(entry.startedAt)} started`
+        : relativeTime(entry.completedAt);
+      console.log(`    ${outcomeColor(outcome.padEnd(11))} ${chalk.dim(when.padEnd(18))} ${label}`);
     }
   }
 
