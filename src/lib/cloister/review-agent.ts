@@ -11,7 +11,7 @@ import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
-import { getProviderEnvForModel, getAgentRuntimeBaseCommand } from '../agents.js';
+import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -454,9 +454,26 @@ async function spawnReviewer(
   projectPath: string,
 ): Promise<void> {
   const claudeCmd = getAgentRuntimeBaseCommand(model);
-  const providerEnv = getProviderEnvForModel(model);
+  const providerExports = getProviderExportsForModel(model);
 
-  await createSessionAsync(sessionName, projectPath, claudeCmd, { env: providerEnv });
+  // Write a launcher script that unsets all stale provider env vars and re-exports
+  // the correct ones for the target model before exec-ing the agent runtime.
+  // Using a script (rather than tmux -e flags) ensures that stale ANTHROPIC_BASE_URL
+  // from the parent tmux server env is always cleared — even for Anthropic models
+  // whose env map is empty, so tmux -e flags would add nothing and the parent
+  // session's ANTHROPIC_BASE_URL pointing at a proxy would leak through.
+  const launcherPath = join(tmpdir(), `pan-reviewer-${sessionName}.sh`);
+  const launcherContent = [
+    '#!/bin/bash',
+    'set -o pipefail',
+    `cd "${projectPath}"`,
+    providerExports.trimEnd(),
+    `exec ${claudeCmd}`,
+    '',
+  ].join('\n');
+  await writeFile(launcherPath, launcherContent, { mode: 0o755 });
+
+  await createSessionAsync(sessionName, projectPath, `bash ${launcherPath}`);
 
   // Wait for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));

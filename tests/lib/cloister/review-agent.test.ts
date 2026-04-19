@@ -943,4 +943,41 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).toContain('getAgentRuntimeBaseCommand(');
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
+
+  it('review-agent.ts imports getProviderExportsForModel (not getProviderEnvForModel)', async () => {
+    // getProviderExportsForModel always emits `unset ANTHROPIC_BASE_URL` lines,
+    // preventing stale parent-session env from leaking into reviewer processes.
+    // getProviderEnvForModel returns {} for Anthropic models, so tmux -e flags
+    // would add nothing and the parent ANTHROPIC_BASE_URL would not be cleared.
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+    expect(src).toMatch(/getProviderExportsForModel/);
+    expect(src).not.toMatch(/getProviderEnvForModel/);
+  });
+
+  it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const spawnReviewerMatch = src.match(/async function spawnReviewer[\s\S]*?^}/m);
+    expect(spawnReviewerMatch).not.toBeNull();
+    const fn = spawnReviewerMatch![0];
+
+    // Must write a launcher script file and run it via bash
+    expect(fn).toContain('getProviderExportsForModel(');
+    expect(fn).toContain('writeFile(');
+    expect(fn).toMatch(/bash\s+.*launcherPath/);
+
+    // Must NOT pass env via tmux -e flags (old pattern that fails for Anthropic models)
+    expect(fn).not.toMatch(/\{\s*env\s*:/);
+    expect(fn).not.toContain('getProviderEnvForModel(');
+  });
 });
