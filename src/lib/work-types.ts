@@ -112,6 +112,10 @@ export const WORK_TYPES = {
     category: 'review',
     description: 'Synthesizes findings from parallel reviewers',
   },
+  'review:lightweight': {
+    category: 'review',
+    description: 'Fast lightweight code reviewer for haiku-tier alias resolution',
+  },
 
   // Pre-work agents
   'planning-agent': {

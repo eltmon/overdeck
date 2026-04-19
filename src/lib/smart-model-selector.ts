@@ -173,6 +173,12 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
     { skill: 'planning', weight: 0.2 }, // Organizing findings
   ],
 
+  'review:lightweight': [
+    { skill: 'speed', weight: 0.5 }, // Speed-first: resolves to haiku-tier
+    { skill: 'code-review', weight: 0.3 }, // Basic code understanding
+    { skill: 'debugging', weight: 0.2 }, // Lightweight issue spotting
+  ],
+
   // ═══════════════════════════════════════════════════════════════════════════
   // PRE-WORK AGENTS
   // ═══════════════════════════════════════════════════════════════════════════

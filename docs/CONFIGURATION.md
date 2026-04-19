@@ -273,14 +273,13 @@ Panopticon's review specialist runs multiple reviewer agents in parallel before 
 
 ### Default Reviewers
 
-When `review_agents` is not configured, Panopticon uses four built-in reviewers:
+When `review_agents` is not configured, Panopticon uses three built-in reviewers:
 
 | Name | Focus |
 |---|---|
 | `correctness` | Logic, edge cases, null handling, type safety |
 | `security` | OWASP Top 10, injection, auth, secrets |
 | `performance` | Algorithms, N+1 queries, memory leaks |
-| `requirements` | Acceptance criteria, issue requirements |
 
 After all reviewers complete, a **synthesis** agent combines the findings.
 
@@ -289,9 +288,8 @@ After all reviewers complete, a **synthesis** agent combines the findings.
 In `~/.panopticon/cloister.toml`:
 
 ```toml
-[specialists.review_agents]
 # Each entry controls one parallel reviewer.
-# Absent = use the four defaults above.
+# Absent = use the three defaults (correctness, security, performance).
 
 [[specialists.review_agents]]
 name = "security"

@@ -13,7 +13,6 @@ import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 import { getProviderEnvForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
-import type { ModelId } from '../settings.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 
@@ -73,7 +72,6 @@ const DEFAULT_REVIEW_AGENTS: ReviewAgentConfig[] = [
   { name: 'correctness', focus: ['logic', 'edge cases', 'null handling', 'type safety'] },
   { name: 'security', focus: ['OWASP Top 10', 'injection', 'auth', 'secrets'] },
   { name: 'performance', focus: ['algorithms', 'N+1 queries', 'memory leaks'] },
-  { name: 'requirements', focus: ['acceptance criteria', 'vBRIEF coverage', 'missing functionality'] },
 ];
 
 /**
@@ -393,18 +391,25 @@ export async function parseReviewerTemplate(templatePath: string): Promise<Revie
 
 /**
  * Resolve shorthand aliases (opus/sonnet/haiku) that can appear in agent
- * template frontmatter to concrete Anthropic model IDs.
- * Provider-correct routing (claudish, fallback, etc.) happens downstream via
- * applyFallback — this mapping only establishes which tier is requested.
+ * template frontmatter to concrete model IDs via the work-type router.
+ * Using getModelId ensures provider-correct routing (Anthropic, MiniMax, etc.)
+ * rather than hard-coding Anthropic model IDs — if Anthropic is disabled,
+ * aliases resolve to the best available model from enabled providers.
  */
-const CLAUDE_ALIAS_MODELS: Record<string, ModelId> = {
-  opus: 'claude-opus-4-7',
-  sonnet: 'claude-sonnet-4-6',
-  haiku: 'claude-haiku-4-5',
+const CLAUDE_ALIAS_WORK_TYPE: Record<string, Parameters<typeof getModelId>[0]> = {
+  opus: 'specialist-review-agent',
+  sonnet: 'review:correctness',
+  haiku: 'review:lightweight',
 };
 
 function resolveClaudeAlias(model: string): string {
-  return (CLAUDE_ALIAS_MODELS[model] as string) ?? model;
+  const workType = CLAUDE_ALIAS_WORK_TYPE[model];
+  if (!workType) return model;
+  try {
+    return getModelId(workType);
+  } catch {
+    return model;
+  }
 }
 
 /** Map reviewer role name to the work-type ID used for model routing */

@@ -432,17 +432,20 @@ describe('resolveReviewerModel', () => {
 
   // Regression: haiku and sonnet must resolve to distinct concrete model IDs.
   // Previously both were routed through review:correctness, producing the same model.
+  // The exact IDs depend on enabled providers (provider-aware routing), so we only
+  // assert distinctness and that aliases are not passed through verbatim.
   it('haiku alias resolves to a distinct model from sonnet alias (real reviewer role)', () => {
     const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
     const sonnet = resolveReviewerModel({ name: 'correctness', model: 'sonnet', focus: [] }, 'any-default');
-    expect(haiku).toBe('claude-haiku-4-5');
-    expect(sonnet).toBe('claude-sonnet-4-6');
+    expect(haiku).not.toBe('haiku');
+    expect(sonnet).not.toBe('sonnet');
     expect(haiku).not.toBe(sonnet);
   });
 
-  it('opus alias resolves to claude-opus-4-7 (real reviewer role)', () => {
+  it('opus alias is resolved (not passed through verbatim) for a real reviewer role', () => {
     const model = resolveReviewerModel({ name: 'correctness', model: 'opus', focus: [] }, 'any-default');
-    expect(model).toBe('claude-opus-4-7');
+    expect(model).not.toBe('opus');
+    expect(model.length).toBeGreaterThan(0);
   });
 });
 
@@ -728,13 +731,12 @@ describe('getReviewAgents', () => {
       },
     });
     const agents = getReviewAgents();
-    // All configured agents are disabled → must fall back to the 4 built-in defaults
+    // All configured agents are disabled → must fall back to the 3 built-in defaults
     const names = agents.map(a => a.name);
     expect(names).toContain('correctness');
     expect(names).toContain('security');
     expect(names).toContain('performance');
-    expect(names).toContain('requirements');
-    expect(agents.length).toBe(4);
+    expect(agents.length).toBe(3);
   });
 
   it('returns only enabled agents when some are disabled', () => {
