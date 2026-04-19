@@ -178,10 +178,10 @@ describe('pushApproveMain — approve route divergence guard', () => {
     );
   });
 
-  // Regression: approve → divergence → local main reset → retry idempotent.
-  // Without the reset, local main is ahead of origin/main after a failed push,
-  // and the next approve attempt's `git pull origin main --ff-only` fails.
-  it('resets local main to origin/main before marking stuck on divergence', async () => {
+  // Regression: approve → divergence → workspace marked stuck, NO implicit hard-reset.
+  // Recovery instructions are surfaced in the error message; the user must explicitly
+  // run `git reset --hard origin/main` before retrying (not done automatically).
+  it('marks workspace stuck on divergence without resetting local main', async () => {
     const localSha = 'aaa1111aaaa';
     const remoteSha = 'bbb2222bbbb';
     mockGitPush.mockRejectedValue(
@@ -191,34 +191,19 @@ describe('pushApproveMain — approve route divergence guard', () => {
     const result = await pushApproveMain(ISSUE_ID, PROJECT_PATH);
 
     expect(result.pushed).toBe(false);
-    // The reset must run before marking stuck so the next approve can pull --ff-only
-    expect(mockExec).toHaveBeenCalledWith(
+    // No implicit git reset — the hard-reset is destructive and must be user-initiated
+    expect(mockExec).not.toHaveBeenCalledWith(
       'git reset --hard origin/main',
-      expect.objectContaining({ cwd: PROJECT_PATH }),
+      expect.anything(),
     );
     expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
       ISSUE_ID,
       'main_diverged',
       expect.objectContaining({ localSha, remoteSha }),
     );
-  });
-
-  it('still marks workspace stuck even when local main reset fails', async () => {
-    mockGitPush.mockRejectedValue(
-      new MainDivergedErrorClass('main diverged', 'aaa', 'bbb'),
-    );
-    // Simulate git reset failing (e.g., detached HEAD state)
-    mockExec.mockRejectedValue(new Error('fatal: could not reset'));
-
-    const result = await pushApproveMain(ISSUE_ID, PROJECT_PATH);
-
-    // Must still return 409 and mark stuck despite the reset failure
-    expect(result.pushed).toBe(false);
-    if (!result.pushed) expect(result.httpStatus).toBe(409);
-    expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE_ID,
-      'main_diverged',
-      expect.any(Object),
-    );
+    // Error message must include recovery instructions so the user knows what to do
+    if (!result.pushed) {
+      expect(result.error).toMatch(/git reset --hard origin\/main/);
+    }
   });
 });

@@ -765,21 +765,18 @@ export async function pushApproveMain(
     return { pushed: true };
   } catch (pushErr: any) {
     if (pushErr instanceof MainDivergedError) {
-      // Restore local main to origin/main so the next approve attempt can
-      // re-checkout and git pull --ff-only cleanly. Without this reset, local
-      // main is ahead of origin (has the abandoned merge commit) and the next
-      // attempt's git pull --ff-only fails immediately.
-      try {
-        await execAsync('git reset --hard origin/main', { cwd: projectPath, encoding: 'utf-8' });
-        console.log(`[approve] Restored local main to origin/main after divergence (${issueId})`);
-      } catch (resetErr: any) {
-        console.error(`[approve] Failed to restore local main after divergence (${issueId}): ${resetErr.message}`);
-      }
+      // Mark the workspace stuck so Deacon skips it — no automatic retry.
+      // Do NOT hard-reset local main here: that is a destructive operation that
+      // must be explicit/user-confirmed, not a silent side-effect of a failed push.
+      // The stuck flag prevents any further automatic approve attempts; when the
+      // user manually unsticks and retries, the approve route's git pull --ff-only
+      // step will detect the orphaned merge commit and surface a recoverable error
+      // with instructions to run: git reset --hard origin/main
       markWorkspaceStuck(issueId, 'main_diverged', {
         localSha: pushErr.localSha,
         remoteSha: pushErr.remoteSha,
       });
-      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — sync main and retry.`;
+      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover: cd ${projectPath} && git reset --hard origin/main, then unstick and retry.`;
       return { pushed: false, httpStatus: 409, error };
     }
     const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
@@ -4016,6 +4013,21 @@ const postWorkspaceApproveRoute = HttpRouter.add(
 
         try {
           await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
+          await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
+          // Detect orphaned merge commit: local main is AHEAD of origin/main from a
+          // previous approve attempt whose push failed. git pull --ff-only would fail
+          // here with "not possible to fast-forward". Surface a recoverable error
+          // with explicit instructions rather than silently hard-resetting.
+          const { stdout: aheadCountRaw } = await execAsync(
+            'git rev-list origin/main..HEAD --count',
+            { cwd: projectPath, encoding: 'utf-8' }
+          );
+          const aheadCount = parseInt(aheadCountRaw.trim(), 10) || 0;
+          if (aheadCount > 0) {
+            const error = `Local main is ${aheadCount} commit(s) ahead of origin/main — a previous approve attempt left an unpushed merge commit. To recover, run:\n  cd ${projectPath} && git reset --hard origin/main\nThen unstick the workspace and retry.`;
+            completePendingOperation(issueId, error);
+            return jsonResponse({ error }, { status: 409 });
+          }
           await execAsync('git pull origin main --ff-only', {
             cwd: projectPath,
             encoding: 'utf-8',
