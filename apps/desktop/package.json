@@ -4,6 +4,10 @@
   "description": "Panopticon Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eltmon/panopticon-cli.git"
+  },
   "bin": {
     "panctl": "./bin/panctl.mjs"
   },
@@ -93,12 +97,12 @@
           ]
         }
       ],
-      "icon": "resources/icon.icns",
+      "icon": "resources/icon.png",
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
       "title": "Panopticon",
-      "icon": "resources/icon.icns"
+      "icon": "resources/icon.png"
     },
     "win": {
       "target": [
