@@ -105,14 +105,29 @@ export function setReviewStatus(
   update: Partial<ReviewStatus>,
   filePath = DEFAULT_STATUS_FILE,
 ): ReviewStatus {
-  const statuses = loadReviewStatuses(filePath);
-  const existing = statuses[issueId] || {
-    issueId,
-    reviewStatus: 'pending' as const,
-    testStatus: 'pending' as const,
-    updatedAt: new Date().toISOString(),
-    readyForMerge: false,
-  };
+  // For the default (SQLite) path, read only the single row we're updating.
+  // Reading the full table and writing it back is a TOCTOU race: two concurrent
+  // calls for different issue IDs can clobber each other if saveReviewStatuses()
+  // deletes rows absent from the in-memory snapshot.
+  let statuses: Record<string, ReviewStatus> | null = null;
+  const existing: ReviewStatus = filePath === DEFAULT_STATUS_FILE
+    ? (getReviewStatusFromDb(issueId) ?? {
+        issueId,
+        reviewStatus: 'pending' as const,
+        testStatus: 'pending' as const,
+        updatedAt: new Date().toISOString(),
+        readyForMerge: false,
+      })
+    : (() => {
+        statuses = loadReviewStatuses(filePath);
+        return statuses[issueId] || {
+          issueId,
+          reviewStatus: 'pending' as const,
+          testStatus: 'pending' as const,
+          updatedAt: new Date().toISOString(),
+          readyForMerge: false,
+        };
+      })();
 
   // Guard: reject reviewStatus regression from 'passed' to 'reviewing' unless the caller
   // is explicitly resetting the merge lifecycle (update includes mergeStatus).
@@ -199,18 +214,16 @@ export function setReviewStatus(
     })();
   }
 
-  // SQLite first — it is the authoritative store (reads prefer SQLite)
   if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      dbUpsert(updated);
-    } catch (err) {
-      console.error('[review-status] SQLite write failed (continuing with JSON):', err);
-    }
+    // Single-row upsert — atomic, no TOCTOU risk. Never call saveReviewStatuses()
+    // here because it does read-all/delete-missing/write-all which races with
+    // concurrent setReviewStatus() calls for different issue IDs.
+    dbUpsert(updated);
+  } else {
+    // Non-default path: JSON file (tests / CLI tools). statuses was populated above.
+    statuses![issueId] = updated;
+    saveReviewStatuses(statuses!, filePath);
   }
-
-  // JSON second — legacy fallback for tools that read review-status.json directly
-  statuses[issueId] = updated;
-  saveReviewStatuses(statuses, filePath);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 

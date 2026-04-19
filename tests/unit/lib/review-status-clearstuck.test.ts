@@ -38,7 +38,7 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, saveReviewStatuses } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, saveReviewStatuses, setReviewStatus } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -135,5 +135,49 @@ describe('saveReviewStatuses (default path)', () => {
     const after = loadReviewStatuses();
     expect(after['PAN-200']).toBeDefined();
     expect(after['PAN-201']).toBeUndefined();
+  });
+});
+
+// ============== setReviewStatus concurrency (TOCTOU regression) ==============
+
+describe('setReviewStatus concurrent updates (default path)', () => {
+  it('does not clobber a different issue when two updates race', () => {
+    // Seed two issues
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-A', 'pending', 'pending', datetime('now'), 0),
+             ('PAN-B', 'pending', 'pending', datetime('now'), 0)
+    `).run();
+
+    // Simulate a TOCTOU race: both callers read the DB, then both write.
+    // With the old read-all/write-all approach the second write would delete
+    // the row written by the first. With single-row upsert both survive.
+    setReviewStatus('PAN-A', { reviewStatus: 'reviewing' });
+    setReviewStatus('PAN-B', { reviewStatus: 'reviewing' });
+
+    const after = loadReviewStatuses();
+    expect(after['PAN-A'].reviewStatus).toBe('reviewing');
+    expect(after['PAN-B'].reviewStatus).toBe('reviewing');
+  });
+
+  it('setReviewStatus uses single-row read — does not load the entire table', () => {
+    // Seed many rows
+    for (let i = 0; i < 5; i++) {
+      testDb.prepare(`
+        INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+        VALUES ('PAN-MANY-${i}', 'pending', 'pending', datetime('now'), 0)
+      `).run();
+    }
+
+    // Update one row — all others must remain intact
+    setReviewStatus('PAN-MANY-2', { reviewStatus: 'passed', testStatus: 'passed' });
+
+    const after = loadReviewStatuses();
+    for (let i = 0; i < 5; i++) {
+      expect(after[`PAN-MANY-${i}`], `PAN-MANY-${i} must exist`).toBeDefined();
+    }
+    expect(after['PAN-MANY-2'].reviewStatus).toBe('passed');
+    // Other rows unaffected
+    expect(after['PAN-MANY-0'].reviewStatus).toBe('pending');
   });
 });
