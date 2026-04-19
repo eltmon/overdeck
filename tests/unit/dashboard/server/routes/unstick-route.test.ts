@@ -6,7 +6,8 @@
  *
  *   404  workspace does not exist
  *   400  workspace exists but is not stuck
- *   200  workspace is stuck → clear stuck fields + reset lifecycle to pending → success body
+ *   409  workspace is stuck but git state not yet repaired (local main still ahead of origin/main)
+ *   200  workspace is stuck, git state verified safe → clear stuck + reset lifecycle → success body
  *
  * processUnstickRequest() is exported from workspaces.ts following the project's
  * established pattern for route helper extraction (computeStuckCount, parseGitActivityParams,
@@ -73,7 +74,7 @@ import { setReviewStatus, getReviewStatus } from '../../../../../src/lib/review-
 
 describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract', () => {
   it('404: returns httpStatus=404 when workspace does not exist', () => {
-    const result = processUnstickRequest('PAN-404', false, null);
+    const result = processUnstickRequest('PAN-404', false, null, true);
 
     expect(result.httpStatus).toBe(404);
     expect(result.body.success).toBe(false);
@@ -84,7 +85,7 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     // workspace exists (workspaceExists=true) but currentStatus has stuck=false/undefined
     const notStuckStatus = getReviewStatus('PAN-NOT-STUCK');  // returns null — not stuck
 
-    const result = processUnstickRequest('PAN-NOT-STUCK', true, notStuckStatus);
+    const result = processUnstickRequest('PAN-NOT-STUCK', true, notStuckStatus, true);
 
     expect(result.httpStatus).toBe(400);
     expect(result.body.success).toBe(false);
@@ -96,20 +97,37 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     setReviewStatus('PAN-PENDING', { reviewStatus: 'pending', testStatus: 'pending' });
     const status = getReviewStatus('PAN-PENDING');  // stuck is falsy
 
-    const result = processUnstickRequest('PAN-PENDING', true, status);
+    const result = processUnstickRequest('PAN-PENDING', true, status, true);
 
     expect(result.httpStatus).toBe(400);
   });
 
+  it('409: returns httpStatus=409 when workspace is stuck but git state not yet repaired', () => {
+    // Simulate operator clicking Unstick before running `git reset --hard origin/main`.
+    // gitSafeState=false means local main is still ahead of origin/main.
+    setReviewStatus('PAN-NOTRESET', { reviewStatus: 'passed', testStatus: 'passed' });
+    markWorkspaceStuck('PAN-NOTRESET', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
+    const stuckStatus = getReviewStatus('PAN-NOTRESET');
+
+    const result = processUnstickRequest('PAN-NOTRESET', true, stuckStatus, false);
+
+    expect(result.httpStatus).toBe(409);
+    expect(result.body.success).toBe(false);
+    expect((result.body as { error: string }).error).toMatch(/git reset --hard origin\/main/i);
+
+    // Stuck flag must NOT be cleared — workspace is still unrepaired
+    expect(getReviewStatusFromDb('PAN-NOTRESET')?.stuck).toBe(true);
+  });
+
   it('200: returns httpStatus=200 and clears stuck flag for a genuinely stuck workspace', () => {
-    // Set up a stuck workspace
+    // Set up a stuck workspace with gitSafeState=true (operator has reset main)
     setReviewStatus('PAN-STUCK', { reviewStatus: 'passed', testStatus: 'passed' });
     markWorkspaceStuck('PAN-STUCK', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
 
     const stuckStatus = getReviewStatus('PAN-STUCK');
     expect(stuckStatus?.stuck).toBe(true);  // precondition
 
-    const result = processUnstickRequest('PAN-STUCK', true, stuckStatus);
+    const result = processUnstickRequest('PAN-STUCK', true, stuckStatus, true);
 
     expect(result.httpStatus).toBe(200);
     expect(result.body.success).toBe(true);
@@ -132,7 +150,7 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     markWorkspaceStuck('PAN-RESET', 'main_diverged');
     const stuckStatus = getReviewStatus('PAN-RESET');
 
-    processUnstickRequest('PAN-RESET', true, stuckStatus);
+    processUnstickRequest('PAN-RESET', true, stuckStatus, true);
 
     const after = getReviewStatus('PAN-RESET');
     // Stuck flag cleared — Deacon will process the issue again
@@ -148,7 +166,7 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     markWorkspaceStuck('PAN-REASON', 'main_diverged');
     const stuckStatus = getReviewStatus('PAN-REASON');
 
-    const result = processUnstickRequest('PAN-REASON', true, stuckStatus);
+    const result = processUnstickRequest('PAN-REASON', true, stuckStatus, true);
 
     expect(result.httpStatus).toBe(200);
     expect((result.body as { previousReason?: string }).previousReason).toBe('main_diverged');

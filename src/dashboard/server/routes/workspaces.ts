@@ -3043,15 +3043,18 @@ export type UnstickResult =
 /**
  * Core logic for POST /api/workspaces/:issueId/unstick.
  *
- * Validates preconditions (workspace exists, workspace is stuck), clears the
- * persistent stuck marker, and invalidates stale review/test results by
- * resetting the lifecycle to pending.
+ * Validates preconditions (workspace exists, workspace is stuck, git state is
+ * repaired), clears the persistent stuck marker, and invalidates stale
+ * review/test results by resetting the lifecycle to pending.
  *
  * The recovery path requires `git reset --hard origin/main` which moves the
  * workspace HEAD away from the reviewed commit, making prior passed results
  * invalid. Keeping reviewStatus=passed after that would let the UI present
  * a stale approval. One atomic setReviewStatus() call clears stuck state and
  * resets the lifecycle in a single DB write and a single notifyPipeline event.
+ *
+ * gitSafeState must be pre-verified by the caller (async git check). Passing
+ * false returns 409 with recovery instructions before any DB mutation.
  *
  * Exported for unit testing — the route handler calls this and maps the result
  * directly to an HTTP response.
@@ -3060,6 +3063,7 @@ export function processUnstickRequest(
   issueId: string,
   workspaceExists: boolean,
   currentStatus: ReturnType<typeof getReviewStatus>,
+  gitSafeState: boolean,
 ): UnstickResult {
   if (!workspaceExists) {
     return { httpStatus: 404, body: { success: false, error: 'Workspace does not exist' } };
@@ -3067,9 +3071,19 @@ export function processUnstickRequest(
   if (!currentStatus?.stuck) {
     return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
   }
+  // Enforce that the operator has actually repaired the git state before we
+  // clear the stuck flag. If local main is still ahead of origin/main, Deacon
+  // would immediately re-enter the same broken approve/merge path.
+  if (!gitSafeState) {
+    return {
+      httpStatus: 409,
+      body: {
+        success: false,
+        error: `Workspace git state is not yet repaired. Run: git reset --hard origin/main in the project repo, then retry.`,
+      },
+    };
+  }
   // Single atomic write: clear stuck fields and reset lifecycle to pending.
-  // Recovery requires `git reset --hard origin/main`, which moves HEAD away from
-  // the previously-reviewed commit — prior passed results are invalid after that.
   setReviewStatusBase(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
@@ -3084,6 +3098,27 @@ export function processUnstickRequest(
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
 }
 
+/**
+ * Check whether the project repo's local main branch is at or behind origin/main.
+ * Returns true (safe) if main is not ahead of origin/main — i.e., the operator
+ * has already run `git reset --hard origin/main` to discard the orphaned merge commit.
+ * Returns false if main is still ahead (orphaned commit still present).
+ * Returns true for any git error so a transient failure doesn't permanently block unstick.
+ */
+async function checkProjectGitSafeState(projectPath: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      'git rev-list origin/main..main --count',
+      { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
+    );
+    const aheadCount = parseInt(stdout.trim(), 10) || 0;
+    return aheadCount === 0;
+  } catch {
+    // If we can't check (no git repo, no origin/main), don't block the operator.
+    return true;
+  }
+}
+
 const postWorkspaceUnstickRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/unstick',
@@ -3093,7 +3128,14 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
     const current = getReviewStatus(issueId);
-    const result = processUnstickRequest(issueId, workspaceInfo.exists, current);
+
+    // Pre-verify git state before mutating stuck flag.
+    // For main_diverged: check that local main is not ahead of origin/main.
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const gitSafeState = yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
+
+    const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitSafeState);
     return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
   }))
 );
