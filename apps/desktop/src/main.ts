@@ -301,7 +301,8 @@ app.on("ready", () => {
   initializeNotifications();
   configureApplicationMenu();
   registerDesktopProtocol();
-  initializeAutoUpdater();
+  const updateChannel = app.getVersion().includes("-canary") ? "beta" : "latest";
+  initializeAutoUpdater(updateChannel);
 
   if (process.platform === "win32") {
     app.setAppUserModelId(APP_ID);

@@ -12,8 +12,9 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:mac": "electron-builder --mac dmg --universal --publish never",
+    "dist:linux": "electron-builder --linux AppImage --publish always",
+    "dist:mac": "electron-builder --mac dmg --universal --publish always",
+    "dist:win": "electron-builder --win nsis --publish always",
     "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3"
   },
   "dependencies": {
@@ -79,6 +80,19 @@
     "dmg": {
       "title": "Panopticon",
       "icon": "resources/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "afterPack": "scripts/afterPack.cjs"
   }

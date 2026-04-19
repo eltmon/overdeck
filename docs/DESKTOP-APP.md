@@ -183,6 +183,25 @@ This is equivalent to `pan up` without the Electron wrapper — useful on headle
 
 ---
 
+## Auto-Updater Channels
+
+The desktop app uses `electron-updater` with GitHub Releases as the update server. Updates respect the release channel so stable and canary users never cross-pollute:
+
+| Build Type | Version Pattern | Update Channel | Behavior |
+|---|---|---|---|
+| **Stable** | `x.y.z` | `latest` | Offers only stable releases |
+| **Canary** | `x.y.z-canary.n` | `beta` | Offers only canary prereleases |
+
+The channel is derived automatically from `app.getVersion()` at startup:
+- Versions containing `-canary` → `beta` channel
+- All other versions → `latest` channel
+
+This means a user on `v1.0.0` will not be prompted to install `v1.1.0-canary.3`, and a user on `v1.1.0-canary.3` will not be offered `v1.0.0`.
+
+The `beta` channel maps to GitHub prereleases; `latest` maps to full releases. Both are served from the same `eltmon/panopticon-cli` release feed.
+
+---
+
 ## Building the Desktop App
 
 See [BUILD.md § Electron Desktop App](./BUILD.md#electron-desktop-app-appsdesktop) for the full build pipeline.
