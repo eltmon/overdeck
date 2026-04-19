@@ -91,13 +91,13 @@ import { reopenWorkspaceState } from '../../src/lib/reopen.js';
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('reopenWorkspaceState', () => {
-  it('resets review/test/merge to pending', () => {
+  it('resets review/test/merge to pending', async () => {
     seedStatus({
       'PAN-999': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },
     });
     const wsDir = createWorkspace();
 
-    const result = reopenWorkspaceState('PAN-999', wsDir);
+    const result = await reopenWorkspaceState('PAN-999', wsDir);
 
     expect(result.specialistStatesReset).toBe(true);
     expect(result.previousReviewStatus).toBe('passed');
@@ -113,10 +113,10 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('creates initial pending status when no prior status exists', () => {
+  it('creates initial pending status when no prior status exists', async () => {
     const wsDir = createWorkspace();
 
-    const result = reopenWorkspaceState('PAN-999', wsDir);
+    const result = await reopenWorkspaceState('PAN-999', wsDir);
 
     expect(result.specialistStatesReset).toBe(true);
     expect(result.previousReviewStatus).toBeNull();
@@ -129,10 +129,10 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('appends Reopened section to STATE.md', () => {
+  it('appends Reopened section to STATE.md', async () => {
     const wsDir = createWorkspace('# PAN-999\n\n**STATUS: Implementation complete**\n\nSome work.\n');
 
-    const result = reopenWorkspaceState('PAN-999', wsDir, { reason: 'Post-merge regression' });
+    const result = await reopenWorkspaceState('PAN-999', wsDir, { reason: 'Post-merge regression' });
 
     expect(result.stateMdUpdated).toBe(true);
 
@@ -147,10 +147,10 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('appends tracker context to STATE.md when provided', () => {
+  it('appends tracker context to STATE.md when provided', async () => {
     const wsDir = createWorkspace();
 
-    reopenWorkspaceState('PAN-999', wsDir, {
+    await reopenWorkspaceState('PAN-999', wsDir, {
       trackerContext: '## Tracker Status\n\nUser requested fix for login bug.',
     });
 
@@ -161,11 +161,11 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('does not modify STATE.md if it does not exist', () => {
+  it('does not modify STATE.md if it does not exist', async () => {
     const wsDir = mkdtempSync(join(tmpdir(), 'pan-reopen-nows-'));
     mkdirSync(join(wsDir, '.planning'), { recursive: true });
 
-    const result = reopenWorkspaceState('PAN-999', wsDir);
+    const result = await reopenWorkspaceState('PAN-999', wsDir);
 
     expect(result.stateMdUpdated).toBe(false);
     expect(existsSync(join(wsDir, '.planning', 'STATE.md'))).toBe(false);
@@ -173,7 +173,7 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('preserves prUrl in status after reset', () => {
+  it('preserves prUrl in status after reset', async () => {
     seedStatus({
       'PAN-999': {
         reviewStatus: 'passed',
@@ -184,7 +184,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    reopenWorkspaceState('PAN-999', wsDir);
+    await reopenWorkspaceState('PAN-999', wsDir);
 
     const row = readStatus('PAN-999')!;
     expect(row.pr_url).toBe('https://github.com/org/repo/pull/42');
@@ -192,13 +192,13 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('resets autoRequeueCount to 0', () => {
+  it('resets autoRequeueCount to 0', async () => {
     seedStatus({
       'PAN-999': { reviewStatus: 'failed', testStatus: 'failed', readyForMerge: false, autoRequeueCount: 3 },
     });
     const wsDir = createWorkspace();
 
-    reopenWorkspaceState('PAN-999', wsDir);
+    await reopenWorkspaceState('PAN-999', wsDir);
 
     const row = readStatus('PAN-999')!;
     expect(row.auto_requeue_count).toBe(0);
@@ -206,10 +206,10 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('returns empty queueItemsRemoved when no queue items exist', () => {
+  it('returns empty queueItemsRemoved when no queue items exist', async () => {
     const wsDir = createWorkspace();
 
-    const result = reopenWorkspaceState('PAN-999', wsDir);
+    const result = await reopenWorkspaceState('PAN-999', wsDir);
 
     expect(result.queueItemsRemoved).toEqual({});
 
@@ -217,7 +217,7 @@ describe('reopenWorkspaceState', () => {
   });
 
   // PAN-653 regression: reopen must clear stuck state and reviewedAtCommit
-  it('clears stuck fields on reopen-after-stuck so Deacon resumes the issue', () => {
+  it('clears stuck fields on reopen-after-stuck so Deacon resumes the issue', async () => {
     seedStatus({
       'PAN-999': {
         reviewStatus: 'passed',
@@ -230,7 +230,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    reopenWorkspaceState('PAN-999', wsDir);
+    await reopenWorkspaceState('PAN-999', wsDir);
 
     const row = readStatus('PAN-999')!;
     expect(row.stuck).toBeFalsy();
@@ -240,7 +240,7 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  it('clears reviewedAtCommit on reopen-after-reviewed so next approve records the new commit', () => {
+  it('clears reviewedAtCommit on reopen-after-reviewed so next approve records the new commit', async () => {
     seedStatus({
       'PAN-999': {
         reviewStatus: 'passed',
@@ -251,7 +251,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    reopenWorkspaceState('PAN-999', wsDir);
+    await reopenWorkspaceState('PAN-999', wsDir);
 
     const row = readStatus('PAN-999')!;
     expect(row.reviewed_at_commit).toBeNull();

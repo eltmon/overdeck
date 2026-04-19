@@ -3,9 +3,12 @@
  *
  * Called by both the CLI `pan reopen` command and the dashboard
  * `POST /api/issues/:id/reopen` endpoint to ensure consistent behavior.
+ *
+ * All filesystem I/O uses fs/promises so this is safe on the dashboard event loop.
  */
 
-import { existsSync, readFileSync, appendFileSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile, appendFile } from 'fs/promises';
 import { join } from 'path';
 import {
   getReviewStatus,
@@ -38,11 +41,11 @@ export interface ReopenOptions {
  * @param workspacePath - Absolute path to workspace directory
  * @param options - Optional reason and tracker context
  */
-export function reopenWorkspaceState(
+export async function reopenWorkspaceState(
   issueId: string,
   workspacePath: string,
   options: ReopenOptions = {}
-): ReopenResult {
+): Promise<ReopenResult> {
   const result: ReopenResult = {
     specialistStatesReset: false,
     previousReviewStatus: null,
@@ -83,10 +86,10 @@ export function reopenWorkspaceState(
   });
   result.specialistStatesReset = true;
 
-  // 2. Append "Reopened" section to STATE.md
+  // 2. Append "Reopened" section to STATE.md (async — safe on dashboard event loop)
   const statePath = join(workspacePath, '.planning', 'STATE.md');
   if (existsSync(statePath)) {
-    const previousContent = readFileSync(statePath, 'utf-8');
+    const previousContent = await readFile(statePath, 'utf-8');
     const lastStatusMatch = previousContent.match(/\*\*STATUS:\s*([^*\n]+)\*\*/);
     const previousStatus = lastStatusMatch ? lastStatusMatch[1].trim() : 'Unknown';
 
@@ -117,7 +120,7 @@ export function reopenWorkspaceState(
     lines.push('');
     lines.push('Specialist states reset to pending. Resume implementation based on tracker context above.');
 
-    appendFileSync(statePath, lines.join('\n') + '\n');
+    await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
     result.stateMdUpdated = true;
   }
 
