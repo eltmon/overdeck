@@ -13,7 +13,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
 import { join } from 'path';
-import { exec, execFile, execSync } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 
