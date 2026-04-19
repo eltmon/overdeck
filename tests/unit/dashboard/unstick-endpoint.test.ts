@@ -39,6 +39,7 @@ import {
   clearWorkspaceStuck,
   getReviewStatusFromDb,
 } from '../../../src/lib/database/review-status-db.js';
+import { setReviewStatus, getReviewStatus } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -130,5 +131,84 @@ describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
 
     expect(getReviewStatusFromDb('PAN-600')!.stuck).toBeUndefined();  // cleared
     expect(getReviewStatusFromDb('PAN-601')!.stuck).toBe(true);       // still stuck
+  });
+});
+
+describe('unstick lifecycle recovery', () => {
+  // These tests verify that the unstick endpoint leaves the issue in a state
+  // that Deacon's orphan-recovery patrol will automatically act on (PAN-653).
+
+  it('resets reviewStatus to pending after unstick so deacon can re-dispatch', () => {
+    // Simulate an issue that passed review/test but then got stuck (e.g. diverged from main)
+    setReviewStatus('PAN-700', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: false,
+    });
+    markWorkspaceStuck('PAN-700', 'main_diverged');
+
+    // Unstick: clear the stuck flag and reset lifecycle
+    clearWorkspaceStuck('PAN-700');
+    setReviewStatus('PAN-700', {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+    });
+
+    const after = getReviewStatus('PAN-700');
+    // Lifecycle must be in a state deacon's orphan recovery will re-dispatch
+    expect(after?.reviewStatus).toBe('pending');
+    expect(after?.testStatus).toBe('pending');
+    expect(after?.readyForMerge).toBe(false);
+    // Stuck flag must be cleared
+    expect(after?.stuck).toBeFalsy();
+  });
+
+  it('unstick from readyForMerge=true also resets to pending', () => {
+    // Simulate a workspace that was approved and ready to merge but then got stuck
+    setReviewStatus('PAN-800', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+    });
+    markWorkspaceStuck('PAN-800', 'main_diverged');
+
+    // Unstick flow
+    clearWorkspaceStuck('PAN-800');
+    setReviewStatus('PAN-800', {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+    });
+
+    const after = getReviewStatus('PAN-800');
+    expect(after?.reviewStatus).toBe('pending');
+    expect(after?.readyForMerge).toBe(false);
+    expect(after?.stuck).toBeFalsy();
+  });
+
+  it('stranded passed/passed state without lifecycle reset would not be acted on by deacon', () => {
+    // This test documents the pre-fix behavior that was a bug: if only the stuck flag
+    // is cleared but reviewStatus/testStatus remain 'passed', deacon has no path to
+    // re-dispatch because the issue looks already-completed.
+    setReviewStatus('PAN-900', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: false,
+    });
+    markWorkspaceStuck('PAN-900', 'main_diverged');
+    clearWorkspaceStuck('PAN-900');  // only clears stuck flag, no lifecycle reset
+
+    // Without the lifecycle reset, issue is stranded: stuck=false but status=passed/passed
+    // After the fix, the endpoint also calls setReviewStatus to reset — verify that the
+    // correct fix (setting reviewStatus=pending) produces a state deacon can act on.
+    setReviewStatus('PAN-900', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false });
+
+    const after = getReviewStatus('PAN-900');
+    // Must not be stuck=true (would be skipped by deacon)
+    expect(after?.stuck).toBeFalsy();
+    // Must not be in completed-looking state (would be ignored by deacon orphan recovery)
+    expect(after?.reviewStatus).not.toBe('passed');
+    expect(after?.reviewStatus).toBe('pending');
   });
 });

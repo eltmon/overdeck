@@ -3013,6 +3013,17 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
     clearWorkspaceStuck(issueId);
     console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${current.stuckReason ?? 'unknown'})`);
 
+    // Reset the review/test lifecycle to 'pending' so Deacon's orphan-recovery patrol
+    // will automatically re-dispatch the review on the next tick. Without this reset,
+    // an issue stranded at reviewStatus=passed/testStatus=passed would remain stuck
+    // indefinitely because no patrol path re-triggers a completed-looking pipeline.
+    setReviewStatus(issueId, {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+    });
+    console.log(`[unstick] Reset review/test lifecycle to pending for ${issueId} — deacon will re-dispatch`);
+
     return jsonResponse({ success: true, issueId, previousReason: current.stuckReason });
   }))
 );
