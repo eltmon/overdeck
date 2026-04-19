@@ -737,6 +737,46 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
   return setReviewStatusBase(issueId, update);
 }
 
+// ─── Exported helper: approve push with divergence guard ─────────────────────
+// Exported for unit testing — encapsulates the gitPush try-catch block from the
+// approve route so the 409/400/success branches can be tested without a full
+// Effect HTTP server.
+
+export type ApprovePushResult =
+  | { pushed: true }
+  | { pushed: false; httpStatus: 409 | 400; error: string };
+
+/**
+ * Push merged main with a divergence guard.
+ *
+ * Throws `MainDivergedError` when origin/main has advanced past our local
+ * ancestor — marks the workspace stuck and returns a 409 result so the route
+ * handler can complete the pending operation and surface the error to the UI.
+ *
+ * All three outcomes (success, divergence/409, other-push-error/400) are tested
+ * in `tests/unit/dashboard/server/routes/approve-push.test.ts`.
+ */
+export async function pushApproveMain(
+  issueId: string,
+  projectPath: string,
+): Promise<ApprovePushResult> {
+  try {
+    await gitPush(projectPath, 'origin', 'main', { issueId });
+    return { pushed: true };
+  } catch (pushErr: any) {
+    if (pushErr instanceof MainDivergedError) {
+      markWorkspaceStuck(issueId, 'main_diverged', {
+        localSha: pushErr.localSha,
+        remoteSha: pushErr.remoteSha,
+      });
+      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — sync main and retry.`;
+      return { pushed: false, httpStatus: 409, error };
+    }
+    const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
+    return { pushed: false, httpStatus: 400, error };
+  }
+}
+
 // ─── Read JSON body helper ────────────────────────────────────────────────────
 
 const readJsonBody = Effect.gen(function* () {
@@ -2987,6 +3027,48 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
 // the user should do that separately via the start-agent UI once they have
 // resolved the divergence (e.g. by syncing main and re-approving).
 
+/** HTTP-contract result from the unstick endpoint. Exported for unit testing. */
+export type UnstickResult =
+  | { httpStatus: 404; body: { success: false; error: string } }
+  | { httpStatus: 400; body: { success: false; error: string } }
+  | { httpStatus: 200; body: { success: true; issueId: string; previousReason?: string } };
+
+/**
+ * Core logic for POST /api/workspaces/:issueId/unstick.
+ *
+ * Validates preconditions (workspace exists, workspace is stuck), clears the
+ * stuck flag, and resets the review/test lifecycle to 'pending' so Deacon's
+ * orphan-recovery patrol will re-dispatch the review automatically.
+ *
+ * Exported for unit testing — the route handler calls this and maps the result
+ * directly to an HTTP response.
+ */
+export function processUnstickRequest(
+  issueId: string,
+  workspaceExists: boolean,
+  currentStatus: ReturnType<typeof getReviewStatus>,
+): UnstickResult {
+  if (!workspaceExists) {
+    return { httpStatus: 404, body: { success: false, error: 'Workspace does not exist' } };
+  }
+  if (!currentStatus?.stuck) {
+    return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
+  }
+  clearWorkspaceStuck(issueId);
+  console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
+  // Reset the review/test lifecycle to 'pending' so Deacon's orphan-recovery patrol
+  // will automatically re-dispatch the review on the next tick. Without this reset,
+  // an issue stranded at reviewStatus=passed/testStatus=passed would remain stuck
+  // indefinitely because no patrol path re-triggers a completed-looking pipeline.
+  setReviewStatus(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    readyForMerge: false,
+  });
+  console.log(`[unstick] Reset review/test lifecycle to pending for ${issueId} — deacon will re-dispatch`);
+  return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
+}
+
 const postWorkspaceUnstickRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/unstick',
@@ -2995,36 +3077,9 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    if (!workspaceInfo.exists) {
-      return jsonResponse(
-        { success: false, error: 'Workspace does not exist' },
-        { status: 404 }
-      );
-    }
-
     const current = getReviewStatus(issueId);
-    if (!current?.stuck) {
-      return jsonResponse(
-        { success: false, error: `Workspace ${issueId} is not stuck` },
-        { status: 400 }
-      );
-    }
-
-    clearWorkspaceStuck(issueId);
-    console.log(`[unstick] Cleared stuck flag for ${issueId} (was: ${current.stuckReason ?? 'unknown'})`);
-
-    // Reset the review/test lifecycle to 'pending' so Deacon's orphan-recovery patrol
-    // will automatically re-dispatch the review on the next tick. Without this reset,
-    // an issue stranded at reviewStatus=passed/testStatus=passed would remain stuck
-    // indefinitely because no patrol path re-triggers a completed-looking pipeline.
-    setReviewStatus(issueId, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      readyForMerge: false,
-    });
-    console.log(`[unstick] Reset review/test lifecycle to pending for ${issueId} — deacon will re-dispatch`);
-
-    return jsonResponse({ success: true, issueId, previousReason: current.stuckReason });
+    const result = processUnstickRequest(issueId, workspaceInfo.exists, current);
+    return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
   }))
 );
 
@@ -4114,25 +4169,12 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           return jsonResponse({ error }, { status: 400 });
         }
 
-        // Push merged main (with divergence guard — throws MainDivergedError if origin/main
-        // has advanced past our local ancestor, protecting against silent hotfix clobber)
-        try {
-          await gitPush(projectPath, 'origin', 'main', { issueId });
-        } catch (pushErr: any) {
-          if (pushErr instanceof MainDivergedError) {
-            // origin/main advanced between our pull and our push — mark workspace stuck
-            // so Deacon does not re-trigger and the user sees a clear error in the UI.
-            markWorkspaceStuck(issueId, 'main_diverged', {
-              localSha: pushErr.localSha,
-              remoteSha: pushErr.remoteSha,
-            });
-            const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha.slice(0, 7)}, local: ${pushErr.localSha.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — sync main and retry.`;
-            completePendingOperation(issueId, error);
-            return jsonResponse({ error }, { status: 409 });
-          }
-          const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
-          completePendingOperation(issueId, error);
-          return jsonResponse({ error }, { status: 400 });
+        // Push merged main (with divergence guard — pushApproveMain catches MainDivergedError
+        // and marks workspace stuck if origin/main advanced past our local ancestor)
+        const pushResult = await pushApproveMain(issueId, projectPath);
+        if (!pushResult.pushed) {
+          completePendingOperation(issueId, pushResult.error);
+          return jsonResponse({ error: pushResult.error }, { status: pushResult.httpStatus });
         }
 
         // Post-merge lifecycle
