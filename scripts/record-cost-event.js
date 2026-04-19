@@ -764,10 +764,18 @@ function runMigrations(db) {
 		} catch {}
 	}
 	if (currentVersion < 20) {
-		try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`); } catch {}
-		try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`); } catch {}
-		try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`); } catch {}
-		try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`);
+		} catch {}
 	}
 	if (currentVersion < 21) db.exec(`
       CREATE TABLE IF NOT EXISTS git_operations (
