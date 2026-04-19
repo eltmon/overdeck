@@ -28,9 +28,10 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes,
         updated_at, ready_for_merge, auto_requeue_count, pr_url,
-        stuck, stuck_reason, stuck_at, stuck_details
+        stuck, stuck_reason, stuck_at, stuck_details,
+        reviewed_at_commit
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -50,7 +51,8 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         stuck                 = excluded.stuck,
         stuck_reason          = excluded.stuck_reason,
         stuck_at              = excluded.stuck_at,
-        stuck_details         = excluded.stuck_details
+        stuck_details         = excluded.stuck_details,
+        reviewed_at_commit    = excluded.reviewed_at_commit
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -71,6 +73,7 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.stuckReason ?? null,
       s.stuckAt ?? null,
       s.stuckDetails ?? null,
+      s.reviewedAtCommit ?? null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -174,6 +177,8 @@ interface DbReviewStatusRow {
   stuck_reason: string | null;
   stuck_at: string | null;
   stuck_details: string | null;
+  // PAN-653: commit SHA at which review passed
+  reviewed_at_commit: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -197,6 +202,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     stuckReason: row.stuck_reason ?? undefined,
     stuckAt: row.stuck_at ?? undefined,
     stuckDetails: row.stuck_details ?? undefined,
+    reviewedAtCommit: row.reviewed_at_commit ?? undefined,
     history: history.length > 0 ? history : undefined,
   });
 }

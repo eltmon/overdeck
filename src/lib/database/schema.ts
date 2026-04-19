@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 22;
 
 /**
  * Initialize the complete database schema.
@@ -81,7 +81,9 @@ export function initSchema(db: Database.Database): void {
       stuck                 INTEGER NOT NULL DEFAULT 0,
       stuck_reason          TEXT,
       stuck_at              TEXT,
-      stuck_details         TEXT
+      stuck_details         TEXT,
+      -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
+      reviewed_at_commit    TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -605,8 +607,8 @@ export function runMigrations(db: Database.Database): void {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch { /* already exists */ }
   }
 
-  // v19 → v20: add git_operations table (PAN-653: persistent git event log)
-  if (currentVersion < 20) {
+  // v20 → v21: add git_operations table (PAN-653: persistent git event log)
+  if (currentVersion < 21) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS git_operations (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -625,6 +627,13 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
         ON git_operations(operation, ts);
     `);
+  }
+
+  // v21 → v22: add reviewed_at_commit column to review_status (PAN-653)
+  // Stores the HEAD commit SHA at which review passed; deacon uses this to detect
+  // new commits pushed after review and invalidate the approved status.
+  if (currentVersion < 22) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
