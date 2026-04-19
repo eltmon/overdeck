@@ -41,7 +41,7 @@ let _cachedEventStore: any = null;
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push"]);
+const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
 const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
