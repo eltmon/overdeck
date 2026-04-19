@@ -40,7 +40,7 @@ vi.mock('../../../src/dashboard/server/services/git-activity.js', () => ({
 
 // ── Import module under test (after mocks) ────────────────────────────────────
 
-import { gitFetch, gitForcePush, gitMerge } from '../../../src/lib/git/operations.js';
+import { gitFetch, gitForcePush, gitMerge, gitPush, MainDivergedError } from '../../../src/lib/git/operations.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,46 @@ const AFTER_SHA  = 'cccc3333cccc3333cccc3333cccc3333cccc3333';
 function mockRevParse(sha: string) {
   execMock.mockResolvedValueOnce({ stdout: sha });
 }
+
+// ─── gitPush ─────────────────────────────────────────────────────────────────
+
+describe('gitPush', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws MainDivergedError and records main_diverged when merge-base exits with code 1', async () => {
+    mockRevParse(LOCAL_SHA);   // git rev-parse HEAD
+    execMock.mockResolvedValueOnce({ stdout: '' });  // git fetch
+    mockRevParse(REMOTE_SHA);  // git rev-parse origin/main
+    // merge-base exits 1 = not an ancestor (true divergence)
+    const notAncestorErr = Object.assign(new Error(''), { code: 1 });
+    execMock.mockRejectedValueOnce(notAncestorErr);
+
+    await expect(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' }))
+      .rejects.toBeInstanceOf(MainDivergedError);
+    expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'main_diverged',
+      status: 'aborted',
+      issueId: 'PAN-10',
+    }));
+  });
+
+  it('rethrows real git errors without recording main_diverged when merge-base exits non-1', async () => {
+    mockRevParse(LOCAL_SHA);
+    execMock.mockResolvedValueOnce({ stdout: '' });  // git fetch
+    mockRevParse(REMOTE_SHA);
+    // merge-base exits 128 = bad object / repo error — not a divergence
+    const badObjectErr = Object.assign(new Error('fatal: not a commit'), { code: 128 });
+    execMock.mockRejectedValueOnce(badObjectErr);
+
+    await expect(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' }))
+      .rejects.toThrow('fatal: not a commit');
+    expect(mockAppend).not.toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'main_diverged',
+    }));
+  });
+});
 
 // ─── gitFetch ────────────────────────────────────────────────────────────────
 

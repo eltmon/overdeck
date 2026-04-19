@@ -164,12 +164,22 @@ describe('scanGitPatterns', () => {
   });
 
   it('records force_push_cmd when a line contains "force-with-lease" without a "git push" prefix', () => {
-    // "git push --force-with-lease" would match push_attempt first (pattern order).
-    // The force_push_cmd pattern fires when git prints a standalone force-with-lease warning.
     scanGitPatterns('warning: rejected by force-with-lease protection', new Set(), 'PAN-5');
     expect(mockAppendGitOperation).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'force_push_cmd',
       status: 'success',
+    }));
+  });
+
+  it('classifies "git push --force-with-lease" as force_push_cmd, not push_attempt', () => {
+    // Regression: force-with-lease pattern must appear before /git push/i in GIT_PATTERNS
+    // so the full command string is correctly classified as a force-push.
+    scanGitPatterns('git push --force-with-lease origin main', new Set(), 'PAN-5');
+    expect(mockAppendGitOperation).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'force_push_cmd',
+    }));
+    expect(mockAppendGitOperation).not.toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'push_attempt',
     }));
   });
 

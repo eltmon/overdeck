@@ -129,8 +129,9 @@ export async function gitPush(
         encoding: 'utf-8',
         timeout: 10000,
       });
-    } catch {
-      // remoteSha is NOT an ancestor of localSha — main has diverged
+    } catch (err: unknown) {
+      // exit code 1 = "not an ancestor" (true divergence); any other code is a real git error
+      if ((err as { code?: number }).code !== 1) throw err;
       appendGitOperation({
         operation: 'main_diverged',
         branch,

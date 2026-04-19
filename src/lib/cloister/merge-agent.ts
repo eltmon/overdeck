@@ -656,11 +656,11 @@ async function captureTmuxOutput(sessionName: string): Promise<string> {
 
 /** Patterns to match in tmux capture-pane output (git push/fetch lines) */
 export const GIT_PATTERNS: Array<{ re: RegExp; operation: GitOperationType; level: 'info' | 'warn' | 'error' }> = [
+  { re: /force-with-lease/i,             operation: 'force_push_cmd',  level: 'warn' },
   { re: /git push/i,                     operation: 'push_attempt',    level: 'info' },
   { re: /git fetch/i,                    operation: 'fetch_attempt',   level: 'info' },
   { re: /\[rejected\]/i,                 operation: 'push_rejected',   level: 'error' },
   { re: /non-fast-forward/i,             operation: 'non_ff',          level: 'error' },
-  { re: /force-with-lease/i,             operation: 'force_push_cmd',  level: 'warn' },
   { re: /retrying/i,                     operation: 'retry',           level: 'warn' },
   { re: /\[remote rejected\]/i,          operation: 'remote_rejected', level: 'error' },
   { re: /Everything up-to-date/i,        operation: 'push_noop',       level: 'info' },
