@@ -6,9 +6,11 @@ benchmark
 bug-fix
 check-merged
 clear-writing
+cliproxy
 code-review
 code-review-performance
 code-review-security
+conv-lookup
 crash-investigation
 dependency-update
 feature-work
@@ -77,6 +79,7 @@ spec-readiness-setup
 stitch-design-md
 stitch-react-components
 stitch-setup
+unarchive-conversation
 web-design-guidelines
 work-complete
 workspace-status
