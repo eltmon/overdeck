@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, killSessionAsync, sendKeys, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync } from './tmux.js';
+import { createSession, killSession, killSessionAsync, sendKeys, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync, listPaneValues } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -1297,6 +1297,22 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
     throw new Error(`Agent ${normalizedId} not running`);
   }
 
+  // Guard: if tmux session exists but Claude Code has exited, resume instead
+  // of typing the message into a bare bash shell.
+  const panePids = listPaneValues(normalizedId, '#{pane_pid}');
+  if (panePids.length > 0) {
+    try {
+      await execAsync(`pgrep -P ${panePids[0]} -x claude`);
+    } catch {
+      console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
+      const resumeResult = await resumeAgent(normalizedId, message);
+      if (resumeResult.success) {
+        return;
+      }
+      throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
+    }
+  }
+
   await sendKeysAsync(normalizedId, message);
 
   // Also save to mail queue
@@ -1463,6 +1479,22 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
 }
 
 /**
+ * Check whether a tmux session has an active Claude Code process.
+ * A session may exist with only a bare bash shell after Claude exits.
+ */
+function isClaudeRunningInSession(sessionName: string): boolean {
+  try {
+    const panePids = listPaneValues(sessionName, '#{pane_pid}');
+    if (panePids.length === 0) return false;
+    const panePid = panePids[0]!;
+    execSync(`pgrep -P ${panePid} -x claude`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Detect crashed agents (state shows running but tmux session is gone)
  */
 export function detectCrashedAgents(): AgentState[] {
@@ -1490,9 +1522,14 @@ export function recoverAgent(agentId: string): AgentState | null {
     return null;
   }
 
-  // Check if already running
+  // Check if already running — session may exist with only a bare shell
+  // after Claude exited (zombie session). Kill it and recover.
   if (sessionExists(normalizedId)) {
-    return state;
+    if (isClaudeRunningInSession(normalizedId)) {
+      return state;
+    }
+    console.log(`[agents] ${normalizedId} tmux session is a zombie (no Claude process) — killing and recovering`);
+    try { killSession(normalizedId); } catch { /* ignore */ }
   }
 
   // Update crash count in health file

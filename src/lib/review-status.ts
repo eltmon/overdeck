@@ -297,32 +297,6 @@ export function setReviewStatus(
     })();
   }
 
-  // Auto-deliver feedback to work agent when review blocks or tests fail.
-  // This ensures feedback reaches the agent regardless of whether status was
-  // set via the dashboard API or directly (e.g., bun -e import). See PAN-586.
-  if (
-    (update.reviewStatus === 'blocked' || update.testStatus === 'failed') &&
-    (update.reviewStatus !== existing.reviewStatus || update.testStatus !== existing.testStatus)
-  ) {
-    const agentSession = `agent-${issueId.toLowerCase()}`;
-    (async () => {
-      try {
-        const { sessionExists } = await import('./tmux.js');
-        if (!sessionExists(agentSession)) return;
-
-        const statusType = update.reviewStatus === 'blocked' ? 'REVIEW BLOCKED' : 'TESTS FAILED';
-        const notes = update.reviewNotes || update.testNotes || 'No details provided.';
-        const msg = `SPECIALIST FEEDBACK: ${statusType} for ${issueId}.\n\n${notes}\n\nFix the issues, then run: pan done ${issueId}`;
-
-        const { messageAgent } = await import('./agents.js');
-        await messageAgent(agentSession, msg);
-        console.log(`[review-status] Auto-delivered ${statusType} feedback to ${agentSession}`);
-      } catch (err: any) {
-        console.warn(`[review-status] Failed to auto-deliver feedback to ${agentSession}: ${err.message}`);
-      }
-    })();
-  }
-
   return updated;
 }
 
