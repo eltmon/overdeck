@@ -7,13 +7,15 @@
  * past the local ancestor, gitPush throws MainDivergedError; the handler must:
  *
  *   1. Return HTTP 409 (not 400 or 500)
- *   2. Reset local main to origin/main (so retry is idempotent)
- *   3. Mark the workspace stuck via markWorkspaceStuck()
- *   4. Include the diverged SHAs in the error message
+ *   2. Mark the workspace stuck via markWorkspaceStuck()
+ *   3. Include the diverged SHAs in the error message
+ *   4. NOT reset local main automatically — the operator must run
+ *      `git reset --hard origin/main` manually before retrying (see stuckDetails)
  *
- * Regression: approve → divergence → unstick → approve retry.
- * Without the reset in step 2, the next approve attempt's
- * `git pull origin main --ff-only` fails because local main is ahead of origin.
+ * The approve route deliberately refuses to auto-reset because a reset on the
+ * project repo would destroy work in the projectPath. The orphaned merge commit
+ * is detected in a separate guard that fires on the NEXT approve attempt and
+ * surfaces explicit recovery instructions.
  *
  * pushApproveMain() is the extracted testable unit — the route calls it and
  * delegates response-building to the caller, following the project's established

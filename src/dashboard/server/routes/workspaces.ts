@@ -4007,7 +4007,9 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           console.log(`Feature branch push note: ${pushErr.message}`);
         }
 
-        // Concurrent-merge detection: warn if another push to main succeeded in the last 30s
+        // Concurrent-merge detection: warn if another push to main succeeded in the last 30s.
+        // recentPushWarning is included in the success response body below (line ~4146) so
+        // the caller can surface it to the operator without a separate lookup.
         const recentCutoff = new Date(Date.now() - 30_000).toISOString();
         const recentMainPushes = listGitOperations({ operation: 'push', since: recentCutoff })
           .filter((op) => op.status === 'success' && op.branch === 'main' && op.issueId !== issueId);
