@@ -313,6 +313,13 @@ describe('agent spawning with work types', () => {
       const { sessionExists } = await import('../../src/lib/tmux.js');
       vi.mocked(sessionExists).mockReturnValue(false);
 
+      // SageOx tests use phase:'implementation' which routes to GPT models.
+      // Ensure cliproxy mock is active in this describe scope — the outer
+      // beforeEach restores it, but belt-and-suspenders in case of module
+      // cache differences in the verification gate environment.
+      const cliproxy = await import('../../src/lib/cliproxy.js');
+      vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
+
       // Create a project structure with .sageox/ so SageOx vars are injected
       // Workspace path resolves to projectRoot via resolve(workspace, '..', '..')
       sageoxProjectRoot = join(tmpdir(), `pan-sageox-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
