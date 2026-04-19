@@ -3073,9 +3073,10 @@ export function processUnstickRequest(
   setReviewStatus(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
+    mergeStatus: 'pending',
     readyForMerge: false,
   });
-  console.log(`[unstick] Reset review/test lifecycle to pending for ${issueId} — deacon will re-dispatch`);
+  console.log(`[unstick] Reset review/test/merge lifecycle to pending for ${issueId} — deacon will re-dispatch`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
 }
 

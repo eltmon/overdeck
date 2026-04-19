@@ -1990,48 +1990,66 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 
 /** Diverged badge with Unstick button — shown when main diverged during git push */
 export function DivergedBadge({ issueIdentifier, stuckReason }: { issueIdentifier: string; stuckReason?: string | null }) {
+  const [unstickError, setUnstickError] = useState<string | null>(null);
   return (
-    <span
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
-      title={stuckReason
-        ? `Push blocked: ${stuckReason}. Click Unstick after syncing main.`
-        : 'Push blocked due to divergence from origin/main. Sync main and click Unstick to retry.'}
-    >
-      <XCircle className="w-3 h-3" />
-      Diverged
-      <button
-        className="ml-1 underline text-red-200 hover:text-white text-xs leading-none"
-        onClick={async (e) => {
-          e.stopPropagation();
-          try {
-            const res = await fetch(`/api/workspaces/${encodeURIComponent(issueIdentifier)}/unstick`, { method: 'POST' });
-            if (!res.ok) {
-              const body = await res.json().catch(() => ({}));
-              alert(`Unstick failed: ${body.error ?? res.statusText}`);
-            } else {
-              // Optimistic update: write directly to store so the badge disappears
-              // immediately without waiting for the WS round-trip
-              const state = useDashboardStore.getState();
-              const upperKey = issueIdentifier.toUpperCase();
-              const current = state.reviewStatusByIssueId[upperKey]
-                ?? state.reviewStatusByIssueId[issueIdentifier];
-              if (current) {
-                const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
-                useDashboardStore.setState((s) => ({
-                  reviewStatusByIssueId: {
-                    ...s.reviewStatusByIssueId,
-                    [key]: { ...current, stuck: undefined, stuckReason: undefined },
-                  },
-                }));
-              }
-            }
-          } catch (err: unknown) {
-            alert(`Unstick request failed: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }}
+    <span className="flex flex-col gap-0.5">
+      <span
+        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
+        title={stuckReason
+          ? `Push blocked: ${stuckReason}. Click Unstick after syncing main.`
+          : 'Push blocked due to divergence from origin/main. Sync main and click Unstick to retry.'}
       >
-        Unstick
-      </button>
+        <XCircle className="w-3 h-3" />
+        Diverged
+        <button
+          className="ml-1 underline text-red-200 hover:text-white text-xs leading-none"
+          onClick={async (e) => {
+            e.stopPropagation();
+            setUnstickError(null);
+            try {
+              const res = await fetch(`/api/workspaces/${encodeURIComponent(issueIdentifier)}/unstick`, { method: 'POST' });
+              if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                setUnstickError(body.error ?? res.statusText);
+              } else {
+                // Optimistic update: mirror what the server resets so the badge
+                // disappears immediately without waiting for the WS round-trip.
+                // Server sets: stuck=false, reviewStatus/testStatus/mergeStatus='pending', readyForMerge=false.
+                const state = useDashboardStore.getState();
+                const upperKey = issueIdentifier.toUpperCase();
+                const current = state.reviewStatusByIssueId[upperKey]
+                  ?? state.reviewStatusByIssueId[issueIdentifier];
+                if (current) {
+                  const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
+                  useDashboardStore.setState((s) => ({
+                    reviewStatusByIssueId: {
+                      ...s.reviewStatusByIssueId,
+                      [key]: {
+                        ...current,
+                        stuck: undefined,
+                        stuckReason: undefined,
+                        reviewStatus: 'pending',
+                        testStatus: 'pending',
+                        mergeStatus: 'pending',
+                        readyForMerge: false,
+                      },
+                    },
+                  }));
+                }
+              }
+            } catch (err: unknown) {
+              setUnstickError(err instanceof Error ? err.message : String(err));
+            }
+          }}
+        >
+          Unstick
+        </button>
+      </span>
+      {unstickError && (
+        <span className="text-xs text-red-400 px-1" title={unstickError}>
+          Unstick failed: {unstickError}
+        </span>
+      )}
     </span>
   );
 }
