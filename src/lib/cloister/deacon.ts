@@ -1199,12 +1199,9 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) {
-      return actions;
-    }
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; mergeStatus?: string; mergeNotes?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
+    // loadReviewStatuses() prefers SQLite (DB-first) and falls back to JSON —
+    // this is the authoritative source of truth after the PAN-653 DB migration.
+    const statuses = loadReviewStatuses();
 
     // Build a set of all active specialist sessions (global + per-project)
     // so we can check if ANY specialist is working on review/test tasks.
@@ -1236,8 +1233,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         }
       }
     }
-
-    let modified = false;
 
     const latestHistoryEntry = (
       history: Array<{ type: string; status: string; notes?: string }> | undefined,
@@ -1307,9 +1302,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           setReviewStatus(issueId, reviewUpdate as Parameters<typeof setReviewStatus>[1]);
           status.reviewStatus = latestTerminalReview.status;
           if (latestTerminalTest) {
-            status.testStatus = latestTerminalTest.status;
+            status.testStatus = latestTerminalTest.status as typeof status.testStatus;
           }
-          modified = true;
           actions.push(
             `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
             (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
@@ -1321,7 +1315,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           // Use setReviewStatus (not direct JSON write) so SQLite is updated too
           setReviewStatus(issueId, { reviewStatus: 'pending' });
           status.reviewStatus = 'pending';
-          modified = true;
           actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
         }
       }
@@ -1363,7 +1356,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             if (result.success) {
               setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               status.reviewStatus = 'reviewing';
-              modified = true;
               actions.push(
                 `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
               );
@@ -1422,8 +1414,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             branch,
           });
           if (result.success) {
+            setReviewStatus(issueId, { testStatus: 'testing' });
             status.testStatus = 'testing';
-            modified = true;
             actions.push(
               `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
             );
@@ -1432,8 +1424,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             );
           } else if (result.error === 'specialist_busy') {
             // Specialist busy — set dispatch_failed so deacon retries next patrol
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
             status.testStatus = 'dispatch_failed';
-            modified = true;
             actions.push(
               `Orphaned test for ${issueId}: specialist busy — set dispatch_failed for next patrol retry`,
             );
@@ -1441,8 +1433,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
               `[deacon] Specialist busy for ${issueId} — set dispatch_failed for next patrol retry`,
             );
           } else {
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
             status.testStatus = 'dispatch_failed';
-            modified = true;
             actions.push(
               `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
             );
@@ -1452,8 +1444,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           }
         } else {
           // Cannot derive workspace/project — reset to pending so the pipeline can re-trigger cleanly
+          setReviewStatus(issueId, { testStatus: 'pending' });
           status.testStatus = 'pending';
-          modified = true;
           actions.push(
             !resolved
               ? `Reset orphaned test for ${issueId}: no project configured`
@@ -1468,10 +1460,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
     }
 
-    // Save changes if any
-    if (modified) {
-      writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
-    }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error checking orphaned review statuses:', msg);
