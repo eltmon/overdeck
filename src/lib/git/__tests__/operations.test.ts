@@ -10,12 +10,12 @@ import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-// Hoist the exec mock so it's available in vi.mock factory
-const execMock = vi.hoisted(() => vi.fn());
+// Hoist the execFile mock so it's available in vi.mock factory
+const execFileMock = vi.hoisted(() => vi.fn());
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: execMock };
+  return { ...actual, execFile: execFileMock };
 });
 
 let TEST_HOME: string;
@@ -26,16 +26,17 @@ async function resetDb() {
 }
 
 /**
- * Install a mock that dispatches exec calls based on substring matches.
+ * Install a mock that dispatches execFile calls based on substring matches.
  * 'rev-parse HEAD' → string or Error
  */
 function installExecMock(responses: Record<string, string | Error>) {
-  execMock.mockImplementation(
-    (cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+  execFileMock.mockImplementation(
+    (_file: string, args: string[], _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
       const callback = (typeof _opts === 'function' ? _opts : cb) as
         | ((err: Error | null, result?: { stdout: string; stderr: string }) => void)
         | undefined;
       if (!callback) return;
+      const cmd = args.join(' ');
       const key = Object.keys(responses).find((k) => cmd.includes(k));
       const result = key !== undefined ? responses[key] : '';
       if (result instanceof Error) {

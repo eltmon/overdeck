@@ -15,11 +15,11 @@
  * imported by dashboard server code (CLAUDE.md rule).
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { appendGitOperation } from '../../dashboard/server/services/git-activity.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ============== Error types ==============
 
@@ -50,7 +50,7 @@ export class MainDivergedError extends Error {
 export async function gitRevParse(cwd: string, ref: string): Promise<string | null> {
   const ts = new Date().toISOString();
   try {
-    const { stdout } = await execAsync(`git rev-parse ${ref}`, { cwd, encoding: 'utf-8' });
+    const { stdout } = await execFileAsync('git', ['rev-parse', ref], { cwd, encoding: 'utf-8' });
     const sha = stdout.trim();
     appendGitOperation({ operation: 'rev_parse', branch: ref, issueId: undefined, afterSha: sha, status: 'success', ts });
     return sha || null;
@@ -69,9 +69,9 @@ export async function gitFetch(
   opts: { issueId?: string } = {},
 ): Promise<void> {
   const ts = new Date().toISOString();
-  const cmd = branch ? `git fetch ${remote} ${branch}` : `git fetch ${remote}`;
+  const args = branch ? ['fetch', remote, branch] : ['fetch', remote];
   try {
-    await execAsync(cmd, { cwd, encoding: 'utf-8', timeout: 30000 });
+    await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout: 30000 });
     appendGitOperation({
       operation: 'fetch',
       branch: branch ?? remote,
@@ -124,7 +124,7 @@ export async function gitPush(
   if (remoteSha) {
     try {
       // git merge-base --is-ancestor <commit> <commit> exits 0 if true, 1 if false
-      await execAsync(`git merge-base --is-ancestor ${remoteSha} ${localSha}`, {
+      await execFileAsync('git', ['merge-base', '--is-ancestor', remoteSha, localSha], {
         cwd,
         encoding: 'utf-8',
         timeout: 10000,
@@ -148,7 +148,7 @@ export async function gitPush(
 
   // Step 5: push
   try {
-    await execAsync(`git push ${remote} ${branch}`, { cwd, encoding: 'utf-8', timeout: 60000 });
+    await execFileAsync('git', ['push', remote, branch], { cwd, encoding: 'utf-8', timeout: 60000 });
     const afterSha = await gitRevParse(cwd, 'HEAD') ?? localSha;
     appendGitOperation({
       operation: 'push',
@@ -192,7 +192,7 @@ export async function gitForcePush(
   const remoteSha = await gitRevParse(cwd, `${remote}/${branch}`) ?? undefined;
 
   try {
-    await execAsync(`git push --force-with-lease ${remote} ${branch}`, {
+    await execFileAsync('git', ['push', '--force-with-lease', remote, branch], {
       cwd,
       encoding: 'utf-8',
       timeout: 60000,
@@ -235,10 +235,9 @@ export async function gitMerge(
 ): Promise<void> {
   const ts = new Date().toISOString();
   const beforeSha = await gitRevParse(cwd, 'HEAD') ?? 'unknown';
-  const flags = opts.noFf ? '--no-ff' : '';
-
+  const args = opts.noFf ? ['merge', '--no-ff', branch] : ['merge', branch];
   try {
-    await execAsync(`git merge${flags ? ` ${flags}` : ''} ${branch}`, { cwd, encoding: 'utf-8', timeout: 60000 });
+    await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout: 60000 });
     const afterSha = await gitRevParse(cwd, 'HEAD') ?? beforeSha;
     appendGitOperation({
       operation: 'merge',

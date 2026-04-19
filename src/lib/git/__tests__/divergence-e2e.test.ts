@@ -17,12 +17,13 @@ import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-// Hoist exec mock before any module imports
+// Hoist exec mocks before any module imports
+const execFileMock = vi.hoisted(() => vi.fn());
 const execMock = vi.hoisted(() => vi.fn());
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: execMock };
+  return { ...actual, execFile: execFileMock, exec: execMock };
 });
 
 let TEST_HOME: string;
@@ -33,21 +34,26 @@ async function resetDb() {
 }
 
 function installExecMock(responses: Record<string, string | Error>) {
-  execMock.mockImplementation(
-    (cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
-      const callback = (typeof _opts === 'function' ? _opts : cb) as
-        | ((err: Error | null, result?: { stdout: string; stderr: string }) => void)
-        | undefined;
-      if (!callback) return;
-      const key = Object.keys(responses).find((k) => cmd.includes(k));
-      const result = key !== undefined ? responses[key] : '';
-      if (result instanceof Error) {
-        callback(result);
-      } else {
-        callback(null, { stdout: result as string, stderr: '' });
-      }
+  const impl = (
+    input: string | string[],
+    _opts: unknown,
+    cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void,
+  ) => {
+    const callback = (typeof _opts === 'function' ? _opts : cb) as
+      | ((err: Error | null, result?: { stdout: string; stderr: string }) => void)
+      | undefined;
+    if (!callback) return;
+    const cmd = Array.isArray(input) ? input.join(' ') : input;
+    const key = Object.keys(responses).find((k) => cmd.includes(k));
+    const result = key !== undefined ? responses[key] : '';
+    if (result instanceof Error) {
+      callback(result);
+    } else {
+      callback(null, { stdout: result as string, stderr: '' });
     }
-  );
+  };
+  execFileMock.mockImplementation((file: string, args: string[], opts: unknown, cb: unknown) => impl(args, opts, cb as typeof cb));
+  execMock.mockImplementation((cmd: string, opts: unknown, cb: unknown) => impl(cmd, opts, cb as typeof cb));
 }
 
 beforeEach(() => {

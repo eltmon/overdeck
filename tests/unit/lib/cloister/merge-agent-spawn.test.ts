@@ -43,7 +43,7 @@ vi.mock('child_process', () => {
       }
     });
 
-  return { exec, spawn: vi.fn() };
+  return { exec, spawn: vi.fn(), execFile: vi.fn() };
 });
 
 // ── Other dependency mocks ────────────────────────────────────────────────────

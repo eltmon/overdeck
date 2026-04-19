@@ -27,7 +27,7 @@ import { EventStoreService } from '../services/domain-services.js';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
-import { listGitOperations } from '../services/git-activity.js';
+import { listGitOperations, type GitOperation } from '../services/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';
@@ -348,6 +348,27 @@ export function parseGitActivityParams(params: URLSearchParams): { since?: strin
   return { since, issueId, limit };
 }
 
+/** Map a GitOperation DB row to an ActivityPanel-compatible entry. Exported for unit testing. */
+export function mapGitOperationToActivityEntry(op: GitOperation) {
+  return {
+    id: `git-op-${op.id ?? op.ts}`,
+    timestamp: op.ts,
+    source: 'git',
+    level: op.status === 'success' ? 'success'
+      : op.status === 'aborted' ? 'warn'
+      : 'error',
+    message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
+    details: [
+      op.beforeSha && `before: ${op.beforeSha}`,
+      op.afterSha && `after: ${op.afterSha}`,
+      op.remoteSha && `remote: ${op.remoteSha}`,
+      op.error && `error: ${op.error}`,
+    ].filter(Boolean).join('\n') || null,
+    issueId: op.issueId ?? null,
+    category: 'git',
+  };
+}
+
 const getGitActivityRoute = HttpRouter.add(
   'GET',
   '/api/git-activity',
@@ -359,24 +380,7 @@ const getGitActivityRoute = HttpRouter.add(
     const { since, issueId, limit } = parseGitActivityParams(params);
 
     const ops = listGitOperations({ since, issueId, limit });
-    // Map to ActivityPanel-compatible format
-    const entries = ops.map((op) => ({
-      id: `git-op-${op.id ?? op.ts}`,
-      timestamp: op.ts,
-      source: 'git',
-      level: op.status === 'success' ? 'success'
-        : op.status === 'aborted' ? 'warn'
-        : 'error',
-      message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
-      details: [
-        op.beforeSha && `before: ${op.beforeSha}`,
-        op.afterSha && `after: ${op.afterSha}`,
-        op.remoteSha && `remote: ${op.remoteSha}`,
-        op.error && `error: ${op.error}`,
-      ].filter(Boolean).join('\n') || null,
-      issueId: op.issueId ?? null,
-      category: 'git',
-    }));
+    const entries = ops.map(mapGitOperationToActivityEntry);
     return jsonResponse(entries);
   }))
 );

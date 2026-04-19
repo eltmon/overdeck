@@ -28,7 +28,23 @@ vi.mock('child_process', () => {
     return { stdout: result?.stdout ?? '', stderr: '' };
   };
 
-  return { exec };
+  // execFile mock — delegates to execMock with joined args so existing test setups work
+  function execFile(file: string, args: string[], optsOrCb: unknown, maybeCb?: unknown) {
+    const cb = (typeof optsOrCb === 'function' ? optsOrCb : typeof maybeCb === 'function' ? maybeCb : undefined) as (
+      err: Error | null, stdout: string, stderr: string) => void | undefined;
+    const cmd = [file, ...args].join(' ');
+    const result = execMock(cmd) as { stdout: string } | undefined;
+    if (cb) cb(null, result?.stdout ?? '', '');
+    return {} as ReturnType<typeof import('child_process').execFile>;
+  }
+
+  (execFile as unknown as Record<symbol, unknown>)[kCustom] = async (file: string, args: string[]) => {
+    const cmd = [file, ...args].join(' ');
+    const result = await execMock(cmd) as { stdout: string } | undefined;
+    return { stdout: result?.stdout ?? '', stderr: '' };
+  };
+
+  return { exec, execFile };
 });
 
 // ── appendGitOperation mock ───────────────────────────────────────────────────
