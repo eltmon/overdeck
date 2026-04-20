@@ -497,7 +497,7 @@ async function spawnReviewer(
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  const ready = await waitForClaudePrompt(sessionName, 15000);
+  const ready = await waitForClaudePrompt(sessionName, 60000);
   if (!ready) {
     throw new Error(`Reviewer prompt did not appear: ${target}`);
   }

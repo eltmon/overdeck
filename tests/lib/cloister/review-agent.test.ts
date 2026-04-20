@@ -922,7 +922,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(src).toContain("listPaneValuesAsync(sessionName, '#{session_name}:#{window_index}.#{pane_index}')");
     expect(src).toContain('paneTargets.includes(target)');
     expect(src).toContain('Reviewer pane did not start:');
-    expect(src).toContain('waitForClaudePrompt(sessionName, 15000)');
+    expect(src).toContain('waitForClaudePrompt(sessionName, 60000)');
     expect(src).toContain('Reviewer prompt did not appear:');
   });
 
