@@ -220,6 +220,14 @@ describe('rebaseAndPushRepos', () => {
     expect(existsSync(join(repoDir, rebaseApplyPath.trim()))).toBe(false);
   });
 
+  it('uses a dedicated error outcome for conflict inspection failures', async () => {
+    const src = await readFile(join(process.cwd(), 'src/lib/rebase-helper.ts'), 'utf-8');
+
+    expect(src).toContain("| { outcome: 'error'; message: string }");
+    expect(src).toContain("return { outcome: 'error', message: `Failed to inspect rebase conflicts:");
+    expect(src).not.toContain("remainingConflicts: ['(error checking rebase status)']");
+  });
+
   it('keeps branch-name git commands shell-safe', async () => {
     const injectedPath = join(repoDir, 'branch-injected');
     const hostileMergeSet: MergeSet = {

@@ -130,7 +130,16 @@ async function rebaseOneRepo(
         const resolution = await tryResolvePlanningConflicts(repoPath);
         const rebaseInProgress = await isRebaseInProgress(repoPath);
 
-        if (!resolution.shouldRetry && resolution.remainingConflicts.length === 0 && !rebaseInProgress) {
+        if (resolution.outcome === 'error') {
+          await execFileAsync('git', ['rebase', '--abort'], { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }).catch(() => {});
+          return {
+            repoKey,
+            outcome: 'error',
+            message: resolution.message,
+          };
+        }
+
+        if (resolution.outcome === 'clean' && !rebaseInProgress) {
           if (attempts > 0) {
             recovered = true;
             break;
@@ -142,7 +151,7 @@ async function rebaseOneRepo(
           };
         }
 
-        if (resolution.shouldRetry) {
+        if (resolution.outcome === 'retry') {
           try {
             await execFileAsync('git', ['rebase', '--continue'], {
               cwd: repoPath,
@@ -181,18 +190,11 @@ async function rebaseOneRepo(
         }
 
         await execFileAsync('git', ['rebase', '--abort'], { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }).catch(() => {});
-        if (resolution.remainingConflicts.length > 0) {
-          return {
-            repoKey,
-            outcome: 'conflict',
-            message: `Rebase conflicts in non-planning files: ${resolution.remainingConflicts.join(', ')}`,
-            conflictFiles: resolution.remainingConflicts,
-          };
-        }
         return {
           repoKey,
-          outcome: 'error',
-          message: `Rebase failed: ${getErrorMessage(lastError)}`,
+          outcome: 'conflict',
+          message: `Rebase conflicts in non-planning files: ${resolution.remainingConflicts.join(', ')}`,
+          conflictFiles: resolution.remainingConflicts,
         };
       }
 
@@ -243,9 +245,15 @@ async function isRebaseInProgress(repoPath: string): Promise<boolean> {
   }
 }
 
+type PlanningConflictResolution =
+  | { outcome: 'retry'; remainingConflicts: [] }
+  | { outcome: 'clean'; remainingConflicts: [] }
+  | { outcome: 'conflict'; remainingConflicts: string[] }
+  | { outcome: 'error'; message: string };
+
 async function tryResolvePlanningConflicts(
   repoPath: string
-): Promise<{ shouldRetry: boolean; remainingConflicts: string[] }> {
+): Promise<PlanningConflictResolution> {
   try {
     const { stdout } = await execFileAsync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
       cwd: repoPath,
@@ -259,17 +267,17 @@ async function tryResolvePlanningConflicts(
       .filter(Boolean);
 
     if (conflictFiles.length === 0) {
-      return { shouldRetry: false, remainingConflicts: [] };
+      return { outcome: 'clean', remainingConflicts: [] };
     }
 
     const unsafeConflicts = conflictFiles.filter(file => isAbsolute(file) || file.split('/').includes('..'));
     if (unsafeConflicts.length > 0) {
-      return { shouldRetry: false, remainingConflicts: unsafeConflicts };
+      return { outcome: 'conflict', remainingConflicts: unsafeConflicts };
     }
 
     const nonPlanningConflicts = conflictFiles.filter(f => !f.startsWith('.planning/'));
     if (nonPlanningConflicts.length > 0) {
-      return { shouldRetry: false, remainingConflicts: nonPlanningConflicts };
+      return { outcome: 'conflict', remainingConflicts: nonPlanningConflicts };
     }
 
     for (const file of conflictFiles) {
@@ -285,8 +293,8 @@ async function tryResolvePlanningConflicts(
       });
     }
 
-    return { shouldRetry: true, remainingConflicts: [] };
-  } catch {
-    return { shouldRetry: false, remainingConflicts: ['(error checking rebase status)'] };
+    return { outcome: 'retry', remainingConflicts: [] };
+  } catch (error: unknown) {
+    return { outcome: 'error', message: `Failed to inspect rebase conflicts: ${getErrorMessage(error)}` };
   }
 }
