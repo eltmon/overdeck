@@ -562,6 +562,37 @@ describe('parseConversationMessages', () => {
     expect(result.messages[0]).toMatchObject({ role: 'assistant', text: 'After compact' });
     expect(result.messages[1]).toMatchObject({ role: 'user', text: 'User after compact' });
   });
+
+  it('correctly orders a real mis-ordered session fixture', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const fixturePath = join(fileURLToPath(import.meta.url), '../../__fixtures__/misordered-session.jsonl');
+    const fixture = readFileSync(fixturePath);
+    mockReadFile.mockResolvedValue(fixture);
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    // Messages should be in terminal order (by timestamp, sequence tiebreaker)
+    const messageTexts = result.messages.map((m) => m.text);
+    expect(messageTexts).toEqual([
+      'List the files in the current directory',
+      "I'll list the files for you.",
+      'Now show me the contents of package.json',
+      'Here is the package.json content.',
+      'Done!',
+    ]);
+
+    // WorkLog entries should be paired and ordered
+    expect(result.workLog).toHaveLength(2);
+    expect(result.workLog[0]).toMatchObject({ id: 'tool-bash-1', label: 'Bash', result: 'package.json\nsrc/\nREADME.md\n' });
+    expect(result.workLog[1]).toMatchObject({ id: 'tool-read-1', label: 'Read' });
+
+    // Sequence should be monotonically increasing in emission order
+    const sequences = result.messages.map((m) => m.sequence);
+    expect(sequences).toEqual([0, 2, 3, 4, 6]);
+  });
 });
 
 describe('discoverSessionFile', () => {
