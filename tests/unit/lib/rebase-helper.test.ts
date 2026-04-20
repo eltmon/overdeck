@@ -237,6 +237,27 @@ describe('rebaseAndPushRepos', () => {
 
     expect(result.success).toBe(false);
     expect(result.firstFailure?.outcome).toBe('error');
+    expect(result.firstFailure?.message).toBe('Invalid branch name for rebase/push operation');
     expect(existsSync(injectedPath)).toBe(false);
   });
+
+  it('rejects branch names that begin with a dash', async () => {
+    const hostileMergeSet: MergeSet = {
+      ...createMergeSet(),
+      repos: [
+        {
+          ...createMergeSet().repos[0],
+          sourceBranch: '-force',
+          targetBranch: 'main',
+        },
+      ],
+    };
+
+    const result = await rebaseAndPushRepos(repoDir, hostileMergeSet);
+
+    expect(result.success).toBe(false);
+    expect(result.firstFailure?.outcome).toBe('error');
+    expect(result.firstFailure?.message).toBe('Invalid branch name for rebase/push operation');
+  });
+
 });

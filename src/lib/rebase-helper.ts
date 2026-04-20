@@ -24,6 +24,10 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message.trim() : String(error).trim();
 }
 
+function isSafeBranchName(branch: string): boolean {
+  return /^[A-Za-z0-9._/-]+$/.test(branch) && !branch.startsWith('-');
+}
+
 export interface RebaseResult {
   repoKey: string;
   outcome: 'rebased' | 'already-current' | 'conflict' | 'error';
@@ -73,6 +77,14 @@ async function rebaseOneRepo(
   targetBranch: string,
   repoKey: string
 ): Promise<RebaseResult> {
+  if (!isSafeBranchName(sourceBranch) || !isSafeBranchName(targetBranch)) {
+    return {
+      repoKey,
+      outcome: 'error',
+      message: 'Invalid branch name for rebase/push operation',
+    };
+  }
+
   try {
     await execFileAsync('git', ['fetch', 'origin', targetBranch], {
       cwd: repoPath,
@@ -159,6 +171,15 @@ async function rebaseOneRepo(
           };
         }
 
+        if (resolution.remainingConflicts.length === 0) {
+          await execFileAsync('git', ['rebase', '--abort'], { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }).catch(() => {});
+          return {
+            repoKey,
+            outcome: 'error',
+            message: 'Rebase in progress but no resolvable conflicts detected — manual intervention required',
+          };
+        }
+
         await execFileAsync('git', ['rebase', '--abort'], { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }).catch(() => {});
         if (resolution.remainingConflicts.length > 0) {
           return {
@@ -241,7 +262,7 @@ async function tryResolvePlanningConflicts(
       return { shouldRetry: false, remainingConflicts: [] };
     }
 
-    const unsafeConflicts = conflictFiles.filter(file => file.split('/').includes('..'));
+    const unsafeConflicts = conflictFiles.filter(file => isAbsolute(file) || file.split('/').includes('..'));
     if (unsafeConflicts.length > 0) {
       return { shouldRetry: false, remainingConflicts: unsafeConflicts };
     }
