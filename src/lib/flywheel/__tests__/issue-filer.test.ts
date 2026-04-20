@@ -128,12 +128,43 @@ describe('fileFlywheelIssues', () => {
     expect(result.filed).toHaveLength(1);
   });
 
-  it('issueNumber is parsed from the returned issue id', async () => {
+  it('issueNumber is parsed from the issue URL (same when id === visible number)', async () => {
     mockCreateIssue.mockResolvedValue({ id: '99', url: 'https://github.com/eltmon/panopticon-cli/issues/99', title: '' });
 
     const result = await fileFlywheelIssues([makeProposal()], { owner: 'o', repo: 'r' });
 
     expect(result.filed[0].issueNumber).toBe(99);
     expect(result.filed[0].issueUrl).toContain('/99');
+  });
+
+  it('issueNumber uses visible issue number from URL, not the internal GitHub node id', async () => {
+    // Real GitHub: id is a large internal node id; visible number is the URL path segment
+    mockCreateIssue.mockResolvedValue({
+      id: '9876543210',
+      ref: '#42',
+      url: 'https://github.com/eltmon/panopticon-cli/issues/42',
+      title: '',
+    });
+
+    const result = await fileFlywheelIssues([makeProposal()], { owner: 'o', repo: 'r' });
+
+    expect(result.filed[0].issueNumber).toBe(42);
+    expect(result.filed[0].issueNumber).not.toBe(9876543210);
+  });
+
+  it('triggeringRetros contains the basenames of the triggering retro paths', async () => {
+    const proposal = makeProposal({
+      triggeringRetros: [
+        '/home/user/docs/flywheel/retros/pan-600-1714000000.md',
+        '/home/user/docs/flywheel/retros/pan-601-1714000001.md',
+      ],
+    });
+
+    const result = await fileFlywheelIssues([proposal], { owner: 'o', repo: 'r' });
+
+    expect(result.filed[0].triggeringRetros).toEqual([
+      'pan-600-1714000000.md',
+      'pan-601-1714000001.md',
+    ]);
   });
 });

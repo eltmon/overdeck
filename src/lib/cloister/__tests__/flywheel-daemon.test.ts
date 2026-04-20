@@ -45,6 +45,7 @@ vi.mock('../../flywheel/synthesis.js', () => ({
 
 vi.mock('../../flywheel/issue-filer.js', () => ({
   fileFlywheelIssues: vi.fn().mockResolvedValue({ filed: [], deferred: [], errors: [] }),
+  writeProvenanceIndex: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../flywheel/retro-archiver.js', () => ({

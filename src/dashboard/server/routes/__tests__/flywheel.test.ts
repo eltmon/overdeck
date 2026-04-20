@@ -39,7 +39,7 @@ vi.mock('../../../../lib/projects.js', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { computeFlywheelMetrics, readNonArchivedRetroFiles, issueIdFromFilename, buildRollbackPreviewDiff, resolveRollbackRepoDir } from '../flywheel.js';
+import { computeFlywheelMetrics, readNonArchivedRetroFiles, issueIdFromFilename, buildRollbackPreviewDiff, resolveRollbackRepoDir, fetchRetrosForIssueId } from '../flywheel.js';
 import { parseRetroMarkdown } from '../../../../lib/flywheel/retro-writer.js';
 import { resolveProjectFromIssue } from '../../../../lib/projects.js';
 
@@ -231,5 +231,62 @@ describe('resolveRollbackRepoDir', () => {
   it('falls back to process.cwd() when the issue cannot be resolved', () => {
     mockResolveProjectFromIssue.mockReturnValue(null);
     expect(resolveRollbackRepoDir('PAN-UNKNOWN')).toBe(process.cwd());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchRetrosForIssueId — provenance index fallback (PAN-709 review-026 fix 1)
+// Flywheel-change issues have no retro files named after them. The retros endpoint
+// must fall back to the provenance index (written by the daemon at issue-filing time)
+// to find which source-issue retros triggered the flywheel-change.
+// ---------------------------------------------------------------------------
+
+describe('fetchRetrosForIssueId', () => {
+  it('returns retros matched by filename for source issues (direct match)', async () => {
+    mockReaddir.mockResolvedValue(['PAN-600-1714000000.md'] as unknown as ReturnType<typeof readdir> extends Promise<infer T> ? T : never);
+    mockReadFile.mockResolvedValue('retro body' as unknown as Buffer);
+    mockParseRetroMarkdown.mockReturnValue({
+      frontmatter: { surprise: true, friction_score: 8, proposed_changes: [{ type: 'update_skill', name: 'pan-review', section: '', change: '' }] },
+      body: 'First summary line\nSecond line',
+    } as ReturnType<typeof parseRetroMarkdown>);
+
+    const result = await fetchRetrosForIssueId('PAN-600');
+
+    expect(result.retros).toHaveLength(1);
+    expect(result.retros[0].filename).toBe('PAN-600-1714000000.md');
+    expect(result.signalCount).toBe(1);
+  });
+
+  it('returns triggering retros via provenance index when no direct filename match exists', async () => {
+    // Flywheel-change issue 'PAN-750' has no retros named PAN-750-*.md.
+    // Provenance index maps issue number '750' → ['PAN-600-1714000000.md'].
+    mockReaddir.mockResolvedValue(['PAN-600-1714000000.md'] as unknown as ReturnType<typeof readdir> extends Promise<infer T> ? T : never);
+    mockReadFile.mockImplementation(async (path: unknown) => {
+      if (String(path).includes('provenance-index.json')) {
+        return JSON.stringify({ '750': ['PAN-600-1714000000.md'] }) as unknown as Buffer;
+      }
+      return 'retro body' as unknown as Buffer;
+    });
+    mockParseRetroMarkdown.mockReturnValue({
+      frontmatter: { surprise: true, friction_score: 7, proposed_changes: [{ type: 'update_skill', name: 'pan-review', section: '', change: '' }] },
+      body: 'Triggering retro summary',
+    } as ReturnType<typeof parseRetroMarkdown>);
+
+    const result = await fetchRetrosForIssueId('PAN-750');
+
+    expect(result.retros).toHaveLength(1);
+    expect(result.retros[0].filename).toBe('PAN-600-1714000000.md');
+    expect(result.signalCount).toBe(1);
+    expect(result.skillName).toBe('pan-review');
+  });
+
+  it('returns empty result when neither direct match nor provenance entry exists', async () => {
+    mockReaddir.mockResolvedValue([]);
+    mockReadFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+    const result = await fetchRetrosForIssueId('PAN-UNKNOWN');
+
+    expect(result.retros).toEqual([]);
+    expect(result.signalCount).toBe(0);
   });
 });

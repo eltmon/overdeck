@@ -177,7 +177,7 @@ async function runSynthesis(): Promise<void> {
   console.log('[flywheel-daemon] Synthesis step — starting');
   try {
     const { runSynthesis: synthesize } = await import('../flywheel/synthesis.js');
-    const { fileFlywheelIssues } = await import('../flywheel/issue-filer.js');
+    const { fileFlywheelIssues, writeProvenanceIndex } = await import('../flywheel/issue-filer.js');
     const { archiveProcessedRetros } = await import('../flywheel/retro-archiver.js');
     const { appendFlywheelReport } = await import('../flywheel/flywheel-report.js');
 
@@ -192,6 +192,13 @@ async function runSynthesis(): Promise<void> {
     // File GitHub issues for above-threshold proposals
     const filingResult = await fileFlywheelIssues(result.proposals);
     console.log(`[flywheel-daemon] Filed ${filingResult.filed.length} issues, deferred ${filingResult.deferred.length}`);
+
+    // Persist provenance: flywheel-change issue number → triggering retro filenames
+    if (filingResult.filed.length > 0) {
+      await writeProvenanceIndex(
+        filingResult.filed.map((f) => ({ issueUrl: f.issueUrl, retroFilenames: f.triggeringRetros })),
+      );
+    }
 
     // Archive only retros that contributed to successfully filed proposals.
     // Watchlist retros (below the 3-signal threshold) must remain in docs/flywheel/retros/

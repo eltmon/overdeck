@@ -30,6 +30,7 @@ const execFileAsync = promisify(execFile);
 
 const RETROS_DIR = join(homedir(), 'docs', 'flywheel', 'retros');
 const REPORT_PATH = join(homedir(), 'docs', 'FLYWHEEL-REPORT.md');
+const PROVENANCE_INDEX_PATH = join(homedir(), 'docs', 'flywheel', 'provenance-index.json');
 
 // ============================================================================
 // Helpers
@@ -90,47 +91,87 @@ const getFlywheelRetrosRoute = HttpRouter.add(
 // Route: GET /api/flywheel/retros/:issueId
 // ============================================================================
 
+/** Read provenance index that maps GitHub issue number → triggering retro filenames. */
+async function readProvenanceIndex(): Promise<Record<string, string[]>> {
+  try {
+    const raw = await readFile(PROVENANCE_INDEX_PATH, 'utf-8');
+    return JSON.parse(String(raw)) as Record<string, string[]>;
+  } catch {
+    return {};
+  }
+}
+
+interface RetroEntry {
+  filename: string;
+  frictionScore: number;
+  summary: string;
+  skillName: string;
+}
+
+interface RetrosResponse {
+  issueId: string;
+  retros: RetroEntry[];
+  signalCount: number;
+  skillName: string;
+}
+
+function buildRetroEntry(filename: string, content: string, fallbackSkillName: string): RetroEntry {
+  const doc = parseRetroMarkdown(content);
+  const firstChange = doc?.frontmatter.proposed_changes?.[0];
+  const skillName =
+    firstChange && 'name' in firstChange
+      ? (firstChange as { name: string }).name
+      : firstChange && 'title' in firstChange
+      ? (firstChange as { title: string }).title
+      : fallbackSkillName;
+  return {
+    filename,
+    frictionScore: doc?.frontmatter.friction_score ?? 0,
+    summary: doc?.body.split('\n').find((l) => l.trim() && !l.startsWith('#')) ?? '',
+    skillName,
+  };
+}
+
+/**
+ * Fetch retros for an issue ID. For source issues, matches by filename prefix.
+ * For flywheel-change issues (which have no retro files named after them), falls
+ * back to the provenance index that was written when the issue was filed.
+ * Exported for unit testing.
+ */
+export async function fetchRetrosForIssueId(issueId: string): Promise<RetrosResponse> {
+  const files = await readNonArchivedRetroFiles();
+  let matched = files.filter((f) => issueIdFromFilename(f.filename) === issueId);
+
+  // Flywheel-change issues have no retro files named after them — look up the
+  // provenance index (written by the daemon when the issue was filed) to find
+  // which source-issue retros triggered this flywheel-change.
+  if (matched.length === 0) {
+    const provenanceIndex = await readProvenanceIndex();
+    // issueId may be 'PAN-750', '#750', or '750' — extract the numeric part
+    const issueNum = issueId.replace(/^[A-Z]+-/, '').replace(/^#/, '');
+    const triggeringFilenames = provenanceIndex[issueNum] ?? [];
+    if (triggeringFilenames.length > 0) {
+      matched = files.filter((f) => triggeringFilenames.includes(f.filename));
+    }
+  }
+
+  if (matched.length === 0) {
+    return { issueId, retros: [], signalCount: 0, skillName: issueId };
+  }
+
+  const retros = matched.map(({ filename, content }) => buildRetroEntry(filename, content, issueId));
+  const skillName = retros[0]?.skillName ?? issueId;
+  return { issueId, retros, signalCount: retros.length, skillName };
+}
+
 const getFlywheelRetroByIssueRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/retros/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
-
-    const files = yield* Effect.promise(() => readNonArchivedRetroFiles());
-    const matched = files.filter(
-      (f) => issueIdFromFilename(f.filename) === issueId,
-    );
-
-    if (matched.length === 0) {
-      return jsonResponse({ retros: [], signalCount: 0, skillName: issueId, issueId });
-    }
-
-    const retros = matched.map(({ filename, content }) => {
-      const doc = parseRetroMarkdown(content);
-      const firstChange = doc?.frontmatter.proposed_changes?.[0];
-      const skillName =
-        firstChange && 'name' in firstChange
-          ? (firstChange as { name: string }).name
-          : firstChange && 'title' in firstChange
-          ? (firstChange as { title: string }).title
-          : issueId;
-      return {
-        filename,
-        frictionScore: doc?.frontmatter.friction_score ?? 0,
-        summary: doc?.body.split('\n').find((l) => l.trim() && !l.startsWith('#')) ?? '',
-        skillName,
-      };
-    });
-
-    const skillName = retros[0]?.skillName ?? issueId;
-
-    return jsonResponse({
-      issueId,
-      retros,
-      signalCount: retros.length,
-      skillName,
-    });
+    const result = yield* Effect.promise(() => fetchRetrosForIssueId(issueId));
+    return jsonResponse(result);
   })),
 );
 

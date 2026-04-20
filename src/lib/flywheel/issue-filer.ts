@@ -10,8 +10,40 @@
  * Uses the existing tracker client to inherit retry/auth behavior.
  */
 
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { homedir } from 'os';
 import { createTracker } from '../tracker/factory.js';
 import type { IssueProposal } from './synthesis.js';
+
+// ============================================================================
+// Provenance index — maps GitHub issue number → triggering retro filenames
+// ============================================================================
+
+export const PROVENANCE_INDEX_PATH = join(homedir(), 'docs', 'flywheel', 'provenance-index.json');
+
+export type ProvenanceIndex = Record<string, string[]>;
+
+export async function readProvenanceIndex(): Promise<ProvenanceIndex> {
+  try {
+    const raw = await readFile(PROVENANCE_INDEX_PATH, 'utf-8');
+    return JSON.parse(raw) as ProvenanceIndex;
+  } catch {
+    return {};
+  }
+}
+
+export async function writeProvenanceIndex(
+  entries: Array<{ issueUrl: string; retroFilenames: string[] }>,
+): Promise<void> {
+  const existing = await readProvenanceIndex();
+  for (const { issueUrl, retroFilenames } of entries) {
+    const num = issueUrl.split('/').pop() ?? '';
+    if (num) existing[num] = retroFilenames;
+  }
+  await mkdir(dirname(PROVENANCE_INDEX_PATH), { recursive: true });
+  await writeFile(PROVENANCE_INDEX_PATH, JSON.stringify(existing, null, 2), 'utf-8');
+}
 
 const MAX_ISSUES_PER_RUN = 10;
 
@@ -28,9 +60,12 @@ const VERB_MAP: Record<string, string> = {
 
 export interface FiledIssue {
   proposalSignature: string;
+  /** Visible GitHub issue number (from URL), NOT the internal GitHub node id. */
   issueNumber: number;
   issueUrl: string;
   title: string;
+  /** Basenames of the retro files that triggered this flywheel-change issue. */
+  triggeringRetros: string[];
 }
 
 export interface IssueFilingResult {
@@ -149,9 +184,12 @@ export async function fileFlywheelIssues(
 
       filed.push({
         proposalSignature: signatureStr,
-        issueNumber: parseInt(String(issue.id), 10),
+        // Parse the visible issue number from the URL — issue.id is GitHub's
+        // internal node id, which differs from the user-visible issue number.
+        issueNumber: parseInt(issue.url.split('/').pop() ?? '', 10),
         issueUrl: issue.url,
         title,
+        triggeringRetros: proposal.triggeringRetros.map((p) => p.split('/').pop() ?? p),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
