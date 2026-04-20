@@ -1302,7 +1302,8 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
   const panePids = await listPaneValuesAsync(normalizedId, '#{pane_pid}');
   if (panePids.length > 0) {
     try {
-      await execAsync(`pgrep -P ${panePids[0]} -x claude`);
+      const { stdout: comm } = await execAsync(`ps -p ${panePids[0]} -o comm=`);
+      if (comm.trim() !== 'claude') throw new Error('not claude');
     } catch {
       console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
       const resumeResult = await resumeAgent(normalizedId, message);
@@ -1487,8 +1488,8 @@ function isClaudeRunningInSession(sessionName: string): boolean {
     const panePids = listPaneValues(sessionName, '#{pane_pid}');
     if (panePids.length === 0) return false;
     const panePid = panePids[0]!;
-    execSync(`pgrep -P ${panePid} -x claude`, { stdio: 'ignore' });
-    return true;
+    const comm = execSync(`ps -p ${panePid} -o comm=`, { encoding: 'utf-8' }).trim();
+    return comm === 'claude';
   } catch {
     return false;
   }
