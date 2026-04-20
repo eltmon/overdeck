@@ -50,9 +50,11 @@ export interface DetailPanelLayoutProps {
   onClose: () => void;
   /** When true, don't render the terminal — another component (e.g. PlanDialog) owns it */
   suppressTerminal?: boolean;
+  /** When true, render as inline content (no border-l, drag handle, or fixed width) */
+  inline?: boolean;
 }
 
-export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, suppressTerminal }: DetailPanelLayoutProps) {
+export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, suppressTerminal, inline }: DetailPanelLayoutProps) {
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
@@ -195,6 +197,115 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const innerContent = showTerminal ? (
+    <Group
+      orientation="horizontal"
+      onLayoutChanged={(layout) => {
+        const inspectorSize = layout['inspector'];
+        if (inspectorSize != null) {
+          savePanelState(issueId, { inspectorDefaultSize: `${inspectorSize}%` });
+        }
+      }}
+      style={{ width: '100%', height: '100%' }}
+    >
+      <Panel
+        id="inspector"
+        defaultSize={panelState.inspectorDefaultSize}
+        minSize="20%"
+        maxSize="60%"
+      >
+        <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+          <InspectorPanel
+            key={issueId}
+            agent={agent}
+            issueId={issueId}
+            issueUrl={issueUrl}
+            issue={issue}
+            phase={phase}
+            reviewStatus={reviewStatus}
+            reviewStatusLoading={reviewStatusLoading}
+            onClose={onClose}
+            onOpenTerminal={openTerminal}
+          />
+        </div>
+      </Panel>
+
+      <Separator
+        style={{
+          width: '4px',
+          backgroundColor: '#232f48',
+          cursor: 'col-resize',
+          flexShrink: 0,
+        }}
+      />
+
+      <Panel id="terminal" minSize="30%">
+        <div className="flex flex-col" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+          {availableTerminals.length > 0 && (
+            <TerminalTabs
+              tabs={availableTerminals}
+              selectedSession={selectedSession}
+              activePhase={phase}
+              pinned={pinned}
+              onSelectSession={handleSelectSession}
+              onTogglePin={handleTogglePin}
+            />
+          )}
+          <div className="flex-1 min-h-0">
+            {phase === 'merged' && !(pinned && pinnedSession) ? (
+              <MergedSummaryCard
+                mergedAt={reviewStatus?.updatedAt ?? new Date().toISOString()}
+                prUrl={workspaceData?.mrUrl ?? null}
+                totalCost={costData?.totalCost}
+                onViewLastLog={
+                  availableTerminals.some(t => t.id === 'merging' && !t.disabled)
+                    ? () => {
+                        const mergeTab = availableTerminals.find(t => t.id === 'merging');
+                        if (mergeTab?.sessionName) {
+                          handleSelectSession(mergeTab.sessionName);
+                          setPinned(true);
+                        }
+                      }
+                    : null
+                }
+              />
+            ) : selectedSession ? (
+              <TerminalPanel
+                key={selectedSession}
+                agent={agent}
+                onClose={closeTerminal}
+                sessionName={selectedSession}
+                title={selectedSession}
+                onSessionEnded={markSessionDead}
+              />
+            ) : (
+              <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
+            )}
+          </div>
+        </div>
+      </Panel>
+    </Group>
+  ) : (
+    <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      <InspectorPanel
+        key={issueId}
+        agent={agent}
+        issueId={issueId}
+        issueUrl={issueUrl}
+        issue={issue}
+        phase={phase}
+        reviewStatus={reviewStatus}
+        reviewStatusLoading={reviewStatusLoading}
+        onClose={onClose}
+        onOpenTerminal={agent ? openTerminal : undefined}
+      />
+    </div>
+  );
+
+  if (inline) {
+    return innerContent;
+  }
+
   return (
     <div
       className="relative flex h-full border-l shrink-0"
@@ -211,112 +322,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
         onMouseDown={handleResizeMouseDown}
       />
 
-      {showTerminal ? (
-        <Group
-          orientation="horizontal"
-          onLayoutChanged={(layout) => {
-            // layout is a map of panel id -> flexGrow value
-            const inspectorSize = layout['inspector'];
-            if (inspectorSize != null) {
-              savePanelState(issueId, { inspectorDefaultSize: `${inspectorSize}%` });
-            }
-          }}
-          style={{ width: '100%', height: '100%' }}
-        >
-          <Panel
-            id="inspector"
-            defaultSize={panelState.inspectorDefaultSize}
-            minSize="20%"
-            maxSize="60%"
-          >
-            <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-              <InspectorPanel
-                key={issueId}
-                agent={agent}
-                issueId={issueId}
-                issueUrl={issueUrl}
-                issue={issue}
-                phase={phase}
-                reviewStatus={reviewStatus}
-                reviewStatusLoading={reviewStatusLoading}
-                onClose={onClose}
-                onOpenTerminal={openTerminal}
-              />
-            </div>
-          </Panel>
-
-          <Separator
-            style={{
-              width: '4px',
-              backgroundColor: '#232f48',
-              cursor: 'col-resize',
-              flexShrink: 0,
-            }}
-          />
-
-          <Panel id="terminal" minSize="30%">
-            <div className="flex flex-col" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-              {availableTerminals.length > 0 && (
-                <TerminalTabs
-                  tabs={availableTerminals}
-                  selectedSession={selectedSession}
-                  activePhase={phase}
-                  pinned={pinned}
-                  onSelectSession={handleSelectSession}
-                  onTogglePin={handleTogglePin}
-                />
-              )}
-              <div className="flex-1 min-h-0">
-                {/* Show merged summary unless the user has pinned a specific session to view */}
-                {phase === 'merged' && !(pinned && pinnedSession) ? (
-                  <MergedSummaryCard
-                    mergedAt={reviewStatus?.updatedAt ?? new Date().toISOString()}
-                    prUrl={workspaceData?.mrUrl ?? null}
-                    totalCost={costData?.totalCost}
-                    onViewLastLog={
-                      availableTerminals.some(t => t.id === 'merging' && !t.disabled)
-                        ? () => {
-                            const mergeTab = availableTerminals.find(t => t.id === 'merging');
-                            if (mergeTab?.sessionName) {
-                              handleSelectSession(mergeTab.sessionName);
-                              setPinned(true);
-                            }
-                          }
-                        : null
-                    }
-                  />
-                ) : selectedSession ? (
-                  <TerminalPanel
-                    key={selectedSession}
-                    agent={agent}
-                    onClose={closeTerminal}
-                    sessionName={selectedSession}
-                    title={selectedSession}
-                    onSessionEnded={markSessionDead}
-                  />
-                ) : (
-                  <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
-                )}
-              </div>
-            </div>
-          </Panel>
-        </Group>
-      ) : (
-        <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-          <InspectorPanel
-            key={issueId}
-            agent={agent}
-            issueId={issueId}
-            issueUrl={issueUrl}
-            issue={issue}
-            phase={phase}
-            reviewStatus={reviewStatus}
-            reviewStatusLoading={reviewStatusLoading}
-            onClose={onClose}
-            onOpenTerminal={agent ? openTerminal : undefined}
-          />
-        </div>
-      )}
+      {innerContent}
     </div>
   );
 }

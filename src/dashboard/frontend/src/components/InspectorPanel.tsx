@@ -120,9 +120,11 @@ export interface InspectorPanelProps {
   reviewStatusLoading?: boolean;
   onClose: () => void;
   onOpenTerminal?: () => void;
+  /** When true, render without sidebar chrome (border-r, close btn) for embedded use */
+  embedded?: boolean;
 }
 
-export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal }: InspectorPanelProps) {
+export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, embedded }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -179,10 +181,20 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
   });
 
-  // reviewStatus and reviewStatusLoading are hoisted to DetailPanelLayout to avoid
-  // duplicate queries — they share react-query cache key ['review-status', issueId]
-  const reviewStatus = reviewStatusProp;
-  const reviewStatusLoading = reviewStatusLoadingProp ?? false;
+  // Self-contained review status query (shares cache key with DetailPanelLayout)
+  const { data: fetchedReviewStatus, isLoading: fetchedReviewStatusLoading } = useQuery<ReviewStatus>({
+    queryKey: ['review-status', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/review/${issueId}/status`);
+      if (!res.ok) throw new Error('Failed to fetch review status');
+      return res.json();
+    },
+    refetchInterval: 15000,
+    enabled: !reviewStatusProp, // only fetch if parent didn't provide it
+  });
+
+  const reviewStatus = reviewStatusProp ?? fetchedReviewStatus;
+  const reviewStatusLoading = reviewStatusLoadingProp ?? fetchedReviewStatusLoading ?? false;
 
   useEffect(() => {
     if (!agentLaunchState) return;
@@ -631,7 +643,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   return (
     <>
       <div
-        className="flex flex-col h-full overflow-y-auto bg-surface-raised border-r border-divider"
+        className={`flex flex-col h-full overflow-y-auto bg-surface-raised border-divider ${embedded ? '' : 'border-r'}`}
         data-testid="workspace-sidebar"
       >
         {/* Header */}
@@ -659,20 +671,22 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               );
             })()}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {onOpenTerminal && agent && (
-              <button
-                onClick={onOpenTerminal}
-                className="p-1 rounded transition-colors hover:bg-surface-overlay text-content-subtle"
-                title="Open terminal"
-              >
-                <Terminal className="w-3.5 h-3.5" />
+          {!embedded && (
+            <div className="flex items-center gap-1 shrink-0">
+              {onOpenTerminal && agent && (
+                <button
+                  onClick={onOpenTerminal}
+                  className="p-1 rounded transition-colors hover:bg-surface-overlay text-content-subtle"
+                  title="Open terminal"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-surface-overlay text-content-subtle">
+                <X className="w-3.5 h-3.5" />
               </button>
-            )}
-            <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-surface-overlay text-content-subtle">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Issue title */}

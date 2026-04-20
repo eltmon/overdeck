@@ -79,17 +79,21 @@ export function EventRouter() {
     }
 
     // ── Event coalescing ──────────────────────────────────────────────────────
+    // Batch events across ~16 ms (one frame) instead of queueMicrotask.
+    // WebSocket messages arrive in separate tasks; queueMicrotask flushes
+    // too eagerly and causes a re-render per message. A small timeout
+    // batches rapid bursts into a single store update + React render.
     function scheduleFlush() {
       if (flushScheduled.current) return
       flushScheduled.current = true
-      queueMicrotask(() => {
+      setTimeout(() => {
         flushScheduled.current = false
         const batch = pendingBatch.current.splice(0)
         if (batch.length === 0) return
         applyEvents(batch)
         const lastSeq = batch[batch.length - 1]!.sequence
         coordinator.markEventBatchApplied(lastSeq)
-      })
+      }, 16)
     }
 
     // ── Event handler ─────────────────────────────────────────────────────────
