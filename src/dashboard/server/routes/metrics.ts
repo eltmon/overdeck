@@ -45,7 +45,6 @@ function getReviewStatusesCached(): ReturnType<typeof loadReviewStatuses> {
   return _cachedReviewStatuses;
 }
 import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
-import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
 import { httpHandler } from './http-handler.js';
 
@@ -98,25 +97,11 @@ const getMetricsSummaryRoute = HttpRouter.add(
     const service = getCloisterService();
     const status = service.getStatus();
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayEvents = readEvents({ startDate: todayStr });
-    const dailyTotal = todayEvents.reduce((sum, e) => sum + (e.cost || 0), 0);
-
-    const agentCosts = new Map<string, number>();
-    const issueCosts = new Map<string, number>();
-    for (const e of todayEvents) {
-      agentCosts.set(e.agentId, (agentCosts.get(e.agentId) || 0) + e.cost);
-      issueCosts.set(e.issueId, (issueCosts.get(e.issueId) || 0) + e.cost);
-    }
-
-    const topAgents = Array.from(agentCosts.entries())
-      .map(([agentId, cost]) => ({ agentId, cost }))
-      .sort((a, b) => b.cost - a.cost)
-      .slice(0, 5);
-    const topIssues = Array.from(issueCosts.entries())
-      .map(([issueId, cost]) => ({ issueId, cost }))
-      .sort((a, b) => b.cost - a.cost)
-      .slice(0, 5);
+    // Use in-memory cost summary instead of readEvents() — the events file is
+    // 100K+ lines and readFileSync on every metrics request blocks the loop.
+    const costSummary = service.getCostSummary();
+    const topAgents = costSummary.topAgents.slice(0, 5);
+    const topIssues = costSummary.topIssues.slice(0, 5);
 
     const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
     const stuckCount = computeStuckCount(
@@ -128,7 +113,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
 
     return jsonResponse({
       today: {
-        totalCost: Math.round(dailyTotal * 100) / 100,
+        totalCost: Math.round(costSummary.dailyTotal * 100) / 100,
         agentCount: status.summary.total,
         activeCount: status.summary.active,
         stuckCount,
