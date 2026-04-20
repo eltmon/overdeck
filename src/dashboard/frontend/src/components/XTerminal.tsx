@@ -296,7 +296,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         cursorStyle: 'bar',
         cursorInactiveStyle: 'none',
         fontSize: 14,
-        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontFamily: "'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
         scrollback: 0,  // tmux is the source of truth for history; local scrollback duplicates content
