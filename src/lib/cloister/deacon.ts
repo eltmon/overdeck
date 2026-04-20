@@ -2659,6 +2659,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
+  // Kill orphaned review sessions whose work agent is no longer running.
+  // Review sessions are named review-<issueId>-<timestamp>-<role> and are
+  // never killed by teardown because the exact-match pattern doesn't catch them.
+  const reviewCleanupActions = await cleanupOrphanedReviewSessions();
+  actions.push(...reviewCleanupActions);
+  for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
+
   // Detect new commits pushed after review passed — invalidate stale reviews
   const postReviewActions = await checkPostReviewCommits();
   actions.push(...postReviewActions);
@@ -2968,6 +2975,49 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
     } catch { /* non-fatal */ }
 
     const msg = `Killed orphaned ${planningSession} (work agent ${workAgentSession} is running)`;
+    actions.push(msg);
+    console.log(`[deacon] ${msg}`);
+  }
+
+  return actions;
+}
+
+/**
+ * Kill orphaned parallel-review sessions whose work agent is no longer running.
+ *
+ * Review sessions are named `review-<issueId>-<timestamp>-<role>` (e.g.
+ * `review-PAN-540-1713456789000-correctness`). They are created by
+ * `runParallelReview()` but can leak when:
+ *   - `waitForReviewer()` fails to kill (race, tmux busy, swallowed exception)
+ *   - The work agent is stopped/killed but review sessions survive
+ *   - A retry generates a new reviewId, leaving old sessions behind
+ *
+ * A review session is "orphaned" when the corresponding work agent session
+ * `agent-<issueLower>` does not exist. We only check existence (not state)
+ * because a stopped agent may still have its tmux session alive transiently.
+ */
+async function cleanupOrphanedReviewSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  let reviewSessions: string[];
+  try {
+    reviewSessions = (await listSessionNamesAsync())
+      .filter(s => /^review-/.test(s));
+  } catch {
+    return actions;
+  }
+
+  for (const reviewSession of reviewSessions) {
+    // review-PAN-540-1713456789000-correctness → agent-pan-540
+    const match = reviewSession.match(/^review-([a-z]+-\d+)-\d+/);
+    if (!match) continue;
+    const workAgentSession = `agent-${match[1]}`;
+    if (sessionExists(workAgentSession)) continue;
+
+    try {
+      await killSessionAsync(reviewSession).catch(() => {});
+    } catch { /* non-fatal */ }
+
+    const msg = `Killed orphaned ${reviewSession} (work agent ${workAgentSession} not running)`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);
   }
