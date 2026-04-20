@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
@@ -502,7 +502,9 @@ export async function waitForReviewer(
   while (Date.now() < deadline) {
     // Output file is the primary completion signal — Claude sessions don't auto-exit.
     if (fileExists(outputFile)) {
-      try { await killSession(sessionName); } catch { /* ignore */ }
+      try { await killSession(sessionName); } catch (err) {
+        console.error(`[review-agent] Failed to kill completed reviewer session ${sessionName}:`, err);
+      }
       return 'completed';
     }
     if (!await sessionExists(sessionName)) {
@@ -512,7 +514,9 @@ export async function waitForReviewer(
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
   // Timeout — kill and report failed
-  try { await killSession(sessionName); } catch { /* ignore */ }
+  try { await killSession(sessionName); } catch (err) {
+    console.error(`[review-agent] Failed to kill timed-out reviewer session ${sessionName}:`, err);
+  }
   return 'failed';
 }
 
@@ -568,6 +572,25 @@ export async function runParallelReview(
     postReviewFn = postGitHubPRReview,
   }: RunParallelReviewDeps = {},
 ): Promise<{ result: ReviewResult; reviewId: string }> {
+  // Clean up any stale review sessions for this issue before starting a new review run.
+  // Review sessions are named review-<issueId>-<timestamp>-<role>; a new timestamp
+  // is generated on every retry, so old sessions accumulate and leak.
+  try {
+    const allSessions = await listSessionNamesAsync();
+    const reviewRegex = new RegExp(`^review-${context.issueId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
+    const staleSessions = allSessions.filter(s => reviewRegex.test(s));
+    for (const session of staleSessions) {
+      try {
+        await killSessionAsync(session);
+        console.log(`[review-agent] Killed stale review session: ${session}`);
+      } catch (err) {
+        console.error(`[review-agent] Failed to kill stale review session ${session}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error(`[review-agent] Failed to list sessions during stale review cleanup:`, err);
+  }
+
   const reviewId = `review-${context.issueId}-${Date.now()}`;
 
   // Guard: fail fast if no reviewers are enabled
