@@ -214,6 +214,12 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
     { skill: 'code-generation', weight: 0.2 }, // Simple generation
     { skill: 'synthesis', weight: 0.1 }, // Quick understanding
   ],
+
+  'tts:summarizer': [
+    { skill: 'speed', weight: 0.5 }, // Low latency for real-time TTS
+    { skill: 'synthesis', weight: 0.4 }, // Condensing activity into brief utterances
+    { skill: 'documentation', weight: 0.1 }, // Clear, speakable output
+  ],
 };
 
 /**

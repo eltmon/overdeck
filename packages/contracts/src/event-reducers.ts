@@ -29,6 +29,8 @@ export interface ReadModelState {
   agentOutputById: Record<string, string[]>
   issuesRaw: unknown[]
   recentActivity: unknown[]
+  detailedActivity: unknown[]
+  ttsActivity: unknown[]
   shadowInferenceByIssueId: Record<string, string>
   dashboardLifecycle: DashboardLifecycleState
 }
@@ -53,6 +55,8 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   agentOutputById: {},
   issuesRaw: [],
   recentActivity: [],
+  detailedActivity: [],
+  ttsActivity: [],
   shadowInferenceByIssueId: {},
   dashboardLifecycle: {
     active: false,
@@ -70,6 +74,8 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
 
 const MAX_AGENT_OUTPUT_LINES = 200
 const MAX_ACTIVITY_ENTRIES = 50
+const MAX_DETAILED_ENTRIES = 200
+const MAX_TTS_ENTRIES = 50
 
 // ─── syncSnapshot — bootstrap from a full DashboardSnapshot ──────────────────
 
@@ -361,6 +367,20 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const newEntry = { id: entry.id, timestamp: event.timestamp, ...entry };
       const updated = [newEntry, ...(state.recentActivity as Array<Record<string, unknown>>)].slice(0, MAX_ACTIVITY_ENTRIES);
       return { ...state, sequence: Math.max(state.sequence, event.sequence), recentActivity: updated };
+    }
+
+    case 'activity.detailed': {
+      const entry = event.payload as Record<string, unknown>;
+      const newEntry = { id: entry.id, timestamp: event.timestamp, ...entry };
+      const updated = [newEntry, ...(state.detailedActivity as Array<Record<string, unknown>>)].slice(0, MAX_DETAILED_ENTRIES);
+      return { ...state, sequence: Math.max(state.sequence, event.sequence), detailedActivity: updated };
+    }
+
+    case 'activity.tts': {
+      const entry = event.payload as Record<string, unknown>;
+      const newEntry = { id: entry.id, timestamp: event.timestamp, ...entry };
+      const updated = [newEntry, ...(state.ttsActivity as Array<Record<string, unknown>>)].slice(0, MAX_TTS_ENTRIES);
+      return { ...state, sequence: Math.max(state.sequence, event.sequence), ttsActivity: updated };
     }
 
     case 'dashboard.lifecycle_started': {

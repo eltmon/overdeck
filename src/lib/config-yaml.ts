@@ -68,6 +68,18 @@ export interface ConversationsConfig {
 }
 
 /**
+ * TTS summarizer configuration
+ */
+export interface TtsSummarizerConfig {
+  /** Whether the TTS summarizer is active */
+  enabled?: boolean;
+  /** Model ID to use for summarization (default: gpt-5.4-nano) */
+  model?: ModelId;
+  /** Seconds to batch activity before summarizing (default: 15) */
+  batch_window_seconds?: number;
+}
+
+/**
  * Complete configuration structure (YAML schema)
  */
 export interface YamlConfig {
@@ -141,6 +153,11 @@ export interface YamlConfig {
   agents?: {
     /** Caveman compressed output mode configuration */
     caveman?: CavemanConfig;
+  };
+
+  /** TTS summarizer configuration */
+  tts?: {
+    summarizer?: TtsSummarizerConfig;
   };
 }
 
@@ -260,6 +277,13 @@ export interface NormalizedConfig {
 
   /** Caveman compressed output configuration (normalised, never undefined) */
   caveman: NormalizedCavemanConfig;
+
+  /** TTS summarizer configuration (normalised, never undefined) */
+  ttsSummarizer: {
+    enabled: boolean;
+    model: ModelId;
+    batchWindowSeconds: number;
+  };
 }
 
 /**
@@ -347,6 +371,11 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       test: 'full',
       merge: 'full',
     },
+  },
+  ttsSummarizer: {
+    enabled: false,
+    model: 'gpt-5.4-nano',
+    batchWindowSeconds: 15,
   },
 };
 
@@ -539,6 +568,11 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       enabled: DEFAULT_CONFIG.caveman.enabled,
       abTest: DEFAULT_CONFIG.caveman.abTest,
       modes: { ...DEFAULT_CONFIG.caveman.modes },
+    },
+    ttsSummarizer: {
+      enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
+      model: DEFAULT_CONFIG.ttsSummarizer.model,
+      batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds,
     },
   };
 
@@ -737,6 +771,20 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
 
     // Merge caveman configuration
     mergeCavemanConfig(result.caveman, config);
+
+    // Merge TTS summarizer configuration
+    if (config.tts?.summarizer) {
+      const s = config.tts.summarizer;
+      if (s.enabled !== undefined) {
+        result.ttsSummarizer.enabled = s.enabled;
+      }
+      if (s.model) {
+        result.ttsSummarizer.model = resolveModelId(s.model) as ModelId;
+      }
+      if (s.batch_window_seconds !== undefined) {
+        result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
+      }
+    }
   }
 
   return { config: result, explicitlyDisabled };
