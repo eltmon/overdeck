@@ -75,10 +75,27 @@ Then STOP — you are done.
 
 ## Your Task
 
-1. Review all changes in the branch compared to {{DIFF_BASE}}
+1. Review ALL changes in the branch compared to {{DIFF_BASE}}
 2. Check for code quality issues, security concerns, best practices
 3. Verify test FILES exist for new code (DO NOT run tests)
-4. Provide specific, actionable feedback
+4. Collect EVERY issue you find — do NOT stop at the first one
+5. Report ALL findings in a SINGLE comprehensive review
+
+### Comprehensive Review Required
+
+You MUST review ALL dimensions before reporting:
+- Correctness (logic, edge cases, race conditions)
+- Test coverage (new functions have tests, bug fixes have regression tests)
+- Type safety (no missing union members, assertions justified)
+- Blocking operations (no execSync/spawnSync in server-reachable code)
+- Dead code (unused imports, variables, functions)
+- Error handling (async errors caught and logged)
+- Schema/migration consistency (DB columns match code, migrations exist)
+- Contract consistency (types match runtime behavior)
+
+**DO NOT call `/api/specialists/done` until you have reviewed ALL files and ALL dimensions.**
+If you find an issue in file A, keep reviewing files B, C, D before reporting.
+Piecemeal reviews waste time — the work agent needs the complete list to fix everything at once.
 
 ### How to Review Changes
 

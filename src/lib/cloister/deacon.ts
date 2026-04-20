@@ -13,7 +13,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
 import { join } from 'path';
-import { exec, execFile, execSync } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 
@@ -27,25 +27,7 @@ import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
-/**
- * Update testStatus to 'testing' when the test-agent starts working.
- * Uses the shared review-status.json file (same as dashboard server).
- */
-function updateTestStatusToTesting(issueId: string): void {
-  try {
-    if (!existsSync(REVIEW_STATUS_FILE)) return;
-    const data = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-    const upper = issueId.toUpperCase();
-    if (data[upper]) {
-      data[upper].testStatus = 'testing';
-      data[upper].updatedAt = new Date().toISOString();
-      writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      console.log(`[deacon] Updated testStatus to 'testing' for ${upper}`);
-    }
-  } catch (error) {
-    console.error(`[deacon] Failed to update testStatus for ${issueId}:`, error);
-  }
-}
+
 import {
   SpecialistType,
   getTmuxSessionName,
@@ -1029,6 +1011,14 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     const thinkingMinutes = Math.round(thinkingMs / 60000);
     const attempts = recovery?.attempts ?? 0;
 
+    // PAN-653: If the workspace is marked stuck (e.g. main diverged during approve),
+    // skip all recovery actions — Deacon must not respawn a stuck workspace.
+    const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+    if (getReviewStatus(agentIssueId)?.stuck) {
+      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): workspace is stuck`);
+      continue;
+    }
+
     console.log(`[deacon] Work agent ${agent.id} stuck thinking for ${thinkingMinutes}m (attempt ${attempts + 1})`);
 
     try {
@@ -1191,12 +1181,9 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) {
-      return actions;
-    }
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; prUrl?: string; mergeStatus?: string; mergeNotes?: string; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
+    // loadReviewStatuses() prefers SQLite (DB-first) and falls back to JSON —
+    // this is the authoritative source of truth after the PAN-653 DB migration.
+    const statuses = loadReviewStatuses();
 
     // Build a set of all active specialist sessions (global + per-project)
     // so we can check if ANY specialist is working on review/test tasks.
@@ -1312,9 +1299,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           setReviewStatus(issueId, reviewUpdate as Parameters<typeof setReviewStatus>[1]);
           status.reviewStatus = latestTerminalReview.status;
           if (latestTerminalTest) {
-            status.testStatus = latestTerminalTest.status;
+            status.testStatus = latestTerminalTest.status as typeof status.testStatus;
           }
-          modified = true;
           actions.push(
             `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
             (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
@@ -1326,7 +1312,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           // Use setReviewStatus (not direct JSON write) so SQLite is updated too
           setReviewStatus(issueId, { reviewStatus: 'pending' });
           status.reviewStatus = 'pending';
-          modified = true;
           actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
         }
       }
@@ -1365,7 +1350,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
               // dispatchParallelReview sets reviewStatus='reviewing' internally;
               // keep local status in sync so this patrol doesn't re-process the issue.
               status.reviewStatus = 'reviewing';
-              modified = true;
               actions.push(
                 `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
               );
@@ -1416,8 +1400,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             branch,
           });
           if (result.success) {
+            setReviewStatus(issueId, { testStatus: 'testing' });
             status.testStatus = 'testing';
-            modified = true;
             actions.push(
               `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
             );
@@ -1426,8 +1410,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             );
           } else if (result.error === 'specialist_busy') {
             // Specialist busy — set dispatch_failed so deacon retries next patrol
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
             status.testStatus = 'dispatch_failed';
-            modified = true;
             actions.push(
               `Orphaned test for ${issueId}: specialist busy — set dispatch_failed for next patrol retry`,
             );
@@ -1435,8 +1419,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
               `[deacon] Specialist busy for ${issueId} — set dispatch_failed for next patrol retry`,
             );
           } else {
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
             status.testStatus = 'dispatch_failed';
-            modified = true;
             actions.push(
               `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
             );
@@ -1446,8 +1430,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           }
         } else {
           // Cannot derive workspace/project — reset to pending so the pipeline can re-trigger cleanly
+          setReviewStatus(issueId, { testStatus: 'pending' });
           status.testStatus = 'pending';
-          modified = true;
           actions.push(
             !resolved
               ? `Reset orphaned test for ${issueId}: no project configured`
@@ -1462,10 +1446,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
     }
 
-    // Save changes if any
-    if (modified) {
-      writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
-    }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error checking orphaned review statuses:', msg);
@@ -2239,6 +2219,13 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       const count = runtimeState.resolutionCount || 0;
       const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
 
+      // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
+      // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
+      if (getReviewStatus(issueId)?.stuck) {
+        console.log(`[deacon] Skipping stuck workspace ${issueId} in patrolWorkAgentResolutions`);
+        continue;
+      }
+
       if (resolution === 'done' && count >= 2) {
         // Agent was nudged twice but still hasn't called pan work done — auto-complete
         console.log(`[deacon] Auto-completing ${agent.id} (${issueId}): resolution=done, count=${count}`);
@@ -2735,10 +2722,8 @@ export async function runPatrol(): Promise<PatrolResult> {
           if (projSpec.specialistType === 'merge-agent' && runtimeState.currentIssue) {
             const issueId = runtimeState.currentIssue;
             try {
-              if (!existsSync(REVIEW_STATUS_FILE)) continue;
-              const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-              const rs = statuses[issueId];
-              if (rs?.mergeStatus === 'merging') {
+              const currentStatus = getReviewStatus(issueId);
+              if (currentStatus?.mergeStatus === 'merging') {
                 const { resolveProjectFromIssue } = await import('../projects.js');
                 const resolved = resolveProjectFromIssue(issueId);
                 if (resolved) {
@@ -2749,9 +2734,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                   );
                   if (stdout.trim()) {
                     console.log(`[deacon] PAN-375: merge specialist died but ${issueId} IS merged (${stdout.trim()}). Auto-completing.`);
-                    statuses[issueId].mergeStatus = 'merged';
-                    statuses[issueId].readyForMerge = false;
-                    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+                    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
                     const { postMergeLifecycle } = await import('./merge-agent.js');
                     postMergeLifecycle(issueId, resolved.projectPath).catch(err =>
                       console.warn(`[deacon] postMergeLifecycle failed for ${issueId}: ${err}`)
@@ -2759,8 +2742,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                     actions.push(`Auto-completed stale merge for ${issueId}`);
                   } else {
                     console.log(`[deacon] Merge specialist died and ${issueId} NOT merged. Resetting to readyForMerge.`);
-                    statuses[issueId].mergeStatus = 'pending';
-                    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+                    setReviewStatus(issueId, { mergeStatus: 'pending' });
                   }
                 }
               }

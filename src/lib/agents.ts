@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, killSessionAsync, sendKeys, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -781,7 +781,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = `agent-${options.issueId.toLowerCase()}`;
 
   // Check if already running
-  if (sessionExists(agentId)) {
+  if (await sessionExistsAsync(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
@@ -969,7 +969,7 @@ ${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
 
   clearReadySignal(agentId);
 
-  createSession(agentId, options.workspace, claudeCmd, {
+  await createSessionAsync(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
@@ -987,7 +987,7 @@ ${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
     let ready = false;
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 1000));
-      if (!sessionExists(agentId)) {
+      if (!(await sessionExistsAsync(agentId))) {
         console.error(`[${agentId}] Tmux session died before becoming ready`);
         break;
       }
@@ -1200,7 +1200,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // session before re-creating it.
   const agentState = getAgentState(normalizedId);
   if (agentState && agentState.status === 'stopped') {
-    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${sessionExists(normalizedId)})`);
+    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await sessionExistsAsync(normalizedId)})`);
 
     const resumeResult = await resumeAgent(normalizedId, message);
 
@@ -1239,8 +1239,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     }
 
     clearReadySignal(normalizedId);
-    if (sessionExists(normalizedId)) {
-      try { killSession(normalizedId); } catch { /* ignore */ }
+    if (await sessionExistsAsync(normalizedId)) {
+      try { await killSessionAsync(normalizedId); } catch { /* ignore */ }
     }
 
     const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
@@ -1250,7 +1250,7 @@ export CI=1
 ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')}
 `;
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
-    createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
+    await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
@@ -1293,8 +1293,25 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
     return;
   }
 
-  if (!sessionExists(normalizedId)) {
+  if (!(await sessionExistsAsync(normalizedId))) {
     throw new Error(`Agent ${normalizedId} not running`);
+  }
+
+  // Guard: if tmux session exists but Claude Code has exited, resume instead
+  // of typing the message into a bare bash shell.
+  const panePids = await listPaneValuesAsync(normalizedId, '#{pane_pid}');
+  if (panePids.length > 0) {
+    try {
+      const { stdout: comm } = await execAsync(`ps -p ${panePids[0]} -o comm=`);
+      if (comm.trim() !== 'claude') throw new Error('not claude');
+    } catch {
+      console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
+      const resumeResult = await resumeAgent(normalizedId, message);
+      if (resumeResult.success) {
+        return;
+      }
+      throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
+    }
   }
 
   await sendKeysAsync(normalizedId, message);
@@ -1333,7 +1350,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
 
   // Also allow resuming a "running" agent with no live tmux session — this happens after
   // a system crash where tmux was killed but state.json was never updated to 'stopped'.
-  const isCrashed = agentState?.status === 'running' && !sessionExists(normalizedId);
+  const isCrashed = agentState?.status === 'running' && !(await sessionExistsAsync(normalizedId));
 
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
     || (agentState && allowedAgentStatuses.includes(agentState.status))
@@ -1363,9 +1380,9 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   }
 
   // Kill any zombie tmux session (crashed agent left behind)
-  if (sessionExists(normalizedId)) {
+  if (await sessionExistsAsync(normalizedId)) {
     try {
-      killSession(normalizedId);
+      await killSessionAsync(normalizedId);
     } catch { /* non-fatal */ }
   }
 
@@ -1412,7 +1429,7 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
-    createSession(normalizedId, agentState.workspace, claudeCmd, {
+    await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
@@ -1463,6 +1480,22 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
 }
 
 /**
+ * Check whether a tmux session has an active Claude Code process.
+ * A session may exist with only a bare bash shell after Claude exits.
+ */
+function isClaudeRunningInSession(sessionName: string): boolean {
+  try {
+    const panePids = listPaneValues(sessionName, '#{pane_pid}');
+    if (panePids.length === 0) return false;
+    const panePid = panePids[0]!;
+    const comm = execSync(`ps -p ${panePid} -o comm=`, { encoding: 'utf-8' }).trim();
+    return comm === 'claude';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Detect crashed agents (state shows running but tmux session is gone)
  */
 export function detectCrashedAgents(): AgentState[] {
@@ -1490,9 +1523,14 @@ export function recoverAgent(agentId: string): AgentState | null {
     return null;
   }
 
-  // Check if already running
+  // Check if already running — session may exist with only a bare shell
+  // after Claude exited (zombie session). Kill it and recover.
   if (sessionExists(normalizedId)) {
-    return state;
+    if (isClaudeRunningInSession(normalizedId)) {
+      return state;
+    }
+    console.log(`[agents] ${normalizedId} tmux session is a zombie (no Claude process) — killing and recovering`);
+    try { killSession(normalizedId); } catch { /* ignore */ }
   }
 
   // Update crash count in health file

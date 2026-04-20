@@ -41,7 +41,7 @@ let _cachedEventStore: any = null;
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push"]);
+const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
 const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
@@ -78,7 +78,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit'>): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -90,6 +90,11 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     readyForMerge: status.readyForMerge === true,
     updatedAt: status.updatedAt,
     prUrl: status.prUrl || undefined,
+    stuck: status.stuck === true ? true : undefined,
+    stuckReason: status.stuckReason || undefined,
+    stuckAt: status.stuckAt || undefined,
+    stuckDetails: status.stuckDetails || undefined,
+    reviewedAtCommit: status.reviewedAtCommit || undefined,
   };
 }
 
@@ -173,13 +178,20 @@ export const ReadModelServiceLive = Layer.effect(
 
           // Also pick up agents created after the last cache save (new state files not in cache)
           const cachedIds = new Set(validAgents.map((a: any) => a.id));
-          const newAgentIds: string[] = yield* Effect.promise(() => discoverNewAgentIds(agentsDir, cachedIds));
+          const { readdir: readdirAsync, readFile: readFileAsync } = yield* Effect.promise(() => import('node:fs/promises'));
+          const newAgentIds: string[] = [];
+          const dirEntries = yield* Effect.promise(() => readdirAsync(agentsDir).catch(() => [] as string[]));
+          for (const entry of dirEntries) {
+            if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
+              newAgentIds.push(entry);
+            }
+          }
 
           // Load new agent state files and add them to the snapshot
           const newAgents: any[] = [];
           for (const agentId of newAgentIds) {
             try {
-              const raw: string = yield* Effect.promise(() => import('node:fs/promises').then(fs => fs.readFile(joinPath(agentsDir, agentId, 'state.json'), 'utf-8')));
+              const raw = yield* Effect.promise(() => readFileAsync(joinPath(agentsDir, agentId, 'state.json'), 'utf-8'));
               newAgents.push(JSON.parse(raw));
             } catch { /* skip unreadable state files */ }
           }

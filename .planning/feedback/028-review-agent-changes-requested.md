@@ -1,13 +1,13 @@
 ---
 specialist: review-agent
-issueId: PAN-540
+issueId: PAN-653
 outcome: changes-requested
-timestamp: 2026-04-15T22:33:48Z
+timestamp: 2026-04-18T16:44:25Z
 ---
 
-CODE REVIEW BLOCKED for PAN-540:
+CODE REVIEW BLOCKED for PAN-653:
 
-Dead code in review-agent.ts: `__filename` and `__dirname` are declared (lines 21-22) but `__dirname` is never used anywhere in the file. `__filename` only exists to compute `__dirname`. The `dirname` import (path) and `fileURLToPath` import (url) are therefore also dead. Additionally, `import { writeFeedbackFile }` at line 23 appears after non-import const declarations (lines 19-22) — it must be moved to the top import block. Fix: remove lines 21-22, remove `dirname` from the path import, remove the `fileURLToPath` import, and move the writeFeedbackFile import to the top.
+1. src/lib/git/operations.ts:123-145 treats any git merge-base failure as divergence. Exit code 1 means not-ancestor, but other failures (e.g. bad object/repo error) should surface as real git errors instead of incorrectly marking the workspace stuck with main_diverged. Add a regression test for non-code-1 merge-base failures in the new gitPush helper tests. 2. src/lib/cloister/merge-agent.ts:688-705 with src/dashboard/server/routes/metrics.ts:357-365 misclassifies force-with-lease usage. A line like "git push --force-with-lease ..." is recorded as push_attempt because the generic /git push/i pattern matches before /force-with-lease/i, so the new git activity feed can hide a force-push as a normal push. Reorder or refine the patterns and add a regression test for the real command string.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
@@ -15,6 +15,6 @@ Dead code in review-agent.ts: `__filename` and `__dirname` are declared (lines 2
 2. Fix the code for EVERY issue listed
 3. Run tests locally to verify your fixes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-540 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
+5. Invoke the /rebase-and-submit skill for PAN-653 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.

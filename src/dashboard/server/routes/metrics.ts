@@ -12,13 +12,56 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/activity/:id
  */
 
-import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
+import { listRunningAgents } from '../../../lib/agents.js';
+import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { httpHandler } from './http-handler.js';
+
+// ─── Exported helper: safe agentId→issueId map ───────────────────────────────
+// Exported for unit testing — skips agents with missing/empty issueId so the
+// route never throws on malformed or legacy persisted agent state.
+
+export function buildAgentIssueMap(
+  agents: Array<{ id: string; issueId?: string; tmuxActive: boolean }>,
+): Map<string, string> {
+  return new Map(
+    agents
+      .filter((a): a is typeof a & { issueId: string } => a.tmuxActive && Boolean(a.issueId))
+      .map((a) => [a.id, a.issueId.toUpperCase()]),
+  );
+}
+
+// ─── Exported helper: union stuck count ──────────────────────────────────────
+// Exported for unit testing — used by both /api/metrics/summary and
+// /api/metrics/stuck to ensure consistent stuck counts across both endpoints.
+
+export function computeStuckCount(
+  agentsNeedingAttention: string[],
+  getAgentHealth: (id: string) => { state: string } | null | undefined,
+  agentIdToIssueId: Map<string, string>,
+  reviewStatuses: Record<string, { stuck?: boolean; issueId: string }>,
+): number {
+  const persistentSet = new Set(
+    Object.values(reviewStatuses)
+      .filter((rs) => rs.stuck === true)
+      .map((rs) => rs.issueId.toUpperCase()),
+  );
+  const healthSet = new Set<string>();
+  for (const agentId of agentsNeedingAttention) {
+    const health = getAgentHealth(agentId);
+    if (health?.state === 'stuck') {
+      const issueId = agentIdToIssueId.get(agentId);
+      if (issueId) healthSet.add(issueId);
+    }
+  }
+  return new Set([...healthSet, ...persistentSet]).size;
+}
 
 // ─── Route: GET /api/metrics/summary ─────────────────────────────────────────
 
@@ -50,12 +93,19 @@ const getMetricsSummaryRoute = HttpRouter.add(
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 5);
 
+      const stuckCount = computeStuckCount(
+        status.agentsNeedingAttention,
+        (id) => service.getAgentHealth(id),
+        buildAgentIssueMap(listRunningAgents()),
+        loadReviewStatuses(),
+      );
+
       return jsonResponse({
         today: {
           totalCost: Math.round(dailyTotal * 100) / 100,
           agentCount: status.summary.total,
           activeCount: status.summary.active,
-          stuckCount: status.summary.stuck,
+          stuckCount,
           warningCount: status.summary.warning,
         },
         topSpenders: {
@@ -101,8 +151,15 @@ const getMetricsStuckRoute = HttpRouter.add(
   '/api/metrics/stuck',
   httpHandler(Effect.try({
     try: () => {
-      const status = getCloisterService().getStatus();
-      return jsonResponse({ current: status.summary.stuck, incidents: [] });
+      const service = getCloisterService();
+      const status = service.getStatus();
+      const current = computeStuckCount(
+        status.agentsNeedingAttention,
+        (id) => service.getAgentHealth(id),
+        buildAgentIssueMap(listRunningAgents()),
+        loadReviewStatuses(),
+      );
+      return jsonResponse({ current, incidents: [] });
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
@@ -155,6 +212,58 @@ const getActivityByIdRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/git-activity ─────────────────────────────────────────────
+// Returns recent git_operations rows as ActivityPanel-compatible entries.
+// Supports ?since=ISO&issueId=PAN-XXX&limit=N query params.
+
+/** Parse and validate query params for GET /api/git-activity. Exported for unit testing. */
+export function parseGitActivityParams(params: URLSearchParams): { since?: string; issueId?: string; limit: number } {
+  const since   = params.get('since')   ?? undefined;
+  const issueId = params.get('issueId') ?? undefined;
+  const limitRaw = params.get('limit');
+  const limitParsed = limitRaw ? parseInt(limitRaw, 10) : NaN;
+  const limit   = !isNaN(limitParsed) ? Math.min(Math.max(1, limitParsed), 500) : 200;
+  return { since, issueId, limit };
+}
+
+/** Map a GitOperation DB row to an ActivityPanel-compatible entry. Exported for unit testing. */
+export function mapGitOperationToActivityEntry(op: GitOperation) {
+  return {
+    id: `git-op-${op.id ?? op.ts}`,
+    timestamp: op.ts,
+    source: 'git',
+    level: op.status === 'success' ? 'success'
+      : op.status === 'aborted' ? 'warn'
+      : 'error',
+    message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
+    details: [
+      op.beforeSha && `before: ${op.beforeSha}`,
+      op.afterSha && `after: ${op.afterSha}`,
+      op.remoteSha && `remote: ${op.remoteSha}`,
+      op.error && `error: ${op.error}`,
+    ].filter(Boolean).join('\n') || null,
+    issueId: op.issueId ?? null,
+    category: 'git',
+  };
+}
+
+const getGitActivityRoute = HttpRouter.add(
+  'GET',
+  '/api/git-activity',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const urlOpt = HttpServerRequest.toURL(request);
+    const params = Option.isSome(urlOpt) ? urlOpt.value.searchParams : new URLSearchParams();
+
+    const { since, issueId, limit } = parseGitActivityParams(params);
+
+    const ops = listGitOperations({ since, issueId, limit });
+    const entries = ops.map(mapGitOperationToActivityEntry);
+    return jsonResponse(entries);
+  }))
+);
+
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const metricsRouteLayer = Layer.mergeAll(
@@ -164,6 +273,7 @@ export const metricsRouteLayer = Layer.mergeAll(
   getMetricsStuckRoute,
   getActivityRoute,
   getActivityByIdRoute,
+  getGitActivityRoute,
 );
 
 export default metricsRouteLayer;

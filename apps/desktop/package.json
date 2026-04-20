@@ -1,9 +1,13 @@
 {
-  "name": "panctl",
-  "version": "0.7.2-canary.1",
+  "name": "@eltmon/panctl",
+  "version": "0.7.2-canary.3",
   "description": "Panopticon Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eltmon/panopticon-cli.git"
+  },
   "bin": {
     "panctl": "./bin/panctl.mjs"
   },
@@ -26,19 +30,19 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "dist:linux": "electron-builder --linux AppImage --publish always",
-    "dist:mac": "electron-builder --mac dmg --universal --publish always",
-    "dist:win": "electron-builder --win nsis --publish always",
+    "dist:linux": "electron-builder --linux AppImage --publish never",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never",
+    "dist:win": "electron-builder --win nsis --publish never",
     "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3 2>/dev/null; exit 0"
   },
   "dependencies": {
     "conf": "^13.0.0",
-    "electron": "40.6.0",
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@panopticon/contracts": "workspace:*",
     "@types/node": "^22.0.0",
+    "electron": "40.6.0",
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
     "tsdown": "^0.21.7",
@@ -93,12 +97,12 @@
           ]
         }
       ],
-      "icon": "resources/icon.icns",
+      "icon": "resources/icon.png",
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
       "title": "Panopticon",
-      "icon": "resources/icon.icns"
+      "icon": "resources/icon.png"
     },
     "win": {
       "target": [

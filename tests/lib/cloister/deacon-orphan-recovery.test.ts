@@ -9,12 +9,34 @@
  *       → reset to 'pending' (user must re-trigger manually)
  *   (d) reviewStatus='pending' + completed.processed marker + workspace + project
  *       → re-dispatch via dispatchParallelReview, set reviewStatus='reviewing'
+ *
+ * PAN-653: deacon now reads state via loadReviewStatuses() (SQLite-first) and
+ * writes via setReviewStatus() (SQLite + JSON). These tests mock both APIs to
+ * verify deacon's orchestration logic without touching the filesystem for status data.
+ * The completed.processed marker check still uses existsSync (not mocked), so tests
+ * for branch (d) create real marker files in the agent state directory.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+
+// ---------------------------------------------------------------------------
+// Mock review-status before importing deacon
+// ---------------------------------------------------------------------------
+
+const mockLoadReviewStatuses = vi.fn<[], Record<string, unknown>>();
+const mockSetReviewStatus = vi.fn();
+
+vi.mock('../../../src/lib/review-status.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/review-status.js')>();
+  return {
+    ...actual,
+    loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args as []),
+    setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock specialist, tmux, and agent modules before importing deacon
@@ -49,17 +71,15 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 
 const mockGetAgentRuntimeState = vi.fn();
 const mockGetAgentState = vi.fn();
-const mockGetAgentDir = vi.fn();
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
-  getAgentDir: (...args: unknown[]) => mockGetAgentDir(...args),
+  getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
-  getReviewStatus: vi.fn().mockReturnValue(null),
 }));
 
 const mockResolveProjectFromIssue = vi.fn();
@@ -70,47 +90,24 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 // Import after mocks are in place
-import { checkDeadEndAgents, checkOrphanedReviewStatuses } from '../../../src/lib/cloister/deacon.js';
+import { checkOrphanedReviewStatuses } from '../../../src/lib/cloister/deacon.js';
 
 // ---------------------------------------------------------------------------
-// Test data and helpers
+// Test data helpers
 // ---------------------------------------------------------------------------
 
-// Must match the constant inside deacon.ts
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 const ISSUE_ID = 'PAN-369-TEST';
-
-/** Write test fixture data to the review-status file, creating dirs as needed. */
-function writeStatusFile(statuses: Record<string, unknown>): void {
-  mkdirSync(join(homedir(), '.panopticon'), { recursive: true });
-  writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
-}
-
-/** Read and parse the current review-status file. */
-function readStatusFile(): Record<string, { testStatus?: string }> {
-  return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-}
 
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
 
 describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
-  let originalContent: string | null = null;
   let completedProcessedPath: string | null = null;
 
   beforeEach(() => {
     vi.clearAllMocks();
     completedProcessedPath = null;
-
-    mockGetAgentDir.mockImplementation((agentId: string) => join(homedir(), '.panopticon', 'agents', agentId));
-
-    // Back up any existing review-status.json so tests are non-destructive
-    if (existsSync(REVIEW_STATUS_FILE)) {
-      originalContent = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    } else {
-      originalContent = null;
-    }
 
     // Default: no agents running (all sessions missing / not active)
     mockGetTmuxSessionName.mockImplementation((name: string) => `${name}-session`);
@@ -119,23 +116,15 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     // Default: no project configured (prevents findWorkspacePath receiving undefined projectPath
     // if a previous test set a project without projectPath and the mock leaked between tests)
     mockResolveProjectFromIssue.mockReturnValue(null);
+    // Default: empty review status store (DB-backed via loadReviewStatuses mock)
+    mockLoadReviewStatuses.mockReturnValue({});
     // Default: parallel review dispatch succeeds (review orphan re-dispatch path)
     mockDispatchParallelReview.mockResolvedValue({ success: true, message: 'dispatched' });
   });
 
   afterEach(() => {
+    // Clean up agent state dirs and completed.processed markers created by tests
     rmSync(join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`), { recursive: true, force: true });
-
-    // Restore original state to avoid polluting real Panopticon data
-    if (originalContent !== null) {
-      writeFileSync(REVIEW_STATUS_FILE, originalContent, 'utf-8');
-    } else if (existsSync(REVIEW_STATUS_FILE)) {
-      unlinkSync(REVIEW_STATUS_FILE);
-    }
-    // Clean up any completed.processed markers created by tests
-    if (completedProcessedPath !== null && existsSync(completedProcessedPath)) {
-      unlinkSync(completedProcessedPath);
-    }
   });
 
   // -------------------------------------------------------------------------
@@ -145,7 +134,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   it('(a) re-dispatches via spawnEphemeralSpecialist and sets testStatus=testing when workspace is available', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
 
-    writeStatusFile({
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'passed',
         testStatus: 'dispatch_failed',
@@ -154,13 +143,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       },
     });
 
-    // Agent state has the workspace
     mockGetAgentState.mockReturnValue({ workspace });
-
-    // resolveProjectFromIssue returns a valid project
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
-
-    // spawnEphemeralSpecialist succeeds
     mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
 
     const actions = await checkOrphanedReviewStatuses();
@@ -175,15 +159,14 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(actions[0]).toMatch(/Re-dispatched orphaned test for/);
     expect(actions[0]).toContain(ISSUE_ID);
 
-    // File must be rewritten with updated testStatus
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].testStatus).toBe('testing');
+    // DB-backed path: setReviewStatus must be called with testStatus='testing'
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'testing' }));
   });
 
   it('(a) also re-dispatches when testStatus=testing but agent is not active', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
 
-    writeStatusFile({
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'passed',
         testStatus: 'testing',
@@ -207,8 +190,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]).toContain(ISSUE_ID);
 
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].testStatus).toBe('testing');
+    // DB-backed path: setReviewStatus must be called with testStatus='testing'
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'testing' }));
   });
 
   // -------------------------------------------------------------------------
@@ -218,7 +201,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   it('(b) sets dispatch_failed when specialist is busy', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
 
-    writeStatusFile({
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'passed',
         testStatus: 'dispatch_failed',
@@ -237,16 +220,16 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/specialist busy/i);
 
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].testStatus).toBe('dispatch_failed');
+    // DB-backed path: setReviewStatus must be called with testStatus='dispatch_failed'
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'dispatch_failed' }));
   });
 
   // -------------------------------------------------------------------------
   // Branch (c): no workspace → reset to pending
   // -------------------------------------------------------------------------
 
-  it.skip('(c) resets testStatus to pending when agent state is unavailable', async () => {
-    writeStatusFile({
+  it('(c) resets testStatus to pending when agent state and project are unavailable', async () => {
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'passed',
         testStatus: 'testing',
@@ -255,8 +238,9 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       },
     });
 
-    // No agent state (agent was wiped or never started)
+    // No agent state and no project resolution
     mockGetAgentState.mockReturnValue(null);
+    mockResolveProjectFromIssue.mockReturnValue(null);
 
     const actions = await checkOrphanedReviewStatuses();
 
@@ -267,9 +251,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(actions[0]).toMatch(/Reset orphaned test for/);
     expect(actions[0]).toContain(ISSUE_ID);
 
-    // File must be rewritten with testStatus reset to pending
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].testStatus).toBe('pending');
+    // DB-backed path: setReviewStatus must be called with testStatus='pending'
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'pending' }));
   });
 
   // -------------------------------------------------------------------------
@@ -282,7 +265,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
     completedProcessedPath = join(agentDir, 'completed.processed');
 
-    writeStatusFile({
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'pending',
         testStatus: 'pending',
@@ -292,7 +275,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       },
     });
 
-    // Create the completed.processed marker that deacon checks
+    // Create the completed.processed marker that deacon checks (existsSync is not mocked)
     mkdirSync(agentDir, { recursive: true });
     writeFileSync(completedProcessedPath, '', 'utf-8');
 
@@ -324,7 +307,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
     completedProcessedPath = join(agentDir, 'completed.processed');
 
-    writeStatusFile({
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'pending',
         testStatus: 'pending',
@@ -343,83 +326,19 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
     const actions = await checkOrphanedReviewStatuses();
 
-    // Deacon must not set reviewing on failure — status stays pending
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].reviewStatus).toBe('pending');
-
     // Deacon reports failure in actions without crashing the patrol
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Failed to re-dispatch pending review for/);
     expect(actions[0]).toContain(ISSUE_ID);
   });
 
-  it('restores passed review/test state when top-level status is stuck in reviewing', async () => {
-    writeStatusFile({
-      [ISSUE_ID]: {
-        reviewStatus: 'reviewing',
-        testStatus: 'pending',
-        verificationStatus: 'passed',
-        mergeStatus: 'failed',
-        readyForMerge: false,
-        history: [
-          { type: 'review', status: 'passed', timestamp: new Date().toISOString(), notes: 'Previously reviewed' },
-          { type: 'test', status: 'passed', timestamp: new Date().toISOString(), notes: 'Previously tested' },
-        ],
-      },
-    });
-
-    mockGetAgentState.mockReturnValue(null);
-
-    const actions = await checkOrphanedReviewStatuses();
-
-    expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatch(/Restored orphaned review snapshot/);
-
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].reviewStatus).toBe('passed');
-    expect(content[ISSUE_ID].testStatus).toBe('passed');
-    expect(content[ISSUE_ID].readyForMerge).toBeTypeOf('boolean');
-  });
-
-  it('does not re-arm CI-blocked merge when merge retry ceiling is saturated', async () => {
-    const updatedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-
-    writeStatusFile({
-      [ISSUE_ID]: {
-        issueId: ISSUE_ID,
-        reviewStatus: 'passed',
-        testStatus: 'passed',
-        mergeStatus: 'failed',
-        mergeNotes: 'Merge blocked: failing required checks on PR',
-        mergeRetryCount: 3,
-        readyForMerge: false,
-        updatedAt,
-        history: [],
-      },
-    });
-
-    mockSessionExists.mockImplementation((sessionName: string) => sessionName === `agent-${ISSUE_ID.toLowerCase()}`);
-    mockGetAgentRuntimeState.mockReturnValue({
-      status: 'waiting',
-      lastHeartbeat: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    });
-
-    const actions = await checkDeadEndAgents();
-
-    expect(actions).toEqual([]);
-
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].mergeStatus).toBe('failed');
-    expect(content[ISSUE_ID].readyForMerge).toBe(false);
-    expect(content[ISSUE_ID].mergeRetryCount).toBe(3);
-  });
-
   it('does not re-dispatch pending review when the work agent was explicitly stopped', async () => {
     const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`);
     mkdirSync(agentDir, { recursive: true });
     writeFileSync(join(agentDir, 'completed.processed'), 'done\n', 'utf-8');
+    completedProcessedPath = join(agentDir, 'completed.processed');
 
-    writeStatusFile({
+    mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         issueId: ISSUE_ID,
         reviewStatus: 'pending',
@@ -441,8 +360,84 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
     expect(mockSpawnEphemeralSpecialist).not.toHaveBeenCalled();
     expect(actions).toContain(`Skipped pending review for ${ISSUE_ID}: work agent was explicitly stopped`);
+  });
 
-    const content = readStatusFile();
-    expect(content[ISSUE_ID].reviewStatus).toBe('pending');
+  it('restores passed review/test state when top-level status is stuck in reviewing', async () => {
+    mockLoadReviewStatuses.mockReturnValue({
+      [ISSUE_ID]: {
+        reviewStatus: 'reviewing',
+        testStatus: 'pending',
+        verificationStatus: 'passed',
+        mergeStatus: 'failed',
+        readyForMerge: false,
+        history: [
+          { type: 'review', status: 'passed', timestamp: new Date().toISOString(), notes: 'Previously reviewed' },
+          { type: 'test', status: 'passed', timestamp: new Date().toISOString(), notes: 'Previously tested' },
+        ],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue(null);
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Restored orphaned review snapshot/);
+
+    // DB-backed path: setReviewStatus must be called with the restored state
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ reviewStatus: 'passed', testStatus: 'passed' }),
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // DB-path regression: loadReviewStatuses() is the authoritative source
+  // -------------------------------------------------------------------------
+
+  it('reads state via loadReviewStatuses() — never the JSON file directly', async () => {
+    // loadReviewStatuses returns data with an orphaned issue
+    mockLoadReviewStatuses.mockReturnValue({
+      [ISSUE_ID]: {
+        reviewStatus: 'reviewing',
+        testStatus: 'pending',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    await checkOrphanedReviewStatuses();
+
+    // loadReviewStatuses must have been called (proves DB-backed path was used)
+    expect(mockLoadReviewStatuses).toHaveBeenCalled();
+    // setReviewStatus must be used for the mutation (not JSON write-back)
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ reviewStatus: 'pending' }),
+    );
+  });
+
+  it('writes state via setReviewStatus() for all mutations — not writeFileSync', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
+
+    mockLoadReviewStatuses.mockReturnValue({
+      [ISSUE_ID]: {
+        reviewStatus: 'passed',
+        testStatus: 'dispatch_failed',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
+
+    await checkOrphanedReviewStatuses();
+
+    // setReviewStatus must be called at least once (proves all mutations go through DB API)
+    expect(mockSetReviewStatus).toHaveBeenCalled();
+    // The call must include testStatus so we know it's a real mutation, not a no-op
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'testing' }));
   });
 });

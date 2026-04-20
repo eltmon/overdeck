@@ -368,7 +368,9 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
 
   writeTextFile(releaseNotesPath, releaseNotes);
 
-  run('git add package.json apps/desktop/package.json', repoRoot);
+  run('bun install', repoRoot);
+
+  run('git add package.json apps/desktop/package.json bun.lock', repoRoot);
   run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
   run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
 

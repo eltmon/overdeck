@@ -691,6 +691,72 @@ async function generateTurnPrefixSummary(
 }
 
 // ============================================================================
+// Chunked incremental summarization
+// ============================================================================
+
+// Per-chunk serialized-content budget (in characters). Leaves room in the
+// model's context window for the prompt template, the carried-forward
+// <previous-summary>, and the generated output. Intentionally conservative
+// — code-heavy content tokenizes denser than the 4-chars/token heuristic.
+const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
+  'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
+  'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
+  'claude-opus-4-6': 1_200_000,           // ~300k tokens content, 1M window
+};
+const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;
+
+function getChunkBudgetChars(model: string | undefined): number {
+  if (!model) return DEFAULT_CHUNK_BUDGET_CHARS;
+  return CHUNK_BUDGET_CHARS_BY_MODEL[model] ?? DEFAULT_CHUNK_BUDGET_CHARS;
+}
+
+function chunkEntriesByBudget(entries: any[], budgetChars: number): any[][] {
+  const chunks: any[][] = [];
+  let current: any[] = [];
+  let currentChars = 0;
+  for (const entry of entries) {
+    const serialized = serializeEntry(entry);
+    const size = serialized ? serialized.length + 2 : 0;
+    if (currentChars + size > budgetChars && current.length > 0) {
+      chunks.push(current);
+      current = [];
+      currentChars = 0;
+    }
+    current.push(entry);
+    currentChars += size;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+async function generateChunkedSummary(
+  entries: any[],
+  initialPreviousSummary: string | undefined,
+  model: string | undefined,
+  richMode: boolean,
+  timeoutMs: number,
+): Promise<string> {
+  const budget = getChunkBudgetChars(model);
+  const chunks = chunkEntriesByBudget(entries, budget);
+  if (chunks.length === 0) {
+    return initialPreviousSummary ?? '';
+  }
+
+  let running: string | undefined = initialPreviousSummary;
+  for (let i = 0; i < chunks.length; i++) {
+    const serialized = serializeConversation(chunks[i]);
+    if (!serialized.trim()) continue;
+    console.log(
+      `[smart-compaction] Summarizing chunk ${i + 1}/${chunks.length} ` +
+      `(${serialized.length} chars, ${chunks[i].length} entries) with ${model ?? DEFAULT_SUMMARY_MODEL}`,
+    );
+    running = await generateSummaryFromPrompt(serialized, running, model, richMode, timeoutMs);
+  }
+
+  return running ?? '';
+}
+
+// ============================================================================
 // Main smart compaction
 // ============================================================================
 
@@ -772,14 +838,23 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
 
   if (!hasHistory && !hasPrefix) {
     // Nothing to summarize — return previous summary or a minimal stub.
-    // For forks, serialize the entire conversation as a last resort.
+    // For forks, summarize the entire conversation via chunked incremental
+    // passes (carrying <previous-summary> forward) so arbitrarily large
+    // JSONL files fit the selected model's context window.
     if (isFork) {
-      const allSerialized = serializeConversation(entries);
-      if (allSerialized.trim().length > 0) {
+      const forkTimeoutMs = llmTimeoutMs ?? 120_000;
+      // Summarize from the previous compact boundary (if any) forward — the
+      // previousSummary already covers everything before boundaryStart.
+      const forkEntries = boundaryStart > 0 ? entries.slice(boundaryStart) : entries;
+      const anyContent = forkEntries.some((e) => serializeEntry(e));
+      if (anyContent) {
         try {
-          summary = await generateSummaryFromPrompt(allSerialized, previousSummary, model, richMode, llmTimeoutMs);
+          summary = await generateChunkedSummary(forkEntries, previousSummary, model, richMode, forkTimeoutMs);
         } catch (error) {
           throw new Error(`Smart summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (!summary.trim()) {
+          throw new Error('Smart summary generation failed: chunked summarization produced empty output');
         }
       } else {
         summary = previousSummary || '## Goal\nContinue the current task.\n\n## Constraints & Preferences\n- (none)\n\n## Progress\n### Done\n- (none)\n\n### In Progress\n- [ ] Awaiting next instruction\n\n### Blocked\n- (none)\n\n## Key Decisions\n- (none)\n\n## Next Steps\n1. Await user instruction\n\n## Critical Context\n- (none)';

@@ -19,9 +19,14 @@ import type { ExecaReturnValue } from 'execa';
 // Mock tmux module at the top level (hoisted before imports)
 vi.mock('../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
   createSession: vi.fn(),
+  createSessionAsync: vi.fn().mockResolvedValue(undefined),
+  killSession: vi.fn(),
+  killSessionAsync: vi.fn().mockResolvedValue(undefined),
   sendKeys: vi.fn(),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
+  listPaneValuesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 describe('Agent Lifecycle Integration (PAN-80)', () => {
@@ -264,7 +269,7 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       // Configure tmux mocks
       const tmuxMock = await import('../../src/lib/tmux.js');
       vi.mocked(tmuxMock.sessionExists).mockReturnValue(false);
-      vi.mocked(tmuxMock.createSession).mockImplementation(() => {});
+      vi.mocked(tmuxMock.createSessionAsync).mockResolvedValue(undefined);
       vi.mocked(tmuxMock.sendKeys).mockImplementation(() => {});
 
       // Resume agent
@@ -281,9 +286,9 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       const retrievedSessionId = getSessionId(agentId);
       expect(retrievedSessionId).toBe(sessionId);
 
-      // Verify createSession was called with a launcher script that contains --resume
-      expect(tmuxMock.createSession).toHaveBeenCalled();
-      const createSessionCall = vi.mocked(tmuxMock.createSession).mock.calls[0];
+      // Verify createSessionAsync was called with a launcher script that contains --resume
+      expect(tmuxMock.createSessionAsync).toHaveBeenCalled();
+      const createSessionCall = vi.mocked(tmuxMock.createSessionAsync).mock.calls[0];
       const command = createSessionCall[2]; // 3rd param is the command
       // Command is either direct --resume or a launcher script wrapping it
       if (command.startsWith('bash ')) {
@@ -341,7 +346,7 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       // Configure tmux mocks
       const tmuxMock = await import('../../src/lib/tmux.js');
       vi.mocked(tmuxMock.sessionExists).mockReturnValue(false);
-      vi.mocked(tmuxMock.createSession).mockImplementation(() => {
+      vi.mocked(tmuxMock.createSessionAsync).mockImplementation(async () => {
         // Simulate SessionStart hook creating ready signal
         const readyPath = join(agentDir, 'ready.json');
         writeFileSync(readyPath, JSON.stringify({ ready: true }));
