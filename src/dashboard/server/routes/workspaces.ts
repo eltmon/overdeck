@@ -230,8 +230,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     const issueId = `${issuePrefix}-1`;
     const resolved = resolveProjectFromIssue(issueId);
     if (resolved) return resolved.projectPath;
-  }
-  if (issuePrefix) {
+
     const config = getGitHubConfig();
     if (config) {
       for (const { owner, repo, prefix } of config.repos) {
