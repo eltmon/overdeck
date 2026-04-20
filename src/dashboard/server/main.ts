@@ -26,11 +26,19 @@ import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
+import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 
 declare const Bun: unknown;
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
+
+// Prepare the managed tmux context exactly once, before any code path can spawn
+// tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
+// `tmuxExecAsync` are effectively free — no per-call file writes, no per-call
+// `start-server`/`source-file` round-trips. Critical for terminal attach latency
+// and agent message delivery (PAN-785).
+await ensureManagedTmuxContextOnce();
 
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 void initTrackerConfigCache().catch(err => {

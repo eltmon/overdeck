@@ -47,9 +47,34 @@ function sendControl(ws: WebSocket, payload: unknown): void {
   }
 }
 
-async function captureSnapshot(sessionName: string, cols: number, rows: number): Promise<string> {
+// Fresh-attach snapshot cap. 5000 lines with escape sequences was several megabytes
+// on a busy session — the client then had to receive, parse, and write all of that
+// before sending `ready` and letting live data through. 500 lines covers a generous
+// scrollback window; override via env for sessions that really need deeper history.
+const SNAPSHOT_SCROLLBACK_LINES = (() => {
+  const parsed = Number(process.env.PANOPTICON_TERMINAL_SNAPSHOT_LINES);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 500;
+})();
+
+/**
+ * Snapshot for a fresh attach (no existing hub). Resizes the tmux window to the
+ * client's requested dimensions, then captures up to SNAPSHOT_SCROLLBACK_LINES
+ * lines of scrollback so the user sees prior context on first draw.
+ */
+async function captureFreshSnapshot(sessionName: string, cols: number, rows: number): Promise<string> {
   await resizeWindowAsync(sessionName, cols, rows).catch(() => {});
-  return capturePaneAsync(sessionName, 5000, { escapeSequences: true });
+  return capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
+}
+
+/**
+ * Snapshot for a hub-join (a second/Nth client attaching to an already-running
+ * PTY). The PTY is actively streaming and the hub already holds the authoritative
+ * dimensions, so we skip the resize and capture only the visible viewport —
+ * anything past the viewport will be re-delivered as the tmux redraw stream
+ * naturally covers it. `-S 0` starts capture from the first visible line.
+ */
+async function captureViewportSnapshot(sessionName: string): Promise<string> {
+  return capturePaneAsync(sessionName, 0, { escapeSequences: true });
 }
 
 /**
@@ -177,7 +202,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         addClientToHub(existingHub, ws, false);
         existingHub.inputClient = ws;
 
-        const snapshot = await captureSnapshot(sessionName, existingHub.cols, existingHub.rows);
+        const snapshot = await captureViewportSnapshot(sessionName);
         sendControl(ws, { type: 'snapshot', cols: existingHub.cols, rows: existingHub.rows, data: snapshot });
 
         const handleJoinMessage = (message: string) => {
@@ -305,7 +330,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         pendingInput.length = 0;
       };
 
-      const snapshot = await captureSnapshot(sessionName, requestedCols, requestedRows);
+      const snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
       sendControl(ws, { type: 'snapshot', cols: requestedCols, rows: requestedRows, data: snapshot });
 
       const handleLocalMessage = (message: string) => {
