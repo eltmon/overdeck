@@ -42,3 +42,4 @@ Preparing the extraction bead commit for reusable planning chips in `src/dashboa
 - **[2026-04-20T16:35Z] verification-gate → FAILED** — `.planning/feedback/092-verification-gate-failed.md`
 - **[2026-04-20T16:54Z] verification-gate → FAILED** — `.planning/feedback/093-verification-gate-failed.md`
 - **[2026-04-20T16:57Z] verification-gate → FAILED** — `.planning/feedback/094-verification-gate-failed.md`
+- **[2026-04-20T17:12Z] verification-gate → FAILED** — `.planning/feedback/095-verification-gate-failed.md`
