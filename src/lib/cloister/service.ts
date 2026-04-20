@@ -240,6 +240,13 @@ export class CloisterService {
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
 
+  // ─── Status cache ────────────────────────────────────────────────────────────
+  // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
+  // to eliminate blocking on high-frequency dashboard polls.
+  private _statusCache: CloisterStatus | null = null;
+  private _statusCacheAt = 0;
+  private readonly STATUS_CACHE_TTL_MS = 3_000;
+
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
   }
@@ -416,6 +423,7 @@ export class CloisterService {
 
     this.running = true;
     this.starting = false;
+    this._statusCache = null;
     writeStateFile(true);
     this.emit({ type: 'started' });
 
@@ -437,6 +445,7 @@ export class CloisterService {
 
     console.log('🔔 Stopping Cloister agent watchdog...');
     this.running = false;
+    this._statusCache = null;
     writeStateFile(false);
 
     if (this.checkInterval) {
@@ -1191,8 +1200,17 @@ export class CloisterService {
 
   /**
    * Get current status
+   *
+   * Uses a 3-second TTL cache to avoid blocking the event loop on repeated
+   * dashboard polls. The underlying computation does sync file I/O and tmux
+   * calls for every agent, which scales poorly with agent count.
    */
   getStatus(): CloisterStatus {
+    const now = Date.now();
+    if (this._statusCache && now - this._statusCacheAt < this.STATUS_CACHE_TTL_MS) {
+      return this._statusCache;
+    }
+
     const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
     const agentIds = runningAgents.map((a) => a.id);
 
@@ -1209,13 +1227,17 @@ export class CloisterService {
     const summary = generateHealthSummary(agentHealths);
     const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
 
-    return {
+    const status: CloisterStatus = {
       running: this.isRunning(),
       lastCheck: this.lastCheck,
       config: this.config,
       summary,
       agentsNeedingAttention: needsAttention,
     };
+
+    this._statusCache = status;
+    this._statusCacheAt = now;
+    return status;
   }
 
   /**
