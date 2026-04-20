@@ -386,6 +386,10 @@ export async function parseConversationMessages(
     }
   }
 
+  // Sort by (createdAt, sequence) so the conversation view matches terminal order
+  messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
+  workLog.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
+
   // Streaming detection: last assistant message has no stop_reason and file was modified < 5s ago
   let streaming = false;
   const lastMsg = messages[messages.length - 1];
