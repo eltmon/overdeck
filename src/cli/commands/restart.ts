@@ -64,8 +64,7 @@ function resolveNode22(): string {
 }
 
 function resolveBundledServerPath(): string {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  return join(__dirname, '..', '..', 'dashboard', 'server.js');
+  return join(process.cwd(), 'dist', 'dashboard', 'server.js');
 }
 
 function spawnDashboardDetached(config: PlatformConfig): void {
