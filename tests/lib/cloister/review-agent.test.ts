@@ -991,5 +991,13 @@ describe('spawnReviewer runtime command routing regression', () => {
 
     expect(waitForPromptFn).toContain("if (!await sessionExistsAsync(sessionName)) return false;");
     expect(waitForPromptFn).toContain('consecutivePromptPolls >= 2');
+
+    const sendKeysAsyncMatch = tmuxSrc.match(/export async function sendKeysAsync[\s\S]*?^}/m);
+    expect(sendKeysAsyncMatch).not.toBeNull();
+    const sendKeysAsyncFn = sendKeysAsyncMatch![0];
+
+    expect(sendKeysAsyncFn).toContain('no longer exists before sendKeysAsync');
+    expect(sendKeysAsyncFn).toContain('no longer exists before paste-buffer');
+    expect(sendKeysAsyncFn).toContain('no longer exists before send-keys');
   });
 });

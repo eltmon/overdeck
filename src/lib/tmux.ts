@@ -385,20 +385,27 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  // Mirror the sync `sendKeys` pattern: one temp file, one load-buffer, one
-  // paste-buffer, one Enter. Splitting by line and pasting line-by-line
-  // (the previous implementation) cost ~5 tmux spawns and 50 ms of sleep
-  // per line, which made large prompts take seconds (PAN-785).
-  // `paste-buffer -d` drops the buffer in the same call so we don't need a
-  // separate delete-buffer round-trip.
   const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
 
   try {
+    if (!await sessionExistsAsync(sessionName)) {
+      throw new Error(`tmux session ${sessionName} no longer exists before sendKeysAsync`);
+    }
+
     await writeFile(tmpFile, keys, 'utf-8');
     await tmuxExecAsync(['load-buffer', tmpFile], { encoding: 'utf-8' });
+
+    if (!await sessionExistsAsync(sessionName)) {
+      throw new Error(`tmux session ${sessionName} no longer exists before paste-buffer`);
+    }
     await tmuxExecAsync(['paste-buffer', '-d', '-t', sessionName], { encoding: 'utf-8' });
+
     await new Promise(r => setTimeout(r, 300));
+
+    if (!await sessionExistsAsync(sessionName)) {
+      throw new Error(`tmux session ${sessionName} no longer exists before send-keys`);
+    }
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } finally {
     await unlink(tmpFile).catch(() => {});
