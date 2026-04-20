@@ -199,7 +199,7 @@ export function getModelsByProvider(provider: ModelProvider): ModelId[] {
  *
  * @param provider Provider to check
  * @param enabledProviders Set of enabled provider names
- * @returns true if provider is enabled or is Anthropic (always enabled)
+ * @returns true if provider is in the enabled set
  */
 export function isProviderEnabled(
   provider: ModelProvider,
@@ -353,13 +353,16 @@ export function getFallbackModel(modelId: ModelId): AnthropicModel {
  * @returns Set of enabled provider names
  */
 export function detectEnabledProviders(apiKeys: {
+  anthropic?: string;
   openai?: string;
   google?: string;
   kimi?: string;
 }): Set<ModelProvider> {
-  const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
+  const enabled = new Set<ModelProvider>();
 
-  // Check each optional provider
+  if (apiKeys.anthropic && apiKeys.anthropic.trim()) {
+    enabled.add('anthropic');
+  }
   if (apiKeys.openai && apiKeys.openai.trim()) {
     enabled.add('openai');
   }

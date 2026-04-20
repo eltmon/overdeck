@@ -245,8 +245,14 @@ describe('model-fallback', () => {
   });
 
   describe('detectEnabledProviders', () => {
-    it('should always include Anthropic', () => {
+    it('returns an empty set when no provider keys are configured', () => {
       const enabled = detectEnabledProviders({});
+      expect(enabled.size).toBe(0);
+      expect(enabled.has('anthropic')).toBe(false);
+    });
+
+    it('detects Anthropic when key present', () => {
+      const enabled = detectEnabledProviders({ anthropic: 'sk-ant-test' });
       expect(enabled.has('anthropic')).toBe(true);
     });
 
@@ -262,11 +268,12 @@ describe('model-fallback', () => {
 
     it('should detect multiple providers', () => {
       const enabled = detectEnabledProviders({
+        anthropic: 'sk-ant-test',
         openai: 'sk-test',
         google: 'test-key',
       });
 
-      expect(enabled.size).toBe(3); // anthropic + 2 others
+      expect(enabled.size).toBe(3);
       expect(enabled.has('anthropic')).toBe(true);
       expect(enabled.has('openai')).toBe(true);
       expect(enabled.has('google')).toBe(true);
@@ -274,24 +281,26 @@ describe('model-fallback', () => {
 
     it('should ignore empty strings', () => {
       const enabled = detectEnabledProviders({
+        anthropic: ' ',
         openai: '',
         google: '  ',
       });
 
-      expect(enabled.size).toBe(1); // Only anthropic
-      expect(enabled.has('anthropic')).toBe(true);
+      expect(enabled.size).toBe(0);
+      expect(enabled.has('anthropic')).toBe(false);
       expect(enabled.has('openai')).toBe(false);
       expect(enabled.has('google')).toBe(false);
     });
 
     it('should handle undefined values', () => {
       const enabled = detectEnabledProviders({
+        anthropic: undefined,
         openai: undefined,
         google: undefined,
       });
 
-      expect(enabled.size).toBe(1); // Only anthropic
-      expect(enabled.has('anthropic')).toBe(true);
+      expect(enabled.size).toBe(0);
+      expect(enabled.has('anthropic')).toBe(false);
     });
   });
 
