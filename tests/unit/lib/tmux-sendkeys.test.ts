@@ -38,4 +38,19 @@ describe('sendKeysAsync', () => {
     const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
     expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
   });
+
+  it('uses a unique buffer name for single-line sends', async () => {
+    await sendKeysAsync('agent-pan-711', 'single line');
+
+    const loadBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('load-buffer'));
+    expect(loadBufferCall).toBeDefined();
+
+    const pasteBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('paste-buffer'));
+    const deleteBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('delete-buffer'));
+
+    const bufferId = loadBufferCall?.[1]?.[loadBufferCall[1].indexOf('-b') + 1];
+    expect(bufferId).toMatch(/^pan-sendkeys-\d+-\d+$/);
+    expect(pasteBufferCall?.[1]?.[pasteBufferCall[1].indexOf('-b') + 1]).toBe(bufferId);
+    expect(deleteBufferCall?.[1]?.[deleteBufferCall[1].indexOf('-b') + 1]).toBe(bufferId);
+  });
 });

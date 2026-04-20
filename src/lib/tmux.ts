@@ -370,14 +370,15 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     return;
   }
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const requestId = `pan-sendkeys-${process.pid}-${Date.now()}`;
+  const tmpFile = join(tmpdir(), `${requestId}.txt`);
   try {
     await writeFile(tmpFile, keys);
-    await tmuxExecAsync(['load-buffer', '-b', 'pan-single', tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', 'pan-single', '-t', sessionName, '-d'], { encoding: 'utf-8' });
+    await tmuxExecAsync(['load-buffer', '-b', requestId, tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', requestId, '-t', sessionName, '-d'], { encoding: 'utf-8' });
     await new Promise(r => setTimeout(r, 300));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-    await tmuxExecAsync(['delete-buffer', '-b', 'pan-single'], { encoding: 'utf-8' }).catch(() => {});
+    await tmuxExecAsync(['delete-buffer', '-b', requestId], { encoding: 'utf-8' }).catch(() => {});
   } finally {
     try { await unlink(tmpFile); } catch {}
   }

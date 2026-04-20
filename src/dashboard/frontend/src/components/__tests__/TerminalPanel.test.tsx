@@ -109,15 +109,18 @@ describe('TerminalPanel — stopped agent content rendering', () => {
   });
 
   it('renders last output (pre element) when agent is stopped and conversation is empty', async () => {
-    renderPanel(
-      makeAgent(),
-      makeFetch({ tmuxAlive: false, conversationMessages: [], output: 'last terminal output' }),
-    );
+    const fetch = makeFetch({ tmuxAlive: false, conversationMessages: [], output: 'last terminal output' });
+    renderPanel(makeAgent(), fetch);
 
     await waitFor(() => {
       expect(screen.getByText('last terminal output')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('messages-timeline')).not.toBeInTheDocument();
+
+    const conversationCallIndex = fetch.mock.calls.findIndex(([input]) => String(input).includes('/conversation'));
+    const outputCallIndex = fetch.mock.calls.findIndex(([input]) => String(input).includes('/output'));
+    expect(conversationCallIndex).toBeGreaterThanOrEqual(0);
+    expect(outputCallIndex).toBeGreaterThan(conversationCallIndex);
   });
 
   it('renders "No saved output available." when stopped with no output and no conversation', async () => {

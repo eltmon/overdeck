@@ -97,7 +97,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
   const { data: output, refetch } = useQuery({
     queryKey: ['agent-output', agent.id],
     queryFn: () => fetchOutput(agent.id),
-    enabled: isStopped && !hasConversation,
+    enabled: isStopped && conversationData !== undefined && !hasConversation,
   });
 
   useEffect(() => {
