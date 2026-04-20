@@ -52,6 +52,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gemini-2.5-flash': 'google',
 
   // Kimi models
+  'kimi-k2.6': 'kimi',
   'kimi-k2.5': 'kimi',
   'kimi-k2': 'kimi',
   'K2.6-code-preview': 'kimi',
@@ -104,6 +105,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gemini-2.5-flash': 'claude-haiku-4-5',
 
   // Kimi → Anthropic
+  'kimi-k2.6': 'claude-sonnet-4-6', // Latest flagship → Sonnet
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
   'kimi-k2': 'claude-sonnet-4-6', // Previous gen
   'K2.6-code-preview': 'claude-sonnet-4-6',

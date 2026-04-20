@@ -479,7 +479,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.kimi).toEqual(['kimi-k2.5', 'K2.6-code-preview']);
+      expect(available.kimi).toEqual(['kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {
