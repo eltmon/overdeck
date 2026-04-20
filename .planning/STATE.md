@@ -27,3 +27,4 @@ Implementing bead pan-569-f4a: Playwright UAT — all implementation beads compl
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-20T23:04Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
