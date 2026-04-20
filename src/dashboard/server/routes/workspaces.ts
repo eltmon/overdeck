@@ -70,8 +70,10 @@ import {
   messageAgent,
   saveAgentRuntimeState,
   getAgentRuntimeState,
+  getAgentRuntimeStateAsync,
   transitionIssueToInReview,
   getAgentState,
+  getAgentStateAsync,
   spawnAgent,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
@@ -111,7 +113,7 @@ async function ensureWorkAgentReadyForMerge(
     return { recovered: true, agentId, detail: 'Work agent already running; sent merge preparation request.' };
   }
 
-  const agentState = getAgentState(agentId);
+  const agentState = await getAgentStateAsync(agentId);
   if (agentState) {
     try {
       await messageAgent(agentId, rebaseMsg);
@@ -2948,7 +2950,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
 
     try {
       const agentId = `agent-${issueId.toLowerCase()}`;
-      const runtimeState = getAgentRuntimeState(agentId);
+      const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(agentId));
       if (runtimeState) {
         saveAgentRuntimeState(agentId, {
           resolution: 'working',
@@ -3427,7 +3429,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const { runQualityGates } = await import('../../../lib/cloister/validation.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
       const { messageAgent } = await import('../../../lib/agents.js');
-      const { sessionExists } = await import('../../../lib/tmux.js');
+      const { sessionExistsAsync } = await import('../../../lib/tmux.js');
       let mergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
       if (!mergeSet) {
         const error = `No merge set found for ${issueId}`;
@@ -3448,7 +3450,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       }
 
       const agentId = `agent-${issueId.toLowerCase()}`;
-      if (!sessionExists(agentId)) {
+      if (!await sessionExistsAsync(agentId)) {
         const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
@@ -3529,14 +3531,15 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           }
         }
 
-        if (!sessionExists(agentId)) break;
+        if (!await sessionExistsAsync(agentId)) break;
       }
 
       if (pushedRepos.size !== activeRepos.length) {
         const remaining = activeRepos
           .filter(repo => !pushedRepos.has(repo.repoKey))
           .map(repo => repo.repoKey);
-        const error = !sessionExists(agentId)
+        const agentRunning = await sessionExistsAsync(agentId);
+        const error = !agentRunning
           ? `Work agent ${agentId} stopped before completing polyrepo rebases for ${remaining.join(', ')}`
           : `Work agent did not push rebased branches for ${remaining.join(', ')} within ${REBASE_TIMEOUT_MS / 60000} minutes`;
         for (const repoKey of remaining) {
@@ -3740,7 +3743,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const agentId = `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
-    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${sessionExists(agentId) ? 'running' : 'stopped'})...`);
+    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await sessionExistsAsync(agentId) ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
@@ -3775,7 +3778,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           }
         } catch { /* fetch failed, retry */ }
 
-        if (!sessionExists(agentId)) {
+        if (!await sessionExistsAsync(agentId)) {
           console.log(`[merge] Work agent ${agentId} stopped during rebase`);
           break;
         }
@@ -3783,7 +3786,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
       if (newHead) {
         rebaseResult = { success: true, newHead };
-      } else if (!sessionExists(agentId)) {
+      } else if (!await sessionExistsAsync(agentId)) {
         rebaseResult = {
           success: false,
           reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,

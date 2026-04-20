@@ -15,7 +15,7 @@ import { join } from 'path'
 import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
-import { getAgentRuntimeState, getAgentDir } from './agents.js'
+import { getAgentRuntimeStateAsync, getAgentDir } from './agents.js'
 import { resolveProjectFromIssue } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefix } from './issue-id.js'
@@ -209,7 +209,7 @@ export async function computeAgentEnrichment(
   const agentPhase = (isPlanning ? 'planning' : (statePhase || 'implementation')) as AgentEnrichment['agentPhase']
 
   // Get runtime state for resolution + idle detection
-  const runtimeState = getAgentRuntimeState(agentId)
+  const runtimeState = await getAgentRuntimeStateAsync(agentId)
   const isIdle = runtimeState?.state === 'idle' ||
     (runtimeState?.currentTool === 'AskUserQuestion')
 

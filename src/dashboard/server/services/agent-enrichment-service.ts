@@ -12,7 +12,7 @@
  * restored here via the event-driven projection pipeline.
  */
 
-import { listRunningAgents } from '../../../lib/agents.js'
+import { listRunningAgentsAsync } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
@@ -48,9 +48,9 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
 // ─── Poller ───────────────────────────────────────────────────────────────────
 
 async function pollOnce(state: EnrichmentServiceState): Promise<void> {
-  let runningAgents: ReturnType<typeof listRunningAgents>
+  let runningAgents: Awaited<ReturnType<typeof listRunningAgentsAsync>>
   try {
-    runningAgents = listRunningAgents()
+    runningAgents = await listRunningAgentsAsync()
   } catch {
     return
   }

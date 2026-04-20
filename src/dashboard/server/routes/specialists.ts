@@ -547,10 +547,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         yield* Effect.promise(async () => {
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-            const { sessionExists } = await import('../../../lib/tmux.js');
+            const { sessionExistsAsync } = await import('../../../lib/tmux.js');
             const { messageAgent, spawnAgent, getAgentState } = await import('../../../lib/agents.js');
 
-            if (sessionExists(workAgentId)) {
+            if (await sessionExistsAsync(workAgentId)) {
               // Agent is running — send rebase instructions directly
               const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
               await messageAgent(workAgentId, rebaseMsg);
@@ -571,10 +571,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-          const { sessionExists } = await import('../../../lib/tmux.js');
+          const { sessionExistsAsync } = await import('../../../lib/tmux.js');
           const { messageAgent } = await import('../../../lib/agents.js');
 
-          if (sessionExists(workAgentId)) {
+          if (await sessionExistsAsync(workAgentId)) {
             const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then re-request review with: pan review request ${normalizedIssueId} -m "Fixed review issues"`;
             await messageAgent(workAgentId, reviewMsg);
             console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
@@ -1129,12 +1129,12 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       getTmuxSessionName,
       isProjectSpecialistActivelyRunning,
     } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const { getAgentRuntimeState } = yield* Effect.promise(() => import('../../../lib/agents.js'));
+    const { getAgentRuntimeStateAsync } = yield* Effect.promise(() => import('../../../lib/agents.js'));
 
     const registryKey = makeSpecialistRegistryKey(type, issueId);
     const metadata = getRunMetadata(project, registryKey);
     const tmuxSession = metadata.tmuxSession ?? getTmuxSessionName(type, project, issueId);
-    const runtimeState = getAgentRuntimeState(tmuxSession);
+    const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(tmuxSession));
     const isRunning = isProjectSpecialistActivelyRunning(runtimeState, metadata.currentRun !== null);
 
     return jsonResponse({

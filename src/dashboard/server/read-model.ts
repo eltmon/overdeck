@@ -225,7 +225,7 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
             Effect.promise(() => import('../../lib/cloister/specialists.js')),
@@ -237,7 +237,7 @@ export const ReadModelServiceLive = Layer.effect(
         warnOnBareNumericIssueIds();
 
         // ── Agents ────────────────────────────────────────────────────────────
-        const running = listRunningAgents();
+        const running = yield* Effect.promise(() => listRunningAgentsAsync());
         const agentsById: Record<string, AgentSnapshot> = {};
 
         // Compute enrichment for all agents in parallel during bootstrap
