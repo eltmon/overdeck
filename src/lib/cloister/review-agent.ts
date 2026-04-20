@@ -72,6 +72,7 @@ const DEFAULT_REVIEW_AGENTS: ReviewAgentConfig[] = [
   { name: 'correctness', focus: ['logic', 'edge cases', 'null handling', 'type safety'] },
   { name: 'security', focus: ['OWASP Top 10', 'injection', 'auth', 'secrets'] },
   { name: 'performance', focus: ['algorithms', 'N+1 queries', 'memory leaks'] },
+  { name: 'requirements', focus: ['acceptance criteria', 'vBRIEF coverage', 'missing functionality'] },
 ];
 
 /**

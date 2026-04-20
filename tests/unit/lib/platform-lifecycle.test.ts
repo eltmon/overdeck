@@ -16,9 +16,11 @@ import {
   StageError,
 } from '../../../src/lib/platform-lifecycle.js';
 
+// Use ephemeral ports so stopDashboard's lsof scan never hits a real
+// dashboard process during verification-gate test runs.
 const baseConfig = {
-  dashboardPort: 3010,
-  dashboardApiPort: 3011,
+  dashboardPort: 43990,
+  dashboardApiPort: 43991,
   traefikEnabled: false,
   traefikDomain: 'pan.localhost',
   traefikDir: '/tmp/does-not-exist/traefik',
@@ -130,7 +132,7 @@ describe('waitForDashboardHealth', () => {
       }),
     );
     await expect(
-      waitForDashboardHealth(3011, { timeoutMs: 2000, pollIntervalMs: 50 }),
+      waitForDashboardHealth(43991, { timeoutMs: 2000, pollIntervalMs: 50 }),
     ).resolves.toBeUndefined();
     expect(calls).toBeGreaterThanOrEqual(2);
   });
@@ -141,7 +143,7 @@ describe('waitForDashboardHealth', () => {
       vi.fn().mockRejectedValue(new Error('nope')),
     );
     try {
-      await waitForDashboardHealth(3011, { timeoutMs: 200, pollIntervalMs: 50 });
+      await waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 });
       throw new Error('should not reach here');
     } catch (err) {
       expect(err).toBeInstanceOf(StageError);

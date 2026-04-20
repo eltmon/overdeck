@@ -55,6 +55,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   openai: {
     name: 'OpenAI',
     models: [
+      { id: 'gpt-5.4-pro' as ModelId, name: 'GPT-5.4 Pro', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Most advanced OpenAI model. Pro subscribers only.' },
+      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship. 1.05M context, strong coding.' },
+      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: FlaskConical, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and efficient. 400K context.' },
+      { id: 'gpt-5.4-nano' as ModelId, name: 'GPT-5.4 Nano', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Fastest OpenAI model. API-only.' },
+      { id: 'o3' as ModelId, name: 'O3', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic'], description: 'Deep reasoning. Best for debugging and complex analysis.' },
+      { id: 'o4-mini' as ModelId, name: 'O4 Mini', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'fast'], description: 'Compact reasoning model. Fast, cost-efficient.' },
       { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: FlaskConical, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
       { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
     ],
@@ -177,11 +183,14 @@ export function getModelById(id: ModelId): ModelDef | undefined {
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
   if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-6');
 
-  // OpenAI models
-  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
-  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3');
-  if (idLower.includes('o4') || idLower.includes('mini')) return models.find(m => m.id === 'o4-mini');
+  // OpenAI models — order matters: specific patterns before broad ones
+  if (idLower.includes('gpt-5.4-pro')) return models.find(m => m.id === 'gpt-5.4-pro');
+  if (idLower.includes('gpt-5.4-nano')) return models.find(m => m.id === 'gpt-5.4-nano');
+  if (idLower.includes('gpt-5.4-mini')) return models.find(m => m.id === 'gpt-5.4-mini');
   if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.4');
+  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
+  if (idLower.includes('o4-mini')) return models.find(m => m.id === 'o4-mini');
+  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3');
 
   // Google models
   if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');

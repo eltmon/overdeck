@@ -731,12 +731,13 @@ describe('getReviewAgents', () => {
       },
     });
     const agents = getReviewAgents();
-    // All configured agents are disabled → must fall back to the 3 built-in defaults
+    // All configured agents are disabled → must fall back to the 4 built-in defaults
     const names = agents.map(a => a.name);
     expect(names).toContain('correctness');
     expect(names).toContain('security');
     expect(names).toContain('performance');
-    expect(agents.length).toBe(3);
+    expect(names).toContain('requirements');
+    expect(agents.length).toBe(4);
   });
 
   it('returns only enabled agents when some are disabled', () => {
