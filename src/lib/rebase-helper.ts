@@ -12,13 +12,12 @@
  *   - Any other conflicts: abort rebase, surface error, agent resolves manually.
  */
 
-import { exec, execFile } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 import { MergeSet } from './merge-set.js';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 function getErrorMessage(error: unknown): string {
@@ -181,7 +180,7 @@ async function rebaseOneRepo(
         return {
           repoKey,
           outcome: 'error',
-          message: `Rebase failed: ${getErrorMessage(lastError)}`,
+          message: `Rebase failed after 20 auto-resolution attempts: ${getErrorMessage(lastError)}`,
         };
       }
     }
@@ -209,7 +208,7 @@ async function rebaseOneRepo(
  */
 async function isRebaseInProgress(repoPath: string): Promise<boolean> {
   try {
-    const { stdout: gitDirOutput } = await execAsync('git rev-parse --git-dir', {
+    const { stdout: gitDirOutput } = await execFileAsync('git', ['rev-parse', '--git-dir'], {
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 10000,
