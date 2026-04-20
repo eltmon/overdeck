@@ -49,8 +49,9 @@ async function fetchIssueWithComments(
   const linearIssue = results.nodes[0];
   const state = await linearIssue.state;
 
-  // Fetch comments (IssueSearchResult has the comments() method at runtime via prototype chain)
-  const commentsData = await (linearIssue as any).comments();
+  // Fetch full Issue object to access comments() (IssueSearchResult lacks this method)
+  const fullIssue = await client.issue(linearIssue.id);
+  const commentsData = await fullIssue.comments();
   const comments: LinearComment[] = [];
 
   for (const comment of commentsData.nodes) {
