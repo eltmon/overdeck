@@ -37,7 +37,7 @@ vi.mock('../../../src/lib/config-yaml.js', () => ({
 }));
 
 describe('tmux send helpers', () => {
-  it('uses a unique temp file path for concurrent async sends in the same millisecond', async () => {
+  it('uses unique buffer ids for concurrent async sends in the same millisecond', async () => {
     vi.resetModules();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-20T14:36:45.000Z'));
@@ -52,12 +52,13 @@ describe('tmux send helpers', () => {
     await vi.runAllTimersAsync();
     await sendPromise;
 
-    const tempPaths = writeFileMock.mock.calls
-      .map(([filePath]) => String(filePath))
-      .filter((filePath) => filePath.includes('pan-sendkeys-'));
+    const asyncBufferIds = execFileMock.mock.calls
+      .map(([, args]) => Array.isArray(args) ? args.map(String) : [])
+      .filter((args) => args.includes('set-buffer'))
+      .map((args) => args[args.indexOf('-b') + 1] ?? '');
 
-    expect(tempPaths).toHaveLength(2);
-    expect(new Set(tempPaths).size).toBe(2);
+    expect(asyncBufferIds).toHaveLength(2);
+    expect(new Set(asyncBufferIds).size).toBe(2);
 
     vi.useRealTimers();
   });

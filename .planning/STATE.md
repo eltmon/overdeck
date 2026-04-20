@@ -52,3 +52,4 @@ Preparing the extraction bead commit for reusable planning chips in `src/dashboa
 - **[2026-04-20T19:53Z] review-agent → COMMENTED** — `.planning/feedback/102-review-agent-commented.md`
 - **[2026-04-20T19:54Z] review-agent → COMMENTED** — `.planning/feedback/103-review-agent-commented.md`
 - **[2026-04-20T19:54Z] review-agent → COMMENTED** — `.planning/feedback/104-review-agent-commented.md`
+- **[2026-04-20T20:28Z] verification-gate → FAILED** — `.planning/feedback/105-verification-gate-failed.md`
