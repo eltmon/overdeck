@@ -463,9 +463,7 @@ export async function waitForClaudePrompt(sessionName: string, timeoutMs: number
   const poll = 500;
   while (Date.now() - start < timeoutMs) {
     const output = await capturePaneAsync(sessionName, 10);
-    const lines = output.split('\n').filter(l => l.trim());
-    const lastLine = lines[lines.length - 1] || '';
-    if (lastLine.includes('❯')) return true;
+    if (output.includes('❯')) return true;
     await new Promise(r => setTimeout(r, poll));
   }
   return false;

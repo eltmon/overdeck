@@ -12,7 +12,7 @@ vi.mock('child_process', async () => {
   };
 });
 
-import { sendKeysAsync } from '../../../src/lib/tmux.js';
+import { sendKeysAsync, waitForClaudePrompt } from '../../../src/lib/tmux.js';
 
 describe('sendKeysAsync', () => {
   beforeEach(() => {
@@ -53,5 +53,20 @@ describe('sendKeysAsync', () => {
     expect(bufferId).toMatch(/^pan-sendkeys-\d+-\d+-[a-z0-9]+-single$/);
     expect(pasteBufferCall?.[1]?.[pasteBufferCall[1].indexOf('-b') + 1]).toBe(bufferId);
     expect(execFileMock.mock.calls.some(([, args]) => Array.isArray(args) && args.includes('delete-buffer'))).toBe(false);
+  });
+});
+
+describe('waitForClaudePrompt', () => {
+  it('detects the prompt anywhere in the captured pane output', async () => {
+    execFileMock.mockReset();
+    execFileMock.mockImplementation((_file: string, args: string[], _options: unknown, callback: (error: null, result: { stdout: string; stderr: string }) => void) => {
+      if (Array.isArray(args) && args.includes('capture-pane')) {
+        callback(null, { stdout: 'Startup banner\nMore output\n❯ continue', stderr: '' });
+        return;
+      }
+      callback(null, { stdout: '', stderr: '' });
+    });
+
+    await expect(waitForClaudePrompt('agent-pan-711', 10)).resolves.toBe(true);
   });
 });
