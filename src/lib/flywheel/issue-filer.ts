@@ -11,7 +11,7 @@
  */
 
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { homedir } from 'os';
 import { createTracker } from '../tracker/factory.js';
 import type { IssueProposal } from './synthesis.js';
@@ -105,7 +105,7 @@ function formatIssueBody(proposal: IssueProposal): string {
   lines.push('');
   for (const retroPath of proposal.triggeringRetros) {
     // Show the filename portion for readability
-    const filename = retroPath.split('/').pop() ?? retroPath;
+    const filename = basename(retroPath);
     lines.push(`- \`${filename}\``);
   }
   lines.push('');
@@ -189,7 +189,7 @@ export async function fileFlywheelIssues(
         issueNumber: parseInt(issue.url.split('/').pop() ?? '', 10) || 0,
         issueUrl: issue.url,
         title,
-        triggeringRetros: proposal.triggeringRetros.map((p) => p.split('/').pop() ?? p),
+        triggeringRetros: proposal.triggeringRetros.map((p) => basename(p)),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

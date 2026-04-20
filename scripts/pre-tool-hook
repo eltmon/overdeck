@@ -103,10 +103,11 @@ fi
 # Optionally send heartbeat to API server (non-blocking)
 # Only if dashboard is running
 if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; then
+  jq -n --arg state "$AGENT_STATE" --arg tool "$TOOL_NAME" --arg ts "$(date -Iseconds)" \
+    '{"state":$state,"tool":$tool,"timestamp":$ts}' | \
   curl -s -X POST "http://localhost:3011/api/agents/$AGENT_ID/heartbeat" \
     -H "Content-Type: application/json" \
-    -d "{"state":"$AGENT_STATE","tool":"$TOOL_NAME","timestamp":"$(date -Iseconds)"}" \
-    > /dev/null 2>&1 &
+    -d @- > /dev/null 2>&1 &
 fi
 
 # Always exit successfully

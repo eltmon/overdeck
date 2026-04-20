@@ -7,7 +7,7 @@
  */
 
 import { promises as fsPromises } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 
 const DEFAULT_REPORT_PATH = join(homedir(), 'docs', 'FLYWHEEL-REPORT.md');
@@ -144,7 +144,7 @@ export async function appendFlywheelReport(
     updated = existing.slice(0, firstRunIdx + 1) + newSection + existing.slice(firstRunIdx + 1);
   }
 
-  await fsPromises.mkdir(reportPath.split('/').slice(0, -1).join('/'), { recursive: true });
+  await fsPromises.mkdir(dirname(reportPath), { recursive: true });
   await fsPromises.writeFile(reportPath, updated, 'utf-8');
   return reportPath;
 }
