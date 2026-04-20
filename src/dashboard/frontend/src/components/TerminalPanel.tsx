@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
+import { MessagesTimeline } from './chat/MessagesTimeline';
+import type { ChatMessage } from './chat/chat-types';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -74,6 +76,18 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
     enabled: isStopped,
   });
 
+  const { data: conversationData } = useQuery({
+    queryKey: ['agent-conversation', agent.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${agent.id}/conversation`);
+      if (!res.ok) return { messages: [] as ChatMessage[] };
+      const data = await res.json();
+      return { messages: (data.messages ?? []) as ChatMessage[] };
+    },
+    enabled: isStopped,
+  });
+  const conversationMessages = conversationData?.messages ?? [];
+
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'auto' });
@@ -102,7 +116,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : displayTitle}
+          {isStopped ? (conversationMessages.length > 0 ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -138,15 +152,21 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
 
       {/* Content */}
       {isStopped ? (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-foreground"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+        conversationMessages.length > 0 ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MessagesTimeline messages={conversationMessages} />
+          </div>
+        ) : (
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-foreground"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
+        )
       ) : (
         <div className="flex-1 min-h-0">
           <TerminalSessionWrapper
