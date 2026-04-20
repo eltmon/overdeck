@@ -187,4 +187,24 @@ describe('rebaseAndPushRepos', () => {
     expect(existsSync(join(repoDir, rebaseMergePath.trim()))).toBe(false);
     expect(existsSync(join(repoDir, rebaseApplyPath.trim()))).toBe(false);
   });
+
+  it('keeps branch-name git commands shell-safe', async () => {
+    const injectedPath = join(repoDir, 'branch-injected');
+    const hostileMergeSet: MergeSet = {
+      ...createMergeSet(),
+      repos: [
+        {
+          ...createMergeSet().repos[0],
+          sourceBranch: 'feature/$(touch branch-injected)',
+          targetBranch: 'main; touch branch-injected',
+        },
+      ],
+    };
+
+    const result = await rebaseAndPushRepos(repoDir, hostileMergeSet);
+
+    expect(result.success).toBe(false);
+    expect(result.firstFailure?.outcome).toBe('error');
+    expect(existsSync(injectedPath)).toBe(false);
+  });
 });

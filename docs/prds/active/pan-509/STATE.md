@@ -14,7 +14,7 @@ The Inspector automatically surfaces the most relevant terminal for the current 
 - `DetailPanelLayout.tsx:48` owns the two-pane layout (`inspector+terminal`) and constructs `<TerminalPanel key={agent.id} agent={agent} … />` — the terminal session name is hardwired to `agent.id`.
 - `TerminalPanel.tsx` renders `<XTerminal sessionName={agent.id} />` (raw websocket at `/ws/terminal?session=<name>`).
 - `XTerminal` is already session-agnostic — it accepts any `sessionName` prop and streams it (confirmed by `ConversationPanel.tsx:162` and `PlanDialog.tsx:861`).
-- Review status (`reviewStatus`/`testStatus`/`mergeStatus`) is already fetched in `InspectorPanel.tsx:159` via `/api/review/:issueId/status` and consumed by `ActionsSection.tsx`.
+- Review status (`reviewStatus`/`testStatus`/`mergeStatus`) is already fetched in `InspectorPanel.tsx:159` via `/api/workspaces/:issueId/review-status` and consumed by `ActionsSection.tsx`.
 - Specialist tmux sessions follow `specialist-<projectKey>-<name>` for project-scoped specialists and `specialist-<name>` for global ones (`src/lib/cloister/specialists.ts:561`).
 - Planning tmux session name is `planning-<issueId>` (per issue description).
 - `/api/specialists` returns the list of specialists with their `tmuxSession` field (see `SpecialistAgentCard.tsx`).

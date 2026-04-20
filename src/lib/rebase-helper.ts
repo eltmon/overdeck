@@ -75,7 +75,7 @@ async function rebaseOneRepo(
   repoKey: string
 ): Promise<RebaseResult> {
   try {
-    await execAsync(`git fetch origin ${targetBranch}`, {
+    await execFileAsync('git', ['fetch', 'origin', targetBranch], {
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 60000,
@@ -87,12 +87,15 @@ async function rebaseOneRepo(
   // Is the branch already rebased onto target?
   let alreadyRebased = false;
   try {
-    const { stdout: mergeBase } = await execAsync(
-      `git merge-base HEAD origin/${targetBranch}`,
+    const remoteTarget = `origin/${targetBranch}`;
+    const { stdout: mergeBase } = await execFileAsync(
+      'git',
+      ['merge-base', 'HEAD', remoteTarget],
       { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }
     );
-    const { stdout: targetHead } = await execAsync(
-      `git rev-parse origin/${targetBranch}`,
+    const { stdout: targetHead } = await execFileAsync(
+      'git',
+      ['rev-parse', remoteTarget],
       { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }
     );
     alreadyRebased = mergeBase.trim() === targetHead.trim();
@@ -102,7 +105,7 @@ async function rebaseOneRepo(
 
   if (!alreadyRebased) {
     try {
-      await execAsync(`git rebase origin/${targetBranch}`, {
+      await execFileAsync('git', ['rebase', `origin/${targetBranch}`], {
         cwd: repoPath,
         encoding: 'utf-8',
         timeout: 120000,
@@ -163,8 +166,9 @@ async function rebaseOneRepo(
   // Push — always, even if already rebased. The agent may have new local commits
   // that were never pushed.
   try {
-    await execAsync(
-      `git push --force-with-lease origin HEAD:refs/heads/${sourceBranch}`,
+    await execFileAsync(
+      'git',
+      ['push', '--force-with-lease', 'origin', `HEAD:refs/heads/${sourceBranch}`],
       { cwd: repoPath, encoding: 'utf-8', timeout: 60000 }
     );
   } catch (err: unknown) {
