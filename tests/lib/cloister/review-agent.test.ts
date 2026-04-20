@@ -981,4 +981,20 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).not.toMatch(/\{\s*env\s*:/);
     expect(fn).not.toContain('getProviderEnvForModel(');
   });
+
+  it('spawnReviewer waits for the Claude prompt before sending the review prompt', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const spawnReviewerMatch = src.match(/async function spawnReviewer[\s\S]*?^}/m);
+    expect(spawnReviewerMatch).not.toBeNull();
+    const fn = spawnReviewerMatch![0];
+
+    expect(fn).toContain('waitForClaudePrompt(sessionName, 15000)');
+    expect(fn).toContain('Reviewer session ${sessionName} did not reach Claude prompt');
+  });
 });
