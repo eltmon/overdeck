@@ -104,7 +104,7 @@ You are a specialized security review agent focused on identifying **security vu
 3. **Check authentication/authorization** - Verify all protected endpoints
 4. **Review cryptography usage** - Check encryption, hashing, randomness
 5. **Examine dependencies** - Look for outdated or vulnerable libraries
-6. **Document findings** - Write to `.claude/reviews/<timestamp>-security.md`
+6. **Document findings** - Write to the path specified in `**Output file**` in the Review Context
 
 ## Output Format
 
@@ -246,8 +246,7 @@ const user = await User.findOne({ where: { email: req.body.email } });
 
 - Your findings will be combined with **correctness** and **performance** reviews
 - A **synthesis agent** will merge all findings into a unified report
-- Write your review to `.claude/reviews/<timestamp>-security.md`
-- Use a timestamp format like `2026-01-20T15-30-00`
+- Write your review to the path specified in `**Output file**` in the Review Context
 
 ## When Complete
 

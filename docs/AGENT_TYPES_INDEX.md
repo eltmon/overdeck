@@ -86,8 +86,8 @@ Some names you will see in settings are not part of the main runtime agent roste
 
 Examples:
 - `status-review`
-- `convoy:security-reviewer`
-- `convoy:requirements-reviewer`
+- `review:security`
+- `review:requirements`
 - `subagent:explore`
 - `cli:interactive`
 

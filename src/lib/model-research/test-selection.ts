@@ -42,9 +42,9 @@ for (const [workType, result] of Object.entries(allResults)) {
 console.log('\n');
 
 // Test 3: Detailed selection for a specific work type
-console.log('Test 3: Detailed Selection - convoy:security-reviewer');
+console.log('Test 3: Detailed Selection - review:security');
 console.log('─'.repeat(60));
-const securityResult = selectModel('convoy:security-reviewer', allModels);
+const securityResult = selectModel('review:security', allModels);
 
 console.log(`  Selected: ${securityResult.model}`);
 console.log(`  Reason: ${securityResult.reason}`);

@@ -7,7 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
+import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
@@ -512,5 +512,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         }
       }
     }
+  }
+
+  // Mirror project-level skills/ → .claude/skills/ against the devroot when
+  // configured, so pan sync works from any cwd (not just from inside the repo tree).
+  const skillsMirror = mirrorProjectSkills(getDevrootPath() ?? process.cwd());
+  const skillsParts: string[] = [];
+  if (skillsMirror.added.length > 0) skillsParts.push(`${skillsMirror.added.length} added`);
+  if (skillsMirror.updated.length > 0) skillsParts.push(`${skillsMirror.updated.length} updated`);
+  if (skillsMirror.removed.length > 0) skillsParts.push(`${skillsMirror.removed.length} removed`);
+  if (skillsParts.length > 0) {
+    console.log(chalk.cyan(`Skills mirror: ${skillsParts.join(', ')}`));
   }
 }

@@ -71,6 +71,20 @@ export interface TestAgentConfig extends SpecialistConfig {
 }
 
 /**
+ * Configuration for a single reviewer agent in the parallel review flow.
+ */
+export interface ReviewAgentConfig {
+  /** Unique name / role identifier (e.g. 'correctness', 'security', 'performance') */
+  name: string;
+  /** Optional model override (e.g. 'claude-opus-4-6'). Falls back to work-type routing. */
+  model?: string;
+  /** Focus areas for this reviewer (informational, passed as context) */
+  focus?: string[];
+  /** Set to false to skip this reviewer. Defaults to true. */
+  enabled?: boolean;
+}
+
+/**
  * All specialist agents configuration
  */
 export interface SpecialistsConfig {
@@ -79,6 +93,8 @@ export interface SpecialistsConfig {
   test_agent?: TestAgentConfig;
   inspect_agent?: SpecialistConfig;
   uat_agent?: SpecialistConfig;
+  /** User-configurable list of parallel reviewer agents. Absent ⇒ 3 built-in defaults. */
+  review_agents?: ReviewAgentConfig[];
 }
 
 /**
