@@ -397,11 +397,13 @@ async function tmpLoadAndPaste(sessionName: string, keys: string, opId: string):
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}-${randomUUID()}.txt`);
+  const opId = `${process.pid}-${Date.now()}-${randomUUID()}`;
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${opId}.txt`);
+  const bufId = `pan-sendkeys-${opId}`;
   try {
     writeFileSync(tmpFile, keys);
-    tmuxExecSync(['load-buffer', tmpFile]);
-    tmuxExecSync(['paste-buffer', '-t', sessionName]);
+    tmuxExecSync(['load-buffer', '-b', bufId, tmpFile]);
+    tmuxExecSync(['paste-buffer', '-b', bufId, '-t', sessionName, '-d']);
     execSync('sleep 0.3');
     tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
   } finally {
