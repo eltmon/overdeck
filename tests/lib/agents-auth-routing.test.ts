@@ -118,6 +118,14 @@ describe('agents auth routing', () => {
     );
   });
 
+  it('launches GPT subscription models through claudish with the cx@ prefix', () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+    expect(getAgentRuntimeBaseCommand('gpt-5.4-pro')).toBe(
+      'claudish -i --model cx@gpt-5.4-pro --dangerously-skip-permissions --permission-mode bypassPermissions'
+    );
+  });
+
   it('clears stale provider env before exporting Anthropic settings', () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false });
 

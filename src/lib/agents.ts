@@ -54,14 +54,6 @@ export function getAgentRuntimeBaseCommand(model: string): string {
     return `claude ${permissionFlags} --model ${model}`;
   }
 
-  // OpenAI subscription → local CLIProxyAPI sidecar exposes an
-  // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
-  // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
-  // The provider env vars are injected separately by getProviderEnvForModel.
-  if (provider.name === 'openai' && getProviderAuthMode(model) === 'subscription') {
-    return `claude ${permissionFlags} --model ${model}`;
-  }
-
   const routedModel = getLaunchModelForModel(model);
   return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }
