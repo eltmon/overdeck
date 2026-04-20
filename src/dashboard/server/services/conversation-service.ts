@@ -33,6 +33,19 @@ export interface ParseResult {
   streaming: boolean;
   /** Total estimated cost in USD computed from assistant message usage data. */
   totalCost: number;
+  /** Unpaired tool_use entries waiting for tool_result (persist across incremental calls). */
+  pendingToolUse: Map<string, WorkLogEntry>;
+  /** Pre-arrived tool_result entries waiting for tool_use (persist across incremental calls). */
+  unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
+  /** Last sequence number assigned (persist across incremental calls). */
+  lastSequence: number;
+}
+
+/** State carried across incremental parseConversationMessages calls. */
+export interface ParseState {
+  pendingToolUse: Map<string, WorkLogEntry>;
+  unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
+  lastSequence: number;
 }
 
 export interface ConversationActivitySummary {
@@ -174,6 +187,7 @@ function isSystemInjection(text: string): boolean {
 export async function parseConversationMessages(
   sessionFile: string,
   fromByteOffset = 0,
+  priorState?: ParseState,
 ): Promise<ParseResult> {
   const buffer = await readFile(sessionFile);
   const text = buffer.toString('utf-8');
@@ -192,11 +206,11 @@ export async function parseConversationMessages(
   // Track last user message timestamp for duration calculation
   let lastUserTimestamp: string | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
-  const pendingToolUse = new Map<string, WorkLogEntry>();
+  const pendingToolUse = priorState?.pendingToolUse ?? new Map<string, WorkLogEntry>();
   // Map tool_use id → pre-arrived tool_result (waiting for tool_use)
-  const unresolvedResults = new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
+  const unresolvedResults = priorState?.unresolvedResults ?? new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
   // Monotonic sequence counter per JSONL line
-  let sequence = 0;
+  let sequence = priorState?.lastSequence ?? 0;
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -363,9 +377,13 @@ export async function parseConversationMessages(
     messages.push(pendingAssistant);
   }
 
-  // Flush any tool_use entries that never got a result (still running)
-  for (const [, entry] of pendingToolUse) {
-    workLog.push(entry);
+  // Flush any tool_use entries that never got a result (still running).
+  // Only flush on non-incremental parses; incremental callers pass priorState
+  // and will receive pendingToolUse back for the next call.
+  if (!priorState) {
+    for (const [, entry] of pendingToolUse) {
+      workLog.push(entry);
+    }
   }
 
   // Streaming detection: last assistant message has no stop_reason and file was modified < 5s ago
@@ -376,7 +394,16 @@ export async function parseConversationMessages(
     streaming = Date.now() - fileStat.mtimeMs < 5000;
   }
 
-  return { messages, workLog, byteOffset: newByteOffset, streaming, totalCost };
+  return {
+    messages,
+    workLog,
+    byteOffset: newByteOffset,
+    streaming,
+    totalCost,
+    pendingToolUse,
+    unresolvedResults,
+    lastSequence: sequence,
+  };
 }
 
 export async function summarizeConversationActivity(
@@ -485,6 +512,7 @@ export function watchConversation(
   callback: (result: ParseResult) => void,
 ): ConversationWatchHandle {
   let byteOffset = 0;
+  let priorState: ParseState | undefined;
   let stopped = false;
   let abortController: AbortController | null = null;
   let pollInterval: ReturnType<typeof setTimeout> | null = null;
@@ -492,9 +520,14 @@ export function watchConversation(
   async function handleChange(): Promise<void> {
     if (stopped) return;
     try {
-      const result = await parseConversationMessages(sessionFile, byteOffset);
+      const result = await parseConversationMessages(sessionFile, byteOffset, priorState);
       if (result.byteOffset > byteOffset) {
         byteOffset = result.byteOffset;
+        priorState = {
+          pendingToolUse: result.pendingToolUse,
+          unresolvedResults: result.unresolvedResults,
+          lastSequence: result.lastSequence,
+        };
         callback(result);
       }
     } catch {
