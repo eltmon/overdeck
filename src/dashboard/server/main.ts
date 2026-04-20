@@ -11,7 +11,6 @@ import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
-import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
@@ -102,9 +101,6 @@ console.log('[panopticon] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
-// Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
-startTtsSummarizer();
-
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
@@ -120,13 +116,11 @@ process.once('SIGTERM', () => {
   emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
-  stopTtsSummarizer();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
-  stopTtsSummarizer();
 });
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
