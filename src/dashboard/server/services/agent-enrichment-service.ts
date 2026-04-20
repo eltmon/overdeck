@@ -57,8 +57,12 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
   const eventStore = getEventStore()
 
+  // Only enrich agents that actually have a live tmux session.
+  // Stopped agents have no changing state — their enrichment is static.
+  const activeAgents = runningAgents.filter(a => a.tmuxActive)
+
   await Promise.all(
-    runningAgents.map(async (agent) => {
+    activeAgents.map(async (agent) => {
       const { id: agentId, issueId, startedAt } = agent
 
       // If this agent hasn't been seen since server start, emit agent.created so the
@@ -93,7 +97,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               },
             },
           }
-          eventStore.append(createdEvent as never)
+          await eventStore.appendAsync(createdEvent as never)
         } catch {
           // Non-fatal — event store may not be ready at startup
         }
@@ -113,7 +117,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               previousStatus: 'stopped',
             },
           }
-          eventStore.append(statusEvent as never)
+          await eventStore.appendAsync(statusEvent as never)
         } catch {
           // Non-fatal
         }
@@ -165,7 +169,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       }
 
       try {
-        eventStore.append(event as never)
+        await eventStore.appendAsync(event as never)
       } catch {
         // Non-fatal — event store may not be initialized yet at startup
       }
@@ -173,7 +177,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   )
 
   // Clean up stale entries for agents that have stopped
-  const activeIds = new Set(runningAgents.map(a => a.id))
+  const activeIds = new Set(activeAgents.map(a => a.id))
   for (const id of state.lastEnrichment.keys()) {
     if (!activeIds.has(id)) {
       state.lastEnrichment.delete(id)
@@ -184,7 +188,10 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-const POLL_INTERVAL_MS = 3_000
+/** Poll interval: 10 seconds (was 3s). The enrichment data changes slowly —
+ *  pending questions, resolution state, phase — none of these need sub-second
+ *  latency. 10s eliminates ~70% of poller I/O without any user-visible lag. */
+const POLL_INTERVAL_MS = 10_000
 
 const serviceState: EnrichmentServiceState = {
   timer: null,

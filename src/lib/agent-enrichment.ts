@@ -123,10 +123,44 @@ export async function getAgentJsonlPath(agentId: string): Promise<string | null>
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
 
+/**
+ * Read the last `maxBytes` from a file. Efficient for large JSONL files where
+ * only recent entries (at the end) are relevant.
+ */
+async function readFileTail(filePath: string, maxBytes: number): Promise<string> {
+  try {
+    const fileStat = await stat(filePath)
+    const start = Math.max(0, fileStat.size - maxBytes)
+    // For fs/promises readFile we can't specify start offset directly,
+    // so use a stream approach for large files.
+    if (start === 0) {
+      return readFile(filePath, 'utf-8')
+    }
+    const { createReadStream } = await import('node:fs')
+    return new Promise((resolve, reject) => {
+      const stream = createReadStream(filePath, { start, encoding: 'utf-8' })
+      let data = ''
+      stream.on('data', chunk => { data += chunk })
+      stream.on('end', () => resolve(data))
+      stream.on('error', reject)
+    })
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Parse pending questions from a JSONL file.
+ *
+ * Optimization: only reads the last 512KB of the file. Pending questions
+ * are always recent events — reading the entire multi-megabyte file on
+ * every poll was a major source of dashboard lag.
+ */
 export async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
   if (!existsSync(jsonlPath)) return []
   try {
-    const content = await readFile(jsonlPath, 'utf-8')
+    // Only read the last 512KB — pending questions are always recent.
+    const content = await readFileTail(jsonlPath, 512_000)
     const lines = content.split('\n').filter(line => line.trim())
     const toolCalls = new Map<string, PendingQuestion>()
     const answeredIds = new Set<string>()
