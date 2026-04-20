@@ -126,11 +126,16 @@ async function readTmuxTails(issueId: string): Promise<Record<string, string>> {
       if (!entry.isDirectory()) continue;
       if (!entry.name.endsWith(`-${issueLower}`) && entry.name !== issueLower) continue;
 
-      // Try reading a persisted tmux tail file first
-      const tailFile = join(agentsDir, entry.name, 'tmux-tail.txt');
-      const tail = await readTailLines(tailFile, TMUX_TAIL_LINES);
-      if (tail) {
-        tails[entry.name] = tail;
+      // Try reading a persisted tmux tail file first; isolate per-entry errors
+      // so one unreadable file doesn't abort the rest.
+      try {
+        const tailFile = join(agentsDir, entry.name, 'tmux-tail.txt');
+        const tail = await readTailLines(tailFile, TMUX_TAIL_LINES);
+        if (tail) {
+          tails[entry.name] = tail;
+        }
+      } catch {
+        // Skip unreadable entry — other agents' tails still collected
       }
     }
   } catch {
