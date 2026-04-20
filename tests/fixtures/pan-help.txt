@@ -40,12 +40,6 @@ Commands:
   install [options]            Install Panopticon prerequisites
   inspect [options] <issueId>  Request inspection of a completed bead before
                                proceeding to the next
-  caveman-compress <file>      Compress a static reference doc using
-                               caveman-compress (manual use only, never
-                               automated). Calls the Claude API recursively to
-                               compress prose by ~65-75% while preserving
-                               technical accuracy.
-  migrate-config [options]     Migrate from settings.json to config.yaml
   status [options]             Show running agents
   up [options]                 Start dashboard (and Traefik if enabled)
   down [options]               Stop dashboard (and Traefik if enabled)

@@ -1,20 +1,19 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
-import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+const execAsync = promisify(exec);
+import { join } from 'path';
+import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
-import { getVBriefACStatus, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
+import { runPreflightChecks } from '../../lib/work/done-preflight.js';
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
-
-const execAsync = promisify(exec);
 
 interface DoneOptions {
   comment?: string;
@@ -142,136 +141,20 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const workspacePath = agentState?.workspace;
 
     if (workspacePath && existsSync(workspacePath)) {
-      const failures: string[] = [];
-
-      // Check 1: Open beads for THIS issue only (not all beads in shared database)
+      // Commit any stale .planning/ artifacts from a previous interrupted pan done run
+      // so the uncommitted-changes gate in runPreflightChecks doesn't reject them.
       try {
-        const { stdout } = await execAsync(
-          `bd list --status open -l "${issueId.toLowerCase()}" --limit 0 --json`,
-          { cwd: workspacePath }
-        );
-        const beads = JSON.parse(stdout);
-        if (Array.isArray(beads) && beads.length > 0) {
-          failures.push(`  Open beads (${beads.length}):`);
-          for (const bead of beads) {
-            const id = bead.id || bead.beadId || '?';
-            const task = bead.task || bead.subject || bead.title || 'untitled';
-            failures.push(`    - ${id} ${task}`);
-          }
-        }
-      } catch {
-        // beads CLI not installed or not a beads workspace — skip check
-      }
-
-      // Auto-commit planning artifacts before the uncommitted-changes check.
-      // plan.vbrief.json can be modified by a previous invocation of `pan done`
-      // (vBRIEF sync) and left dirty if that run failed. Commit it so Check 2
-      // doesn't block on workspace-internal state that this command manages.
-      try {
-        const { stdout: preDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
-        if (preDirty.trim()) {
-          await execAsync('git add .planning/', { cwd: workspacePath });
-          await execAsync('git commit -m "chore: sync planning artifacts" --allow-empty-message', { cwd: workspacePath }).catch(() =>
-            execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath })
-          );
-        }
-      } catch { /* non-fatal */ }
-
-      // Check 2: Uncommitted changes
-      // Detect polyrepo (subdirs with .git) vs monorepo (top-level .git)
-      const hasTopLevelGit = existsSync(join(workspacePath, '.git'));
-
-      if (hasTopLevelGit) {
-        // Monorepo — single git status check
-        try {
-          const { stdout } = await execAsync('git status --porcelain', { cwd: workspacePath });
-          if (stdout.trim()) {
-            failures.push('  Uncommitted changes:');
-            for (const line of stdout.trim().split('\n')) {
-              failures.push(`    ${line}`);
-            }
-          }
-        } catch {
-          // git not available or not a repo — skip
-        }
-      } else {
-        // Polyrepo — check each subdir that has a .git file/dir
-        try {
-          const entries = readdirSync(workspacePath, { withFileTypes: true });
-          for (const entry of entries) {
-            if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-            const subPath = join(workspacePath, entry.name);
-            if (!existsSync(join(subPath, '.git'))) continue;
-
-            try {
-              const { stdout } = await execAsync('git status --porcelain', { cwd: subPath });
-              if (stdout.trim()) {
-                failures.push(`  Uncommitted changes in ${entry.name}/:`);
-                for (const line of stdout.trim().split('\n')) {
-                  failures.push(`    ${line}`);
-                }
-              }
-            } catch {
-              // skip this sub-repo
-            }
-          }
-        } catch {
-          // can't read workspace dir — skip
-        }
-      }
-
-      // Sync closed beads to vBRIEF AC status before running the AC check.
-      // The work agent closes beads via bd close, but nothing syncs that to
-      // the plan's AC subItems until now.
-      try {
-        const { stdout } = await execAsync(
-          `bd list --status closed -l "${issueId.toLowerCase()}" --json --limit 0`,
+        const { stdout: preDirty } = await execAsync(
+          'git status --porcelain .planning/',
           { cwd: workspacePath, encoding: 'utf-8' }
         );
-        const closedBeads = JSON.parse(stdout || '[]');
-        let synced = 0;
-        for (const bead of closedBeads) {
-          if (bead.id) {
-            const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
-            if (itemId) synced++;
-          }
-        }
-        if (synced > 0) {
-          console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
-        }
-      } catch {
-        // Non-fatal — sync failure shouldn't block completion check
-      }
-
-      // Commit any planning artifacts dirtied by the vBRIEF sync above.
-      // This ensures both Check 2 (uncommitted changes) and Step 0 (rebase)
-      // see a clean working tree.
-      try {
-        const { stdout: afterSyncDirty } = await execAsync('git status --porcelain .planning/', { cwd: workspacePath, encoding: 'utf-8' });
-        if (afterSyncDirty.trim()) {
+        if (preDirty.trim()) {
           await execAsync('git add .planning/', { cwd: workspacePath });
           await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
         }
       } catch { /* non-fatal */ }
 
-      // Check 3: vBRIEF acceptance criteria completion
-      try {
-        const acStatus = getVBriefACStatus(workspacePath);
-        if (acStatus && !acStatus.allCompleted) {
-          failures.push(`  Incomplete acceptance criteria (${acStatus.totalPending}/${acStatus.totalCount}):`);
-          for (const item of acStatus.items) {
-            if (item.pending > 0) {
-              for (const ac of item.criteria) {
-                if (ac.status !== 'completed' && ac.status !== 'cancelled') {
-                  failures.push(`    - [ ] ${ac.title} (${item.itemTitle})`);
-                }
-              }
-            }
-          }
-        }
-      } catch {
-        // vBRIEF not available — skip check
-      }
+      const failures = await runPreflightChecks(workspacePath, issueId);
 
       if (failures.length > 0) {
         console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
@@ -284,6 +167,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.error('');
         process.exit(1);
       }
+
+      // Commit plan.vbrief.json dirtied by the bead→vBRIEF sync in this preflight run.
+      try {
+        const { stdout: syncDirty } = await execAsync(
+          'git status --porcelain .planning/plan.vbrief.json',
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        if (syncDirty.trim()) {
+          await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+        }
+      } catch { /* non-fatal */ }
     }
   }
 
@@ -354,7 +249,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (skipTrackerUpdate) {
       shadowModeActive = true;
       spinner.text = 'Updating shadow state...';
-      await updateShadowState(issueId, 'closed', 'pan done');
+      await updateShadowState(issueId, 'in_review', 'pan done');
       console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
     } else if (isGitHubIssue) {
       // GitHub issue - update labels

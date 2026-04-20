@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync, readFileSync, writeFileSync } from 'fs';
+import { execSync } from 'child_process';
 import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
 import {
@@ -77,10 +78,11 @@ export interface MigrationResult {
  *
  * This is safe to run multiple times — it's a no-op if nothing remains to clean up.
  *
- * Removes two kinds of stale Panopticon content from ~/.claude/:
- * 1. Symlinks pointing to .panopticon or panopticon-cli (legacy sync method)
- * 2. Plain directories that also exist in the devroot (stale copies from before
- *    the devroot migration — these cause duplicate skill listings)
+ * Removes stale Panopticon content from ~/.claude/:
+ * - Symlinks pointing to .panopticon or panopticon-cli (legacy sync method)
+ *
+ * Plain directories are always preserved as user content — there is no reliable
+ * way to prove a plain directory was created by Panopticon vs the user.
  */
 export function migrateStalePersonalContent(): MigrationResult {
   const claudeDir = join(homedir(), '.claude');
@@ -89,25 +91,6 @@ export function migrateStalePersonalContent(): MigrationResult {
     preservedUserContent: [],
     errors: [],
   };
-
-  // Build a set of skill/agent/command names that exist in the devroot
-  // so we can identify stale copies in ~/.claude/
-  const devrootNames = new Set<string>();
-  const devroot = getDevrootPath();
-  if (devroot) {
-    for (const subdir of ['skills', 'commands', 'agents']) {
-      const devrootDir = join(devroot, '.claude', subdir);
-      if (existsSync(devrootDir)) {
-        try {
-          for (const entry of readdirSync(devrootDir)) {
-            devrootNames.add(`${subdir}/${entry}`);
-          }
-        } catch {
-          // Ignore read errors on devroot
-        }
-      }
-    }
-  }
 
   for (const subdir of ['skills', 'commands', 'agents']) {
     const dir = join(claudeDir, subdir);
@@ -128,14 +111,8 @@ export function migrateStalePersonalContent(): MigrationResult {
               // Symlink to somewhere else — leave it
               result.preservedUserContent.push(`${subdir}/${entry}`);
             }
-          } else if (stats.isDirectory() && devrootNames.has(`${subdir}/${entry}`)) {
-            // Plain directory that also exists in devroot — stale Panopticon copy.
-            // The devroot copy is the canonical one; this personal copy causes
-            // duplicate listings and violates principle #4 (never touch ~/.claude/).
-            rmSync(entryPath, { recursive: true, force: true });
-            result.removedSymlinks.push(`${subdir}/${entry} (stale copy)`);
           } else {
-            // Real file/directory with no devroot counterpart — user content, never touch
+            // Plain file or directory — user content, never touch
             result.preservedUserContent.push(`${subdir}/${entry}`);
           }
         } catch (err: any) {
@@ -647,4 +624,243 @@ function updateSettingsStatusline(settingsFile: string, scriptPath: string): voi
 
   mkdirSync(dirname(settingsFile), { recursive: true });
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+}
+
+export interface SkillsMirrorResult {
+  added: string[];
+  updated: string[];
+  removed: string[];
+}
+
+/**
+ * Recursively sync the contents of srcDir into dstDir (full mirror-copy).
+ * nameMap (shallow, top-level only): renames source entries on copy (used to
+ * normalise skill.md → SKILL.md).
+ * Returns true if any file or directory was added, updated, or removed.
+ */
+function syncDirContents(
+  srcDir: string,
+  dstDir: string,
+  nameMap?: Record<string, string>,
+): boolean {
+  mkdirSync(dstDir, { recursive: true });
+  let changed = false;
+  const dstKept = new Set<string>();
+
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    const dstName = nameMap?.[entry.name] ?? entry.name;
+    dstKept.add(dstName);
+    const src = join(srcDir, entry.name);
+    const dst = join(dstDir, dstName);
+    if (entry.isDirectory()) {
+      if (syncDirContents(src, dst)) changed = true;
+    } else if (entry.isFile()) {
+      const srcStat = lstatSync(src);
+      const srcMode = srcStat.mode & 0o777;
+      const srcBuf = readFileSync(src);
+      const dstExists = existsSync(dst);
+      const dstBuf = dstExists ? readFileSync(dst) : null;
+      const dstMode = dstExists ? lstatSync(dst).mode & 0o777 : null;
+      if (!dstBuf || !srcBuf.equals(dstBuf)) {
+        writeFileSync(dst, srcBuf);
+        chmodSync(dst, srcMode);
+        changed = true;
+      } else if (dstMode !== srcMode) {
+        chmodSync(dst, srcMode);
+        changed = true;
+      }
+    }
+  }
+
+  try {
+    for (const entry of readdirSync(dstDir, { withFileTypes: true })) {
+      if (!dstKept.has(entry.name)) {
+        rmSync(join(dstDir, entry.name), { recursive: true, force: true });
+        changed = true;
+      }
+    }
+  } catch { /* non-fatal */ }
+
+  return changed;
+}
+
+/**
+ * Walk up from startDir to find the nearest ancestor (inclusive) that contains a
+ * skills/ directory with at least one SKILL.md-bearing subdirectory.
+ * Returns the resolved root path, or null if not found.
+ */
+function resolveSkillsRoot(startDir: string): string | null {
+  let dir = startDir;
+  while (true) {
+    const candidate = join(dir, 'skills');
+    if (existsSync(candidate)) {
+      try {
+        for (const entry of readdirSync(candidate, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          if (existsSync(join(candidate, entry.name, 'SKILL.md')) ||
+              existsSync(join(candidate, entry.name, 'skill.md'))) {
+            return dir;
+          }
+        }
+      } catch { /* non-readable — keep walking */ }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null; // filesystem root
+    dir = parent;
+  }
+}
+
+/**
+ * Mirror the top-level skills/ directory into .claude/skills/ when run inside a
+ * panopticon-cli-style project that has a skills/ tree with SKILL.md files.
+ *
+ * - Creates missing skill directories and recursively copies all their contents
+ * - Updates out-of-date files when source content has changed
+ * - Removes files and directories in .claude/skills/<name>/ that no longer exist in source
+ * - Removes directories in .claude/skills/ that no longer exist in skills/
+ * - Preserves .claude/skills/.gitignore untouched
+ * - No-op for any project without a top-level skills/ directory containing SKILL.md files
+ * - Safe to call from any subdirectory — walks up to find the project root
+ *
+ * @param cwd Working directory to check (defaults to process.cwd())
+ */
+
+/** Returns names of subdirs inside targetDir that are tracked by git in projectRoot. */
+function getGitTrackedSkillDirNames(targetDir: string, projectRoot: string): Set<string> {
+  const names = new Set<string>();
+  try {
+    const rel = relative(projectRoot, targetDir).replace(/\\/g, '/');
+    const output = execSync(
+      `git ls-files --full-name -- "${rel}/"`,
+      { cwd: projectRoot, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 }
+    );
+    const prefix = rel + '/';
+    for (const line of output.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const rest = trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed;
+      const name = rest.split('/')[0];
+      if (name) names.add(name);
+    }
+  } catch {
+    // Not a git repo or git unavailable — fall back to manifest-only ownership check
+  }
+  return names;
+}
+
+export function mirrorProjectSkills(
+  cwd: string = process.cwd(),
+  opts?: { manifestDir?: string },
+): SkillsMirrorResult {
+  const result: SkillsMirrorResult = { added: [], updated: [], removed: [] };
+
+  const resolvedCwd = resolveSkillsRoot(cwd) ?? cwd;
+  const sourceDir = join(resolvedCwd, 'skills');
+  const targetDir = join(resolvedCwd, '.claude', 'skills');
+
+  if (!existsSync(sourceDir)) return result;
+
+  // Verify this is a project with actual skill definitions (has at least one SKILL.md)
+  let hasSkillFiles = false;
+  try {
+    for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (existsSync(join(sourceDir, entry.name, 'SKILL.md')) ||
+          existsSync(join(sourceDir, entry.name, 'skill.md'))) {
+        hasSkillFiles = true;
+        break;
+      }
+    }
+  } catch {
+    return result;
+  }
+  if (!hasSkillFiles) return result;
+
+  mkdirSync(targetDir, { recursive: true });
+
+  // Manifest lives outside the repo to avoid creating untracked files in .claude/skills/.
+  // Default: ~/.panopticon/state/mirrors/<escaped-resolvedCwd>/manifest
+  // Testable via opts.manifestDir.
+  const manifestDir =
+    opts?.manifestDir ??
+    join(homedir(), '.panopticon', 'state', 'mirrors', resolvedCwd.replace(/[/\\:]/g, '_'));
+  mkdirSync(manifestDir, { recursive: true });
+  // Read manifest BEFORE the mirror loop so we can check ownership on existing target dirs.
+  // Only mirror-managed dirs (listed in the manifest) may be overwritten; dirs that pre-existed
+  // and are not in the manifest are user-managed and must not be touched.
+  const manifestPath = join(manifestDir, 'manifest');
+  const manifestNames = new Set<string>();
+  try {
+    const content = readFileSync(manifestPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const name = line.trim();
+      if (name) manifestNames.add(name);
+    }
+  } catch {
+    // No manifest yet — nothing was previously managed, nothing to delete
+  }
+
+  // Git-tracked names: dirs inside targetDir that are committed in the repo.
+  // These are canonical repo content — safe to mirror even on first run, before any manifest entry.
+  const gitTrackedNames = getGitTrackedSkillDirNames(targetDir, resolvedCwd);
+
+  // sourceNames: all valid source skills (used to guard against removing non-source dirs)
+  // mirroredNames: skills actually synced this run (written to manifest)
+  const sourceNames = new Set<string>();
+  const mirroredNames = new Set<string>();
+
+  for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const sourcePath = join(sourceDir, entry.name);
+
+    const hasUpperSKILL = existsSync(join(sourcePath, 'SKILL.md'));
+    const hasLowerSkill = !hasUpperSKILL && existsSync(join(sourcePath, 'skill.md'));
+    if (!hasUpperSKILL && !hasLowerSkill) continue; // skip dirs without a skill definition
+
+    sourceNames.add(entry.name);
+    const targetPath = join(targetDir, entry.name);
+    const targetExists = existsSync(targetPath);
+
+    // Ownership guard: if the target dir already exists but is neither in the mirror manifest
+    // nor git-tracked (canonical repo content), treat it as user-managed — leave it untouched.
+    if (targetExists && !manifestNames.has(entry.name) && !gitTrackedNames.has(entry.name)) continue;
+
+    // Track whether the target already had a SKILL.md (to distinguish added vs updated)
+    const targetHadSkillMd = targetExists && (
+      existsSync(join(targetPath, 'SKILL.md')) || existsSync(join(targetPath, 'skill.md'))
+    );
+
+    // Rename skill.md → SKILL.md when source uses lowercase
+    const nameMap = hasLowerSkill ? { 'skill.md': 'SKILL.md' } : undefined;
+
+    const changed = syncDirContents(sourcePath, targetPath, nameMap);
+    mirroredNames.add(entry.name);
+
+    if (changed) {
+      if (targetHadSkillMd) {
+        result.updated.push(entry.name);
+      } else {
+        result.added.push(entry.name);
+      }
+    }
+  }
+
+  // Remove mirror-managed dirs that no longer exist in source
+  try {
+    for (const entry of readdirSync(targetDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (manifestNames.has(entry.name) && !sourceNames.has(entry.name)) {
+        rmSync(join(targetDir, entry.name), { recursive: true, force: true });
+        result.removed.push(entry.name);
+      }
+    }
+  } catch {
+    // Non-fatal — target may not exist or be unreadable
+  }
+
+  // Update manifest to reflect only the skills we mirrored (not user-managed pre-existing dirs)
+  const sortedMirrored = Array.from(mirroredNames).sort();
+  writeFileSync(manifestPath, sortedMirrored.join('\n') + '\n', 'utf-8');
+
+  return result;
 }

@@ -240,6 +240,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
     // No agent state and no project resolution
     mockGetAgentState.mockReturnValue(null);
+    // No project configured — vi.clearAllMocks() does not reset mockReturnValue so
+    // prior tests' return values persist; explicitly reset to null for this branch.
     mockResolveProjectFromIssue.mockReturnValue(null);
 
     const actions = await checkOrphanedReviewStatuses();

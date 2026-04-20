@@ -191,7 +191,9 @@ describe('getReviewStatusFromDb', () => {
     expect(result!.readyForMerge).toBe(false);
   });
 
-  it('does not clear readyForMerge when verification failed (test pass is authoritative)', () => {
+  it('preserves readyForMerge=true when verificationStatus=failed (no longer normalized)', () => {
+    // verificationStatus no longer clears readyForMerge in normalizeReviewStatus.
+    // Only mergeStatus=merged, reviewStatus!=passed, or testStatus!=passed do so.
     upsertReviewStatus(makeStatus({
       issueId: 'PAN-G-5',
       reviewStatus: 'passed',
