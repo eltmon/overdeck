@@ -20,7 +20,7 @@ import { homedir } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
-import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
 
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
@@ -57,13 +57,37 @@ const SNAPSHOT_SCROLLBACK_LINES = (() => {
 })();
 
 /**
- * Snapshot for a fresh attach (no existing hub). Resizes the tmux window to the
- * client's requested dimensions, then captures up to SNAPSHOT_SCROLLBACK_LINES
- * lines of scrollback so the user sees prior context on first draw.
+ * Snapshot for a fresh attach (no existing hub).
+ *
+ * We used to call `resizeWindowAsync` before `capturePaneAsync`, but tmux's
+ * resize is only synchronous from tmux's point of view — the grid dims change
+ * instantly, yet the inner program (Claude Code, etc.) only redraws its
+ * content asynchronously in response to SIGWINCH. The capture ran between
+ * those two events, so the snapshot contained old content laid out for the
+ * previous width, painted into a new-width grid. The client then displayed
+ * that garbled state until the PTY attach triggered a real redraw — a
+ * visible 1–2 s "letters all over the place" glitch on every fresh attach.
+ *
+ * New strategy: only capture if tmux is already at the client's requested
+ * dims (the common reopen case — previous client disconnected, dims
+ * retained). In that case the content is valid at the requested size and
+ * paints cleanly. When the dims don't match, return an empty snapshot at
+ * the requested dims: the client resizes its xterm, the PTY attaches at
+ * those dims (driving tmux's real resize + the inner program's redraw),
+ * and the first visible content is the clean live redraw — no stale
+ * mid-resize garbage.
  */
-async function captureFreshSnapshot(sessionName: string, cols: number, rows: number): Promise<string> {
-  await resizeWindowAsync(sessionName, cols, rows).catch(() => {});
-  return capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
+async function captureFreshSnapshot(
+  sessionName: string,
+  requestedCols: number,
+  requestedRows: number,
+): Promise<{ cols: number; rows: number; data: string }> {
+  const dims = await getWindowDimensionsAsync(sessionName);
+  if (!dims || dims.cols !== requestedCols || dims.rows !== requestedRows) {
+    return { cols: requestedCols, rows: requestedRows, data: '' };
+  }
+  const data = await capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
+  return { cols: requestedCols, rows: requestedRows, data };
 }
 
 /**
@@ -196,14 +220,53 @@ export function setupTerminalWebSocket(server: http.Server): void {
         return;
       }
 
+      const requestedCols = attachMessage.cols;
+      const requestedRows = attachMessage.rows;
+
       const existingHub = activePtyHubs.get(sessionName);
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
         addClientToHub(existingHub, ws, false);
         existingHub.inputClient = ws;
 
-        const snapshot = await captureViewportSnapshot(sessionName);
-        sendControl(ws, { type: 'snapshot', cols: existingHub.cols, rows: existingHub.rows, data: snapshot });
+        const dimsMatchHub = existingHub.cols === requestedCols && existingHub.rows === requestedRows;
+
+        if (dimsMatchHub) {
+          // Hub already at the new client's requested dims — capture viewport
+          // content and hand it to the new client directly. The captured
+          // content is valid at both the hub and the client's dims (same
+          // number), so it paints cleanly and no resize dance is needed.
+          const snapshot = await captureViewportSnapshot(sessionName);
+          sendControl(ws, { type: 'snapshot', cols: existingHub.cols, rows: existingHub.rows, data: snapshot });
+        } else {
+          // Hub is at different dims than the new client needs. Sending the
+          // hub's current viewport would force the new client's xterm to
+          // the hub's dims, painting stale content (including mid-frame
+          // Claude Code spinners) laid out for the wrong width until the
+          // post-ready resize caught up — a visible 1–2 s glitch.
+          //
+          // Instead, resize the hub to the new client now: update hub dims,
+          // resize the PTY (drives SIGWINCH to the inner program), resize
+          // the tmux window, and broadcast a size frame to the other
+          // clients so their xterms follow. The new client gets an empty
+          // snapshot at its requested dims — the clean live redraw stream
+          // from Claude Code's SIGWINCH response is the first content it
+          // sees.
+          existingHub.cols = requestedCols;
+          existingHub.rows = requestedRows;
+          try {
+            existingHub.pty.resize(requestedCols, requestedRows);
+          } catch {
+            // PTY may be mid-teardown; subsequent operations will notice.
+          }
+          resizeWindowAsync(sessionName, requestedCols, requestedRows).catch(() => {});
+          for (const client of existingHub.clients) {
+            if (client !== ws) {
+              sendControl(client, { type: 'size', cols: requestedCols, rows: requestedRows });
+            }
+          }
+          sendControl(ws, { type: 'snapshot', cols: requestedCols, rows: requestedRows, data: '' });
+        }
 
         const handleJoinMessage = (message: string) => {
           const parsed = parseControlMessage(message);
@@ -263,8 +326,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
         return;
       }
 
-      const requestedCols = attachMessage.cols;
-      const requestedRows = attachMessage.rows;
       let ptyProcess: pty.IPty | null = null;
       let ptyStarted = false;
       const pendingInput: string[] = [];
@@ -331,7 +392,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
       };
 
       const snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
-      sendControl(ws, { type: 'snapshot', cols: requestedCols, rows: requestedRows, data: snapshot });
+      sendControl(ws, { type: 'snapshot', cols: snapshot.cols, rows: snapshot.rows, data: snapshot.data });
 
       const handleLocalMessage = (message: string) => {
         const parsed = parseControlMessage(message);

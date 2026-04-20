@@ -83,6 +83,19 @@ export function removeClientFromHub(
   hub.clientStates.delete(ws);
   if (hub.clients.size === 0) {
     hubs.delete(sessionName);
+    // Kill the PTY (our `tmux attach-session` process) so it stops being
+    // a tmux client. Previously we let the PTY "exit naturally when pipes
+    // close", but `tmux attach-session` doesn't exit when its stdout/stdin
+    // go quiet — it stays attached to tmux forever. Every dashboard
+    // restart then left behind an orphan tmux client whose dimensions
+    // pinned the window size and caused the "dots on the right" snapshot
+    // glitch (Claude Code truncating to the smaller window, dashboards
+    // displaying at the larger client dims).
+    try {
+      hub.pty.kill();
+    } catch {
+      // PTY may already have exited; nothing to do.
+    }
     return true; // last client — hub torn down
   }
   // If the departing client was the input client, hand off to another
