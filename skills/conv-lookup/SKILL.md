@@ -1,4 +1,5 @@
 ---
+audience: operator
 name: conv-lookup
 description: Find, review, read, inspect, summarize, or compare Panopticon conversations. Use when the user references a pan.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. Maps conversation IDs to Claude Code JSONL session files and parses session content. Read-only.
 triggers:
@@ -17,6 +18,7 @@ triggers:
   - conv 
   - conversation
 ---
+audience: operator
 
 # Conversation Lookup
 

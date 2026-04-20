@@ -1,10 +1,12 @@
 ---
+audience: operator
 name: pan-release
 description: Panopticon-specific stable vs canary release workflow from main
 allowed-tools:
   - Bash
   - Read
 ---
+audience: operator
 
 # Panopticon Release Workflow
 

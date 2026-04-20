@@ -1,4 +1,5 @@
 ---
+audience: operator
 name: pan-docs
 description: Find, update, and structure Panopticon documentation using the docs index and documentation guide
 author: Panopticon
@@ -17,6 +18,7 @@ allowed-tools:
   - Glob
   - Edit
 ---
+audience: operator
 
 # Pan-Docs Skill
 
@@ -30,6 +32,7 @@ Use this skill for three kinds of work:
 This is the primary Panopticon documentation skill. If you need general prose cleanup, use `clear-writing` as a supporting skill, not as a replacement for Panopticon-specific documentation judgment.
 
 ---
+audience: operator
 
 ## Core Rules
 
@@ -45,6 +48,7 @@ For the full writing philosophy and maintenance guidance, read:
 - `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md`
 
 ---
+audience: operator
 
 ## Workflow
 
@@ -86,6 +90,7 @@ After editing, check:
 - `docs/INDEX.md` still helps someone find the topic
 
 ---
+audience: operator
 
 ## Common Uses
 
@@ -107,6 +112,7 @@ When a doc feels too low-level for its audience:
 - add links to the deeper reference instead of embedding the full internals
 
 ---
+audience: operator
 
 ## Quick Pointers
 
@@ -119,6 +125,7 @@ When a doc feels too low-level for its audience:
 | General prose cleanup | `clear-writing` |
 
 ---
+audience: operator
 
 ## When docs are missing
 

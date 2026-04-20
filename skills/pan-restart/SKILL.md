@@ -1,7 +1,9 @@
 ---
+audience: operator
 name: pan-restart
 description: "pan restart — scoped restart (dashboard by default; --cliproxy, --traefik, or --full) that will not strand shared sidecars"
 ---
+audience: operator
 
 # Restart Panopticon
 

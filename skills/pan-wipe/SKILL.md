@@ -1,4 +1,5 @@
 ---
+audience: operator
 name: pan-wipe
 description: "pan wipe <id> — destructive reset to Todo: remove workspace, branches, and agent state"
 triggers:
@@ -9,6 +10,7 @@ triggers:
 allowed-tools:
   - Bash
 ---
+audience: operator
 
 # pan wipe
 

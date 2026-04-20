@@ -1,4 +1,5 @@
 ---
+audience: operator
 name: unarchive-conversation
 description: Restore an archived Panopticon conversation by exact conversation name or by matching archived title. Use when the user asks to unarchive, restore, bring back, or reopen a Claude/Panopticon conversation such as "unarchive Models, Models, Models".
 triggers:
@@ -12,6 +13,7 @@ allowed-tools:
   - Bash
   - Read
 ---
+audience: operator
 
 # unarchive-conversation
 

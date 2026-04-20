@@ -1,4 +1,5 @@
 ---
+audience: operator
 name: cliproxy
 description: >
   Check and restart the CLIProxy sidecar (port 8317). CLIProxy bridges
@@ -19,6 +20,7 @@ allowed-tools:
   - Bash
   - Read
 ---
+audience: operator
 
 # CLIProxy — Check and Restart
 
