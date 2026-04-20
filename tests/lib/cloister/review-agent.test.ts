@@ -911,15 +911,17 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(src).toMatch(/import\s*\{[^}]*getAgentRuntimeBaseCommand[^}]*\}\s*from\s*['"]\.\.\/agents\.js['"]/);
   });
 
-  it('spawnReviewer waits for sessionExistsAsync before sendKeysAsync', async () => {
+  it('spawnReviewer waits for the reviewer pane before sendKeysAsync', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toContain("while (!(await sessionExistsAsync(sessionName)))");
-    expect(src).toContain("Reviewer session did not start:");
+    expect(src).toContain("const target = `${sessionName}:0.0`;");
+    expect(src).toContain("listPaneValuesAsync(sessionName, '#{session_name}:#{window_index}.#{pane_index}')");
+    expect(src).toContain('paneTargets.includes(target)');
+    expect(src).toContain('Reviewer pane did not start:');
   });
 
   it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {

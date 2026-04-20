@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listPaneValuesAsync, listSessionNamesAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -480,11 +480,20 @@ async function spawnReviewer(
 
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`);
 
+  const target = `${sessionName}:0.0`;
   const deadline = Date.now() + 5000;
-  while (!(await sessionExistsAsync(sessionName))) {
+  while (true) {
     if (Date.now() >= deadline) {
-      throw new Error(`Reviewer session did not start: ${sessionName}`);
+      throw new Error(`Reviewer pane did not start: ${target}`);
     }
+
+    if (await sessionExistsAsync(sessionName)) {
+      const paneTargets = await listPaneValuesAsync(sessionName, '#{session_name}:#{window_index}.#{pane_index}');
+      if (paneTargets.includes(target)) {
+        break;
+      }
+    }
+
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
