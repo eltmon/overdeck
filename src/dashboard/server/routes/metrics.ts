@@ -184,6 +184,45 @@ const getActivityRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/activity/detailed ────────────────────────────────────────
+
+const getActivityDetailedRoute = HttpRouter.add(
+  'GET',
+  '/api/activity/detailed',
+  httpHandler(Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
+    const events = yield* eventStore.queryByType('activity.detailed', 200);
+    return jsonResponse(events.map((e) => ({
+      id: (e.payload as Record<string, unknown>)['id'] as string,
+      timestamp: e.timestamp,
+      source: (e.payload as Record<string, unknown>)['source'] as string,
+      level: (e.payload as Record<string, unknown>)['level'] as string,
+      message: (e.payload as Record<string, unknown>)['message'] as string,
+      details: (e.payload as Record<string, unknown>)['details'] as string | null,
+      issueId: (e.payload as Record<string, unknown>)['issueId'] as string | null,
+      triggeringEvent: (e.payload as Record<string, unknown>)['triggeringEvent'] as string | null,
+    })));
+  })),
+);
+
+// ─── Route: GET /api/activity/tts ─────────────────────────────────────────────
+
+const getActivityTtsRoute = HttpRouter.add(
+  'GET',
+  '/api/activity/tts',
+  httpHandler(Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
+    const events = yield* eventStore.queryByType('activity.tts', 50);
+    return jsonResponse(events.map((e) => ({
+      id: (e.payload as Record<string, unknown>)['id'] as string,
+      timestamp: e.timestamp,
+      utterance: (e.payload as Record<string, unknown>)['utterance'] as string,
+      priority: (e.payload as Record<string, unknown>)['priority'] as number | null,
+      issueId: (e.payload as Record<string, unknown>)['issueId'] as string | null,
+    })));
+  })),
+);
+
 // ─── Route: GET /api/activity/:id ────────────────────────────────────────────
 
 const getActivityByIdRoute = HttpRouter.add(
@@ -270,6 +309,8 @@ export const metricsRouteLayer = Layer.mergeAll(
   getMetricsHandoffsRoute,
   getMetricsStuckRoute,
   getActivityRoute,
+  getActivityDetailedRoute,
+  getActivityTtsRoute,
   getActivityByIdRoute,
   getGitActivityRoute,
 );

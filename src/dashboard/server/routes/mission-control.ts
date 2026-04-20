@@ -927,12 +927,20 @@ async function fetchProjectTree(): Promise<unknown[]> {
   const projects = listProjects();
 
   const issueTitleMap = new Map<string, string>();
+  const issueStateMap = new Map<string, string>();
+  let allIssues: Array<Record<string, unknown>> = [];
   try {
     const issueDataService = getIssueDataService();
-    const allIssues = issueDataService.getIssues() as Array<{ identifier?: string; title?: string }>;
+    allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
     for (const issue of allIssues) {
-      if (issue.identifier && issue.title) {
-        issueTitleMap.set(issue.identifier.toUpperCase(), issue.title);
+      const id = issue['identifier'] as string | undefined;
+      const title = issue['title'] as string | undefined;
+      const state = issue['state'] as string | undefined;
+      if (id && title) {
+        issueTitleMap.set(id.toUpperCase(), title);
+      }
+      if (id && state) {
+        issueStateMap.set(id.toUpperCase(), state);
       }
     }
   } catch { /* non-fatal */ }
@@ -1007,7 +1015,10 @@ async function fetchProjectTree(): Promise<unknown[]> {
         const featureStat = await stat(featurePath).catch(() => null);
         const isRecentWorkspace = featureStat ? (now - featureStat.mtimeMs) < recentMs : false;
 
-        if (!hasTmux && !isAgentLive && !isRecentWorkspace) continue;
+        const issueCanonicalState = issueStateMap.get(issueId) || '';
+        const showByTrackerState = ['in_progress', 'in_review'].includes(issueCanonicalState);
+
+        if (!hasTmux && !isAgentLive && !isRecentWorkspace && !showByTrackerState) continue;
 
         const [hasPlanning, hasPrd, hasState, isShadow] = await Promise.all([
           pathExists(planningDir),
@@ -1065,8 +1076,6 @@ async function fetchProjectTree(): Promise<unknown[]> {
 
     // Add Rally Features from cached issues
     const existingIds = new Set(features.map(f => f['issueId']));
-    const issueDataService = getIssueDataService();
-    const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
     const projectName = (project.config as { name?: string }).name || projectPath.split('/').pop() || 'Unknown';
 
     for (const issue of allIssues) {
@@ -1086,6 +1095,46 @@ async function fetchProjectTree(): Promise<unknown[]> {
         isRally: true, childCount: issue['totalChildCount'],
         completedCount: issue['completedChildCount'], inProgressCount: issue['inProgressChildCount'],
         rawTrackerState: issue['rawTrackerState'],
+      });
+    }
+
+    // Add tracker issues without workspaces that are in active states
+    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review', 'done']);
+    const projectPrefixes: string[] = [];
+    if (project.config.issue_prefix) {
+      projectPrefixes.push(project.config.issue_prefix.toUpperCase());
+    }
+    if (project.config.issue_prefixes) {
+      for (const p of project.config.issue_prefixes) {
+        projectPrefixes.push(p.toUpperCase());
+      }
+    }
+    // Fallback: derive prefix from project key
+    if (projectPrefixes.length === 0) {
+      projectPrefixes.push(project.key.toUpperCase().replace(/-/g, ''));
+    }
+
+    for (const issue of allIssues) {
+      const issueId = issue['identifier'] as string | undefined;
+      if (!issueId || existingIds.has(issueId)) continue;
+
+      const prefix = extractPrefix(issueId);
+      if (!prefix || !projectPrefixes.includes(prefix.toUpperCase())) continue;
+
+      const state = issue['state'] as string | undefined;
+      if (!state || !SHOW_ALWAYS_STATES.has(state)) continue;
+
+      features.push({
+        issueId,
+        title: issue['title'] || issueTitleMap.get(issueId.toUpperCase()) || issueId,
+        branch: '',
+        status: 'idle',
+        stateLabel: issue['status'] || state,
+        agentStatus: null,
+        hasPlanning: false,
+        hasPrd: false,
+        hasState: false,
+        isShadow: false,
       });
     }
 

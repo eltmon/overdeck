@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { capturePaneAsync, listSessionNamesAsync, sendKeysAsync, sessionExists, sessionExistsAsync } from '../tmux.js';
-import { emitActivityEntry, emitDashboardLifecycle } from '../activity-logger.js';
+import { emitActivityEntry, emitActivityTts, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -639,6 +639,17 @@ function announceMerge(
     source: 'merge-agent',
     level: status === 'failed' ? 'error' : 'success',
     message: `${prefix} for ${issueId}${tail}`,
+    issueId,
+  });
+  // Upleveled TTS utterance — short, speakable, no issue prefix noise
+  const ttsUtterance = status === 'started'
+    ? `Starting merge for ${issueId}`
+    : status === 'completed'
+      ? `${issueId} merged to main`
+      : `Merge failed for ${issueId}`;
+  emitActivityTts({
+    utterance: ttsUtterance,
+    priority: status === 'failed' ? 0 : 1,
     issueId,
   });
 }

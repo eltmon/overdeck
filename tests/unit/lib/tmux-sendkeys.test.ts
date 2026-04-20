@@ -26,14 +26,14 @@ describe('sendKeysAsync', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses a distinct temp file per multiline segment', async () => {
+  it('uses a distinct buffer per multiline segment', async () => {
     await sendKeysAsync('agent-pan-711', 'first line\nsecond line');
 
-    const loadBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('load-buffer'));
-    expect(loadBufferCalls).toHaveLength(2);
+    const setBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('set-buffer'));
+    expect(setBufferCalls).toHaveLength(2);
 
-    const loadedFiles = loadBufferCalls.map(([, args]) => args[args.length - 1]);
-    expect(loadedFiles[0]).not.toBe(loadedFiles[1]);
+    const bufferIds = setBufferCalls.map(([, args]) => args[args.indexOf('-b') + 1]);
+    expect(bufferIds[0]).not.toBe(bufferIds[1]);
 
     const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
     expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
@@ -42,15 +42,15 @@ describe('sendKeysAsync', () => {
   it('uses a unique buffer name for single-line sends', async () => {
     await sendKeysAsync('agent-pan-711', 'single line');
 
-    const loadBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('load-buffer'));
-    expect(loadBufferCall).toBeDefined();
+    const setBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('set-buffer'));
+    expect(setBufferCall).toBeDefined();
 
     const pasteBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('paste-buffer'));
-    const deleteBufferCall = execFileMock.mock.calls.find(([, args]) => Array.isArray(args) && args.includes('delete-buffer'));
+    expect(pasteBufferCall).toBeDefined();
 
-    const bufferId = loadBufferCall?.[1]?.[loadBufferCall[1].indexOf('-b') + 1];
-    expect(bufferId).toMatch(/^pan-sendkeys-\d+-\d+$/);
+    const bufferId = setBufferCall?.[1]?.[setBufferCall[1].indexOf('-b') + 1];
+    expect(bufferId).toMatch(/^pan-sendkeys-\d+-\d+-[a-z0-9]+-single$/);
     expect(pasteBufferCall?.[1]?.[pasteBufferCall[1].indexOf('-b') + 1]).toBe(bufferId);
-    expect(deleteBufferCall?.[1]?.[deleteBufferCall[1].indexOf('-b') + 1]).toBe(bufferId);
+    expect(execFileMock.mock.calls.some(([, args]) => Array.isArray(args) && args.includes('delete-buffer'))).toBe(false);
   });
 });

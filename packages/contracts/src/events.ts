@@ -317,6 +317,37 @@ export const ActivityEntryEvent = Schema.Struct({
 })
 export type ActivityEntryEvent = typeof ActivityEntryEvent.Type
 
+/** Detailed activity log — auto-generated from domain state changes */
+export const ActivityDetailedEvent = Schema.Struct({
+  type: Schema.Literal("activity.detailed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    id: Schema.String,
+    source: Schema.String,
+    level: Schema.String,
+    message: Schema.String,
+    details: Schema.optional(Schema.String),
+    issueId: Schema.optional(IssueId),
+    triggeringEvent: Schema.optional(Schema.String),
+  }),
+})
+export type ActivityDetailedEvent = typeof ActivityDetailedEvent.Type
+
+/** TTS activity log — upleveled utterances for text-to-speech */
+export const ActivityTtsEvent = Schema.Struct({
+  type: Schema.Literal("activity.tts"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    id: Schema.String,
+    utterance: Schema.String,
+    priority: Schema.optional(Schema.Number),
+    issueId: Schema.optional(IssueId),
+  }),
+})
+export type ActivityTtsEvent = typeof ActivityTtsEvent.Type
+
 // ─── Dashboard Lifecycle Events ─────────────────────────────────────────────────
 
 /** Dashboard is restarting (post-merge deploy, pan restart, etc.) (PAN-520) */
@@ -463,6 +494,8 @@ export const DomainEvent = Schema.Union([
   IssueStatusChangedEvent,
   ActivityUpdatedEvent,
   ActivityEntryEvent,
+  ActivityDetailedEvent,
+  ActivityTtsEvent,
   ShadowInferenceUpdateEvent,
   CostEventRecordedEvent,
   WorkspaceCreatedEvent,

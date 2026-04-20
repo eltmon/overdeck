@@ -11,13 +11,14 @@ import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore } from './event-store.js';
-import { emitActivityEntry } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
@@ -101,6 +102,9 @@ console.log('[panopticon] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
+// Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
+startTtsSummarizer();
+
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
@@ -109,17 +113,20 @@ const emitShutdownActivity = () => {
       level: 'info',
       message: 'Dashboard stopping',
     });
+    emitActivityTts({ utterance: 'Dashboard stopping', priority: 2 });
   } catch { /* non-fatal */ }
 };
 process.once('SIGTERM', () => {
   emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
+  stopTtsSummarizer();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
+  stopTtsSummarizer();
 });
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
