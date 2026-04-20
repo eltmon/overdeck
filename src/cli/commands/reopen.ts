@@ -272,7 +272,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
       }
 
       const resetSpinner = ora('Resetting workspace state...').start();
-      const result = reopenWorkspaceState(id, workspacePath, {
+      const result = await reopenWorkspaceState(id, workspacePath, {
         reason: options.reason,
         trackerContext,
       });

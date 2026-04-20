@@ -346,7 +346,15 @@ function initSchema(db) {
       updated_at            TEXT NOT NULL,
       ready_for_merge       INTEGER NOT NULL DEFAULT 0,
       auto_requeue_count    INTEGER DEFAULT 0,
-      pr_url                TEXT
+      merge_retry_count     INTEGER DEFAULT 0,
+      pr_url                TEXT,
+      -- PAN-653: persistent stuck state (set when main diverges mid-approve)
+      stuck                 INTEGER NOT NULL DEFAULT 0,
+      stuck_reason          TEXT,
+      stuck_at              TEXT,
+      stuck_details         TEXT,
+      -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
+      reviewed_at_commit    TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -530,8 +538,28 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
+
+    -- ===== Git Operations (PAN-653: persistent git event log) =====
+    CREATE TABLE IF NOT EXISTS git_operations (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      operation   TEXT NOT NULL,   -- e.g. 'push', 'fetch', 'force_push', 'merge', 'rev_parse'
+      branch      TEXT,
+      issue_id    TEXT,
+      before_sha  TEXT,
+      after_sha   TEXT,
+      remote_sha  TEXT,
+      status      TEXT NOT NULL,   -- 'success' | 'failure' | 'aborted'
+      error       TEXT,
+      ts          TEXT NOT NULL    -- ISO 8601 timestamp
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
+      ON git_operations(issue_id, ts);
+
+    CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
+      ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 19`);
+	db.pragma(`user_version = 23`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -539,7 +567,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 19) return;
+	if (currentVersion === 23) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -736,7 +764,45 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 19`);
+	if (currentVersion < 20) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`);
+		} catch {}
+	}
+	if (currentVersion < 21) db.exec(`
+      CREATE TABLE IF NOT EXISTS git_operations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation   TEXT NOT NULL,
+        branch      TEXT,
+        issue_id    TEXT,
+        before_sha  TEXT,
+        after_sha   TEXT,
+        remote_sha  TEXT,
+        status      TEXT NOT NULL,
+        error       TEXT,
+        ts          TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
+        ON git_operations(issue_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
+        ON git_operations(operation, ts);
+    `);
+	if (currentVersion < 22) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`);
+	} catch {}
+	if (currentVersion < 23) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`);
+	} catch {}
+	db.pragma(`user_version = 23`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
