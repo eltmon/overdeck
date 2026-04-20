@@ -6,6 +6,7 @@ import { ActivityView } from './MissionControl/ActivityView';
 import { deriveAgentIssueId } from './AgentOutputPanel';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 import { MessagesTimeline } from './chat/MessagesTimeline';
+import type { ChatMessage, WorkLogEntry } from './chat/chat-types';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -37,11 +38,21 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
-async function fetchConversation(agentId: string): Promise<unknown[]> {
+interface ConversationData {
+  messages: ChatMessage[];
+  workLog: WorkLogEntry[];
+  streaming: boolean;
+}
+
+async function fetchConversation(agentId: string): Promise<ConversationData> {
   const res = await fetch(`/api/agents/${agentId}/conversation`);
-  if (!res.ok) return [];
+  if (!res.ok) return { messages: [], workLog: [], streaming: false };
   const data = await res.json();
-  return (data.messages as unknown[]) ?? [];
+  return {
+    messages: (data.messages as ChatMessage[]) ?? [],
+    workLog: (data.workLog as WorkLogEntry[]) ?? [],
+    streaming: Boolean(data.streaming),
+  };
 }
 
 
@@ -89,11 +100,12 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
   });
 
   // Prefer conversation messages over raw output when the agent has stopped
-  const { data: conversationMessages = [] } = useQuery({
+  const { data: conversationData } = useQuery({
     queryKey: ['agent-conversation', agent.id],
     queryFn: () => fetchConversation(agent.id),
     enabled: isStopped,
   });
+  const conversationMessages = conversationData?.messages ?? [];
   const hasConversation = conversationMessages.length > 0;
 
   useEffect(() => {
@@ -197,7 +209,11 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
       {isStopped ? (
         hasConversation ? (
           <div className="flex-1 min-h-0 overflow-auto">
-            <MessagesTimeline messages={conversationMessages} />
+            <MessagesTimeline
+            messages={conversationMessages}
+            workLog={conversationData?.workLog ?? []}
+            streaming={conversationData?.streaming ?? false}
+          />
           </div>
         ) : (
           <pre
