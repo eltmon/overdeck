@@ -20,6 +20,7 @@ import {
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
+  getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
   getOpenRouterFavorites,
   updateProviderApiKey,
@@ -42,23 +43,6 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
-
-/** Determine provider from model ID */
-function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'zai' {
-  if (modelId.startsWith('claude-')) return 'anthropic';
-  if (
-    modelId.startsWith('gpt-')
-    || modelId === 'o3'
-    || modelId.startsWith('o3-')
-    || modelId === 'o4-mini'
-    || modelId.startsWith('o1')
-  ) return 'openai';
-  if (modelId.startsWith('gemini-')) return 'google';
-  if (modelId.startsWith('kimi-') || modelId === 'K2.6-code-preview') return 'kimi';
-  if (modelId.startsWith('minimax-')) return 'minimax';
-  if (modelId.startsWith('glm-')) return 'zai';
-  return 'anthropic'; // default
-}
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
@@ -90,6 +74,8 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
   // Z.AI models
   'glm-5.1': { apiModel: 'glm-5.1' },
+  'glm-4.7': { apiModel: 'glm-4.7' },
+  'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -121,6 +107,17 @@ const getOptimalDefaultsRoute = HttpRouter.add(
   '/api/settings/optimal-defaults',
   httpHandler(Effect.try({
     try: () => jsonResponse(getOptimalDefaultsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+// ─── Route: GET /api/settings/minimax-defaults ───────────────────────────────
+
+const getMiniMaxDefaultsRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/minimax-defaults',
+  httpHandler(Effect.try({
+    try: () => jsonResponse(getMiniMaxDefaultsApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -611,6 +608,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getSettingsRoute,
   getAvailableModelsRoute,
   getOptimalDefaultsRoute,
+  getMiniMaxDefaultsRoute,
   getClaudeAuthRoute,
   getOpenAIAuthRoute,
   postTestApiKeyRoute,

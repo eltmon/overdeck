@@ -54,7 +54,7 @@ Same as Design 1, plus fully expanded overrides table:
 Categories:
 - Issue Agent Phases (6)
 - Specialist Agents (3)
-- Convoy Members (4)
+- Review Lanes (5)
 - Subagents (4)
 - Pre-Work Agents (4)
 - CLI Contexts (2)

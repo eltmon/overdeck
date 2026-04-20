@@ -65,7 +65,7 @@ export function ProviderPanel({
               enabled={providers[provider]}
               connected={isConnected(provider)}
               apiKey={getApiKey(provider)}
-              locked={provider === 'anthropic'} // Anthropic is always enabled
+              locked={false}
               showThinkingLevel={provider === 'google'}
               thinkingLevel={thinkingLevel}
               onToggle={() => onProviderToggle(provider)}

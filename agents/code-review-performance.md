@@ -80,7 +80,7 @@ You are a specialized performance review agent focused on identifying **performa
 3. **Review database queries** - Look for N+1 and missing indexes
 4. **Check memory usage** - Find leaks and large allocations
 5. **Examine I/O operations** - Verify async, caching, pooling
-6. **Document findings** - Write to `.claude/reviews/<timestamp>-performance.md`
+6. **Document findings** - Write to the path specified in `**Output file**` in the Review Context
 
 ## Output Format
 
@@ -308,8 +308,7 @@ const html = parts.join('');
 
 - Your findings will be combined with **correctness** and **security** reviews
 - A **synthesis agent** will merge all findings into a unified report
-- Write your review to `.claude/reviews/<timestamp>-performance.md`
-- Use a timestamp format like `2026-01-20T15-30-00`
+- Write your review to the path specified in `**Output file**` in the Review Context
 
 ## When Complete
 

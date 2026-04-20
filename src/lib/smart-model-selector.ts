@@ -140,37 +140,43 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
   ],
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CONVOY MEMBERS
+  // REVIEW AGENTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'convoy:security-reviewer': [
+  'review:security': [
     { skill: 'security', weight: 0.7 }, // PRIMARY - never compromise
     { skill: 'code-review', weight: 0.2 }, // Code understanding
     { skill: 'debugging', weight: 0.1 }, // Finding vulnerabilities
   ],
 
-  'convoy:performance-reviewer': [
+  'review:performance': [
     { skill: 'performance', weight: 0.6 }, // Primary skill
     { skill: 'code-review', weight: 0.3 }, // Code understanding
     { skill: 'debugging', weight: 0.1 }, // Finding bottlenecks
   ],
 
-  'convoy:correctness-reviewer': [
+  'review:correctness': [
     { skill: 'code-review', weight: 0.4 }, // Primary skill
     { skill: 'debugging', weight: 0.4 }, // Finding bugs
     { skill: 'testing', weight: 0.2 }, // Test coverage
   ],
 
-  'convoy:requirements-reviewer': [
-    { skill: 'planning', weight: 0.5 }, // Primary skill
-    { skill: 'documentation', weight: 0.3 }, // Understanding requirements
-    { skill: 'code-review', weight: 0.2 }, // Requirements vs implementation
+  'review:requirements': [
+    { skill: 'planning', weight: 0.4 },    // Mapping requirements to code
+    { skill: 'code-review', weight: 0.4 }, // Understanding what code does
+    { skill: 'documentation', weight: 0.2 }, // Reading vBRIEF structure
   ],
 
-  'convoy:synthesis-agent': [
+  'review:synthesis': [
     { skill: 'synthesis', weight: 0.6 }, // Primary skill
     { skill: 'documentation', weight: 0.2 }, // Clear writing
     { skill: 'planning', weight: 0.2 }, // Organizing findings
+  ],
+
+  'review:lightweight': [
+    { skill: 'speed', weight: 0.5 }, // Speed-first: resolves to haiku-tier
+    { skill: 'code-review', weight: 0.3 }, // Basic code understanding
+    { skill: 'debugging', weight: 0.2 }, // Lightweight issue spotting
   ],
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 # Model Routing
 
-Panopticon routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Panopticon workflow (e.g., `issue-agent:implementation`, `convoy:security-reviewer`). Every time a workflow step needs to call an LLM, Panopticon looks up which model is assigned to that step's work type.
+Panopticon routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Panopticon workflow (e.g., `issue-agent:implementation`, `review:security`). Every time a workflow step needs to call an LLM, Panopticon looks up which model is assigned to that step's work type.
 
 ## Terminology
 
@@ -170,9 +170,9 @@ Specialists (`review`, `test`, `merge`, `inspect`, `uat`) resolve through `speci
 2. Work-type router via `specialist-<agent>`
 3. Hard fallback: `claude-sonnet-4-6`
 
-### Convoy
+### Review Agents
 
-Convoy reviewers are spawned from the convoy coordinator and resolve their models through the same work-type router using their `convoy:*` work type ID.
+Parallel review lanes are spawned by the review-agent and resolve their models through the same work-type router using their `review:*` work type ID.
 
 ### Subagents
 
