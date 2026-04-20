@@ -353,18 +353,15 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}-${randomUUID()}.txt`);
-  await writeFile(tmpFile, keys);
-
   const lines = keys.split('\n');
+  const opId = `${process.pid}-${Date.now()}-${randomUUID()}`;
   if (lines.length > 1) {
     // Multiline: send each line separately with S-Enter between them.
     // S-Enter (Shift+Enter) inserts a newline in readline without submitting,
     // whereas literal \n in a pasted buffer gets interpreted as Enter/submit.
     for (let i = 0; i < lines.length; i++) {
       if (lines[i]!.length > 0) {
-        await writeFile(tmpFile, lines[i]!);
-        await tmpLoadAndPaste(sessionName, tmpFile, i);
+        await tmpLoadAndPaste(sessionName, lines[i]!, `${opId}-${i}`);
       }
       if (i < lines.length - 1) {
         await tmuxExecAsync(['send-keys', '-t', sessionName, 'S-Enter'], { encoding: 'utf-8' });
@@ -373,25 +370,24 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     // Final Enter to submit
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } else {
-    // Single-line text — original approach
-    await tmuxExecAsync(['load-buffer', '-b', 'pan-single', tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', 'pan-single', '-t', sessionName, '-d'], { encoding: 'utf-8' });
+    await tmpLoadAndPaste(sessionName, keys, opId);
     await new Promise(r => setTimeout(r, 300));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-    await tmuxExecAsync(['delete-buffer', '-b', 'pan-single'], { encoding: 'utf-8' }).catch(() => {});
   }
-
-  try { await unlink(tmpFile); } catch {}
 }
 
-/** Load a file into a unique tmux buffer, paste it into the session, then clean up. */
-async function tmpLoadAndPaste(sessionName: string, tmpFile: string, index: number): Promise<void> {
-  const bufId = `pan-sendkeys-${process.pid}-${index}`;
-  await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
-  await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName], { encoding: 'utf-8' });
-  await new Promise(r => setTimeout(r, 50));
-  // Skip explicit delete — paste-buffer already delivered the text.
-  // tmux reuses buffer names safely across operations.
+/** Load text into a unique tmux buffer via a unique temp file, paste it, then clean up. */
+async function tmpLoadAndPaste(sessionName: string, keys: string, opId: string): Promise<void> {
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${opId}.txt`);
+  const bufId = `pan-sendkeys-${opId}`;
+  await writeFile(tmpFile, keys);
+  try {
+    await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName, '-d'], { encoding: 'utf-8' });
+    await new Promise(r => setTimeout(r, 50));
+  } finally {
+    try { await unlink(tmpFile); } catch {}
+  }
 }
 
 /**
