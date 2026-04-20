@@ -28,12 +28,12 @@ import { reloadGlobalRouter } from './work-type-router.js';
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   const rawDefaults: Partial<Record<WorkTypeId, string>> = {
     // Planning & high-stakes review — GPT-5.4
-    'issue-agent:exploration': 'K2.6-code-preview',
+    'issue-agent:exploration': 'kimi-k2.6',
 
     // Implementation — GLM-5.1 (SWE-Bench Pro #1, 8-hour autonomous sessions)
     'issue-agent:implementation': 'glm-5.1',
-    'issue-agent:testing': 'K2.6-code-preview',
-    'issue-agent:documentation': 'K2.6-code-preview',
+    'issue-agent:testing': 'kimi-k2.6',
+    'issue-agent:documentation': 'kimi-k2.6',
     'issue-agent:review-response': 'glm-5.1',
 
     // Specialist agents
@@ -41,7 +41,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'specialist-test-agent': 'minimax-m2.7',
     'specialist-merge-agent': 'minimax-m2.7',
     'specialist-inspect-agent': 'minimax-m2.7-highspeed',
-    'specialist-uat-agent': 'K2.6-code-preview',
+    'specialist-uat-agent': 'kimi-k2.6',
 
     // Review agents - mixed based on criticality
     'review:security': 'claude-opus-4-6', // SAFETY CRITICAL
@@ -54,7 +54,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'subagent:explore': 'gpt-5.4-nano',
     'subagent:plan': 'gpt-5.4-nano',
     'subagent:bash': 'gpt-5.4-nano',
-    'subagent:general-purpose': 'K2.6-code-preview',
+    'subagent:general-purpose': 'kimi-k2.6',
 
     // Workflow jobs
     'status-review': 'gpt-5.4-nano',
