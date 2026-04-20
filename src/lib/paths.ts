@@ -66,7 +66,7 @@ const currentDir = dirname(currentFile);
 // Handle both development (src/lib/) and production (dist/) modes
 // In dev: /path/to/panopticon/src/lib/paths.ts -> /path/to/panopticon
 // In prod: /path/to/panopticon/dist/lib/paths.js -> /path/to/panopticon
-let packageRoot: string;
+export let packageRoot: string;
 if (currentDir.includes('/src/')) {
   // Development mode - go up from src/lib to package root
   packageRoot = dirname(dirname(currentDir));
