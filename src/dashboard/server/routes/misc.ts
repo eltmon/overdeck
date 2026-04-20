@@ -768,23 +768,25 @@ const getVersionRoute = HttpRouter.add(
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────
 
+export function serializeRegisteredProjects(projects: ReturnType<typeof listProjects>) {
+  return projects.map((project) => ({
+    key: project.key,
+    name: project.config.name,
+    path: project.config.path,
+    linearTeam: getIssuePrefix(project.config) || null,
+    githubRepo: project.config.github_repo || null,
+    linearProject: project.config.linear_project || null,
+    issuePattern: project.config.issue_pattern || null,
+  }));
+}
+
 const getRegisteredProjectsRoute = HttpRouter.add(
   'GET',
   '/api/registered-projects',
   Effect.try({
     try: () => {
       const projects = listProjects();
-      return jsonResponse(
-        projects.map(p => ({
-          key: p.key,
-          name: p.config.name,
-          path: p.config.path,
-          linearTeam: getIssuePrefix(p.config) || null,
-          githubRepo: p.config.github_repo || null,
-          linearProject: p.config.linear_project || null,
-          issuePattern: p.config.issue_pattern || null,
-        })),
-      );
+      return jsonResponse(serializeRegisteredProjects(projects));
     },
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);

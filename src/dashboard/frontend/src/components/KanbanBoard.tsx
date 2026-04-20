@@ -25,6 +25,7 @@ import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { parseIssueId } from '../../../../lib/issue-id.js';
+import type { ProjectConfig } from '../../../../lib/projects.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
@@ -642,7 +643,13 @@ function canUseWorkspaceActionsForIssue(
       return false;
     }
 
-    return parseIssueId(issue.identifier, { issue_pattern: project.issuePattern } as Parameters<typeof parseIssueId>[1]) !== null;
+    const projectConfig: ProjectConfig = {
+      name: 'Registered Project',
+      path: '.',
+      issue_pattern: project.issuePattern,
+    };
+
+    return parseIssueId(issue.identifier, projectConfig) !== null;
   });
 }
 
