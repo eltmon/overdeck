@@ -4,6 +4,7 @@ import { saveAgentRuntimeState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+const execAsync = promisify(exec);
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
@@ -140,8 +141,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const workspacePath = agentState?.workspace;
 
     if (workspacePath && existsSync(workspacePath)) {
-      const execAsync = promisify(exec);
-
       // Commit any stale .planning/ artifacts from a previous interrupted pan done run
       // so the uncommitted-changes gate in runPreflightChecks doesn't reject them.
       try {
