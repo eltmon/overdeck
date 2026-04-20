@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listPaneValuesAsync, listSessionNamesAsync, waitForClaudePrompt } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listPaneValuesAsync, listSessionNamesAsync, waitForClaudePrompt, capturePaneAsync, confirmDelivery } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -503,7 +503,12 @@ async function spawnReviewer(
   }
 
   const prompt = await readFile(promptFile, 'utf-8');
+  const outputBefore = await capturePaneAsync(sessionName, 50);
   await sendKeysAsync(sessionName, prompt, 'spawnReviewer');
+  const delivered = await confirmDelivery(sessionName, outputBefore, 10000);
+  if (!delivered) {
+    throw new Error(`Reviewer prompt did not start processing: ${target}`);
+  }
 }
 
 /** Poll until the output file is written (or the session exits), then kill the session */

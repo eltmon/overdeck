@@ -923,7 +923,10 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(src).toContain('paneTargets.includes(target)');
     expect(src).toContain('Reviewer pane did not start:');
     expect(src).toContain('waitForClaudePrompt(sessionName, 60000)');
+    expect(src).toContain('capturePaneAsync(sessionName, 50)');
+    expect(src).toContain('confirmDelivery(sessionName, outputBefore, 10000)');
     expect(src).toContain('Reviewer prompt did not appear:');
+    expect(src).toContain('Reviewer prompt did not start processing:');
   });
 
   it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {
