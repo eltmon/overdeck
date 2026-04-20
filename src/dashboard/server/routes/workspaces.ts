@@ -29,6 +29,9 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/review/:issueId/request
  *   POST   /api/review/:issueId/reset
  *   DELETE /api/review/:issueId/pending
+ *
+ * Stuck-state endpoints (/api/workspaces/):
+ *   POST   /api/workspaces/:issueId/unstick
  */
 
 import { exec, spawn } from 'node:child_process';
@@ -54,8 +57,11 @@ import { EventStoreService } from '../services/domain-services.js';
 import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
+  markWorkspaceStuck,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
+import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
+import { listGitOperations } from '../../../lib/git-activity.js';
 import {
   computeQueuePositionFromStatus,
   findPositionInQueue,
@@ -728,6 +734,54 @@ async function getIndexStats(workspacePath: string): Promise<{
 // live in the Express server until full migration is complete).
 function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
   return setReviewStatusBase(issueId, update);
+}
+
+// ─── Exported helper: approve push with divergence guard ─────────────────────
+// Exported for unit testing — encapsulates the gitPush try-catch block from the
+// approve route so the 409/400/success branches can be tested without a full
+// Effect HTTP server.
+
+export type ApprovePushResult =
+  | { pushed: true }
+  | { pushed: false; httpStatus: 409 | 400; error: string };
+
+/**
+ * Push merged main with a divergence guard.
+ *
+ * Throws `MainDivergedError` when origin/main has advanced past our local
+ * ancestor — marks the workspace stuck and returns a 409 result so the route
+ * handler can complete the pending operation and surface the error to the UI.
+ *
+ * All three outcomes (success, divergence/409, other-push-error/400) are tested
+ * in `tests/unit/dashboard/server/routes/approve-push.test.ts`.
+ */
+export async function pushApproveMain(
+  issueId: string,
+  projectPath: string,
+): Promise<ApprovePushResult> {
+  try {
+    await gitPush(projectPath, 'origin', 'main', { issueId });
+    return { pushed: true };
+  } catch (pushErr: unknown) {
+    if (pushErr instanceof MainDivergedError) {
+      // Mark the workspace stuck so Deacon skips it — no automatic retry.
+      // Do NOT hard-reset local main here: that is a destructive operation that
+      // must be explicit/user-confirmed, not a silent side-effect of a failed push.
+      // The stuck flag prevents any further automatic approve attempts; when the
+      // user manually unsticks and retries, the approve route's git pull --ff-only
+      // step will detect the orphaned merge commit and surface a recoverable error
+      // with instructions to run: git reset --hard origin/main
+      markWorkspaceStuck(issueId, 'main_diverged', {
+        localSha: pushErr.localSha,
+        remoteSha: pushErr.remoteSha,
+      });
+      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover: cd ${projectPath} && git reset --hard origin/main, then unstick and retry.`;
+      return { pushed: false, httpStatus: 409, error };
+    }
+    const message = pushErr instanceof Error ? pushErr.message : String(pushErr);
+    const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${message}`;
+    return { pushed: false, httpStatus: 400, error };
+  }
 }
 
 // ─── Read JSON body helper ────────────────────────────────────────────────────
@@ -2973,6 +3027,121 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/workspaces/:issueId/unstick ────────────────────────
+//
+// Clears the persistent stuck flag set by markWorkspaceStuck() so Deacon
+// resumes normal patrol for this workspace. Does NOT restart the agent —
+// the user should do that separately via the start-agent UI once they have
+// resolved the divergence (e.g. by syncing main and re-approving).
+
+/** HTTP-contract result from the unstick endpoint. Exported for unit testing. */
+export type UnstickResult =
+  | { httpStatus: 404; body: { success: false; error: string } }
+  | { httpStatus: 400; body: { success: false; error: string } }
+  | { httpStatus: 409; body: { success: false; error: string } }
+  | { httpStatus: 200; body: { success: true; issueId: string; previousReason?: string } };
+
+/**
+ * Core logic for POST /api/workspaces/:issueId/unstick.
+ *
+ * Validates preconditions (workspace exists, workspace is stuck, git state is
+ * repaired), clears the persistent stuck marker, and invalidates stale
+ * review/test results by resetting the lifecycle to pending.
+ *
+ * The recovery path requires `git reset --hard origin/main` which moves the
+ * workspace HEAD away from the reviewed commit, making prior passed results
+ * invalid. Keeping reviewStatus=passed after that would let the UI present
+ * a stale approval. One atomic setReviewStatus() call clears stuck state and
+ * resets the lifecycle in a single DB write and a single notifyPipeline event.
+ *
+ * gitSafeState must be pre-verified by the caller (async git check). Passing
+ * false returns 409 with recovery instructions before any DB mutation.
+ *
+ * Exported for unit testing — the route handler calls this and maps the result
+ * directly to an HTTP response.
+ */
+export function processUnstickRequest(
+  issueId: string,
+  workspaceExists: boolean,
+  currentStatus: ReturnType<typeof getReviewStatus>,
+  gitSafeState: boolean,
+): UnstickResult {
+  if (!workspaceExists) {
+    return { httpStatus: 404, body: { success: false, error: 'Workspace does not exist' } };
+  }
+  if (!currentStatus?.stuck) {
+    return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
+  }
+  // Enforce that the operator has actually repaired the git state before we
+  // clear the stuck flag. If local main is still ahead of origin/main, Deacon
+  // would immediately re-enter the same broken approve/merge path.
+  if (!gitSafeState) {
+    return {
+      httpStatus: 409,
+      body: {
+        success: false,
+        error: `Workspace git state is not yet repaired. Run: git reset --hard origin/main in the project repo, then retry.`,
+      },
+    };
+  }
+  // Single atomic write: clear stuck fields and reset lifecycle to pending.
+  setReviewStatusBase(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    readyForMerge: false,
+    stuck: undefined,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewedAtCommit: undefined,
+  });
+  console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
+  return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
+}
+
+/**
+ * Check whether the project repo's local main branch is at or behind origin/main.
+ * Returns true (safe) if main is not ahead of origin/main — i.e., the operator
+ * has already run `git reset --hard origin/main` to discard the orphaned merge commit.
+ * Returns false if main is still ahead (orphaned commit still present).
+ * Returns true for any git error so a transient failure doesn't permanently block unstick.
+ */
+async function checkProjectGitSafeState(projectPath: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      'git rev-list origin/main..main --count',
+      { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
+    );
+    const aheadCount = parseInt(stdout.trim(), 10) || 0;
+    return aheadCount === 0;
+  } catch {
+    // If we can't check (no git repo, no origin/main), don't block the operator.
+    return true;
+  }
+}
+
+const postWorkspaceUnstickRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/unstick',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+    const current = getReviewStatus(issueId);
+
+    // Pre-verify git state before mutating stuck flag.
+    // For main_diverged: check that local main is not ahead of origin/main.
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const gitSafeState = yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
+
+    const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitSafeState);
+    return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
+  }))
+);
+
 // ─── Route: POST /api/issues/:issueId/sync-main ──────────────────────────
 
 const postWorkspaceSyncMainRoute = HttpRouter.add(
@@ -3882,8 +4051,36 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           console.log(`Feature branch push note: ${pushErr.message}`);
         }
 
+        // Concurrent-merge detection: warn if another push to main succeeded in the last 30s.
+        // recentPushWarning is included in the success response body below (line ~4146) so
+        // the caller can surface it to the operator without a separate lookup.
+        const recentCutoff = new Date(Date.now() - 30_000).toISOString();
+        const recentMainPushes = listGitOperations({ operation: 'push', since: recentCutoff })
+          .filter((op) => op.status === 'success' && op.branch === 'main' && op.issueId !== issueId);
+        const recentPushWarning = recentMainPushes.length > 0
+          ? `Another workspace pushed to main ${Math.round((Date.now() - new Date(recentMainPushes[0].ts).getTime()) / 1000)}s ago — divergence possible`
+          : undefined;
+        if (recentPushWarning) {
+          console.warn(`[approve] ${recentPushWarning} (${issueId})`);
+        }
+
         try {
           await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
+          await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
+          // Detect orphaned merge commit: local main is AHEAD of origin/main from a
+          // previous approve attempt whose push failed. git pull --ff-only would fail
+          // here with "not possible to fast-forward". Surface a recoverable error
+          // with explicit instructions rather than silently hard-resetting.
+          const { stdout: aheadCountRaw } = await execAsync(
+            'git rev-list origin/main..HEAD --count',
+            { cwd: projectPath, encoding: 'utf-8' }
+          );
+          const aheadCount = parseInt(aheadCountRaw.trim(), 10) || 0;
+          if (aheadCount > 0) {
+            const error = `Local main is ${aheadCount} commit(s) ahead of origin/main — a previous approve attempt left an unpushed merge commit. To recover, run:\n  cd ${projectPath} && git reset --hard origin/main\nThen unstick the workspace and retry.`;
+            completePendingOperation(issueId, error);
+            return jsonResponse({ error }, { status: 409 });
+          }
           await execAsync('git pull origin main --ff-only', {
             cwd: projectPath,
             encoding: 'utf-8',
@@ -3893,6 +4090,19 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           completePendingOperation(issueId, error);
           return jsonResponse({ error }, { status: 400 });
         }
+
+        // Divergence preview: count how many commits main has advanced past the feature branch
+        let mainAdvancedBy = 0;
+        try {
+          const { stdout: aheadRaw } = await execAsync(
+            `git rev-list ${branchName}..main --count`,
+            { cwd: projectPath, encoding: 'utf-8' }
+          );
+          mainAdvancedBy = parseInt(aheadRaw.trim(), 10) || 0;
+          if (mainAdvancedBy > 0) {
+            console.log(`[approve] main has advanced ${mainAdvancedBy} commit(s) past ${branchName}`);
+          }
+        } catch {}
 
         const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } =
           await import('../../../lib/cloister/specialists.js');
@@ -3979,6 +4189,8 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
             message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
             pipeline: 'running',
             note: 'Watch the specialists panel for progress. Click Merge when review+test pass.',
+            ...(recentPushWarning && { recentPushWarning }),
+            ...(mainAdvancedBy > 0 && { mainAdvancedBy }),
           });
         }
 
@@ -4033,13 +4245,12 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           return jsonResponse({ error }, { status: 400 });
         }
 
-        // Push merged main
-        try {
-          await execAsync('git push origin main', { cwd: projectPath, encoding: 'utf-8' });
-        } catch (pushErr: any) {
-          const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
-          completePendingOperation(issueId, error);
-          return jsonResponse({ error }, { status: 400 });
+        // Push merged main (with divergence guard — pushApproveMain catches MainDivergedError
+        // and marks workspace stuck if origin/main advanced past our local ancestor)
+        const pushResult = await pushApproveMain(issueId, projectPath);
+        if (!pushResult.pushed) {
+          completePendingOperation(issueId, pushResult.error);
+          return jsonResponse({ error: pushResult.error }, { status: pushResult.httpStatus });
         }
 
         // Post-merge lifecycle
@@ -4196,6 +4407,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceReviewRoute,
   postWorkspaceRequestReviewRoute,
   postWorkspaceResetReviewRoute,
+  postWorkspaceUnstickRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
   postWorkspaceApproveRoute,

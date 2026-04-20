@@ -55,12 +55,29 @@ describe('toAgentPhase', () => {
     expect(toAgentPhase('post_push')).toBe('post_push')
   })
 
+  it('passes through specialist/work-agent phases (review, review-response, merge)', () => {
+    expect(toAgentPhase('review')).toBe('review')
+    expect(toAgentPhase('review-response')).toBe('review-response')
+    expect(toAgentPhase('merge')).toBe('merge')
+  })
+
   it('returns undefined for invalid values', () => {
     expect(toAgentPhase('coding')).toBeUndefined()
     expect(toAgentPhase('IMPLEMENTATION')).toBeUndefined()
     expect(toAgentPhase(null)).toBeUndefined()
     expect(toAgentPhase(undefined)).toBeUndefined()
     expect(toAgentPhase('')).toBeUndefined()
+  })
+
+  // Regression: persisted review/merge phases must survive snapshot bootstrap.
+  // Before the fix, VALID_AGENT_PHASES only contained work-agent phases
+  // (planning…post_push), so toAgentPhase('review') returned undefined and the
+  // phase was silently dropped when hydrating agent snapshots after a restart.
+  it('regression: persisted review/merge phases are not silently dropped on bootstrap', () => {
+    for (const phase of ['review', 'review-response', 'merge'] as const) {
+      const result = toAgentPhase(phase)
+      expect(result, `phase '${phase}' must not be dropped by toAgentPhase`).toBe(phase)
+    }
   })
 })
 

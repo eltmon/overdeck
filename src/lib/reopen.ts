@@ -3,15 +3,17 @@
  *
  * Called by both the CLI `pan reopen` command and the dashboard
  * `POST /api/issues/:id/reopen` endpoint to ensure consistent behavior.
+ *
+ * All filesystem I/O uses fs/promises so this is safe on the dashboard event loop.
  */
 
-import { existsSync, readFileSync, appendFileSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile, appendFile } from 'fs/promises';
 import { join } from 'path';
 import {
-  loadReviewStatuses,
-  saveReviewStatuses,
-  type ReviewStatus,
-} from '../dashboard/server/review-status.js';
+  getReviewStatus,
+  setReviewStatus,
+} from './review-status.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -26,8 +28,6 @@ export interface ReopenResult {
 export interface ReopenOptions {
   reason?: string;
   trackerContext?: string;
-  /** Override the review-status.json path (used in tests for isolation) */
-  statusFilePath?: string;
 }
 
 /**
@@ -41,11 +41,11 @@ export interface ReopenOptions {
  * @param workspacePath - Absolute path to workspace directory
  * @param options - Optional reason and tracker context
  */
-export function reopenWorkspaceState(
+export async function reopenWorkspaceState(
   issueId: string,
   workspacePath: string,
   options: ReopenOptions = {}
-): ReopenResult {
+): Promise<ReopenResult> {
   const result: ReopenResult = {
     specialistStatesReset: false,
     previousReviewStatus: null,
@@ -56,9 +56,9 @@ export function reopenWorkspaceState(
     reason: options.reason,
   };
 
-  // 1. Reset specialist states
-  const statuses = loadReviewStatuses(options.statusFilePath);
-  const existing: ReviewStatus | undefined = statuses[issueId];
+  // 1. Reset specialist states — single-row atomic update, no TOCTOU risk.
+  // setReviewStatus() reads only this issue's row and upserts only this issue's row.
+  const existing = getReviewStatus(issueId);
 
   if (existing) {
     result.previousReviewStatus = existing.reviewStatus;
@@ -66,40 +66,30 @@ export function reopenWorkspaceState(
     result.previousMergeStatus = existing.mergeStatus ?? null;
   }
 
-  const now = new Date().toISOString();
-  const history = [...(existing?.history ?? [])];
-
-  // Record the reopen transition in history
-  history.push({
-    type: 'review',
-    status: 'pending',
-    timestamp: now,
-    notes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
-  });
-  while (history.length > 10) history.shift();
-
-  statuses[issueId] = {
-    issueId,
+  setReviewStatus(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
     mergeStatus: 'pending',
-    reviewNotes: undefined,
+    reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
     testNotes: undefined,
     mergeNotes: undefined,
-    updatedAt: now,
     readyForMerge: false,
     prUrl: existing?.prUrl,
     autoRequeueCount: 0,
-    history,
-  };
-
-  saveReviewStatuses(statuses, options.statusFilePath);
+    // PAN-653: clear stuck state so Deacon resumes processing this issue.
+    // reviewedAtCommit is cleared so the next approve cycle records the new commit SHA.
+    stuck: undefined,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewedAtCommit: undefined,
+  });
   result.specialistStatesReset = true;
 
-  // 2. Append "Reopened" section to STATE.md
+  // 2. Append "Reopened" section to STATE.md (async — safe on dashboard event loop)
   const statePath = join(workspacePath, '.planning', 'STATE.md');
   if (existsSync(statePath)) {
-    const previousContent = readFileSync(statePath, 'utf-8');
+    const previousContent = await readFile(statePath, 'utf-8');
     const lastStatusMatch = previousContent.match(/\*\*STATUS:\s*([^*\n]+)\*\*/);
     const previousStatus = lastStatusMatch ? lastStatusMatch[1].trim() : 'Unknown';
 
@@ -130,7 +120,7 @@ export function reopenWorkspaceState(
     lines.push('');
     lines.push('Specialist states reset to pending. Resume implementation based on tracker context above.');
 
-    appendFileSync(statePath, lines.join('\n') + '\n');
+    await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
     result.stateMdUpdated = true;
   }
 

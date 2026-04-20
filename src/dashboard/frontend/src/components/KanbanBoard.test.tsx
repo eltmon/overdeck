@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
+import { useDashboardStore } from '../lib/store';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -631,5 +632,116 @@ describe('groupByCanceledType', () => {
     expect(result[1].name).toBe('Duplicate');
     expect(result[2].name).toBe("Won't Do");
     expect(result[3].name).toBe('Other');
+  });
+});
+
+// ─── DivergedBadge ────────────────────────────────────────────────────────────
+
+describe('DivergedBadge', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    vi.stubGlobal('alert', vi.fn());
+  });
+
+  it('renders "Diverged" text', () => {
+    render(<DivergedBadge issueIdentifier="PAN-1" />);
+    expect(screen.getByText('Diverged')).toBeTruthy();
+  });
+
+  it('renders an "Unstick" button', () => {
+    render(<DivergedBadge issueIdentifier="PAN-1" />);
+    expect(screen.getByRole('button', { name: 'Unstick' })).toBeTruthy();
+  });
+
+  it('shows generic title when no stuckReason', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
+    const span = container.querySelector('span[title]');
+    expect(span?.getAttribute('title')).toContain('divergence from origin/main');
+  });
+
+  it('shows stuckReason in title when provided', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckReason="main advanced by 3 commits" />);
+    const span = container.querySelector('span[title]');
+    expect(span?.getAttribute('title')).toContain('main advanced by 3 commits');
+  });
+
+  it('shows abbreviated localSha and remoteSha from stuckDetails in title', () => {
+    const details = JSON.stringify({ localSha: 'aaa1111aaaa', remoteSha: 'bbb2222bbbb' });
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckDetails={details} />);
+    const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
+    expect(title).toContain('aaa1111'); // first 7 chars of localSha
+    expect(title).toContain('bbb2222'); // first 7 chars of remoteSha
+  });
+
+  it('includes recovery instructions in title', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
+    const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
+    expect(title).toContain('git reset --hard origin/main');
+  });
+
+  it('handles malformed stuckDetails gracefully without throwing', () => {
+    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckDetails="not-json" />);
+    const span = container.querySelector('span[title]');
+    // Falls back to the generic message without SHA info
+    expect(span?.getAttribute('title')).toContain('divergence from origin/main');
+  });
+
+  it('POSTs to /api/workspaces/:issueId/unstick when Unstick is clicked', async () => {
+    render(<DivergedBadge issueIdentifier="PAN-42" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+    await Promise.resolve(); // flush microtasks
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/workspaces/PAN-42/unstick',
+      { method: 'POST' }
+    );
+  });
+
+  it('URL-encodes the issueIdentifier in the unstick request', async () => {
+    render(<DivergedBadge issueIdentifier="PAN 99" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/workspaces/PAN%2099/unstick',
+      { method: 'POST' }
+    );
+  });
+
+  it('clears stuck flag in store immediately on successful unstick', async () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-42': { issueId: 'PAN-42', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<DivergedBadge issueIdentifier="PAN-42" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+
+    await waitFor(() => {
+      expect(useDashboardStore.getState().reviewStatusByIssueId['PAN-42']?.stuck).toBeFalsy();
+    });
+  });
+
+  it('resets reviewStatus/testStatus to pending in store after unstick (lifecycle invalidated)', async () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-43': { issueId: 'PAN-43', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<DivergedBadge issueIdentifier="PAN-43" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
+
+    await waitFor(() => {
+      const s = useDashboardStore.getState().reviewStatusByIssueId['PAN-43'];
+      expect(s?.stuck).toBeFalsy();
+      // Lifecycle reset — prior results invalid after `git reset --hard origin/main`
+      expect(s?.reviewStatus).toBe('pending');
+      expect(s?.testStatus).toBe('pending');
+      expect(s?.readyForMerge).toBe(false);
+    });
+  });
+
+  afterEach(() => {
+    useDashboardStore.setState({ reviewStatusByIssueId: {} } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 });
