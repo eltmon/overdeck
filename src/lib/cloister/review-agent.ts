@@ -476,6 +476,14 @@ async function spawnReviewer(
 
   await createSessionAsync(sessionName, projectPath, `bash ${launcherPath}`);
 
+  const deadline = Date.now() + 5000;
+  while (!(await sessionExistsAsync(sessionName))) {
+    if (Date.now() >= deadline) {
+      throw new Error(`Reviewer session did not start: ${sessionName}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
   // Wait for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));
 

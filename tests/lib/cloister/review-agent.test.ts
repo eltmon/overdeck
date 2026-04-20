@@ -927,6 +927,17 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(src).toMatch(/import\s*\{[^}]*getAgentRuntimeBaseCommand[^}]*\}\s*from\s*['"]\.\.\/agents\.js['"]/);
   });
 
+  it('spawnReviewer waits for sessionExistsAsync before sendKeysAsync', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+    expect(src).toContain("while (!(await sessionExistsAsync(sessionName)))");
+    expect(src).toContain("Reviewer session did not start:");
+  });
+
   it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
