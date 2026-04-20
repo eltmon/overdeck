@@ -455,6 +455,28 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   // KIMI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  'kimi-k2.6': {
+    model: 'kimi-k2.6',
+    provider: 'kimi',
+    displayName: 'Kimi K2.6',
+    costPer1MTokens: 1.6, // $0.60 in / $2.50 out
+    contextWindow: 256000,
+    skills: {
+      'code-generation': 94, // Improved over K2.5
+      'code-review': 92,
+      debugging: 92,
+      planning: 90,
+      documentation: 90,
+      testing: 90,
+      security: 85,
+      performance: 88,
+      synthesis: 94, // Native multimodal, stronger agentic capabilities
+      speed: 75, // MoE architecture
+      'context-length': 98, // 256K context
+    },
+    notes: 'Kimi\'s smartest model (April 2026). Native multimodal, superior agentic coding, and autonomous agent execution. Replaces K2.6-code-preview.',
+  },
+
   'kimi-k2.5': {
     model: 'kimi-k2.5',
     provider: 'kimi',
