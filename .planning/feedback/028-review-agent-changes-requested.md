@@ -1,13 +1,13 @@
 ---
 specialist: review-agent
-issueId: PAN-653
+issueId: PAN-714
 outcome: changes-requested
-timestamp: 2026-04-18T16:44:25Z
+timestamp: 2026-04-15T06:56:34Z
 ---
 
-CODE REVIEW BLOCKED for PAN-653:
+CODE REVIEW BLOCKED for PAN-714:
 
-1. src/lib/git/operations.ts:123-145 treats any git merge-base failure as divergence. Exit code 1 means not-ancestor, but other failures (e.g. bad object/repo error) should surface as real git errors instead of incorrectly marking the workspace stuck with main_diverged. Add a regression test for non-code-1 merge-base failures in the new gitPush helper tests. 2. src/lib/cloister/merge-agent.ts:688-705 with src/dashboard/server/routes/metrics.ts:357-365 misclassifies force-with-lease usage. A line like "git push --force-with-lease ..." is recorded as push_attempt because the generic /git push/i pattern matches before /force-with-lease/i, so the new git activity feed can hide a force-push as a normal push. Reorder or refine the patterns and add a regression test for the real command string.
+Two issues: (1) approve.ts:202 uses catch (error: any) without justification — file is actively modified in this branch, pre-existing violation that must be fixed. (2) approveCommand.test.ts happy-path test gives false confidence: AGENTS_DIR is mocked to /tmp/pan-test-agents but the directory is never created, so writeFileSync throws ENOENT, process.exit(1) is silently swallowed because exit is mocked, and the assertion resolves.not.toThrow() passes trivially. The test does not verify process.exit(1) was NOT called, meaning the happy path silently fails but the test reports success.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
@@ -15,6 +15,6 @@ CODE REVIEW BLOCKED for PAN-653:
 2. Fix the code for EVERY issue listed
 3. Run tests locally to verify your fixes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-653 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
+5. Invoke the /rebase-and-submit skill for PAN-714 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.

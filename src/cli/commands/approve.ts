@@ -9,7 +9,7 @@ import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { markAsSynced } from '../../lib/shadow-state.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 
-function checkGhCli(): boolean {
+export function checkGhCli(): boolean {
   try {
     execSync('which gh', { stdio: 'pipe' });
     return true;
@@ -18,7 +18,7 @@ function checkGhCli(): boolean {
   }
 }
 
-function findPRForBranch(workspace: string): { number: number; url: string } | null {
+export function findPRForBranch(workspace: string): { number: number; url: string } | null {
   try {
     // Get current branch
     const branch = execSync('git rev-parse --abbrev-ref HEAD', {
@@ -44,7 +44,7 @@ function findPRForBranch(workspace: string): { number: number; url: string } | n
   }
 }
 
-function mergePR(workspace: string, prNumber: number): { success: boolean; error?: string } {
+export function mergePR(workspace: string, prNumber: number): { success: boolean; error?: string } {
   try {
     // NOTE: Do NOT use --delete-branch - feature branches should be preserved for history
     execSync(`gh pr merge ${prNumber} --squash`, {
@@ -53,12 +53,12 @@ function mergePR(workspace: string, prNumber: number): { success: boolean; error
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-async function updateLinearStatus(apiKey: string, issueIdentifier: string): Promise<boolean> {
+export async function updateLinearStatus(apiKey: string, issueIdentifier: string): Promise<boolean> {
   try {
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
@@ -199,8 +199,8 @@ export async function approveCommand(id: string): Promise<void> {
     console.log(chalk.dim('Workspace can be cleaned up with:'));
     console.log(chalk.dim(`  pan workspace destroy ${state.issueId}`));
 
-  } catch (error: any) {
-    spinner.fail(error.message);
+  } catch (error: unknown) {
+    spinner.fail(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

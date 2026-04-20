@@ -22,13 +22,17 @@ triggers:
 
 Before doing anything else, **read these in order**:
 
-1. `docs/FIX-ALL-PRD.md` (in `panopticon-cli`) — the PRD describing the flywheel,
+1. `docs/FLYWHEEL-STATE.md` (in `panopticon-cli`) — **the living state file**.
+   Contains the current pipeline snapshot, cycling alerts, infrastructure gaps,
+   and pattern ledger from the previous run. Read this FIRST — it tells you what
+   was stuck last time and which issues were cycling.
+2. `docs/FIX-ALL-PRD.md` (in `panopticon-cli`) — the PRD describing the flywheel,
    the goals, the roles, the "main always clean" mandate, and the acceptance
    criteria.
-2. `docs/OPERATION-FIX-ALL.md` (in `panopticon-cli`) — the operational manual
+3. `docs/OPERATION-FIX-ALL.md` (in `panopticon-cli`) — the operational manual
    for pan-oversee at scale: phases, classification, bug log template, known
    recurring issues.
-3. `CLAUDE.md` (in `panopticon-cli`) — the no-bandaid engineering philosophy.
+4. `CLAUDE.md` (in `panopticon-cli`) — the no-bandaid engineering philosophy.
    Every rule in there applies during this skill.
 
 If any of those have been updated since the last run, the *new* versions win.
@@ -39,6 +43,31 @@ If any of those have been updated since the last run, the *new* versions win.
 the Panopticon orchestration substrate. If you finish a run having only
 shepherded issues without committing fixes to Panopticon, the flywheel didn't
 turn — it just spun.
+
+## Urgency-first: the priority ladder
+
+**Every decision in the flywheel — which issue to diagnose first, which bug to
+fix first, which merge to surface first — is driven by urgency:**
+
+| Tier | Criteria | Typical labels |
+|------|----------|----------------|
+| **P0 Hotfix** | PAN issue with `P0` label, or title contains "hotfix"/"emergency"/"critical" | `P0`, `critical` |
+| **P1 Substrate bug** | PAN issue with `P1` or `bug` label | `P1`, `bug` |
+| **P2 PAN feature** | Regular PAN issues (no priority label) | `enhancement` |
+| **P3 Other projects** | MIN, AUR, KRUX, etc. | any |
+
+Within each tier: **oldest-ready first** (FIFO).
+
+Apply this ladder everywhere:
+- Inventory triage order
+- Which stuck agent to attend to first
+- Which substrate fix to implement first
+- Awaiting Merge sort order (already encoded in the page)
+- Which planning agent question to answer first
+
+A P0 hotfix must never wait behind a P2 enhancement or any non-PAN issue.
+If a non-PAN issue is stalling the merge queue, fix the substrate that allows
+the queue to stall, then let the non-PAN issue flow on its own.
 
 ## Hard rules (non-negotiable)
 
@@ -62,6 +91,14 @@ turn — it just spun.
   commit messages (`fix(dashboard):`, `fix(deacon):`, …). Rebuild and restart
   the dashboard after every fix. Verify visual fixes in Playwright with a
   screenshot.
+- **BLOCKING BUGS MUST BE FIXED IN CODE — FILING IS NOT ENOUGH.** If a
+  substrate bug is preventing an issue from progressing (e.g., Docker UAT
+  containers not starting, label cleanup failing on closed issues, planning
+  sessions restarting for In-Review issues), you MUST fix it in code during
+  THIS run. File a PAN issue for tracking/posterity, but **the code fix comes
+  first and happens immediately**. "I filed PAN-NNN for this" is NEVER an
+  acceptable response to a blocking substrate bug. The flywheel's entire
+  purpose is to fix these root causes — not collect them.
 - **NEVER call deep-wipe** without explicit user approval.
 - **NEVER click merge yourself** until the user has confirmed they have UATd
   the issue via the frontend link on the Awaiting Merge page.
@@ -82,7 +119,27 @@ turn — it just spun.
 
 ## The flywheel — one revolution
 
-### 0. Main hygiene check (BEFORE anything else)
+### 0. Read FLYWHEEL-STATE.md (BEFORE main hygiene)
+
+Open `docs/FLYWHEEL-STATE.md` and absorb:
+
+- **Cycling Alerts**: Any issue listed here was stuck at the same phase with the
+  same root cause last run. It is your FIRST diagnosis target this run — the
+  previous fix didn't hold or the agent regressed. Treat it as a P1 substrate bug
+  immediately, not after inventory.
+- **Infrastructure Gaps**: Gaps you've been working around. If any are now
+  addressable (a PR landed, a new API exists), fix them this run.
+- **Pattern Ledger**: Known recurring signatures. When you see a symptom that
+  matches a ledger entry, skip straight to the documented root cause instead of
+  re-diagnosing from scratch.
+- **Active Pipeline**: Prior snapshot of issue states. Use this to spot
+  regressions — an issue that was further along last run and is now further back
+  is a state-management bug.
+
+If `docs/FLYWHEEL-STATE.md` does not exist yet, create it at the end of this run
+(Step 7.5). Don't skip the file — it is the flywheel's memory.
+
+### 0.1 Main hygiene check (BEFORE anything else)
 
 Run from `panopticon-cli`:
 
@@ -112,13 +169,15 @@ a recurring-dirt bug**: fix it at the root (commit the polyfill, ignore the
 generated path, move config to a real config layer) and file the fix in PAN.
 Recurring dirt is a flywheel target, not background noise.
 
-### 1. Inventory
+### 1. Inventory (priority-sorted)
 
 - Hit the dashboard API for the full picture: agents, issues by canonical
   status, review statuses, tmux sessions, heartbeats.
 - For each PAN issue in `In Progress` or `In Review`, classify it per
   `docs/OPERATION-FIX-ALL.md` Phase 1: healthy / ghost / stuck /
   pipeline-stalled / wrong-column / reverting.
+- **Sort your work queue by the urgency ladder** (P0 → P1 → P2, oldest-first
+  within each tier). Report this sorted list when acknowledging the run.
 - Open `https://pan.localhost` in Playwright for visual confirmation of
   columns, badges, and inspector state.
 
@@ -132,6 +191,23 @@ Recurring Issues):
 - Status reverts → fix race conditions in complete-planning / start-agent
 - Specialist not waking → fix dispatch / wake logic
 - Wrong column / wrong tag → fix label-sync code, not the labels themselves
+
+**Cycle-detection check** — before diagnosing any bug, compare the issue's current
+blocker to `FLYWHEEL-STATE.md` › Active Pipeline. If the issue was blocked at the
+exact same phase for the same reason last run:
+
+- That means the previous fix did not hold. Don't re-apply the same fix.
+- Dig one level deeper: why did the fix revert? Was it not committed? Was it
+  undone by a rebase? Was it the wrong layer?
+- Update `FLYWHEEL-STATE.md` › Cycling Alerts immediately — increment Runs Stuck
+  and note the regression source.
+
+**Mid-run state review** — after every 3 substrate fixes (or when you feel like
+you're going in circles), re-read `FLYWHEEL-STATE.md` and ask:
+- Am I fixing the same bug I fixed last run under a different name?
+- Is there an infrastructure gap I keep working around instead of closing?
+- Have any cycling alerts been resolved (Runs Stuck → 0) or worsened (Runs Stuck
+  keeps climbing)?
 
 For each bug:
 
@@ -220,6 +296,44 @@ If any of those show dirt, you are NOT done. Either commit + push, or surface
 the dirt to the user with the recurring-dirt analysis. Reporting "all-up
 complete" with `main` dirty is a violation of this skill.
 
+### 7.5. Update FLYWHEEL-STATE.md (AFTER main hygiene, BEFORE declaring done)
+
+Overwrite `docs/FLYWHEEL-STATE.md` with a fresh snapshot of current state. This is
+the flywheel's memory — a future run will read this before doing anything else.
+
+The file must contain all five sections:
+
+**Active Pipeline** — one row per PAN issue currently in In Progress / In Review /
+awaiting-merge. Columns: Issue, Phase, Root Cause/Blocker, Auto-Requeues, Runs Stuck,
+Notes. Remove issues that merged/closed this run. Reset Runs Stuck to 0 for issues
+that moved forward past their blocker.
+
+**Cycling Alerts** — keep any alert where Runs Stuck ≥ 2. Add new alerts for issues
+that were blocked at the same phase/reason as last run. Remove alerts for issues that
+broke the cycle. For each alert write: the pattern, why it cycles, the candidate fix,
+and current status.
+
+**Infrastructure Gaps** — the accumulated table of missing capabilities. Mark gaps as
+`Resolved (RunN)` when a fix lands. Add new gaps discovered this run. Never remove
+rows — resolved rows are history.
+
+**Pattern Ledger** — add any new recurring failure signature observed this run (with
+root cause and the fix applied). Keep all prior rows. This ledger is a lookup table
+for fast diagnosis.
+
+**Skill Gaps** — desired automation or CLI capabilities the flywheel keeps wishing
+existed. Add new entries; mark closed entries as resolved.
+
+After writing the file:
+```bash
+git add docs/FLYWHEEL-STATE.md
+git commit -m "docs(flywheel): update state snapshot after run N"
+git push origin main
+```
+
+This commit must land before you report the run complete. A stale FLYWHEEL-STATE.md
+is dirt — the next run will be less effective because of it.
+
 ## Done criteria for a single `/all-up` invocation
 
 - Every PAN issue that started the run in `In Progress` / `In Review` is either
@@ -231,6 +345,8 @@ complete" with `main` dirty is a violation of this skill.
   user.
 - A short flywheel report has been appended to `docs/OPERATION-FIX-ALL.md`:
   *N issues moved, M bugs fixed, K friction points removed*.
+- `docs/FLYWHEEL-STATE.md` has been overwritten with a fresh snapshot and committed
+  (Step 7.5 complete). A stale state file is a failed run.
 - `main` is clean and pushed (Step 7 passes).
 
 ## Anti-patterns (do not do these — the user has called these out)
@@ -246,6 +362,34 @@ complete" with `main` dirty is a violation of this skill.
 - Splitting one substrate fix into multiple issues
   (`feedback_issue_granularity`).
 - Leaving `main` dirty "for now" because you'll come back to it.
+- **Filing a blocking substrate bug as a PAN issue without also fixing it in
+  code during the same run.** Filing is for tracking. Fixing is for unblocking.
+  Both must happen. "I opened PAN-NNN" is never a sufficient response to a bug
+  that is preventing an issue from progressing through the pipeline.
+
+## Flywheel diagram
+
+The flywheel has a canonical visual diagram saved at
+`docs/diagrams/flywheel-diagram.excalidraw` in `panopticon-cli`. When
+regenerating or updating the diagram (e.g. after adding new phases or
+annotations), follow the Panopticon typography standard defined in
+`design/style-guide/STYLE-GUIDE.md`:
+
+| Element | Font | Excalidraw fontFamily |
+|---------|------|-----------------------|
+| Diagram title (e.g. "The Fix-All Flywheel…") | **Space Grotesk** | `9` (`"space grotesk"`) |
+| Node labels, annotation callouts | Virgil (hand-drawn, default) | `1` |
+| Code / technical strings | Cascadia | `3` |
+
+**Space Grotesk (fontFamily=9)** is Panopticon's display font (geometric,
+technical, tight apertures). It is registered as a custom font in the
+`mcp_excalidraw` canvas frontend (`frontend/src/App.tsx` mutates
+`FONT_FAMILY['Space Grotesk'] = 9` after import; `frontend/index.html` loads
+it from Google Fonts). The `normalizeFontFamily` function in `dist/types.js`
+maps the string `"space grotesk"` → `9`.
+
+When creating diagram titles, always specify `fontFamily: 9` (or
+`fontFamily: "space grotesk"`) on the title text element.
 
 ## When you're ready to start
 
