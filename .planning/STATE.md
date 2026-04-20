@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# Agent State: PAN-540
-=======
 # PAN-704: FeatureCard action buttons (Plan / See Plan / vBRIEF / Tasks)
 
 ## Status: In Progress
@@ -23,7 +20,6 @@ Preparing the extraction bead commit for reusable planning chips in `src/dashboa
 - Land the FeatureCard action bar first and keep RTL as its own bead because the beads graph blocked closing the action-bar bead until the test bead was complete.
 - Centralize plan / vBRIEF / tasks behavior in `PlanningChips.tsx` while keeping `IssueCard`’s own planning-state query for Start Agent gating; React Query dedupes the chip subscriptions.
 - Follow the workspace rule to install dependencies locally with `bun install`; this workspace initially had no `node_modules`, which blocked Vitest until installed.
->>>>>>> 00693a15 (refactor(dashboard): extract planning action chips)
 
 ## Specialist Feedback
 
@@ -59,3 +55,4 @@ Preparing the extraction bead commit for reusable planning chips in `src/dashboa
 - **[2026-04-20T21:11Z] review-agent → COMMENTED** — `.planning/feedback/109-review-agent-commented.md`
 - **[2026-04-20T21:17Z] review-agent → COMMENTED** — `.planning/feedback/110-review-agent-commented.md`
 - **[2026-04-20T21:17Z] review-agent → COMMENTED** — `.planning/feedback/110-review-agent-commented.md`
+- **[2026-04-20T22:19Z] verification-gate → FAILED** — `.planning/feedback/112-verification-gate-failed.md`
