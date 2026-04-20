@@ -102,6 +102,7 @@ exec script -qfaec "bash '${innerScript}'" "${logFile}"
 
     // Snapshot the retros dir before polling so we can detect newly-written files
     const retroOutputDir = join(cwd, 'docs', 'flywheel', 'retros');
+    await mkdir(retroOutputDir, { recursive: true });
     const existingRetroFiles = new Set(await readdir(retroOutputDir).catch(() => [] as string[]));
 
     // Wait for completion or timeout

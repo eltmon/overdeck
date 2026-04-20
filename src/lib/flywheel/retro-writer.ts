@@ -172,6 +172,13 @@ export function parseRetroMarkdown(content: string): RetroDocument | null {
     fm[currentKey] = listItems;
   }
 
+  // Validate required fields before asserting the type so callers get null
+  // instead of a partially-valid object that passes the type check but breaks later.
+  const required: Array<keyof RetroFrontmatter> = ['issue', 'agent', 'run', 'cycle_count', 'friction_score', 'surprise', 'proposed_changes'];
+  for (const field of required) {
+    if (fm[field] === undefined) return null;
+  }
+
   return {
     frontmatter: fm as unknown as RetroFrontmatter,
     body: body.trim(),

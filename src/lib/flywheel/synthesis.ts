@@ -203,6 +203,7 @@ interface RetroSignalAccumulator {
   changeDescription: string;
   frictionScores: number[];
   retroPaths: string[];
+  seenPaths: Set<string>;
 }
 
 /**
@@ -255,13 +256,14 @@ export async function runSynthesis(retrosDir: string = DEFAULT_RETROS_DIR): Prom
           changeDescription: signal.changeDescription,
           frictionScores: [],
           retroPaths: [],
+          seenPaths: new Set(),
         });
       }
 
       const acc = accumulators.get(key)!;
       acc.frictionScores.push(frictionScore);
-      // Avoid duplicating the same retro path for multiple proposed_changes
-      if (!acc.retroPaths.includes(path)) {
+      if (!acc.seenPaths.has(path)) {
+        acc.seenPaths.add(path);
         acc.retroPaths.push(path);
       }
     }

@@ -401,16 +401,20 @@ export async function daemonTick(): Promise<void> {
     return;
   }
 
-  // Drain retros that were queued during quiet hours
+  // Drain retros that were queued during quiet hours.
+  // Remove each entry only after its spawn succeeds so a crash mid-batch
+  // doesn't silently lose unspawned retros.
   try {
     const pending = await loadPendingRetros();
-    if (pending.length > 0) {
-      await savePendingRetros([]); // Clear before spawning to prevent re-processing on next tick
-      for (const pendingIssueId of pending) {
-        console.log(`[flywheel-daemon] Draining pending retro for ${pendingIssueId}`);
-        spawnRetroAgentForIssue(pendingIssueId).catch(err =>
-          console.warn(`[flywheel-daemon] Failed to drain pending retro for ${pendingIssueId}:`, err)
-        );
+    for (const pendingIssueId of pending) {
+      console.log(`[flywheel-daemon] Draining pending retro for ${pendingIssueId}`);
+      try {
+        await spawnRetroAgentForIssue(pendingIssueId);
+        // Remove from queue only after successful spawn
+        const remaining = await loadPendingRetros();
+        await savePendingRetros(remaining.filter((id) => id !== pendingIssueId));
+      } catch (err) {
+        console.warn(`[flywheel-daemon] Failed to drain pending retro for ${pendingIssueId}:`, err);
       }
     }
   } catch (err) {
