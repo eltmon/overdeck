@@ -186,7 +186,7 @@ export async function fileFlywheelIssues(
         proposalSignature: signatureStr,
         // Parse the visible issue number from the URL — issue.id is GitHub's
         // internal node id, which differs from the user-visible issue number.
-        issueNumber: parseInt(issue.url.split('/').pop() ?? '', 10),
+        issueNumber: parseInt(issue.url.split('/').pop() ?? '', 10) || 0,
         issueUrl: issue.url,
         title,
         triggeringRetros: proposal.triggeringRetros.map((p) => p.split('/').pop() ?? p),

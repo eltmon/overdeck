@@ -130,7 +130,8 @@ export function parseRetroMarkdown(content: string): RetroDocument | null {
     if (kvMatch) {
       // Flush previous list
       if (currentKey && inList) {
-        fm[currentKey] = listItems.splice(0);
+        fm[currentKey] = listItems.slice();
+        listItems.length = 0;
         inList = false;
       }
       currentKey = kvMatch[1];
