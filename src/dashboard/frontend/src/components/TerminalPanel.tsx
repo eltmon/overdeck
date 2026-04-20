@@ -154,7 +154,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
       {isStopped ? (
         conversationMessages.length > 0 ? (
           <div className="flex-1 min-h-0 overflow-hidden">
-            <MessagesTimeline messages={conversationMessages} />
+            <MessagesTimeline messages={conversationMessages} workLog={[]} streaming={false} />
           </div>
         ) : (
           <pre
