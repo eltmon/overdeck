@@ -193,6 +193,8 @@ export async function parseConversationMessages(
   let lastUserTimestamp: string | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
   const pendingToolUse = new Map<string, WorkLogEntry>();
+  // Monotonic sequence counter per JSONL line
+  let sequence = 0;
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -201,6 +203,7 @@ export async function parseConversationMessages(
     } catch {
       continue;
     }
+    const lineSequence = sequence++;
 
     if (entry.type === 'user' && entry.message) {
       const msg = entry.message;
@@ -223,6 +226,7 @@ export async function parseConversationMessages(
             role: 'user',
             text: rawContent,
             createdAt: ts,
+            sequence: lineSequence,
           });
         }
       } else if (Array.isArray(rawContent)) {
@@ -268,6 +272,7 @@ export async function parseConversationMessages(
             role: 'user',
             text: textBlocks.join('\n'),
             createdAt: ts,
+            sequence: lineSequence,
           });
         }
       }
@@ -301,6 +306,7 @@ export async function parseConversationMessages(
             tone: 'tool',
             toolTitle: block.name,
             detail: block.input ? JSON.stringify(block.input) : undefined,
+            sequence: lineSequence,
           };
           pendingToolUse.set(block.id, toolEntry);
         }
@@ -325,6 +331,7 @@ export async function parseConversationMessages(
             ? (entry.timestamp || new Date().toISOString())
             : undefined,
           streaming: !msg.stop_reason,
+          sequence: lineSequence,
         };
       }
     }
