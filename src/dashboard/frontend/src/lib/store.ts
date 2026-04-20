@@ -78,18 +78,45 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     set((state) => applyEvents(state, events)),
 }))
 
+// ─── Selector memoization helpers ─────────────────────────────────────────────
+// Reducers use immutable updates, so we can cache derived arrays keyed by the
+// source object reference. This prevents cascading re-renders when unrelated
+// store slices change (e.g. an agent event should not re-render components
+// that only consume issues).
+
+function memoizeArraySelector<S, K extends keyof S, R>(
+  key: K,
+  derive: (slice: S[K]) => R,
+): (s: S) => R {
+  let lastSlice: S[K] | undefined
+  let lastResult: R | undefined
+  return (s: S) => {
+    const slice = s[key]
+    if (slice === lastSlice && lastResult !== undefined) {
+      return lastResult
+    }
+    lastSlice = slice
+    lastResult = derive(slice)
+    return lastResult
+  }
+}
+
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectAgentList = (s: DashboardState): AgentSnapshot[] =>
-  Object.values(s.agentsById)
+export const selectAgentList = memoizeArraySelector(
+  'agentsById',
+  (agents): AgentSnapshot[] => Object.values(agents),
+)
 
 export const selectAgentById =
   (id: string) =>
   (s: DashboardState): AgentSnapshot | undefined =>
     s.agentsById[id]
 
-export const selectSpecialistList = (s: DashboardState): SpecialistSnapshot[] =>
-  Object.values(s.specialistsByName)
+export const selectSpecialistList = memoizeArraySelector(
+  'specialistsByName',
+  (specs): SpecialistSnapshot[] => Object.values(specs),
+)
 
 export const selectReviewStatus =
   (issueId: string) =>
@@ -101,18 +128,23 @@ export const selectReviewStatus =
  * and not already merged. Sorted oldest-ready first (FIFO) so issues
  * don't age in the queue.
  */
-export const selectAwaitingMerge = (s: DashboardState): ReviewStatusSnapshot[] =>
-  Object.values(s.reviewStatusByIssueId)
-    .filter(
-      (rs): rs is ReviewStatusSnapshot =>
-        rs?.readyForMerge === true && rs.mergeStatus !== 'merged',
-    )
-    .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''))
+export const selectAwaitingMerge = memoizeArraySelector(
+  'reviewStatusByIssueId',
+  (rsMap): ReviewStatusSnapshot[] =>
+    Object.values(rsMap)
+      .filter(
+        (rs): rs is ReviewStatusSnapshot =>
+          rs?.readyForMerge === true && rs.mergeStatus !== 'merged',
+      )
+      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+)
+
+const EMPTY_STRING_ARRAY: string[] = []
 
 export const selectAgentOutput =
   (agentId: string) =>
   (s: DashboardState): string[] =>
-    s.agentOutputById[agentId] ?? []
+    s.agentOutputById[agentId] ?? EMPTY_STRING_ARRAY
 
 export const selectIsBootstrapped = (s: DashboardState): boolean => s.bootstrapComplete
 
@@ -123,17 +155,20 @@ export const selectResources = (s: DashboardState): ResourceStats | null => s.re
 export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw
 
 export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =>
-  (s: DashboardState): unknown[] => {
-    const issues = s.issuesRaw as Array<Record<string, unknown>>
-    if (includeCompleted) return issues
-    // Only filter out canceled issues here. Done issues flow through to
-    // groupByStatus() which handles closed-out label filtering separately.
-    // "Include closed-out" controls the closed-out label, not the Done column.
-    return issues.filter(
-      (i) =>
-        i['state'] !== 'canceled' && i['canonicalStatus'] !== 'canceled',
-    )
-  }
+  memoizeArraySelector(
+    'issuesRaw',
+    (issues): unknown[] => {
+      const typed = issues as Array<Record<string, unknown>>
+      if (includeCompleted) return typed
+      // Only filter out canceled issues here. Done issues flow through to
+      // groupByStatus() which handles closed-out label filtering separately.
+      // "Include closed-out" controls the closed-out label, not the Done column.
+      return typed.filter(
+        (i) =>
+          i['state'] !== 'canceled' && i['canonicalStatus'] !== 'canceled',
+      )
+    },
+  )
 
 // ─── Export pure functions for testing ────────────────────────────────────────
 

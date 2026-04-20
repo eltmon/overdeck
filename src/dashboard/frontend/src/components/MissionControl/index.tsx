@@ -2,16 +2,17 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
-import { ActivityView } from './ActivityView';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
+import { DetailPanelLayout } from '../DetailPanelLayout';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
-import type { Issue } from '../../types';
+import type { Agent, Issue } from '../../types';
+import { useDashboardStore, selectAgentList } from '../../lib/store';
 import styles from './styles/mission-control.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -103,6 +104,9 @@ export function MissionControl({
     queryFn: fetchVersion,
     staleTime: Infinity,
   });
+
+  // Agents from dashboard store (for terminal panel in detail view)
+  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
   // Build title map from issues
   const issueTitles: Record<string, string> = {};
@@ -409,12 +413,23 @@ export function MissionControl({
                 onOpenBeads={() => setShowBeads(true)}
               />
 
-              {/* Activity View */}
-              <ActivityView
-                issueId={selectedFeature}
-                issues={issues}
-                featureData={selectedFeatureData}
-              />
+              {/* Inspector + Terminal split view */}
+              {(() => {
+                const issue = issues.find(i => i.identifier === selectedFeature);
+                const agent = agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase());
+                return issue ? (
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <DetailPanelLayout
+                      inline
+                      agent={agent}
+                      issueId={selectedFeature}
+                      issue={issue}
+                      issueUrl={issue.url}
+                      onClose={() => setSelectedFeature(null)}
+                    />
+                  </div>
+                ) : null;
+              })()}
             </>
           ) : (
             <div className={styles.contentEmpty}>

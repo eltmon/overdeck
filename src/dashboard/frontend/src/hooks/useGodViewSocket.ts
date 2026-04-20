@@ -42,13 +42,22 @@ export const useGodViewStore = create<GodViewStore>((set) => ({
 // Derived selectors from DashboardStore (replaces duplicate GodView state)
 export const selectGodViewAgentOutput = (s: { agentOutputById: Record<string, string[]> }) =>
   s.agentOutputById;
+
+let _lastAgentsById: Record<string, { status: string }> | undefined;
+let _lastStatuses: Record<string, string> | undefined;
 export const selectGodViewAgentStatuses = (s: { agentsById: Record<string, { status: string }> }) => {
+  if (s.agentsById === _lastAgentsById && _lastStatuses) {
+    return _lastStatuses;
+  }
   const statuses: Record<string, string> = {};
   for (const [id, agent] of Object.entries(s.agentsById)) {
     statuses[id] = agent.status;
   }
+  _lastAgentsById = s.agentsById;
+  _lastStatuses = statuses;
   return statuses;
 };
+
 export const selectGodViewActivityFeed = (s: { recentActivity: unknown[] }) =>
   s.recentActivity as GodViewActivityEvent[];
 
