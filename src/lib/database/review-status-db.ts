@@ -108,10 +108,11 @@ export function deleteReviewStatus(issueId: string): void {
  */
 export function getReviewStatusFromDb(issueId: string): ReviewStatus | null {
   const db = getDatabase();
+  const normalizedId = issueId.toUpperCase();
 
   const row = db.prepare(`
     SELECT * FROM review_status WHERE issue_id = ?
-  `).get(issueId) as DbReviewStatusRow | undefined;
+  `).get(normalizedId) as DbReviewStatusRow | undefined;
 
   if (!row) return null;
 
@@ -141,12 +142,13 @@ export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
  */
 function getHistoryFromDb(issueId: string): StatusHistoryEntry[] {
   const db = getDatabase();
+  const normalizedId = issueId.toUpperCase();
   const rows = db.prepare(`
     SELECT type, status, timestamp, notes
     FROM status_history
     WHERE issue_id = ?
     ORDER BY timestamp ASC
-  `).all(issueId) as Array<{ type: string; status: string; timestamp: string; notes: string | null }>;
+  `).all(normalizedId) as Array<{ type: string; status: string; timestamp: string; notes: string | null }>;
 
   return rows.map(r => ({
     type: r.type as 'review' | 'test' | 'merge' | 'inspect' | 'uat',
