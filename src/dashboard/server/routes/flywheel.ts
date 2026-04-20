@@ -284,6 +284,11 @@ const getRollbackPreviewRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
 
+    // Validate issueId to prevent regex injection into git --grep
+    if (!/^[A-Z][A-Z0-9]{0,15}-\d+$/.test(issueId)) {
+      return jsonResponse({ issueId, commitSha: '', diff: '' });
+    }
+
     // Find the most recent commit for this flywheel-change issue
     // Convention: commit message contains the issue ID
     const repoDir = resolveRollbackRepoDir(issueId);
@@ -293,7 +298,7 @@ const getRollbackPreviewRoute = HttpRouter.add(
       const { stdout: logOut } = yield* Effect.promise(() =>
         execFileAsync('git', [
           '-C', repoDir,
-          'log', '--oneline', '--grep', issueId,
+          'log', '--oneline', '-F', '--grep', issueId,
           '-1',
         ])
       );

@@ -15,7 +15,7 @@
  */
 
 import { existsSync } from 'fs';
-import { readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
+import { open, readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { PANOPTICON_HOME } from '../paths.js';
@@ -121,25 +121,36 @@ export async function hasActiveClaudeSession(): Promise<boolean> {
 // ============================================================================
 
 export async function acquireLock(): Promise<boolean> {
-  if (existsSync(FLYWHEEL_LOCK_FILE)) {
+  // Try atomic exclusive-create first (wx = fail if exists)
+  try {
+    const fh = await open(FLYWHEEL_LOCK_FILE, 'wx');
+    await fh.writeFile(JSON.stringify({ pid: process.pid, ts: Date.now() }), 'utf-8');
+    await fh.close();
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') return false;
+    // Lock file exists — check if stale
     try {
       const lockData = JSON.parse(await readFile(FLYWHEEL_LOCK_FILE, 'utf-8'));
       const lockAge = Date.now() - lockData.ts;
-      // Stale lock older than 30 minutes — take it
       if (lockAge < 30 * 60 * 1000) {
         console.log(`[flywheel-daemon] Lock held by pid ${lockData.pid}, age ${Math.round(lockAge / 1000)}s — skipping`);
         return false;
       }
       console.log(`[flywheel-daemon] Removing stale lock (${Math.round(lockAge / 60000)}min old)`);
+      await unlink(FLYWHEEL_LOCK_FILE);
     } catch {
-      // Corrupt lock file — remove it
+      // Corrupt or already removed — retry acquisition below
     }
-  }
-  try {
-    await writeFile(FLYWHEEL_LOCK_FILE, JSON.stringify({ pid: process.pid, ts: Date.now() }), 'utf-8');
-    return true;
-  } catch {
-    return false;
+    // Best-effort re-acquire after stale removal (still not atomic, but stale-lock path is rare)
+    try {
+      const fh = await open(FLYWHEEL_LOCK_FILE, 'wx');
+      await fh.writeFile(JSON.stringify({ pid: process.pid, ts: Date.now() }), 'utf-8');
+      await fh.close();
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -215,10 +226,6 @@ async function runSynthesis(): Promise<void> {
     }
     const archiveResult = await archiveProcessedRetros([...filedRetros]);
     console.log(`[flywheel-daemon] Archived ${archiveResult.archived.length} retros, wontfixed ${archiveResult.wontfixed.length}`);
-
-    // Determine run number from archive state
-    const runNumberMatch = archiveResult.archived.length > 0 ? 1 : 0; // rough — appendFlywheelReport tracks its own counter
-    void runNumberMatch;
 
     // Append to FLYWHEEL-REPORT.md
     await appendFlywheelReport({

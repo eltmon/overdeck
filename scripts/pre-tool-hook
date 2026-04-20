@@ -27,6 +27,7 @@ elif [ -n "$TMUX" ]; then
 else
   AGENT_ID="main-cli"
 fi
+AGENT_ID=$(printf '%s' "${AGENT_ID:-unknown}" | tr -cd 'A-Za-z0-9._-')
 AGENT_ID="${AGENT_ID:-unknown}"
 
 # Parse tool info from stdin

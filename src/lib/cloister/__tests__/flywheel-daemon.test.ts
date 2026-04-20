@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync } from 'fs';
-import { readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
+import { open, readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
 
 // ---------------------------------------------------------------------------
 // Module mocks (must be before any imports from the module under test)
@@ -25,6 +25,7 @@ vi.mock('fs', async () => {
 });
 
 vi.mock('fs/promises', () => ({
+  open: vi.fn(),
   readFile: vi.fn().mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
   writeFile: vi.fn().mockResolvedValue(undefined),
   unlink: vi.fn().mockResolvedValue(undefined),
@@ -81,11 +82,17 @@ const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
 const mockExecFile = vi.mocked(execFile);
 
 const mockExistsSync = vi.mocked(existsSync);
+const mockOpen = vi.mocked(open);
 const mockReadFile = vi.mocked(readFile);
 const mockWriteFile = vi.mocked(writeFile);
 const mockUnlink = vi.mocked(unlink);
 const mockReaddir = vi.mocked(readdir);
 const mockStat = vi.mocked(stat);
+
+// Fake FileHandle returned by mockOpen — methods reconfigured in beforeEach
+const mockFhWriteFile = vi.fn().mockResolvedValue(undefined);
+const mockFhClose = vi.fn().mockResolvedValue(undefined);
+const mockFileHandle = { writeFile: mockFhWriteFile, close: mockFhClose };
 
 // ---------------------------------------------------------------------------
 // Suite: scaffold (start/stop/status)
@@ -153,43 +160,48 @@ describe('flywheelDaemon — start/stop/status', () => {
 describe('acquireLock / releaseLock', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExistsSync.mockReturnValue(false);
-    mockWriteFile.mockResolvedValue(undefined);
+    mockOpen.mockResolvedValue(mockFileHandle as unknown as Awaited<ReturnType<typeof open>>);
+    mockFhWriteFile.mockResolvedValue(undefined);
+    mockFhClose.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
   });
 
   it('acquireLock returns true when no lock file exists', async () => {
-    mockExistsSync.mockReturnValue(false);
+    // open('wx') succeeds → lock acquired
     const result = await acquireLock();
     expect(result).toBe(true);
-    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockOpen).toHaveBeenCalledOnce();
+    expect(mockFhWriteFile).toHaveBeenCalledOnce();
   });
 
   it('acquireLock returns false when a fresh lock file exists', async () => {
-    mockExistsSync.mockReturnValue(true);
+    // open('wx') throws EEXIST → fall through to stale check → fresh lock → return false
+    const eexist = Object.assign(new Error('EEXIST'), { code: 'EEXIST' });
+    mockOpen.mockRejectedValueOnce(eexist);
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ pid: 9999, ts: Date.now() }) as unknown as Buffer,
     );
     const result = await acquireLock();
     expect(result).toBe(false);
-    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockFhWriteFile).not.toHaveBeenCalled();
   });
 
   it('acquireLock takes over a stale lock (>30 min old)', async () => {
-    mockExistsSync.mockReturnValue(true);
+    // open('wx') throws EEXIST → stale check → remove → re-acquire succeeds
+    const eexist = Object.assign(new Error('EEXIST'), { code: 'EEXIST' });
+    mockOpen.mockRejectedValueOnce(eexist);   // first open fails with EEXIST
+    mockOpen.mockResolvedValueOnce(mockFileHandle as unknown as Awaited<ReturnType<typeof open>>); // re-acquire succeeds
     const stalTs = Date.now() - 31 * 60 * 1000;
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ pid: 9999, ts: stalTs }) as unknown as Buffer,
     );
-    mockWriteFile.mockResolvedValue(undefined);
     const result = await acquireLock();
     expect(result).toBe(true);
-    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockFhWriteFile).toHaveBeenCalledOnce();
   });
 
-  it('acquireLock returns false when writeFile throws', async () => {
-    mockExistsSync.mockReturnValue(false);
-    mockWriteFile.mockRejectedValueOnce(new Error('EPERM'));
+  it('acquireLock returns false when open throws non-EEXIST error', async () => {
+    mockOpen.mockRejectedValueOnce(Object.assign(new Error('EPERM'), { code: 'EPERM' }));
     const result = await acquireLock();
     expect(result).toBe(false);
   });
@@ -409,8 +421,9 @@ describe('daemonTick — double-scheduled path', () => {
     // Spy on Date.now so the intervals are always "overdue" regardless of module state.
     // quiet_hours is '' so isQuietHours bypasses new Date() check entirely (parseQuietHours returns null).
     vi.spyOn(Date, 'now').mockReturnValue(FAR_FUTURE_MS);
-    mockExistsSync.mockReturnValue(false); // no lock file
-    mockWriteFile.mockResolvedValue(undefined);
+    mockOpen.mockResolvedValue(mockFileHandle as unknown as Awaited<ReturnType<typeof open>>); // no lock file → open('wx') succeeds
+    mockFhWriteFile.mockResolvedValue(undefined);
+    mockFhClose.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
     mockReaddir.mockResolvedValue([]);
     mockReadFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
@@ -437,10 +450,9 @@ describe('daemonTick — double-scheduled path', () => {
     // code computes both booleans upfront and acquires the lock exactly once.
     await daemonTick();
 
-    // Exactly one writeFile call = the lock was acquired exactly once.
-    // In the old double-lock code, mockExistsSync=false means both acquires succeed
-    // and writeFile is called twice.
-    expect(mockWriteFile).toHaveBeenCalledOnce();
+    // Exactly one open('wx') call = the lock was acquired exactly once.
+    // In the old double-lock code, both acquire paths ran and open was called twice.
+    expect(mockOpen).toHaveBeenCalledOnce();
   });
 
   it('does not acquire the lock when neither interval is due', async () => {
@@ -459,7 +471,7 @@ describe('daemonTick — double-scheduled path', () => {
 
     await daemonTick();
 
-    // No lock should be acquired (no writeFile call for lock file)
-    expect(mockWriteFile).not.toHaveBeenCalled();
+    // No lock should be acquired (no open('wx') call for lock file)
+    expect(mockOpen).not.toHaveBeenCalled();
   });
 });
