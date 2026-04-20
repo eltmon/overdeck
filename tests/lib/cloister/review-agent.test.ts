@@ -980,5 +980,16 @@ describe('spawnReviewer runtime command routing regression', () => {
 
     expect(fn).toContain('waitForClaudePrompt(sessionName, 15000)');
     expect(fn).toContain('Reviewer session ${sessionName} did not reach Claude prompt');
+
+    const tmuxSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/tmux.ts'),
+      'utf-8',
+    );
+    const waitForPromptMatch = tmuxSrc.match(/export async function waitForClaudePrompt[\s\S]*?^}/m);
+    expect(waitForPromptMatch).not.toBeNull();
+    const waitForPromptFn = waitForPromptMatch![0];
+
+    expect(waitForPromptFn).toContain("if (!await sessionExistsAsync(sessionName)) return false;");
+    expect(waitForPromptFn).toContain('consecutivePromptPolls >= 2');
   });
 });

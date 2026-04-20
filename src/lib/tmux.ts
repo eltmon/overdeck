@@ -483,11 +483,24 @@ export async function listPaneValuesAsync(target: string, format: string): Promi
 export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
   const poll = 500;
+  let consecutivePromptPolls = 0;
+
   while (Date.now() - start < timeoutMs) {
+    if (!await sessionExistsAsync(sessionName)) return false;
+
     const output = await capturePaneAsync(sessionName, 10);
     const lines = output.split('\n').filter(l => l.trim());
     const lastLine = lines[lines.length - 1] || '';
-    if (lastLine.includes('❯')) return true;
+
+    if (lastLine.includes('❯')) {
+      consecutivePromptPolls += 1;
+      if (consecutivePromptPolls >= 2 && await sessionExistsAsync(sessionName)) {
+        return true;
+      }
+    } else {
+      consecutivePromptPolls = 0;
+    }
+
     await new Promise(r => setTimeout(r, poll));
   }
   return false;
