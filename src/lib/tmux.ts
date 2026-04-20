@@ -1,7 +1,7 @@
 import { execSync, execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { getPanopticonHome } from './paths.js';
@@ -27,6 +27,13 @@ const MANAGED_TMUX_CONFIG_CONTENT = [
   'bind-key -T root M-MouseDown3Pane select-pane -t =',
   '',
 ].join('\n');
+
+// One-shot guard: the managed tmux context (config file + loaded server) only needs
+// to be prepared once per process. Every tmux subprocess invocation already passes
+// `-L panopticon -f <configPath>`, so after the first source-file the config is live
+// on the shared server for every subsequent command. Re-writing the file and
+// re-sourcing it per call was the root of PAN-785's terminal lag.
+let tmuxContextPrepared = false;
 
 /**
  * Log file for tmux sendKeys operations.
@@ -87,15 +94,31 @@ async function reloadManagedTmuxConfigAsync(): Promise<void> {
 }
 
 function ensureManagedTmuxConfigSync(): void {
+  if (tmuxContextPrepared) return;
   ensureManagedTmuxDirSync();
   writeFileSync(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
   reloadManagedTmuxConfigSync();
+  tmuxContextPrepared = true;
 }
 
 async function ensureManagedTmuxConfigAsync(): Promise<void> {
+  if (tmuxContextPrepared) return;
   await ensureManagedTmuxDirAsync();
   await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
   await reloadManagedTmuxConfigAsync();
+  tmuxContextPrepared = true;
+}
+
+/**
+ * Explicit one-shot init for the managed tmux context. Call awaited from the
+ * dashboard server entry point before `server.listen` so that no request path
+ * ever pays the prep cost (file write + tmux start-server + source-file).
+ *
+ * In `inherit-user` mode this is a no-op. Safe to call multiple times.
+ */
+export async function ensureManagedTmuxContextOnce(): Promise<void> {
+  const mode = getTmuxConfigMode();
+  await ensureTmuxContextPreparedAsync(mode);
 }
 
 export function getTmuxConfigMode(): TmuxConfigMode {
@@ -123,10 +146,19 @@ async function ensureTmuxContextPreparedAsync(mode: TmuxConfigMode): Promise<voi
   }
 }
 
+/**
+ * Pure: returns the tmux socket/config args for the active mode.
+ *
+ * Callers that build a tmux command line directly (e.g., `pty.spawn('tmux',
+ * buildTmuxArgs(...))`) MUST have `ensureManagedTmuxContextOnce()` awaited
+ * earlier in the process lifetime — the dashboard server does this from
+ * main.ts before `server.listen`. The `tmuxExecAsync` / `tmuxExecSync`
+ * helpers still call `ensureTmuxContextPrepared*` themselves (cheap after the
+ * first call) so CLI entry points that never went through the server init
+ * still work on first use.
+ */
 export function getTmuxBaseArgs(): string[] {
-  const mode = getTmuxConfigMode();
-  ensureTmuxContextPreparedSync(mode);
-  return getTmuxContextArgsForMode(mode);
+  return getTmuxContextArgsForMode(getTmuxConfigMode());
 }
 
 export function buildTmuxArgs(args: string[]): string[] {
@@ -357,37 +389,23 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
+  // Mirror the sync `sendKeys` pattern: one temp file, one load-buffer, one
+  // paste-buffer, one Enter. Splitting by line and pasting line-by-line
+  // (the previous implementation) cost ~5 tmux spawns and 50 ms of sleep
+  // per line, which made large prompts take seconds (PAN-785).
+  // `paste-buffer -d` drops the buffer in the same call so we don't need a
+  // separate delete-buffer round-trip.
   const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
 
-  const lines = keys.split('\n');
-  if (lines.length > 1) {
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i]!.length > 0) {
-        await setAndPasteBuffer(sessionName, lines[i]!, `${sendId}-${i}`);
-
-      }
-      if (i < lines.length - 1) {
-        await tmuxExecAsync(['send-keys', '-t', sessionName, 'S-Enter'], { encoding: 'utf-8' });
-      }
-    }
+  try {
+    await writeFile(tmpFile, keys, 'utf-8');
+    await tmuxExecAsync(['load-buffer', tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-d', '-t', sessionName], { encoding: 'utf-8' });
     await new Promise(r => setTimeout(r, 300));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-  } else {
-    await setAndPasteBuffer(sessionName, keys, `${sendId}-single`, true);
-    await new Promise(r => setTimeout(r, 300));
-    await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-  }
-}
-
-async function setAndPasteBuffer(sessionName: string, content: string, bufferId: string, deleteAfterPaste = false): Promise<void> {
-  const bufId = `pan-sendkeys-${bufferId}`;
-  await tmuxExecAsync(['set-buffer', '-b', bufId, '--', content], { encoding: 'utf-8' });
-  const pasteArgs = ['paste-buffer', '-b', bufId, '-t', sessionName];
-  if (deleteAfterPaste) pasteArgs.push('-d');
-  await tmuxExecAsync(pasteArgs, { encoding: 'utf-8' });
-  await new Promise(r => setTimeout(r, 50));
-  if (!deleteAfterPaste) {
-    await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
+  } finally {
+    await unlink(tmpFile).catch(() => {});
   }
 }
 
