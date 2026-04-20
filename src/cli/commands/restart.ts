@@ -64,8 +64,13 @@ function resolveNode22(): string {
 }
 
 function resolveBundledServerPath(): string {
+  // After tsdown bundles the CLI, this code runs inside `dist/cli/index.js`,
+  // so `__dirname` is `dist/cli` and the sibling dashboard bundle sits at
+  // `dist/dashboard/server.js` — one `..` up, not two. The old two-up form
+  // was written assuming the unbundled `dist/cli/commands/restart.js` layout
+  // and resolved to `<project>/dashboard/server.js`, which never exists.
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  return join(__dirname, '..', '..', 'dashboard', 'server.js');
+  return join(__dirname, '..', 'dashboard', 'server.js');
 }
 
 function spawnDashboardDetached(config: PlatformConfig): void {
