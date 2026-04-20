@@ -28,3 +28,17 @@ Preparing the extraction bead commit for reusable planning chips in `src/dashboa
 ## Specialist Feedback
 
 - **[2026-04-20T13:24Z] test-agent → FAILED** — `.planning/feedback/080-test-agent-failed.md`
+- **[2026-04-20T13:45Z] verification-gate → FAILED** — `.planning/feedback/081-verification-gate-failed.md`
+- **[2026-04-20T14:36Z] review-agent → COMMENTED** — `.planning/feedback/082-review-agent-commented.md`
+- **[2026-04-20T15:02Z] review-agent → COMMENTED** — `.planning/feedback/083-review-agent-commented.md`
+- **[2026-04-20T15:13Z] review-agent → COMMENTED** — `.planning/feedback/084-review-agent-commented.md`
+- **[2026-04-20T15:15Z] review-agent → COMMENTED** — `.planning/feedback/085-review-agent-commented.md`
+- **[2026-04-20T15:18Z] review-agent → COMMENTED** — `.planning/feedback/086-review-agent-commented.md`
+- **[2026-04-20T15:23Z] review-agent → COMMENTED** — `.planning/feedback/087-review-agent-commented.md`
+- **[2026-04-20T15:25Z] review-agent → COMMENTED** — `.planning/feedback/088-review-agent-commented.md`
+- **[2026-04-20T15:33Z] review-agent → COMMENTED** — `.planning/feedback/089-review-agent-commented.md`
+- **[2026-04-20T15:44Z] review-agent → COMMENTED** — `.planning/feedback/090-review-agent-commented.md`
+- **[2026-04-20T15:49Z] review-agent → COMMENTED** — `.planning/feedback/091-review-agent-commented.md`
+- **[2026-04-20T16:35Z] verification-gate → FAILED** — `.planning/feedback/092-verification-gate-failed.md`
+- **[2026-04-20T16:54Z] verification-gate → FAILED** — `.planning/feedback/093-verification-gate-failed.md`
+- **[2026-04-20T16:57Z] verification-gate → FAILED** — `.planning/feedback/094-verification-gate-failed.md`
