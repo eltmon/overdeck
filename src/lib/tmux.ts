@@ -4,6 +4,7 @@ import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlink
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { randomUUID } from 'crypto';
 import { getPanopticonHome } from './paths.js';
 import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 
@@ -352,7 +353,7 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}-${randomUUID()}.txt`);
   await writeFile(tmpFile, keys);
 
   const lines = keys.split('\n');
