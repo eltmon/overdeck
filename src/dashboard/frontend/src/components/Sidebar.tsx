@@ -139,6 +139,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
               title="Go to Board"
             >
               <Eye className="w-5 h-5 text-primary shrink-0" />
+              {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Panopticon
               </span>
