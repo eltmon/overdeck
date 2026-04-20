@@ -4,6 +4,7 @@ import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { ActivityView } from './MissionControl/ActivityView';
 import { deriveAgentIssueId } from './AgentOutputPanel';
+import { MessagesTimeline } from './chat/MessagesTimeline';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 
 interface TerminalPanelProps {
@@ -73,11 +74,30 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
   // Never true for specialist tabs — they manage their own session lifecycle via onSessionEnded.
   const isStopped = isViewingWorkAgent && tmuxAlive === false;
 
+  const { data: conversationData } = useQuery({
+    queryKey: ['agent-conversation', agent.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(agent.id)}/conversation`);
+      if (!res.ok) {
+        return { messages: [], workLog: [], streaming: false };
+      }
+      const data = await res.json();
+      return {
+        messages: Array.isArray(data.messages) ? data.messages : [],
+        workLog: Array.isArray(data.workLog) ? data.workLog : [],
+        streaming: data.streaming === true,
+      };
+    },
+    enabled: isStopped,
+  });
+
+  const hasConversation = (conversationData?.messages?.length ?? 0) > 0 || (conversationData?.workLog?.length ?? 0) > 0;
+
   // Only fetch for stopped agents — running agents use XTerminal WebSocket
   const { data: output, refetch } = useQuery({
     queryKey: ['agent-output', agent.id],
     queryFn: () => fetchOutput(agent.id),
-    enabled: isStopped,
+    enabled: isStopped && !hasConversation,
   });
 
   useEffect(() => {
@@ -143,7 +163,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : displayTitle}
+          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -179,15 +199,25 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
 
       {/* Content */}
       {isStopped ? (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+        hasConversation ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MessagesTimeline
+              messages={conversationData?.messages ?? []}
+              workLog={conversationData?.workLog ?? []}
+              streaming={conversationData?.streaming ?? false}
+            />
+          </div>
+        ) : (
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
+        )
       ) : (
         <div className="flex-1 min-h-0">
           <TerminalSessionWrapper
