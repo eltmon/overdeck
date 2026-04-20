@@ -167,9 +167,11 @@ export function SessionDetail({ session, onClose }: Props) {
       </div>
 
       {/* Enrichment controls */}
-      {displaySession.enrichmentLevel < 2 && !displaySession.enrichmentFailed && (
+      {displaySession.enrichmentLevel < 2 && (
         <div className="px-3 py-2 border-t border-gray-800 shrink-0">
-          <div className="text-[10px] text-gray-500 mb-1.5">Enrich this session</div>
+          <div className="text-[10px] text-gray-500 mb-1.5">
+            {displaySession.enrichmentFailed ? 'Enrichment failed — retry:' : 'Enrich this session'}
+          </div>
           <div className="flex gap-2">
             {displaySession.enrichmentLevel < 1 && (
               <button
