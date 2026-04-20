@@ -231,7 +231,7 @@ SYSTEM
 ### 4. Typography Update
 
 **Current:** Space Grotesk (display) + Noto Sans (body)
-**New:** Space Grotesk (display) + DM Sans (body) + JetBrains Mono / SF Mono (code)
+**New:** DM Sans (universal body) + Space Grotesk (sidebar wordmark ONLY) + SF Mono (code / technical identifiers)
 
 **Why DM Sans over Noto Sans:**
 - DM Sans is what T3Code uses — proven in a similar dashboard context
@@ -251,27 +251,31 @@ SYSTEM
 ```js
 fontFamily: {
   display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
-  body: ['"DM Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
-  mono: ['"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'Menlo', 'monospace'],
+  body: ['"DM Sans"', 'system-ui', 'sans-serif'],
+  mono: ['"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
 }
 ```
 
 **Body default:**
 ```css
 body {
-  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: "DM Sans", system-ui, sans-serif;
 }
 ```
 
-**CRITICAL: Space Grotesk vs DM Sans boundary.**
-Space Grotesk has a distinctive double-story "g" that looks wrong in body text — it makes the UI look cheap and inconsistent. DM Sans has a clean single-story open-tail "g" that is correct for body/UI text.
+**CRITICAL: The Four Canonical Typography Rules (PAN-698)**
 
-- **Space Grotesk (`font-display`):** ONLY for the "Panopticon" brand/logo text and numeric stat values (e.g., "$12.47", "5/8"). Space Grotesk's double-story "g" looks bad in UI text, so any heading containing "g" (e.g., "In Progress", "Settings", "Agents") MUST use DM Sans.
-- **DM Sans (default):** EVERYTHING else — card titles, nav items, badge text ("RUNNING", "PLANNING"), button labels ("DEPLOY", "REVIEW"), stat labels ("COST TODAY", "AGENTS"), issue IDs, form text, dialog body, tooltips, toasts.
+These rules are absolute. There are no exceptions outside God View.
 
-The rule: if the text is inside a card, list row, badge, button, nav item, or form — it's DM Sans. If it's a standalone page/section heading — Space Grotesk. When in doubt, DM Sans.
+1. **DM Sans is the universal default for all non–God-View UI.** Body text, headings, labels, nav, buttons, dialogs, tables, forms, metric values, conversation prose, list titles, metadata — everything uses DM Sans unless explicitly covered by Rule 2 or 3.
 
-This was caught during mockup review (Stitch defaulted all labels to Space Grotesk). See `design/style-guide/STYLE-GUIDE.md` Section 2 "CRITICAL: Space Grotesk vs DM Sans Boundary" for the full specification.
+2. **SF Mono is ONLY for code and technical identifiers.** Code blocks, terminal output, command snippets, session IDs, run IDs, file paths, env vars, hashes, model IDs, branch names, tool names, vBRIEF IDs.
+
+3. **Space Grotesk (`font-display`) is ONLY for the sidebar "Panopticon" wordmark.** No other non–God-View surface uses `font-display`. Page titles, section headings, nav labels, stat values, card titles — all DM Sans.
+
+4. **God View uses its own scoped typography system.** God View (`src/dashboard/frontend/src/components/GodView/*`) is the only deliberate exception to Rules 1–3.
+
+See `design/style-guide/STYLE-GUIDE.md` Section 2 for the full specification.
 
 ### 5. Fractal Noise Texture Overlay
 
