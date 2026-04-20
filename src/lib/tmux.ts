@@ -352,7 +352,7 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const target = `${sessionName}:0.0`;
+  const target = sessionName;
   const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const lines = keys.split('\n');
   if (lines.length > 1) {

@@ -37,7 +37,7 @@ describe('sendKeysAsync', () => {
 
     const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
     expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
-    expect(sendKeysCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711:0.0')).toBe(true);
+    expect(sendKeysCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711')).toBe(true);
   });
 
   it('uses a unique buffer name for single-line sends', async () => {
