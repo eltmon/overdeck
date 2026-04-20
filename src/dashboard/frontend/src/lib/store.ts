@@ -104,7 +104,7 @@ function memoizeArraySelector<K extends keyof DashboardState, R>(
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectAgentList = memoizeArraySelector<DashboardState, 'agentsById', AgentSnapshot[]>(
+export const selectAgentList = memoizeArraySelector<'agentsById', AgentSnapshot[]>(
   'agentsById',
   (agents) => Object.values(agents),
 )
@@ -114,7 +114,7 @@ export const selectAgentById =
   (s: DashboardState): AgentSnapshot | undefined =>
     s.agentsById[id]
 
-export const selectSpecialistList = memoizeArraySelector<DashboardState, 'specialistsByName', SpecialistSnapshot[]>(
+export const selectSpecialistList = memoizeArraySelector<'specialistsByName', SpecialistSnapshot[]>(
   'specialistsByName',
   (specs) => Object.values(specs),
 )
@@ -129,7 +129,7 @@ export const selectReviewStatus =
  * and not already merged. Sorted oldest-ready first (FIFO) so issues
  * don't age in the queue.
  */
-export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
+export const selectAwaitingMerge = memoizeArraySelector<'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
   'reviewStatusByIssueId',
   (rsMap) =>
     Object.values(rsMap)
@@ -156,7 +156,7 @@ export const selectResources = (s: DashboardState): ResourceStats | null => s.re
 export const selectIssues = (s: DashboardState): Issue[] => s.issuesRaw as Issue[]
 
 export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =>
-  memoizeArraySelector<DashboardState, 'issuesRaw', unknown[]>(
+  memoizeArraySelector<'issuesRaw', Issue[]>(
     'issuesRaw',
     (issuesRaw): Issue[] => {
       const issues = issuesRaw as Issue[]
