@@ -78,8 +78,8 @@ export async function commitSynthesisRun(options: SynthesisCommitOptions): Promi
       'commit', '-m', commitMessage,
     ]);
 
-    const shaMatch = commitOut.match(/\[.*?\s+([0-9a-f]{7,40})\]/);
-    const commitSha = shaMatch ? shaMatch[1] : undefined;
+    const { stdout: shaOut } = await execFileAsync('git', ['-C', docsDir, 'rev-parse', 'HEAD']);
+    const commitSha = shaOut.trim() || undefined;
 
     // Push
     let pushed = false;
