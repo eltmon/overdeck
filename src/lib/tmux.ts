@@ -470,23 +470,37 @@ export async function confirmDelivery(
 ): Promise<boolean> {
   const start = Date.now();
   const poll = 1000;
-  const beforeLineCount = outputBefore.split('\n').filter(l => l.trim()).length;
+  const beforeText = outputBefore.trimEnd();
+  const processingPatterns = [
+    '●',
+    '⎿',
+    'Read',
+    '✻',
+    '✶',
+    '✽',
+    '✢',
+    'Generating',
+    'thinking',
+    'thought for',
+    'Retrying in',
+    'API Error',
+    "You've hit your limit",
+    'Tool use',
+  ];
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, poll));
     const after = await capturePaneAsync(sessionName, 50);
-    const afterLines = after.split('\n').filter(l => l.trim());
-    const afterLineCount = afterLines.length;
+    const afterText = after.trimEnd();
+    if (afterText === beforeText) continue;
 
-    if (afterLineCount > beforeLineCount + 1) return true;
+    const newOutput = afterText.startsWith(beforeText)
+      ? afterText.slice(beforeText.length)
+      : afterText;
 
-    const newOutput = afterLines.slice(beforeLineCount).join('\n');
-    if (
-      newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read') ||
-      newOutput.includes('✻') || newOutput.includes('·') || newOutput.includes('✶') ||
-      newOutput.includes('✽') || newOutput.includes('✢') || newOutput.includes('Generating') ||
-      newOutput.includes('thinking') || newOutput.includes('thought for')
-    ) return true;
+    if (processingPatterns.some(pattern => newOutput.includes(pattern))) {
+      return true;
+    }
   }
   return false;
 }

@@ -12,7 +12,7 @@ vi.mock('child_process', async () => {
   };
 });
 
-import { sendKeysAsync, waitForClaudePrompt } from '../../../src/lib/tmux.js';
+import { confirmDelivery, sendKeysAsync, waitForClaudePrompt } from '../../../src/lib/tmux.js';
 
 describe('sendKeysAsync', () => {
   beforeEach(() => {
@@ -94,5 +94,45 @@ describe('waitForClaudePrompt', () => {
     });
 
     await expect(waitForClaudePrompt('agent-pan-711', 10)).resolves.toBe(true);
+  });
+});
+
+describe('confirmDelivery', () => {
+  it('does not treat pasted prompt markers alone as successful processing', async () => {
+    execFileMock.mockReset();
+    let captureCount = 0;
+    execFileMock.mockImplementation((_file: string, args: string[], _options: unknown, callback: (error: null, result: { stdout: string; stderr: string }) => void) => {
+      if (Array.isArray(args) && args.includes('capture-pane')) {
+        captureCount += 1;
+        if (captureCount === 1) {
+          callback(null, { stdout: '❯', stderr: '' });
+          return;
+        }
+        callback(null, { stdout: '❯ [Pasted text #1 +45 lines]\n❯', stderr: '' });
+        return;
+      }
+      callback(null, { stdout: '', stderr: '' });
+    });
+
+    await expect(confirmDelivery('agent-pan-711', '❯', 10)).resolves.toBe(false);
+  });
+
+  it('detects real processing activity after delivery', async () => {
+    execFileMock.mockReset();
+    let captureCount = 0;
+    execFileMock.mockImplementation((_file: string, args: string[], _options: unknown, callback: (error: null, result: { stdout: string; stderr: string }) => void) => {
+      if (Array.isArray(args) && args.includes('capture-pane')) {
+        captureCount += 1;
+        if (captureCount === 1) {
+          callback(null, { stdout: '❯', stderr: '' });
+          return;
+        }
+        callback(null, { stdout: '❯ [Pasted text #1 +45 lines]\n✻ Generating… (3s)', stderr: '' });
+        return;
+      }
+      callback(null, { stdout: '', stderr: '' });
+    });
+
+    await expect(confirmDelivery('agent-pan-711', '❯', 1500)).resolves.toBe(true);
   });
 });
