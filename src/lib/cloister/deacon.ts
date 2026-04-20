@@ -1765,7 +1765,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
             const agentSession = `agent-${issueId.toLowerCase()}`;
             if (sessionExists(agentSession)) {
               await sendKeysAsync(agentSession,
-                `CI checks are failing on the PR after 5 retries. Read .planning/feedback/ for details, fix the failures, commit, then invoke the /rebase-and-submit skill for ${issueId}. The skill is an atomic task — do not stop until pan done has completed successfully.`
+                `CI checks are failing on the PR after 5 retries. Read .planning/feedback/ for details, fix the failures, commit, then run: pan done ${issueId}`
               );
             }
             ciEntry.count++; // increment past 5 so this block only fires once
@@ -1800,7 +1800,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         const agentSessionCi = `agent-${issueId.toLowerCase()}`;
         if (sessionExists(agentSessionCi)) {
           await sendKeysAsync(agentSessionCi,
-            `CI checks failed on the PR for ${issueId}. This may be transient. Read .planning/feedback/ for details, then invoke the /rebase-and-submit skill for ${issueId}.`
+            `CI checks failed on the PR for ${issueId}. This may be transient. Read .planning/feedback/ for details, fix any failures, commit, then run: pan done ${issueId}`
           );
         }
         actions.push(`CI failure notification for ${issueId} (attempt ${ciEntry.count}/5)`);
