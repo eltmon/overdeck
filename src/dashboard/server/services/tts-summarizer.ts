@@ -13,6 +13,8 @@ import { loadConfig } from '../../../lib/config-yaml.js';
 import { getEventStore, type StoredEvent } from '../event-store.js';
 import { emitActivityTts } from '../../../lib/activity-logger.js';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface SummarizerState {
   timer: ReturnType<typeof setInterval> | null;
   unsubscribe: (() => void) | null;
@@ -33,6 +35,8 @@ interface OpenAIChatCompletion {
     message: { content: string };
   }>;
 }
+
+// ─── Prompt ───────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a concise voice narrator for a software development dashboard.
 Your job: review recent activity and produce a SINGLE brief utterance suitable for text-to-speech.
@@ -59,12 +63,16 @@ Output: "PAN-123 verification failed due to lint errors."
 Input: "Agent idle", "Agent idle"
 Output: <silence>`;
 
+// ─── State ────────────────────────────────────────────────────────────────────
+
 const state: SummarizerState = {
   timer: null,
   unsubscribe: null,
   buffer: [],
   lastFlush: 0,
 };
+
+// ─── API call ─────────────────────────────────────────────────────────────────
 
 async function callSummarizer(
   model: string,
@@ -110,6 +118,8 @@ async function callSummarizer(
   }
 }
 
+// ─── Flush logic ──────────────────────────────────────────────────────────────
+
 async function flush(): Promise<void> {
   const { config } = loadConfig();
   if (!config.ttsSummarizer.enabled) return;
@@ -133,10 +143,13 @@ async function flush(): Promise<void> {
   try {
     emitActivityTts({ utterance, priority });
   } catch {
+    // Non-fatal
   }
 
   state.lastFlush = Date.now();
 }
+
+// ─── Event handler ────────────────────────────────────────────────────────────
 
 function onEvent(event: StoredEvent): void {
   if (event.type !== 'activity.entry') return;
@@ -154,13 +167,16 @@ function onEvent(event: StoredEvent): void {
 
   state.buffer.push(item);
 
+  // Cap buffer size to avoid unbounded growth if flush is stuck
   if (state.buffer.length > 50) {
     state.buffer.splice(0, state.buffer.length - 50);
   }
 }
 
+// ─── Lifecycle ────────────────────────────────────────────────────────────────
+
 export function startTtsSummarizer(): void {
-  if (state.timer !== null) return;
+  if (state.timer !== null) return; // Already running
 
   const { config } = loadConfig();
   if (!config.ttsSummarizer.enabled) {
@@ -174,6 +190,7 @@ export function startTtsSummarizer(): void {
   const intervalMs = config.ttsSummarizer.batchWindowSeconds * 1000;
   state.timer = setInterval(() => {
     flush().catch(() => {
+      // Swallow errors — must not crash the server
     });
   }, intervalMs);
 
