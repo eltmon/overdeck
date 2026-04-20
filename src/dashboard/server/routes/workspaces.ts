@@ -2507,8 +2507,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             }
 
             console.log(`[review] Parallel review dispatched for ${issueId}`);
-            // PAN-511: set 'reviewing' only after dispatch succeeds
-            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
@@ -2820,8 +2818,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (result.success) {
         console.log(`[request-review] Parallel review dispatched for ${issueId}`);
-        // PAN-511: set 'reviewing' only after dispatch succeeds
-        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
           timestamp: new Date().toISOString(),
@@ -2944,7 +2940,6 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             });
 
             if (result.success) {
-              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               console.log(`[reset-review] Re-dispatched review for ${issueId}`);
             } else {
               console.warn(
