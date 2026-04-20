@@ -504,7 +504,7 @@ async function spawnReviewer(
 
   const prompt = await readFile(promptFile, 'utf-8');
   const outputBefore = await capturePaneAsync(sessionName, 50);
-  await sendKeysAsync(sessionName, prompt, 'spawnReviewer');
+  await sendKeysAsync(sessionName, prompt, 'spawnReviewer', target);
   const delivered = await confirmDelivery(sessionName, outputBefore, 10000);
   if (!delivered) {
     throw new Error(`Reviewer prompt did not start processing: ${target}`);

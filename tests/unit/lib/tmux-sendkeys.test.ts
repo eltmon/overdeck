@@ -26,7 +26,7 @@ describe('sendKeysAsync', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses a distinct buffer per multiline segment', async () => {
+  it('uses the session target by default', async () => {
     await sendKeysAsync('agent-pan-711', 'first line\nsecond line');
 
     const setBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('set-buffer'));
@@ -38,6 +38,18 @@ describe('sendKeysAsync', () => {
     const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
     expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
     expect(sendKeysCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711')).toBe(true);
+  });
+
+  it('supports an explicit pane target', async () => {
+    await sendKeysAsync('agent-pan-711', 'first line\nsecond line', undefined, 'agent-pan-711:0.0');
+
+    const pasteBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('paste-buffer'));
+    expect(pasteBufferCalls).toHaveLength(2);
+    expect(pasteBufferCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711:0.0')).toBe(true);
+
+    const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
+    expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
+    expect(sendKeysCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711:0.0')).toBe(true);
   });
 
   it('uses a unique buffer name for single-line sends', async () => {
