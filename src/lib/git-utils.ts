@@ -18,31 +18,31 @@ const execAsync = promisify(exec);
  */
 async function hasRunningGitProcesses(repoPath: string): Promise<boolean> {
   try {
-    // Try to find git processes that reference this specific repository
-    // Use fuser to check if any process has the .git directory open (more reliable)
+    // Try to find git processes that reference this specific repository.
+    // Bound these probes so stale-lock cleanup cannot hang on shell/process tools.
     try {
       const gitDir = join(repoPath, '.git');
       const { stdout } = await execAsync(`fuser "${gitDir}" 2>/dev/null`, {
         encoding: 'utf-8',
+        timeout: 1000,
       });
-      // fuser returns PIDs if any process has the directory open
       return stdout.trim().length > 0;
     } catch {
-      // fuser not available or no processes found
-      // Fall back to checking ps for git processes in this directory
       try {
+        const escapedRepoPath = repoPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const { stdout } = await execAsync(
-          `ps aux | grep -E "git.*${repoPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" | grep -v grep`,
-          { encoding: 'utf-8' }
+          `ps aux | grep -E "git.*${escapedRepoPath}" | grep -v grep`,
+          {
+            encoding: 'utf-8',
+            timeout: 1000,
+          },
         );
         return stdout.trim().length > 0;
       } catch {
-        // No git processes found for this repo
         return false;
       }
     }
   } catch {
-    // Error checking - conservatively assume no processes
     return false;
   }
 }
