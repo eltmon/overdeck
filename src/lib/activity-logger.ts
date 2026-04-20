@@ -28,6 +28,21 @@ export interface EmitActivityOptions {
   issueId?: string;
 }
 
+export interface EmitDetailedOptions {
+  source: string;
+  level: ActivityLevel;
+  message: string;
+  details?: string;
+  issueId?: string;
+  triggeringEvent?: string;
+}
+
+export interface EmitTtsOptions {
+  utterance: string;
+  priority?: number; // 0=error (interrupt), 1=warn/success, 2=info
+  issueId?: string;
+}
+
 /**
  * Emit an activity.entry domain event to the SQLite event store.
  * Non-blocking — throws silently if event store is not yet initialized.
@@ -53,6 +68,55 @@ export function emitActivityEntry(options: EmitActivityOptions): void {
     store.append(entry);
   } catch {
     // Non-fatal — event store may not be initialized during early boot
+  }
+}
+
+/**
+ * Emit a detailed activity log entry — auto-generated from domain state changes.
+ * Use for fine-grained visibility into agent lifecycle, plan changes, pipeline transitions.
+ */
+export function emitActivityDetailed(options: EmitDetailedOptions): void {
+  try {
+    const store = getEventStore();
+    const entry = {
+      type: 'activity.detailed' as const,
+      timestamp: new Date().toISOString(),
+      payload: {
+        id: randomUUID(),
+        source: options.source,
+        level: options.level,
+        message: options.message,
+        details: options.details,
+        issueId: options.issueId,
+        triggeringEvent: options.triggeringEvent,
+      },
+    };
+    store.append(entry);
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Emit a TTS activity log entry — upleveled utterance for text-to-speech.
+ * Keep utterances short (<140 chars), human-friendly, and speakable.
+ */
+export function emitActivityTts(options: EmitTtsOptions): void {
+  try {
+    const store = getEventStore();
+    const entry = {
+      type: 'activity.tts' as const,
+      timestamp: new Date().toISOString(),
+      payload: {
+        id: randomUUID(),
+        utterance: options.utterance,
+        priority: options.priority ?? 2,
+        issueId: options.issueId,
+      },
+    };
+    store.append(entry);
+  } catch {
+    // Non-fatal
   }
 }
 

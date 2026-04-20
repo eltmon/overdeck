@@ -2,7 +2,7 @@ import { access, readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
-import { emitActivityEntry } from './activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import {
   upsertReviewStatus as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -217,39 +217,43 @@ export function setReviewStatus(
     if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, issueId });
   }
   if (update.reviewStatus && update.reviewStatus !== existing.reviewStatus) {
-    const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+    const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       reviewing: { level: 'info',    msg: `${issueId} — review started` },
-      passed:    { level: 'success', msg: `${issueId} — review passed` },
-      failed:    { level: 'error',   msg: `${issueId} — review failed${update.reviewNotes ? ': ' + update.reviewNotes : ''}` },
+      passed:    { level: 'success', msg: `${issueId} — review passed`, tts: `${issueId} review passed` },
+      failed:    { level: 'error',   msg: `${issueId} — review failed${update.reviewNotes ? ': ' + update.reviewNotes : ''}`, tts: `${issueId} review failed` },
       blocked:   { level: 'warn',    msg: `${issueId} — review blocked${update.reviewNotes ? ': ' + update.reviewNotes : ''}` },
     };
     const entry = rMap[update.reviewStatus];
     if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, issueId });
+    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.testStatus && update.testStatus !== existing.testStatus) {
-    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       testing:         { level: 'info',    msg: `${issueId} — tests running` },
-      passed:          { level: 'success', msg: `${issueId} — tests passed` },
-      failed:          { level: 'error',   msg: `${issueId} — tests failed${update.testNotes ? ': ' + update.testNotes : ''}` },
+      passed:          { level: 'success', msg: `${issueId} — tests passed`, tts: `${issueId} tests passed` },
+      failed:          { level: 'error',   msg: `${issueId} — tests failed${update.testNotes ? ': ' + update.testNotes : ''}`, tts: `${issueId} tests failed` },
       skipped:         { level: 'info',    msg: `${issueId} — tests skipped` },
       dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
     };
     const entry = tMap[update.testStatus];
     if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, issueId });
+    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
-    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
+    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       queued:    { level: 'info',    msg: `${issueId} — queued for merge` },
       merging:   { level: 'info',    msg: `${issueId} — merge in progress` },
       verifying: { level: 'info',    msg: `${issueId} — post-merge verification` },
-      merged:    { level: 'success', msg: `${issueId} — merged` },
-      failed:    { level: 'error',   msg: `${issueId} — merge failed${update.mergeNotes ? ': ' + update.mergeNotes : ''}` },
+      merged:    { level: 'success', msg: `${issueId} — merged`, tts: `${issueId} merged to main` },
+      failed:    { level: 'error',   msg: `${issueId} — merge failed${update.mergeNotes ? ': ' + update.mergeNotes : ''}`, tts: `${issueId} merge failed` },
     };
     const entry = mMap[update.mergeStatus];
     if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, issueId });
+    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.readyForMerge === true && !existing.readyForMerge) {
     emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
+    emitActivityTts({ utterance: `${issueId} ready for merge`, priority: 1, issueId });
   }
 
   // Dispatch test-agent when review transitions to 'passed'.
