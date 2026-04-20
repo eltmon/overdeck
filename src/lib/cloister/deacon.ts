@@ -1229,8 +1229,6 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Non-fatal: fall back to specialist-only detection
     }
 
-    let modified = false;
-
     const latestHistoryEntry = (
       history: Array<{ type: string; status: string; notes?: string }> | undefined,
       type: 'review' | 'test',

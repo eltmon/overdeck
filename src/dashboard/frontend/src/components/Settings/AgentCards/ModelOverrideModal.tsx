@@ -247,7 +247,6 @@ interface ModelOverrideModalProps {
   currentModel: ModelId;
   isOverride: boolean;
   enabledProviders: string[];
-  openRouterFavorites?: OpenRouterFavoriteModel[];
   onApply: (model: ModelId) => void;
   onRemove: () => void;
   onClose: () => void;
@@ -258,7 +257,6 @@ export function ModelOverrideModal({
   currentModel,
   isOverride,
   enabledProviders,
-  openRouterFavorites,
   onApply,
   onRemove,
   onClose,
@@ -302,29 +300,13 @@ export function ModelOverrideModal({
     return base;
   }, [enabledProviders, openRouterModels]);
 
-  // Build display list: base providers + OpenRouter favorites section
-  const displayProviders = useMemo(() => {
-    const base = availableProviders.map(([key, provider]) => ({
+  const displayProviders = useMemo(() =>
+    availableProviders.map(([key, provider]) => ({
       key,
       name: provider.name,
       models: provider.models,
-    }));
-    if (openRouterFavorites && openRouterFavorites.length > 0) {
-      base.push({
-        key: 'openrouter',
-        name: 'OpenRouter (Favorites)',
-        models: openRouterFavorites.map((m) => ({
-          id: m.id as ModelId,
-          name: m.name,
-          icon: Star,
-          tier: 'premium' as const,
-          capabilities: ['reasoning', 'code'] as Capability[],
-          description: `Context: ${(m.contextLength / 1000).toFixed(0)}K · Thinking: ${m.supportsThinking ? 'Yes' : 'No'}`,
-        })),
-      });
-    }
-    return base;
-  }, [availableProviders, openRouterFavorites]);
+    })),
+  [availableProviders]);
 
   // Find recommended model (best capability match)
   const recommendedModel = useMemo(() => {

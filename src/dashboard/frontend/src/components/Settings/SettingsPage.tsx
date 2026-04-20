@@ -1495,7 +1495,6 @@ export function SettingsPage() {
           enabledProviders={Object.entries(formData.models.providers)
             .filter(([_, enabled]) => enabled)
             .map(([provider]) => provider)}
-          openRouterFavorites={openRouterFavoriteModels}
           onApply={(model) => handleSetOverride(modalWorkType, model)}
           onRemove={() => handleRemoveOverride(modalWorkType)}
           onClose={() => setModalWorkType(null)}
