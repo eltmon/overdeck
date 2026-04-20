@@ -9,9 +9,12 @@ import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 
 const execFileAsync = promisify(execFile);
 
-let _sendKeysTmpCounter = 0;
-function uniqueTmpFile(): string {
-  return join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}-${++_sendKeysTmpCounter}.txt`);
+let _sendKeysCallCounter = 0;
+function uniqueCallId(): number {
+  return ++_sendKeysCallCounter;
+}
+function uniqueTmpFile(callId: number): string {
+  return join(tmpdir(), `pan-sendkeys-${process.pid}-${callId}.txt`);
 }
 
 const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
@@ -357,7 +360,8 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = uniqueTmpFile();
+  const callId = uniqueCallId();
+  const tmpFile = uniqueTmpFile(callId);
   await writeFile(tmpFile, keys);
 
   const lines = keys.split('\n');
@@ -368,7 +372,7 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     for (let i = 0; i < lines.length; i++) {
       if (lines[i]!.length > 0) {
         await writeFile(tmpFile, lines[i]!);
-        await tmpLoadAndPaste(sessionName, tmpFile, i);
+        await tmpLoadAndPaste(sessionName, tmpFile, callId, i);
       }
       if (i < lines.length - 1) {
         await tmuxExecAsync(['send-keys', '-t', sessionName, 'S-Enter'], { encoding: 'utf-8' });
@@ -377,25 +381,27 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     // Final Enter to submit
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } else {
-    // Single-line text — original approach
-    await tmuxExecAsync(['load-buffer', '-b', 'pan-single', tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', 'pan-single', '-t', sessionName, '-d'], { encoding: 'utf-8' });
+    // Single-line: use a call-scoped buffer name to prevent collision with concurrent calls.
+    const bufId = `pan-sendkeys-${process.pid}-${callId}`;
+    await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName, '-d'], { encoding: 'utf-8' });
     await new Promise(r => setTimeout(r, 300));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-    await tmuxExecAsync(['delete-buffer', '-b', 'pan-single'], { encoding: 'utf-8' }).catch(() => {});
+    await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
   }
 
   try { await unlink(tmpFile); } catch {}
 }
 
 /** Load a file into a unique tmux buffer, paste it into the session, then clean up. */
-async function tmpLoadAndPaste(sessionName: string, tmpFile: string, index: number): Promise<void> {
-  const bufId = `pan-sendkeys-${process.pid}-${index}`;
+async function tmpLoadAndPaste(sessionName: string, tmpFile: string, callId: number, index: number): Promise<void> {
+  // Buffer ID is scoped to both the call and the line index so concurrent multiline
+  // sends from the same process never share a buffer name.
+  const bufId = `pan-sendkeys-${process.pid}-${callId}-${index}`;
   await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
   await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName], { encoding: 'utf-8' });
   await new Promise(r => setTimeout(r, 50));
-  // Skip explicit delete — paste-buffer already delivered the text.
-  // tmux reuses buffer names safely across operations.
+  await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
 }
 
 /**
@@ -405,7 +411,7 @@ async function tmpLoadAndPaste(sessionName: string, tmpFile: string, index: numb
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = uniqueTmpFile();
+  const tmpFile = uniqueTmpFile(uniqueCallId());
   try {
     writeFileSync(tmpFile, keys);
     tmuxExecSync(['load-buffer', tmpFile]);
