@@ -103,7 +103,7 @@ export function AwaitingMergePage() {
         <header className="mb-6">
           <div className="flex items-center gap-3 mb-1">
             <GitMerge className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-semibold text-foreground font-display">
+            <h1 className="text-2xl font-semibold text-foreground">
               Awaiting Merge
             </h1>
             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">
