@@ -12,3 +12,4 @@
 - **[2026-04-20T19:23Z] review-agent → COMMENTED** — `.planning/feedback/087-review-agent-commented.md`
 - **[2026-04-20T19:24Z] review-agent → COMMENTED** — `.planning/feedback/088-review-agent-commented.md`
 - **[2026-04-20T21:50Z] verification-gate → FAILED** — `.planning/feedback/089-verification-gate-failed.md`
+- **[2026-04-20T21:55Z] verification-gate → FAILED** — `.planning/feedback/090-verification-gate-failed.md`
