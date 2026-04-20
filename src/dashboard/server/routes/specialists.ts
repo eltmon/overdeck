@@ -21,8 +21,8 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   DELETE /api/specialists/:name/queue/:itemId
  *   PUT    /api/specialists/:name/queue/reorder
  *   POST   /api/specialists/:name/auto-complete
- *   GET    /api/specialists/:project/:type/status
- *   POST   /api/specialists/:project/:type/kill
+ *   GET    /api/specialists/:project/:issueId/:type/status
+ *   POST   /api/specialists/:project/:issueId/:type/kill
  *   GET    /api/specialists/:project/:type/queue
  *   POST   /api/specialists/:project/:type/spawn
  *   GET    /api/specialists/:project/:type/runs
@@ -56,7 +56,6 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   loadReviewStatuses,
-  saveReviewStatuses,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import {
@@ -197,19 +196,16 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       results.push({ name, killed, sessionCleared, queueCleared: true });
     }
 
-    // Reset any "reviewing" statuses to "pending"
+    // Reset any "reviewing" statuses to "pending" — use per-issue atomic updates
+    // to avoid the read-all/write-all race that saveReviewStatuses() would reintroduce.
     let reviewStatusesReset = 0;
     try {
       const statuses = loadReviewStatuses();
       for (const key of Object.keys(statuses)) {
         if (statuses[key].reviewStatus === 'reviewing') {
-          statuses[key].reviewStatus = 'pending';
-          statuses[key].updatedAt = new Date().toISOString();
+          setReviewStatusBase(key, { reviewStatus: 'pending' });
           reviewStatusesReset++;
         }
-      }
-      if (reviewStatusesReset > 0) {
-        saveReviewStatuses(statuses);
       }
     } catch (e) {
       console.error('Failed to reset review statuses:', e);
@@ -330,18 +326,34 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // Apply the update (triggers side effects like idle state, queue processing)
     const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
 
-    // Set specialist state to idle.
+    // Set specialist state to idle and clear registry write-scope.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
     yield* Effect.promise(async () => {
       try {
-        const { getTmuxSessionName } =
+        const { getTmuxSessionName, updateRunMetadata, makeSpecialistRegistryKey } =
           await import('../../../lib/cloister/specialists.js');
-        const tmuxSession = getTmuxSessionName(`${specialist}-agent` as SpecialistType);
+        const project = resolveProjectFromIssue(normalizedIssueId);
+        const projectKey = project?.projectKey;
+        const tmuxSession = projectKey
+          ? getTmuxSessionName(`${specialist}-agent` as SpecialistType, projectKey, normalizedIssueId)
+          : getTmuxSessionName(`${specialist}-agent` as SpecialistType);
         saveAgentRuntimeState(tmuxSession, {
           state: 'idle',
           lastActivity: new Date().toISOString(),
         });
-        console.log(`[specialists/done] Set ${specialist}-agent to idle`);
+        console.log(`[specialists/done] Set ${tmuxSession} to idle`);
+
+        // Clear write-scope lock so the next specialist can claim the workspace
+        if (projectKey) {
+          const registryKey = makeSpecialistRegistryKey(`${specialist}-agent`, normalizedIssueId);
+          updateRunMetadata(projectKey, registryKey, {
+            currentRun: null,
+            writeScope: null,
+            workspace: null,
+            currentActivity: null,
+          });
+          console.log(`[specialists/done] Cleared registry lock for ${registryKey} (${projectKey})`);
+        }
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../lib/cloister/specialist-handoff-logger.js');
@@ -535,10 +547,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         yield* Effect.promise(async () => {
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-            const { sessionExists } = await import('../../../lib/tmux.js');
+            const { sessionExistsAsync } = await import('../../../lib/tmux.js');
             const { messageAgent, spawnAgent, getAgentState } = await import('../../../lib/agents.js');
 
-            if (sessionExists(workAgentId)) {
+            if (await sessionExistsAsync(workAgentId)) {
               // Agent is running — send rebase instructions directly
               const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
               await messageAgent(workAgentId, rebaseMsg);
@@ -554,16 +566,16 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     }
 
-    // When review fails, send feedback to work agent so it can fix the issues
-    if (specialist === 'review' && status === 'failed' && notes) {
+    // When review fails or is blocked, send feedback to work agent so it can fix the issues
+    if (specialist === 'review' && (status === 'failed' || status === 'blocked') && notes) {
       yield* Effect.promise(async () => {
         try {
           const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-          const { sessionExists } = await import('../../../lib/tmux.js');
+          const { sessionExistsAsync } = await import('../../../lib/tmux.js');
           const { messageAgent } = await import('../../../lib/agents.js');
 
-          if (sessionExists(workAgentId)) {
-            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"`;
+          if (await sessionExistsAsync(workAgentId)) {
+            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then re-request review with: pan review request ${normalizedIssueId} -m "Fixed review issues"`;
             await messageAgent(workAgentId, reviewMsg);
             console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
           }
@@ -1093,14 +1105,15 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/specialists/:project/:type/status ────────────────────────
+// ─── Route: GET /api/specialists/:project/:issueId/:type/status ───────────────
 
 const getProjectSpecialistStatusRoute = HttpRouter.add(
   'GET',
-  '/api/specialists/:project/:type/status',
+  '/api/specialists/:project/:issueId/:type/status',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
@@ -1110,20 +1123,41 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       );
     }
 
-    const { getSpecialistStatus } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const status = yield* Effect.promise(() => getSpecialistStatus(type, project));
-    return jsonResponse(status);
+    const {
+      makeSpecialistRegistryKey,
+      getRunMetadata,
+      getTmuxSessionName,
+      isProjectSpecialistActivelyRunning,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const { getAgentRuntimeStateAsync } = yield* Effect.promise(() => import('../../../lib/agents.js'));
+
+    const registryKey = makeSpecialistRegistryKey(type, issueId);
+    const metadata = getRunMetadata(project, registryKey);
+    const tmuxSession = metadata.tmuxSession ?? getTmuxSessionName(type, project, issueId);
+    const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(tmuxSession));
+    const isRunning = isProjectSpecialistActivelyRunning(runtimeState, metadata.currentRun !== null);
+
+    return jsonResponse({
+      name: type,
+      state: isRunning ? 'active' : 'sleeping',
+      isRunning,
+      tmuxSession,
+      currentIssue: issueId,
+      sessionId: metadata.sessionId,
+      contextTokens: undefined,
+    });
   })),
 );
 
-// ─── Route: POST /api/specialists/:project/:type/kill ────────────────────────
+// ─── Route: POST /api/specialists/:project/:issueId/:type/kill ───────────────
 
 const postProjectSpecialistKillRoute = HttpRouter.add(
   'POST',
-  '/api/specialists/:project/:type/kill',
+  '/api/specialists/:project/:issueId/:type/kill',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
@@ -1133,8 +1167,13 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const tmuxSession = getTmuxSessionName(type, project);
+    const { getTmuxSessionName, makeSpecialistRegistryKey, getRunMetadata } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+
+    const registryKey = makeSpecialistRegistryKey(type, issueId);
+    const tmuxSession = getRunMetadata(project, registryKey).tmuxSession
+      ?? getTmuxSessionName(type, project, issueId);
+
     yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
     // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
     saveAgentRuntimeState(tmuxSession, {
@@ -1143,7 +1182,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     });
     return jsonResponse({
       success: true,
-      message: `Killed ${type} (${project})`,
+      message: `Killed ${type} (${project}/${issueId})`,
     });
   })),
 );
@@ -1537,7 +1576,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
     const body = yield* readJsonBody;
-    const { status, notes } = body as { status?: string; notes?: string };
+    const { status, notes, issueId } = body as { status?: string; notes?: string; issueId?: string };
 
     if (!status || !['passed', 'failed', 'blocked'].includes(status)) {
       return jsonResponse(
@@ -1555,7 +1594,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
 
     const { signalSpecialistCompletion } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    signalSpecialistCompletion(project, type, { status, notes });
+    signalSpecialistCompletion(project, type, { status, notes }, issueId);
     return jsonResponse({
       success: true,
       message: 'Specialist completion signaled, grace period started',

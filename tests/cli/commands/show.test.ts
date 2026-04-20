@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   shadowMock, cvMock, contextMock, healthMock,
-  getShadowStateMock, pingAgentMock, getAgentCVMock,
+  getShadowStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock,
 } = vi.hoisted(() => ({
   shadowMock: vi.fn().mockResolvedValue(undefined),
   cvMock: vi.fn().mockResolvedValue(undefined),
@@ -20,6 +20,7 @@ const {
   getShadowStateMock: vi.fn(),
   pingAgentMock: vi.fn(),
   getAgentCVMock: vi.fn(),
+  getAgentRuntimeStateMock: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/commands/shadow.js', () => ({
@@ -44,6 +45,9 @@ vi.mock('../../../src/lib/health.js', () => ({
 vi.mock('../../../src/lib/cv.js', () => ({
   getAgentCV: getAgentCVMock,
 }));
+vi.mock('../../../src/lib/agents.js', () => ({
+  getAgentRuntimeState: getAgentRuntimeStateMock,
+}));
 
 import { showCommand } from '../../../src/cli/commands/show.js';
 
@@ -60,6 +64,7 @@ describe('showCommand', () => {
       forceKillCount: 0,
       recoveryCount: 0,
       inCooldown: false,
+      lastActivity: new Date().toISOString(),
     });
     getAgentCVMock.mockReturnValue({
       agentId: 'agent-pan-6',
@@ -78,6 +83,7 @@ describe('showCommand', () => {
       skillsUsed: [],
       recentWork: [],
     });
+    getAgentRuntimeStateMock.mockReturnValue(null);
   });
 
   describe('flag delegation', () => {
@@ -184,7 +190,6 @@ describe('showCommand', () => {
 
       await showCommand('PAN-8', { json: true });
 
-      // Capture call state BEFORE restoring — mockRestore clears call history.
       const calls = logSpy.mock.calls.slice();
       logSpy.mockRestore();
 
@@ -195,6 +200,56 @@ describe('showCommand', () => {
       expect(payload).toHaveProperty('shadow');
       expect(payload).toHaveProperty('health');
       expect(payload).toHaveProperty('cv');
+    });
+
+    it('shows in-progress work with started time instead of never and uses lastActivity instead of lastPing', async () => {
+      const now = new Date().toISOString();
+      pingAgentMock.mockResolvedValue({
+        agentId: 'agent-pan-446',
+        status: 'warning',
+        consecutiveFailures: 0,
+        forceKillCount: 0,
+        recoveryCount: 0,
+        inCooldown: false,
+        lastPing: new Date(Date.now() + 60_000).toISOString(),
+        lastActivity: '2026-04-18T19:32:09-04:00',
+      });
+      getAgentRuntimeStateMock.mockReturnValue({
+        state: 'waiting-on-human',
+        lastActivity: '2026-04-18T19:32:09-04:00',
+        waitingNotification: 'Claude is waiting for your input',
+      });
+      getAgentCVMock.mockReturnValue({
+        agentId: 'agent-pan-446',
+        createdAt: now,
+        lastActive: now,
+        runtime: 'claude',
+        model: 'sonnet',
+        stats: {
+          totalIssues: 2,
+          successCount: 0,
+          failureCount: 0,
+          abandonedCount: 0,
+          avgDuration: 0,
+          successRate: 0,
+        },
+        skillsUsed: [],
+        recentWork: [
+          { issueId: 'PAN-446', startedAt: '2026-04-18T22:07:38.196Z', outcome: 'in_progress' },
+        ],
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-446');
+      const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      logSpy.mockRestore();
+
+      expect(output).toContain('waiting on human');
+      expect(output).toContain('2 total (0 done, 2 active)');
+      expect(output).toContain('in_progress');
+      expect(output).toContain('started');
+      expect(output).not.toContain('in_progress never');
+      expect(output).not.toContain('last activity 0s ago');
     });
   });
 });

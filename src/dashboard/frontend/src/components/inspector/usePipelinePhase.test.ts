@@ -49,7 +49,7 @@ describe('derivePipelinePhase precedence table', () => {
       const input = makeInput({ reviewStatus: makeReviewStatus({ mergeStatus: 'queued' }) });
       const { phase, activeSession } = derivePipelinePhase(input);
       expect(phase).toBe('merging');
-      expect(activeSession).toBe('specialist-panopticon-merge-agent');
+      expect(activeSession).toBe('specialist-panopticon-pan-509-merge-agent');
     });
 
     it('returns merging when mergeStatus === merging', () => {
@@ -78,7 +78,7 @@ describe('derivePipelinePhase precedence table', () => {
         reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
       });
       const { activeSession } = derivePipelinePhase(input);
-      expect(activeSession).toBe('specialist-my-project-merge-agent');
+      expect(activeSession).toBe('specialist-my-project-pan-509-merge-agent');
     });
 
     it('falls back to global session name when no project key', () => {
@@ -92,7 +92,7 @@ describe('derivePipelinePhase precedence table', () => {
 
     it('returns null activeSession when merging session is dead', () => {
       const input = makeInput({ reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }) });
-      const dead = new Set(['specialist-panopticon-merge-agent']);
+      const dead = new Set(['specialist-panopticon-pan-509-merge-agent']);
       const { activeSession } = derivePipelinePhase(input, dead);
       expect(activeSession).toBeNull();
     });
@@ -128,7 +128,7 @@ describe('derivePipelinePhase precedence table', () => {
       const input = makeInput({ reviewStatus: makeReviewStatus({ testStatus: 'testing' }) });
       const { phase, activeSession } = derivePipelinePhase(input);
       expect(phase).toBe('testing');
-      expect(activeSession).toBe('specialist-panopticon-test-agent');
+      expect(activeSession).toBe('specialist-panopticon-pan-509-test-agent');
     });
 
     it('does NOT return testing when testStatus !== testing', () => {
@@ -147,7 +147,7 @@ describe('derivePipelinePhase precedence table', () => {
 
     it('returns null activeSession when test session is dead', () => {
       const input = makeInput({ reviewStatus: makeReviewStatus({ testStatus: 'testing' }) });
-      const dead = new Set(['specialist-panopticon-test-agent']);
+      const dead = new Set(['specialist-panopticon-pan-509-test-agent']);
       const { activeSession } = derivePipelinePhase(input, dead);
       expect(activeSession).toBeNull();
     });
@@ -158,7 +158,7 @@ describe('derivePipelinePhase precedence table', () => {
       const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
       const { phase, activeSession } = derivePipelinePhase(input);
       expect(phase).toBe('reviewing');
-      expect(activeSession).toBe('specialist-panopticon-review-agent');
+      expect(activeSession).toBe('specialist-panopticon-pan-509-review-agent');
     });
 
     it('does NOT return reviewing when reviewStatus !== reviewing', () => {
@@ -178,7 +178,7 @@ describe('derivePipelinePhase precedence table', () => {
 
     it('returns null activeSession when review session is dead', () => {
       const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
-      const dead = new Set(['specialist-panopticon-review-agent']);
+      const dead = new Set(['specialist-panopticon-pan-509-review-agent']);
       const { activeSession } = derivePipelinePhase(input, dead);
       expect(activeSession).toBeNull();
     });
@@ -354,7 +354,7 @@ describe('derivePipelinePhase availableTerminals', () => {
 
   it('marks dead sessions as disabled', () => {
     const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'passed' }) });
-    const dead = new Set(['specialist-panopticon-review-agent']);
+    const dead = new Set(['specialist-panopticon-pan-509-review-agent']);
     const { availableTerminals } = derivePipelinePhase(input, dead);
     const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
     expect(reviewTab?.disabled).toBe(true);

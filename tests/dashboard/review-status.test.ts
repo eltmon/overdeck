@@ -10,7 +10,8 @@ import {
   getReviewStatus,
   clearReviewStatus,
   loadReviewStatuses,
-} from '../../src/dashboard/server/review-status.js';
+  saveReviewStatuses,
+} from '../../src/lib/review-status-json.js';
 
 let testDir: string;
 let statusFile: string;
@@ -159,7 +160,10 @@ describe('setReviewStatus', () => {
     expect(result.mergeNotes).toBeUndefined();
   });
 
-  it('keeps readyForMerge true when verification has failed (test pass is authoritative)', () => {
+  it('preserves explicit readyForMerge=true even when verificationStatus=failed', () => {
+    // verificationStatus no longer blocks readyForMerge — normalizeReviewStatus only
+    // clears it for mergeStatus=merged, reviewStatus!=passed, or testStatus!=passed.
+    // The post-rebase gate in triggerMerge() is the authoritative quality gate.
     const result = setReviewStatus('PAN-113', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -280,5 +284,46 @@ describe('setReviewStatus — regression guard (PAN-338)', () => {
     const result = setReviewStatus('PAN-338d', { reviewStatus: 'reviewing' }, statusFile);
 
     expect(result.reviewStatus).toBe('reviewing');
+  });
+});
+
+// ── saveReviewStatuses / loadReviewStatuses JSON-path semantics ───────────────
+// These exercise src/lib/review-status-json.ts (the JSON-file path used by CLI
+// tooling and tests). DB-backed semantics live in review-status-clearstuck.test.ts.
+
+describe('saveReviewStatuses (JSON path)', () => {
+  it('persists batch mutations to the JSON file', () => {
+    // Seed two entries
+    setReviewStatus('PAN-100', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatus('PAN-101', { reviewStatus: 'reviewing' }, statusFile);
+
+    // Load → mutate → save
+    const statuses = loadReviewStatuses(statusFile);
+    statuses['PAN-100'].reviewStatus = 'pending';
+    statuses['PAN-101'].reviewStatus = 'pending';
+    saveReviewStatuses(statuses, statusFile);
+
+    const after = loadReviewStatuses(statusFile);
+    expect(after['PAN-100'].reviewStatus).toBe('pending');
+    expect(after['PAN-101'].reviewStatus).toBe('pending');
+  });
+
+  it('deletes entries absent from the passed map (replace-all semantics)', () => {
+    setReviewStatus('PAN-200', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatus('PAN-201', { reviewStatus: 'passed' }, statusFile);
+
+    const statuses = loadReviewStatuses(statusFile);
+    delete (statuses as Record<string, unknown>)['PAN-201'];
+    saveReviewStatuses(statuses, statusFile);
+
+    const after = loadReviewStatuses(statusFile);
+    expect(after['PAN-200']).toBeDefined();
+    expect(after['PAN-201']).toBeUndefined();
+  });
+
+  it('round-trips an empty map (clears all entries)', () => {
+    setReviewStatus('PAN-300', { reviewStatus: 'passed' }, statusFile);
+    saveReviewStatuses({}, statusFile);
+    expect(Object.keys(loadReviewStatuses(statusFile))).toHaveLength(0);
   });
 });

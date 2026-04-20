@@ -152,12 +152,6 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-admin-cloister-stop', label: 'pan admin cloister stop', description: 'Stop Cloister monitoring', insert: 'pan admin cloister stop', category: 'Admin' },
   { id: 'pan-admin-cloister-emergency-stop', label: 'pan admin cloister emergency-stop', description: 'Emergency stop — kill ALL agents', insert: 'pan admin cloister emergency-stop', category: 'Admin' },
 
-  // ─── Convoy ──────────────────────────────────────────────────────────────────
-  { id: 'pan-convoy-start', label: 'pan convoy start', description: 'Start a new convoy', insert: 'pan convoy start ', category: 'Convoy' },
-  { id: 'pan-convoy-status', label: 'pan convoy status', description: 'Show convoy status', insert: 'pan convoy status ', category: 'Convoy' },
-  { id: 'pan-convoy-list', label: 'pan convoy list', description: 'List all convoys', insert: 'pan convoy list', category: 'Convoy' },
-  { id: 'pan-convoy-stop', label: 'pan convoy stop', description: 'Stop a running convoy', insert: 'pan convoy stop ', category: 'Convoy' },
-
   // ─── Admin: Specialists ──────────────────────────────────────────────────────
   { id: 'pan-admin-specialists-list', label: 'pan admin specialists list', description: 'Show all specialists with status', insert: 'pan admin specialists list', category: 'Admin' },
   { id: 'pan-admin-specialists-wake', label: 'pan admin specialists wake', description: 'Wake up a specialist agent', insert: 'pan admin specialists wake ', category: 'Admin' },

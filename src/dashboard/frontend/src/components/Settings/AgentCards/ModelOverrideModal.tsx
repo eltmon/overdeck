@@ -1,13 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   type LucideIcon,
   Gem,
   Sparkles,
   Zap,
-  Code2,
-  Brain,
   FlaskConical,
   Layers,
+  Network,
   Globe,
   X,
   CheckCircle2,
@@ -50,47 +49,47 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
       { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
-      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous gen Sonnet, strong coding performance' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },
   openai: {
     name: 'OpenAI',
     models: [
-      { id: 'gpt-5.4-pro' as ModelId, name: 'GPT-5.4 Pro', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math', 'agentic'], description: 'Top-tier OpenAI coding and reasoning' },
-      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Code2, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Best everyday OpenAI implementation model' },
-      { id: 'o3' as ModelId, name: 'O3', icon: Brain, tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math'], description: 'Deep reasoning model for debugging and analysis' },
-      { id: 'o4-mini' as ModelId, name: 'O4 Mini', icon: FlaskConical, tier: 'balanced', capabilities: ['reasoning', 'code', 'fast'], description: 'Fast reasoning model with strong code support' },
-      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: Layers, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code', 'reasoning'], description: 'Fast, cheap, and capable for high-volume work' },
-      { id: 'gpt-5.4-nano' as ModelId, name: 'GPT-5.4 Nano', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Cheapest OpenAI lane for tiny helper tasks' },
+      { id: 'gpt-5.4-pro' as ModelId, name: 'GPT-5.4 Pro', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Most advanced OpenAI model. Pro subscribers only.' },
+      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship. 1.05M context, strong coding.' },
+      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: FlaskConical, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and efficient. 400K context.' },
+      { id: 'gpt-5.4-nano' as ModelId, name: 'GPT-5.4 Nano', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Fastest OpenAI model. API-only.' },
+      { id: 'o3' as ModelId, name: 'O3', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic'], description: 'Deep reasoning. Best for debugging and complex analysis.' },
+      { id: 'o4-mini' as ModelId, name: 'O4 Mini', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'fast'], description: 'Compact reasoning model. Fast, cost-efficient.' },
+      { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: FlaskConical, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
+      { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
     ],
   },
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship with strong large-context reasoning' },
-      { id: 'gemini-3-flash' as ModelId, name: 'Gemini 3 Flash', icon: Zap, tier: 'balanced', capabilities: ['fast', 'large-context', 'code'], description: 'Fast large-context model for exploration-heavy work' },
-      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Lowest-cost Gemini lane' },
+      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
+      { id: 'gemini-3-flash' as ModelId, name: 'Gemini 3 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and cheap with 1M context' },
+      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
     ],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Latest Kimi coding preview model' },
-      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best-value implementation model, 256K context' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
+    ],
+  },
+  zai: {
+    name: 'Zhipu (GLM)',
+    models: [
+      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 128K context, strong agentic coding' },
     ],
   },
   minimax: {
     name: 'MiniMax',
     models: [
-      { id: 'minimax-m2.7' as ModelId, name: 'MiniMax M2.7', icon: Globe, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Anthropic-compatible coding model with strong value' },
-      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'MiniMax M2.7 Highspeed', icon: Zap, tier: 'fast', capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'fast'], description: 'Same MiniMax quality tier with higher throughput' },
-    ],
-  },
-  zai: {
-    name: 'Z.AI',
-    models: [
-      { id: 'glm-5.1' as ModelId, name: 'GLM 5.1', icon: Globe, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI direct provider for GLM 5.1' },
+      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
+      { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],
   },
 };
@@ -107,16 +106,17 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'specialist-merge-agent': ['code'],
   'specialist-inspect-agent': ['reasoning', 'code'],
   'specialist-uat-agent': ['reasoning', 'code'],
-  'convoy:security-reviewer': ['reasoning', 'code'],
-  'convoy:performance-reviewer': ['reasoning', 'code'],
-  'convoy:correctness-reviewer': ['reasoning', 'code'],
-  'convoy:synthesis-agent': ['reasoning'],
+  'planning-agent': ['reasoning'],
+  'status-review': ['reasoning'],
+  'review:security': ['reasoning', 'code'],
+  'review:performance': ['reasoning', 'code'],
+  'review:correctness': ['reasoning', 'code'],
+  'review:requirements': ['reasoning', 'code'],
+  'review:synthesis': ['reasoning'],
   'subagent:explore': ['fast', 'reasoning'],
   'subagent:plan': ['reasoning'],
   'subagent:bash': ['fast', 'code'],
   'subagent:general-purpose': ['reasoning', 'code'],
-  'planning-agent': ['reasoning'],
-  'status-review': ['reasoning'],
   'cli:interactive': ['reasoning', 'code'],
   'cli:quick-command': ['fast'],
 };
@@ -133,16 +133,17 @@ export const WORK_TYPE_NAMES: Record<string, string> = {
   'specialist-merge-agent': 'Merge Agent',
   'specialist-inspect-agent': 'Inspect Agent',
   'specialist-uat-agent': 'UAT Agent',
-  'convoy:security-reviewer': 'Security Reviewer',
-  'convoy:performance-reviewer': 'Performance Reviewer',
-  'convoy:correctness-reviewer': 'Correctness Reviewer',
-  'convoy:synthesis-agent': 'Synthesis Agent',
+  'planning-agent': 'Planning Agent',
+  'status-review': 'Status Review',
+  'review:security': 'Security Reviewer',
+  'review:performance': 'Performance Reviewer',
+  'review:correctness': 'Correctness Reviewer',
+  'review:requirements': 'Requirements Reviewer',
+  'review:synthesis': 'Synthesis Agent',
   'subagent:explore': 'Explore Subagent',
   'subagent:plan': 'Plan Subagent',
   'subagent:bash': 'Bash Subagent',
   'subagent:general-purpose': 'General Purpose Subagent',
-  'planning-agent': 'Planning Agent',
-  'status-review': 'Status Review',
   'cli:interactive': 'CLI Interactive',
   'cli:quick-command': 'CLI Quick Command',
 };
@@ -178,41 +179,37 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // Anthropic models
   if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
-  if (idLower.includes('sonnet') && idLower.includes('4.6')) return models.find(m => m.id === 'claude-sonnet-4-6');
   if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-6');
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
   if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-6');
 
-  // OpenAI models
+  // OpenAI models — order matters: specific patterns before broad ones
   if (idLower.includes('gpt-5.4-pro')) return models.find(m => m.id === 'gpt-5.4-pro');
-  if (idLower.includes('gpt-5.4') && idLower.includes('mini')) return models.find(m => m.id === 'gpt-5.4-mini');
-  if (idLower.includes('gpt-5.4') && idLower.includes('nano')) return models.find(m => m.id === 'gpt-5.4-nano');
-  if (idLower.includes('gpt-5.4') || idLower.includes('gpt-5.2-codex')) return models.find(m => m.id === 'gpt-5.4');
-  if (idLower.includes('gpt-4o-mini')) return models.find(m => m.id === 'gpt-5.4-nano');
-  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-5.4-mini');
-  if (idLower.includes('o4') && idLower.includes('mini')) return models.find(m => m.id === 'o4-mini');
-  if (idLower.includes('o3')) return models.find(m => m.id === 'o3');
+  if (idLower.includes('gpt-5.4-nano')) return models.find(m => m.id === 'gpt-5.4-nano');
+  if (idLower.includes('gpt-5.4-mini')) return models.find(m => m.id === 'gpt-5.4-mini');
+  if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.4');
+  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
+  if (idLower.includes('o4-mini')) return models.find(m => m.id === 'o4-mini');
+  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3');
 
   // Google models
-  if (idLower.includes('gemini') && idLower.includes('lite')) return models.find(m => m.id === 'gemini-3.1-flash-lite-preview');
   if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');
   if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
 
   // Kimi models
-  if (id === 'K2.6-code-preview') return models.find(m => m.id === 'K2.6-code-preview');
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
     return models.find(m => m.id === 'kimi-k2.5');
+  }
+
+  // GLM models
+  if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
+    return models.find(m => m.id === 'glm-5.1');
   }
 
   // MiniMax models
   if (idLower.includes('minimax')) {
     if (idLower.includes('highspeed')) return models.find(m => m.id === 'minimax-m2.7-highspeed');
     return models.find(m => m.id === 'minimax-m2.7');
-  }
-
-  // Z.AI models
-  if (idLower.includes('glm') || idLower.includes('zai')) {
-    return models.find(m => m.id === 'glm-5.1');
   }
 
   return undefined;
@@ -267,16 +264,43 @@ export function ModelOverrideModal({
   onClose,
 }: ModelOverrideModalProps) {
   const [selectedModel, setSelectedModel] = useState<ModelId>(currentModel);
+  const [openRouterModels, setOpenRouterModels] = useState<ModelDef[]>([]);
 
   const workTypeName = WORK_TYPE_NAMES[workType] || workType;
   const requiredCapabilities = WORK_TYPE_CAPABILITIES[workType] || ['reasoning'];
 
-  // Filter providers based on enabled list
+  // Fetch OpenRouter favorites when provider is enabled
+  useEffect(() => {
+    if (!enabledProviders.includes('openrouter')) return;
+    fetch('/api/settings/openrouter/models')
+      .then(r => r.json())
+      .then(({ models, favorites }: { models: { id: string; name: string }[]; favorites: string[] }) => {
+        const favSet = new Set(favorites);
+        const favModels: ModelDef[] = models
+          .filter(m => favSet.has(m.id))
+          .map(m => ({
+            id: m.id as ModelId,
+            name: m.name,
+            icon: Globe,
+            tier: 'balanced' as const,
+            capabilities: ['reasoning', 'code'] as Capability[],
+            description: `OpenRouter: ${m.id}`,
+          }));
+        setOpenRouterModels(favModels);
+      })
+      .catch(() => {});
+  }, [enabledProviders]);
+
+  // Filter providers based on enabled list, injecting OpenRouter favorites dynamically
   const availableProviders = useMemo(() => {
-    return Object.entries(MODELS_BY_PROVIDER).filter(([key]) =>
+    const base = Object.entries(MODELS_BY_PROVIDER).filter(([key]) =>
       key === 'anthropic' || enabledProviders.includes(key)
     );
-  }, [enabledProviders]);
+    if (enabledProviders.includes('openrouter') && openRouterModels.length > 0) {
+      base.push(['openrouter', { name: 'OpenRouter (Favorites)', models: openRouterModels }]);
+    }
+    return base;
+  }, [enabledProviders, openRouterModels]);
 
   // Build display list: base providers + OpenRouter favorites section
   const displayProviders = useMemo(() => {
@@ -339,18 +363,18 @@ export function ModelOverrideModal({
               <h1 className="text-content tracking-tight text-2xl font-bold">Select Model</h1>
               <div className="flex items-center gap-3">
                 <span className="text-content-muted text-sm">Task:</span>
-                <span className="text-blue-400 font-medium">{workTypeName}</span>
+                <span className="text-primary font-medium">{workTypeName}</span>
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-content-muted text-xs">Needs:</span>
                 {requiredCapabilities.map(cap => (
-                  <span key={cap} className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">
+                  <span key={cap} className="text-[10px] px-2 py-0.5 rounded badge-bg-primary text-primary font-medium">
                     {CAPABILITY_INFO[cap].name}
                   </span>
                 ))}
               </div>
             </div>
-            <button onClick={onClose} className="text-content-muted hover:text-content transition-colors p-1" aria-label="Close model picker">
+            <button onClick={onClose} className="text-content-muted hover:text-content transition-colors p-1">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -379,16 +403,16 @@ export function ModelOverrideModal({
                     title={model.description}
                     className={`group flex items-center gap-4 px-6 py-3.5 cursor-pointer transition-all border-l-2 ${
                       isSelected
-                        ? 'bg-blue-500/10 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+                        ? 'badge-bg-primary border-primary shadow-[0_0_15px_var(--primary)]'
                         : isRecommended
-                          ? 'bg-blue-500/5 border-blue-400/50 hover:bg-blue-500/10'
+                          ? 'badge-bg-primary border-primary/50 hover:bg-primary/10'
                           : 'border-transparent hover:bg-surface-overlay'
                     }`}
                   >
                     <div className={`flex items-center justify-center rounded-lg shrink-0 size-10 transition-colors ${
-                      isSelected || isRecommended ? 'bg-blue-500/20' : 'bg-surface-emphasis group-hover:bg-divider'
+                      isSelected || isRecommended ? 'badge-bg-primary' : 'bg-surface-emphasis group-hover:bg-divider'
                     }`}>
-                      <model.icon className={`w-5 h-5 ${isSelected || isRecommended ? 'text-blue-400' : 'text-content-muted'}`} />
+                      <model.icon className={`w-5 h-5 ${isSelected || isRecommended ? 'text-primary' : 'text-content-muted'}`} />
                     </div>
 
                     <div className="flex flex-1 flex-col justify-center min-w-0">
@@ -403,17 +427,17 @@ export function ModelOverrideModal({
                           </span>
                         )}
                         {isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-content font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-primary text-[9px] text-white font-bold uppercase tracking-tight shrink-0">
                             Best Fit
                           </span>
                         )}
                         {model.tier === 'premium' && !isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[9px] text-amber-400 font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full badge-bg-warning text-[9px] text-warning font-bold uppercase tracking-tight shrink-0">
                             Premium
                           </span>
                         )}
                         {model.tier === 'fast' && (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[9px] text-emerald-400 font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full badge-bg-success text-[9px] text-success font-bold uppercase tracking-tight shrink-0">
                             Fast
                           </span>
                         )}
@@ -428,7 +452,7 @@ export function ModelOverrideModal({
                               title={CAPABILITY_INFO[cap].description}
                               className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                 isMatching
-                                  ? 'bg-blue-500/20 text-blue-300'
+                                  ? 'badge-bg-primary text-primary'
                                   : 'bg-surface-emphasis text-content-subtle border border-divider'
                               }`}
                             >
@@ -442,13 +466,15 @@ export function ModelOverrideModal({
                     {/* Match indicator */}
                     <div className="flex items-center gap-2 shrink-0">
                       {matchScore === 1 ? (
-                        <span className="text-emerald-400 text-xs font-bold">100%</span>
+                        <span className="text-success text-xs font-bold">100%</span>
                       ) : matchScore >= 0.5 ? (
-                        <span className="text-amber-400 text-xs font-bold">{Math.round(matchScore * 100)}%</span>
+                        <span className="text-warning text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       ) : (
                         <span className="text-content-muted text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       )}
-                      {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
+                      {isSelected && (
+                        <CheckCircle2 className="w-5 h-5 text-primary" />
+                      )}
                     </div>
                   </div>
                 );
@@ -463,7 +489,7 @@ export function ModelOverrideModal({
             {isOverride && (
               <button
                 onClick={() => { onRemove(); onClose(); }}
-                className="text-rose-400 hover:text-rose-300 text-sm font-medium transition-colors"
+                className="text-destructive hover:text-destructive/80 text-sm font-medium transition-colors"
               >
                 Remove Override
               </button>
@@ -479,7 +505,7 @@ export function ModelOverrideModal({
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-6 py-2 rounded-lg bg-blue-500 text-content font-bold hover:bg-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="px-6 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Apply Selection
             </button>

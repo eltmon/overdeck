@@ -66,7 +66,7 @@ function broadcastToRenderers(channel: string, ...args: unknown[]): void {
  * Initialize the auto-updater service.
  * Sets up event handlers and starts periodic update checks.
  */
-export function initializeAutoUpdater(): void {
+export function initializeAutoUpdater(channel: string = "latest"): void {
   if (initialized) {
     console.log("[updater] Already initialized, skipping...");
     return;
@@ -79,6 +79,9 @@ export function initializeAutoUpdater(): void {
     owner: "eltmon",
     repo: "panopticon-cli",
   });
+
+  // Respect release channel so canary users don't get stable updates and vice versa
+  autoUpdater.channel = channel;
 
   // Don't auto-download - we want to notify user first
   autoUpdater.autoDownload = false;

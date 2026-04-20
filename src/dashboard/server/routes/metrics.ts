@@ -1,9 +1,8 @@
 import { jsonResponse } from "../http-helpers.js";
 /**
- * Metrics + Convoys route module — Effect HttpRouter.Layer (PAN-428 B16)
+ * Metrics route module — Effect HttpRouter.Layer (PAN-428 B16)
  *
- * Implements all /api/metrics/*, /api/convoys/*, and /api/activity/* endpoints
- * from the Express server (11 routes total):
+ * Implements all /api/metrics/*, and /api/activity/* endpoints:
  *
  *   GET  /api/metrics/summary
  *   GET  /api/metrics/costs
@@ -11,69 +10,111 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/metrics/stuck
  *   GET  /api/activity
  *   GET  /api/activity/:id
- *   GET  /api/convoys
- *   GET  /api/convoys/:id
- *   POST /api/convoys/start
- *   POST /api/convoys/:id/stop
- *   GET  /api/convoys/:id/output
  */
 
-import { readFile } from 'node:fs/promises';
-
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { readEvents } from '../../../lib/costs/index.js';
-import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
+import { listRunningAgentsAsync } from '../../../lib/agents.js';
+import { loadReviewStatuses } from '../../../lib/review-status.js';
+
+// ─── Cached review statuses ───────────────────────────────────────────────────
+// loadReviewStatuses() hits SQLite with SELECT * FROM review_status on every
+// metrics request. Cache for 5s — review status changes are low-frequency.
+let _cachedReviewStatuses: ReturnType<typeof loadReviewStatuses> | null = null;
+let _cachedReviewStatusesAt = 0;
+const REVIEW_STATUS_CACHE_TTL_MS = 5_000;
+
+function getReviewStatusesCached(): ReturnType<typeof loadReviewStatuses> {
+  const now = Date.now();
+  if (_cachedReviewStatuses && now - _cachedReviewStatusesAt < REVIEW_STATUS_CACHE_TTL_MS) {
+    return _cachedReviewStatuses;
+  }
+  _cachedReviewStatuses = loadReviewStatuses();
+  _cachedReviewStatusesAt = now;
+  return _cachedReviewStatuses;
+}
+import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
 import { httpHandler } from './http-handler.js';
+
+// ─── Exported helper: safe agentId→issueId map ───────────────────────────────
+// Exported for unit testing — skips agents with missing/empty issueId so the
+// route never throws on malformed or legacy persisted agent state.
+
+export function buildAgentIssueMap(
+  agents: Array<{ id: string; issueId?: string; tmuxActive: boolean }>,
+): Map<string, string> {
+  return new Map(
+    agents
+      .filter((a): a is typeof a & { issueId: string } => a.tmuxActive && Boolean(a.issueId))
+      .map((a) => [a.id, a.issueId.toUpperCase()]),
+  );
+}
+
+// ─── Exported helper: union stuck count ──────────────────────────────────────
+// Exported for unit testing — used by both /api/metrics/summary and
+// /api/metrics/stuck to ensure consistent stuck counts across both endpoints.
+
+export function computeStuckCount(
+  agentsNeedingAttention: string[],
+  getAgentHealth: (id: string) => { state: string } | null | undefined,
+  agentIdToIssueId: Map<string, string>,
+  reviewStatuses: Record<string, { stuck?: boolean; issueId: string }>,
+): number {
+  const persistentSet = new Set(
+    Object.values(reviewStatuses)
+      .filter((rs) => rs.stuck === true)
+      .map((rs) => rs.issueId.toUpperCase()),
+  );
+  const healthSet = new Set<string>();
+  for (const agentId of agentsNeedingAttention) {
+    const health = getAgentHealth(agentId);
+    if (health?.state === 'stuck') {
+      const issueId = agentIdToIssueId.get(agentId);
+      if (issueId) healthSet.add(issueId);
+    }
+  }
+  return new Set([...healthSet, ...persistentSet]).size;
+}
 
 // ─── Route: GET /api/metrics/summary ─────────────────────────────────────────
 
 const getMetricsSummaryRoute = HttpRouter.add(
   'GET',
   '/api/metrics/summary',
-  httpHandler(Effect.try({
-    try: () => {
-      const service = getCloisterService();
-      const status = service.getStatus();
+  httpHandler(Effect.gen(function* () {
+    const service = getCloisterService();
+    const status = service.getStatus();
 
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayEvents = readEvents({ startDate: todayStr });
-      const dailyTotal = todayEvents.reduce((sum, e) => sum + (e.cost || 0), 0);
+    // Use in-memory cost summary instead of readEvents() — the events file is
+    // 100K+ lines and readFileSync on every metrics request blocks the loop.
+    const costSummary = service.getCostSummary();
+    const topAgents = costSummary.topAgents.slice(0, 5);
+    const topIssues = costSummary.topIssues.slice(0, 5);
 
-      const agentCosts = new Map<string, number>();
-      const issueCosts = new Map<string, number>();
-      for (const e of todayEvents) {
-        agentCosts.set(e.agentId, (agentCosts.get(e.agentId) || 0) + e.cost);
-        issueCosts.set(e.issueId, (issueCosts.get(e.issueId) || 0) + e.cost);
-      }
+    const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const stuckCount = computeStuckCount(
+      status.agentsNeedingAttention,
+      (id) => service.getAgentHealth(id),
+      buildAgentIssueMap(runningAgents),
+      getReviewStatusesCached(),
+    );
 
-      const topAgents = Array.from(agentCosts.entries())
-        .map(([agentId, cost]) => ({ agentId, cost }))
-        .sort((a, b) => b.cost - a.cost)
-        .slice(0, 5);
-      const topIssues = Array.from(issueCosts.entries())
-        .map(([issueId, cost]) => ({ issueId, cost }))
-        .sort((a, b) => b.cost - a.cost)
-        .slice(0, 5);
-
-      return jsonResponse({
-        today: {
-          totalCost: Math.round(dailyTotal * 100) / 100,
-          agentCount: status.summary.total,
-          activeCount: status.summary.active,
-          stuckCount: status.summary.stuck,
-          warningCount: status.summary.warning,
-        },
-        topSpenders: {
-          agents: topAgents,
-          issues: topIssues,
-        },
-      });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    return jsonResponse({
+      today: {
+        totalCost: Math.round(costSummary.dailyTotal * 100) / 100,
+        agentCount: status.summary.total,
+        activeCount: status.summary.active,
+        stuckCount,
+        warningCount: status.summary.warning,
+      },
+      topSpenders: {
+        agents: topAgents,
+        issues: topIssues,
+      },
+    });
   })),
 );
 
@@ -108,12 +149,17 @@ const getMetricsHandoffsRoute = HttpRouter.add(
 const getMetricsStuckRoute = HttpRouter.add(
   'GET',
   '/api/metrics/stuck',
-  httpHandler(Effect.try({
-    try: () => {
-      const status = getCloisterService().getStatus();
-      return jsonResponse({ current: status.summary.stuck, incidents: [] });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  httpHandler(Effect.gen(function* () {
+    const service = getCloisterService();
+    const status = service.getStatus();
+    const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const current = computeStuckCount(
+      status.agentsNeedingAttention,
+      (id) => service.getAgentHealth(id),
+      buildAgentIssueMap(runningAgents),
+      getReviewStatusesCached(),
+    );
+    return jsonResponse({ current, incidents: [] });
   })),
 );
 
@@ -164,118 +210,57 @@ const getActivityByIdRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/convoys ──────────────────────────────────────────────────
+// ─── Route: GET /api/git-activity ─────────────────────────────────────────────
+// Returns recent git_operations rows as ActivityPanel-compatible entries.
+// Supports ?since=ISO&issueId=PAN-XXX&limit=N query params.
 
-const getConvoysRoute = HttpRouter.add(
+/** Parse and validate query params for GET /api/git-activity. Exported for unit testing. */
+export function parseGitActivityParams(params: URLSearchParams): { since?: string; issueId?: string; limit: number } {
+  const since   = params.get('since')   ?? undefined;
+  const issueId = params.get('issueId') ?? undefined;
+  const limitRaw = params.get('limit');
+  const limitParsed = limitRaw ? parseInt(limitRaw, 10) : NaN;
+  const limit   = !isNaN(limitParsed) ? Math.min(Math.max(1, limitParsed), 500) : 200;
+  return { since, issueId, limit };
+}
+
+/** Map a GitOperation DB row to an ActivityPanel-compatible entry. Exported for unit testing. */
+export function mapGitOperationToActivityEntry(op: GitOperation) {
+  return {
+    id: `git-op-${op.id ?? op.ts}`,
+    timestamp: op.ts,
+    source: 'git',
+    level: op.status === 'success' ? 'success'
+      : op.status === 'aborted' ? 'warn'
+      : 'error',
+    message: `${op.operation}: ${op.branch ?? '?'} [${op.status}]`,
+    details: [
+      op.beforeSha && `before: ${op.beforeSha}`,
+      op.afterSha && `after: ${op.afterSha}`,
+      op.remoteSha && `remote: ${op.remoteSha}`,
+      op.error && `error: ${op.error}`,
+    ].filter(Boolean).join('\n') || null,
+    issueId: op.issueId ?? null,
+    category: 'git',
+  };
+}
+
+const getGitActivityRoute = HttpRouter.add(
   'GET',
-  '/api/convoys',
-  httpHandler(Effect.try({
-    try: () => jsonResponse({ convoys: listConvoys() }),
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-  })),
-);
-
-// ─── Route: GET /api/convoys/:id ─────────────────────────────────────────────
-
-const getConvoyByIdRoute = HttpRouter.add(
-  'GET',
-  '/api/convoys/:id',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const convoy = yield* Effect.try({
-      try: () => getConvoyStatus(id),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
-    if (!convoy) {
-      return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
-    }
-    return jsonResponse(convoy);
-  })),
-);
-
-// ─── Route: POST /api/convoys/start ──────────────────────────────────────────
-
-const postConvoysStartRoute = HttpRouter.add(
-  'POST',
-  '/api/convoys/start',
+  '/api/git-activity',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const text = yield* request.text;
-    let body: { template?: string; context?: ConvoyContext } = {};
-    try { body = text ? JSON.parse(text) : {}; } catch { /* use empty */ }
+    const urlOpt = HttpServerRequest.toURL(request);
+    const params = Option.isSome(urlOpt) ? urlOpt.value.searchParams : new URLSearchParams();
 
-    const { template, context } = body;
-    const eventStore = yield* EventStoreService;
+    const { since, issueId, limit } = parseGitActivityParams(params);
 
-    if (!template) {
-      return jsonResponse({ error: 'Template name is required' }, { status: 400 });
-    }
-    if (!context?.projectPath) {
-      return jsonResponse({ error: 'Context with projectPath is required' }, { status: 400 });
-    }
-
-    const convoy = yield* Effect.tryPromise({
-      try: () => startConvoy(template, context),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
-
-    if (context.issueId) {
-      yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: context.issueId } });
-    }
-    return jsonResponse(convoy);
-  })),
+    const ops = listGitOperations({ since, issueId, limit });
+    const entries = ops.map(mapGitOperationToActivityEntry);
+    return jsonResponse(entries);
+  }))
 );
 
-// ─── Route: POST /api/convoys/:id/stop ───────────────────────────────────────
-
-const postConvoyStopRoute = HttpRouter.add(
-  'POST',
-  '/api/convoys/:id/stop',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    yield* Effect.tryPromise({
-      try: () => stopConvoy(id),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
-    return jsonResponse({ success: true, message: 'Convoy stopped' });
-  })),
-);
-
-// ─── Route: GET /api/convoys/:id/output ──────────────────────────────────────
-
-const getConvoyOutputRoute = HttpRouter.add(
-  'GET',
-  '/api/convoys/:id/output',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-
-    const convoy = yield* Effect.try({
-      try: () => getConvoyStatus(id),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
-    if (!convoy) {
-      return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
-    }
-
-    const outputs: Record<string, string> = {};
-    for (const agent of convoy.agents) {
-      if (agent.outputFile) {
-        // Non-fatal: skip unreadable output files rather than aborting the request
-        const content = yield* Effect.promise(() =>
-          readFile(agent.outputFile!, 'utf-8').catch(() => null as null | string)
-        );
-        if (content !== null) {
-          outputs[agent.role] = content;
-        }
-      }
-    }
-
-    return jsonResponse({ outputs });
-  })),
-);
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
@@ -286,11 +271,7 @@ export const metricsRouteLayer = Layer.mergeAll(
   getMetricsStuckRoute,
   getActivityRoute,
   getActivityByIdRoute,
-  getConvoysRoute,
-  getConvoyByIdRoute,
-  postConvoysStartRoute,
-  postConvoyStopRoute,
-  getConvoyOutputRoute,
+  getGitActivityRoute,
 );
 
 export default metricsRouteLayer;

@@ -9,7 +9,6 @@ export type Tab =
   | 'skills'
   | 'health'
   | 'activity'
-  | 'convoys'
   | 'metrics'
   | 'costs'
   | 'handoffs'

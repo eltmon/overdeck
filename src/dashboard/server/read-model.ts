@@ -22,13 +22,26 @@ import {
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panopticon/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 
+// ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
+
+export async function discoverNewAgentIds(agentsDir: string, cachedIds: Set<string>): Promise<string[]> {
+  const { readdir } = await import('node:fs/promises');
+  let entries: string[];
+  try {
+    entries = await readdir(agentsDir);
+  } catch {
+    return [];
+  }
+  return entries.filter(e => !cachedIds.has(e) && existsSync(join(agentsDir, e, 'state.json')));
+}
+
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
 
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push"]);
+const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
 const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
@@ -65,7 +78,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit'>): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -77,6 +90,11 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     readyForMerge: status.readyForMerge === true,
     updatedAt: status.updatedAt,
     prUrl: status.prUrl || undefined,
+    stuck: status.stuck === true ? true : undefined,
+    stuckReason: status.stuckReason || undefined,
+    stuckAt: status.stuckAt || undefined,
+    stuckDetails: status.stuckDetails || undefined,
+    reviewedAtCommit: status.reviewedAtCommit || undefined,
   };
 }
 
@@ -160,23 +178,20 @@ export const ReadModelServiceLive = Layer.effect(
 
           // Also pick up agents created after the last cache save (new state files not in cache)
           const cachedIds = new Set(validAgents.map((a: any) => a.id));
-          const { readdirSync: readdirSyncFs } = yield* Effect.promise(() => import('node:fs'));
+          const { readdir: readdirAsync, readFile: readFileAsync } = yield* Effect.promise(() => import('node:fs/promises'));
           const newAgentIds: string[] = [];
-          try {
-            const entries = readdirSyncFs(agentsDir);
-            for (const entry of entries) {
-              if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
-                newAgentIds.push(entry);
-              }
+          const dirEntries = yield* Effect.promise(() => readdirAsync(agentsDir).catch(() => [] as string[]));
+          for (const entry of dirEntries) {
+            if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
+              newAgentIds.push(entry);
             }
-          } catch { /* agentsDir may not exist on first boot */ }
+          }
 
           // Load new agent state files and add them to the snapshot
-          const { readFileSync: readFileSyncFs } = yield* Effect.promise(() => import('node:fs'));
           const newAgents: any[] = [];
           for (const agentId of newAgentIds) {
             try {
-              const raw = readFileSyncFs(joinPath(agentsDir, agentId, 'state.json'), 'utf-8');
+              const raw = yield* Effect.promise(() => readFileAsync(joinPath(agentsDir, agentId, 'state.json'), 'utf-8'));
               newAgents.push(JSON.parse(raw));
             } catch { /* skip unreadable state files */ }
           }
@@ -210,7 +225,7 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
             Effect.promise(() => import('../../lib/cloister/specialists.js')),
@@ -222,7 +237,7 @@ export const ReadModelServiceLive = Layer.effect(
         warnOnBareNumericIssueIds();
 
         // ── Agents ────────────────────────────────────────────────────────────
-        const running = listRunningAgents();
+        const running = yield* Effect.promise(() => listRunningAgentsAsync());
         const agentsById: Record<string, AgentSnapshot> = {};
 
         // Compute enrichment for all agents in parallel during bootstrap

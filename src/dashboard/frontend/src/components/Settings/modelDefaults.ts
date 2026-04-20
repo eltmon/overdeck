@@ -1,42 +1,32 @@
 import { ModelId, WorkTypeId } from './types';
 
-export const FALLBACK_DEFAULT_MODEL: ModelId = 'gpt-5.4-mini';
+export const FALLBACK_DEFAULT_MODEL: ModelId = 'gpt-4o-mini';
 
 export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<WorkTypeId, ModelId>> = {
-  // Planning & high-stakes review — GPT-5.4 (best non-Anthropic reasoning)
-  'planning-agent': 'gpt-5.4',
-  'specialist-review-agent': 'gpt-5.4',
-  'convoy:security-reviewer': 'gpt-5.4',
-
-  // Exploration & mid-complexity — Kimi K2.6
-  'issue-agent:exploration': 'K2.6-code-preview',
-  'issue-agent:testing': 'K2.6-code-preview',
-  'issue-agent:documentation': 'K2.6-code-preview',
-  'convoy:requirements-reviewer': 'K2.6-code-preview',
-  'convoy:performance-reviewer': 'K2.6-code-preview',
-  'specialist-uat-agent': 'K2.6-code-preview',
-  'subagent:general-purpose': 'K2.6-code-preview',
-
-  // Heavy implementation & agentic coding — GLM-5.1 (SWE-Bench Pro #1)
-  'issue-agent:implementation': 'glm-5.1',
-  'issue-agent:review-response': 'glm-5.1',
-  'convoy:correctness-reviewer': 'glm-5.1',
-
-  // Procedural specialists — MiniMax M2.7 (97% skill adherence)
-  'specialist-test-agent': 'minimax-m2.7',
-  'specialist-merge-agent': 'minimax-m2.7',
-  'convoy:synthesis-agent': 'minimax-m2.7',
-  'specialist-inspect-agent': 'minimax-m2.7-highspeed',
-
-  // Fast subagents & CLI — GPT-5.4 Nano (fastest, cheapest, strong tool use)
-  'subagent:explore': 'gpt-5.4-nano',
-  'subagent:bash': 'gpt-5.4-nano',
-  'subagent:plan': 'gpt-5.4-nano',
-  'status-review': 'gpt-5.4-nano',
-  'cli:quick-command': 'gpt-5.4-nano',
-
-  // Interactive CLI — GPT-5.4 Mini (speed + reasoning balance)
-  'cli:interactive': 'gpt-5.4-mini',
+  'issue-agent:exploration': 'claude-opus-4-6',
+  'issue-agent:implementation': 'kimi-k2.5',
+  'issue-agent:testing': 'claude-sonnet-4-6',
+  'issue-agent:documentation': 'claude-sonnet-4-6',
+  'issue-agent:review-response': 'claude-sonnet-4-6',
+  'specialist-review-agent': 'claude-opus-4-6',
+  'specialist-test-agent': 'claude-sonnet-4-6',
+  'specialist-merge-agent': 'claude-sonnet-4-6',
+  'specialist-inspect-agent': 'claude-sonnet-4-6',
+  'specialist-uat-agent': 'claude-sonnet-4-6',
+  'review:security': 'claude-opus-4-6',
+  'review:performance': 'claude-sonnet-4-6',
+  'review:correctness': 'claude-sonnet-4-6',
+  'review:requirements': 'claude-sonnet-4-6',
+  'review:synthesis': 'claude-sonnet-4-6',
+  'review:lightweight': 'claude-haiku-4-5',
+  'subagent:explore': 'claude-haiku-4-5',
+  'subagent:plan': 'claude-haiku-4-5',
+  'subagent:bash': 'claude-haiku-4-5',
+  'subagent:general-purpose': 'claude-sonnet-4-6',
+  'planning-agent': 'claude-opus-4-6',
+  'status-review': 'claude-sonnet-4-6',
+  'cli:interactive': 'claude-sonnet-4-6',
+  'cli:quick-command': 'claude-haiku-4-5',
 };
 
 export function getEffectiveModelId(

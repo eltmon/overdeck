@@ -1,20 +1,39 @@
 {
-  "name": "@panopticon/desktop",
-  "version": "0.6.0",
-  "private": true,
+  "name": "@eltmon/panctl",
+  "version": "0.7.2-canary.3",
+  "description": "Panopticon Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eltmon/panopticon-cli.git"
+  },
+  "bin": {
+    "panctl": "./bin/panctl.mjs"
+  },
+  "files": [
+    "bin",
+    "dist-electron",
+    "server",
+    "resources"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "bun run --parallel dev:bundle dev:electron",
     "dev:bundle": "tsdown --watch",
     "dev:electron": "bun run scripts/dev-electron.mjs",
     "build": "tsdown",
+    "build:publish": "node scripts/build-for-publish.mjs",
+    "prepublishOnly": "node scripts/build-for-publish.mjs",
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "dist:linux": "electron-builder --linux AppImage --publish never",
     "dist:mac": "electron-builder --mac dmg --universal --publish never",
-    "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3"
+    "dist:win": "electron-builder --win nsis --publish never",
+    "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3 2>/dev/null; exit 0"
   },
   "dependencies": {
     "conf": "^13.0.0",
@@ -27,7 +46,7 @@
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
     "tsdown": "^0.21.7",
-    "typescript": "catalog:",
+    "typescript": "^5.7.3",
     "vitest": "^4.0.18"
   },
   "build": {
@@ -60,7 +79,9 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "resources/icon.png",
@@ -70,15 +91,33 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
-      "icon": "resources/icon.icns",
+      "icon": "resources/icon.png",
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
       "title": "Panopticon",
-      "icon": "resources/icon.icns"
+      "icon": "resources/icon.png"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "afterPack": "scripts/afterPack.cjs"
   }

@@ -1,6 +1,6 @@
 {
   "name": "panopticon-cli",
-  "version": "0.7.1",
+  "version": "0.7.2-canary.4",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
     "ai-agents",
@@ -57,7 +57,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-beta.43"
@@ -71,8 +71,10 @@
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
     "build:dashboard:frontend": "cd src/dashboard/frontend && npm run build",
     "build:dashboard:server": "npm run build:contracts && cd src/dashboard/server && npm run build && mkdir -p ../../../dist/dashboard/prompts && cp ../../lib/cloister/prompts/*.md ../../../dist/dashboard/prompts/",
-    "build:desktop": "cd apps/desktop && bun run build && bun run dist:linux && bun run dist:mac",
+    "build:desktop": "cd apps/desktop && bun run build && bun run dist:linux && bun run dist:mac && bun run dist:win",
     "build:desktop:linux": "cd apps/desktop && bun run build && bun run dist:linux",
+    "build:desktop:mac": "cd apps/desktop && bun run build && bun run dist:mac",
+    "build:desktop:win": "cd apps/desktop && bun run build && bun run dist:win",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "vitest run",

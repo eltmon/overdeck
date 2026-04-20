@@ -1,132 +1,543 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-15T01:58:14Z",
+    "created": "2026-04-15T00:44:09Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-712: fix stale pan work/cloister/specialists refs in .claude/skills/",
-    "updated": "2026-04-15T08:50:53.303Z"
+    "description": "Plan for PAN-714: clean up stale .claude/skills/ references and add unit tests for doneCommand/approveCommand",
+    "updated": "2026-04-20T10:22:39.535Z"
   },
   "plan": {
-    "id": "pan-712",
-    "title": "fix: stale pan work/cloister/specialists refs in .claude/skills/",
+    "id": "pan-714",
+    "title": "fix(pan-705 followup): clean up stale .claude/skills/ references and add unit tests for doneCommand/approveCommand",
     "status": "approved",
-    "uid": "bf82ed53-bd83-4fcb-952f-f027a47b06d2",
+    "uid": "163808ab-c659-4110-8ab8-3b50aeb510cf",
     "author": "agent:claude-opus-4-6",
-    "sequence": 17,
-    "created": "2026-04-15T01:58:14Z",
-    "updated": "2026-04-15T08:50:53.303Z",
+    "sequence": 342,
+    "created": "2026-04-15T00:44:09Z",
+    "updated": "2026-04-20T10:22:39.535Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/712",
-        "label": "PAN-712",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/714",
+        "label": "PAN-714",
         "type": "issue"
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
-        "label": "PAN-705",
+        "label": "PAN-705 parent reorg",
         "type": "issue"
       }
     ],
     "tags": [
-      "docs",
-      "skills",
       "cleanup",
-      "pan-705-followup"
+      "tests",
+      "pan-705-followup",
+      "skills"
     ],
     "narratives": {
-      "Problem": "Project-level skill files under .claude/skills/ still reference the pre-PAN-705 command taxonomy (pan work <verb>, pan cloister, pan specialists). These references mislead any agent that loads the affected skills about correct CLI syntax. A grep audit found 5 stale occurrences in exactly 2 files: .claude/skills/test-specialist-workflow/SKILL.md (4 refs) and .claude/skills/update-panopticon-docs/resources/EXAMPLES.md (1 ref).",
-      "Proposal": "Two trivial, independent doc edits — one bead per file. Bead 1 rewrites the test-specialist-workflow skill to use `pan admin cloister start` and `pan admin specialists wake ...`. Bead 2 rewrites the pan-work example in the update-panopticon-docs skill to reflect the flat lifecycle taxonomy (no `pan work` namespace). A final anchored grep (\\bpan (work|cloister|specialists)\\b) over .claude/skills/ must return zero hits; `pan workspace` references are intentionally preserved because that command group still exists post-PAN-705."
+      "Problem": "PAN-705 command taxonomy reorg (pan work list → pan issues, pan cloister/specialists → pan admin *) left project-level .claude/skills/ with stale command refs, 5 orphan skills, 56 missing new skills, and structural bugs (nested dirs). Separately, work/done.ts (535 lines) and work/approve.ts (214 lines) have zero unit tests despite complex pre-flight logic, tracker API paths, and issue-id normalization.",
+      "Proposal": "Regenerate .claude/skills/ as an exact mirror of canonical skills/, then extend pan sync to auto-mirror project-level skills on future runs so drift cannot recur. Extract pre-flight checks from doneCommand into src/lib/work/done-preflight.ts and export the existing approve.ts helpers, unit-test both at the helper and command-behavior level following the reopen.test.ts convention."
     },
     "items": [
       {
-        "id": "fix-test-specialist-workflow-skill",
-        "title": "Update test-specialist-workflow SKILL.md to pan admin cloister/specialists",
+        "id": "regen-claude-skills",
+        "title": "Regenerate .claude/skills/ as exact mirror of canonical skills/",
         "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-15T01:58:14Z",
+        "priority": "high",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-712"
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Edit .claude/skills/test-specialist-workflow/SKILL.md. Replace `pan cloister start` (line 40) with `pan admin cloister start`. Replace the three `pan specialists wake <agent>` lines (163, 164, 165) and the `pan specialists wake test-agent --task \"...\"` line (174) with their `pan admin specialists wake ...` equivalents. Do not change any other content. Verify by running `pan admin cloister --help` and `pan admin specialists --help` against the resulting command strings."
+          "Action": "Delete all tracked entries under .claude/skills/ except the .gitignore, then copy every directory from skills/ into .claude/skills/ verbatim. This removes the 5 orphan skills (hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-panopticon-docs), fixes structural bugs (nested pan-new-project/pan-new-project/, work-complete/work-complete/), eliminates all stale command references (pan work list, pan cloister start, pan specialists wake), and adds the 56 canonical skills missing from the project tree."
         },
         "subItems": [
           {
-            "id": "fix-test-specialist-workflow-skill.ac1",
-            "title": "File .claude/skills/test-specialist-workflow/SKILL.md contains zero occurrences of `pan cloister` or `pan specialists` (as standalone commands, not `pan admin cloister`/`pan admin specialists`)",
+            "id": "regen-claude-skills.ac1",
+            "title": "`rg -n \"pan work list|pan cloister start|pan specialists wake\" .claude/skills/` returns zero matches",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.294Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "fix-test-specialist-workflow-skill.ac2",
-            "title": "Every rewritten command in the file is a valid subcommand of `pan admin cloister` or `pan admin specialists` as shown by `pan admin cloister --help` and `pan admin specialists --help`",
+            "id": "regen-claude-skills.ac2",
+            "title": "Every directory in skills/ has a corresponding directory in .claude/skills/ with byte-identical SKILL.md contents (verify via `diff -rq skills/ .claude/skills/ | grep -v .gitignore` showing no differences)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.294Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "fix-test-specialist-workflow-skill.ac3",
-            "title": "No unrelated changes in the file (diff is limited to the 5 stale command references and minimal surrounding whitespace)",
+            "id": "regen-claude-skills.ac3",
+            "title": ".claude/skills/.gitignore is preserved unchanged (protects future Panopticon-managed symlinks)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.294Z"
+            "completed": "2026-04-15T02:59:53.925Z"
+          },
+          {
+            "id": "regen-claude-skills.ac4",
+            "title": "No nested-duplicate directories remain (no `*/pan-new-project/pan-new-project`, no `*/work-complete/work-complete`)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.925Z"
+          },
+          {
+            "id": "regen-claude-skills.ac5",
+            "title": "Orphan skills hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-panopticon-docs are deleted from .claude/skills/",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.925Z"
           }
         ],
-        "completed": "2026-04-15T08:50:53.303Z"
+        "completed": "2026-04-20T10:22:39.534Z"
       },
       {
-        "id": "fix-update-panopticon-docs-examples",
-        "title": "Update update-panopticon-docs EXAMPLES.md Pattern 6 to drop pan work namespace",
+        "id": "pan-sync-project-skills",
+        "title": "Extend pan sync to auto-mirror project-level .claude/skills/ from local skills/",
         "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-15T01:58:14Z",
+        "priority": "high",
+        "created": "2026-04-15T00:44:09Z",
         "metadata": {
-          "difficulty": "trivial",
-          "issueLabel": "pan-712"
+          "difficulty": "medium",
+          "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Edit .claude/skills/update-panopticon-docs/resources/EXAMPLES.md. Replace the `pan work --help` verify step (line 294) with `pan --help` (or a more specific command like `pan start --help` if the surrounding example is about the `start` verb). Review Pattern 6's surrounding prose and update any wording that still implies a `pan work` command namespace — after PAN-705, lifecycle verbs (`start`, `done`, `kill`, `recover`, `tell`, `resume`, `approve`, `close`, `reopen`, `sync-main`, `wipe`) are top-level, not subcommands of `pan work`. Keep the example's original teaching intent intact."
+          "Action": "In src/lib/sync.ts (or a helper called from it), after the existing user-level sync, detect whether the current working directory contains a top-level `skills/` tree with one or more SKILL.md files. If so, mirror skills/* into .claude/skills/* — creating missing directories, updating out-of-date SKILL.md files, and removing directories in .claude/skills/ that no longer exist in skills/. Preserve .claude/skills/.gitignore untouched. Report the count of added/updated/removed skills in the sync output. This must be a no-op for any project without a top-level skills/ directory (i.e., every non-panopticon-cli project)."
         },
         "subItems": [
           {
-            "id": "fix-update-panopticon-docs-examples.ac1",
-            "title": "File .claude/skills/update-panopticon-docs/resources/EXAMPLES.md contains zero occurrences of `pan work ` (trailing space, to exclude `pan workspace`)",
+            "id": "pan-sync-project-skills.ac1",
+            "title": "Running `pan sync` inside panopticon-cli on a clean tree (after regen-claude-skills) produces no changes to .claude/skills/ and reports 0 added / 0 updated / 0 removed",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.293Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "fix-update-panopticon-docs-examples.ac2",
-            "title": "Pattern 6 prose and example commands are consistent with the post-PAN-705 flat lifecycle taxonomy — no text implies lifecycle verbs live under a `pan work` group",
+            "id": "pan-sync-project-skills.ac2",
+            "title": "After touching one file under skills/ (e.g., adding a new line to skills/pan-help/SKILL.md), `pan sync` updates the corresponding .claude/skills/pan-help/SKILL.md to match and reports `1 updated`",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.293Z"
+            "completed": "2026-04-15T02:59:53.925Z"
           },
           {
-            "id": "fix-update-panopticon-docs-examples.ac3",
-            "title": "Repo-wide audit `grep -rn -E '\\bpan (work|cloister|specialists)\\b' .claude/skills/` returns zero hits across all files under .claude/skills/ (this is the issue-level acceptance criterion and must be re-run after both beads land)",
+            "id": "pan-sync-project-skills.ac3",
+            "title": "After deleting a directory under skills/, `pan sync` removes the corresponding directory under .claude/skills/ and reports `1 removed`",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-15T03:29:24.293Z"
+            "completed": "2026-04-15T02:59:53.926Z"
+          },
+          {
+            "id": "pan-sync-project-skills.ac4",
+            "title": "Running `pan sync` inside a project without a top-level skills/ directory is a no-op for .claude/skills/ (the existing user-level sync behavior is unchanged)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.926Z"
+          },
+          {
+            "id": "pan-sync-project-skills.ac5",
+            "title": "The existing .claude/skills/.gitignore file is never deleted, overwritten, or moved by the mirror logic",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.926Z"
+          },
+          {
+            "id": "pan-sync-project-skills.ac6",
+            "title": "Unit test in tests/lib/sync.test.ts (or similar) exercises the three cases above (no-op, update, remove) against a tmp-dir fixture",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.926Z"
           }
         ],
-        "completed": "2026-04-15T08:50:53.302Z"
+        "completed": "2026-04-20T10:22:39.535Z"
+      },
+      {
+        "id": "extract-done-preflight",
+        "title": "Extract done.ts pre-flight checks into src/lib/work/done-preflight.ts",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create src/lib/work/done-preflight.ts exporting `checkOpenBeads(workspacePath, issueId)`, `checkUncommittedChanges(workspacePath)`, `checkVBriefACStatus(workspacePath)`, and a composed `runPreflightChecks(workspacePath, issueId)` that returns a string[] of failure lines (empty array = pass). The composed function must also invoke the existing `syncBeadStatusToVBrief` pass over closed beads before running checkVBriefACStatus so the AC check sees the latest state. Refactor doneCommand in src/cli/commands/work/done.ts to call `runPreflightChecks` and, on failure, print the same output and exit(1) — the surface behavior must be byte-identical to the current implementation."
+        },
+        "subItems": [
+          {
+            "id": "extract-done-preflight.ac1",
+            "title": "src/lib/work/done-preflight.ts exists and exports checkOpenBeads, checkUncommittedChanges, checkVBriefACStatus, runPreflightChecks",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.924Z"
+          },
+          {
+            "id": "extract-done-preflight.ac2",
+            "title": "doneCommand in src/cli/commands/work/done.ts no longer contains inline bd/git/AC-check logic; it calls runPreflightChecks and handles the returned failure lines",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.924Z"
+          },
+          {
+            "id": "extract-done-preflight.ac3",
+            "title": "Running `pan work done <issue>` against a workspace with known failures (open bead + uncommitted file + pending AC) produces the same stderr output as before the refactor (verify by comparing against a pre-refactor capture)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.924Z"
+          },
+          {
+            "id": "extract-done-preflight.ac4",
+            "title": "npm run typecheck and npm run lint pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.924Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.534Z"
+      },
+      {
+        "id": "test-done-preflight-beads",
+        "title": "Unit tests: checkOpenBeads helper",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create tests/lib/work/done-preflight.beads.test.ts. Mock execAsync or use a fake workspace with a scripted bd binary. Cover: (1) zero open beads → returns []; (2) N open beads → returns N+1 lines starting with `  Open beads (N):`; (3) bd not installed → returns [] (silent skip); (4) issue-id is lowercased correctly in the bd query."
+        },
+        "subItems": [
+          {
+            "id": "test-done-preflight-beads.ac1",
+            "title": "Test file exists at tests/lib/work/done-preflight.beads.test.ts and imports from src/lib/work/done-preflight.ts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          },
+          {
+            "id": "test-done-preflight-beads.ac2",
+            "title": "Covers happy path (0 beads), failure path (N beads), bd-missing path, and issue-id casing",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          },
+          {
+            "id": "test-done-preflight-beads.ac3",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.534Z"
+      },
+      {
+        "id": "test-done-preflight-git",
+        "title": "Unit tests: checkUncommittedChanges helper (mono + polyrepo)",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create tests/lib/work/done-preflight.git.test.ts. Build tmp-dir fixtures via mkdtempSync that simulate (a) monorepo — single top-level .git marker, clean and dirty states; (b) polyrepo — multiple subdirs each with their own .git marker, mixed clean/dirty. Use real `git init` + `git add` where feasible, or mock execAsync to return canned `git status --porcelain` output. Assert failure-line format: `  Uncommitted changes:` for monorepo, `  Uncommitted changes in <subdir>/:` for polyrepo."
+        },
+        "subItems": [
+          {
+            "id": "test-done-preflight-git.ac1",
+            "title": "Covers monorepo-clean (returns []), monorepo-dirty (returns failure lines), polyrepo-mixed (returns failure lines scoped per subdir)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.920Z"
+          },
+          {
+            "id": "test-done-preflight-git.ac2",
+            "title": "Covers polyrepo detection fallback: workspace with no top-level .git correctly walks subdirectories",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.920Z"
+          },
+          {
+            "id": "test-done-preflight-git.ac3",
+            "title": "Dotfile subdirectories (e.g., .planning/) are skipped during polyrepo walk",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.920Z"
+          },
+          {
+            "id": "test-done-preflight-git.ac4",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.920Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.531Z"
+      },
+      {
+        "id": "test-done-preflight-ac",
+        "title": "Unit tests: checkVBriefACStatus helper",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create tests/lib/work/done-preflight.ac.test.ts. Build a tmp-dir workspace with a synthetic .planning/plan.vbrief.json containing items with mixed AC statuses. Cover: (1) all AC completed → returns []; (2) one pending AC → returns two lines (header + `  - [ ] <title>`); (3) multiple items with pending AC → returns grouped output; (4) no vBRIEF file present → returns [] (silent skip, matching current behavior)."
+        },
+        "subItems": [
+          {
+            "id": "test-done-preflight-ac.ac1",
+            "title": "Covers all-completed, one-pending, multiple-pending, and no-vBRIEF cases",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-preflight-ac.ac2",
+            "title": "Test fixtures are created and torn down per-test (no leftover tmp dirs)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-preflight-ac.ac3",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.532Z"
+      },
+      {
+        "id": "export-test-approve-helpers",
+        "title": "Export and unit-test approve.ts helpers",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Add `export` keywords to findPRForBranch, mergePR, and updateLinearStatus in src/cli/commands/work/approve.ts (checkGhCli already trivially testable). Create tests/cli/commands/work/approve.test.ts following the reopen.test.ts dynamic-import pattern. Cover: (1) findPRForBranch — mocked `gh pr list --json` output returns PR object; empty output returns null; gh failure returns null. (2) mergePR — success returns {success:true}; non-zero exit returns {success:false,error}. (3) updateLinearStatus — mock @linear/sdk; happy path returns true; team-missing returns false; target-state-missing returns false. Use vi.mock or monkey-patch imports as existing tests do."
+        },
+        "subItems": [
+          {
+            "id": "export-test-approve-helpers.ac1",
+            "title": "findPRForBranch, mergePR, updateLinearStatus are exported from src/cli/commands/work/approve.ts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          },
+          {
+            "id": "export-test-approve-helpers.ac2",
+            "title": "tests/cli/commands/work/approve.test.ts covers happy and failure paths for each of the three helpers",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          },
+          {
+            "id": "export-test-approve-helpers.ac3",
+            "title": "All tests pass under `npm test`",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.923Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.533Z"
+      },
+      {
+        "id": "test-done-command-behavior",
+        "title": "Command-level tests: doneCommand behavior (force, shadow, id normalization)",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "Create tests/cli/commands/work/done.test.ts. Mock the lib-level dependencies (runPreflightChecks, updateLinearToInReview, updateGitHubToInReview, createReviewArtifactsForIssue, saveAgentState, the dashboard auto-review HTTP calls) so the test exercises the *control flow* in doneCommand without hitting real APIs. Cover: (1) --force bypasses runPreflightChecks entirely (spy asserts it is never called); (2) shadow mode (via shouldSkipTrackerUpdate returning true) skips both Linear and GitHub update paths and calls updateShadowState instead; (3) issue-id normalization: `agent-pan-714`, `pan-714`, `PAN-714` all route to the same canonical `PAN-714` / `agent-pan-714` pair; (4) GitHub branch taken when issueId.startsWith('PAN-'), Linear branch otherwise."
+        },
+        "subItems": [
+          {
+            "id": "test-done-command-behavior.ac1",
+            "title": "--force flag skips pre-flight checks (runPreflightChecks spy asserts zero calls)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac2",
+            "title": "Shadow mode routes to updateShadowState and skips both Linear and GitHub tracker update paths",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.921Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac3",
+            "title": "Issue-id normalization covered for agent-prefixed, lowercase, and uppercase inputs",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac4",
+            "title": "PAN- prefix routes to GitHub branch; non-PAN routes to Linear branch",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          },
+          {
+            "id": "test-done-command-behavior.ac5",
+            "title": "All tests pass under `npm test` and do not make real network calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.533Z"
+      },
+      {
+        "id": "test-approve-command-behavior",
+        "title": "Command-level tests: approveCommand behavior",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-15T00:44:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-714"
+        },
+        "narrative": {
+          "Action": "In tests/cli/commands/work/approve.test.ts (same file as export-test-approve-helpers), add a describe block for approveCommand covering: (1) agent not found → exits with error; (2) PR not found in workspace → exits with error; (3) happy path (PR found, merge succeeds, Linear update succeeds) exits 0 and marks agent state stopped; (4) shouldSkipTrackerUpdate=true skips Linear update but still merges PR. Mock getAgentState/saveAgentState, findPRForBranch, mergePR, updateLinearStatus."
+        },
+        "subItems": [
+          {
+            "id": "test-approve-command-behavior.ac1",
+            "title": "Covers agent-not-found, pr-not-found, happy-path, and shadow-mode-skip",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          },
+          {
+            "id": "test-approve-command-behavior.ac2",
+            "title": "All tests pass under `npm test` and do not make real network or gh CLI calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-15T02:59:53.922Z"
+          }
+        ],
+        "completed": "2026-04-20T10:22:39.533Z"
       }
     ],
-    "edges": []
+    "edges": [
+      {
+        "from": "regen-claude-skills",
+        "to": "pan-sync-project-skills",
+        "type": "informs"
+      },
+      {
+        "from": "extract-done-preflight",
+        "to": "test-done-preflight-beads",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-done-preflight",
+        "to": "test-done-preflight-git",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-done-preflight",
+        "to": "test-done-preflight-ac",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-done-preflight",
+        "to": "test-done-command-behavior",
+        "type": "blocks"
+      },
+      {
+        "from": "export-test-approve-helpers",
+        "to": "test-approve-command-behavior",
+        "type": "informs"
+      }
+    ]
   }
 }

@@ -45,6 +45,9 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'gemini-2.5-flash': 'gemini-3-flash',
   // Kimi deprecated
   'kimi-k2': 'kimi-k2.5',
+  // Z.AI deprecated
+  'glm-4.7': 'glm-5.1',
+  'glm-4.7-flash': 'glm-5.1',
 };
 
 /**
@@ -364,6 +367,14 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
+  // Retired OpenAI model IDs — replaced by newer versions, kept for backward compat
+  'gpt-5.2-codex': { model: 'gpt-5.2-codex', provider: 'openai', displayName: 'GPT-5.2 Codex (deprecated)', costPer1MTokens: 20.0, contextWindow: 128000, skills: { 'code-generation': 92, 'code-review': 90, debugging: 88, planning: 85, documentation: 85, testing: 85, security: 80, performance: 82, synthesis: 88, speed: 50, 'context-length': 75 } },
+  'o3-deep-research': { model: 'o3-deep-research', provider: 'openai', displayName: 'O3 Deep Research (deprecated)', costPer1MTokens: 5.0, contextWindow: 200000, skills: { 'code-generation': 88, 'code-review': 95, debugging: 98, planning: 95, documentation: 88, testing: 88, security: 92, performance: 92, synthesis: 95, speed: 25, 'context-length': 95 } },
+  // Active OpenAI API names — NOT deprecated. Kept in MODEL_CAPABILITIES for backward compat
+  // with saved configs. These are real OpenAI model IDs that still work via the OpenAI API.
+  'gpt-4o': { model: 'gpt-4o', provider: 'openai', displayName: 'GPT-4o', costPer1MTokens: 7.5, contextWindow: 128000, skills: { 'code-generation': 82, 'code-review': 80, debugging: 78, planning: 76, documentation: 80, testing: 76, security: 74, performance: 74, synthesis: 80, speed: 75, 'context-length': 75 } },
+  'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'openai', displayName: 'GPT-4o Mini', costPer1MTokens: 0.6, contextWindow: 128000, skills: { 'code-generation': 68, 'code-review': 64, debugging: 60, planning: 56, documentation: 66, testing: 60, security: 52, performance: 56, synthesis: 62, speed: 92, 'context-length': 75 } },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GOOGLE MODELS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -434,6 +445,12 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads.',
   },
 
+  // Legacy Google IDs — deprecated aliases kept for backward compat with saved configs
+  'gemini-3-pro-preview': { model: 'gemini-3-pro-preview', provider: 'google', displayName: 'Gemini 3 Pro (deprecated)', costPer1MTokens: 7.0, contextWindow: 1000000, skills: { 'code-generation': 93, 'code-review': 90, debugging: 88, planning: 88, documentation: 90, testing: 88, security: 82, performance: 88, synthesis: 92, speed: 75, 'context-length': 100 } },
+  'gemini-3-flash-preview': { model: 'gemini-3-flash-preview', provider: 'google', displayName: 'Gemini 3 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 80, 'code-review': 75, debugging: 72, planning: 68, documentation: 76, testing: 72, security: 60, performance: 70, synthesis: 75, speed: 96, 'context-length': 100 } },
+  'gemini-2.5-pro': { model: 'gemini-2.5-pro', provider: 'google', displayName: 'Gemini 2.5 Pro (deprecated)', costPer1MTokens: 7.0, contextWindow: 1000000, skills: { 'code-generation': 90, 'code-review': 88, debugging: 86, planning: 86, documentation: 88, testing: 86, security: 80, performance: 86, synthesis: 90, speed: 70, 'context-length': 100 } },
+  'gemini-2.5-flash': { model: 'gemini-2.5-flash', provider: 'google', displayName: 'Gemini 2.5 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 78, 'code-review': 74, debugging: 70, planning: 66, documentation: 74, testing: 70, security: 58, performance: 68, synthesis: 74, speed: 94, 'context-length': 100 } },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // KIMI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -481,6 +498,9 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     },
     notes: 'Kimi coding preview model.',
   },
+
+  // Legacy Kimi ID — kimi-k2 deprecated in favor of kimi-k2.5
+  'kimi-k2': { model: 'kimi-k2', provider: 'kimi', displayName: 'Kimi K2 (deprecated)', costPer1MTokens: 1.6, contextWindow: 128000, skills: { 'code-generation': 88, 'code-review': 86, debugging: 86, planning: 84, documentation: 84, testing: 84, security: 78, performance: 80, synthesis: 88, speed: 72, 'context-length': 80 }, notes: '65.8% SWE-bench. Superseded by Kimi K2.5.' },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MINIMAX MODELS
@@ -551,6 +571,50 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 75,
     },
     notes: 'Z.AI GLM-5.1 model via Anthropic-compatible API.',
+  },
+
+  'glm-4.7': {
+    model: 'glm-4.7',
+    provider: 'zai',
+    displayName: 'GLM-4.7 (deprecated)',
+    costPer1MTokens: 1.5,
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 88,
+      'code-review': 85,
+      debugging: 84,
+      planning: 82,
+      documentation: 80,
+      testing: 82,
+      security: 78,
+      performance: 80,
+      synthesis: 84,
+      speed: 80,
+      'context-length': 92,
+    },
+    notes: 'Top open-source model for agentic coding. 73.8% SWE-bench, 200K context.',
+  },
+
+  'glm-4.7-flash': {
+    model: 'glm-4.7-flash',
+    provider: 'zai',
+    displayName: 'GLM-4.7 Flash (deprecated)',
+    costPer1MTokens: 0.3,
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 78,
+      'code-review': 74,
+      debugging: 72,
+      planning: 70,
+      documentation: 72,
+      testing: 72,
+      security: 68,
+      performance: 70,
+      synthesis: 74,
+      speed: 95,
+      'context-length': 92,
+    },
+    notes: 'Fast and affordable GLM model for quick iterations. 200K context.',
   },
 };
 

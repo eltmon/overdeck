@@ -10,13 +10,13 @@ permissions:
   id-token: write
 
 jobs:
-  release:
+  classify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+      npm_tag: ${{ steps.channel.outputs.npm_tag }}
+      prerelease: ${{ steps.channel.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v4
-
       - name: Classify release channel
         id: channel
         shell: bash
@@ -34,6 +34,12 @@ jobs:
             echo "Unsupported release tag: $tag"
             exit 1
           fi
+
+  npm:
+    needs: classify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -59,16 +65,99 @@ jobs:
 
       - name: Publish to npm
         run: |
-          if [ "${{ steps.channel.outputs.npm_tag }}" = "latest" ]; then
+          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
             npm publish --provenance --access public
           else
-            npm publish --provenance --access public --tag "${{ steps.channel.outputs.npm_tag }}"
+            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Build desktop app (Linux)
-        run: bun run build:desktop:linux
+      - name: Publish panctl to npm
+        run: |
+          cd apps/desktop
+          node scripts/build-for-publish.mjs
+          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
+            npm publish --provenance --access public
+          else
+            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  desktop:
+    needs: classify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+            script: build:desktop:linux
+            artifact: apps/desktop/dist/*.AppImage
+          - os: macos-latest
+            target: mac
+            script: build:desktop:mac
+            artifact: apps/desktop/dist/*.dmg
+          - os: windows-latest
+            target: win
+            script: build:desktop:win
+            artifact: apps/desktop/dist/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Build desktop app (${{ matrix.target }})
+        run: bun run ${{ matrix.script }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: [classify, npm, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Download all desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: desktop-*
+          merge-multiple: true
 
       - name: Generate structured release notes
         run: |
@@ -79,8 +168,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           body_path: .release/${{ github.ref_name }}.md
-          prerelease: ${{ steps.channel.outputs.prerelease }}
+          prerelease: ${{ needs.classify.outputs.prerelease }}
           files: |
-            apps/desktop/dist/*.AppImage
+            artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

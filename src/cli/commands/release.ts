@@ -25,6 +25,7 @@ type ReleaseNotesOptions = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJsonPath = join(__dirname, '..', '..', 'package.json');
+const desktopPackageJsonPath = join(__dirname, '..', '..', 'apps', 'desktop', 'package.json');
 
 export function registerReleaseCommands(program: Command): void {
   const release = program
@@ -63,6 +64,14 @@ function readPackageJson(): PackageJson {
 
 function writePackageJson(pkg: PackageJson): void {
   writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
+function readDesktopPackageJson(): PackageJson {
+  return JSON.parse(readFileSync(desktopPackageJsonPath, 'utf-8')) as PackageJson;
+}
+
+function writeDesktopPackageJson(pkg: PackageJson): void {
+  writeFileSync(desktopPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
 function getCurrentVersion(): string {
@@ -344,6 +353,10 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
   pkg.version = resolvedVersion;
   writePackageJson(pkg);
 
+  const desktopPkg = readDesktopPackageJson();
+  desktopPkg.version = resolvedVersion;
+  writeDesktopPackageJson(desktopPkg);
+
   const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
   const releaseNotes = buildReleaseNotesMarkdown({
     channel,
@@ -355,7 +368,9 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
 
   writeTextFile(releaseNotesPath, releaseNotes);
 
-  run('git add package.json', repoRoot);
+  run('bun install', repoRoot);
+
+  run('git add package.json apps/desktop/package.json bun.lock', repoRoot);
   run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
   run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
 

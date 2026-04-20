@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
+import { readFile, readdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, killSessionAsync, sendKeys, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -227,8 +228,10 @@ function clearReadySignal(agentId: string): void {
 }
 
 /**
- * Wait for SessionStart hook to signal ready (async - non-blocking)
- * Returns true if ready signal received, false if timeout
+ * Wait for agent to be ready (async - non-blocking).
+ * Primary: ready.json written by SessionStart hook.
+ * Fallback: tmux pane shows Claude's interactive prompt indicator.
+ * Returns true if ready signal received, false if timeout.
  */
 async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
@@ -247,6 +250,16 @@ async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise
         // File exists but invalid - keep waiting
       }
     }
+
+    // Fallback: check tmux pane for Claude's interactive prompt indicator.
+    // ready.json is currently not written by any hook (PAN-759), so this is the
+    // primary detection path for resumed/fresh-started agents.
+    try {
+      const pane = await capturePaneAsync(agentId, 200);
+      if (pane.includes('bypass permissions on') || pane.includes('⏵⏵')) {
+        return true;
+      }
+    } catch { /* non-fatal — session may not exist yet */ }
   }
 
   return false;
@@ -290,6 +303,14 @@ export function getAgentState(agentId: string): AgentState | null {
   return JSON.parse(content);
 }
 
+export async function getAgentStateAsync(agentId: string): Promise<AgentState | null> {
+  const stateFile = join(getAgentDir(agentId), 'state.json');
+  if (!existsSync(stateFile)) return null;
+
+  const content = await readFile(stateFile, 'utf-8');
+  return JSON.parse(content);
+}
+
 export function saveAgentState(state: AgentState): void {
   const dir = getAgentDir(state.id);
   mkdirSync(dir, { recursive: true });
@@ -315,6 +336,7 @@ function markAgentRunning(state: AgentState): void {
 function markAgentStopped(state: AgentState): void {
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
+  (state as AgentState & { stoppedByUser?: boolean }).stoppedByUser = true;
 }
 
 // ============================================================================
@@ -327,7 +349,7 @@ function markAgentStopped(state: AgentState): void {
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
 export interface AgentRuntimeState {
-  state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized';
+  state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' | 'waiting-on-human';
   lastActivity: string;
   currentTool?: string;
   sessionId?: string;
@@ -338,6 +360,9 @@ export interface AgentRuntimeState {
   resolution?: AgentResolution; // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;     // How many times this resolution was set
   resolutionUpdatedAt?: string; // When resolution was last updated
+  waitingReason?: string;
+  waitingStartedAt?: string;
+  waitingNotification?: string;
 }
 
 /**
@@ -402,6 +427,45 @@ export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null 
   return null;
 }
 
+export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
+  const runtimeFile = getAgentRuntimeFile(agentId);
+  const stateFile = join(getAgentDir(agentId), 'state.json');
+
+  // Try runtime.json first (new location)
+  if (existsSync(runtimeFile)) {
+    try {
+      const content = await readFile(runtimeFile, 'utf-8');
+      return JSON.parse(content) as AgentRuntimeState;
+    } catch {
+      // Fall through to legacy
+    }
+  }
+
+  // Fallback to state.json (legacy — runtime fields were mixed in)
+  if (existsSync(stateFile)) {
+    try {
+      const content = await readFile(stateFile, 'utf-8');
+      const parsed = JSON.parse(content);
+      // Only use if it has runtime-specific fields
+      if (parsed.state && parsed.lastActivity) {
+        return parsed as AgentRuntimeState;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  // No state at all — uninitialized
+  if (!existsSync(stateFile) && !existsSync(runtimeFile)) {
+    return {
+      state: 'uninitialized',
+      lastActivity: new Date().toISOString(),
+    };
+  }
+
+  return null;
+}
+
 /**
  * Save agent runtime state to runtime.json (separate from AgentState config)
  *
@@ -415,7 +479,6 @@ export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRunti
 
   const runtimeFile = getAgentRuntimeFile(agentId);
 
-  // Merge with existing runtime state (read from runtime.json only, not state.json)
   let existing: AgentRuntimeState | null = null;
   if (existsSync(runtimeFile)) {
     try {
@@ -425,12 +488,32 @@ export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRunti
     }
   }
 
+  const previousState = existing?.state;
   const merged: AgentRuntimeState = {
     ...(existing || { state: 'uninitialized', lastActivity: new Date().toISOString() }),
     ...state,
   };
 
+  if (merged.state !== 'waiting-on-human') {
+    merged.waitingReason = undefined;
+    merged.waitingStartedAt = undefined;
+    merged.waitingNotification = undefined;
+  } else if (!merged.waitingStartedAt) {
+    merged.waitingStartedAt = merged.lastActivity;
+  }
+
   writeFileSync(runtimeFile, JSON.stringify(merged, null, 2));
+
+  if (previousState !== merged.state || state.waitingReason || state.waitingNotification || state.resolution || state.currentTool) {
+    console.log(
+      `[agents] runtime ${agentId}: ${previousState ?? 'none'} -> ${merged.state}`
+        + (merged.waitingReason ? ` waitingReason=${merged.waitingReason}` : '')
+        + (merged.waitingNotification ? ` waitingNotification=${merged.waitingNotification}` : '')
+        + (merged.resolution ? ` resolution=${merged.resolution}` : '')
+        + (merged.currentTool ? ` tool=${merged.currentTool}` : '')
+        + ` lastActivity=${merged.lastActivity}`
+    );
+  }
 }
 
 /**
@@ -746,7 +829,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = `agent-${options.issueId.toLowerCase()}`;
 
   // Check if already running
-  if (sessionExists(agentId)) {
+  if (await sessionExistsAsync(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
@@ -934,7 +1017,7 @@ ${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
 
   clearReadySignal(agentId);
 
-  createSession(agentId, options.workspace, claudeCmd, {
+  await createSessionAsync(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
@@ -952,7 +1035,7 @@ ${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
     let ready = false;
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 1000));
-      if (!sessionExists(agentId)) {
+      if (!(await sessionExistsAsync(agentId))) {
         console.error(`[${agentId}] Tmux session died before becoming ready`);
         break;
       }
@@ -1029,6 +1112,32 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
   return agents;
 }
 
+export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActive: boolean })[]> {
+  const tmuxSessions = await getAgentSessionsAsync();
+  const tmuxNames = new Set(tmuxSessions.map(s => s.name));
+
+  const agents: (AgentState & { tmuxActive: boolean })[] = [];
+
+  // Read all agent states
+  if (!existsSync(AGENTS_DIR)) return agents;
+
+  const entries = await readdir(AGENTS_DIR).catch(() => [] as string[]);
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      const state = await getAgentStateAsync(entry);
+      if (state) {
+        agents.push({
+          ...state,
+          tmuxActive: tmuxNames.has(state.id),
+        });
+      }
+    })
+  );
+
+  return agents;
+}
+
 /**
  * Scan ~/.panopticon/agents/ for state files with bare numeric issueIds
  * (e.g. "484" instead of "PAN-484") and log warnings to stderr.
@@ -1092,7 +1201,11 @@ export function stopAgent(agentId: string): void {
   // Also mark runtime.json as stopped so Cloister/Deacon won't auto-restart.
   // state.json and runtime.json are separate files — both must agree the agent
   // was intentionally stopped to prevent race conditions with health check polls.
-  saveAgentRuntimeState(normalizedId, { state: 'stopped' });
+  console.log(`[agents] Stopping ${normalizedId}: tmux=${sessionExists(normalizedId)} stateStatus=${state?.status ?? 'none'}`);
+  saveAgentRuntimeState(normalizedId, {
+    state: 'stopped',
+    lastActivity: new Date().toISOString(),
+  });
 }
 
 export async function stopAgentAsync(agentId: string): Promise<void> {
@@ -1121,7 +1234,11 @@ export async function stopAgentAsync(agentId: string): Promise<void> {
     saveAgentState(state);
   }
 
-  saveAgentRuntimeState(normalizedId, { state: 'stopped' });
+  console.log(`[agents] Stopping ${normalizedId} (async): tmux=${await sessionExistsAsync(normalizedId)} stateStatus=${state?.status ?? 'none'}`);
+  saveAgentRuntimeState(normalizedId, {
+    state: 'stopped',
+    lastActivity: new Date().toISOString(),
+  });
 }
 
 export async function messageAgent(agentId: string, message: string): Promise<void> {
@@ -1157,7 +1274,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // session before re-creating it.
   const agentState = getAgentState(normalizedId);
   if (agentState && agentState.status === 'stopped') {
-    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${sessionExists(normalizedId)})`);
+    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await sessionExistsAsync(normalizedId)})`);
 
     const resumeResult = await resumeAgent(normalizedId, message);
 
@@ -1196,8 +1313,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     }
 
     clearReadySignal(normalizedId);
-    if (sessionExists(normalizedId)) {
-      try { killSession(normalizedId); } catch { /* ignore */ }
+    if (await sessionExistsAsync(normalizedId)) {
+      try { await killSessionAsync(normalizedId); } catch { /* ignore */ }
     }
 
     const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
@@ -1207,7 +1324,7 @@ export CI=1
 ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')}
 `;
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
-    createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
+    await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
@@ -1250,8 +1367,25 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
     return;
   }
 
-  if (!sessionExists(normalizedId)) {
+  if (!(await sessionExistsAsync(normalizedId))) {
     throw new Error(`Agent ${normalizedId} not running`);
+  }
+
+  // Guard: if tmux session exists but Claude Code has exited, resume instead
+  // of typing the message into a bare bash shell.
+  const panePids = await listPaneValuesAsync(normalizedId, '#{pane_pid}');
+  if (panePids.length > 0) {
+    try {
+      const { stdout: comm } = await execAsync(`ps -p ${panePids[0]} -o comm=`);
+      if (comm.trim() !== 'claude') throw new Error('not claude');
+    } catch {
+      console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
+      const resumeResult = await resumeAgent(normalizedId, message);
+      if (resumeResult.success) {
+        return;
+      }
+      throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
+    }
   }
 
   await sendKeysAsync(normalizedId, message);
@@ -1290,7 +1424,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
 
   // Also allow resuming a "running" agent with no live tmux session — this happens after
   // a system crash where tmux was killed but state.json was never updated to 'stopped'.
-  const isCrashed = agentState?.status === 'running' && !sessionExists(normalizedId);
+  const isCrashed = agentState?.status === 'running' && !(await sessionExistsAsync(normalizedId));
 
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
     || (agentState && allowedAgentStatuses.includes(agentState.status))
@@ -1320,9 +1454,9 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   }
 
   // Kill any zombie tmux session (crashed agent left behind)
-  if (sessionExists(normalizedId)) {
+  if (await sessionExistsAsync(normalizedId)) {
     try {
-      killSession(normalizedId);
+      await killSessionAsync(normalizedId);
     } catch { /* non-fatal */ }
   }
 
@@ -1357,14 +1491,19 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
     const model = agentState.model || 'claude-sonnet-4-6';
     const providerExports = getProviderExportsForModel(model);
+    // Non-Anthropic models route through a proxy (ANTHROPIC_BASE_URL). Without an explicit
+    // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
+    // requests through the proxy → "unknown provider" 502. Always include --model when
+    // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
+    const resumeModelFlag = providerExports.includes('ANTHROPIC_BASE_URL') ? ` --model ${model}` : '';
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     const launcherContent = `#!/bin/bash
 export CI=1
-${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permissions --permission-mode bypassPermissions
+${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --dangerously-skip-permissions --permission-mode bypassPermissions
 `;
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
-    createSession(normalizedId, agentState.workspace, claudeCmd, {
+    await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
@@ -1390,9 +1529,12 @@ ${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permiss
     }
 
     // Update runtime state
+    const resumedAt = new Date().toISOString();
+    console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
     saveAgentRuntimeState(normalizedId, {
       state: 'active',
-      resumedAt: new Date().toISOString(),
+      resumedAt,
+      lastActivity: resumedAt,
     });
 
     // Update agent state
@@ -1408,6 +1550,22 @@ ${providerExports}exec claude --resume "${sessionId}" --dangerously-skip-permiss
       success: false,
       error: `Failed to resume agent: ${msg}`
     };
+  }
+}
+
+/**
+ * Check whether a tmux session has an active Claude Code process.
+ * A session may exist with only a bare bash shell after Claude exits.
+ */
+function isClaudeRunningInSession(sessionName: string): boolean {
+  try {
+    const panePids = listPaneValues(sessionName, '#{pane_pid}');
+    if (panePids.length === 0) return false;
+    const panePid = panePids[0]!;
+    const comm = execSync(`ps -p ${panePid} -o comm=`, { encoding: 'utf-8' }).trim();
+    return comm === 'claude';
+  } catch {
+    return false;
   }
 }
 
@@ -1439,9 +1597,14 @@ export function recoverAgent(agentId: string): AgentState | null {
     return null;
   }
 
-  // Check if already running
+  // Check if already running — session may exist with only a bare shell
+  // after Claude exited (zombie session). Kill it and recover.
   if (sessionExists(normalizedId)) {
-    return state;
+    if (isClaudeRunningInSession(normalizedId)) {
+      return state;
+    }
+    console.log(`[agents] ${normalizedId} tmux session is a zombie (no Claude process) — killing and recovering`);
+    try { killSession(normalizedId); } catch { /* ignore */ }
   }
 
   // Update crash count in health file

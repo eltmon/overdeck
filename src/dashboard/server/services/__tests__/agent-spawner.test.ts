@@ -17,12 +17,14 @@ vi.mock('node:fs', () => ({
 // ─── Mock agents.ts ───────────────────────────────────────────────────────────
 
 const mockGetAgentState = vi.fn();
+const mockGetAgentStateAsync = vi.fn();
 const mockSpawnAgent = vi.fn();
 const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
+  getAgentStateAsync: mockGetAgentStateAsync,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
   stopAgentAsync: mockStopAgent,
@@ -78,6 +80,7 @@ describe('AgentSpawner Effect service', () => {
       return true; // workspace exists
     });
     mockGetAgentState.mockReturnValue(null);
+    mockGetAgentStateAsync.mockResolvedValue(null);
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
     mockMessageAgent.mockResolvedValue(undefined);
@@ -131,7 +134,7 @@ describe('AgentSpawner Effect service', () => {
     });
 
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
-      mockGetAgentState.mockReturnValue({ status: 'running', issueId: 'PAN-1' });
+      mockGetAgentStateAsync.mockResolvedValue({ status: 'running', issueId: 'PAN-1' });
 
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 

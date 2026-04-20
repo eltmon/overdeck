@@ -62,6 +62,7 @@ import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renam
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
+import { sessionExistsAsync } from '../tmux.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
@@ -88,6 +89,31 @@ export function identifyOrphanedReviewingIssues(
     orphaned.push(issueId);
   }
   return orphaned;
+}
+
+export function parseSpecialistAgentSession(name: string): {
+  projectKey: string;
+  specialistType: 'review-agent' | 'test-agent' | 'merge-agent';
+  issueId?: string;
+} | null {
+  const issueScoped = name.match(/^specialist-(.+)-([A-Z]+-\d+)-(review-agent|test-agent|merge-agent)$/);
+  if (issueScoped) {
+    return {
+      projectKey: issueScoped[1],
+      issueId: issueScoped[2],
+      specialistType: issueScoped[3] as 'review-agent' | 'test-agent' | 'merge-agent',
+    };
+  }
+
+  const legacy = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+  if (legacy) {
+    return {
+      projectKey: legacy[1],
+      specialistType: legacy[2] as 'review-agent' | 'test-agent' | 'merge-agent',
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -214,6 +240,13 @@ export class CloisterService {
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
 
+  // ─── Status cache ────────────────────────────────────────────────────────────
+  // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
+  // to eliminate blocking on high-frequency dashboard polls.
+  private _statusCache: CloisterStatus | null = null;
+  private _statusCacheAt = 0;
+  private readonly STATUS_CACHE_TTL_MS = 3_000;
+
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
   }
@@ -270,14 +303,11 @@ export class CloisterService {
     try {
       if (existsSync(AGENTS_DIR)) {
         const { isRunning: isSpecialistRunning } = await import('./specialists.js');
-        const specialistPattern = /^specialist-(.+)-(review-agent|test-agent|merge-agent)$/;
         const entries = readdirSync(AGENTS_DIR, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
-          const match = specialistPattern.exec(entry.name);
-          if (!match) continue;
-          const projectKey = match[1];
-          const specialistType = match[2] as 'review-agent' | 'test-agent' | 'merge-agent';
+          const parsed = parseSpecialistAgentSession(entry.name);
+          if (!parsed) continue;
           const runtimeState = getAgentRuntimeState(entry.name);
           if (!runtimeState?.currentIssue) continue;
 
@@ -285,8 +315,12 @@ export class CloisterService {
             saveAgentRuntimeState(entry.name, { currentIssue: undefined });
             console.log(`  ✓ Cleared stale currentIssue '${runtimeState.currentIssue}' from idle ${entry.name}`);
           } else if (runtimeState.state === 'active') {
-            // Check if the process is actually alive — if not, the state is stale from a crash
-            const stillRunning = await isSpecialistRunning(specialistType, projectKey);
+            // Check if the process is actually alive — if not, the state is stale from a crash.
+            // For issue-scoped specialists, check the exact tmux session instead of the legacy
+            // project/type singleton lookup, which cannot represent PAN-754 session identity.
+            const stillRunning = parsed.issueId
+              ? await sessionExistsAsync(entry.name)
+              : await isSpecialistRunning(parsed.specialistType, parsed.projectKey);
             if (!stillRunning) {
               saveAgentRuntimeState(entry.name, {
                 state: 'idle',
@@ -308,7 +342,8 @@ export class CloisterService {
     try {
       const reviewStatuses = loadReviewStatuses();
       const { resolveProjectFromIssue } = await import('../projects.js');
-      const { spawnEphemeralSpecialist, getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+      const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
+      const { dispatchParallelReview } = await import('./review-agent.js');
 
       // Build set of issue IDs actively being reviewed by a running specialist
       const activeReviewIssues = new Set<string>();
@@ -326,6 +361,15 @@ export class CloisterService {
         const globalRs = getAgentRuntimeState(globalSession);
         if (globalRs?.state === 'active' && globalRs.currentIssue) {
           activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
+        }
+
+        // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
+        // These never register runtime state, so they're invisible to the checks above.
+        const { listSessionNamesAsync } = await import('../tmux.js');
+        const { getActiveParallelReviewIssues } = await import('./review-agent.js');
+        const allSessions = await listSessionNamesAsync();
+        for (const issueId of getActiveParallelReviewIssues(allSessions)) {
+          activeReviewIssues.add(issueId);
         }
       } catch {
         // Non-fatal: if we can't check active sessions, re-dispatch all orphaned
@@ -356,18 +400,9 @@ export class CloisterService {
           }
 
           const branch = `feature/${issueId.toLowerCase()}`;
-          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-            issueId,
-            workspace,
-            branch,
-          });
-          if (result.success) {
-            console.log(`  ✓ Re-dispatched recovery review for ${issueId} (project: ${resolved.projectKey})`);
-          } else {
-            // Busy or failed — reset to pending so deacon patrol picks it up
-            console.log(`  ⚠ ${issueId}: recovery dispatch failed (${result.message}) — resetting to pending`);
-            setReviewStatus(issueId, { reviewStatus: 'pending' });
-          }
+          await dispatchParallelReview({ issueId, workspace, branch });
+          // dispatchParallelReview sets reviewStatus='reviewing' internally
+          console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
         }
       }
     } catch (error) {
@@ -389,6 +424,7 @@ export class CloisterService {
 
     this.running = true;
     this.starting = false;
+    this._statusCache = null;
     writeStateFile(true);
     this.emit({ type: 'started' });
 
@@ -410,6 +446,7 @@ export class CloisterService {
 
     console.log('🔔 Stopping Cloister agent watchdog...');
     this.running = false;
+    this._statusCache = null;
     writeStateFile(false);
 
     if (this.checkInterval) {
@@ -1164,8 +1201,17 @@ export class CloisterService {
 
   /**
    * Get current status
+   *
+   * Uses a 3-second TTL cache to avoid blocking the event loop on repeated
+   * dashboard polls. The underlying computation does sync file I/O and tmux
+   * calls for every agent, which scales poorly with agent count.
    */
   getStatus(): CloisterStatus {
+    const now = Date.now();
+    if (this._statusCache && now - this._statusCacheAt < this.STATUS_CACHE_TTL_MS) {
+      return this._statusCache;
+    }
+
     const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
     const agentIds = runningAgents.map((a) => a.id);
 
@@ -1182,13 +1228,17 @@ export class CloisterService {
     const summary = generateHealthSummary(agentHealths);
     const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
 
-    return {
+    const status: CloisterStatus = {
       running: this.isRunning(),
       lastCheck: this.lastCheck,
       config: this.config,
       summary,
       agentsNeedingAttention: needsAttention,
     };
+
+    this._statusCache = status;
+    this._statusCacheAt = now;
+    return status;
   }
 
   /**

@@ -21,7 +21,8 @@ import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 import { loadCloisterConfig } from './config.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
-import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
+import { getProviderEnvForModel } from '../agents.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -78,31 +79,6 @@ async function resolveWorkspaceGitInfo(workspace: string | undefined, taskBranch
 }
 
 /**
- * Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for a model.
- * For non-Anthropic providers (Kimi, Z.AI, etc.), returns env vars needed
- * to redirect Claude Code API calls to the correct endpoint.
- */
-function getProviderEnvForModel(model: string): Record<string, string> {
-  const provider = getProviderForModel(model as ModelId);
-  if (provider.name === 'anthropic') return {};
-
-  // OpenRouter has its own key path
-  if (provider.name === 'openrouter') {
-    const { config } = loadYamlConfig();
-    const apiKey = config.apiKeys.openrouter;
-    if (apiKey) return getProviderEnv(provider, apiKey);
-    throw new Error(`OpenRouter API key not configured. Add your key in Settings before using model "${model}".`);
-  }
-
-  const { config } = loadYamlConfig();
-  const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
-  if (apiKey) {
-    return getProviderEnv(provider, apiKey);
-  }
-  throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
-}
-
-/**
  * Shell fragment that unsets every provider-routing env var a parent tmux server
  * may have leaked into its child sessions. The panopticon tmux server is long-lived
  * and inherits whatever env existed when it was spawned — so fresh Anthropic-model
@@ -120,6 +96,17 @@ const PROVIDER_ENV_UNSETS = [
 ];
 const PROVIDER_UNSET_LINES = PROVIDER_ENV_UNSETS.map(k => `unset ${k}`).join('\n');
 const PROVIDER_UNSET_CMD = `unset ${PROVIDER_ENV_UNSETS.join(' ')}`;
+
+/**
+ * Convert a providerEnv dict to bash export lines (re-export after PROVIDER_UNSET_LINES).
+ * Non-Anthropic models (e.g. gpt-5.4 via cliproxy) need ANTHROPIC_BASE_URL set in the
+ * script body — tmux -e flags are wiped by PROVIDER_UNSET_LINES before claude runs.
+ */
+function buildProviderExportLines(providerEnv: Record<string, string>): string {
+  const entries = Object.entries(providerEnv);
+  if (entries.length === 0) return '';
+  return entries.map(([k, v]) => `export ${k}="${v}"`).join('\n') + '\n';
+}
 
 /**
  * Build tmux -e flags for environment variables
@@ -212,6 +199,18 @@ export interface SpecialistStatus extends SpecialistMetadata {
 }
 
 /**
+ * One step in the model resolution trace (PAN-754)
+ */
+export interface ResolutionStep {
+  source: 'work-type-router' | 'cloister-config' | 'fallback';
+  workTypeId?: string;
+  configKey?: string;
+  resolvedAlias?: string;
+  resolvedModel: string;
+  matched: boolean;
+}
+
+/**
  * Per-project specialist metadata
  */
 export interface ProjectSpecialistMetadata {
@@ -220,14 +219,31 @@ export interface ProjectSpecialistMetadata {
   lastRunStatus: 'passed' | 'failed' | 'blocked' | null;
   currentRun: string | null; // Run ID if active
   sessionId?: string; // Legacy session ID for transition period
+  // Identity fields (PAN-754)
+  issueId?: string;
+  tmuxSession?: string; // Stored at spawn time so we can look it up without recomputing
+  role?: string; // For convoy members: 'correctness' | 'performance' | etc.
+  // Activity visibility (PAN-754)
+  currentActivity?: string | null;
+  model?: string | null;
+  resolutionTrace?: ResolutionStep[] | null;
+  // Write-scope (PAN-754)
+  writeScope?: 'full' | 'readonly-plus-output';
+  outputPath?: string | null;
+  workspace?: string | null; // workspace path for write-scope conflict detection
 }
 
 export function isProjectSpecialistActivelyRunning(
-  runtimeState?: { state?: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' } | null,
+  runtimeState?: { state?: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' | 'waiting-on-human' } | null,
   fallbackRunning: boolean = false
 ): boolean {
   if (runtimeState?.state === 'active') return true;
-  if (runtimeState?.state === 'idle' || runtimeState?.state === 'suspended' || runtimeState?.state === 'stopped') {
+  if (
+    runtimeState?.state === 'idle'
+    || runtimeState?.state === 'suspended'
+    || runtimeState?.state === 'stopped'
+    || runtimeState?.state === 'waiting-on-human'
+  ) {
     return false;
   }
   return fallbackRunning;
@@ -311,7 +327,7 @@ export function initSpecialistsDirectory(): void {
   // Create default registry if it doesn't exist
   if (!existsSync(REGISTRY_FILE)) {
     const registry: SpecialistRegistry = {
-      version: '2.0', // Updated for per-project structure
+      version: '3.0', // Updated for compound-key (issueId-aware) structure (PAN-754)
       defaults: {
         contextRuns: 5,
         digestModel: null,
@@ -333,38 +349,46 @@ export function initSpecialistsDirectory(): void {
 }
 
 /**
- * Migrate old registry format to new per-project structure
+ * Migrate old registry format to new per-project structure (PAN-754: compound-key aware).
+ *
+ * v1.0 → v2.0: flat specialist list → projects[projectKey][specialistType]
+ * v2.0 → v3.0: projects[projectKey][specialistType] → projects[projectKey][compoundKey]
+ *   Legacy v2.0 plain-type keys are left as-is (still readable by compat wrappers).
+ *   getProjectSpecialistMetadata() and updateProjectSpecialistMetadata() handle both formats.
  */
 function migrateRegistryIfNeeded(): void {
   try {
     const content = readFileSync(REGISTRY_FILE, 'utf-8');
     const registry = JSON.parse(content) as SpecialistRegistry;
 
-    // Check if already migrated
-    if (registry.version === '2.0' || registry.projects) {
+    // v2.0 already migrated (or registry.projects exists for fresh installs)
+    if (registry.version === '2.0' && registry.projects) {
+      // No additional migration needed — legacy plain-type keys are handled by compat wrappers.
       return;
     }
 
-    // Migrate to new structure
-    console.log('[specialists] Migrating registry to per-project structure...');
+    if (!registry.projects) {
+      // v1.0 → v2.0: add projects map
+      console.log('[specialists] Migrating registry v1.0 → v2.0...');
 
-    const migratedRegistry: SpecialistRegistry = {
-      version: '2.0',
-      defaults: {
-        contextRuns: 5,
-        digestModel: null,
-        retention: {
-          maxDays: 30,
-          maxRuns: 50,
+      const migratedRegistry: SpecialistRegistry = {
+        version: '2.0',
+        defaults: {
+          contextRuns: 5,
+          digestModel: null,
+          retention: {
+            maxDays: 30,
+            maxRuns: 50,
+          },
         },
-      },
-      projects: {},
-      specialists: registry.specialists, // Keep for backward compat
-      lastUpdated: new Date().toISOString(),
-    };
+        projects: {},
+        specialists: registry.specialists,
+        lastUpdated: new Date().toISOString(),
+      };
 
-    saveRegistry(migratedRegistry);
-    console.log('[specialists] Registry migration complete');
+      saveRegistry(migratedRegistry);
+      console.log('[specialists] Registry migration v1.0 → v2.0 complete');
+    }
   } catch (error) {
     console.error('[specialists] Failed to migrate registry:', error);
   }
@@ -633,12 +657,33 @@ export function getSpecialistState(name: SpecialistType): Exclude<SpecialistStat
  * @param projectKey - Optional project key for per-project specialists
  * @returns Expected tmux session name
  */
-export function getTmuxSessionName(name: SpecialistType, projectKey?: string): string {
+export function getTmuxSessionName(name: SpecialistType, projectKey?: string, issueId?: string): string {
+  if (projectKey && issueId) {
+    return `specialist-${projectKey}-${issueId}-${name}`;
+  }
   if (projectKey) {
     return `specialist-${projectKey}-${name}`;
   }
   // Legacy format for backward compatibility
   return `specialist-${name}`;
+}
+
+/**
+ * Construct the compound registry key for a per-issue specialist (PAN-754).
+ * Format: `${specialistType}:${issueId}` or `${specialistType}:${issueId}:${role}` for convoy.
+ */
+export function makeSpecialistRegistryKey(specialistType: string, issueId: string, role?: string): string {
+  return role ? `${specialistType}:${issueId}:${role}` : `${specialistType}:${issueId}`;
+}
+
+/**
+ * Parse a compound registry key back into its parts.
+ */
+export function parseSpecialistRegistryKey(key: string): { specialistType: string; issueId?: string; role?: string } {
+  const parts = key.split(':');
+  if (parts.length === 1) return { specialistType: parts[0] };
+  if (parts.length === 2) return { specialistType: parts[0], issueId: parts[1] };
+  return { specialistType: parts[0], issueId: parts[1], role: parts[2] };
 }
 
 /**
@@ -711,7 +756,8 @@ export async function spawnEphemeralSpecialist(
   // Ensure project specialist directory exists
   ensureProjectSpecialistDir(projectKey, specialistType);
 
-  const tmuxSession = getTmuxSessionName(specialistType, projectKey);
+  const registryKey = makeSpecialistRegistryKey(specialistType, task.issueId);
+  const tmuxSession = getTmuxSessionName(specialistType, projectKey, task.issueId);
 
   // Busy check FIRST — before any state mutation. A rejected dispatch must NOT
   // create a run log, advance currentRun, or write task files into the shared
@@ -754,6 +800,29 @@ export async function spawnEphemeralSpecialist(
     // Non-fatal: session check failure shouldn't block spawn
   }
 
+  // Write-scope enforcement (PAN-754): enforce single-writer-per-worktree policy.
+  // 'full' scope specialists have exclusive write access; only one may run per workspace.
+  // 'readonly-plus-output' specialists (convoy reviewers) may run concurrently as long
+  // as their outputPath values are disjoint.
+  if (task.workspace) {
+    const registry = loadRegistry();
+    const projectBucket = registry.projects[projectKey] ?? {};
+    for (const [key, entry] of Object.entries(projectBucket)) {
+      if (key === registryKey) continue; // same slot — handled by busy check above
+      if (!entry.currentRun) continue; // not running
+      if (entry.workspace !== task.workspace) continue; // different worktree — no conflict
+      // Another specialist is running against the same workspace
+      const incomingScope = 'full'; // default; convoy callers will pass 'readonly-plus-output' via task.context
+      if (incomingScope === 'full' || (entry.writeScope ?? 'full') === 'full') {
+        return {
+          success: false,
+          message: `Write conflict: specialist ${key} (${projectKey}) is already running with full write scope on workspace ${task.workspace}`,
+          error: 'worktree_write_conflict',
+        };
+      }
+    }
+  }
+
   // Load context digest
   const { loadContextDigest } = await import('./specialist-context.js');
   const contextDigest = loadContextDigest(projectKey, specialistType);
@@ -767,9 +836,9 @@ export async function spawnEphemeralSpecialist(
     contextDigest || undefined
   );
 
-  // Update metadata
-  setCurrentRun(projectKey, specialistType, runId);
-  incrementProjectRunCount(projectKey, specialistType);
+  // Update metadata (3-level: projectKey + issueId + specialistType via compound key)
+  setCurrentRun(projectKey, registryKey, runId);
+  incrementProjectRunCount(projectKey, registryKey);
 
   // Build task prompt (use override if provided, otherwise build from template)
   const basePrompt = task.promptOverride ?? await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
@@ -796,36 +865,59 @@ ${basePrompt}`;
 
   try {
     // Determine model for this specialist
-    // Priority: cloister config specialist_models > work-type-router > default fallback
+    // Priority: work-type-router (respects config.yaml overrides) > cloister config defaults > fallback
+    // PAN-754: work-type-router MUST be checked first so user's models.overrides.specialist-X config wins.
     const fallbackModel = 'claude-sonnet-4-6';
     let model: string | undefined;
+    const resolutionTrace: ResolutionStep[] = [];
 
     try {
-      const cloisterConfig = loadCloisterConfig();
-      const normalizedName = specialistType.replace(/-/g, '_');
-      const configuredModel = (cloisterConfig.model_selection?.specialist_models as any)?.[normalizedName] as string | undefined;
-      if (configuredModel) {
-        const modelMap: Record<string, string> = { opus: 'claude-opus-4-6', sonnet: 'claude-sonnet-4-6', haiku: 'claude-haiku-4-5' };
-        model = modelMap[configuredModel];
-        if (model) {
-          console.log(`[specialist] Using model "${model}" for ${specialistType} (from cloister config)`);
-        }
+      const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
+      const resolved = getModelId(workTypeId);
+      if (resolved) {
+        model = resolved;
+        resolutionTrace.push({ source: 'work-type-router', workTypeId, resolvedModel: resolved, matched: true });
+        console.log(`[specialist] Using model "${model}" for ${specialistType} (from work-type-router)`);
       }
     } catch {
-      // Config lookup failed, fall through to work-type-router
+      resolutionTrace.push({ source: 'work-type-router', workTypeId: `specialist-${specialistType}`, resolvedModel: '', matched: false });
     }
 
     if (!model) {
       try {
-        const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
-        model = getModelId(workTypeId);
-        console.log(`[specialist] Using model "${model}" for ${specialistType} (from work-type-router)`);
+        const cloisterConfig = loadCloisterConfig();
+        const normalizedName = specialistType.replace(/-/g, '_');
+        const configuredAlias = (cloisterConfig.model_selection?.specialist_models as any)?.[normalizedName] as string | undefined;
+        if (configuredAlias) {
+          const modelMap: Record<string, string> = { opus: 'claude-opus-4-7', sonnet: 'claude-sonnet-4-6', haiku: 'claude-haiku-4-5' };
+          const resolved = modelMap[configuredAlias];
+          if (resolved) {
+            model = resolved;
+            resolutionTrace.push({ source: 'cloister-config', configKey: normalizedName, resolvedAlias: configuredAlias, resolvedModel: resolved, matched: true });
+            console.log(`[specialist] Using model "${model}" for ${specialistType} (from cloister config default)`);
+          }
+        }
       } catch {
-        console.warn(`Warning: Could not resolve model for ${specialistType} via work-type-router, using default`);
+        // Config lookup failed
       }
     }
 
-    model = model || fallbackModel;
+    if (!model) {
+      model = fallbackModel;
+      resolutionTrace.push({ source: 'fallback', resolvedModel: fallbackModel, matched: true });
+      console.warn(`[specialist] Falling back to default model "${fallbackModel}" for ${specialistType}`);
+    }
+
+    // Store model + trace + identity in registry metadata for Agent activity visibility
+    updateRunMetadata(projectKey, registryKey, {
+      model,
+      resolutionTrace,
+      issueId: task.issueId,
+      tmuxSession,
+      workspace: task.workspace ?? null,
+      currentActivity: `Running ${specialistType} for ${task.issueId}`,
+      writeScope: 'full',
+    });
 
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
     const providerEnv = getProviderEnvForModel(model);
@@ -893,11 +985,12 @@ ${basePrompt}`;
       loadYamlConfig().config.caveman
     );
 
+    const providerExportLines = buildProviderExportLines(providerEnv);
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
 ${PROVIDER_UNSET_LINES}
-export CI=1
+${providerExportLines}export CI=1
 export PANOPTICON_AGENT_ID="${tmuxSession}"
 export PANOPTICON_ISSUE_ID="${task.issueId}"
 export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
@@ -954,7 +1047,7 @@ exec script -qfaec "bash '${innerScript}'" "${logFilePath}"
     console.error(`[specialist] Failed to spawn ${specialistType}:`, error);
 
     // Clean up metadata
-    setCurrentRun(projectKey, specialistType, null);
+    setCurrentRun(projectKey, registryKey, null);
 
     return {
       success: false,
@@ -1316,6 +1409,34 @@ export function getGracePeriodState(
 }
 
 /**
+ * Find the active registry key for (projectKey, specialistType).
+ * Searches compound keys; falls back to plain specialistType key.
+ * Returns undefined if nothing is currently active.
+ */
+export function findActiveRegistryKey(projectKey: string, specialistType: SpecialistType): string | undefined {
+  const registry = loadRegistry();
+  const bucket = registry.projects[projectKey] ?? {};
+
+  // Check compound keys first (new format: "type:issueId")
+  const prefix = `${specialistType}:`;
+  const activeCompound = Object.keys(bucket).find(k =>
+    k.startsWith(prefix) && bucket[k].currentRun !== null
+  );
+  if (activeCompound) return activeCompound;
+
+  // Check legacy plain key
+  if (bucket[specialistType]?.currentRun !== null) return specialistType;
+
+  // Return most recently touched key even if not active
+  const allMatching = Object.keys(bucket).filter(k =>
+    k === specialistType || k.startsWith(prefix)
+  ).sort((a, b) =>
+    (bucket[b].lastRunAt ?? '').localeCompare(bucket[a].lastRunAt ?? '')
+  );
+  return allMatching[0];
+}
+
+/**
  * Signal that a specialist has completed its task
  *
  * This should be called when the specialist finishes its work.
@@ -1324,6 +1445,7 @@ export function getGracePeriodState(
  * @param projectKey - Project identifier
  * @param specialistType - Specialist type
  * @param result - Task result
+ * @param issueId - Optional: issue being handled (used to compute compound registry key)
  */
 export function signalSpecialistCompletion(
   projectKey: string,
@@ -1331,12 +1453,19 @@ export function signalSpecialistCompletion(
   result: {
     status: 'passed' | 'failed' | 'blocked';
     notes?: string;
-  }
+  },
+  issueId?: string
 ): void {
-  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
+  const registryKey = issueId
+    ? makeSpecialistRegistryKey(specialistType, issueId)
+    : (findActiveRegistryKey(projectKey, specialistType) ?? specialistType);
+  const metadata = getRunMetadata(projectKey, registryKey);
+
+  // Derive tmuxSession: use stored field when available, recompute as fallback
+  const resolvedTmuxSession = metadata.tmuxSession ?? getTmuxSessionName(specialistType, projectKey, issueId);
 
   // Update status
-  updateRunStatus(projectKey, specialistType, result.status);
+  updateRunStatus(projectKey, registryKey, result.status);
 
   // Finalize log if there's a current run
   if (metadata.currentRun) {
@@ -1354,10 +1483,11 @@ export function signalSpecialistCompletion(
 
   // Completion means the run itself is over, even if the tmux session stays alive
   // during the grace period for inspection or manual termination.
-  setCurrentRun(projectKey, specialistType, null);
+  setCurrentRun(projectKey, registryKey, null);
+  updateRunMetadata(projectKey, registryKey, { currentActivity: null });
   import('../agents.js')
     .then(({ saveAgentRuntimeState }) => {
-      saveAgentRuntimeState(getTmuxSessionName(specialistType, projectKey), {
+      saveAgentRuntimeState(resolvedTmuxSession, {
         state: 'idle',
         lastActivity: new Date().toISOString(),
         currentIssue: undefined,
@@ -1383,10 +1513,16 @@ export function signalSpecialistCompletion(
  */
 export async function terminateSpecialist(
   projectKey: string,
-  specialistType: SpecialistType
+  specialistType: SpecialistType,
+  issueId?: string
 ): Promise<void> {
-  const tmuxSession = getTmuxSessionName(specialistType, projectKey);
-  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
+  const registryKey = issueId
+    ? makeSpecialistRegistryKey(specialistType, issueId)
+    : (findActiveRegistryKey(projectKey, specialistType) ?? specialistType);
+  const metadata = getRunMetadata(projectKey, registryKey);
+
+  // Derive tmuxSession: use stored field, or recompute
+  const tmuxSession = metadata.tmuxSession ?? getTmuxSessionName(specialistType, projectKey, issueId);
 
   try {
     // Kill tmux session
@@ -1410,8 +1546,10 @@ export async function terminateSpecialist(
     }
 
     // Clear current run
-    setCurrentRun(projectKey, specialistType, null);
+    setCurrentRun(projectKey, registryKey, null);
   }
+
+  updateRunMetadata(projectKey, registryKey, { currentActivity: null });
 
   // Clear grace period state
   const key = `${projectKey}-${specialistType}`;
@@ -1487,11 +1625,12 @@ export function ensureProjectSpecialistDir(projectKey: string, specialistType: S
 }
 
 /**
- * Get per-project specialist metadata
+ * Get metadata for a specific (projectKey, registryKey) pair.
+ * registryKey is either a plain specialistType (legacy) or a compound key from makeSpecialistRegistryKey().
  */
-export function getProjectSpecialistMetadata(
+export function getRunMetadata(
   projectKey: string,
-  specialistType: SpecialistType
+  registryKey: string,
 ): ProjectSpecialistMetadata {
   const registry = loadRegistry();
 
@@ -1499,9 +1638,8 @@ export function getProjectSpecialistMetadata(
     registry.projects[projectKey] = {};
   }
 
-  if (!registry.projects[projectKey][specialistType]) {
-    // Initialize with defaults
-    registry.projects[projectKey][specialistType] = {
+  if (!registry.projects[projectKey][registryKey]) {
+    registry.projects[projectKey][registryKey] = {
       runCount: 0,
       lastRunAt: null,
       lastRunStatus: null,
@@ -1510,15 +1648,15 @@ export function getProjectSpecialistMetadata(
     saveRegistry(registry);
   }
 
-  return registry.projects[projectKey][specialistType];
+  return registry.projects[projectKey][registryKey];
 }
 
 /**
- * Update per-project specialist metadata
+ * Update metadata for a specific (projectKey, registryKey) pair.
  */
-export function updateProjectSpecialistMetadata(
+export function updateRunMetadata(
   projectKey: string,
-  specialistType: SpecialistType,
+  registryKey: string,
   updates: Partial<ProjectSpecialistMetadata>
 ): void {
   const registry = loadRegistry();
@@ -1527,8 +1665,8 @@ export function updateProjectSpecialistMetadata(
     registry.projects[projectKey] = {};
   }
 
-  if (!registry.projects[projectKey][specialistType]) {
-    registry.projects[projectKey][specialistType] = {
+  if (!registry.projects[projectKey][registryKey]) {
+    registry.projects[projectKey][registryKey] = {
       runCount: 0,
       lastRunAt: null,
       lastRunStatus: null,
@@ -1536,8 +1674,8 @@ export function updateProjectSpecialistMetadata(
     };
   }
 
-  registry.projects[projectKey][specialistType] = {
-    ...registry.projects[projectKey][specialistType],
+  registry.projects[projectKey][registryKey] = {
+    ...registry.projects[projectKey][registryKey],
     ...updates,
   };
 
@@ -1545,36 +1683,111 @@ export function updateProjectSpecialistMetadata(
 }
 
 /**
- * Increment run count for a project's specialist
+ * Get per-project specialist metadata — backward-compat wrapper.
+ * Searches compound-key entries for this project+type; returns the active run, or most recent.
  */
-export function incrementProjectRunCount(projectKey: string, specialistType: SpecialistType): void {
-  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
-  updateProjectSpecialistMetadata(projectKey, specialistType, {
+export function getProjectSpecialistMetadata(
+  projectKey: string,
+  specialistType: SpecialistType
+): ProjectSpecialistMetadata {
+  const registry = loadRegistry();
+  const projectBucket = registry.projects[projectKey] ?? {};
+
+  // Check for exact legacy key first
+  if (projectBucket[specialistType]) {
+    return projectBucket[specialistType];
+  }
+
+  // Search compound keys for the most relevant entry
+  const prefix = `${specialistType}:`;
+  const candidates = Object.entries(projectBucket)
+    .filter(([k]) => k.startsWith(prefix))
+    .map(([, v]) => v);
+
+  // Prefer active run, then most recently started
+  const active = candidates.find(c => c.currentRun !== null);
+  if (active) return active;
+  const sorted = candidates.sort((a, b) =>
+    (b.lastRunAt ?? '').localeCompare(a.lastRunAt ?? '')
+  );
+  if (sorted.length > 0) return sorted[0];
+
+  // No entry found — return blank default (don't save it)
+  return { runCount: 0, lastRunAt: null, lastRunStatus: null, currentRun: null };
+}
+
+/**
+ * Update per-project specialist metadata — backward-compat wrapper.
+ * Updates the active compound-key entry, or the legacy plain-key entry.
+ */
+export function updateProjectSpecialistMetadata(
+  projectKey: string,
+  specialistType: SpecialistType,
+  updates: Partial<ProjectSpecialistMetadata>
+): void {
+  const registry = loadRegistry();
+  const projectBucket = registry.projects[projectKey] ?? {};
+
+  // Try legacy key first
+  if (projectBucket[specialistType]) {
+    updateRunMetadata(projectKey, specialistType, updates);
+    return;
+  }
+
+  // Find the active compound-key entry for this type
+  const prefix = `${specialistType}:`;
+  const activeKey = Object.keys(projectBucket).find(k =>
+    k.startsWith(prefix) && projectBucket[k].currentRun !== null
+  );
+  if (activeKey) {
+    updateRunMetadata(projectKey, activeKey, updates);
+    return;
+  }
+
+  // Fall back to most recent
+  const latestKey = Object.keys(projectBucket)
+    .filter(k => k.startsWith(prefix))
+    .sort((a, b) => (projectBucket[b].lastRunAt ?? '').localeCompare(projectBucket[a].lastRunAt ?? ''))
+    .shift();
+  if (latestKey) {
+    updateRunMetadata(projectKey, latestKey, updates);
+  }
+}
+
+/**
+ * Increment run count for a project's specialist.
+ * registryKey may be a plain specialistType (legacy) or a compound key.
+ */
+export function incrementProjectRunCount(projectKey: string, registryKey: string): void {
+  const metadata = getRunMetadata(projectKey, registryKey);
+  updateRunMetadata(projectKey, registryKey, {
     runCount: metadata.runCount + 1,
     lastRunAt: new Date().toISOString(),
   });
 }
 
 /**
- * Set current run for a project's specialist
+ * Set current run for a project's specialist.
+ * registryKey may be a plain specialistType (legacy) or a compound key.
  */
 export function setCurrentRun(
   projectKey: string,
-  specialistType: SpecialistType,
+  registryKey: string,
   runId: string | null
 ): void {
-  updateProjectSpecialistMetadata(projectKey, specialistType, { currentRun: runId });
+  updateRunMetadata(projectKey, registryKey, { currentRun: runId });
 }
 
 /**
- * Update run status for a project's specialist
+ * Update run status for a project's specialist.
+ * registryKey may be a plain specialistType (legacy) or a compound key.
  */
 export function updateRunStatus(
   projectKey: string,
-  specialistType: SpecialistType,
+  registryKey: string,
   status: 'passed' | 'failed' | 'blocked' | null
 ): void {
-  updateProjectSpecialistMetadata(projectKey, specialistType, { lastRunStatus: status });
+  updateRunMetadata(projectKey, registryKey, { lastRunStatus: status });
 }
 
 /**
@@ -1600,43 +1813,53 @@ export function listSpecialistsForProject(projectKey: string): SpecialistType[] 
 }
 
 /**
- * Get all per-project specialist statuses
+ * Get all per-project specialist statuses (PAN-754: compound-key aware).
+ * Walks registry including compound keys (type:issueId[:role]) and returns
+ * enriched entries with issueId, model, currentActivity for the Agents page.
  */
 export async function getAllProjectSpecialistStatuses(): Promise<Array<{
   projectKey: string;
   specialistType: SpecialistType;
+  registryKey: string;
+  issueId?: string;
+  role?: string;
   metadata: ProjectSpecialistMetadata;
   isRunning: boolean;
   tmuxSession: string;
 }>> {
   const registry = loadRegistry();
+  const { getAgentRuntimeState } = await import('../agents.js');
+
   const results: Array<{
     projectKey: string;
     specialistType: SpecialistType;
+    registryKey: string;
+    issueId?: string;
+    role?: string;
     metadata: ProjectSpecialistMetadata;
     isRunning: boolean;
     tmuxSession: string;
   }> = [];
 
   for (const [projectKey, specialists] of Object.entries(registry.projects)) {
-    for (const [specialistType, metadata] of Object.entries(specialists)) {
-      const tmuxSession = getTmuxSessionName(specialistType as SpecialistType, projectKey);
-      const { getAgentRuntimeState } = await import('../agents.js');
+    for (const [registryKey, metadata] of Object.entries(specialists)) {
+      const { specialistType, issueId, role } = parseSpecialistRegistryKey(registryKey);
+
+      // Determine tmux session: use stored field when available
+      const tmuxSession = metadata.tmuxSession
+        ?? getTmuxSessionName(specialistType as SpecialistType, projectKey, issueId);
+
       const runtimeState = getAgentRuntimeState(tmuxSession);
-      const running = isProjectSpecialistActivelyRunning(
-        runtimeState,
-        await isRunning(specialistType as SpecialistType, projectKey)
-      );
-      const effectiveMetadata = running
-        ? metadata
-        : {
-            ...metadata,
-            currentRun: null,
-          };
+      const sessionRunning = await isRunning(specialistType as SpecialistType, projectKey).catch(() => false);
+      const running = isProjectSpecialistActivelyRunning(runtimeState, sessionRunning);
+      const effectiveMetadata = running ? metadata : { ...metadata, currentRun: null };
 
       results.push({
         projectKey,
         specialistType: specialistType as SpecialistType,
+        registryKey,
+        issueId,
+        role,
         metadata: effectiveMetadata,
         isRunning: running,
         tmuxSession,
@@ -1871,7 +2094,7 @@ export async function getSpecialistStatus(
     state,
     isRunning: running,
     tmuxSession: getTmuxSessionName(name, projectKey),
-    currentIssue: runtimeState?.currentIssue,
+    currentIssue: running ? runtimeState?.currentIssue : undefined,
   };
 }
 
@@ -1965,10 +2188,11 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
 
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
+    const initProviderExportLines = buildProviderExportLines(providerEnv);
     writeFileSync(launcherScript, `#!/bin/bash
 cd "${cwd}"
 ${PROVIDER_UNSET_LINES}
-prompt=$(cat "${promptFile}")
+${initProviderExportLines}prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "${newSessionId}" --model ${model} "$prompt"
 `, { mode: 0o755 });
     setSessionId(name, newSessionId);
@@ -2193,7 +2417,11 @@ export async function wakeSpecialist(
       // signatures, making resumed sessions permanently fail (PAN-612).
       const effectiveSessionId = sessionId || randomUUID();
       if (!sessionId) setSessionId(name, effectiveSessionId);
-      const claudeCmd = `${PROVIDER_UNSET_CMD}; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      const providerExportCmd = Object.entries(providerEnv)
+        .map(([k, v]) => `export ${k}="${v}"`)
+        .join('; ');
+      const providerSetupCmd = providerExportCmd ? `${providerExportCmd}; ` : '';
+      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });

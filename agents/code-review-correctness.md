@@ -62,7 +62,7 @@ You are a specialized code review agent focused on **correctness and logic**. Yo
    - If a pattern is applied in some files, Grep for similar files that may be missing it
    - If `.planning/plan.vbrief.json` exists, read the `items` array and check each AC against the diff
    - If `.beads/issues.jsonl` exists, scan closed beads and verify their described changes are present
-4. **Document findings** - Write to `.claude/reviews/<timestamp>-correctness.md`
+4. **Document findings** - Write to the path specified in `**Output file**` in the Review Context
 
 ## Output Format
 
@@ -168,8 +168,7 @@ return user?.email ?? null;
 
 - Your findings will be combined with **security** and **performance** reviews
 - A **synthesis agent** will merge all findings into a unified report
-- Write your review to `.claude/reviews/<timestamp>-correctness.md`
-- Use a timestamp format like `2026-01-20T15-30-00`
+- Write your review to the path specified in `**Output file**` in the Review Context
 
 ## When Complete
 

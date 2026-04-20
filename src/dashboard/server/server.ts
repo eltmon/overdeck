@@ -44,6 +44,7 @@ import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
 import { adminRouteLayer } from './routes/admin.js';
+import { prereqsRouteLayer } from './routes/prereqs.js';
 import { emitActivityEntry } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -190,6 +191,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   eventsRouteLayer,
   showRouteLayer,
   adminRouteLayer,
+  prereqsRouteLayer,
   staticRouteLayer,
 );
 

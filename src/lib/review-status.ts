@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { access, readFile } from 'fs/promises';
+import { join } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry } from './activity-logger.js';
@@ -8,6 +8,8 @@ import {
   deleteReviewStatus as dbDelete,
   getReviewStatusFromDb,
   getAllReviewStatusesFromDb,
+  markWorkspaceStuck as dbMarkStuck,
+  clearWorkspaceStuck as dbClearStuck,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -42,6 +44,14 @@ export interface ReviewStatus {
   history?: StatusHistoryEntry[];
   /** HEAD commit SHA at the time review passed — used to detect new commits after review */
   reviewedAtCommit?: string;
+  /** PAN-653: workspace is stuck (e.g. main diverged mid-approve) — Deacon skips it */
+  stuck?: boolean;
+  /** PAN-653: reason workspace is stuck (e.g. 'main_diverged') */
+  stuckReason?: string;
+  /** PAN-653: ISO timestamp when workspace was marked stuck */
+  stuckAt?: string;
+  /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
+  stuckDetails?: string;
 }
 
 function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
@@ -56,44 +66,47 @@ function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>)
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
-  // Prefer SQLite when using the default path
-  if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      return getAllReviewStatusesFromDb();
-    } catch {
-      // Fall through to JSON on DB error
-    }
+  // SQLite is the authoritative store for the default (server) path.
+  // Non-default JSON paths have been moved to review-status-json.ts so that
+  // dashboard-reachable code never imports sync FS operations.
+  if (filePath !== DEFAULT_STATUS_FILE) {
+    throw new Error(
+      `Non-default review-status paths are not supported in review-status.ts. ` +
+      `Import from review-status-json.ts for JSON file operations.`
+    );
   }
-
-  try {
-    if (existsSync(filePath)) {
-      return JSON.parse(readFileSync(filePath, 'utf-8'));
-    }
-  } catch (err) {
-    console.error('Failed to load review statuses:', err);
-  }
-  return {};
+  return getAllReviewStatusesFromDb();
 }
 
 export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
-  try {
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+  // SQLite is the authoritative store for the default (server) path.
+  // Mirrors the old JSON overwrite semantics: upsert every entry in the map and
+  // delete any SQLite rows whose keys are absent from the map (replace-all).
+  if (filePath !== DEFAULT_STATUS_FILE) {
+    throw new Error(
+      `Non-default review-status paths are not supported in review-status.ts. ` +
+      `Import from review-status-json.ts for JSON file operations.`
+    );
+  }
+  const incoming = new Set(Object.keys(statuses));
+  const existing = getAllReviewStatusesFromDb();
+  for (const id of Object.keys(existing)) {
+    if (!incoming.has(id)) {
+      dbDelete(id);
     }
-    writeFileSync(filePath, JSON.stringify(statuses, null, 2));
-  } catch (err) {
-    console.error('Failed to save review statuses:', err);
+  }
+  for (const status of Object.values(statuses)) {
+    dbUpsert(status);
   }
 }
 
 export function setReviewStatus(
   issueId: string,
   update: Partial<ReviewStatus>,
-  filePath = DEFAULT_STATUS_FILE,
 ): ReviewStatus {
-  const statuses = loadReviewStatuses(filePath);
-  const existing = statuses[issueId] || {
+  // Read only the single row we're updating (avoids TOCTOU: bulk read-modify-write
+  // races when two concurrent calls for different issue IDs run concurrently).
+  const existing: ReviewStatus = getReviewStatusFromDb(issueId) ?? {
     issueId,
     reviewStatus: 'pending' as const,
     testStatus: 'pending' as const,
@@ -186,18 +199,8 @@ export function setReviewStatus(
     })();
   }
 
-  // SQLite first — it is the authoritative store (reads prefer SQLite)
-  if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      dbUpsert(updated);
-    } catch (err) {
-      console.error('[review-status] SQLite write failed (continuing with JSON):', err);
-    }
-  }
-
-  // JSON second — legacy fallback for tools that read review-status.json directly
-  statuses[issueId] = updated;
-  saveReviewStatuses(statuses, filePath);
+  // Single-row upsert — atomic, no TOCTOU risk.
+  dbUpsert(updated);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 
@@ -266,13 +269,13 @@ export function setReviewStatus(
         const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
         let workspace: string | undefined;
         let branch: string | undefined;
-        if (existsSync(workStateFile)) {
-          try {
-            const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
-            workspace = workState.workspace;
-            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-          } catch {}
-        }
+        try {
+          await access(workStateFile);
+          const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
+          workspace = workState.workspace;
+          branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+        } catch {}
+
         const resolved = resolveProjectFromIssue(issueId);
         if (!resolved) {
           console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
@@ -297,47 +300,11 @@ export function setReviewStatus(
     })();
   }
 
-  // Auto-deliver feedback to work agent when review blocks or tests fail.
-  // This ensures feedback reaches the agent regardless of whether status was
-  // set via the dashboard API or directly (e.g., bun -e import). See PAN-586.
-  if (
-    (update.reviewStatus === 'blocked' || update.testStatus === 'failed') &&
-    (update.reviewStatus !== existing.reviewStatus || update.testStatus !== existing.testStatus)
-  ) {
-    const agentSession = `agent-${issueId.toLowerCase()}`;
-    (async () => {
-      try {
-        const { sessionExists } = await import('./tmux.js');
-        if (!sessionExists(agentSession)) return;
-
-        const statusType = update.reviewStatus === 'blocked' ? 'REVIEW BLOCKED' : 'TESTS FAILED';
-        const notes = update.reviewNotes || update.testNotes || 'No details provided.';
-        const msg = `SPECIALIST FEEDBACK: ${statusType} for ${issueId}.\n\n${notes}\n\nFix the issues, then run: pan done ${issueId}`;
-
-        const { messageAgent } = await import('./agents.js');
-        await messageAgent(agentSession, msg);
-        console.log(`[review-status] Auto-delivered ${statusType} feedback to ${agentSession}`);
-      } catch (err: any) {
-        console.warn(`[review-status] Failed to auto-deliver feedback to ${agentSession}: ${err.message}`);
-      }
-    })();
-  }
-
   return updated;
 }
 
-export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
-  // Prefer SQLite when using the default path
-  if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      const fromDb = getReviewStatusFromDb(issueId);
-      if (fromDb) return fromDb;
-    } catch {
-      // Fall through to JSON on DB error
-    }
-  }
-  const statuses = loadReviewStatuses(filePath);
-  return statuses[issueId] || null;
+export function getReviewStatus(issueId: string): ReviewStatus | null {
+  return getReviewStatusFromDb(issueId) ?? null;
 }
 
 /**
@@ -403,17 +370,51 @@ export function fixStuckReadyForMerge(): void {
   }
 }
 
-export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
-  const statuses = loadReviewStatuses(filePath);
-  delete statuses[issueId];
-  saveReviewStatuses(statuses, filePath);
+export function clearReviewStatus(issueId: string): void {
+  try {
+    dbDelete(issueId);
+  } catch (err) {
+    console.error('[review-status] SQLite delete failed:', err);
+  }
+}
 
-  // Dual-delete from SQLite when using the default path
-  if (filePath === DEFAULT_STATUS_FILE) {
-    try {
-      dbDelete(issueId);
-    } catch (err) {
-      console.error('[review-status] SQLite delete failed (continuing with JSON):', err);
-    }
+// ============== Stuck state helpers (PAN-653) ==============
+
+/**
+ * Mark a workspace as stuck with a reason and optional JSON details.
+ * Persists across dashboard restarts. Deacon will skip stuck workspaces.
+ *
+ * @param issueId - Issue ID (e.g. "PAN-653")
+ * @param reason  - Short reason code (e.g. "main_diverged")
+ * @param details - Optional structured details (e.g. {localSha, remoteSha})
+ */
+export function markWorkspaceStuck(
+  issueId: string,
+  reason: string,
+  details?: Record<string, unknown>,
+): void {
+  try {
+    dbMarkStuck(issueId, reason, details);
+    console.log(`[review-status] Marked ${issueId} as stuck: ${reason}`);
+    const updated = getReviewStatus(issueId);
+    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
+  } catch (err) {
+    console.error(`[review-status] Failed to mark ${issueId} as stuck:`, err);
+  }
+}
+
+/**
+ * Clear the stuck flag for a workspace.
+ * Called when the human clicks "Unstick" in the dashboard.
+ * Re-enables Deacon patrol for this workspace.
+ */
+export function clearWorkspaceStuck(issueId: string): void {
+  try {
+    dbClearStuck(issueId);
+    console.log(`[review-status] Cleared stuck state for ${issueId}`);
+    const updated = getReviewStatus(issueId);
+    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
+  } catch (err) {
+    console.error(`[review-status] Failed to clear stuck state for ${issueId}:`, err);
   }
 }

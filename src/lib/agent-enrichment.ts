@@ -8,14 +8,14 @@
  * AgentEnrichmentService background poller.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
-import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
-import { getAgentRuntimeState, getAgentDir } from './agents.js'
+import { getAgentRuntimeStateAsync, getAgentDir } from './agents.js'
 import { resolveProjectFromIssue } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefix } from './issue-id.js'
@@ -42,18 +42,21 @@ export function getClaudeProjectDir(workspacePath: string): string {
   return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
 }
 
-export function getActiveSessionPath(projectDir: string): string | null {
+export async function getActiveSessionPath(projectDir: string): Promise<string | null> {
   if (!existsSync(projectDir)) return null
   try {
-    const files = readdirSync(projectDir)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(f => ({
+    const entries = await readdir(projectDir)
+    const jsonlFiles = entries.filter(f => f.endsWith('.jsonl'))
+    if (jsonlFiles.length === 0) return null
+    const withMtime = await Promise.all(
+      jsonlFiles.map(async f => ({
         name: f,
         path: join(projectDir, f),
-        mtime: statSync(join(projectDir, f)).mtime.getTime(),
+        mtime: (await stat(join(projectDir, f))).mtime.getTime(),
       }))
-      .sort((a, b) => b.mtime - a.mtime)
-    return files.length > 0 ? files[0].path : null
+    )
+    withMtime.sort((a, b) => b.mtime - a.mtime)
+    return withMtime[0].path
   } catch {
     return null
   }
@@ -86,7 +89,7 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
   const stateFile = join(getAgentDir(agentId), 'state.json')
   if (existsSync(stateFile)) {
     try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'))
       if (state.workspace) return state.workspace
     } catch {}
   }
@@ -115,15 +118,49 @@ export async function getAgentJsonlPath(agentId: string): Promise<string | null>
   const workspace = await getAgentWorkspace(agentId)
   if (!workspace) return null
   const projectDir = getClaudeProjectDir(workspace)
-  return getActiveSessionPath(projectDir)
+  return await getActiveSessionPath(projectDir)
 }
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
 
+/**
+ * Read the last `maxBytes` from a file. Efficient for large JSONL files where
+ * only recent entries (at the end) are relevant.
+ */
+async function readFileTail(filePath: string, maxBytes: number): Promise<string> {
+  try {
+    const fileStat = await stat(filePath)
+    const start = Math.max(0, fileStat.size - maxBytes)
+    // For fs/promises readFile we can't specify start offset directly,
+    // so use a stream approach for large files.
+    if (start === 0) {
+      return readFile(filePath, 'utf-8')
+    }
+    const { createReadStream } = await import('node:fs')
+    return new Promise((resolve, reject) => {
+      const stream = createReadStream(filePath, { start, encoding: 'utf-8' })
+      let data = ''
+      stream.on('data', chunk => { data += chunk })
+      stream.on('end', () => resolve(data))
+      stream.on('error', reject)
+    })
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Parse pending questions from a JSONL file.
+ *
+ * Optimization: only reads the last 512KB of the file. Pending questions
+ * are always recent events — reading the entire multi-megabyte file on
+ * every poll was a major source of dashboard lag.
+ */
 export async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
   if (!existsSync(jsonlPath)) return []
   try {
-    const content = await readFile(jsonlPath, 'utf-8')
+    // Only read the last 512KB — pending questions are always recent.
+    const content = await readFileTail(jsonlPath, 512_000)
     const lines = content.split('\n').filter(line => line.trim())
     const toolCalls = new Map<string, PendingQuestion>()
     const answeredIds = new Set<string>()
@@ -169,7 +206,7 @@ export async function getAgentJsonlMtime(agentId: string): Promise<number | null
   const jsonlPath = await getAgentJsonlPath(agentId)
   if (!jsonlPath || !existsSync(jsonlPath)) return null
   try {
-    return statSync(jsonlPath).mtime.getTime()
+    return (await stat(jsonlPath)).mtime.getTime()
   } catch {
     return null
   }
@@ -198,7 +235,7 @@ export async function computeAgentEnrichment(
   let statePhase: string | undefined
   if (existsSync(stateFile)) {
     try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'))
       statePhase = state.phase
     } catch {}
   }
@@ -206,7 +243,7 @@ export async function computeAgentEnrichment(
   const agentPhase = (isPlanning ? 'planning' : (statePhase || 'implementation')) as AgentEnrichment['agentPhase']
 
   // Get runtime state for resolution + idle detection
-  const runtimeState = getAgentRuntimeState(agentId)
+  const runtimeState = await getAgentRuntimeStateAsync(agentId)
   const isIdle = runtimeState?.state === 'idle' ||
     (runtimeState?.currentTool === 'AskUserQuestion')
 

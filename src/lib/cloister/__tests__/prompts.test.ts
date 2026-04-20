@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { renderPrompt, loadPromptFrontmatter, clearPromptCache, PromptError } from '../prompts.js';
+import { renderPrompt, loadPromptFrontmatter, PromptError } from '../prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PROMPTS_DIR = join(dirname(__filename), '..', 'prompts');
@@ -13,7 +13,6 @@ const SCRATCH_PATH = join(PROMPTS_DIR, `${SCRATCH}.md`);
 function writeScratch(body: string): void {
   mkdirSync(PROMPTS_DIR, { recursive: true });
   writeFileSync(SCRATCH_PATH, body, 'utf-8');
-  clearPromptCache();
 }
 
 afterEach(() => {
@@ -22,7 +21,6 @@ afterEach(() => {
   } catch {
     // ignore
   }
-  clearPromptCache();
 });
 
 describe('prompts loader', () => {
@@ -112,7 +110,6 @@ body`
     });
 
     it('throws when template file is missing', () => {
-      clearPromptCache();
       expect(() => loadPromptFrontmatter('definitely-not-a-real-template')).toThrow(
         /Failed to load prompt template/
       );
@@ -317,6 +314,40 @@ requires:
       );
       const out = renderPrompt({ name: SCRATCH, vars: { FLAG: false } });
       expect(out).toBe('off');
+    });
+  });
+
+  describe('live review template', () => {
+    const baseReviewVars = {
+      ISSUE_ID: 'PAN-999',
+      BRANCH: 'feature/pan-999',
+      WORKSPACE: '/tmp/repo',
+      DIFF_BASE: 'main',
+      IS_POLYREPO: false,
+      GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
+      GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
+      API_URL: 'http://localhost:3011',
+    };
+
+    it('reports stale branches through specialists/done instead of direct review status updates', () => {
+      const out = renderPrompt({
+        name: 'review',
+        vars: baseReviewVars,
+      });
+      expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
+      expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"passed"');
+      expect(out).not.toContain('/api/review/PAN-999/status');
+      expect(out).not.toContain('pan tell PAN-999');
+    });
+
+    it('reports blocked review results through specialists/done instead of pan tell', () => {
+      const out = renderPrompt({
+        name: 'review',
+        vars: baseReviewVars,
+      });
+      expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"failed"');
+      expect(out).toContain('Do NOT message the work agent directly');
+      expect(out).not.toContain('pan tell PAN-999');
     });
   });
 

@@ -26,14 +26,24 @@ Panopticon is an open-source control plane for multi-agent software development.
 ## Quick Start
 
 ```bash
-npx panopticon-cli@latest install && pan up
+npx @eltmon/panctl
 ```
+
+No install step required — Command Deck opens immediately. Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them. For headless and CI, keep using `pan`.
+
+For the power-user path that installs everything up front: `pan install`.
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
 On install, Panopticon rebuilds native modules like `better-sqlite3` for your active Node.js version. If you switch Node versions later, run `npm rebuild better-sqlite3` before starting Panopticon again.
 
 See the [full documentation](https://panopticon-cli.com) for detailed setup, configuration, and usage guides.
+
+---
+
+## Architecture at a Glance
+
+Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx @eltmon/panctl`; keep `pan` for headless and CI.
 
 ---
 

@@ -135,7 +135,7 @@ describe('work-type-router', () => {
           'specialist-inspect-agent',
           'specialist-uat-agent',
           'subagent:explore',
-          'convoy:security-reviewer',
+          'review:security',
           'planning-agent',
           'cli:interactive',
         ];
@@ -219,7 +219,7 @@ describe('work-type-router', () => {
           apiKeys: {},
           overrides: {
             'issue-agent:exploration': 'claude-opus-4-6',
-            'convoy:security-reviewer': 'claude-opus-4-6',
+            'review:security': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -228,7 +228,7 @@ describe('work-type-router', () => {
         const overrides = router.getOverrides();
 
         expect(overrides['issue-agent:exploration']).toBe('claude-opus-4-6');
-        expect(overrides['convoy:security-reviewer']).toBe('claude-opus-4-6');
+        expect(overrides['review:security']).toBe('claude-opus-4-6');
       });
 
       it('should return copy (not reference)', () => {
@@ -483,7 +483,7 @@ describe('work-type-router', () => {
 
       // Smart selector picks best implementation model from anthropic+google
       const impl = router.getModel('issue-agent:implementation');
-      expect(impl.model).toBe('claude-opus-4-6'); // Opus scores highest for implementation
+      expect(impl.model).toBe('claude-opus-4-7'); // Opus 4.7 scores highest for implementation
       expect(impl.usedFallback).toBe(false);
     });
   });

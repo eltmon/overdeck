@@ -1,48 +1,52 @@
 ---
 name: pan-restart
-description: "pan up — restart the dashboard (handles stale builds, port conflicts on 3010/3011)"
+description: "pan restart — scoped restart (dashboard by default; --cliproxy, --traefik, or --full) that will not strand shared sidecars"
 ---
 
-# Restart Panopticon Dashboard
+# Restart Panopticon
 
-Use this whenever the Panopticon dashboard needs a restart, reload, or rebuild-backed restart.
+Use this whenever a Panopticon component needs to be restarted. The `pan restart`
+command is scope-aware: by default it restarts **only the dashboard** and leaves
+CLIProxy, Traefik, and TLDR running — so a dashboard restart cannot strand the
+system or kill unrelated dependencies.
 
-This is the canonical path for:
-- dashboard restart requests
-- server code changes that need a rebuild + restart
-- `EADDRINUSE` / "address already in use" on port `3010` or `3011`
-- cases where an old dashboard process did not die cleanly
+## Canonical paths
 
-## Usage
-
-Run `/pan-restart` to restart the dashboard.
-
-`pan up` is the correct command because it:
-- builds/runs the proper dashboard runtime path
-- kills the old dashboard listeners by port
-- restarts cleanly on the expected ports
+| Situation                                                        | Command                        |
+|------------------------------------------------------------------|--------------------------------|
+| Dashboard restart (rebuild, stale state, `EADDRINUSE` on 3010/3011) | `pan restart`                  |
+| GPT-routed agents returning 502s (CLIProxy died)                 | `pan restart --cliproxy`       |
+| `.localhost` routing / Traefik changes                           | `pan restart --traefik`        |
+| Whole-stack rebuild (use sparingly — stops CLIProxy & Traefik)   | `pan restart --full`           |
 
 ## Execution
 
 ```bash
-# Build first if code was changed
+# Build first if dashboard server or CLI code changed
 cd /home/eltmon/Projects/panopticon-cli && npm run build
 
-# Canonical restart path
-# pan up kills old listeners on 3010 (frontend) and 3011 (API) before starting
-pan up
+# Dashboard-only restart (safe — leaves CLIProxy, Traefik, TLDR running)
+pan restart
 
-# Verify API is back
-curl -s http://localhost:3011/api/health | head -1
+# Scoped alternatives
+pan restart --cliproxy
+pan restart --traefik
+pan restart --full       # nuclear — stops & restarts everything
 ```
 
-Expected output: `{"status":"ok"...}`
+Each stage is health-gated: the command waits for `GET /api/health` (dashboard)
+or port binding (CLIProxy) to succeed before reporting `✓`, and exits non-zero
+with a `[stage] reason` message on timeout.
 
 ## Important Notes
 
-- If you see `listen EADDRINUSE` on `3010` or `3011`, that means the old dashboard is still bound to the port. Use this skill; do NOT start another server manually.
-- NEVER use `pkill -f "node.*server"` or similar — it can kill unrelated Node processes.
-- NEVER use `npm run dev` for the dashboard restart path — production-style dashboard runs under Node 22 via built dist.
-- Always run `npm run build` first if you changed dashboard server or CLI code.
-- `pan up` is idempotent for restart purposes: it kills the old process first, then starts the new one.
-- Prefer this skill whenever the request mentions restart, reload, stale server state, or port conflicts on `3010`/`3011`.
+- `pan restart` is idempotent: it stops the old listener(s), starts a new one,
+  then polls until the health check passes.
+- `pan restart --dashboard` NEVER touches CLIProxy, Traefik, or TLDR — that
+  scope contract is enforced by tests.
+- If the dashboard restart fails, shared sidecars are left running so recovery
+  is possible with another `pan restart` once the root cause is fixed.
+- NEVER use `pkill -f "node.*server"` — it can kill unrelated Node processes.
+- Prefer `pan restart` over `pan down && pan up` whenever you only need to
+  cycle one component. `pan down && pan up` tears down everything and takes
+  longer to recover.

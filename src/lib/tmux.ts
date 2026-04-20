@@ -287,6 +287,10 @@ export async function sessionExistsAsync(name: string): Promise<boolean> {
   }
 }
 
+/**
+ * @deprecated Legacy sync function — blocks the event loop. Use `createSessionAsync` instead.
+ * Kept for CLI-only callers. Never call from server-reachable code.
+ */
 export function createSession(
   name: string,
   cwd: string,
@@ -509,4 +513,8 @@ export async function confirmDelivery(
 
 export function getAgentSessions(): TmuxSession[] {
   return listSessions().filter(s => s.name.startsWith('agent-'));
+}
+
+export async function getAgentSessionsAsync(): Promise<TmuxSession[]> {
+  return (await listSessionsAsync()).filter(s => s.name.startsWith('agent-'));
 }

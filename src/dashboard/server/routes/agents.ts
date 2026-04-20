@@ -47,7 +47,9 @@ import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
   getAgentState,
+  getAgentStateAsync,
   getAgentRuntimeState,
+  getAgentRuntimeStateAsync,
   saveAgentRuntimeState,
   saveAgentState,
   getActivity,
@@ -59,6 +61,7 @@ import {
   stopAgent,
   stopAgentAsync,
   listRunningAgents,
+  listRunningAgentsAsync,
   getAgentDir,
 } from '../../../lib/agents.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
@@ -282,7 +285,7 @@ const getAgentsRoute = HttpRouter.add(
               });
             }
 
-            const runtimeState = getAgentRuntimeState(name);
+            const runtimeState = await getAgentRuntimeStateAsync(name);
             const isIdle = runtimeState?.state === 'idle' || (runtimeState?.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
 
             const issueReviewStatus = getReviewStatus(issueId);
@@ -805,7 +808,7 @@ const getAgentFilesRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = getAgentState(id);
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState?.workspace) {
       return jsonResponse({ files: [] });
     }
@@ -846,7 +849,7 @@ const getAgentTimelineRoute = HttpRouter.add(
     const limit = parseInt(limitStr) || 50;
 
     const activity = getActivity(id, limit);
-    const agentState = getAgentState(id);
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     const events = activity.map((a: any) => ({
       timestamp: a.timestamp || new Date().toISOString(),
       type: a.type || 'activity',
@@ -924,7 +927,7 @@ const postAgentResumeRoute = HttpRouter.add(
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
-      const agentState = getAgentState(id);
+      const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.started',
         timestamp: new Date().toISOString(),
@@ -986,7 +989,7 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = getAgentState(id);
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -1082,7 +1085,7 @@ const getAgentCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = getAgentState(id);
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -1823,7 +1826,7 @@ const postAgentsRestartAllRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.promise(async () => {
       try {
-        const running = listRunningAgents().filter(a => a.tmuxActive);
+        const running = (await listRunningAgentsAsync()).filter(a => a.tmuxActive);
         const results: { id: string; issueId: string; model: string; status: string }[] = [];
 
         for (const agent of running) {
@@ -1892,7 +1895,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const lifecycle = getWorkAgentLifecycleState(id);
-    const agentState = getAgentState(id);
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
     }

@@ -71,6 +71,20 @@ export interface TestAgentConfig extends SpecialistConfig {
 }
 
 /**
+ * Configuration for a single reviewer agent in the parallel review flow.
+ */
+export interface ReviewAgentConfig {
+  /** Unique name / role identifier (e.g. 'correctness', 'security', 'performance') */
+  name: string;
+  /** Optional model override (e.g. 'claude-opus-4-6'). Falls back to work-type routing. */
+  model?: string;
+  /** Focus areas for this reviewer (informational, passed as context) */
+  focus?: string[];
+  /** Set to false to skip this reviewer. Defaults to true. */
+  enabled?: boolean;
+}
+
+/**
  * All specialist agents configuration
  */
 export interface SpecialistsConfig {
@@ -79,6 +93,8 @@ export interface SpecialistsConfig {
   test_agent?: TestAgentConfig;
   inspect_agent?: SpecialistConfig;
   uat_agent?: SpecialistConfig;
+  /** User-configurable list of parallel reviewer agents. Absent ⇒ 3 built-in defaults. */
+  review_agents?: ReviewAgentConfig[];
 }
 
 /**
@@ -94,9 +110,9 @@ export interface ModelSelectionConfig {
     expert: 'opus' | 'sonnet' | 'haiku';
   };
   specialist_models: {
-    merge_agent: 'opus' | 'sonnet' | 'haiku';
-    review_agent: 'opus' | 'sonnet' | 'haiku';
-    test_agent: 'opus' | 'sonnet' | 'haiku';
+    merge_agent?: 'opus' | 'sonnet' | 'haiku';
+    review_agent?: 'opus' | 'sonnet' | 'haiku';
+    test_agent?: 'opus' | 'sonnet' | 'haiku';
     inspect_agent?: 'opus' | 'sonnet' | 'haiku';
     uat_agent?: 'opus' | 'sonnet' | 'haiku';
   };
@@ -242,11 +258,8 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       expert: 'opus',
     },
     specialist_models: {
-      merge_agent: 'sonnet',
-      review_agent: 'sonnet',
-      test_agent: 'haiku',
-      inspect_agent: 'sonnet',
-      uat_agent: 'sonnet',
+      // PAN-754: no hardcoded defaults. User config.yaml overrides are authoritative.
+      // Resolution falls through to work-type-router, then to the global fallback model.
     },
   },
   handoffs: {
