@@ -401,7 +401,7 @@ async function tmpLoadAndPaste(sessionName: string, tmpFile: string, index: numb
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}-${randomUUID()}.txt`);
   try {
     writeFileSync(tmpFile, keys);
     tmuxExecSync(['load-buffer', tmpFile]);
