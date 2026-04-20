@@ -64,7 +64,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     authType: 'credential-file',
     credentialFile: '~/.kimi/credentials/kimi-code.json',
     credentialHelper: '~/.panopticon/bin/kimi-token-helper.sh',
-    models: ['kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tested: true,
     description: 'Anthropic-compatible API via Kimi Code Plan (OAuth token refresh)',
   },
@@ -148,7 +148,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Kimi models
-  if (['kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 
