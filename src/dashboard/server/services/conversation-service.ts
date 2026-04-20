@@ -193,6 +193,8 @@ export async function parseConversationMessages(
   let lastUserTimestamp: string | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
   const pendingToolUse = new Map<string, WorkLogEntry>();
+  // Map tool_use id → pre-arrived tool_result (waiting for tool_use)
+  const unresolvedResults = new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
   // Monotonic sequence counter per JSONL line
   let sequence = 0;
 
@@ -234,17 +236,17 @@ export async function parseConversationMessages(
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
             const pending = pendingToolUse.get(block.tool_use_id);
+            let resultText: string | undefined;
+            if (typeof block.content === 'string') {
+              resultText = block.content;
+            } else if (Array.isArray(block.content)) {
+              resultText = (block.content as Array<{ type?: string; text?: string }>)
+                .filter(b => b.type === 'text' && b.text)
+                .map(b => b.text)
+                .join('\n');
+            }
             if (pending) {
               pendingToolUse.delete(block.tool_use_id);
-              let resultText: string | undefined;
-              if (typeof block.content === 'string') {
-                resultText = block.content;
-              } else if (Array.isArray(block.content)) {
-                resultText = (block.content as Array<{ type?: string; text?: string }>)
-                  .filter(b => b.type === 'text' && b.text)
-                  .map(b => b.text)
-                  .join('\n');
-              }
               workLog.push({
                 ...pending,
                 detail: block.is_error
@@ -252,6 +254,12 @@ export async function parseConversationMessages(
                   : pending.detail,
                 result: resultText,
                 tone: block.is_error ? 'error' : pending.tone,
+              });
+            } else {
+              unresolvedResults.set(block.tool_use_id, {
+                resultText,
+                isError: block.is_error ?? false,
+                rawContent: block.content,
               });
             }
           }
@@ -308,7 +316,20 @@ export async function parseConversationMessages(
             detail: block.input ? JSON.stringify(block.input) : undefined,
             sequence: lineSequence,
           };
-          pendingToolUse.set(block.id, toolEntry);
+          const unresolved = unresolvedResults.get(block.id);
+          if (unresolved) {
+            unresolvedResults.delete(block.id);
+            workLog.push({
+              ...toolEntry,
+              detail: unresolved.isError
+                ? `Error: ${unresolved.resultText ?? JSON.stringify(unresolved.rawContent)}`
+                : toolEntry.detail,
+              result: unresolved.resultText,
+              tone: unresolved.isError ? 'error' : toolEntry.tone,
+            });
+          } else {
+            pendingToolUse.set(block.id, toolEntry);
+          }
         }
       }
 
