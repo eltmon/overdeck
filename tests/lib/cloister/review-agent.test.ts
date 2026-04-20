@@ -291,6 +291,20 @@ describe('getFilesChangedFromPR', () => {
 
     expect(files).toEqual(['src/a.ts', 'src/b.ts']);
   });
+
+  it('excludes planning and Panopticon artifact files from reviewer context', async () => {
+    const execFn = vi.fn().mockResolvedValue({
+      stdout: '.planning/STATE.md\nsrc/lib/tmux.ts\ndocs/prds/active/PAN-704/plan.md\n.pan/review/run-1/correctness.md\n.panopticon/prompts/foo.md\nsrc/dashboard/frontend/src/components/PlanningChips.tsx\n',
+      stderr: '',
+    });
+
+    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
+
+    expect(files).toEqual([
+      'src/lib/tmux.ts',
+      'src/dashboard/frontend/src/components/PlanningChips.tsx',
+    ]);
+  });
 });
 
 // ── helpers ───────────────────────────────────────────────────────────────────

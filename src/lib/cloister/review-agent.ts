@@ -126,7 +126,11 @@ export async function getFilesChangedFromPR(
     return (stdout as string)
       .split('\n')
       .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+      .filter((line) => line.length > 0)
+      .filter((line) => !line.startsWith('.planning/'))
+      .filter((line) => !line.startsWith('docs/prds/'))
+      .filter((line) => !line.startsWith('.pan/'))
+      .filter((line) => !line.startsWith('.panopticon/'));
   } catch (error) {
     console.error('Failed to get files changed from PR:', error);
     return [];
