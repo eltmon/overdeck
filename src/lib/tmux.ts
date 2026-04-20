@@ -9,6 +9,11 @@ import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 
 const execFileAsync = promisify(execFile);
 
+let _sendKeysTmpCounter = 0;
+function uniqueTmpFile(): string {
+  return join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}-${++_sendKeysTmpCounter}.txt`);
+}
+
 const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
 const MANAGED_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
@@ -352,7 +357,7 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const tmpFile = uniqueTmpFile();
   await writeFile(tmpFile, keys);
 
   const lines = keys.split('\n');
@@ -400,7 +405,7 @@ async function tmpLoadAndPaste(sessionName: string, tmpFile: string, index: numb
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const tmpFile = uniqueTmpFile();
   try {
     writeFileSync(tmpFile, keys);
     tmuxExecSync(['load-buffer', tmpFile]);
