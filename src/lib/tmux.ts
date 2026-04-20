@@ -352,23 +352,24 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
+  const target = `${sessionName}:0.0`;
   const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const lines = keys.split('\n');
   if (lines.length > 1) {
     for (let i = 0; i < lines.length; i++) {
       if (lines[i]!.length > 0) {
-        await setAndPasteBuffer(sessionName, lines[i]!, `${sendId}-${i}`);
+        await setAndPasteBuffer(target, lines[i]!, `${sendId}-${i}`);
       }
       if (i < lines.length - 1) {
-        await tmuxExecAsync(['send-keys', '-t', sessionName, 'S-Enter'], { encoding: 'utf-8' });
+        await tmuxExecAsync(['send-keys', '-t', target, 'S-Enter'], { encoding: 'utf-8' });
       }
     }
     await new Promise(r => setTimeout(r, 300));
-    await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+    await tmuxExecAsync(['send-keys', '-t', target, 'C-m'], { encoding: 'utf-8' });
   } else {
-    await setAndPasteBuffer(sessionName, keys, `${sendId}-single`, true);
+    await setAndPasteBuffer(target, keys, `${sendId}-single`, true);
     await new Promise(r => setTimeout(r, 300));
-    await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+    await tmuxExecAsync(['send-keys', '-t', target, 'C-m'], { encoding: 'utf-8' });
   }
 }
 
