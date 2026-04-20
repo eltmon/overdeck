@@ -428,6 +428,26 @@ describe('enrichSessions (POST /api/discovered-sessions/enrich logic)', () => {
   });
 });
 
+// ─── POST /api/discovered-sessions/:id/enrich ────────────────────────────────
+
+describe('enrichSessions single-session (POST /api/discovered-sessions/:id/enrich logic)', () => {
+  it('enriches a single session by id', async () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/enrich-single/1.jsonl', workspaceHash: 'enrich-s-1' });
+    const all = findDiscoveredSessions({});
+    const inserted = all.find((s) => s.jsonlPath === '/enrich-single/1.jsonl');
+    expect(inserted).toBeTruthy();
+
+    const result = await enrichSessions({ tier: 1, sessionIds: [inserted!.id] });
+    expect(typeof result.enriched).toBe('number');
+    expect(typeof result.durationMs).toBe('number');
+  });
+
+  it('returns skipped when session has no jsonl content to enrich', async () => {
+    const result = await enrichSessions({ tier: 1, sessionIds: [999998] });
+    expect(result.enriched).toBe(0);
+  });
+});
+
 // ─── POST /api/discovered-sessions/embed ─────────────────────────────────────
 
 describe('embedSessions (POST /api/discovered-sessions/embed logic)', () => {
