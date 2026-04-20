@@ -25,6 +25,7 @@ const mockSessionExists = vi.fn();
 const mockSendKeysAsync = vi.fn();
 const mockWriteFeedbackFile = vi.fn();
 const mockResolveProjectFromIssue = vi.fn();
+const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
@@ -65,7 +66,7 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentRuntimeState: vi.fn().mockReturnValue(null),
+  getAgentRuntimeState: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
@@ -315,6 +316,12 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
     mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
+    // Make agent appear idle so isAgentIdleForNudge returns true and dead-end
+    // detection can proceed to the setReviewStatus / ciRetryMap.delete paths.
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    });
 
     if (existsSync(REVIEW_STATUS_FILE)) {
       originalContent = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
