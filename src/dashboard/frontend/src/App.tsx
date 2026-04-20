@@ -275,7 +275,7 @@ export default function App() {
     refetchIntervalInBackground: true,
     retry: 1, // one retry before marking as error
     retryDelay: 1000,
-    staleTime: 0,
+    staleTime: 5000,
   });
   // Only show banner after 2 consecutive failures to avoid flicker on transient errors
   const showBackendBanner = backendDown && backendFailureCount >= 2;

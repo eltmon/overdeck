@@ -30,13 +30,14 @@ describe('sendKeysAsync', () => {
     await sendKeysAsync('agent-pan-711', 'first line\nsecond line');
 
     const setBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('set-buffer'));
-    expect(setBufferCalls).toHaveLength(2);
+    expect(setBufferCalls).toHaveLength(1);
 
-    const bufferIds = setBufferCalls.map(([, args]) => args[args.indexOf('-b') + 1]);
-    expect(bufferIds[0]).not.toBe(bufferIds[1]);
+    const pasteBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('paste-buffer'));
+    expect(pasteBufferCalls).toHaveLength(1);
+    expect(pasteBufferCalls[0]?.[1]?.[pasteBufferCalls[0][1].indexOf('-t') + 1]).toBe('agent-pan-711');
 
     const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
-    expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
+    expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['C-m']);
     expect(sendKeysCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711')).toBe(true);
   });
 
@@ -44,11 +45,11 @@ describe('sendKeysAsync', () => {
     await sendKeysAsync('agent-pan-711', 'first line\nsecond line', undefined, 'agent-pan-711:0.0');
 
     const pasteBufferCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('paste-buffer'));
-    expect(pasteBufferCalls).toHaveLength(2);
+    expect(pasteBufferCalls).toHaveLength(1);
     expect(pasteBufferCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711:0.0')).toBe(true);
 
     const sendKeysCalls = execFileMock.mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('send-keys'));
-    expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['S-Enter', 'C-m']);
+    expect(sendKeysCalls.map(([, args]) => args.at(-1))).toEqual(['C-m']);
     expect(sendKeysCalls.every(([, args]) => args[args.indexOf('-t') + 1] === 'agent-pan-711:0.0')).toBe(true);
   });
 
@@ -62,9 +63,9 @@ describe('sendKeysAsync', () => {
     expect(pasteBufferCall).toBeDefined();
 
     const bufferId = setBufferCall?.[1]?.[setBufferCall[1].indexOf('-b') + 1];
-    expect(bufferId).toMatch(/^pan-sendkeys-\d+-\d+-[a-z0-9]+-single$/);
+    expect(bufferId).toMatch(/^pan-sendkeys-\d+-\d+-[a-z0-9]+$/);
     expect(pasteBufferCall?.[1]?.[pasteBufferCall[1].indexOf('-b') + 1]).toBe(bufferId);
-    expect(execFileMock.mock.calls.some(([, args]) => Array.isArray(args) && args.includes('delete-buffer'))).toBe(false);
+    expect(pasteBufferCall?.[1]).toContain('-d');
   });
 });
 

@@ -10,6 +10,8 @@ import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 const execFileAsync = promisify(execFile);
 
 const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
+let managedTmuxConfigPreparedSync = false;
+let managedTmuxConfigPreparedAsync = false;
 const MANAGED_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
@@ -107,14 +109,18 @@ function getTmuxContextArgsForMode(mode: TmuxConfigMode): string[] {
 }
 
 function ensureTmuxContextPreparedSync(mode: TmuxConfigMode): void {
-  if (mode === 'managed') {
+  if (mode === 'managed' && !managedTmuxConfigPreparedSync) {
     ensureManagedTmuxConfigSync();
+    managedTmuxConfigPreparedSync = true;
+    managedTmuxConfigPreparedAsync = true;
   }
 }
 
 async function ensureTmuxContextPreparedAsync(mode: TmuxConfigMode): Promise<void> {
-  if (mode === 'managed') {
+  if (mode === 'managed' && !managedTmuxConfigPreparedAsync) {
     await ensureManagedTmuxConfigAsync();
+    managedTmuxConfigPreparedAsync = true;
+    managedTmuxConfigPreparedSync = true;
   }
 }
 
@@ -357,35 +363,14 @@ export async function sendKeysAsync(
 ): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const lines = keys.split('\n');
-  if (lines.length > 1) {
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i]!.length > 0) {
-        await setAndPasteBuffer(target, lines[i]!, `${sendId}-${i}`);
-      }
-      if (i < lines.length - 1) {
-        await tmuxExecAsync(['send-keys', '-t', target, 'S-Enter'], { encoding: 'utf-8' });
-      }
-    }
+  const bufferId = `pan-sendkeys-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await tmuxExecAsync(['set-buffer', '-b', bufferId, '--', keys], { encoding: 'utf-8' });
+  try {
+    await tmuxExecAsync(['paste-buffer', '-b', bufferId, '-t', target, '-d'], { encoding: 'utf-8' });
     await new Promise(r => setTimeout(r, 300));
     await tmuxExecAsync(['send-keys', '-t', target, 'C-m'], { encoding: 'utf-8' });
-  } else {
-    await setAndPasteBuffer(target, keys, `${sendId}-single`, true);
-    await new Promise(r => setTimeout(r, 300));
-    await tmuxExecAsync(['send-keys', '-t', target, 'C-m'], { encoding: 'utf-8' });
-  }
-}
-
-async function setAndPasteBuffer(sessionName: string, content: string, bufferId: string, deleteAfterPaste = false): Promise<void> {
-  const bufId = `pan-sendkeys-${bufferId}`;
-  await tmuxExecAsync(['set-buffer', '-b', bufId, '--', content], { encoding: 'utf-8' });
-  const pasteArgs = ['paste-buffer', '-b', bufId, '-t', sessionName];
-  if (deleteAfterPaste) pasteArgs.push('-d');
-  await tmuxExecAsync(pasteArgs, { encoding: 'utf-8' });
-  await new Promise(r => setTimeout(r, 50));
-  if (!deleteAfterPaste) {
-    await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
+  } finally {
+    await tmuxExecAsync(['delete-buffer', '-b', bufferId], { encoding: 'utf-8' }).catch(() => {});
   }
 }
 
