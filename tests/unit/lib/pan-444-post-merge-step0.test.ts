@@ -21,6 +21,7 @@ const kCustom = Symbol.for('nodejs.util.promisify.custom');
 vi.mock('child_process', () => ({
   spawn: mockSpawn,
   exec: mockExec,
+  execFile: mockExec,
 }));
 
 // ── fs/promises mock ──────────────────────────────────────────────────────────

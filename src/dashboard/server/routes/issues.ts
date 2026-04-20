@@ -1377,7 +1377,7 @@ const postIssueReopenRoute = HttpRouter.add(
           ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
           : '';
         if (workspacePath) {
-          reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason });
+          await reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason });
         } else {
           // Fallback: no workspace path, just clear review status
           clearReviewStatus(id.toUpperCase());

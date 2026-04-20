@@ -45,6 +45,12 @@ vi.mock('../../src/lib/cv.js', () => ({
   getAgentCV: vi.fn().mockReturnValue(null),
 }));
 
+// Mock cliproxy so GPT-routed agents don't require a running sidecar
+vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/cliproxy.js')>();
+  return { ...actual, isCliproxyRunning: vi.fn().mockReturnValue(true) };
+});
+
 // Mock config loading
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal() as any;
@@ -77,12 +83,19 @@ describe('agent spawning with work types', () => {
     // Override PANOPTICON_HOME for tests (must be set before importing paths module)
     process.env.PANOPTICON_HOME = testPanopticonHome;
 
-    // Clear all mocks
+    // Clear all mocks — note: this resets mock implementations too, so restore
+    // any mocks that must stay active across all tests in this suite.
     vi.clearAllMocks();
 
     // Reset sessionExistsAsync to default false (tests that need true override it)
     const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
     vi.mocked(sessionExistsAsync).mockResolvedValue(false);
+
+    // Restore cliproxy mock: clearAllMocks() drops the mockReturnValue(true) set
+    // during vi.mock() hoisting, so SageOx tests (which route through GPT) would
+    // see isCliproxyRunning() → undefined (falsy) and throw without this restore.
+    const cliproxy = await import('../../src/lib/cliproxy.js');
+    vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -299,6 +312,13 @@ describe('agent spawning with work types', () => {
       // Reset the sessionExists mock to return false for these tests
       const { sessionExists } = await import('../../src/lib/tmux.js');
       vi.mocked(sessionExists).mockReturnValue(false);
+
+      // SageOx tests use phase:'implementation' which routes to GPT models.
+      // Ensure cliproxy mock is active in this describe scope — the outer
+      // beforeEach restores it, but belt-and-suspenders in case of module
+      // cache differences in the verification gate environment.
+      const cliproxy = await import('../../src/lib/cliproxy.js');
+      vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
 
       // Create a project structure with .sageox/ so SageOx vars are injected
       // Workspace path resolves to projectRoot via resolve(workspace, '..', '..')
