@@ -5,6 +5,7 @@ import { Agent } from '../types';
 import { ActivityView } from './MissionControl/ActivityView';
 import { deriveAgentIssueId } from './AgentOutputPanel';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
+import { MessagesTimeline } from './chat/MessagesTimeline';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -34,6 +35,13 @@ async function fetchOutput(agentId: string): Promise<string> {
   if (!res.ok) throw new Error('Failed to fetch output');
   const data = await res.json();
   return data.output || '';
+}
+
+async function fetchConversation(agentId: string): Promise<unknown[]> {
+  const res = await fetch(`/api/agents/${agentId}/conversation`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.messages as unknown[]) ?? [];
 }
 
 
@@ -79,6 +87,14 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
     queryFn: () => fetchOutput(agent.id),
     enabled: isStopped,
   });
+
+  // Prefer conversation messages over raw output when the agent has stopped
+  const { data: conversationMessages = [] } = useQuery({
+    queryKey: ['agent-conversation', agent.id],
+    queryFn: () => fetchConversation(agent.id),
+    enabled: isStopped,
+  });
+  const hasConversation = conversationMessages.length > 0;
 
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
@@ -143,7 +159,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : displayTitle}
+          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -179,15 +195,21 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
 
       {/* Content */}
       {isStopped ? (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+        hasConversation ? (
+          <div className="flex-1 min-h-0 overflow-auto">
+            <MessagesTimeline messages={conversationMessages} />
+          </div>
+        ) : (
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
+        )
       ) : (
         <div className="flex-1 min-h-0">
           <TerminalSessionWrapper
