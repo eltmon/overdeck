@@ -5,6 +5,8 @@ import { Agent } from '../types';
 import { ActivityView } from './MissionControl/ActivityView';
 import { deriveAgentIssueId } from './AgentOutputPanel';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
+import { MessagesTimeline } from './chat/MessagesTimeline';
+import type { ChatMessage, WorkLogEntry } from './chat/chat-types';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -36,6 +38,22 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
+interface ConversationPayload {
+  messages: ChatMessage[];
+  workLog: WorkLogEntry[];
+  streaming: boolean;
+}
+
+async function fetchConversation(agentId: string): Promise<ConversationPayload> {
+  const res = await fetch(`/api/agents/${agentId}/conversation`);
+  if (!res.ok) throw new Error('Failed to fetch conversation');
+  const data = await res.json() as Partial<ConversationPayload>;
+  return {
+    messages: data.messages ?? [],
+    workLog: data.workLog ?? [],
+    streaming: data.streaming ?? false,
+  };
+}
 
 export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
   const activeSession = sessionNameProp ?? agent.id;
@@ -79,6 +97,14 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
     queryFn: () => fetchOutput(agent.id),
     enabled: isStopped,
   });
+
+  const { data: conversation } = useQuery({
+    queryKey: ['agent-conversation', agent.id],
+    queryFn: () => fetchConversation(agent.id),
+    enabled: isStopped,
+  });
+
+  const hasConversation = (conversation?.messages.length ?? 0) > 0
 
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
@@ -143,7 +169,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : displayTitle}
+          {isStopped ? (hasConversation ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -179,15 +205,25 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
 
       {/* Content */}
       {isStopped ? (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+        hasConversation ? (
+          <div className="flex-1 min-h-0">
+            <MessagesTimeline
+              messages={conversation?.messages ?? []}
+              workLog={conversation?.workLog ?? []}
+              streaming={conversation?.streaming ?? false}
+            />
+          </div>
+        ) : (
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-content"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
+        )
       ) : (
         <div className="flex-1 min-h-0">
           <TerminalSessionWrapper
