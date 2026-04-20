@@ -568,10 +568,20 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
   const handleReview = async () => {
     const forceReview = shouldForceReviewTrigger(reviewStatus);
-    const message = forceReview
-      ? `Re-run review & test pipeline for ${issueId}?`
-      : `Start review & test pipeline for ${issueId}?`;
-    if (await confirm({ title: forceReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: forceReview ? 'Re-run' : 'Start Review' })) {
+    const breakerExhausted = (reviewStatus?.autoRequeueCount ?? 0) >= 7;
+    const useResetRerun = breakerExhausted && !forceReview;
+    const message = useResetRerun
+      ? `Reset the exhausted review circuit breaker and re-run review & test for ${issueId}?`
+      : forceReview
+        ? `Re-run review & test pipeline for ${issueId}?`
+        : `Start review & test pipeline for ${issueId}?`;
+    const title = useResetRerun ? 'Reset & Re-run Review' : forceReview ? 'Re-run Review' : 'Start Review';
+    const confirmLabel = useResetRerun ? 'Reset & Re-run' : forceReview ? 'Re-run' : 'Start Review';
+    if (await confirm({ title, message, confirmLabel })) {
+      if (useResetRerun) {
+        resetReviewMutation.mutate({ rerun: true });
+        return;
+      }
       forceReviewRef.current = forceReview;
       reviewMutation.mutate();
     }
