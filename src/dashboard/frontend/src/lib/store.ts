@@ -103,9 +103,9 @@ function memoizeArraySelector<S, K extends keyof S, R>(
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectAgentList = memoizeArraySelector(
+export const selectAgentList = memoizeArraySelector<DashboardState, 'agentsById', AgentSnapshot[]>(
   'agentsById',
-  (agents): AgentSnapshot[] => Object.values(agents),
+  (agents) => Object.values(agents),
 )
 
 export const selectAgentById =
@@ -113,9 +113,9 @@ export const selectAgentById =
   (s: DashboardState): AgentSnapshot | undefined =>
     s.agentsById[id]
 
-export const selectSpecialistList = memoizeArraySelector(
+export const selectSpecialistList = memoizeArraySelector<DashboardState, 'specialistsByName', SpecialistSnapshot[]>(
   'specialistsByName',
-  (specs): SpecialistSnapshot[] => Object.values(specs),
+  (specs) => Object.values(specs),
 )
 
 export const selectReviewStatus =
@@ -128,9 +128,9 @@ export const selectReviewStatus =
  * and not already merged. Sorted oldest-ready first (FIFO) so issues
  * don't age in the queue.
  */
-export const selectAwaitingMerge = memoizeArraySelector(
+export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
   'reviewStatusByIssueId',
-  (rsMap): ReviewStatusSnapshot[] =>
+  (rsMap) =>
     Object.values(rsMap)
       .filter(
         (rs): rs is ReviewStatusSnapshot =>
@@ -155,9 +155,9 @@ export const selectResources = (s: DashboardState): ResourceStats | null => s.re
 export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw
 
 export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =>
-  memoizeArraySelector(
+  memoizeArraySelector<DashboardState, 'issuesRaw', unknown[]>(
     'issuesRaw',
-    (issues): unknown[] => {
+    (issues) => {
       const typed = issues as Array<Record<string, unknown>>
       if (includeCompleted) return typed
       // Only filter out canceled issues here. Done issues flow through to
