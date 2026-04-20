@@ -2996,10 +2996,22 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     if (state.status !== 'stopped') continue;
     if (state.phase !== 'implementation') continue;
 
-    // Skip if the agent has a completed marker (or processed completion)
+    // Skip if the agent has a completed marker (or processed completion) — unless
+    // review or test found issues that need fixing (blocked / failed).
     const completedFile = join(getAgentDir(agentId), 'completed');
     const processedFile = join(getAgentDir(agentId), 'completed.processed');
-    if (existsSync(completedFile) || existsSync(processedFile)) continue;
+    if (existsSync(completedFile) || existsSync(processedFile)) {
+      const review = getReviewStatus(state.issueId);
+      if (
+        review?.reviewStatus === 'blocked' ||
+        review?.reviewStatus === 'failed' ||
+        review?.testStatus === 'failed'
+      ) {
+        // Agent needs to fix review/test issues — resume it
+      } else {
+        continue;
+      }
+    }
 
     // Skip if workspace is missing
     if (!state.workspace || !existsSync(state.workspace)) continue;
