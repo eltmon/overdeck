@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, renameSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
@@ -299,16 +299,24 @@ export function getAgentState(agentId: string): AgentState | null {
   const stateFile = join(getAgentDir(agentId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
-  const content = readFileSync(stateFile, 'utf8');
-  return JSON.parse(content);
+  try {
+    const content = readFileSync(stateFile, 'utf8');
+    return JSON.parse(content) as AgentState;
+  } catch {
+    return null;
+  }
 }
 
 export async function getAgentStateAsync(agentId: string): Promise<AgentState | null> {
   const stateFile = join(getAgentDir(agentId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
-  const content = await readFile(stateFile, 'utf-8');
-  return JSON.parse(content);
+  try {
+    const content = await readFile(stateFile, 'utf-8');
+    return JSON.parse(content) as AgentState;
+  } catch {
+    return null;
+  }
 }
 
 export function saveAgentState(state: AgentState): void {
@@ -321,10 +329,10 @@ export function saveAgentState(state: AgentState): void {
     state.stoppedAt = new Date().toISOString();
   }
 
-  writeFileSync(
-    join(dir, 'state.json'),
-    JSON.stringify(state, null, 2)
-  );
+  const stateFile = join(dir, 'state.json');
+  const tempFile = `${stateFile}.tmp`;
+  writeFileSync(tempFile, JSON.stringify(state, null, 2));
+  renameSync(tempFile, stateFile);
 }
 
 function markAgentRunning(state: AgentState): void {
@@ -502,7 +510,9 @@ export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRunti
     merged.waitingStartedAt = merged.lastActivity;
   }
 
-  writeFileSync(runtimeFile, JSON.stringify(merged, null, 2));
+  const tempRuntimeFile = `${runtimeFile}.tmp`;
+  writeFileSync(tempRuntimeFile, JSON.stringify(merged, null, 2));
+  renameSync(tempRuntimeFile, runtimeFile);
 
   if (previousState !== merged.state || state.waitingReason || state.waitingNotification || state.resolution || state.currentTool) {
     console.log(

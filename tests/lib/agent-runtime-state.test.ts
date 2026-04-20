@@ -56,6 +56,25 @@ describe('Agent Runtime State (PAN-80)', () => {
       expect(state?.lastActivity).toBeDefined();
     });
 
+    it('should ignore malformed runtime.json', async () => {
+      const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../../src/lib/agents.js');
+      const agentId = getUniqueAgentId();
+      const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(join(agentDir, 'runtime.json'), '{\n  "state": "active",\n');
+
+      expect(getAgentRuntimeState(agentId)).toBeNull();
+
+      saveAgentRuntimeState(agentId, {
+        state: 'idle',
+        lastActivity: '2026-01-23T10:35:00.000Z',
+      });
+
+      const recovered = getAgentRuntimeState(agentId);
+      expect(recovered?.state).toBe('idle');
+      expect(recovered?.lastActivity).toBe('2026-01-23T10:35:00.000Z');
+    });
+
     it.skip('should read existing state file', async () => {
       // Skipped: AGENTS_DIR is set at module load time, cannot be changed via env
       // Covered by integration tests (panopticon-wk6m)
