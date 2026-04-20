@@ -250,7 +250,7 @@ describe('Stage 4: search after enrichment', () => {
     const sessions = findDiscoveredSessions({});
     const myapp = sessions.find((s) => s.jsonlPath.includes('myapp'))!;
 
-    const result = searchSessions({
+    const result = await searchSessions({
       filter: { workspacePath: myapp.workspacePath ?? undefined },
     });
 
@@ -281,10 +281,10 @@ describe('Stage 4: search after enrichment', () => {
   it('filter by model finds correct sessions', async () => {
     await scan({ mode: 'system', watchDirs: [] });
 
-    const haiku = searchSessions({
+    const haiku = await searchSessions({
       filter: { primaryModel: 'claude-haiku-4-5-20251001' },
     });
-    const sonnet = searchSessions({
+    const sonnet = await searchSessions({
       filter: { primaryModel: 'claude-sonnet-4-6' },
     });
 

@@ -28,6 +28,9 @@ import {
   getDiscoveredSessionById,
 } from '../database/discovered-sessions-db.js';
 import type { DiscoveredSession, ConversationFilter } from '../database/discovered-sessions-db.js';
+import { embed } from './embeddings/providers.js';
+import type { EmbeddingProviderName } from './embeddings/providers.js';
+import { getConversationsConfig } from '../config.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +39,10 @@ export interface SearchQuery {
   q?: string;
   /** Session ID to find similar sessions for (semantic) */
   similarTo?: number;
+  /** Free-text string to embed and use for semantic cosine-ranked search */
+  semanticQuery?: string;
+  /** Embedding provider for semanticQuery (defaults to config) */
+  semanticProvider?: EmbeddingProviderName;
   /** Embedding model to use for semantic search */
   embeddingModel?: string;
   /** Structured filters (time fields accept relative strings like "7d") */
@@ -203,11 +210,37 @@ function semanticSearch(
  *  - q + filter         → FTS5 + intersect with filter IDs
  *  - similarTo + q      → FTS5 re-ranked by semantic similarity
  */
-export function searchSessions(query: SearchQuery): SearchResult {
+export async function searchSessions(query: SearchQuery): Promise<SearchResult> {
   const start = Date.now();
   const limit = query.limit ?? 50;
   const offset = query.offset ?? 0;
-  const embeddingModel = query.embeddingModel ?? 'text-embedding-3-small';
+  const config = getConversationsConfig();
+  const embeddingModel = query.embeddingModel ?? config.embeddingModel ?? 'text-embedding-3-small';
+
+  // ── Semantic free-text query path ─────────────────────────────────────────
+  if (query.semanticQuery?.trim()) {
+    const provider = (query.semanticProvider ?? config.embeddingProvider ?? 'openai') as EmbeddingProviderName;
+    const embedResult = await embed(provider, { text: query.semanticQuery.trim(), model: embeddingModel });
+    const queryEmbedding = embedResult.embedding;
+    const filter = normalizeFilter(query.filter, undefined, undefined);
+    const allSessions = findDiscoveredSessions(filter);
+    const allEmbeddings = loadEmbeddings(embeddingModel);
+    const embMap = new Map(allEmbeddings.map((e) => [e.sessionId, e.embedding]));
+    const sessionMap = new Map(allSessions.map((s) => [s.id, s]));
+    const scored: Array<{ session: DiscoveredSession; score: number }> = [];
+    for (const [sid, emb] of embMap) {
+      const session = sessionMap.get(sid);
+      if (!session) continue;
+      scored.push({ session, score: cosineSimilarity(queryEmbedding, emb) });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return {
+      sessions: scored.slice(offset, offset + limit).map((x) => x.session),
+      total: scored.length,
+      mode: 'semantic',
+      durationMs: Date.now() - start,
+    };
+  }
 
   const hasQ = Boolean(query.q?.trim());
   const hasSimilarTo = query.similarTo != null;

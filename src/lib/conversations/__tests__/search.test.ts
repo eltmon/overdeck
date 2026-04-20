@@ -148,47 +148,47 @@ describe('searchSessions', () => {
     seedSession({ id: 3, workspace: '/home/user/Projects/alpha', tags: ['feat', 'large'], cost: 0.20 });
   });
 
-  it('filter by workspacePath returns matching sessions', () => {
-    const result = searchSessions({ filter: { workspacePath: '/home/user/Projects/alpha' } });
+  it('filter by workspacePath returns matching sessions', async () => {
+    const result = await searchSessions({ filter: { workspacePath: '/home/user/Projects/alpha' } });
     expect(result.mode).toBe('filter');
     expect(result.sessions.length).toBe(2);
     expect(result.sessions.every((s) => s.workspacePath === '/home/user/Projects/alpha')).toBe(true);
   });
 
-  it('filter by minCost excludes cheap sessions', () => {
-    const result = searchSessions({ filter: { minCost: 0.10 } });
+  it('filter by minCost excludes cheap sessions', async () => {
+    const result = await searchSessions({ filter: { minCost: 0.10 } });
     expect(result.sessions.length).toBe(1);
     expect(result.sessions[0].estimatedCost).toBeGreaterThanOrEqual(0.10);
   });
 
-  it('no q and no filter returns all sessions', () => {
-    const result = searchSessions({});
+  it('no q and no filter returns all sessions', async () => {
+    const result = await searchSessions({});
     expect(result.mode).toBe('filter');
     expect(result.sessions.length).toBe(3);
   });
 
-  it('limit is respected', () => {
-    const result = searchSessions({ limit: 2 });
+  it('limit is respected', async () => {
+    const result = await searchSessions({ limit: 2 });
     expect(result.sessions.length).toBeLessThanOrEqual(2);
   });
 
-  it('since filter with relative time excludes old sessions', () => {
+  it('since filter with relative time excludes old sessions', async () => {
     // All seeded sessions have ts=2025-01-01, which is before "7d" ago from ~now
-    const result = searchSessions({ filter: { since: '7d' } });
+    const result = await searchSessions({ filter: { since: '7d' } });
     // These sessions are from 2025-01-01, which is in the past well beyond 7 days
     // since we're in 2026, so they should NOT be found
     expect(result.sessions.length).toBe(0);
   });
 
-  it('filter by tag returns only matching sessions', () => {
-    const result = searchSessions({ filter: { tags: ['large'] } });
+  it('filter by tag returns only matching sessions', async () => {
+    const result = await searchSessions({ filter: { tags: ['large'] } });
     expect(result.sessions.length).toBe(1);
     expect(result.sessions[0].tags).toContain('large');
   });
 
-  it('filter total reflects unpaginated match count (not page size)', () => {
+  it('filter total reflects unpaginated match count (not page size)', async () => {
     // 3 sessions seeded in beforeEach; request page of 1
-    const result = searchSessions({ limit: 1, offset: 0 });
+    const result = await searchSessions({ limit: 1, offset: 0 });
     expect(result.sessions.length).toBe(1);
     expect(result.total).toBe(3); // true count, not the page
   });
@@ -219,7 +219,7 @@ describe('searchSessions', () => {
       fileMtime: recentTs,
       tags: [],
     });
-    const result = searchSessions({ filter: { since: 'today' } });
+    const result = await searchSessions({ filter: { since: 'today' } });
     expect(result.sessions.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -259,17 +259,17 @@ describe('FTS total is not derived from the capped candidate slice', () => {
     }
   });
 
-  it('FTS total reflects true match count, not the paginated slice', () => {
+  it('FTS total reflects true match count, not the paginated slice', async () => {
     // Request only 2 of the 5 matching sessions
-    const result = searchSessions({ q: 'cache eviction bugfix', limit: 2, offset: 0 });
+    const result = await searchSessions({ q: 'cache eviction bugfix', limit: 2, offset: 0 });
     expect(result.sessions.length).toBeLessThanOrEqual(2);
     // total must be 5 (all matching sessions), not 2 (page size)
     expect(result.total).toBe(5);
   });
 
-  it('FTS with filter: total uses true intersection count, not over-fetch cap', () => {
+  it('FTS with filter: total uses true intersection count, not over-fetch cap', async () => {
     // Only 3 of the 5 sessions are in proj1/proj2/proj3 workspaces
-    const result = searchSessions({
+    const result = await searchSessions({
       q: 'cache eviction bugfix',
       filter: { workspacePath: '/home/user/Projects/proj1' },
       limit: 1,
@@ -316,9 +316,9 @@ describe('FTS pagination with non-zero offset', () => {
     }
   });
 
-  it('page 2 (offset=3, limit=3) returns 3 distinct results', () => {
-    const page1 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
-    const page2 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 3 });
+  it('page 2 (offset=3, limit=3) returns 3 distinct results', async () => {
+    const page1 = await searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
+    const page2 = await searchSessions({ q: 'pagination regression test', limit: 3, offset: 3 });
 
     expect(page1.sessions.length).toBe(3);
     expect(page2.sessions.length).toBe(3);
@@ -329,16 +329,16 @@ describe('FTS pagination with non-zero offset', () => {
     expect(overlap.length).toBe(0);
   });
 
-  it('total is consistent across pages', () => {
-    const page1 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
-    const page2 = searchSessions({ q: 'pagination regression test', limit: 3, offset: 3 });
+  it('total is consistent across pages', async () => {
+    const page1 = await searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
+    const page2 = await searchSessions({ q: 'pagination regression test', limit: 3, offset: 3 });
     expect(page1.total).toBe(8);
     expect(page2.total).toBe(8);
   });
 
-  it('last page returns remaining items without truncation', () => {
+  it('last page returns remaining items without truncation', async () => {
     // 8 sessions, limit=5 → page 2 starts at offset=5, should return 3
-    const page2 = searchSessions({ q: 'pagination regression test', limit: 5, offset: 5 });
+    const page2 = await searchSessions({ q: 'pagination regression test', limit: 5, offset: 5 });
     expect(page2.sessions.length).toBe(3);
     expect(page2.total).toBe(8);
   });
@@ -386,9 +386,9 @@ describe('semantic+FTS search respects filter constraints', () => {
     }
   });
 
-  it('filter excludes sessions outside requested workspace', () => {
+  it('filter excludes sessions outside requested workspace', async () => {
     // similarTo=session 1 (workspace-A); q matches all 4; filter restricts to workspace-A
-    const result = searchSessions({
+    const result = await searchSessions({
       q: 'tokenizer refactor',
       similarTo: 1,
       embeddingModel: MODEL,
@@ -399,8 +399,8 @@ describe('semantic+FTS search respects filter constraints', () => {
     expect(result.sessions.every((s) => s.workspacePath === '/home/user/Projects/workspace-A')).toBe(true);
   });
 
-  it('total reflects filtered intersection, not global FTS count', () => {
-    const result = searchSessions({
+  it('total reflects filtered intersection, not global FTS count', async () => {
+    const result = await searchSessions({
       q: 'tokenizer refactor',
       similarTo: 1,
       embeddingModel: MODEL,

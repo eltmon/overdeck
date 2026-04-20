@@ -29,6 +29,10 @@ export interface EnrichOptions {
   skipAlreadyEnriched?: boolean;
   /** If true, bypass the cost confirmation threshold */
   force?: boolean;
+  /** Override the model used for enrichment (ignores tier-based model selection) */
+  modelOverride?: string;
+  /** Append custom text to the enrichment prompt */
+  promptSuffix?: string;
   /** Injected API caller for testing */
   callApi?: EnrichSessionOptions['callApi'];
   /** Progress callback */
@@ -135,6 +139,8 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       sessionId: session.id,
       jsonlPath: session.jsonlPath,
       tier,
+      modelOverride: opts.modelOverride,
+      promptSuffix: opts.promptSuffix,
       config: tierConfig,
       callApi: opts.callApi,
     });

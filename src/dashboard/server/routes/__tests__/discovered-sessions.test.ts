@@ -209,21 +209,21 @@ describe('search (route logic)', () => {
     });
   });
 
-  it('searchSessions returns sessions array and mode', () => {
-    const result = searchSessions({});
+  it('searchSessions returns sessions array and mode', async () => {
+    const result = await searchSessions({});
     expect(result).toHaveProperty('sessions');
     expect(result).toHaveProperty('mode');
     expect(result.sessions.length).toBeGreaterThan(0);
   });
 
-  it('filter by workspace returns only matching sessions', () => {
-    const result = searchSessions({
+  it('filter by workspace returns only matching sessions', async () => {
+    const result = await searchSessions({
       filter: { workspacePath: '/home/user/Projects/alpha' },
     });
     expect(result.sessions.every((s) => s.workspacePath === '/home/user/Projects/alpha')).toBe(true);
   });
 
-  it('limit is honored', () => {
+  it('limit is honored', async () => {
     // Seed 3 more sessions
     for (let i = 2; i <= 4; i++) {
       upsertDiscoveredSession({
@@ -249,11 +249,11 @@ describe('search (route logic)', () => {
       });
     }
 
-    const result = searchSessions({ limit: 2 });
+    const result = await searchSessions({ limit: 2 });
     expect(result.sessions.length).toBeLessThanOrEqual(2);
   });
 
-  it('searchSessions total reflects unpaginated match count', () => {
+  it('searchSessions total reflects unpaginated match count', async () => {
     // Seed 4 more sessions (5 total after beforeEach)
     for (let i = 2; i <= 5; i++) {
       upsertDiscoveredSession({
@@ -279,7 +279,7 @@ describe('search (route logic)', () => {
       });
     }
 
-    const page = searchSessions({ limit: 2, offset: 0 });
+    const page = await searchSessions({ limit: 2, offset: 0 });
     expect(page.sessions.length).toBeLessThanOrEqual(2);
     // total must reflect ALL 5 sessions, not just the 2-session page
     expect(page.total).toBeGreaterThanOrEqual(5);

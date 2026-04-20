@@ -32,7 +32,8 @@ import { searchSessions } from '../../../lib/conversations/search.js';
 import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
-import { getConversationsConfig } from '../../../lib/config.js';
+import { getConversationsConfig, loadConfig, saveConfig } from '../../../lib/config.js';
+import { embed } from '../../../lib/conversations/embeddings/providers.js';
 
 // ─── GET /api/discovered-sessions/stats ───────────────────────────────────────
 
@@ -141,7 +142,7 @@ const searchRoute = HttpRouter.add(
     const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
     const filter = parseSearchParams(params);
-    const result = searchSessions({ q, similarTo, filter, limit, offset });
+    const result = yield* Effect.promise(() => searchSessions({ q, similarTo, filter, limit, offset }));
     return jsonResponse(result);
   })),
 );
@@ -367,6 +368,89 @@ const postEmbedRoute = HttpRouter.add(
   })),
 );
 
+// ─── GET /api/discovered-sessions/config ─────────────────────────────────────
+
+const getConvConfigRoute = HttpRouter.add(
+  'GET',
+  '/api/discovered-sessions/config',
+  httpHandler(Effect.gen(function* () {
+    const config = getConversationsConfig();
+    return jsonResponse({
+      embeddings: config.embeddings,
+      embeddingProvider: config.embeddingProvider,
+      embeddingModel: config.embeddingModel,
+      embeddingAutoOnDeep: config.embeddingAutoOnDeep,
+    });
+  })),
+);
+
+// ─── PUT /api/discovered-sessions/config ─────────────────────────────────────
+
+const putConvConfigRoute = HttpRouter.add(
+  'PUT',
+  '/api/discovered-sessions/config',
+  httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const body = (yield* req.json) as {
+      embeddings?: boolean;
+      embeddingProvider?: string;
+      embeddingModel?: string;
+      embeddingAutoOnDeep?: boolean;
+    };
+
+    yield* Effect.promise(async () => {
+      const cfg = loadConfig();
+      if (!cfg.conversations) cfg.conversations = {} as typeof cfg.conversations;
+      const conv = cfg.conversations!;
+      if (body.embeddings !== undefined) conv.embeddings = body.embeddings;
+      if (body.embeddingProvider !== undefined) conv.embeddingProvider = body.embeddingProvider as typeof conv.embeddingProvider;
+      if (body.embeddingModel !== undefined) conv.embeddingModel = body.embeddingModel;
+      if (body.embeddingAutoOnDeep !== undefined) conv.embeddingAutoOnDeep = body.embeddingAutoOnDeep;
+      saveConfig(cfg);
+    });
+
+    return jsonResponse({ ok: true });
+  })),
+);
+
+// ─── POST /api/discovered-sessions/test-connection ───────────────────────────
+
+const postTestConnectionRoute = HttpRouter.add(
+  'POST',
+  '/api/discovered-sessions/test-connection',
+  httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const body = (yield* req.json) as {
+      provider: string;
+      model: string;
+      apiKey?: string;
+      ollamaBaseUrl?: string;
+    };
+
+    const VALID_PROVIDERS = new Set(['openai', 'voyage', 'ollama']);
+    if (!VALID_PROVIDERS.has(body.provider)) {
+      return jsonResponse({ error: 'Invalid provider' }, { status: 400 });
+    }
+
+    const result = yield* Effect.promise(async () => {
+      const startTs = Date.now();
+      try {
+        await embed(body.provider as 'openai' | 'voyage' | 'ollama', {
+          text: 'connection test',
+          model: body.model,
+          apiKey: body.apiKey,
+          baseUrl: body.ollamaBaseUrl,
+        });
+        return { ok: true, latencyMs: Date.now() - startTs };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), latencyMs: Date.now() - startTs };
+      }
+    });
+
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Layer composition ────────────────────────────────────────────────────────
 
 export const discoveredSessionsRouteLayer = Layer.mergeAll(
@@ -379,4 +463,7 @@ export const discoveredSessionsRouteLayer = Layer.mergeAll(
   postScanRoute,
   postEnrichRoute,
   postEmbedRoute,
+  getConvConfigRoute,
+  putConvConfigRoute,
+  postTestConnectionRoute,
 );

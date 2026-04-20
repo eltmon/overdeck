@@ -9,6 +9,7 @@ import { listAction } from './list.js';
 import { showAction } from './show.js';
 import { costAction } from './cost.js';
 import { enrichAction } from './enrich.js';
+import { embedAction } from './embed.js';
 
 export function registerConversationsCommands(program: Command): void {
   const conversations = program
@@ -18,14 +19,19 @@ export function registerConversationsCommands(program: Command): void {
 
   // ── scan ────────────────────────────────────────────────────────────────────
   conversations
-    .command('scan')
+    .command('scan [dirs...]')
     .description('Scan ~/.claude/projects/ and index discovered sessions')
-    .option('--mode <mode>', 'Scan mode: system | watched | targeted', 'system')
-    .option('--dir <path...>', 'Directories to scan (targeted mode only)')
+    .option('--watched', 'Scan configured watch directories (from config.yaml)')
+    .option('--system', 'Scan system-wide ~/.claude/projects/ (default when no dirs given)')
     .option('--dry-run', 'Preview without writing to database')
     .option('--max-parallel <n>', 'Override parallelism (default: auto)')
-    .action((opts: { mode?: string; dryRun?: boolean; dir?: string[]; maxParallel?: string }) =>
-      scanAction({ ...opts, dirs: opts.dir }),
+    .action(
+      (dirs: string[], opts: { watched?: boolean; system?: boolean; dryRun?: boolean; maxParallel?: string }) => {
+        let mode: 'system' | 'watched' | 'targeted' = 'system';
+        if (dirs && dirs.length > 0) mode = 'targeted';
+        else if (opts.watched) mode = 'watched';
+        return scanAction({ mode, dirs: dirs.length > 0 ? dirs : undefined, dryRun: opts.dryRun, maxParallel: opts.maxParallel });
+      },
     );
 
   // ── search ──────────────────────────────────────────────────────────────────
@@ -35,16 +41,25 @@ export function registerConversationsCommands(program: Command): void {
     .option('--workspace <path>', 'Filter by workspace path')
     .option('--model <name>', 'Filter by primary model')
     .option('--since <time>', 'Filter sessions after time (ISO or "7d", "today")')
+    .option('--after <time>', 'Alias for --since (sessions after this time)')
     .option('--before <time>', 'Filter sessions before time')
     .option('--min-cost <n>', 'Filter by minimum estimated cost')
     .option('--max-cost <n>', 'Filter by maximum estimated cost')
+    .option('--min-messages <n>', 'Filter sessions with at least N messages')
     .option('--managed', 'Show only Panopticon-managed sessions')
-    .option('--tags <tags>', 'Filter by tags (comma-separated)')
+    .option('--unmanaged', 'Show only unmanaged (personal) sessions')
+    .option('--enriched', 'Show only enriched sessions')
+    .option('--not-enriched', 'Show only unenriched sessions')
+    .option('--tag <value>', 'Filter by tag (repeatable: --tag foo --tag bar)')
+    .option('--tool <name>', 'Filter by tool used (repeatable)')
+    .option('--file <path>', 'Filter by file referenced (repeatable)')
+    .option('--issue <id>', 'Filter by associated issue ID')
     .option('--similar <id>', 'Find sessions similar to this session ID (semantic)')
+    .option('--semantic <query>', 'Find sessions semantically similar to query text')
     .option('--format <fmt>', 'Output format: table | json | brief | ids', 'table')
     .option('--limit <n>', 'Maximum results', '20')
     .option('--offset <n>', 'Pagination offset', '0')
-    .action((query: string | undefined, opts: Record<string, string | boolean | undefined>) =>
+    .action((query: string | undefined, opts: Record<string, string | boolean | string[] | undefined>) =>
       searchAction(query, opts),
     );
 
@@ -79,13 +94,36 @@ export function registerConversationsCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .action((opts: Record<string, string | boolean | undefined>) => costAction(opts));
 
+  // ── embed ───────────────────────────────────────────────────────────────────
+  conversations
+    .command('embed [ids...]')
+    .description('Generate embeddings for enriched sessions (required for --semantic search)')
+    .option('--regenerate', 'Regenerate embeddings even for sessions that already have them')
+    .option('--status', 'Show embedding coverage stats and exit')
+    .option('--provider <name>', 'Embedding provider: openai | voyage | ollama')
+    .option('--model <name>', 'Embedding model override')
+    .option('--max-parallel <n>', 'Override parallelism')
+    .action((positionalIds: string[], opts: Record<string, string | boolean | undefined>) =>
+      embedAction(positionalIds, opts),
+    );
+
   // ── enrich ──────────────────────────────────────────────────────────────────
   conversations
-    .command('enrich')
+    .command('enrich [ids...]')
     .description('Enrich sessions with AI-generated summaries and tags')
     .option('--tier <n>', 'Enrichment tier: 1 (quick) | 2 (detailed) | 3 (deep)', '1')
-    .option('--ids <ids>', 'Comma-separated session IDs to enrich (default: all unenriched)')
+    .option('--deep', 'Shorthand for --tier 3')
+    .option('--full', 'Enrich even already-enriched sessions')
+    .option('--upgrade', 'Re-enrich sessions at a lower tier than requested')
+    .option('--with <model>', 'Override the model used for enrichment')
+    .option('--prompt <text>', 'Append custom prompt text to the enrichment request')
+    .option('--limit <n>', 'Cap the number of sessions to enrich')
+    .option('--workspace <path>', 'Restrict to sessions from this workspace path')
+    .option('--since <time>', 'Only enrich sessions after this time (ISO or relative)')
+    .option('--ids <ids>', 'Comma-separated session IDs to enrich (legacy; prefer positional args)')
     .option('--max-parallel <n>', 'Override parallelism')
     .option('--yes', 'Skip cost confirmation prompt')
-    .action((opts: Record<string, string | boolean | undefined>) => enrichAction(opts));
+    .action((positionalIds: string[], opts: Record<string, string | boolean | undefined>) =>
+      enrichAction(positionalIds, opts),
+    );
 }

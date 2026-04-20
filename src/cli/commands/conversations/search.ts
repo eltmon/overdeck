@@ -9,7 +9,7 @@ import { formatTable, formatBrief, formatIds } from './format.js';
 
 export async function searchAction(
   query: string | undefined,
-  opts: Record<string, string | boolean | undefined>,
+  opts: Record<string, string | boolean | string[] | undefined>,
 ): Promise<void> {
   const limit = parseInt((opts['limit'] as string) ?? '20', 10);
   const offset = parseInt((opts['offset'] as string) ?? '0', 10);
@@ -19,17 +19,43 @@ export async function searchAction(
   if (opts['workspace']) filter.workspacePath = opts['workspace'] as string;
   if (opts['model']) filter.primaryModel = opts['model'] as string;
   if (opts['since']) filter.since = opts['since'] as string;
+  if (opts['after']) filter.after = opts['after'] as string;
   if (opts['before']) filter.before = opts['before'] as string;
   if (opts['minCost']) filter.minCost = parseFloat(opts['minCost'] as string);
   if (opts['maxCost']) filter.maxCost = parseFloat(opts['maxCost'] as string);
+  if (opts['minMessages']) filter.minMessages = parseInt(opts['minMessages'] as string, 10);
   if (opts['managed']) filter.managed = true;
-  if (opts['tags']) filter.tags = (opts['tags'] as string).split(',').map((t) => t.trim());
+  if (opts['unmanaged']) filter.unmanaged = true;
+  if (opts['enriched']) filter.enriched = true;
+  if (opts['notEnriched']) filter.notEnriched = true;
+  // --tag can be repeated (commander stores as array) or comma-separated
+  if (opts['tag']) {
+    const raw = opts['tag'];
+    filter.tags = Array.isArray(raw)
+      ? raw.flatMap((t) => t.split(',').map((s) => s.trim()))
+      : (raw as string).split(',').map((t) => t.trim());
+  }
+  if (opts['tool']) {
+    const raw = opts['tool'];
+    filter.tools = Array.isArray(raw)
+      ? raw
+      : (raw as string).split(',').map((t) => t.trim());
+  }
+  if (opts['file']) {
+    const raw = opts['file'];
+    filter.files = Array.isArray(raw)
+      ? raw
+      : (raw as string).split(',').map((t) => t.trim());
+  }
+  if (opts['issue']) filter.issueId = opts['issue'] as string;
 
   const similarTo = opts['similar'] ? parseInt(opts['similar'] as string, 10) : undefined;
+  const semanticQuery = opts['semantic'] as string | undefined;
 
-  const result = searchSessions({
+  const result = await searchSessions({
     q: query?.trim() || undefined,
     similarTo,
+    semanticQuery,
     filter,
     limit,
     offset,

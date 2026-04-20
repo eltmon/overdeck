@@ -6,14 +6,43 @@ import chalk from 'chalk';
 import { enrichSessions, CostThresholdError, estimateEnrichmentCost } from '../../../lib/conversations/enrichment/index.js';
 import type { EnrichmentTier } from '../../../lib/conversations/enrichment/index.js';
 
-export async function enrichAction(opts: Record<string, string | boolean | undefined>): Promise<void> {
-  const tier = parseInt((opts['tier'] as string) ?? '1', 10) as EnrichmentTier;
+export async function enrichAction(
+  positionalIds: string[],
+  opts: Record<string, string | boolean | undefined>,
+): Promise<void> {
+  // --deep is shorthand for --tier 3
+  const deep = Boolean(opts['deep']);
+  const tierRaw = deep ? 3 : parseInt((opts['tier'] as string) ?? '1', 10);
+  const tier = tierRaw as EnrichmentTier;
   const yes = Boolean(opts['yes']);
   const maxParallel = opts['maxParallel'] ? parseInt(opts['maxParallel'] as string, 10) : undefined;
+  const skipAlreadyEnriched = !Boolean(opts['full']) && !Boolean(opts['upgrade']);
+  const force = Boolean(opts['full']) || Boolean(opts['upgrade']);
+  const limit = opts['limit'] ? parseInt(opts['limit'] as string, 10) : undefined;
+  const workspace = opts['workspace'] as string | undefined;
+  const since = opts['since'] as string | undefined;
 
-  const sessionIds = opts['ids']
+  // Collect session IDs from positional args and --ids flag
+  const fromPositional = positionalIds.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+  const fromFlag = opts['ids']
     ? (opts['ids'] as string).split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
-    : undefined;
+    : [];
+  let sessionIds: number[] | undefined =
+    fromPositional.length > 0 || fromFlag.length > 0
+      ? [...new Set([...fromPositional, ...fromFlag])]
+      : undefined;
+
+  // Apply --workspace / --since filters if no explicit session IDs
+  if (!sessionIds && (workspace || since || limit !== undefined)) {
+    const { findDiscoveredSessions } = await import('../../../lib/database/discovered-sessions-db.js');
+    const { parseRelativeTime } = await import('../../../lib/conversations/search.js');
+    const sessions = findDiscoveredSessions({
+      workspacePath: workspace,
+      since: since ? parseRelativeTime(since) : undefined,
+      limit,
+    });
+    sessionIds = sessions.map((s) => s.id);
+  }
 
   if (![1, 2, 3].includes(tier)) {
     console.error(chalk.red('--tier must be 1, 2, or 3'));
@@ -29,6 +58,10 @@ export async function enrichAction(opts: Record<string, string | boolean | undef
       tier,
       sessionIds,
       maxParallel,
+      skipAlreadyEnriched,
+      force,
+      modelOverride: opts['with'] as string | undefined,
+      promptSuffix: opts['prompt'] as string | undefined,
       onProgress: (p) => {
         const pct = p.total > 0 ? Math.round((p.processed / p.total) * 100) : 0;
         const elapsed = (p.elapsedMs / 1000).toFixed(1);
@@ -75,6 +108,9 @@ export async function enrichAction(opts: Record<string, string | boolean | undef
         tier,
         sessionIds,
         maxParallel,
+        skipAlreadyEnriched,
+        modelOverride: opts['with'] as string | undefined,
+        promptSuffix: opts['prompt'] as string | undefined,
         force: true,
       });
       console.log(`  Enriched: ${chalk.green(result.enriched)}, Errors: ${chalk.red(result.errors)}`);

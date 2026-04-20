@@ -74,7 +74,7 @@ describe('enrichAction', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await expect(enrichAction({ tier: '4' })).rejects.toThrow('exit 1');
+    await expect(enrichAction([], { tier: '4' })).rejects.toThrow('exit 1');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -87,7 +87,7 @@ describe('enrichAction', () => {
     });
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await expect(enrichAction({ tier: '1' })).rejects.toThrow('exit 1');
+    await expect(enrichAction([], { tier: '1' })).rejects.toThrow('exit 1');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -99,7 +99,7 @@ describe('enrichAction', () => {
     const { enrichAction } = await import('../enrich.js');
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await enrichAction({ tier: '1', yes: true });
+    await enrichAction([], { tier: '1', yes: true });
 
     // First call throws, second call with force: true succeeds
     expect(mockEnrichSessions).toHaveBeenCalledTimes(2);
@@ -114,7 +114,7 @@ describe('enrichAction', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg) => logs.push(String(msg ?? '')));
 
-    await enrichAction({ tier: '1' });
+    await enrichAction([], { tier: '1' });
 
     const output = logs.join('\n');
     expect(output).toContain('5');
@@ -128,7 +128,7 @@ describe('enrichAction', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg) => logs.push(String(msg ?? '')));
 
-    await enrichAction({ tier: '2' });
+    await enrichAction([], { tier: '2' });
 
     const output = logs.join('\n');
     expect(output).toContain('2');

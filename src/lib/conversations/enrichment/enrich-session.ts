@@ -27,6 +27,10 @@ export interface EnrichSessionOptions {
   jsonlPath: string;
   tier: EnrichmentTier;
   config: TierConfig;
+  /** Override the model used (ignores tier-based selection) */
+  modelOverride?: string;
+  /** Append custom text to the enrichment prompt */
+  promptSuffix?: string;
   /** Injected for testing — skips real API call */
   callApi?: (model: string, prompt: string) => Promise<EnrichmentResponse>;
 }
@@ -210,7 +214,7 @@ export async function callClaudeApi(
  */
 export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
-  const model = selectModelForTier(tier, config);
+  const model = opts.modelOverride ?? selectModelForTier(tier, config);
   const maxLines = maxMessagesForTier(tier);
 
   const apiCall = opts.callApi ?? callClaudeApi;
@@ -229,10 +233,11 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
     }
 
     // Build tier-appropriate prompt
-    const prompt =
+    let prompt =
       tier === 1 ? buildL1Prompt(excerpt) :
       tier === 2 ? buildL2Prompt(excerpt) :
       buildL3Prompt(excerpt);
+    if (opts.promptSuffix) prompt = `${prompt}\n\n${opts.promptSuffix}`;
 
     // Call API
     const response = await apiCall(model, prompt);
