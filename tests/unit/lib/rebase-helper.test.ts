@@ -129,6 +129,38 @@ describe('rebaseAndPushRepos', () => {
     expect(await readFile(join(repoDir, hostileFile), 'utf-8')).toBe('local hostile planning file\n');
   });
 
+  it('resolves delete-modify conflicts in planning files without looping', async () => {
+    await writeFile(join(repoDir, '.planning', 'delete-me.md'), 'shared planning content\n');
+    await execAsync('git add .planning/delete-me.md', { cwd: repoDir });
+    await execAsync('git commit -m "add planning file on feature"', { cwd: repoDir });
+    await execAsync('git push origin feature/pan-711', { cwd: repoDir });
+
+    await execAsync('git checkout main', { cwd: repoDir });
+    await writeFile(join(repoDir, '.planning', 'delete-me.md'), 'shared planning content\n');
+    await execAsync('git add .planning/delete-me.md', { cwd: repoDir });
+    await execAsync('git commit -m "add planning file on main"', { cwd: repoDir });
+    await execAsync('git push origin main', { cwd: repoDir });
+
+    await execAsync('git checkout feature/pan-711', { cwd: repoDir });
+    await writeFile(join(repoDir, '.planning', 'delete-me.md'), 'local planning content updated\n');
+    await execAsync('git add .planning/delete-me.md', { cwd: repoDir });
+    await execAsync('git commit -m "modify planning file locally"', { cwd: repoDir });
+
+    await execAsync('git checkout main', { cwd: repoDir });
+    await execAsync('git rm .planning/delete-me.md', { cwd: repoDir });
+    await execAsync('git commit -m "delete planning file upstream"', { cwd: repoDir });
+    await execAsync('git push origin main', { cwd: repoDir });
+
+    await execAsync('git checkout feature/pan-711', { cwd: repoDir });
+
+    const result = await rebaseAndPushRepos(repoDir, createMergeSet());
+
+    expect(result.success).toBe(true);
+    expect(result.results[0]?.outcome).toBe('rebased');
+    expect(existsSync(join(repoDir, '.planning', 'delete-me.md'))).toBe(true);
+    expect(await readFile(join(repoDir, '.planning', 'delete-me.md'), 'utf-8')).toBe('local planning content updated\n');
+  });
+
   it('fails when a later non-planning conflict appears after planning conflicts are auto-resolved', async () => {
     await writeFile(join(repoDir, 'README.md'), 'local readme\n');
     await execAsync('git add README.md', { cwd: repoDir });

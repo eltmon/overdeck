@@ -113,13 +113,27 @@ async function rebaseOneRepo(
       });
     } catch (rebaseErr: unknown) {
       let lastError = rebaseErr;
+      let recovered = false;
 
-      while (true) {
+      for (let attempts = 0; attempts < 20; attempts++) {
         const resolution = await tryResolvePlanningConflicts(repoPath);
+        const rebaseInProgress = await isRebaseInProgress(repoPath);
+
+        if (!resolution.shouldRetry && resolution.remainingConflicts.length === 0 && !rebaseInProgress) {
+          if (attempts > 0) {
+            recovered = true;
+            break;
+          }
+          return {
+            repoKey,
+            outcome: 'error',
+            message: `Rebase failed: ${getErrorMessage(lastError)}`,
+          };
+        }
 
         if (resolution.shouldRetry) {
           try {
-            await execAsync('git rebase --continue', {
+            await execFileAsync('git', ['rebase', '--continue'], {
               cwd: repoPath,
               encoding: 'utf-8',
               timeout: 60000,
@@ -130,6 +144,7 @@ async function rebaseOneRepo(
               continue;
             }
 
+            recovered = true;
             break;
           } catch (continueErr: unknown) {
             lastError = continueErr;
@@ -137,7 +152,7 @@ async function rebaseOneRepo(
           }
         }
 
-        if (!await isRebaseInProgress(repoPath)) {
+        if (!rebaseInProgress) {
           return {
             repoKey,
             outcome: 'error',
@@ -145,7 +160,7 @@ async function rebaseOneRepo(
           };
         }
 
-        await execAsync('git rebase --abort', { cwd: repoPath }).catch(() => {});
+        await execFileAsync('git', ['rebase', '--abort'], { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }).catch(() => {});
         if (resolution.remainingConflicts.length > 0) {
           return {
             repoKey,
@@ -154,6 +169,15 @@ async function rebaseOneRepo(
             conflictFiles: resolution.remainingConflicts,
           };
         }
+        return {
+          repoKey,
+          outcome: 'error',
+          message: `Rebase failed: ${getErrorMessage(lastError)}`,
+        };
+      }
+
+      if (!recovered) {
+        await execFileAsync('git', ['rebase', '--abort'], { cwd: repoPath, encoding: 'utf-8', timeout: 10000 }).catch(() => {});
         return {
           repoKey,
           outcome: 'error',
@@ -218,6 +242,11 @@ async function tryResolvePlanningConflicts(
       return { shouldRetry: false, remainingConflicts: [] };
     }
 
+    const unsafeConflicts = conflictFiles.filter(file => file.split('/').includes('..'));
+    if (unsafeConflicts.length > 0) {
+      return { shouldRetry: false, remainingConflicts: unsafeConflicts };
+    }
+
     const nonPlanningConflicts = conflictFiles.filter(f => !f.startsWith('.planning/'));
     if (nonPlanningConflicts.length > 0) {
       return { shouldRetry: false, remainingConflicts: nonPlanningConflicts };
@@ -229,7 +258,7 @@ async function tryResolvePlanningConflicts(
         encoding: 'utf-8',
         timeout: 10000,
       });
-      await execFileAsync('git', ['add', '--', file], {
+      await execFileAsync('git', ['add', '-A', '--', file], {
         cwd: repoPath,
         encoding: 'utf-8',
         timeout: 10000,
