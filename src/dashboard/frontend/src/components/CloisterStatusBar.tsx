@@ -85,7 +85,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   });
 
   const agents = useDashboardStore(selectAgentList);
-  const runningAgentCount = agents.filter(a => a.status === 'running').length;
+  const runningAgentCount = agents.filter((a) => a.status === 'running').length;
   const aliveConversationCount = conversations.filter(c => c.sessionAlive).length;
 
   const runningEphemeral: Array<{ projectKey: string; specialistType: string }> =

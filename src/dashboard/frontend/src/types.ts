@@ -28,6 +28,7 @@ export interface Issue {
   source?: IssueSource;
   sourceRepo?: string;
   state?: string;  // Canonical issue state (e.g. 'canceled', 'done', 'in_review')
+  canonicalStatus?: string;
   shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
   targetCanonicalState?: CanonicalState;  // Explicit column placement from drag-drop
   shadowedAt?: string;  // When shadow state was created

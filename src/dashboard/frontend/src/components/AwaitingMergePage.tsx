@@ -43,7 +43,7 @@ async function mergeIssue(issueId: string): Promise<unknown> {
 export function AwaitingMergePage() {
   const queryClient = useQueryClient();
   const awaiting = useDashboardStore(selectAwaitingMerge);
-  const issues = useDashboardStore(selectIssues) as unknown as Issue[];
+  const issues = useDashboardStore(selectIssues);
 
   // Index issues by id (case-insensitive) for quick lookup
   const issuesById = useMemo(() => {

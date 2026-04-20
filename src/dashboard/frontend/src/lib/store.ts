@@ -23,6 +23,7 @@ import {
   applyEvents as applyEventsShared,
 } from '@panopticon/contracts'
 import { saveSnapshotToCache } from './snapshotCache'
+import type { Issue } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -84,13 +85,13 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 // store slices change (e.g. an agent event should not re-render components
 // that only consume issues).
 
-function memoizeArraySelector<S, K extends keyof S, R>(
+function memoizeArraySelector<K extends keyof DashboardState, R>(
   key: K,
-  derive: (slice: S[K]) => R,
-): (s: S) => R {
-  let lastSlice: S[K] | undefined
+  derive: (slice: DashboardState[K]) => R,
+): (s: DashboardState) => R {
+  let lastSlice: DashboardState[K] | undefined
   let lastResult: R | undefined
-  return (s: S) => {
+  return (s: DashboardState) => {
     const slice = s[key]
     if (slice === lastSlice && lastResult !== undefined) {
       return lastResult
@@ -152,20 +153,20 @@ export const selectDashboardLifecycle = (s: DashboardState) => s.dashboardLifecy
 
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 
-export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw
+export const selectIssues = (s: DashboardState): Issue[] => s.issuesRaw as Issue[]
 
 export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =>
   memoizeArraySelector<DashboardState, 'issuesRaw', unknown[]>(
     'issuesRaw',
-    (issues) => {
-      const typed = issues as Array<Record<string, unknown>>
-      if (includeCompleted) return typed
+    (issuesRaw): Issue[] => {
+      const issues = issuesRaw as Issue[]
+      if (includeCompleted) return issues
       // Only filter out canceled issues here. Done issues flow through to
       // groupByStatus() which handles closed-out label filtering separately.
       // "Include closed-out" controls the closed-out label, not the Done column.
-      return typed.filter(
+      return issues.filter(
         (i) =>
-          i['state'] !== 'canceled' && i['canonicalStatus'] !== 'canceled',
+          i.state !== 'canceled' && i.canonicalStatus !== 'canceled',
       )
     },
   )
