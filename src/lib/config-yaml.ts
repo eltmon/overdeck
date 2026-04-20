@@ -89,6 +89,9 @@ export interface YamlConfig {
 
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
+
+    /** Persisted default conversation model (overrides dynamic provider-based selection) */
+    default_conversation_model?: ModelId;
   };
 
   /** OpenRouter-specific configuration */
@@ -233,6 +236,9 @@ export interface NormalizedConfig {
 
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
+
+  /** Persisted default conversation model (overrides dynamic provider-based selection) */
+  defaultConversationModel?: ModelId;
 
   /** Tracker API keys */
   trackerKeys: {
@@ -550,8 +556,14 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       const providers = config.models.providers;
       const legacyKeys = config.api_keys || {};
 
-      // Anthropic (always enabled)
-      result.enabledProviders.add('anthropic');
+      // Anthropic
+      const anthropic = normalizeProviderConfig(providers.anthropic, undefined);
+      if (anthropic.enabled) {
+        result.enabledProviders.add('anthropic');
+      } else if (providers.anthropic !== undefined) {
+        explicitlyDisabled.add('anthropic');
+        result.enabledProviders.delete('anthropic');
+      }
 
       // OpenAI
       const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
@@ -697,6 +709,11 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     // Merge Gemini thinking level
     if (config.models?.gemini_thinking_level) {
       result.geminiThinkingLevel = config.models.gemini_thinking_level;
+    }
+
+    // Merge default conversation model
+    if (config.models?.default_conversation_model) {
+      result.defaultConversationModel = config.models.default_conversation_model;
     }
 
     // Merge tracker keys

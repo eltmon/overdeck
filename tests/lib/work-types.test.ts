@@ -13,9 +13,9 @@ import {
 
 describe('work-types', () => {
   describe('WORK_TYPES registry', () => {
-    it('should have exactly 23 work types', () => {
+    it('should have exactly 24 work types', () => {
       const workTypes = Object.keys(WORK_TYPES);
-      expect(workTypes).toHaveLength(23);
+      expect(workTypes).toHaveLength(24);
     });
 
     it('should have all issue-agent phases', () => {
@@ -62,18 +62,18 @@ describe('work-types', () => {
       });
     });
 
-    it('should have all convoy members', () => {
-      const convoy = [
-        'convoy:security-reviewer',
-        'convoy:performance-reviewer',
-        'convoy:correctness-reviewer',
-        'convoy:requirements-reviewer',
-        'convoy:synthesis-agent',
+    it('should have all review agents', () => {
+      const review = [
+        'review:security',
+        'review:performance',
+        'review:correctness',
+        'review:requirements',
+        'review:synthesis',
       ];
 
-      convoy.forEach((member) => {
+      review.forEach((member) => {
         expect(WORK_TYPES).toHaveProperty(member);
-        expect(WORK_TYPES[member as WorkTypeId].category).toBe('convoy');
+        expect(WORK_TYPES[member as WorkTypeId].category).toBe('review');
       });
     });
 
@@ -110,9 +110,9 @@ describe('work-types', () => {
   });
 
   describe('getAllWorkTypes', () => {
-    it('should return all 23 work type IDs', () => {
+    it('should return all 24 work type IDs', () => {
       const allTypes = getAllWorkTypes();
-      expect(allTypes).toHaveLength(23);
+      expect(allTypes).toHaveLength(24);
     });
 
     it('should return an array of strings', () => {
@@ -131,7 +131,7 @@ describe('work-types', () => {
       expect(categories).toContain('issue-agent');
       expect(categories).toContain('specialist');
       expect(categories).toContain('subagent');
-      expect(categories).toContain('convoy');
+      expect(categories).toContain('review');
       expect(categories).toContain('pre-work');
       expect(categories).toContain('workflow');
       expect(categories).toContain('cli');
@@ -154,9 +154,9 @@ describe('work-types', () => {
       expect(types).toHaveLength(4);
     });
 
-    it('should return 5 convoy types', () => {
-      const types = getWorkTypesByCategory('convoy');
-      expect(types).toHaveLength(5);
+    it('should return 6 review types', () => {
+      const types = getWorkTypesByCategory('review');
+      expect(types).toHaveLength(6);
     });
 
     it('should return 1 pre-work type', () => {
@@ -179,7 +179,7 @@ describe('work-types', () => {
         'issue-agent',
         'specialist',
         'subagent',
-        'convoy',
+        'review',
         'pre-work',
         'workflow',
         'cli',
@@ -198,7 +198,7 @@ describe('work-types', () => {
     it('should return true for valid work types', () => {
       expect(isValidWorkType('issue-agent:exploration')).toBe(true);
       expect(isValidWorkType('specialist-review-agent')).toBe(true);
-      expect(isValidWorkType('convoy:security-reviewer')).toBe(true);
+      expect(isValidWorkType('review:security')).toBe(true);
     });
 
     it('should return false for invalid work types', () => {
@@ -231,7 +231,7 @@ describe('work-types', () => {
       expect(metadata.description).toBeTruthy();
     });
 
-    it('should work for all 20 work types', () => {
+    it('should work for all 23 work types', () => {
       getAllWorkTypes().forEach((id) => {
         const metadata = getWorkTypeMetadata(id);
         expect(metadata).toBeDefined();
@@ -297,7 +297,7 @@ describe('work-types', () => {
         'issue-agent': 5,
         specialist: 5,
         subagent: 4,
-        convoy: 5,
+        review: 6,
         'pre-work': 1,
         workflow: 1,
         cli: 2,
@@ -314,7 +314,7 @@ describe('work-types', () => {
         'issue-agent',
         'specialist',
         'subagent',
-        'convoy',
+        'review',
         'pre-work',
         'workflow',
         'cli',
@@ -324,7 +324,7 @@ describe('work-types', () => {
         return sum + getWorkTypesByCategory(category).length;
       }, 0);
 
-      expect(total).toBe(23);
+      expect(total).toBe(24);
     });
   });
 });

@@ -7,7 +7,6 @@ import { AgentOutputPanel } from './components/AgentOutputPanel';
 import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
-import { ConvoyPanel } from './components/ConvoyPanel';
 import { HandoffsPage } from './components/HandoffsPage';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
@@ -54,7 +53,6 @@ const TAB_PATHS: Record<Tab, string> = {
   'command-deck': '/command-deck',
   agents: '/agents',
   resources: '/resources',
-  convoys: '/convoys',
   handoffs: '/handoffs',
   'awaiting-merge': '/awaiting-merge',
   activity: '/activity',
@@ -626,11 +624,6 @@ export default function App() {
         {activeTab === 'activity' && (
           <div className="w-full h-full">
             <ActivityPanel onClose={() => setActiveTab('kanban')} />
-          </div>
-        )}
-        {activeTab === 'convoys' && (
-          <div className="w-full h-full">
-            <ConvoyPanel onClose={() => setActiveTab('kanban')} />
           </div>
         )}
         {activeTab === 'metrics' && (

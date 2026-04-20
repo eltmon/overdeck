@@ -12,7 +12,6 @@
 - [Commands Reference](#commands-reference)
 - [Workspaces](#workspaces)
 - [Specialists](#specialists)
-- [Convoys](#convoys)
 - [Skills](#skills)
 - [Troubleshooting](#troubleshooting)
 
@@ -465,30 +464,6 @@ Merge Agent spawned
 ```
 
 📖 **[Complete specialist workflow →](SPECIALIST_WORKFLOW.md)**
-
----
-
-## Convoys
-
-Run parallel agents on related issues with automatic synthesis.
-
-### Creating Convoys
-
-```bash
-# Create convoy from dashboard
-# Select multiple issues, click "Create Convoy"
-
-# Or via CLI
-pan convoy create MIN-10 MIN-11 MIN-12 --name "auth-refactor"
-```
-
-### Convoy Synthesis
-
-When all agents complete, a synthesis agent:
-1. Collects all changes
-2. Identifies conflicts
-3. Creates unified merge request
-4. Documents architectural decisions
 
 ---
 

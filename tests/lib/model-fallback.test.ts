@@ -66,11 +66,12 @@ describe('model-fallback', () => {
   describe('getModelsByProvider', () => {
     it('should return all Anthropic models', () => {
       const models = getModelsByProvider('anthropic');
+      expect(models).toContain('claude-opus-4-7');
       expect(models).toContain('claude-opus-4-6');
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(4);
+      expect(models).toHaveLength(5);
     });
 
     it('should return all OpenAI models', () => {
@@ -102,9 +103,10 @@ describe('model-fallback', () => {
   });
 
   describe('isProviderEnabled', () => {
-    it('should always return true for Anthropic', () => {
-      expect(isProviderEnabled('anthropic', new Set())).toBe(true);
-      expect(isProviderEnabled('anthropic', new Set(['openai']))).toBe(true);
+    it('respects enabledProviders set for all providers including Anthropic', () => {
+      expect(isProviderEnabled('anthropic', new Set())).toBe(false);
+      expect(isProviderEnabled('anthropic', new Set<ModelProvider>(['anthropic']))).toBe(true);
+      expect(isProviderEnabled('anthropic', new Set<ModelProvider>(['openai']))).toBe(false);
     });
 
     it('should return true if provider is in enabled set', () => {
@@ -116,6 +118,45 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       expect(isProviderEnabled('openai', enabled)).toBe(false);
       expect(isProviderEnabled('google', enabled)).toBe(false);
+    });
+  });
+
+  describe('Anthropic-disabled provider behavior', () => {
+    it('filterAvailableModels excludes Claude models when Anthropic is disabled', () => {
+      const noAnthropic = new Set<ModelProvider>(['openai']);
+      const filtered = filterAvailableModels(
+        ['claude-opus-4-6', 'claude-sonnet-4-6', 'gpt-5.4'] as ModelId[],
+        noAnthropic
+      );
+      expect(filtered).not.toContain('claude-opus-4-6');
+      expect(filtered).not.toContain('claude-sonnet-4-6');
+      expect(filtered).toContain('gpt-5.4');
+    });
+
+    it('getAvailableModels excludes Claude models when Anthropic is disabled', () => {
+      const noAnthropic = new Set<ModelProvider>(['openai']);
+      const available = getAvailableModels(noAnthropic);
+      for (const model of available) {
+        expect(getModelProvider(model)).not.toBe('anthropic');
+      }
+    });
+
+    it('applyFallback does not fall back to Anthropic when Anthropic is disabled (MiniMax-only)', () => {
+      // Regression: with anthropic=false and minimax=true, a disabled-provider model must NOT
+      // silently rewrite to claude-sonnet-4-6. The original model is returned with a warning.
+      const minimaxOnly = new Set<ModelProvider>(['minimax']);
+      // minimax-m2.7 is enabled — should pass through unchanged
+      expect(applyFallback('minimax-m2.7' as ModelId, minimaxOnly)).toBe('minimax-m2.7');
+      // gpt-5.4 is disabled (openai not in set) AND Anthropic is also disabled —
+      // must NOT return claude-sonnet-4-6
+      const result = applyFallback('gpt-5.4' as ModelId, minimaxOnly);
+      expect(getModelProvider(result)).not.toBe('anthropic');
+    });
+
+    it('applyFallback falls back to Anthropic when Anthropic IS enabled and provider is disabled', () => {
+      // Standard path: openai disabled, anthropic enabled → Anthropic fallback applied
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallback('gpt-5.4' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
     });
   });
 
@@ -301,18 +342,19 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       const models = getAvailableModels(enabled);
 
+      expect(models).toContain('claude-opus-4-7');
       expect(models).toContain('claude-opus-4-6');
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(4);
+      expect(models).toHaveLength(5);
     });
 
     it('should return all models when all providers enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(23); // 4 Anthropic + 10 OpenAI + 7 Google + 2 Kimi
+      expect(models.length).toBe(25); // 5 Anthropic + 10 OpenAI + 7 Google + 3 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -323,7 +365,7 @@ describe('model-fallback', () => {
       expect(models).toContain('o3');
       expect(models).toContain('gpt-5.2-codex');
       expect(models).toContain('gpt-4o');
-      expect(models.length).toBe(14); // 4 Anthropic + 10 OpenAI
+      expect(models.length).toBe(15); // 5 Anthropic + 10 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -335,7 +377,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).toContain('gemini-2.5-pro');
       expect(models).toContain('gemini-2.5-flash');
-      expect(models.length).toBe(11); // 4 Anthropic + 7 Google
+      expect(models.length).toBe(12); // 5 Anthropic + 7 Google
     });
   });
 
@@ -368,6 +410,61 @@ describe('model-fallback', () => {
         const fallback = applyFallback(model, enabled);
         expect(fallback).not.toBe('claude-opus-4-6');
       });
+    });
+  });
+
+  describe('newly introduced model catalog regression (PAN-540)', () => {
+    it('glm-4.7 is recognized as zai provider', () => {
+      expect(getModelProvider('glm-4.7' as ModelId)).toBe('zai');
+      expect(getModelProvider('glm-4.7-flash' as ModelId)).toBe('zai');
+    });
+
+    it('glm-4.7 requires external key', () => {
+      expect(requiresExternalKey('glm-4.7' as ModelId)).toBe(true);
+      expect(requiresExternalKey('glm-4.7-flash' as ModelId)).toBe(true);
+    });
+
+    it('glm-4.7 appears in getModelsByProvider for zai', () => {
+      const zaiModels = getModelsByProvider('zai');
+      expect(zaiModels).toContain('glm-4.7');
+      expect(zaiModels).toContain('glm-4.7-flash');
+      expect(zaiModels).toContain('glm-5.1');
+    });
+
+    it('glm-4.7 falls back to Sonnet and glm-4.7-flash falls back to Haiku when zai is disabled', () => {
+      // glm-4.7 is strong-tier (like Sonnet), glm-4.7-flash is economy-tier (like Haiku).
+      // Explicit FALLBACK_MAP entries ensure tier-correct results regardless of the
+      // MODEL_DEPRECATIONS chain (which previously mapped both through glm-5.1 → Sonnet).
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallback('glm-4.7' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+      expect(applyFallback('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-haiku-4-5');
+    });
+
+    it('glm-4.7 stays when zai is enabled', () => {
+      const zaiEnabled = new Set<ModelProvider>(['zai']);
+      expect(applyFallback('glm-4.7' as ModelId, zaiEnabled)).toBe('glm-4.7');
+    });
+
+    it('kimi-k2 is recognized as kimi provider', () => {
+      expect(getModelProvider('kimi-k2' as ModelId)).toBe('kimi');
+    });
+
+    it('kimi-k2 falls back to Sonnet when kimi is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallback('kimi-k2' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('claude-opus-4-7 is recognized as anthropic provider', () => {
+      expect(getModelProvider('claude-opus-4-7')).toBe('anthropic');
+      expect(requiresExternalKey('claude-opus-4-7')).toBe(false);
+    });
+
+    it('glm-4.7 and glm-4.7-flash appear in getAvailableModels when zai is enabled', () => {
+      const enabled = new Set<ModelProvider>(['anthropic', 'zai']);
+      const models = getAvailableModels(enabled);
+      expect(models).toContain('glm-4.7');
+      expect(models).toContain('glm-4.7-flash');
+      expect(models).toContain('glm-5.1');
     });
   });
 });

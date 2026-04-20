@@ -42,7 +42,7 @@ project-repo/
 **What does NOT belong here:**
 - General-purpose skills that other projects could use — those live in the
   Panopticon CLI repo under `skills/` and sync globally
-- Runtime output (convoy results, cost events) — see [Runtime Output](#runtime-output-directories)
+- Runtime output (review results, cost events) — see [Runtime Output](#runtime-output-directories)
 
 ### Naming
 
@@ -203,7 +203,7 @@ runs. These live under `.pan/` to keep the project root clean:
 | Path | Written by | Contents |
 |------|-----------|----------|
 | `.pan/events/` | Cost WAL | Per-issue cost event logs (`<issue-id>.jsonl`) |
-| `.pan/convoy/` | Convoy commands | Convoy analysis output |
+| `.pan/review/` | Review agents | Parallel review output |
 | `.pan/prompts/` | Remote agents | VM-side agent prompt files |
 
 These directories are **gitignored** — they are runtime state, not repo artifacts.
@@ -211,7 +211,7 @@ Add to `.gitignore`:
 
 ```
 .pan/events/
-.pan/convoy/
+.pan/review/
 .pan/prompts/
 ```
 
@@ -249,7 +249,7 @@ project-repo/
 │       │   ├── plan.vbrief.json
 │       │   └── STATE.md
 │       └── planned/               Pre-work PRDs
-└── .gitignore                     Must include .pan/events/, .pan/convoy/, .pan/prompts/
+└── .gitignore                     Must include .pan/events/, .pan/review/, .pan/prompts/
 ```
 
 ---

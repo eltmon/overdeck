@@ -15,10 +15,11 @@ import { reloadGlobalRouter } from './work-type-router.js';
 
 /**
  * Optimal model defaults — multi-provider distribution (see docs/research/)
- * - GPT-5.4: Planning, review, security (best non-Anthropic reasoning)
- * - Kimi K2.6: Exploration, testing, docs, UAT, convoy review (strong coding + vision)
- * - GLM-5.1: Implementation, review-response, correctness (SWE-Bench Pro #1)
- * - MiniMax M2.7: Procedural specialists — test, merge, inspect, synthesis
+ * - Kimi K2.6: Exploration, testing, docs, UAT, general-purpose subagent
+ * - GLM-5.1: Implementation, review-response (SWE-Bench Pro #1)
+ * - GPT-5.4: Specialist review agent (high-stakes code review)
+ * - MiniMax M2.7: Procedural specialists — test, merge, inspect
+ * - Claude Opus/Sonnet: All parallel review agents (security, correctness, etc.)
  * - GPT-5.4 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
  *
  * NOTE: All model IDs are automatically resolved through deprecation mapping
@@ -42,12 +43,12 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'specialist-inspect-agent': 'minimax-m2.7-highspeed',
     'specialist-uat-agent': 'K2.6-code-preview',
 
-    // Convoy reviewers
-    'convoy:security-reviewer': 'gpt-5.4',
-    'convoy:performance-reviewer': 'K2.6-code-preview',
-    'convoy:correctness-reviewer': 'glm-5.1',
-    'convoy:requirements-reviewer': 'K2.6-code-preview',
-    'convoy:synthesis-agent': 'minimax-m2.7',
+    // Review agents - mixed based on criticality
+    'review:security': 'claude-opus-4-6', // SAFETY CRITICAL
+    'review:performance': 'claude-sonnet-4-6',
+    'review:correctness': 'claude-sonnet-4-6',
+    'review:requirements': 'claude-sonnet-4-6',
+    'review:synthesis': 'claude-sonnet-4-6',
 
     // Subagents — GPT-5.4 Nano (155 tok/s, Tau2-Bench 92.5% tool use)
     'subagent:explore': 'gpt-5.4-nano',
@@ -135,19 +136,53 @@ export interface ApiSettingsConfig {
 export function getDefaultConversationModelApi(): ModelId {
   const { config } = loadConfig();
 
-  if (config.enabledProviders.has('openai')) {
-    return resolveModelId('gpt-5.4');
-  }
+  if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
 
+  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.4');
+  if (config.enabledProviders.has('minimax')) return resolveModelId('minimax-m2.7-highspeed');
+  if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
+  if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');
+  if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
+  if (config.enabledProviders.has('openrouter')) {
+    const fav = config.openrouterFavorites[0];
+    if (fav) return resolveModelId(fav);
+  }
   return resolveModelId('claude-sonnet-4-6');
 }
+
+/** convoy:* override keys → review:* equivalents (translated on every read) */
+const CONVOY_TO_REVIEW_MIGRATION: Partial<Record<string, WorkTypeId>> = {
+  'convoy:security-reviewer': 'review:security',
+  'convoy:performance-reviewer': 'review:performance',
+  'convoy:correctness-reviewer': 'review:correctness',
+  'convoy:requirements-reviewer': 'review:requirements',
+  'convoy:synthesis-agent': 'review:synthesis',
+};
 
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
+  // Translate persisted convoy:* override keys to review:* equivalents on every read.
+  // The rename is applied in-memory; it persists to disk only when the user calls saveSettingsApi.
+  const migratedOverrides: Partial<Record<WorkTypeId, ModelId>> = {};
+  let migrationNeeded = false;
+  for (const [workType, modelId] of Object.entries(config.overrides)) {
+    const newKey = CONVOY_TO_REVIEW_MIGRATION[workType];
+    if (newKey) {
+      migratedOverrides[newKey] = modelId as ModelId;
+      migrationNeeded = true;
+    } else {
+      migratedOverrides[workType as WorkTypeId] = modelId as ModelId;
+    }
+  }
+  // Use migratedOverrides for the response without mutating the loaded config object.
+  const effectiveOverrides = migrationNeeded
+    ? (migratedOverrides as Record<WorkTypeId, ModelId>)
+    : config.overrides;
+
   // Detect deprecated models in current overrides
   const deprecationWarnings: ApiDeprecationWarning[] = [];
-  for (const [workType, modelId] of Object.entries(config.overrides)) {
+  for (const [workType, modelId] of Object.entries(effectiveOverrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       deprecationWarnings.push({
         workType: workType as WorkTypeId,
@@ -160,7 +195,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
   return {
     models: {
       providers: {
-        anthropic: true, // Always enabled
+        anthropic: config.enabledProviders.has('anthropic'),
         openai: config.enabledProviders.has('openai'),
         google: config.enabledProviders.has('google'),
         minimax: config.enabledProviders.has('minimax'),
@@ -168,7 +203,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         kimi: config.enabledProviders.has('kimi'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
-      overrides: config.overrides,
+      overrides: effectiveOverrides,
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },
@@ -223,6 +258,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       },
       overrides: settings.models.overrides,
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
+      default_conversation_model: settings.models.default_conversation_model,
     },
     api_keys: {
       openai: settings.api_keys.openai,
@@ -335,9 +371,10 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   if (!settings.models?.providers) {
     errors.push('Missing providers configuration');
   } else {
-    // Anthropic must always be enabled
-    if (settings.models.providers.anthropic !== true) {
-      errors.push('Anthropic provider must be enabled');
+    // At least one provider must be enabled
+    const enabledCount = Object.values(settings.models.providers).filter(Boolean).length;
+    if (enabledCount === 0) {
+      errors.push('At least one provider must be enabled');
     }
   }
 
@@ -447,7 +484,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         google: false,
         minimax: false,
         zai: false,
-        kimi: true, // Kimi K2.5 used for implementation work agent
+        kimi: true, // Kimi K2.6 (K2.6-code-preview) used for exploration, testing, and documentation
         openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
@@ -455,6 +492,56 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
     },
     api_keys: {},
     tracker_keys: {},
+  };
+}
+
+/**
+ * MiniMax-optimized defaults: use MiniMax M2.7 for all work, Anthropic disabled
+ */
+export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
+  return {
+    models: {
+      providers: {
+        anthropic: false,
+        openai: false,
+        google: false,
+        zai: false,
+        kimi: false,
+        minimax: true,
+        openrouter: false,
+      },
+      overrides: getMiniMaxModelDefaults(),
+      gemini_thinking_level: 3,
+    },
+    api_keys: {},
+    tracker_keys: {},
+  };
+}
+
+function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
+  return {
+    'issue-agent:exploration': 'minimax-m2.7-highspeed',
+    'issue-agent:implementation': 'minimax-m2.7-highspeed',
+    'issue-agent:testing': 'minimax-m2.7-highspeed',
+    'issue-agent:documentation': 'minimax-m2.7-highspeed',
+    'issue-agent:review-response': 'minimax-m2.7-highspeed',
+    'specialist-review-agent': 'minimax-m2.7-highspeed',
+    'specialist-test-agent': 'minimax-m2.7-highspeed',
+    'specialist-merge-agent': 'minimax-m2.7-highspeed',
+    'specialist-inspect-agent': 'minimax-m2.7-highspeed',
+    'specialist-uat-agent': 'minimax-m2.7-highspeed',
+    'review:security': 'minimax-m2.7-highspeed',
+    'review:performance': 'minimax-m2.7-highspeed',
+    'review:correctness': 'minimax-m2.7-highspeed',
+    'review:requirements': 'minimax-m2.7-highspeed',
+    'review:synthesis': 'minimax-m2.7-highspeed',
+    'subagent:explore': 'minimax-m2.7-highspeed',
+    'subagent:plan': 'minimax-m2.7-highspeed',
+    'subagent:bash': 'minimax-m2.7-highspeed',
+    'subagent:general-purpose': 'minimax-m2.7-highspeed',
+    'planning-agent': 'minimax-m2.7-highspeed',
+    'cli:interactive': 'minimax-m2.7-highspeed',
+    'cli:quick-command': 'minimax-m2.7-highspeed',
   };
 }
 

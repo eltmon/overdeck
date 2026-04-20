@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Eye, LayoutGrid, Bot, Server, Network, ArrowRightLeft,
+  Eye, LayoutGrid, Bot, Server, ArrowRightLeft,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
   Hammer, Loader2, GitMerge,
@@ -27,7 +27,6 @@ const NAV_GROUPS = [
     label: 'Infrastructure',
     items: [
       { id: 'resources' as Tab, label: 'Resources', icon: Server },
-      { id: 'convoys' as Tab, label: 'Convoys', icon: Network },
       { id: 'handoffs' as Tab, label: 'Handoffs', icon: ArrowRightLeft },
     ],
   },

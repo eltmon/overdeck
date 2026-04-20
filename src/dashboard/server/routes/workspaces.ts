@@ -232,8 +232,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     const issueId = `${issuePrefix}-1`;
     const resolved = resolveProjectFromIssue(issueId);
     if (resolved) return resolved.projectPath;
-  }
-  if (issuePrefix) {
+
     const config = getGitHubConfig();
     if (config) {
       for (const { owner, repo, prefix } of config.repos) {
@@ -2486,61 +2485,35 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               return;
             }
 
-            const {
-              spawnEphemeralSpecialist: spawnEphemeral,
-            } = await import('../../../lib/cloister/specialists.js');
-
-            const reviewResolvedProject = resolveProjectFromIssue(issueId);
-            const reviewProjectKey = reviewResolvedProject?.projectKey ?? null;
-
-            let reviewResult: { success: boolean; message: string; error?: string };
-            if (reviewProjectKey) {
-              const prUrl = getReviewStatus(issueId)?.prUrl;
-              reviewResult = await spawnEphemeral(reviewProjectKey, 'review-agent', {
-                issueId,
-                branch: branchName,
-                workspace: workspacePath,
-                prUrl,
-                context: reviewTargetBranch ? { targetBranch: reviewTargetBranch } : undefined,
-              });
-            } else {
-              console.error(
-                `[review] Could not resolve project for ${issueId} — cannot spawn review specialist`
-              );
-              reviewResult = {
-                success: false,
-                message: `No project configured for ${issueId}. Add it to projects.yaml.`,
-              };
-            }
+            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+            const prUrl = getReviewStatus(issueId)?.prUrl;
+            const reviewResult = await dispatchParallelReview({
+              issueId,
+              branch: branchName,
+              workspace: workspacePath,
+              prUrl,
+            });
 
             if (!reviewResult.success) {
-              if (reviewResult.error === 'specialist_busy') {
-                // Specialist busy — leave reviewStatus pending; deacon will retry
-                console.log(
-                  `[review] review-agent busy for ${issueId} — leaving pending for deacon retry`
-                );
-                completePendingOperation(issueId, null);
-                return;
-              }
               console.warn(
-                `[review] review-agent failed to wake: ${reviewResult.message}`
+                `[review] review dispatch failed: ${reviewResult.message}`
               );
               completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
               setReviewStatus(issueId, {
-                reviewStatus: 'failed',
+                reviewStatus: 'pending',
                 reviewNotes: reviewResult.message,
               });
               return;
             }
 
-            console.log(`[review] Review pipeline started for ${issueId}`);
-            // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+            console.log(`[review] Parallel review dispatched for ${issueId}`);
+            // PAN-511: set 'reviewing' only after dispatch succeeds
             setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
             completePendingOperation(issueId, error.message);
-            setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
+            setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: error.message });
           }
         })();
 
@@ -2596,22 +2569,33 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
         (async () => {
           try {
-            transitionIssueToInReview(issueId, workspacePath).catch((err: any) => {
+            // Resolve workspace info locally — outer scope vars (workspacePath, branchName)
+            // are declared after the early return below and must not be relied on here.
+            const issueLowerRerun = issueId.toLowerCase();
+            const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
+            const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+            const branchNameRerun = `feature/${issueLowerRerun}`;
+            const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
+            const workspacePathRerun = wsInfoRerun.isRemote
+              ? wsInfoRerun.remotePath!
+              : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+
+            transitionIssueToInReview(issueId, workspacePathRerun).catch((err: any) => {
               console.warn(`[request-review] Could not transition ${issueId} to in_review: ${err.message}`);
             });
 
             try {
-              if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+              if (wsInfoRerun.isRemote && wsInfoRerun.vmName) {
                 await execAsync(
                   flyExecCmd(
-                    workspaceInfo.vmName,
-                    `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`
+                    wsInfoRerun.vmName,
+                    `cd ${workspacePathRerun} && git push origin ${branchNameRerun} 2>&1 || true`
                   ),
                   { encoding: 'utf-8', timeout: 30000 }
                 );
               } else {
-                await execAsync(`git push origin ${branchName}`, {
-                  cwd: workspacePath,
+                await execAsync(`git push origin ${branchNameRerun}`, {
+                  cwd: workspacePathRerun,
                   encoding: 'utf-8',
                 });
               }
@@ -2619,47 +2603,28 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               console.log(`[request-review] Feature branch push note: ${pushErr.message}`);
             }
 
-            const result = await wakeSpecialistOrQueue(
+            const prUrl = getReviewStatus(issueId)?.prUrl;
+            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+            const result = await dispatchParallelReview({
               issueId,
-              workspacePath,
-              branchName,
-              'request-review'
-            );
+              workspace: workspacePathRerun,
+              branch: branchNameRerun,
+              prUrl,
+            });
 
             if (result.success) {
-              if (result.dispatched || result.spawned || result.position || result.alreadyRunning) {
-                setReviewStatus(issueId, { reviewStatus: 'reviewing' });
-              }
-              if (result.position) {
-                console.log(`[request-review] Review specialist queued for ${issueId} at position ${result.position}`);
-              } else {
-                console.log(`[request-review] Spawned review specialist for ${issueId}`);
-              }
+              // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
+              // managed entirely inside dispatchParallelReview — do not write here.
+              console.log(`[request-review] Parallel review dispatched for ${issueId}`);
             } else {
-              if (result.busy) {
-                console.log(
-                  `[request-review] Review specialist busy for ${issueId} — leaving pending for deacon retry`
-                );
-                setReviewStatus(issueId, { reviewStatus: 'pending' });
-              } else {
-                const errorMsg = result.error || 'Failed to dispatch review specialist';
-                console.error(
-                  `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${errorMsg}`
-                );
-                setReviewStatus(issueId, {
-                  reviewStatus: 'pending',
-                  mergeStatus: existingStatus.mergeStatus,
-                  readyForMerge: existingStatus.readyForMerge,
-                  reviewNotes: errorMsg,
-                });
-              }
+              const errorMsg = result.error || result.message || 'Failed to dispatch review';
+              console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
+              setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: errorMsg });
             }
           } catch (error: any) {
             console.error(`[request-review] Error:`, error);
             setReviewStatus(issueId, {
               reviewStatus: 'pending',
-              mergeStatus: existingStatus.mergeStatus,
-              readyForMerge: existingStatus.readyForMerge,
               reviewNotes: error.message || 'Unknown error',
             });
           }
@@ -2831,9 +2796,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     );
 
     try {
-      const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import(
-        '../../../lib/cloister/specialists.js'
-      ));
       const resolved = resolveProjectFromIssue(issueId);
 
       if (!resolved) {
@@ -2847,15 +2809,18 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         );
       }
 
-      const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-        issueId,
-        workspace: workspacePath,
-        branch: branchName,
-      }));
+      const result = yield* Effect.promise(async () => {
+        const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+        return dispatchParallelReview({
+          issueId,
+          workspace: workspacePath,
+          branch: branchName,
+        });
+      });
 
       if (result.success) {
-        console.log(`[request-review] Spawned review specialist for ${issueId}`);
-        // PAN-511: set 'reviewing' only after specialist is successfully dispatched
+        console.log(`[request-review] Parallel review dispatched for ${issueId}`);
+        // PAN-511: set 'reviewing' only after dispatch succeeds
         setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
@@ -2869,32 +2834,18 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           autoRequeueCount: newCount,
           remainingRequeues: MAX_AUTO_REQUEUE - newCount,
         });
-      } else if (result.error === 'specialist_busy') {
-        console.log(
-          `[request-review] Review specialist busy for ${issueId} — leaving pending for deacon retry`
-        );
-        // Keep reviewStatus as 'pending' — deacon orphan recovery will re-dispatch
-        return jsonResponse(
-          {
-            success: false,
-            error: 'Review specialist busy — will retry automatically',
-            retryable: true,
-            autoRequeueCount: newCount,
-          },
-          { status: 409 }
-        );
       } else {
         console.warn(
-          `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${result.error}`
+          `[request-review] Dispatch failed for ${issueId}: ${result.error}`
         );
         setReviewStatus(issueId, {
-          reviewStatus: 'dispatch_failed',
+          reviewStatus: 'pending',
           reviewNotes: `Dispatch failed: ${result.error || result.message}`,
         });
         return jsonResponse(
           {
             success: false,
-            error: result.error || 'Failed to spawn review specialist',
+            error: result.error || 'Failed to dispatch review',
             autoRequeueCount: newCount,
           },
           { status: 500 }
@@ -2903,7 +2854,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     } catch (error: any) {
       console.error(`[request-review] Error:`, error);
       setReviewStatus(issueId, {
-        reviewStatus: 'dispatch_failed',
+        reviewStatus: 'pending',
         reviewNotes: `Dispatch error: ${error.message}`,
       });
       return jsonResponse(
@@ -2975,9 +2926,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     if (rerun) {
       try {
         yield* Effect.promise(async () => {
-          const {
-            spawnEphemeralSpecialist,
-          } = await import('../../../lib/cloister/specialists.js');
+          const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
           const resolved = resolveProjectFromIssue(issueId);
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -2987,7 +2936,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               wsInfo.localPath ||
               join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
 
-            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+            const result = await dispatchParallelReview({
               issueId,
               workspace: wsPath,
               branch: branchName,
@@ -2997,10 +2946,6 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             if (result.success) {
               setReviewStatus(issueId, { reviewStatus: 'reviewing' });
               console.log(`[reset-review] Re-dispatched review for ${issueId}`);
-            } else if (result.error === 'specialist_busy') {
-              // Specialist is busy — set pending so deacon retries on next patrol
-              setReviewStatus(issueId, { reviewStatus: 'pending' });
-              console.log(`[reset-review] Review specialist busy for ${issueId} — deacon will retry`);
             } else {
               console.warn(
                 `[reset-review] Re-dispatch failed for ${issueId}: ${result.message || result.error}`

@@ -20,6 +20,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minima
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Anthropic models
+  'claude-opus-4-7': 'anthropic',
   'claude-opus-4-6': 'anthropic',
   'claude-sonnet-4-6': 'anthropic',
   'claude-sonnet-4-5': 'anthropic',
@@ -52,6 +53,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Kimi models
   'kimi-k2.5': 'kimi',
+  'kimi-k2': 'kimi',
   'K2.6-code-preview': 'kimi',
 
   // MiniMax models
@@ -60,6 +62,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Z.AI models
   'glm-5.1': 'zai',
+  'glm-4.7': 'zai',
+  'glm-4.7-flash': 'zai',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -81,12 +85,13 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
   'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
-  // Deprecated OpenAI IDs — explicit mappings preserve semantic intent
-  // (gpt-4o was flagship-tier, so → Sonnet; gpt-4o-mini was economy → Haiku)
+  // Retired OpenAI IDs — mappings preserve semantic tier intent
   'gpt-5.2-codex': 'claude-sonnet-4-6',
   'o3-deep-research': 'claude-sonnet-4-6',
-  'gpt-4o': 'claude-sonnet-4-6',
-  'gpt-4o-mini': 'claude-haiku-4-5',
+  // Active OpenAI API names — NOT deprecated. Included here so configs using these
+  // IDs still fall back correctly if the OpenAI provider is disabled.
+  'gpt-4o': 'claude-sonnet-4-6', // flagship-tier → Sonnet
+  'gpt-4o-mini': 'claude-haiku-4-5', // economy-tier → Haiku
 
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
@@ -100,11 +105,20 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Kimi → Anthropic
   'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
+  'kimi-k2': 'claude-sonnet-4-6', // Previous gen
   'K2.6-code-preview': 'claude-sonnet-4-6',
 
   // MiniMax → Anthropic
   'minimax-m2.7': 'claude-sonnet-4-6', // Near-Opus performance → Sonnet
   'minimax-m2.7-highspeed': 'claude-sonnet-4-6', // Same quality, faster → Sonnet
+
+  // Z.AI → Anthropic
+  'glm-5.1': 'claude-sonnet-4-6', // Current GLM flagship → Sonnet
+  // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of
+  // MODEL_DEPRECATIONS resolution order (both resolve glm-4.7→glm-5.1 then FALLBACK_MAP,
+  // and direct FALLBACK_MAP lookup; explicit entries make the result deterministic).
+  'glm-4.7': 'claude-sonnet-4-6', // strong-tier → Sonnet
+  'glm-4.7-flash': 'claude-haiku-4-5', // economy-tier → Haiku
 };
 
 /**
@@ -191,9 +205,6 @@ export function isProviderEnabled(
   provider: ModelProvider,
   enabledProviders: Set<ModelProvider>
 ): boolean {
-  // Anthropic is always enabled (required)
-  if (provider === 'anthropic') return true;
-
   return enabledProviders.has(provider);
 }
 
@@ -241,13 +252,20 @@ export function applyTierAwareFallback(
 ): ModelId {
   const provider = getModelProvider(modelId);
 
-  // Case 1: Provider disabled — use Anthropic equivalent
+  // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {
     const fallback = getFallbackModel(modelId);
+    if (isProviderEnabled('anthropic', enabledProviders)) {
+      console.warn(
+        `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
+      );
+      return fallback;
+    }
+    // Anthropic is also disabled — return original model and warn; caller must handle
     console.warn(
-      `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
+      `Model ${modelId} requires ${provider} API key which is not configured, and Anthropic is also disabled — keeping original model`
     );
-    return fallback;
+    return modelId;
   }
 
   // Case 2: API key auth (userTier undefined) — no tier restriction
@@ -281,12 +299,19 @@ export function applyTierAwareFallback(
     return downgraded;
   }
 
-  // Case 5: No same-tier model available — fall back to Anthropic equivalent
-  const fallback = getBestAnthropicAtTier(userTier, modelId);
+  // Case 5: No same-tier model available — fall back to Anthropic equivalent if available
+  if (isProviderEnabled('anthropic', enabledProviders)) {
+    const fallback = getBestAnthropicAtTier(userTier, modelId);
+    console.warn(
+      `No ${provider} model available at tier ${userTier}, falling back to ${fallback}`
+    );
+    return fallback;
+  }
+  // Anthropic is also disabled — return original model and warn; caller must handle
   console.warn(
-    `No ${provider} model available at tier ${userTier}, falling back to ${fallback}`
+    `No ${provider} model available at tier ${userTier}, and Anthropic is also disabled — keeping original model`
   );
-  return fallback;
+  return modelId;
 }
 
 /**

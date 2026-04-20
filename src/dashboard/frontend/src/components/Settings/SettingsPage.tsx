@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -39,7 +39,9 @@ import {
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { OpenRouterPage } from './OpenRouterPage';
+import { DesktopSettingsSection } from './DesktopSettingsSection';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -50,7 +52,7 @@ import {
   MODELS_BY_PROVIDER,
   OpenRouterFavoriteModel,
 } from './AgentCards/ModelOverrideModal';
-import { FALLBACK_DEFAULT_MODEL, getEffectiveModelId } from './modelDefaults';
+import { getEffectiveModelId } from './modelDefaults';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -92,28 +94,6 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
-interface ClaudeAuthStatus {
-  installed: boolean;
-  loggedIn: boolean;
-  expired: boolean;
-  subscriptionType: string | null;
-  rateLimitTier: string | null;
-  expiresAt: number | null;
-  hasAnthropicApiKey: boolean;
-}
-
-interface OpenAIAuthStatus {
-  installed: boolean;
-  loggedIn: boolean;
-  expired: boolean;
-  authMode: string | null;
-  accountId: string | null;
-  lastRefresh: string | null;
-  accessTokenExpiresAt: number | null;
-  hasOpenAIApiKey: boolean;
-  bridgedFromCodex: boolean;
-}
-
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   const res = await fetch('/api/settings', {
     method: 'PUT',
@@ -133,16 +113,29 @@ async function fetchOptimalDefaults(): Promise<SettingsConfig> {
   return res.json();
 }
 
-async function fetchClaudeAuthStatus(): Promise<ClaudeAuthStatus> {
-  const res = await fetch('/api/settings/claude-auth');
-  if (!res.ok) throw new Error('Failed to fetch Claude auth status');
+async function fetchMiniMaxDefaults(): Promise<SettingsConfig> {
+  const res = await fetch('/api/settings/minimax-defaults');
+  if (!res.ok) throw new Error('Failed to fetch MiniMax defaults');
   return res.json();
 }
 
-async function fetchOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
-  const res = await fetch('/api/settings/openai-auth');
-  if (!res.ok) throw new Error('Failed to fetch OpenAI auth status');
-  return res.json();
+/** Pure merge: apply MiniMax model preset while preserving all non-model settings. */
+export function buildMiniMaxFormData(
+  formData: SettingsConfig | null,
+  miniMaxDefaults: SettingsConfig,
+): SettingsConfig {
+  return {
+    models: {
+      providers: { ...miniMaxDefaults.models.providers },
+      overrides: { ...miniMaxDefaults.models.overrides },
+      gemini_thinking_level: formData?.models.gemini_thinking_level,
+    },
+    api_keys: { ...(formData?.api_keys || {}) },
+    tracker_keys: { ...(formData?.tracker_keys || {}) },
+    conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
+    tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
+    openrouter: { ...(formData?.openrouter || miniMaxDefaults.openrouter || {}) },
+  };
 }
 
 interface TestApiKeyResult {
@@ -163,21 +156,14 @@ async function testApiKey(provider: string, apiKey: string, model?: string): Pro
   return res.json();
 }
 
-function formatAuthTimestamp(value?: number | string | null): string | null {
-  if (!value) return null;
-  const date = typeof value === 'number' ? new Date(value) : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString();
-}
-
 // Provider definitions
 const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[] = [
   { id: 'anthropic', name: 'Anthropic', icon: Code, placeholder: 'sk-ant-...' },
   { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
   { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
   { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'minimax', name: 'MiniMax', icon: Brain, placeholder: 'minimax-...' },
-  { id: 'zai', name: 'Z.AI', icon: Brain, placeholder: '... or $ZAI_API_KEY' },
+  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
 ];
 
 // Tracker definitions
@@ -217,13 +203,14 @@ const AGENT_CATEGORIES: AgentCategory[] = [
     ],
   },
   {
-    name: 'Convoy Reviewers',
+    name: 'Review Agents',
     icon: SplitSquareVertical,
     agents: [
-      { id: 'convoy:security-reviewer' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
-      { id: 'convoy:performance-reviewer' as WorkTypeId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
-      { id: 'convoy:correctness-reviewer' as WorkTypeId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
-      { id: 'convoy:synthesis-agent' as WorkTypeId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
+      { id: 'review:security' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
+      { id: 'review:performance' as WorkTypeId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
+      { id: 'review:correctness' as WorkTypeId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
+      { id: 'review:requirements' as WorkTypeId, name: 'Requirements', icon: ClipboardList, description: 'Requirements coverage vs issue + vBRIEF', implemented: true },
+      { id: 'review:synthesis' as WorkTypeId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
     ],
   },
   {
@@ -260,44 +247,25 @@ const AGENT_CATEGORIES: AgentCategory[] = [
   },
 ];
 
-// Section navigation definitions
-const SETTINGS_SECTIONS = [
-  { id: 'smart-selection', label: 'Smart Selection', icon: Route },
-  { id: 'providers', label: 'Providers', icon: Key },
-  { id: 'openrouter', label: 'OpenRouter', icon: Globe },
-  { id: 'conversations', label: 'Conversations', icon: MessageCircle },
-  { id: 'tmux', label: 'Terminal', icon: Terminal },
-  { id: 'trackers', label: 'Tracker Keys', icon: GitBranch },
-  { id: 'model-assignments', label: 'Model Assignments', icon: Brain },
-  { id: 'maintenance', label: 'Maintenance', icon: Settings },
-] as const;
 
 function getModelDisplay(modelId?: string): string {
   if (!modelId) return 'Default';
   const model = getModelById(modelId as ModelId);
   if (model) return model.name;
   // Fallback for unknown models
-  const id = modelId.toLowerCase();
-  if (id.includes('claude')) return id.includes('opus') ? 'Claude Opus 4.6' : id.includes('haiku') ? 'Claude Haiku 4.5' : 'Claude Sonnet 4.6';
-  if (id.includes('gpt-5.4-pro')) return 'GPT-5.4 Pro';
-  if (id.includes('gpt-5.4') && id.includes('mini')) return 'GPT-5.4 Mini';
-  if (id.includes('gpt-5.4') && id.includes('nano')) return 'GPT-5.4 Nano';
-  if (id.includes('gpt-5.4') || id.includes('gpt-5.2-codex')) return 'GPT-5.4';
-  if (id.includes('gpt-4o-mini')) return 'GPT-5.4 Nano';
-  if (id.includes('gpt-4o')) return 'GPT-5.4 Mini';
-  if (id.includes('o4') && id.includes('mini')) return 'O4 Mini';
-  if (id.includes('o3')) return 'O3';
-  if (id.includes('gemini') && id.includes('lite')) return 'Gemini 3.1 Flash Lite';
-  if (id.includes('gemini') && id.includes('flash')) return 'Gemini 3 Flash';
-  if (id.includes('gemini')) return 'Gemini 3.1 Pro';
-  if (id.includes('kimi')) return 'Kimi K2.5';
-  if (id.includes('glm')) return 'GLM 5.1';
-  return modelId === FALLBACK_DEFAULT_MODEL ? 'Claude Sonnet 4.6' : modelId;
+  if (modelId.includes('claude')) return modelId.includes('opus') ? 'Opus 4.6' : modelId.includes('haiku') ? 'Haiku' : 'Sonnet 4.5';
+  if (modelId.includes('gpt')) return 'GPT-4o';
+  if (modelId.includes('gemini')) return modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
+  if (modelId.includes('kimi')) return modelId.includes('k2.5') || modelId.includes('2.5') ? 'Kimi K2.5' : 'Kimi K2';
+  if (modelId.includes('glm')) return 'GLM-4';
+  if (modelId.includes('minimax')) return modelId.includes('highspeed') ? 'M2.7 HS' : 'M2.7';
+  return modelId;
 }
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
+  const { prefs: uiPrefs, update: updateUIPrefs } = useUIPreferences();
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -314,71 +282,27 @@ export function SettingsPage() {
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
-  const [activeSection, setActiveSection] = useState<string>('smart-selection');
-  const [claudeAuth, setClaudeAuth] = useState<ClaudeAuthStatus | null>(null);
-  const [openaiAuth, setOpenAIAuth] = useState<OpenAIAuthStatus | null>(null);
+  const [claudeAuth, setClaudeAuth] = useState<{
+    installed: boolean;
+    loggedIn: boolean;
+    expired: boolean;
+    subscriptionType: string | null;
+    rateLimitTier: string | null;
+    expiresAt: number | null;
+    hasAnthropicApiKey: boolean;
+  } | null>(null);
   const [refreshingAuth, setRefreshingAuth] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
 
-  const refreshProviderAuth = useCallback(async () => {
+  const fetchClaudeAuth = async () => {
     setRefreshingAuth(true);
     try {
-      const [claudeStatus, openaiStatus] = await Promise.all([
-        fetchClaudeAuthStatus(),
-        fetchOpenAIAuthStatus(),
-      ]);
-      setClaudeAuth(claudeStatus);
-      setOpenAIAuth(openaiStatus);
-    } catch (err) {
-      console.error('Failed to refresh provider auth status:', err);
-      toast.error('Failed to refresh provider login status');
-    } finally {
-      setRefreshingAuth(false);
-    }
-  }, []);
+      const res = await fetch('/api/settings/claude-auth');
+      if (res.ok) setClaudeAuth(await res.json());
+    } catch { /* ignore */ }
+    finally { setRefreshingAuth(false); }
+  };
 
-  // Track active section based on scroll position
-  // The settings page lives inside an overflow-auto container, not the window
-  useEffect(() => {
-    const scrollContainer = contentRef.current?.closest('.overflow-auto') as HTMLElement | null;
-    if (!scrollContainer) return;
-
-    const handleScroll = () => {
-      const sectionIds = SETTINGS_SECTIONS.map(s => s.id);
-      let current = sectionIds[0];
-      const containerRect = scrollContainer.getBoundingClientRect();
-      for (const id of sectionIds) {
-        const el = document.getElementById(id);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          // Section is "active" when its top has scrolled past the top of the container + offset
-          if (rect.top <= containerRect.top + 120) {
-            current = id;
-          }
-        }
-      }
-      setActiveSection(current);
-    };
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-    return () => scrollContainer.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollToSection = useCallback((sectionId: string) => {
-    const el = document.getElementById(sectionId);
-    const scrollContainer = contentRef.current?.closest('.overflow-auto') as HTMLElement | null;
-    if (el && scrollContainer) {
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      scrollContainer.scrollTo({
-        top: scrollContainer.scrollTop + elRect.top - containerRect.top - 16,
-        behavior: 'smooth',
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshProviderAuth();
-  }, [refreshProviderAuth]);
+  useEffect(() => { void fetchClaudeAuth(); }, []);
 
   useEffect(() => {
     fetchOpenRouterCatalog().then(setOrCatalog);
@@ -437,7 +361,7 @@ export function SettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -445,7 +369,7 @@ export function SettingsPage() {
   if (error || !formData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-400">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
+        <div className="text-destructive">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
       </div>
     );
   }
@@ -453,7 +377,6 @@ export function SettingsPage() {
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
 
   const handleProviderToggle = (provider: Provider) => {
-    if (provider === 'anthropic') return;
     setFormData({
       ...formData,
       models: {
@@ -475,16 +398,6 @@ export function SettingsPage() {
         [provider]: key || undefined,
       },
     });
-  };
-
-  const handleOpenRouterKeySaved = (key: string) => {
-    setFormData((current) => current ? {
-      ...current,
-      api_keys: {
-        ...current.api_keys,
-        openrouter: key || undefined,
-      },
-    } : current);
   };
 
   const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
@@ -536,6 +449,7 @@ export function SettingsPage() {
       },
     });
   };
+
 
   const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
     setFormData({
@@ -589,6 +503,16 @@ export function SettingsPage() {
     }
   };
 
+  const handleRestoreMiniMaxDefaults = async () => {
+    try {
+      const miniMaxDefaults = await fetchMiniMaxDefaults();
+      setFormData(buildMiniMaxFormData(formData, miniMaxDefaults));
+    } catch (error) {
+      console.error('Failed to fetch MiniMax defaults:', error);
+      showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });
+    }
+  };
+
   const handleTestApiKey = async (provider: Provider) => {
     const apiKey = formData?.api_keys[provider as keyof typeof formData.api_keys];
     if (!apiKey) return;
@@ -631,47 +555,97 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-8 pb-32">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Settings className="w-8 h-8 text-blue-400" />
-            <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
+    <div>
+      {/* Sticky action bar */}
+      <div className="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm border-b border-divider shadow-sm">
+        <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex items-center justify-between py-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-primary" />
+            <h1 className="text-content text-lg font-black tracking-tight">Settings</h1>
           </div>
-          <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
+          <div className="flex items-center gap-3">
+            {saveMutation.isSuccess && (
+              <span className="flex items-center gap-1.5 text-success text-sm">
+                <CheckCircle className="w-4 h-4" />
+                Saved!
+              </span>
+            )}
+            {saveMutation.isError && (
+              <span className="flex items-center gap-1.5 text-destructive text-sm">
+                <AlertTriangle className="w-4 h-4" />
+                Save failed
+              </span>
+            )}
+            <button
+              onClick={handleRestoreOptimalDefaults}
+              className="px-3 py-1.5 text-warning hover:text-warning/80 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              title="Set all model assignments to research-based optimal defaults (Anthropic + Kimi)"
+            >
+              <Zap className="w-4 h-4" />
+              Optimal Defaults
+            </button>
+            <button
+              onClick={handleRestoreMiniMaxDefaults}
+              className="px-3 py-1.5 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
+              title="Set all model assignments to MiniMax M2.7 (lowest cost)"
+            >
+              <Zap className="w-4 h-4" />
+              MiniMax Defaults
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={!hasChanges}
+              className="px-3 py-1.5 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-40"
+            >
+              Undo
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saveMutation.isPending}
+              className="px-5 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-lg transition-all shadow-md shadow-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Changes
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-8">
-      {/* Main content */}
-      <div className="flex-1 min-w-0" ref={contentRef}>
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
+      {/* Page Header */}
+      <div className="flex flex-col gap-1 mb-8">
+        <div className="flex items-center gap-2 mb-1">
+          <Settings className="w-8 h-8 text-primary" />
+          <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
+        </div>
+        <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
+      </div>
 
       {/* Deprecation Warning Banner */}
       {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-6">
+        <div className="badge-bg-warning border badge-border-warning rounded-xl px-4 py-3 mb-6">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <AlertTriangle className="w-6 h-6 text-warning shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-amber-400 font-semibold mb-2">
+              <p className="text-warning font-semibold mb-2">
                 Deprecated Model IDs Detected
               </p>
               <div className="space-y-1">
                 {formData.deprecation_warnings.map((warning, idx) => (
-                  <p key={idx} className="text-amber-400/90 text-sm">
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">{warning.workType}</span>
+                  <p key={idx} className="text-warning/90 text-sm">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded">{warning.workType}</span>
                     {': '}
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded line-through">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded line-through">
                       {warning.from}
                     </span>
                     {' → '}
-                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs badge-bg-warning px-1.5 py-0.5 rounded">
                       {warning.to}
                     </span>
                   </p>
                 ))}
               </div>
-              <p className="text-amber-400/80 text-xs mt-3">
+              <p className="text-warning/80 text-xs mt-3">
                 Click <span className="font-semibold">Save</span> to automatically migrate to current model IDs. A backup will be created before migration.
               </p>
             </div>
@@ -679,8 +653,9 @@ export function SettingsPage() {
         </div>
       )}
 
+
       {/* Smart Model Selection Hero */}
-      <section id="smart-selection" className="mb-10 scroll-mt-4">
+      <section className="mb-10">
         <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
           <div className="flex flex-col lg:flex-row">
             {/* Visualization */}
@@ -691,12 +666,12 @@ export function SettingsPage() {
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
                     <Terminal className="w-5 h-5 text-content-subtle" />
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-blue-500 to-divider-strong mx-2" />
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-primary to-divider-strong mx-2" />
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <User className="w-5 h-5 text-blue-400" />
+                    <User className="w-5 h-5 text-primary" />
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-blue-500 to-divider mx-2" />
-                  <div className="size-12 rounded-lg bg-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-primary to-divider mx-2" />
+                  <div className="size-12 rounded-lg bg-primary flex items-center justify-center shadow-lg">
                     <Zap className="w-5 h-5 text-content" />
                   </div>
                 </div>
@@ -710,7 +685,7 @@ export function SettingsPage() {
             {/* Content */}
             <div className="lg:w-3/5 p-8">
               <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider rounded border border-blue-500/20">Active</span>
+                <span className="px-2 py-0.5 badge-bg-primary text-primary text-[10px] font-bold uppercase tracking-wider rounded border badge-border-primary">Active</span>
                 <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
               </div>
               <p className="text-content-muted mb-6 leading-relaxed">
@@ -718,14 +693,14 @@ export function SettingsPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
+                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Capability Matching</p>
                     <p className="text-xs text-content-muted">Best model for each task type</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
+                  <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Cost Optimization</p>
                     <p className="text-xs text-content-muted">Balance performance vs spend</p>
@@ -737,140 +712,92 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Provider Logins + Configuration */}
-      <section id="providers" className="mb-12 scroll-mt-4">
-        <div className="flex items-center gap-3 mb-6">
-          <h2 className="text-content text-2xl font-bold">Provider Logins</h2>
+      {/* Claude Code Authentication */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          Claude Code
           <div className="h-px flex-1 bg-divider-strong" />
-          <button
-            onClick={() => void refreshProviderAuth()}
-            disabled={refreshingAuth}
-            className="shrink-0 p-2 rounded-lg border border-divider hover:border-divider-strong text-content-muted hover:text-content transition-colors disabled:opacity-50"
-            title="Refresh provider login status"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshingAuth ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-          <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
+        </h2>
+        <div className="bg-surface-raised border border-divider rounded-xl p-6 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
-              <div className={`mt-1 size-3 rounded-full shrink-0 ${
-                claudeAuth?.loggedIn ? 'bg-emerald-400' :
-                claudeAuth?.installed ? 'bg-amber-400' :
-                'bg-surface-emphasis'
+              {/* Status dot */}
+              <div className={`mt-1 w-3 h-3 rounded-full shrink-0 ${
+                claudeAuth?.loggedIn ? 'bg-success' :
+                claudeAuth?.expired ? 'bg-warning' :
+                claudeAuth?.installed ? 'bg-destructive' :
+                'bg-muted-foreground'
               }`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-content font-bold">Claude Code Login</h3>
-                  {claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
-                    <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
-                      {claudeAuth.subscriptionType.toUpperCase()}
-                    </span>
-                  )}
-                </div>
+              <div>
                 {claudeAuth === null ? (
-                  <p className="text-content-muted text-sm mt-2">Checking local Claude auth…</p>
+                  <p className="text-content-body text-sm">Checking authentication status…</p>
                 ) : !claudeAuth.installed ? (
-                  <p className="text-content-muted text-sm mt-2">
-                    Claude Code is not installed on this machine.
-                  </p>
+                  <>
+                    <p className="text-content font-semibold">Claude Code not detected</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      Install Claude Code to use subscription-based authentication.
+                    </p>
+                  </>
                 ) : claudeAuth.loggedIn ? (
                   <>
-                    <p className="text-content-body text-sm mt-2">
-                      Local Claude subscription login detected.
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-content font-semibold">Logged in</p>
+                      {claudeAuth.subscriptionType && (
+                        <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+                          {claudeAuth.subscriptionType.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
                     {claudeAuth.rateLimitTier && (
                       <p className="text-content-muted text-xs mt-1">
-                        Rate tier: <code className="font-mono">{claudeAuth.rateLimitTier}</code>
-                      </p>
-                    )}
-                    {formatAuthTimestamp(claudeAuth.expiresAt) && (
-                      <p className="text-content-muted text-xs mt-1">
-                        Token expiry: {formatAuthTimestamp(claudeAuth.expiresAt)}
+                        Rate tier: <code className="font-mono text-content-subtle">{claudeAuth.rateLimitTier}</code>
                       </p>
                     )}
                     {claudeAuth.hasAnthropicApiKey && (
-                      <p className="text-amber-400 text-xs mt-2 flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        <span><code className="font-mono">ANTHROPIC_API_KEY</code> is also set and can override subscription auth for direct Anthropic calls.</span>
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                        <p className="text-warning text-xs">
+                          <code className="font-mono">ANTHROPIC_API_KEY</code> is set — this overrides subscription auth for direct API calls
+                        </p>
+                      </div>
                     )}
                   </>
-                ) : (
-                  <p className="text-content-muted text-sm mt-2">
-                    No active Claude Code login detected.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className={`mt-1 size-3 rounded-full shrink-0 ${
-                openaiAuth?.loggedIn ? 'bg-emerald-400' :
-                openaiAuth?.installed ? 'bg-amber-400' :
-                'bg-surface-emphasis'
-              }`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-content font-bold">OpenAI / Codex Login</h3>
-                  {openaiAuth?.loggedIn && (
-                    <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
-                      ChatGPT OAuth
-                    </span>
-                  )}
-                </div>
-                {openaiAuth === null ? (
-                  <p className="text-content-muted text-sm mt-2">Checking local Codex auth…</p>
-                ) : !openaiAuth.installed ? (
-                  <p className="text-content-muted text-sm mt-2">
-                    Codex is not installed or initialized on this machine.
-                  </p>
-                ) : openaiAuth.loggedIn ? (
+                ) : claudeAuth.expired ? (
                   <>
-                    <p className="text-content-body text-sm mt-2">
-                      Local Codex/ChatGPT login detected. GPT work agents route through the local CLIProxyAPI sidecar using your ChatGPT subscription — no API key required.
+                    <p className="text-content font-semibold text-warning">Session expired</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      Your Claude Code session has expired. Run <code className="font-mono bg-surface-overlay px-1 rounded">claude</code> in the terminal and use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code> to re-authenticate.
                     </p>
-                    {openaiAuth.bridgedFromCodex && (
-                      <p className="text-content-muted text-xs mt-2">
-                        Panopticon synced the local Codex login into the CLIProxyAPI sidecar&apos;s credential store so GPT models can launch correctly.
-                      </p>
-                    )}
-                    {openaiAuth.accountId && (
-                      <p className="text-content-muted text-xs mt-1">
-                        Account: <code className="font-mono">{openaiAuth.accountId}</code>
-                      </p>
-                    )}
-                    {formatAuthTimestamp(openaiAuth.lastRefresh) && (
-                      <p className="text-content-muted text-xs mt-1">
-                        Last refresh: {formatAuthTimestamp(openaiAuth.lastRefresh)}
-                      </p>
-                    )}
-                    {openaiAuth.expired && (
-                      <p className="text-amber-400 text-xs mt-2 flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        <span>The cached access token is stale, but Codex may still refresh it automatically on next use.</span>
-                      </p>
-                    )}
-                    {openaiAuth.hasOpenAIApiKey && (
-                      <p className="text-blue-300 text-xs mt-2 flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>An OpenAI API key is also configured for direct key-based tools, but GPT agent launches stay on the local subscription login while it is active.</span>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-content font-semibold">Not logged in</p>
+                    <p className="text-content-muted text-sm mt-1">
+                      No active subscription session. To log in, type <code className="font-mono bg-surface-overlay px-1 rounded">! claude</code> in the command bar, then use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code>.
+                    </p>
+                    {claudeAuth.hasAnthropicApiKey && (
+                      <p className="text-content-subtle text-xs mt-2">
+                        Falling back to <code className="font-mono">ANTHROPIC_API_KEY</code> for Anthropic models.
                       </p>
                     )}
                   </>
-                ) : (
-                  <p className="text-content-muted text-sm mt-2">
-                    No local Codex/ChatGPT login detected. Without that login, GPT models fall back to API-key auth.
-                  </p>
                 )}
               </div>
             </div>
+            <button
+              onClick={() => void fetchClaudeAuth()}
+              disabled={refreshingAuth}
+              className="shrink-0 p-2 rounded-lg border border-divider hover:border-divider-strong text-content-muted hover:text-content transition-colors disabled:opacity-50"
+              title="Refresh auth status"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshingAuth ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
+      </section>
 
+      {/* Provider Configuration */}
+      <section className="mb-12">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Provider Configuration
           <div className="h-px flex-1 bg-divider-strong" />
@@ -878,27 +805,21 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PROVIDERS.map((provider) => {
             const isDefault = provider.id === 'anthropic';
-            const isEnabled = isDefault || formData.models.providers[provider.id];
+            const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
-            const isEnvVarRef = apiKey.startsWith('$');
-            const hasConfiguredValue = !!apiKey;
-            const hasDirectApiKey = hasConfiguredValue && !isEnvVarRef;
-            const canViewModels = provider.id === 'openai'
-              ? hasConfiguredValue || !!openaiAuth?.loggedIn
-              : hasDirectApiKey;
 
             return (
               <div
                 key={provider.id}
                 className={`bg-surface-raised border rounded-xl p-5 relative transition-colors shadow-sm ${
                   isDefault
-                    ? 'border-blue-500/50 shadow-lg shadow-blue-500/5'
+                    ? 'border-primary/50 shadow-lg shadow-primary/5'
                     : 'border-divider hover:border-divider-strong'
                 }`}
               >
                 {isDefault && (
                   <div className="absolute -top-3 right-4">
-                    <span className="bg-blue-500 text-content text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
+                    <span className="bg-primary text-primary-foreground text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
                       Default
                     </span>
                   </div>
@@ -908,18 +829,18 @@ export function SettingsPage() {
                     <provider.icon className="w-5 h-5 text-content-subtle" />
                   </div>
                   <span className="font-bold text-content">{provider.name}</span>
+                  {/* Subscription badge in the Anthropic card header */}
                   {isDefault && claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
-                    <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                    <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
                       {claudeAuth.subscriptionType.toUpperCase()}
                     </span>
                   )}
                   <div className="ml-auto">
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
-                      disabled={isDefault}
                       className={`w-10 h-5 rounded-full relative transition-colors ${
-                        isEnabled ? 'bg-blue-500' : 'bg-surface-emphasis'
-                      } ${isDefault ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        isEnabled ? 'bg-primary' : 'bg-surface-emphasis'
+                      } cursor-pointer`}
                     >
                       <div
                         className={`absolute top-0.5 size-4 bg-white rounded-full transition-all ${
@@ -930,61 +851,47 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {isDefault ? (
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
-                      {claudeAuth?.loggedIn ? (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span className="text-xs text-emerald-300 font-medium">
-                            Using Claude Code subscription login
-                          </span>
-                        </div>
-                      ) : claudeAuth?.hasAnthropicApiKey ? (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                          <Key className="w-4 h-4 text-blue-400 shrink-0" />
-                          <span className="text-xs text-blue-300 font-medium">Using Anthropic API key from environment</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span className="text-xs text-amber-300">No Claude auth detected. See Provider Logins above.</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {provider.id === 'openai' && (
-                        <div>
-                          <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
-                          {openaiAuth?.loggedIn ? (
-                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                              <div className="min-w-0">
-                                <div className="text-xs text-emerald-300 font-medium">
-                                  Using Codex subscription login via CLIProxyAPI sidecar
-                                </div>
-                                {hasConfiguredValue && (
-                                  <div className="text-[11px] text-emerald-200/80 mt-0.5">
-                                    Any saved OpenAI API key is kept only as a fallback for direct key-based tools. GPT agent launches prefer the subscription login.
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
-                      <div className="relative">
-                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">
-                          {provider.id === 'openai' && openaiAuth?.loggedIn ? 'API Key Fallback (Optional)' : 'API Key'}
-                        </label>
-                        {isEnvVarRef ? (
-                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                            <div className="flex items-center gap-2 text-amber-400 text-xs">
+                  <div className="relative">
+                    {/* Anthropic: show authentication method rather than raw API key field */}
+                    {isDefault ? (
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
+                        {claudeAuth?.loggedIn ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                            <div className="w-2 h-2 rounded-full bg-success shrink-0" />
+                            <span className="text-xs text-success font-medium">
+                              Subscription{claudeAuth.subscriptionType ? ` — ${claudeAuth.subscriptionType.toUpperCase()} plan` : ''}
+                            </span>
+                          </div>
+                        ) : claudeAuth?.hasAnthropicApiKey ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <Key className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="text-xs text-primary font-medium">API Key (via env)</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20">
+                            <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                            <span className="text-xs text-warning">Not authenticated — see Claude Code section above</span>
+                          </div>
+                        )}
+                        {claudeAuth?.hasAnthropicApiKey && claudeAuth.loggedIn && (
+                          <p className="text-[10px] text-warning mt-1.5 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <code className="font-mono">ANTHROPIC_API_KEY</code> overrides subscription for direct API calls
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
+                        {/* Check if it's an unresolved env var reference */}
+                        {apiKey.startsWith('$') ? (
+                          <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 text-warning text-xs">
                               <AlertTriangle className="w-4 h-4" />
                               <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
                             </div>
-                            <p className="text-[10px] text-amber-400/70 mt-1">
+                            <p className="text-[10px] text-warning/70 mt-1">
                               Set this environment variable or enter the key directly below
                             </p>
                             <input
@@ -992,7 +899,7 @@ export function SettingsPage() {
                               placeholder={provider.placeholder}
                               onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                               autoComplete="off"
-                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                             />
                           </div>
                         ) : (
@@ -1009,36 +916,50 @@ export function SettingsPage() {
                               data-lpignore="true"
                               data-1p-ignore="true"
                               data-form-type="other"
-                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                              className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body ${apiKey ? 'pr-16' : 'pr-8'}`}
                             />
-                            <button
-                              onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                              className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
-                            >
-                              {showApiKey[provider.id] ? (
-                                <Eye className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4 opacity-50" />
-                              )}
-                            </button>
+                            {apiKey && (
+                              <button
+                                onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
+                                className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                                title={showApiKey[provider.id] ? 'Hide key' : 'Show key'}
+                              >
+                                {showApiKey[provider.id] ? (
+                                  <Eye className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4 opacity-50" />
+                                )}
+                              </button>
+                            )}
+                            {apiKey && (
+                              <button
+                                onClick={() => handleApiKeyChange(provider.id, '')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-destructive transition-colors"
+                                title="Delete API key"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         )}
-                      </div>
-                    </>
-                  )}
-
+                      </>
+                    )}
+                  </div>
+                  {/* Action Buttons */}
                   {!isDefault && (
                     <div className="flex flex-col gap-2">
-                      {canViewModels && (
+                      {/* Show Models Button - only if we have a real API key */}
+                      {apiKey && !apiKey.startsWith('$') && (
                         <button
                           onClick={() => setModelsModalProvider(provider.id)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-xs text-blue-400 transition-colors w-full"
+                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 badge-bg-primary hover:bg-primary/20 border badge-border-primary rounded-lg text-xs text-primary transition-colors w-full"
                         >
                           <BarChart3 className="w-3.5 h-3.5" />
                           View Models
                         </button>
                       )}
-                      {hasDirectApiKey && (
+                      {/* Test API Key Button - only if we have a real API key (not env var ref) */}
+                      {apiKey && !apiKey.startsWith('$') && (
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleTestApiKey(provider.id)}
@@ -1053,7 +974,7 @@ export function SettingsPage() {
                             Test 2+3
                           </button>
                           {testResults[provider.id] && (
-                            <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-green-400' : 'text-red-400'}`}>
+                            <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-success' : 'text-destructive'}`}>
                               {testResults[provider.id]?.success ? (
                                 <CheckCircle className="w-3.5 h-3.5" />
                               ) : (
@@ -1076,7 +997,7 @@ export function SettingsPage() {
       </section>
 
       {/* OpenRouter */}
-      <section id="openrouter" className="mb-12 scroll-mt-4">
+      <section className="mb-12">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           OpenRouter
           <div className="h-px flex-1 bg-divider-strong" />
@@ -1085,8 +1006,14 @@ export function SettingsPage() {
           apiKey={formData.api_keys.openrouter}
           enabled={!!formData.models.providers.openrouter}
           onApiKeyChange={(key) => handleApiKeyChange('openrouter', key)}
-          onApiKeySaved={handleOpenRouterKeySaved}
           onToggleEnabled={() => handleProviderToggle('openrouter')}
+          onApiKeySaved={(savedKey) => {
+            // OpenRouterPage already persisted the key — just sync local form state
+            setFormData(prev => prev ? {
+              ...prev,
+              api_keys: { ...prev.api_keys, openrouter: savedKey },
+            } : prev);
+          }}
         />
       </section>
 
@@ -1286,7 +1213,7 @@ export function SettingsPage() {
       </section>
 
       {/* Tracker API Keys */}
-      <section id="trackers" className="mb-12 scroll-mt-4">
+      <section className="mb-12">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Tracker API Keys
           <div className="h-px flex-1 bg-divider-strong" />
@@ -1316,8 +1243,8 @@ export function SettingsPage() {
                   <div className="relative">
                     <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key / Token</label>
                     {trackerKey.startsWith('$') ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
+                      <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 text-warning text-xs">
                           <AlertTriangle className="w-4 h-4" />
                           <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{trackerKey}</code></span>
                         </div>
@@ -1326,7 +1253,7 @@ export function SettingsPage() {
                           placeholder={tracker.placeholder}
                           onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
                           autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                       </div>
                     ) : (
@@ -1343,7 +1270,7 @@ export function SettingsPage() {
                           data-lpignore="true"
                           data-1p-ignore="true"
                           data-form-type="other"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
                         />
                         <button
                           onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
@@ -1421,36 +1348,36 @@ export function SettingsPage() {
                           ? 'opacity-50 bg-surface-emphasis border-divider cursor-not-allowed'
                           : `cursor-pointer ${
                             isDeprecated
-                              ? 'bg-amber-500/10 border-amber-500/50 hover:border-amber-500/70 hover:bg-amber-500/15'
+                              ? 'badge-bg-warning border-warning/50 hover:border-warning/70 hover:bg-warning/15'
                               : isGoodFit
-                                ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+                                ? 'badge-bg-success border-success/30 hover:border-success/50 hover:bg-success/10'
                                 : isOkFit
-                                  ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
-                                  : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
+                                  ? 'badge-bg-warning border-warning/30 hover:border-warning/50 hover:bg-warning/10'
+                                  : 'badge-bg-destructive border-destructive/30 hover:border-destructive/50 hover:bg-destructive/10'
                             }`
                       }`}
                     >
                       {isDeprecated && (
                         <div className="absolute top-1 right-1">
-                          <span className="bg-amber-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                          <span className="bg-warning text-foreground text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
                             DEPRECATED
                           </span>
                         </div>
                       )}
                       {!agent.implemented && (
                         <div className="absolute top-1 right-1">
-                          <span className="bg-gray-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                          <span className="bg-muted-foreground text-foreground text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
                             NOT YET IMPLEMENTED
                           </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between mb-2">
                         <agent.icon className={`w-4 h-4 ${
-                          isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                          isDeprecated ? 'text-warning' : isGoodFit ? 'text-success' : isOkFit ? 'text-warning' : 'text-destructive'
                         }`} />
                         {agent.implemented && (
                           <span className={`text-[9px] font-bold ${
-                            isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                            isDeprecated ? 'text-warning' : isGoodFit ? 'text-success' : isOkFit ? 'text-warning' : 'text-destructive'
                           }`}>
                             {Math.round(score * 100)}%
                           </span>
@@ -1469,8 +1396,8 @@ export function SettingsPage() {
                               title={`${CAPABILITY_INFO[cap].name}: ${hasIt ? 'Model has this' : 'Model missing this'}`}
                               className={`text-[8px] px-1 py-0.5 rounded ${
                                 hasIt
-                                  ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-rose-500/20 text-rose-400'
+                                  ? 'badge-bg-success text-success-foreground'
+                                  : 'badge-bg-destructive text-destructive-foreground'
                               }`}
                             >
                               {CAPABILITY_INFO[cap].name}
@@ -1487,8 +1414,39 @@ export function SettingsPage() {
         </div>
       </section>
 
+      {/* Appearance */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          <Eye className="w-6 h-6 text-primary" />
+          Appearance
+        </h2>
+        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div>
+              <h3 className="text-sm font-bold text-content flex items-center gap-2">
+                <GitMerge className="w-4 h-4 text-success" />
+                Ready to Merge shimmer
+              </h3>
+              <p className="text-xs text-content-muted mt-1">
+                Animate the "READY TO MERGE" badge with a subtle shimmer to draw attention to cards awaiting your merge approval.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={uiPrefs.readyToMergeShimmer}
+              onClick={() => updateUIPrefs({ readyToMergeShimmer: !uiPrefs.readyToMergeShimmer })}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${uiPrefs.readyToMergeShimmer ? 'bg-primary' : 'bg-input'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ${uiPrefs.readyToMergeShimmer ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Maintenance */}
-      <section id="maintenance" className="space-y-3 pb-20 scroll-mt-4">
+      <section className="space-y-3 pb-20">
         <h2 className="text-xl font-black text-content">Maintenance</h2>
         <div className="bg-surface-emphasis rounded-xl border border-divider p-5">
           <div className="flex items-center justify-between">
@@ -1516,7 +1474,7 @@ export function SettingsPage() {
                 }
               }}
               disabled={clearingCache}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-amber-500/50 hover:bg-amber-500/10 text-content-muted hover:text-amber-400 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-warning/50 hover:bg-warning/10 text-content-muted hover:text-warning transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {clearingCache ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
@@ -1524,79 +1482,9 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
-      </div>{/* end main content */}
 
-      {/* Section Sub-Navigation */}
-      <nav className="hidden xl:block w-44 shrink-0">
-        <div className="sticky top-8">
-          <p className="text-[10px] uppercase font-bold text-content-muted tracking-widest mb-3 px-2">On this page</p>
-          <div className="space-y-0.5">
-            {SETTINGS_SECTIONS.map((section) => {
-              const isActive = activeSection === section.id;
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => scrollToSection(section.id)}
-                  className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors ${
-                    isActive
-                      ? 'text-blue-400 bg-blue-500/10 font-semibold'
-                      : 'text-content-muted hover:text-content-body hover:bg-surface-emphasis'
-                  }`}
-                >
-                  <section.icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-400' : 'text-content-subtle'}`} />
-                  <span className="truncate">{section.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-      </div>{/* end flex container */}
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur-md border-t border-divider-strong shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-6 py-4 z-40">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-content-muted text-sm">
-            {saveMutation.isSuccess && (
-              <>
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                <span className="text-green-400">Settings saved!</span>
-              </>
-            )}
-            {saveMutation.isError && (
-              <>
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span className="text-red-400">Error saving settings</span>
-              </>
-            )}
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={handleRestoreOptimalDefaults}
-              className="px-6 py-2 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
-              title="Set all model assignments to research-based optimal defaults"
-            >
-              <Zap className="w-4 h-4" />
-              Optimal Defaults
-            </button>
-            <button
-              onClick={handleReset}
-              disabled={!hasChanges}
-              className="px-6 py-2 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-50"
-            >
-              Undo Changes
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!hasChanges || saveMutation.isPending}
-              className="px-8 py-2 bg-blue-500 hover:bg-blue-400 text-content font-black rounded-lg transition-all shadow-lg shadow-blue-500/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </footer>
+      </div>{/* end max-w content */}
 
       {/* Model Override Modal */}
       {modalWorkType && (
@@ -1623,7 +1511,7 @@ export function SettingsPage() {
               <div className="flex items-center gap-3">
                 {(() => {
                   const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
-                  return Icon ? <Icon className="w-5 h-5 text-blue-400" /> : null;
+                  return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
                 })()}
                 <h3 className="text-content text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
@@ -1642,9 +1530,8 @@ export function SettingsPage() {
               {(() => {
                 const providerApiKey = formData?.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
                 const isEnvVarRef = providerApiKey.startsWith('$');
-                const canUseSubscriptionLogin = modelsModalProvider === 'openai' && !!openaiAuth?.loggedIn;
 
-                if (!providerApiKey && !canUseSubscriptionLogin) {
+                if (!providerApiKey) {
                   return (
                     <div className="text-center py-8">
                       <Key className="w-10 h-10 text-content-muted mb-2 mx-auto" />
@@ -1656,8 +1543,8 @@ export function SettingsPage() {
                 if (isEnvVarRef) {
                   return (
                     <div className="text-center py-8">
-                      <AlertTriangle className="w-10 h-10 text-amber-500 mb-2 mx-auto" />
-                      <p className="text-amber-400">API key configured via environment variable</p>
+                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
+                      <p className="text-warning">API key configured via environment variable</p>
                       <p className="text-content-muted text-sm mt-1">
                         <code className="font-mono bg-surface-overlay px-1 rounded">{providerApiKey}</code> is not set
                       </p>
@@ -1668,18 +1555,10 @@ export function SettingsPage() {
 
                 return (
                   <div className="space-y-3">
-                  {canUseSubscriptionLogin && !providerApiKey && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
-                      <p className="text-emerald-300 text-xs">
-                        GPT agents use the local Codex subscription login. Model testing in this dialog still requires a direct API key.
-                      </p>
-                    </div>
-                  )}
                   {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
                     const testKey = `${modelsModalProvider}:${model.id}`;
                     const testResult = modelTestResults[testKey];
                     const isTesting = testingModel === testKey;
-                    const canTestModel = !!providerApiKey && !isEnvVarRef;
 
                     return (
                       <div
@@ -1696,9 +1575,9 @@ export function SettingsPage() {
                               <h4 className="text-content font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                  model.tier === 'premium' ? 'bg-purple-500/20 text-purple-400' :
-                                  model.tier === 'balanced' ? 'bg-blue-500/20 text-blue-400' :
-                                  'bg-emerald-500/20 text-emerald-400'
+                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
+                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
+                                  'badge-bg-success text-success-foreground'
                                 }`}>
                                   {model.tier}
                                 </span>
@@ -1721,8 +1600,8 @@ export function SettingsPage() {
                           <div className="flex flex-col items-end gap-2">
                             <button
                               onClick={() => handleTestModel(modelsModalProvider, model.id)}
-                              disabled={!canTestModel || isTesting}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              disabled={isTesting}
+                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
                             >
                               {isTesting ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -1732,7 +1611,7 @@ export function SettingsPage() {
                               Test 2+3
                             </button>
                             {testResult && (
-                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
                                 {testResult.success ? (
                                   <CheckCircle className="w-3.5 h-3.5" />
                                 ) : (
@@ -1762,6 +1641,9 @@ export function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Desktop App settings — shown only inside Electron */}
+      <DesktopSettingsSection />
     </div>
   );
 }
