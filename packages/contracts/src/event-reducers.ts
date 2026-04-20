@@ -324,7 +324,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       )
       const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
         if (issue['identifier'] === issueId || issue['id'] === issueId) {
-          return { ...issue, canonicalStatus: 'todo', state: 'todo' }
+          return { ...issue, status: 'Todo', canonicalStatus: 'todo', state: 'todo' }
         }
         return issue
       })
