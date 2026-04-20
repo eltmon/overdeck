@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listPaneValuesAsync, listSessionNamesAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listPaneValuesAsync, listSessionNamesAsync, waitForClaudePrompt } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -497,8 +497,10 @@ async function spawnReviewer(
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  // Wait for Claude to start
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  const ready = await waitForClaudePrompt(sessionName, 15000);
+  if (!ready) {
+    throw new Error(`Reviewer prompt did not appear: ${target}`);
+  }
 
   const prompt = await readFile(promptFile, 'utf-8');
   await sendKeysAsync(sessionName, prompt, 'spawnReviewer');
