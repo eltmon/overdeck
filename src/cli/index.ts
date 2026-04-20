@@ -68,7 +68,6 @@ import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } 
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
-import { registerConvoyCommands } from './commands/convoy/index.js';
 import { registerConversationsCommands } from './commands/conversations/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
@@ -441,12 +440,8 @@ registerReleaseCommands(program);
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
 
-// Register convoy commands (pan convoy start, status, list, stop)
-registerConvoyCommands(program);
-
 // Register conversations commands (pan conversations scan, search, list, show, cost, enrich)
 registerConversationsCommands(program);
-
 
 // Register install command
 registerInstallCommand(program);
