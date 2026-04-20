@@ -205,6 +205,96 @@ describe('getReviewStatusFromDb', () => {
   });
 });
 
+// ============== reviewedAtCommit / stuckAt / stuckDetails round-trip ==============
+
+describe('DB round-trip for fields used by deacon and the dashboard', () => {
+  it('persists reviewedAtCommit through upsert→get', () => {
+    const sha = 'abc1234def5678901234567890123456789012ab';
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-RAC-1',
+      reviewStatus: 'passed',
+      reviewedAtCommit: sha,
+    }));
+
+    const result = getReviewStatusFromDb('PAN-RAC-1');
+    expect(result).not.toBeNull();
+    expect(result!.reviewedAtCommit).toBe(sha);
+  });
+
+  it('overwrites reviewedAtCommit on update', () => {
+    const sha1 = 'aaaa1111000000000000000000000000000000aa';
+    const sha2 = 'bbbb2222000000000000000000000000000000bb';
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-RAC-2', reviewedAtCommit: sha1 }));
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-RAC-2', reviewedAtCommit: sha2 }));
+
+    const result = getReviewStatusFromDb('PAN-RAC-2');
+    expect(result!.reviewedAtCommit).toBe(sha2);
+  });
+
+  it('returns undefined reviewedAtCommit when not set', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-RAC-3' }));
+    const result = getReviewStatusFromDb('PAN-RAC-3');
+    expect(result!.reviewedAtCommit).toBeUndefined();
+  });
+
+  it('clears reviewedAtCommit when explicitly set to undefined', () => {
+    const sha = 'cccc3333000000000000000000000000000000cc';
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-RAC-4', reviewedAtCommit: sha }));
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-RAC-4', reviewedAtCommit: undefined }));
+
+    const result = getReviewStatusFromDb('PAN-RAC-4');
+    expect(result!.reviewedAtCommit).toBeUndefined();
+  });
+
+  it('persists stuckAt through upsert→get', () => {
+    const ts = '2026-04-19T05:00:00.000Z';
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-SA-1',
+      stuck: true,
+      stuckReason: 'main_diverged',
+      stuckAt: ts,
+    }));
+
+    const result = getReviewStatusFromDb('PAN-SA-1');
+    expect(result!.stuckAt).toBe(ts);
+  });
+
+  it('persists stuckDetails through upsert→get', () => {
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-SD-1',
+      stuck: true,
+      stuckReason: 'main_diverged',
+      stuckDetails: JSON.stringify({ localSha: 'abc123', remoteSha: 'def456' }),
+    }));
+
+    const result = getReviewStatusFromDb('PAN-SD-1');
+    expect(result!.stuckDetails).toContain('abc123');
+    expect(result!.stuckDetails).toContain('def456');
+  });
+
+  it('preserves all three fields together through a restart (getAllReviewStatusesFromDb)', () => {
+    const sha = 'dddd4444000000000000000000000000000000dd';
+    const stuckTs = '2026-04-19T06:00:00.000Z';
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-ALL-1',
+      reviewStatus: 'passed',
+      reviewedAtCommit: sha,
+      stuck: true,
+      stuckReason: 'main_diverged',
+      stuckAt: stuckTs,
+      stuckDetails: JSON.stringify({ localSha: 'aaa', remoteSha: 'bbb' }),
+    }));
+
+    // getAllReviewStatusesFromDb simulates a dashboard restart loading all statuses
+    const all = getAllReviewStatusesFromDb();
+    const status = all['PAN-ALL-1'];
+    expect(status).toBeDefined();
+    expect(status.reviewedAtCommit).toBe(sha);
+    expect(status.stuckAt).toBe(stuckTs);
+    expect(status.stuckDetails).toContain('aaa');
+  });
+});
+
 // ============== getAllReviewStatusesFromDb ==============
 
 describe('getAllReviewStatusesFromDb', () => {

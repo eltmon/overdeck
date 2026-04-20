@@ -56,7 +56,6 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   loadReviewStatuses,
-  saveReviewStatuses,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import {
@@ -197,19 +196,16 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       results.push({ name, killed, sessionCleared, queueCleared: true });
     }
 
-    // Reset any "reviewing" statuses to "pending"
+    // Reset any "reviewing" statuses to "pending" — use per-issue atomic updates
+    // to avoid the read-all/write-all race that saveReviewStatuses() would reintroduce.
     let reviewStatusesReset = 0;
     try {
       const statuses = loadReviewStatuses();
       for (const key of Object.keys(statuses)) {
         if (statuses[key].reviewStatus === 'reviewing') {
-          statuses[key].reviewStatus = 'pending';
-          statuses[key].updatedAt = new Date().toISOString();
+          setReviewStatusBase(key, { reviewStatus: 'pending' });
           reviewStatusesReset++;
         }
-      }
-      if (reviewStatusesReset > 0) {
-        saveReviewStatuses(statuses);
       }
     } catch (e) {
       console.error('Failed to reset review statuses:', e);

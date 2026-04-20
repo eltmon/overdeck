@@ -33,6 +33,9 @@ import { runMergeValidation, autoRevertMerge, runQualityGates } from './validati
 import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
+import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
+import { markWorkspaceStuck } from '../review-status.js';
+import { appendGitOperation, type GitOperationType } from '../git-activity.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -651,6 +654,60 @@ async function captureTmuxOutput(sessionName: string): Promise<string> {
   }
 }
 
+/** Patterns to match in tmux capture-pane output (git push/fetch lines) */
+export const GIT_PATTERNS: Array<{ re: RegExp; operation: GitOperationType; level: 'info' | 'warn' | 'error' }> = [
+  { re: /force-with-lease/i,             operation: 'force_push_cmd',  level: 'warn' },
+  { re: /git push/i,                     operation: 'push_attempt',    level: 'info' },
+  { re: /git fetch/i,                    operation: 'fetch_attempt',   level: 'info' },
+  { re: /\[rejected\]/i,                 operation: 'push_rejected',   level: 'error' },
+  { re: /non-fast-forward/i,             operation: 'non_ff',          level: 'error' },
+  { re: /retrying/i,                     operation: 'retry',           level: 'warn' },
+  { re: /\[remote rejected\]/i,          operation: 'remote_rejected', level: 'error' },
+  { re: /Everything up-to-date/i,        operation: 'push_noop',       level: 'info' },
+];
+
+/**
+ * Scan tmux capture-pane output for git push/fetch patterns and emit each
+ * as a git_operations row. Uses seenLineHashes to dedupe within a session.
+ */
+export function scanGitPatterns(
+  output: string,
+  seenLineHashes: Set<string>,
+  issueId: string,
+  branch?: string,
+): void {
+  const lines = output.split('\n');
+  const ts = new Date().toISOString();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    // Simple hash: first 120 chars (avoids hashing megabytes)
+    const hash = trimmed.slice(0, 120);
+    if (seenLineHashes.has(hash)) continue;
+
+    for (const { re, operation, level } of GIT_PATTERNS) {
+      if (re.test(trimmed)) {
+        seenLineHashes.add(hash);
+        appendGitOperation({
+          operation,
+          branch,
+          issueId,
+          status: level === 'error' ? 'failure' : 'success',
+          error: level !== 'info' ? trimmed.slice(0, 200) : undefined,
+          ts,
+        });
+        emitActivityEntry({
+          source: 'merge-agent',
+          level,
+          message: `[git] ${trimmed.slice(0, 100)}`,
+          issueId,
+        });
+        break; // only match one pattern per line
+      }
+    }
+  }
+}
+
 /**
  * Check if specialist-merge-agent tmux session is running (async)
  */
@@ -938,11 +995,21 @@ export async function spawnMergeAgentForBranches(
   const POLL_INTERVAL = 5000; // 5 seconds
   const MAX_WAIT = 15 * 60 * 1000; // 15 minutes (match MERGE_TIMEOUT_MS)
   const startTime = Date.now();
+  // Dedupe set for git pattern lines scanned from tmux output within this session
+  const seenGitLines = new Set<string>();
 
   while (Date.now() - startTime < MAX_WAIT) {
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
     try {
+      // Scan tmux output for git push/fetch/rejected patterns (PAN-653 pan-1pt)
+      try {
+        const paneOutput = await captureTmuxOutput(mergeSession);
+        if (paneOutput) {
+          scanGitPatterns(paneOutput, seenGitLines, issueId, targetBranch);
+        }
+      } catch { /* non-fatal: pattern scanning is best-effort */ }
+
       // Check if we're still on target branch
       const { stdout: currentBranchRaw } = await execAsync('git branch --show-current', {
         cwd: projectPath,
@@ -1060,12 +1127,13 @@ export async function spawnMergeAgentForBranches(
                 // Revert to ORIG_HEAD (set by git at merge time)
                 const revertSuccess = await autoRevertMerge(projectPath);
 
-                // Force push to revert the remote as well
+                // Force push to revert the remote as well (--force-with-lease: no divergence guard,
+                // this is an intentional revert of a bad merge we caused)
                 if (revertSuccess) {
                   try {
-                    await execAsync(`git push --force-with-lease origin ${targetBranch}`, {
-                      cwd: projectPath,
-                      encoding: 'utf-8',
+                    await gitForcePush(projectPath, 'origin', targetBranch, {
+                      issueId,
+                      reason: 'auto-revert after post-merge validation failure',
                     });
                     console.log(`[merge-agent] ✓ Auto-revert pushed to remote`);
                     logActivity('merge_auto_revert', 'Merge auto-reverted and pushed to remote');
@@ -1417,15 +1485,25 @@ async function salvageStrandedMerge(
       return { success: true };
     }
 
-    // Stranded merge detected — push it
+    // Stranded merge detected — push it (with divergence guard to protect hotfixes)
     console.log(`[merge-agent] SALVAGING stranded merge for ${issueId}: local HEAD ${currentHead.slice(0, 8)} != remote ${remoteHeadRaw.trim().slice(0, 8)}`);
     logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
 
-    await execAsync(`git push origin ${targetBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      timeout: 30000,
-    });
+    try {
+      await gitPush(projectPath, 'origin', targetBranch, { issueId });
+    } catch (pushErr: unknown) {
+      if (pushErr instanceof MainDivergedError) {
+        // origin has advanced past our local ancestor — a hotfix landed.
+        // Mark stuck so Deacon won't re-trigger, then let the caller handle it.
+        markWorkspaceStuck(issueId, 'main_diverged', {
+          localSha: pushErr.localSha,
+          remoteSha: pushErr.remoteSha,
+        });
+        logActivity('merge_salvage_diverged', `Salvage aborted: origin/${targetBranch} diverged (remote ${pushErr.remoteSha.slice(0, 7)} not ancestor of local ${pushErr.localSha.slice(0, 7)})`);
+        return { success: false, reason: pushErr.message };
+      }
+      throw pushErr;
+    }
 
     console.log(`[merge-agent] Salvage push successful for ${issueId}`);
     logActivity('merge_salvage_success', `Stranded merge pushed successfully`);
