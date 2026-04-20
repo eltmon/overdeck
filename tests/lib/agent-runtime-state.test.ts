@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
+import { describe, it, expect, afterAll } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir, homedir } from 'os';
 
@@ -164,6 +164,15 @@ describe('Agent Runtime State (PAN-80)', () => {
         process.env.HOME = originalHome;
         rmSync(tempDir, { recursive: true, force: true });
       }
+    });
+
+    it('should use unique temp files for runtime writes', async () => {
+      const src = readFileSync(join(process.cwd(), 'src/lib/agents.ts'), 'utf8');
+
+      expect(src).toContain('function writeJsonFileAtomically(filePath: string, value: unknown): void');
+      expect(src).toContain('`${filePath}.${process.pid}.${randomUUID()}.tmp`');
+      expect(src).not.toContain('`${runtimeFile}.tmp`');
+      expect(src).not.toContain('`${stateFile}.tmp`');
     });
   });
 

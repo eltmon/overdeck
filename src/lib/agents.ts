@@ -330,9 +330,24 @@ export function saveAgentState(state: AgentState): void {
   }
 
   const stateFile = join(dir, 'state.json');
-  const tempFile = `${stateFile}.tmp`;
-  writeFileSync(tempFile, JSON.stringify(state, null, 2));
-  renameSync(tempFile, stateFile);
+  writeJsonFileAtomically(stateFile, state);
+}
+
+function writeJsonFileAtomically(filePath: string, value: unknown): void {
+  const tempFile = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(tempFile, JSON.stringify(value, null, 2));
+    renameSync(tempFile, filePath);
+  } catch (error) {
+    if (existsSync(tempFile)) {
+      try {
+        unlinkSync(tempFile);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    throw error;
+  }
 }
 
 function markAgentRunning(state: AgentState): void {
@@ -510,9 +525,7 @@ export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRunti
     merged.waitingStartedAt = merged.lastActivity;
   }
 
-  const tempRuntimeFile = `${runtimeFile}.tmp`;
-  writeFileSync(tempRuntimeFile, JSON.stringify(merged, null, 2));
-  renameSync(tempRuntimeFile, runtimeFile);
+  writeJsonFileAtomically(runtimeFile, merged);
 
   if (previousState !== merged.state || state.waitingReason || state.waitingNotification || state.resolution || state.currentTool) {
     console.log(
