@@ -27,6 +27,23 @@ import { EventStoreService } from '../services/domain-services.js';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { listRunningAgentsAsync } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
+
+// ─── Cached review statuses ───────────────────────────────────────────────────
+// loadReviewStatuses() hits SQLite with SELECT * FROM review_status on every
+// metrics request. Cache for 5s — review status changes are low-frequency.
+let _cachedReviewStatuses: ReturnType<typeof loadReviewStatuses> | null = null;
+let _cachedReviewStatusesAt = 0;
+const REVIEW_STATUS_CACHE_TTL_MS = 5_000;
+
+function getReviewStatusesCached(): ReturnType<typeof loadReviewStatuses> {
+  const now = Date.now();
+  if (_cachedReviewStatuses && now - _cachedReviewStatusesAt < REVIEW_STATUS_CACHE_TTL_MS) {
+    return _cachedReviewStatuses;
+  }
+  _cachedReviewStatuses = loadReviewStatuses();
+  _cachedReviewStatusesAt = now;
+  return _cachedReviewStatuses;
+}
 import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
@@ -106,7 +123,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),
       buildAgentIssueMap(runningAgents),
-      loadReviewStatuses(),
+      getReviewStatusesCached(),
     );
 
     return jsonResponse({
@@ -164,7 +181,7 @@ const getMetricsStuckRoute = HttpRouter.add(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),
       buildAgentIssueMap(runningAgents),
-      loadReviewStatuses(),
+      getReviewStatusesCached(),
     );
     return jsonResponse({ current, incidents: [] });
   })),

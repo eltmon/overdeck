@@ -37,6 +37,13 @@ export interface EventStore {
   /** Append a domain event. Returns the assigned sequence number. */
   append(event: Omit<DomainEvent, 'sequence'>): number;
   /**
+   * Async append — queues the event and flushes to SQLite in the next
+   * microtask batch. Use from server-reachable code to avoid blocking
+   * the event loop on every event. The event is emitted to subscribers
+   * immediately; persistence happens asynchronously.
+   */
+  appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+  /**
    * Emit an event to in-memory subscribers ONLY — no SQLite persistence.
    * Use for high-frequency derived events (e.g. issues.snapshot) that are
    * too large to accumulate in the event log but still need live fan-out.
@@ -184,6 +191,66 @@ export function createEventStore(db: DbAdapter): EventStore {
     `DELETE FROM events WHERE type = ?`,
   );
 
+  // ─── Async write queue ───────────────────────────────────────────────────────
+  // Batches events and flushes them in a single transaction on the next tick.
+  // This prevents individual SQLite INSERTs from blocking the event loop
+  // when high-frequency callers (e.g. enrichment poller) emit many events.
+  interface QueuedEvent {
+    type: string;
+    timestamp: string;
+    payload: string;
+    rawPayload: unknown;
+    resolve: (seq: number) => void;
+  }
+  let writeQueue: QueuedEvent[] = [];
+  let flushScheduled = false;
+  let inMemorySequence = 0;
+
+  function scheduleFlush(): void {
+    if (flushScheduled) return;
+    flushScheduled = true;
+    setTimeout(() => {
+      flushScheduled = false;
+      if (writeQueue.length === 0) return;
+      const batch = writeQueue;
+      writeQueue = [];
+
+      // Get current max sequence for in-memory numbering
+      const latestRow = latestSeqStmt.get();
+      let nextSeq = (latestRow?.seq ?? 0) + 1;
+
+      // Batch insert all events in a single transaction
+      try {
+        db.exec('BEGIN IMMEDIATE');
+        for (const q of batch) {
+          insertStmt.run([q.type, q.timestamp, q.payload]);
+        }
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        // Reject all pending promises
+        for (const q of batch) {
+          q.resolve(0);
+        }
+        console.error('[event-store] Batch write failed:', err);
+        return;
+      }
+
+      // Emit events and resolve promises with sequence numbers
+      for (const q of batch) {
+        const stored: StoredEvent = {
+          sequence: nextSeq,
+          type: q.type,
+          timestamp: q.timestamp,
+          payload: q.rawPayload,
+        };
+        emitter.emit('event', stored);
+        q.resolve(nextSeq);
+        nextSeq++;
+      }
+    }, 0);
+  }
+
   function append(event: Omit<DomainEvent, 'sequence'>): number {
     const timestamp =
       (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
@@ -203,6 +270,24 @@ export function createEventStore(db: DbAdapter): EventStore {
 
     emitter.emit('event', stored);
     return sequence;
+  }
+
+  function appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number> {
+    return new Promise((resolve) => {
+      const timestamp =
+        (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
+      const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+
+      writeQueue.push({
+        type: event.type,
+        timestamp,
+        payload,
+        rawPayload: (event as Record<string, unknown>)['payload'] ?? {},
+        resolve,
+      });
+
+      scheduleFlush();
+    });
   }
 
   function emitOnly(event: Omit<DomainEvent, 'sequence'>): void {
@@ -251,7 +336,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     return rows.map(rowToStored).reverse();
   }
 
-  return { append, emitOnly, readFrom, queryByType, subscribe, compact, purgeType, getLatestSequence };
+  return { append, appendAsync, emitOnly, readFrom, queryByType, subscribe, compact, purgeType, getLatestSequence };
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
