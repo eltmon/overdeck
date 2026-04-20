@@ -2050,7 +2050,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           ? `Review verification failed for ${issueId}. Check .planning/feedback/ for details. Common cause: merge conflict markers in .planning/plan.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : `The review agent found issues in your code. Read .planning/feedback/ for the latest blocked feedback, fix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`;
         const nudgeMessage = isReviewBlocked
-          ? reviewFailedMsg
+          ? `The review agent found issues in your code. Read .planning/feedback/ for the latest blocked feedback, fix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
           : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);

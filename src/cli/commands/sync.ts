@@ -514,8 +514,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // Mirror project-level skills/ → .claude/skills/ (no-op outside panopticon-cli)
-  const skillsMirror = mirrorProjectSkills();
+  // Mirror project-level skills/ → .claude/skills/ against the devroot when
+  // configured, so pan sync works from any cwd (not just from inside the repo tree).
+  const skillsMirror = mirrorProjectSkills(getDevrootPath() ?? process.cwd());
   const skillsParts: string[] = [];
   if (skillsMirror.added.length > 0) skillsParts.push(`${skillsMirror.added.length} added`);
   if (skillsMirror.updated.length > 0) skillsParts.push(`${skillsMirror.updated.length} updated`);
