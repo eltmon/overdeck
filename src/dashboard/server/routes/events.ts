@@ -26,6 +26,8 @@ import { httpHandler } from './http-handler.js';
 
 const PUBLIC_CATALOG = [
   'activity.entry',
+  'activity.detailed',
+  'activity.tts',
   'activity.updated',
   'agent.started',
   'agent.stopped',

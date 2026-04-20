@@ -138,6 +138,12 @@ export const WORK_TYPES = {
     category: 'cli',
     description: 'Quick one-off CLI commands',
   },
+
+  // TTS summarizer
+  'tts:summarizer': {
+    category: 'workflow',
+    description: 'Summarizes recent activity into brief TTS utterances',
+  },
 } as const;
 
 /**

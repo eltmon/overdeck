@@ -102,6 +102,27 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   });
   const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
 
+  // Fetch available models from all configured providers
+  const availableModelsQuery = useQuery({
+    queryKey: ['available-models'],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/available-models');
+      if (!res.ok) throw new Error('Failed to load available models');
+      return res.json() as Promise<Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>>;
+    },
+    staleTime: 60000,
+  });
+
+  const PROVIDER_LABELS: Record<string, string> = {
+    anthropic: 'Anthropic',
+    openai: 'OpenAI',
+    google: 'Google',
+    minimax: 'MiniMax',
+    zai: 'Z.AI',
+    kimi: 'Kimi',
+    openrouter: 'OpenRouter',
+  };
+
   // Start planning via SSE stream — replaces the old fire-and-forget mutation.
   // Uses fetch with streaming body parsing since EventSource only supports GET.
   const startPlanningViaSSE = useCallback(async () => {
@@ -815,14 +836,17 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                             className="w-full px-3 py-2 bg-surface-overlay border border-border rounded-lg text-sm text-content-body focus:outline-none focus:ring-1 focus:ring-signal-review"
                           >
                             <option value="">Settings default ({defaultPlanningModel})</option>
-                            <optgroup label="Anthropic">
-                              <option value="claude-opus-4-6">Claude Opus 4.6</option>
-                              <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
-                              <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
-                            </optgroup>
-                            <optgroup label="Kimi">
-                              <option value="kimi-k2.5">Kimi K2.5</option>
-                            </optgroup>
+                            {availableModelsQuery.data && Object.entries(availableModelsQuery.data)
+                              .filter(([, models]) => models.length > 0)
+                              .map(([provider, models]) => (
+                                <optgroup key={provider} label={PROVIDER_LABELS[provider] || provider}>
+                                  {models.map((model) => (
+                                    <option key={model.id} value={model.id}>
+                                      {model.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ))}
                           </select>
                         </div>
 

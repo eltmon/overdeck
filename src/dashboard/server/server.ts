@@ -45,7 +45,7 @@ import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
-import { emitActivityEntry } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
@@ -241,6 +241,7 @@ export const makeServerLayer = Layer.unwrap(
             level: 'success',
             message: `Dashboard started in ${mode}`,
           });
+          emitActivityTts({ utterance: `Dashboard started in ${mode}`, priority: 2 });
         });
       }),
     );
