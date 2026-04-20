@@ -70,11 +70,24 @@ describe('sendKeysAsync', () => {
 });
 
 describe('waitForClaudePrompt', () => {
-  it('detects the prompt anywhere in the captured pane output', async () => {
+  it('detects the classic Claude prompt anywhere in the captured pane output', async () => {
     execFileMock.mockReset();
     execFileMock.mockImplementation((_file: string, args: string[], _options: unknown, callback: (error: null, result: { stdout: string; stderr: string }) => void) => {
       if (Array.isArray(args) && args.includes('capture-pane')) {
         callback(null, { stdout: 'Startup banner\nMore output\n❯ continue', stderr: '' });
+        return;
+      }
+      callback(null, { stdout: '', stderr: '' });
+    });
+
+    await expect(waitForClaudePrompt('agent-pan-711', 10)).resolves.toBe(true);
+  });
+
+  it('detects the native installer prompt variant', async () => {
+    execFileMock.mockReset();
+    execFileMock.mockImplementation((_file: string, args: string[], _options: unknown, callback: (error: null, result: { stdout: string; stderr: string }) => void) => {
+      if (Array.isArray(args) && args.includes('capture-pane')) {
+        callback(null, { stdout: 'cx@gpt-5.4-pro · API Usage Billing\n> Try "how does <filepath> work?"', stderr: '' });
         return;
       }
       callback(null, { stdout: '', stderr: '' });

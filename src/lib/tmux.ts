@@ -450,9 +450,10 @@ export async function listPaneValuesAsync(target: string, format: string): Promi
 export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
   const poll = 500;
+  const promptPattern = /(^|\n)\s*(?:❯|>)\s*/m;
   while (Date.now() - start < timeoutMs) {
     const output = await capturePaneAsync(sessionName, 10);
-    if (output.includes('❯')) return true;
+    if (promptPattern.test(output)) return true;
     await new Promise(r => setTimeout(r, poll));
   }
   return false;
