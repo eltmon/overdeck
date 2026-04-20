@@ -18,8 +18,8 @@
   --mc-warning: #D97706;
   --mc-error: #DC2626;
 
-  --mc-font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro', system-ui, sans-serif;
-  --mc-font-mono: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  --mc-font-family: "DM Sans", system-ui, sans-serif;
+  --mc-font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --mc-font-size-xs: 11px;
   --mc-font-size-sm: 12px;
   --mc-font-size-base: 14px;
@@ -279,6 +279,7 @@
   white-space: nowrap;
 }
 
+/* Feature ID — technical identifier, mono per PAN-698 policy */
 .featureId_sidebar {
   font-size: var(--mc-font-size-xs);
   color: var(--mc-text-muted);
@@ -297,6 +298,7 @@
   white-space: nowrap;
 }
 
+/* Cost value — technical numeric data, mono for alignment per PAN-698 policy */
 .featureCost {
   font-size: var(--mc-font-size-xs);
   color: var(--mc-text-muted);
@@ -345,6 +347,7 @@
   margin: 0;
 }
 
+/* Feature ID — technical identifier, mono per PAN-698 policy */
 .featureId {
   font-size: var(--mc-font-size-sm);
   color: var(--mc-text-muted);
@@ -477,6 +480,7 @@
 
 /* Section type badges always use light mode colors — see comment above */
 
+/* Model ID — technical identifier, mono per PAN-698 policy */
 .sectionModel {
   font-size: var(--mc-font-size-xs);
   color: var(--mc-text-muted);
@@ -530,6 +534,7 @@
 }
 
 /* Preview line shown when section is collapsed */
+/* Log preview — terminal-like content, mono per PAN-698 policy */
 .sectionPreview {
   padding: var(--mc-space-2) var(--mc-space-4);
   font-size: var(--mc-font-size-xs);
@@ -543,6 +548,7 @@
   line-height: 1.4;
 }
 
+/* Section content — pre-wrap log output, mono per PAN-698 policy */
 .sectionContent {
   padding: var(--mc-space-4);
   font-size: var(--mc-font-size-sm);
@@ -626,6 +632,7 @@
   color: var(--mc-text-primary);
 }
 
+/* Isolation content — pre-wrap terminal output, mono per PAN-698 policy */
 .isolationContent {
   flex: 1;
   overflow-y: auto;
@@ -835,6 +842,7 @@
 .markdownContent p { margin: 0 0 var(--mc-space-3); }
 .markdownContent ul, .markdownContent ol { margin: 0 0 var(--mc-space-3); padding-left: var(--mc-space-6); }
 .markdownContent li { margin-bottom: var(--mc-space-1); }
+/* Inline code — mono per PAN-698 policy */
 .markdownContent code {
   font-family: var(--mc-font-mono);
   font-size: var(--mc-font-size-xs);
@@ -842,6 +850,7 @@
   border-radius: 3px;
   background: var(--mc-bg-hover);
 }
+/* Code block — mono per PAN-698 policy */
 .markdownContent pre {
   font-family: var(--mc-font-mono);
   font-size: var(--mc-font-size-xs);
@@ -878,6 +887,7 @@
 }
 
 /* Kbd hint for Isolation mode */
+/* Keyboard shortcut hint — mono per PAN-698 policy */
 .kbdHint {
   display: inline-block;
   padding: 1px 5px;
@@ -1002,6 +1012,7 @@
 }
 
 /* Deacon log viewer */
+/* Deacon log viewer — structured log output, mono per PAN-698 policy */
 .deaconLogViewer {
   max-height: 200px;
   overflow-y: auto;
@@ -1056,6 +1067,7 @@
   justify-content: flex-end;
 }
 
+/* Version label — technical identifier string, mono per PAN-698 policy */
 .versionLabel {
   font-size: 10px;
   color: var(--mc-text-muted);
@@ -1358,7 +1370,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--mc-font-mono);
   font-size: var(--mc-font-size-xs);
 }
 
@@ -1514,6 +1525,7 @@
   color: var(--mc-text-primary);
 }
 
+/* Conversation name input — prose title, not a technical identifier */
 .conversationNameInput {
   flex: 1;
   min-width: 0;
@@ -1521,7 +1533,6 @@
   border: 1px solid var(--mc-accent);
   border-radius: var(--mc-radius-sm);
   color: var(--mc-text-primary);
-  font-family: var(--mc-font-mono);
   font-size: var(--mc-font-size-xs);
   padding: 1px 4px;
   outline: none;
@@ -1554,6 +1565,7 @@
   background: var(--mc-bg-secondary);
 }
 
+/* Model label — technical identifier (model ID), mono per PAN-698 policy */
 .conversationModelLabel {
   font-size: var(--mc-font-size-xs);
   color: var(--mc-text-muted);
@@ -1618,6 +1630,7 @@
   gap: var(--mc-space-1);
 }
 
+/* Session ID — technical identifier, mono per PAN-698 policy */
 .conversationSessionId {
   font-size: 10px;
   color: var(--mc-text-muted);
@@ -1959,6 +1972,7 @@
   min-height: 20px;
 }
 
+/* Terminal icon character — mono for glyph alignment per PAN-698 policy */
 .workLogTerminalIcon {
   font-family: var(--mc-font-mono);
   font-size: 10px;
@@ -1974,6 +1988,7 @@
   flex-shrink: 0;
 }
 
+/* Work log detail — technical identifier/path data, mono per PAN-698 policy */
 .workLogDetail {
   color: var(--mc-text-muted);
   font-family: var(--mc-font-mono);
@@ -1984,6 +1999,7 @@
   flex: 1;
 }
 
+/* Work log result — terminal/command output, mono per PAN-698 policy */
 .workLogResult {
   margin: 2px 0 4px 18px;
   padding: 6px 8px;
@@ -2051,7 +2067,6 @@
 
 .chatMarkdown {
   font-size: var(--mc-font-size-base);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.6;
   color: var(--mc-text-primary);
   word-break: break-word;
@@ -2138,6 +2153,7 @@
   background: var(--mc-bg-hover) !important;
 }
 
+/* Plain code block — mono per PAN-698 policy */
 .codePlain {
   margin: 0;
   padding: var(--mc-space-3) var(--mc-space-4);
@@ -2154,6 +2170,7 @@
   text-underline-offset: 2px;
 }
 
+/* Markdown fallback — raw text output, mono per PAN-698 policy */
 .mdFallback {
   font-family: var(--mc-font-mono);
   font-size: var(--mc-font-size-sm);
@@ -2262,6 +2279,7 @@
   background: var(--mc-bg-hover);
 }
 
+/* Slash command label — command identifier (e.g. /help), mono per PAN-698 policy */
 .slashMenuLabel {
   font-size: var(--mc-font-size-base);
   font-family: var(--mc-font-mono);
