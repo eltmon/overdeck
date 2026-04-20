@@ -330,18 +330,34 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // Apply the update (triggers side effects like idle state, queue processing)
     const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
 
-    // Set specialist state to idle.
+    // Set specialist state to idle and clear registry write-scope.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
     yield* Effect.promise(async () => {
       try {
-        const { getTmuxSessionName } =
+        const { getTmuxSessionName, updateRunMetadata, makeSpecialistRegistryKey } =
           await import('../../../lib/cloister/specialists.js');
-        const tmuxSession = getTmuxSessionName(`${specialist}-agent` as SpecialistType);
+        const project = resolveProjectFromIssue(normalizedIssueId);
+        const projectKey = project?.projectKey;
+        const tmuxSession = projectKey
+          ? getTmuxSessionName(`${specialist}-agent` as SpecialistType, projectKey, normalizedIssueId)
+          : getTmuxSessionName(`${specialist}-agent` as SpecialistType);
         saveAgentRuntimeState(tmuxSession, {
           state: 'idle',
           lastActivity: new Date().toISOString(),
         });
-        console.log(`[specialists/done] Set ${specialist}-agent to idle`);
+        console.log(`[specialists/done] Set ${tmuxSession} to idle`);
+
+        // Clear write-scope lock so the next specialist can claim the workspace
+        if (projectKey) {
+          const registryKey = makeSpecialistRegistryKey(`${specialist}-agent`, normalizedIssueId);
+          updateRunMetadata(projectKey, registryKey, {
+            currentRun: null,
+            writeScope: null,
+            workspace: null,
+            currentActivity: null,
+          });
+          console.log(`[specialists/done] Cleared registry lock for ${registryKey} (${projectKey})`);
+        }
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../lib/cloister/specialist-handoff-logger.js');
@@ -554,8 +570,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     }
 
-    // When review fails, send feedback to work agent so it can fix the issues
-    if (specialist === 'review' && status === 'failed' && notes) {
+    // When review fails or is blocked, send feedback to work agent so it can fix the issues
+    if (specialist === 'review' && (status === 'failed' || status === 'blocked') && notes) {
       yield* Effect.promise(async () => {
         try {
           const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;

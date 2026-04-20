@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { renderPrompt, loadPromptFrontmatter, clearPromptCache, PromptError } from '../prompts.js';
+import { renderPrompt, loadPromptFrontmatter, PromptError } from '../prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PROMPTS_DIR = join(dirname(__filename), '..', 'prompts');
@@ -13,7 +13,6 @@ const SCRATCH_PATH = join(PROMPTS_DIR, `${SCRATCH}.md`);
 function writeScratch(body: string): void {
   mkdirSync(PROMPTS_DIR, { recursive: true });
   writeFileSync(SCRATCH_PATH, body, 'utf-8');
-  clearPromptCache();
 }
 
 afterEach(() => {
@@ -22,7 +21,6 @@ afterEach(() => {
   } catch {
     // ignore
   }
-  clearPromptCache();
 });
 
 describe('prompts loader', () => {
@@ -112,7 +110,6 @@ body`
     });
 
     it('throws when template file is missing', () => {
-      clearPromptCache();
       expect(() => loadPromptFrontmatter('definitely-not-a-real-template')).toThrow(
         /Failed to load prompt template/
       );

@@ -51,8 +51,6 @@ interface ParsedPrompt {
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
-const cache = new Map<string, ParsedPrompt>();
-
 export class PromptError extends Error {
   constructor(message: string) {
     super(message);
@@ -65,9 +63,6 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 function parsePrompt(name: string): ParsedPrompt {
-  const cached = cache.get(name);
-  if (cached) return cached;
-
   const path = join(resolvePromptsDir(), `${name}.md`);
   let raw: string;
   try {
@@ -128,9 +123,7 @@ function parsePrompt(name: string): ParsedPrompt {
     optional: (fm.optional as string[] | undefined) ?? [],
   };
 
-  const result: ParsedPrompt = { frontmatter, body: match[2], path };
-  cache.set(name, result);
-  return result;
+  return { frontmatter, body: match[2], path };
 }
 
 export interface RenderPromptOptions {
@@ -174,8 +167,4 @@ export function renderPrompt({ name, vars }: RenderPromptOptions): string {
 
 export function loadPromptFrontmatter(name: string): PromptFrontmatter {
   return parsePrompt(name).frontmatter;
-}
-
-export function clearPromptCache(): void {
-  cache.clear();
 }
