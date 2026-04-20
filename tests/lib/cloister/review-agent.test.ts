@@ -782,26 +782,8 @@ describe('runParallelReview configuration regressions', () => {
 // ── resolveTemplatePath ───────────────────────────────────────────────────────
 
 describe('resolveTemplatePath', () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'pan-test-'));
-  });
-
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('returns workspace agents/ path when template exists in the project', () => {
-    mkdirSync(join(tmpDir, 'agents'), { recursive: true });
-    writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), 'template content');
-    const result = resolveTemplatePath('code-review-correctness', tmpDir);
-    expect(result).toBe(join(tmpDir, 'agents', 'code-review-correctness.md'));
-  });
-
-  it('falls back to CACHE_AGENTS_DIR when template is absent from workspace', () => {
-    // No agents/ dir in tmpDir → must fall back to the global cache path
-    const result = resolveTemplatePath('code-review-correctness', tmpDir);
+  it('returns CACHE_AGENTS_DIR path (infrastructure reviewers use main cache only)', () => {
+    const result = resolveTemplatePath('code-review-correctness', '/any/workspace');
     expect(result).toContain('agent-definitions');
     expect(result).toContain('code-review-correctness.md');
   });
@@ -814,8 +796,8 @@ describe('runParallelReview', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-review-'));
-    // Create workspace agents/ dir with minimal templates so resolveTemplatePath
-    // finds them in the workspace (proving branch templates take precedence).
+    // Create workspace agents/ dir with minimal templates; tests inject
+    // resolveTemplateFn so these local templates are used instead of the global cache.
     mkdirSync(join(tmpDir, 'agents'), { recursive: true });
     const frontmatter = '---\nmodel: sonnet\n---\nReview the code.\n';
     writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), frontmatter);
@@ -839,12 +821,13 @@ describe('runParallelReview', () => {
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
+    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
 
     const { result } = await runParallelReview(
       baseContext(),
       ['src/foo.ts'],
       [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
     );
 
     expect(spawnFn).toHaveBeenCalledTimes(2); // 1 reviewer + 1 synthesis
@@ -859,12 +842,13 @@ describe('runParallelReview', () => {
     const waitFn = vi.fn().mockResolvedValue('failed'); // all reviewers fail
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
+    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
 
     const { result } = await runParallelReview(
       baseContext(),
       [],
       [{ name: 'correctness' }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
     );
 
     expect(parseSynthesisFn).not.toHaveBeenCalled();

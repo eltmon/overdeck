@@ -13,7 +13,7 @@ import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
-import { CACHE_AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
+import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 
 const execAsync = promisify(exec);
@@ -447,7 +447,11 @@ export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: str
   return resolveClaudeAlias(model);
 }
 
-/** Spawn a single reviewer tmux session and send its prompt */
+/** Spawn a single reviewer tmux session and send its prompt.
+ *  Runs from the main Panopticon codebase (packageRoot), not the workspace,
+ *  so reviewers use main's .claude/rules/ and CLAUDE.md instead of the workspace's.
+ *  The workspace path is passed in the prompt so the reviewer knows where to read files.
+ */
 async function spawnReviewer(
   sessionName: string,
   model: string,
@@ -467,14 +471,14 @@ async function spawnReviewer(
   const launcherContent = [
     '#!/bin/bash',
     'set -o pipefail',
-    `cd "${projectPath}"`,
+    `cd "${packageRoot}"`,
     providerExports.trimEnd(),
     `exec ${claudeCmd}`,
     '',
   ].join('\n');
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
-  await createSessionAsync(sessionName, projectPath, `bash ${launcherPath}`);
+  await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`);
 
   // Wait for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -539,9 +543,11 @@ export function selectCompletedReviewers(
  * Workspace agents/ directory takes precedence over the global cache so that
  * branch changes to agent definitions are picked up immediately.
  */
-export function resolveTemplatePath(subagentName: string, projectPath: string): string {
-  const workspacePath = join(projectPath, 'agents', `${subagentName}.md`);
-  if (existsSync(workspacePath)) return workspacePath;
+/** Resolve infrastructure reviewer template path (main cache only).
+ *  Infrastructure reviewers run from the main Panopticon codebase, so they must
+ *  use templates from the main cache — never from a workspace's agents/ directory.
+ */
+export function resolveTemplatePath(subagentName: string, _projectPath: string): string {
   return join(CACHE_AGENTS_DIR, `${subagentName}.md`);
 }
 
@@ -550,6 +556,7 @@ type RunParallelReviewDeps = {
   waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
   parseSynthesisFn?: typeof parseReviewSynthesis;
   postReviewFn?: typeof postGitHubPRReview;
+  resolveTemplateFn?: (subagentName: string, _projectPath: string) => string;
 };
 
 /**
@@ -570,6 +577,7 @@ export async function runParallelReview(
     waitFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs),
     parseSynthesisFn = parseReviewSynthesis,
     postReviewFn = postGitHubPRReview,
+    resolveTemplateFn = resolveTemplatePath,
   }: RunParallelReviewDeps = {},
 ): Promise<{ result: ReviewResult; reviewId: string }> {
   // Clean up any stale review sessions for this issue before starting a new review run.
@@ -609,7 +617,7 @@ export async function runParallelReview(
   // Guard: validate all reviewer templates exist before spawning any sessions
   for (const agent of agents) {
     const subagentName = `code-review-${agent.name}`;
-    const templatePath = resolveTemplatePath(subagentName, context.projectPath);
+    const templatePath = resolveTemplateFn(subagentName, context.projectPath);
     if (!existsSync(templatePath)) {
       return {
         result: {
@@ -627,17 +635,24 @@ export async function runParallelReview(
   await mkdir(outputDir, { recursive: true });
 
   // ── Phase 1: Spawn all reviewers in parallel ──────────────────────────────
+  // Reviewers run from the main Panopticon codebase, so file paths must be
+  // absolute (or explicitly relative to the workspace) for them to locate files.
+  const absoluteFilesChanged = filesChanged.map(f =>
+    f.startsWith('/') ? f : join(context.projectPath, f),
+  );
+
   const reviewerContext = [
     `**Pull Request**: ${context.prUrl}`,
     `**Issue ID**: ${context.issueId}`,
-    filesChanged.length > 0 ? `**Files changed**: ${filesChanged.join(', ')}` : '',
+    `**Workspace Path**: ${context.projectPath}`,
+    absoluteFilesChanged.length > 0 ? `**Files changed**: ${absoluteFilesChanged.join(', ')}` : '',
   ].filter(Boolean).join('\n');
 
   const reviewerSessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
 
   await Promise.all(agents.map(async agent => {
     const subagentName = `code-review-${agent.name}`;
-    const templatePath = resolveTemplatePath(subagentName, context.projectPath);
+    const templatePath = resolveTemplateFn(subagentName, context.projectPath);
     const template = await parseReviewerTemplate(templatePath);
     const model = resolveReviewerModel(agent, template.model);
     const outputFile = join(outputDir, `${agent.name}.md`);
@@ -679,7 +694,7 @@ export async function runParallelReview(
     };
   }
 
-  const synthTemplatePath = resolveTemplatePath('code-review-synthesis', context.projectPath);
+  const synthTemplatePath = resolveTemplateFn('code-review-synthesis', context.projectPath);
   const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
   const synthOutputFile = join(outputDir, 'synthesis.md');
