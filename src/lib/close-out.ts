@@ -20,7 +20,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
 import { findPrdAtStatus, canonicalPrdSubdir } from './prd-locations.js';
-import { killSessionAsync, sessionExists } from './tmux.js';
+import { killSessionAsync, sessionExists, listSessionNamesAsync } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
 import { extractNumber, extractPrefix, normalizeIssueId } from './issue-id.js';
@@ -304,8 +304,8 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     let cleaned = false;
 
     // Kill tmux sessions for this issue
-    const sessionPatterns = [agentSession, `review-${issueLower}`, `test-${issueLower}`, `merge-${issueLower}`];
-    for (const session of sessionPatterns) {
+    const exactPatterns = [agentSession, `test-${issueLower}`, `merge-${issueLower}`];
+    for (const session of exactPatterns) {
       if (sessionExists(session)) {
         try {
           await killSessionAsync(session);
@@ -313,6 +313,19 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
         } catch { /* session may already be dead */ }
       }
     }
+
+    // Review sessions use timestamped names: review-<issue>-<timestamp>-<role>
+    try {
+      const allSessions = await listSessionNamesAsync();
+      const reviewRegex = new RegExp(`^review-${issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
+      const reviewSessions = allSessions.filter(s => reviewRegex.test(s));
+      for (const session of reviewSessions) {
+        try {
+          await killSessionAsync(session);
+          cleaned = true;
+        } catch { /* session may already be dead */ }
+      }
+    } catch { /* tmux server may not be running */ }
 
     // Stop Docker containers
     if (workspacePath && existsSync(workspacePath)) {

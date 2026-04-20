@@ -16,7 +16,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AGENTS_DIR } from '../paths.js';
-import { killSessionAsync, sessionExists } from '../tmux.js';
+import { killSessionAsync, sessionExists, listSessionNamesAsync } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findWorkspacePath } from './archive-planning.js';
@@ -29,17 +29,16 @@ const execAsync = promisify(exec);
  */
 async function killTmuxSessions(issueLower: string): Promise<StepResult> {
   const step = 'teardown:tmux-sessions';
-  // Legacy naming: agent-{issue}, review-{issue}, etc.
-  const patterns = [
+  let killed = 0;
+
+  // Exact-match sessions (agent, test, merge, planning)
+  const exactPatterns = [
     `agent-${issueLower}`,
-    `review-${issueLower}`,
     `test-${issueLower}`,
     `merge-${issueLower}`,
     `planning-${issueLower}`,
   ];
-
-  let killed = 0;
-  for (const session of patterns) {
+  for (const session of exactPatterns) {
     if (sessionExists(session)) {
       try {
         await killSessionAsync(session);
@@ -48,6 +47,24 @@ async function killTmuxSessions(issueLower: string): Promise<StepResult> {
         // session may have died between check and kill
       }
     }
+  }
+
+  // Review sessions use timestamped names: review-<issue>-<timestamp>-<role>
+  // Use regex to match and kill all review sessions for this issue.
+  try {
+    const allSessions = await listSessionNamesAsync();
+    const reviewRegex = new RegExp(`^review-${issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
+    const reviewSessions = allSessions.filter(s => reviewRegex.test(s));
+    for (const session of reviewSessions) {
+      try {
+        await killSessionAsync(session);
+        killed++;
+      } catch {
+        // session may have died between check and kill
+      }
+    }
+  } catch {
+    // listSessionNamesAsync may fail if tmux server is not running
   }
 
   // NOTE: Per-project ephemeral specialists (specialist-{project}-{type}) are NOT killed here.

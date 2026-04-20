@@ -515,3 +515,7 @@ export function getAgentSessions(): TmuxSession[] {
 export async function getAgentSessionsAsync(): Promise<TmuxSession[]> {
   return (await listSessionsAsync()).filter(s => s.name.startsWith('agent-'));
 }
+
+export async function getReviewSessionsAsync(): Promise<TmuxSession[]> {
+  return (await listSessionsAsync()).filter(s => /^review-/.test(s.name));
+}
