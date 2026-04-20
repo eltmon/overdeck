@@ -1216,6 +1216,21 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
     }
 
+    // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
+    // These never register runtime state, so they're invisible to the specialist checks above.
+    try {
+      const { listSessionNamesAsync } = await import('../tmux.js');
+      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
+      const allSessions = await listSessionNamesAsync();
+      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
+        activeReviewSessions.add(issueId);
+      }
+    } catch {
+      // Non-fatal: fall back to specialist-only detection
+    }
+
+    let modified = false;
+
     const latestHistoryEntry = (
       history: Array<{ type: string; status: string; notes?: string }> | undefined,
       type: 'review' | 'test',
@@ -1329,34 +1344,23 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
           if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
-            const { spawnEphemeralSpecialist } = await import('./specialists.js');
-            const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
-              issueId,
-              workspace,
-              branch,
-            });
-            if (result.success) {
-              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+            const { dispatchParallelReview } = await import('./review-agent.js');
+            try {
+              await dispatchParallelReview({ issueId, workspace, branch });
+              // dispatchParallelReview sets reviewStatus='reviewing' internally;
+              // keep local status in sync so this patrol doesn't re-process the issue.
               status.reviewStatus = 'reviewing';
               actions.push(
-                `Re-dispatched pending review for ${issueId} via ${resolved.projectKey}/review-agent (deacon-orphan-recovery)`,
+                `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
               );
               console.log(
-                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
               );
-            } else if (result.error === 'specialist_busy') {
-              // Specialist busy — leave status as pending, deacon will retry next patrol
+            } catch (err) {
               actions.push(
-                `Skipped pending review for ${issueId}: specialist busy — will retry next patrol`,
+                `Failed to re-dispatch pending review for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
               );
-              console.log(`[deacon] Review specialist busy for ${issueId} — will retry next patrol`);
-            } else {
-              actions.push(
-                `Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-              );
-              console.log(
-                `[deacon] Pending review re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-              );
+              console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, err);
             }
           } else if (!resolved) {
             actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);

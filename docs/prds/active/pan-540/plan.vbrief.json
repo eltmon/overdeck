@@ -1,0 +1,182 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-12T20:21:08.170Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-540: Remove convoy abstraction, inline parallel review directly into review-agent"
+  },
+  "plan": {
+    "id": "pan-540",
+    "title": "Remove convoy abstraction, inline parallel review directly into review-agent",
+    "status": "approved",
+    "uid": "11e166ee-cbee-448f-ba74-42e1f4edc8d0",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-12T20:21:08.170Z",
+    "updated": "2026-04-12T20:21:08.170Z",
+    "references": [
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/540", "label": "PAN-540", "type": "issue" }
+    ],
+    "tags": ["refactor", "cleanup", "review-agent", "dashboard"],
+    "narratives": {
+      "Problem": "The convoy abstraction exists solely to let review-agent.ts spawn 4 parallel reviewers + synthesis in a fixed order. The generic template registry, state persistence in ~/.panopticon/convoys/, CLI commands, dashboard panel/hook/nav, and convoy:* model router keys are all overhead for a single use case. The intended multi-issue fleet runner was never built.",
+      "Proposal": "Inline the parallel-review pipeline directly into review-agent.ts and delete the convoy abstraction entirely. Keep the 4+1 reviewer pipeline (correctness, security, performance, requirements + synthesis) hardcoded — no new YAML config schema. Rename convoy:* model router keys to review:* as a clean break. Delete all convoy CLI, API, and dashboard surface immediately."
+    },
+    "items": [
+      {
+        "id": "inline-review-pipeline",
+        "title": "Inline parallel review pipeline into review-agent.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Refactor spawnReviewAgent() in src/lib/cloister/review-agent.ts to spawn 4 parallel reviewers (correctness, security, performance, requirements) directly via tmux, poll for all 4 to complete, then run the synthesis agent. Inline the parseConvoySynthesis() logic. Preserve output dir structure (.claude/reviews/<id>/), GitHub PR posting, and feedback-to-work-agent paths unchanged. Remove imports from ../convoy.js."
+        },
+        "subItems": [
+          { "id": "inline-review-pipeline.ac1", "title": "spawnReviewAgent no longer imports startConvoy/waitForConvoy/ConvoyContext from ../convoy.js", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac2", "title": "4 reviewers (correctness, security, performance, requirements) are spawned in parallel via tmux sessions named pan-review-<id>-<name>", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac3", "title": "Pipeline waits for all 4 reviewer outputs (<output-dir>/<name>.md) before spawning the synthesis agent", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac4", "title": "Synthesis agent runs in its own tmux session and writes <output-dir>/synthesis.md after all reviewers complete", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac5", "title": "Synthesis parser reads REVIEW_RESULT, FILES_REVIEWED, SECURITY_ISSUES, PERFORMANCE_ISSUES markers from synthesis.md and merges per-reviewer findings from correctness.md, security.md, performance.md, requirements.md", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac6", "title": "postGitHubPRReview and sendFeedbackToWorkAgent are called with the same inputs they currently receive", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac7", "title": "No blocking sync IO (readFileSync/writeFileSync/execSync) is added in the refactored code path — use fs/promises and execAsync", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "inline-review-pipeline.ac8", "title": "Review-agent resolves reviewer models via the new review:<name> model router keys (review:correctness, review:security, review:performance, review:requirements, review:synthesis)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "rename-model-router-keys",
+        "title": "Rename convoy:* model router keys to review:*",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Rename the five convoy:* work type keys to review:* in src/lib/work-types.ts, src/lib/smart-model-selector.ts, and src/lib/settings-api.ts. Mapping: convoy:correctness-reviewer → review:correctness, convoy:security-reviewer → review:security, convoy:performance-reviewer → review:performance, convoy:requirements-reviewer → review:requirements, convoy:synthesis-agent → review:synthesis. Default model assignments (opus for security, sonnet for others) are preserved unchanged. No legacy fallback — clean break."
+        },
+        "subItems": [
+          { "id": "rename-model-router-keys.ac1", "title": "src/lib/work-types.ts contains review:correctness, review:security, review:performance, review:requirements, review:synthesis entries with the same descriptions that were on their convoy:* predecessors", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "rename-model-router-keys.ac2", "title": "src/lib/work-types.ts contains no convoy:* entries", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "rename-model-router-keys.ac3", "title": "src/lib/settings-api.ts default model map uses review:* keys; review:security defaults to claude-opus-4-6; other four default to claude-sonnet-4-6", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "rename-model-router-keys.ac4", "title": "src/lib/smart-model-selector.ts uses review:* keys and no longer references convoy:*", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "rename-model-router-keys.ac5", "title": "No reference to the string \"convoy:\" remains anywhere under src/lib/", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "delete-convoy-runtime",
+        "title": "Delete convoy runtime and templates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Delete src/lib/convoy.ts and src/lib/convoy-templates.ts. Remove all imports of these modules across the codebase. Depends on inline-review-pipeline completing first, since review-agent.ts is the only remaining consumer."
+        },
+        "subItems": [
+          { "id": "delete-convoy-runtime.ac1", "title": "src/lib/convoy.ts does not exist", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-runtime.ac2", "title": "src/lib/convoy-templates.ts does not exist", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-runtime.ac3", "title": "No file in the repo imports from '../convoy.js', '../convoy-templates.js', './convoy.js', or './convoy-templates.js'", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-runtime.ac4", "title": "No code references the types ConvoyContext, ConvoyState, ConvoyAgentState, ConvoyTemplate", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "delete-convoy-cli",
+        "title": "Delete convoy CLI commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Delete src/cli/commands/convoy/ directory (index.ts, start.ts, stop.ts, list.ts, status.ts). Remove the registerConvoyCommands call from the CLI entrypoint. `pan convoy ...` must no longer be a valid subcommand."
+        },
+        "subItems": [
+          { "id": "delete-convoy-cli.ac1", "title": "src/cli/commands/convoy/ directory does not exist", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-cli.ac2", "title": "`pan convoy --help` prints an unknown-command error, not a subcommand list", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-cli.ac3", "title": "No import of './commands/convoy' or ./commands/convoy/index remains in the CLI entrypoint", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "delete-convoy-api",
+        "title": "Remove convoy endpoints from dashboard server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Remove the five convoy routes from src/dashboard/server/routes/metrics.ts: GET /api/convoys, GET /api/convoys/:id, POST /api/convoys/start, POST /api/convoys/:id/stop, GET /api/convoys/:id/output. Remove the associated handler functions and imports from ../../../lib/convoy.js. If metrics.ts becomes empty after this, leave the file in place with its other metrics routes intact — do not delete metrics.ts itself."
+        },
+        "subItems": [
+          { "id": "delete-convoy-api.ac1", "title": "GET /api/convoys returns 404 (route no longer registered)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-api.ac2", "title": "POST /api/convoys/start returns 404", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-api.ac3", "title": "src/dashboard/server/routes/metrics.ts contains no reference to startConvoy, stopConvoy, getConvoyStatus, listConvoys, or the string 'convoy'", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-api.ac4", "title": "Non-convoy routes in metrics.ts still work (no regression in existing /api/metrics endpoints)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "delete-convoy-dashboard-ui",
+        "title": "Remove convoy UI from dashboard frontend",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Delete src/dashboard/frontend/src/components/ConvoyPanel.tsx and src/dashboard/frontend/src/hooks/useConvoys.ts. Remove the 'convoys' nav entry from Sidebar.tsx and its route from App.tsx. In Settings/SettingsPage.tsx, replace the 'Convoy Reviewers' section with a 'Code Review' section that renders model override cards for the renamed review:* work types (correctness, security, performance, requirements, synthesis). Update Settings/types.ts to reference review:* keys."
+        },
+        "subItems": [
+          { "id": "delete-convoy-dashboard-ui.ac1", "title": "src/dashboard/frontend/src/components/ConvoyPanel.tsx does not exist", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-dashboard-ui.ac2", "title": "src/dashboard/frontend/src/hooks/useConvoys.ts does not exist", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-dashboard-ui.ac3", "title": "Sidebar.tsx has no 'convoys' tab and App.tsx has no convoys route", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-dashboard-ui.ac4", "title": "Settings page shows a Code Review section with model override UI for all 5 review:* keys; no 'Convoy Reviewers' section remains", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-dashboard-ui.ac5", "title": "Users can change the model for any of the 5 reviewers from the Settings UI and the change persists (same behavior as the old Convoy Reviewers UI)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "delete-convoy-dashboard-ui.ac6", "title": "No file under src/dashboard/frontend/ contains the string 'convoy' (case-insensitive) except where unrelated (e.g. generated types)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "update-docs",
+        "title": "Remove convoy references from docs",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "trivial", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Remove the Convoys TOC entry and section from docs/USAGE.md. Remove any convoy references from docs/INDEX.md if present. Do not introduce new documentation for the inlined review pipeline — the feature is internal and existing review-agent docs (if any) remain accurate."
+        },
+        "subItems": [
+          { "id": "update-docs.ac1", "title": "docs/USAGE.md contains no 'Convoys' heading, TOC entry, or example `pan convoy` command", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "update-docs.ac2", "title": "docs/INDEX.md contains no convoy references", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "quality-gates-verify",
+        "title": "Verify quality gates and end-to-end review flow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T20:21:08.170Z",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-540" },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, npm test. All must pass. Additionally, exercise the inlined review pipeline by triggering a review on a test PR (or via the review-agent entry point with a minimal ReviewContext) and confirm that all 4 reviewer outputs plus synthesis.md are produced in .claude/reviews/<id>/ and that a ReviewResult is returned with a sensible reviewResult value."
+        },
+        "subItems": [
+          { "id": "quality-gates-verify.ac1", "title": "npm run typecheck exits 0", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "quality-gates-verify.ac2", "title": "npm run lint exits 0", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "quality-gates-verify.ac3", "title": "npm test exits 0 (root + frontend)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "quality-gates-verify.ac4", "title": "An end-to-end invocation of spawnReviewAgent against a test PR produces correctness.md, security.md, performance.md, requirements.md, and synthesis.md in a single .claude/reviews/<id>/ directory", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "quality-gates-verify.ac5", "title": "Grep of the entire repo (src/, docs/, packages/, scripts/) for the string 'convoy' returns zero hits outside of generated/vendor files", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "rename-model-router-keys", "to": "inline-review-pipeline", "type": "informs" },
+      { "from": "inline-review-pipeline", "to": "delete-convoy-runtime", "type": "blocks" },
+      { "from": "rename-model-router-keys", "to": "delete-convoy-dashboard-ui", "type": "informs" },
+      { "from": "delete-convoy-runtime", "to": "delete-convoy-cli", "type": "informs" },
+      { "from": "inline-review-pipeline", "to": "quality-gates-verify", "type": "blocks" },
+      { "from": "rename-model-router-keys", "to": "quality-gates-verify", "type": "blocks" },
+      { "from": "delete-convoy-runtime", "to": "quality-gates-verify", "type": "blocks" },
+      { "from": "delete-convoy-cli", "to": "quality-gates-verify", "type": "blocks" },
+      { "from": "delete-convoy-api", "to": "quality-gates-verify", "type": "blocks" },
+      { "from": "delete-convoy-dashboard-ui", "to": "quality-gates-verify", "type": "blocks" },
+      { "from": "update-docs", "to": "quality-gates-verify", "type": "blocks" }
+    ]
+  }
+}

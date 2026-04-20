@@ -11,7 +11,7 @@
  */
 export interface WorkTypeMetadata {
   /** Broad category this work type belongs to */
-  category: 'issue-agent' | 'specialist' | 'subagent' | 'convoy' | 'pre-work' | 'workflow' | 'cli';
+  category: 'issue-agent' | 'specialist' | 'subagent' | 'review' | 'pre-work' | 'workflow' | 'cli';
   /** Optional phase within the category (e.g., for issue-agent phases) */
   phase?: string;
   /** Human-readable description */
@@ -91,26 +91,30 @@ export const WORK_TYPES = {
     description: 'General-purpose task subagent',
   },
 
-  // Convoy members (5)
-  'convoy:security-reviewer': {
-    category: 'convoy',
-    description: 'Security-focused code reviewer in convoy',
+  // Review agents (5)
+  'review:security': {
+    category: 'review',
+    description: 'Security-focused code reviewer',
   },
-  'convoy:performance-reviewer': {
-    category: 'convoy',
-    description: 'Performance-focused code reviewer in convoy',
+  'review:performance': {
+    category: 'review',
+    description: 'Performance-focused code reviewer',
   },
-  'convoy:correctness-reviewer': {
-    category: 'convoy',
-    description: 'Correctness-focused code reviewer in convoy',
+  'review:correctness': {
+    category: 'review',
+    description: 'Correctness-focused code reviewer',
   },
-  'convoy:requirements-reviewer': {
-    category: 'convoy',
-    description: 'Requirements and design review in convoy',
+  'review:requirements': {
+    category: 'review',
+    description: 'Verifies code changes satisfy the original issue requirements and vBRIEF acceptance criteria',
   },
-  'convoy:synthesis-agent': {
-    category: 'convoy',
-    description: 'Synthesizes findings from convoy reviewers',
+  'review:synthesis': {
+    category: 'review',
+    description: 'Synthesizes findings from parallel reviewers',
+  },
+  'review:lightweight': {
+    category: 'review',
+    description: 'Fast lightweight code reviewer for haiku-tier alias resolution',
   },
 
   // Pre-work agents
