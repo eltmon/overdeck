@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
+import { readFile, readdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -302,6 +303,14 @@ export function getAgentState(agentId: string): AgentState | null {
   return JSON.parse(content);
 }
 
+export async function getAgentStateAsync(agentId: string): Promise<AgentState | null> {
+  const stateFile = join(getAgentDir(agentId), 'state.json');
+  if (!existsSync(stateFile)) return null;
+
+  const content = await readFile(stateFile, 'utf-8');
+  return JSON.parse(content);
+}
+
 export function saveAgentState(state: AgentState): void {
   const dir = getAgentDir(state.id);
   mkdirSync(dir, { recursive: true });
@@ -397,6 +406,45 @@ export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null 
   if (existsSync(stateFile)) {
     try {
       const content = readFileSync(stateFile, 'utf8');
+      const parsed = JSON.parse(content);
+      // Only use if it has runtime-specific fields
+      if (parsed.state && parsed.lastActivity) {
+        return parsed as AgentRuntimeState;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  // No state at all — uninitialized
+  if (!existsSync(stateFile) && !existsSync(runtimeFile)) {
+    return {
+      state: 'uninitialized',
+      lastActivity: new Date().toISOString(),
+    };
+  }
+
+  return null;
+}
+
+export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
+  const runtimeFile = getAgentRuntimeFile(agentId);
+  const stateFile = join(getAgentDir(agentId), 'state.json');
+
+  // Try runtime.json first (new location)
+  if (existsSync(runtimeFile)) {
+    try {
+      const content = await readFile(runtimeFile, 'utf-8');
+      return JSON.parse(content) as AgentRuntimeState;
+    } catch {
+      // Fall through to legacy
+    }
+  }
+
+  // Fallback to state.json (legacy — runtime fields were mixed in)
+  if (existsSync(stateFile)) {
+    try {
+      const content = await readFile(stateFile, 'utf-8');
       const parsed = JSON.parse(content);
       // Only use if it has runtime-specific fields
       if (parsed.state && parsed.lastActivity) {
@@ -1060,6 +1108,32 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
       });
     }
   }
+
+  return agents;
+}
+
+export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActive: boolean })[]> {
+  const tmuxSessions = await getAgentSessionsAsync();
+  const tmuxNames = new Set(tmuxSessions.map(s => s.name));
+
+  const agents: (AgentState & { tmuxActive: boolean })[] = [];
+
+  // Read all agent states
+  if (!existsSync(AGENTS_DIR)) return agents;
+
+  const entries = await readdir(AGENTS_DIR).catch(() => [] as string[]);
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      const state = await getAgentStateAsync(entry);
+      if (state) {
+        agents.push({
+          ...state,
+          tmuxActive: tmuxNames.has(state.id),
+        });
+      }
+    })
+  );
 
   return agents;
 }

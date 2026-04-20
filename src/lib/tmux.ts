@@ -514,3 +514,7 @@ export async function confirmDelivery(
 export function getAgentSessions(): TmuxSession[] {
   return listSessions().filter(s => s.name.startsWith('agent-'));
 }
+
+export async function getAgentSessionsAsync(): Promise<TmuxSession[]> {
+  return (await listSessionsAsync()).filter(s => s.name.startsWith('agent-'));
+}

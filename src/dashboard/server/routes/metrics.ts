@@ -25,7 +25,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { listRunningAgents } from '../../../lib/agents.js';
+import { listRunningAgentsAsync } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
 import { readEvents } from '../../../lib/costs/index.js';
@@ -77,53 +77,51 @@ export function computeStuckCount(
 const getMetricsSummaryRoute = HttpRouter.add(
   'GET',
   '/api/metrics/summary',
-  httpHandler(Effect.try({
-    try: () => {
-      const service = getCloisterService();
-      const status = service.getStatus();
+  httpHandler(Effect.gen(function* () {
+    const service = getCloisterService();
+    const status = service.getStatus();
 
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayEvents = readEvents({ startDate: todayStr });
-      const dailyTotal = todayEvents.reduce((sum, e) => sum + (e.cost || 0), 0);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayEvents = readEvents({ startDate: todayStr });
+    const dailyTotal = todayEvents.reduce((sum, e) => sum + (e.cost || 0), 0);
 
-      const agentCosts = new Map<string, number>();
-      const issueCosts = new Map<string, number>();
-      for (const e of todayEvents) {
-        agentCosts.set(e.agentId, (agentCosts.get(e.agentId) || 0) + e.cost);
-        issueCosts.set(e.issueId, (issueCosts.get(e.issueId) || 0) + e.cost);
-      }
+    const agentCosts = new Map<string, number>();
+    const issueCosts = new Map<string, number>();
+    for (const e of todayEvents) {
+      agentCosts.set(e.agentId, (agentCosts.get(e.agentId) || 0) + e.cost);
+      issueCosts.set(e.issueId, (issueCosts.get(e.issueId) || 0) + e.cost);
+    }
 
-      const topAgents = Array.from(agentCosts.entries())
-        .map(([agentId, cost]) => ({ agentId, cost }))
-        .sort((a, b) => b.cost - a.cost)
-        .slice(0, 5);
-      const topIssues = Array.from(issueCosts.entries())
-        .map(([issueId, cost]) => ({ issueId, cost }))
-        .sort((a, b) => b.cost - a.cost)
-        .slice(0, 5);
+    const topAgents = Array.from(agentCosts.entries())
+      .map(([agentId, cost]) => ({ agentId, cost }))
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 5);
+    const topIssues = Array.from(issueCosts.entries())
+      .map(([issueId, cost]) => ({ issueId, cost }))
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 5);
 
-      const stuckCount = computeStuckCount(
-        status.agentsNeedingAttention,
-        (id) => service.getAgentHealth(id),
-        buildAgentIssueMap(listRunningAgents()),
-        loadReviewStatuses(),
-      );
+    const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const stuckCount = computeStuckCount(
+      status.agentsNeedingAttention,
+      (id) => service.getAgentHealth(id),
+      buildAgentIssueMap(runningAgents),
+      loadReviewStatuses(),
+    );
 
-      return jsonResponse({
-        today: {
-          totalCost: Math.round(dailyTotal * 100) / 100,
-          agentCount: status.summary.total,
-          activeCount: status.summary.active,
-          stuckCount,
-          warningCount: status.summary.warning,
-        },
-        topSpenders: {
-          agents: topAgents,
-          issues: topIssues,
-        },
-      });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    return jsonResponse({
+      today: {
+        totalCost: Math.round(dailyTotal * 100) / 100,
+        agentCount: status.summary.total,
+        activeCount: status.summary.active,
+        stuckCount,
+        warningCount: status.summary.warning,
+      },
+      topSpenders: {
+        agents: topAgents,
+        issues: topIssues,
+      },
+    });
   })),
 );
 
@@ -158,19 +156,17 @@ const getMetricsHandoffsRoute = HttpRouter.add(
 const getMetricsStuckRoute = HttpRouter.add(
   'GET',
   '/api/metrics/stuck',
-  httpHandler(Effect.try({
-    try: () => {
-      const service = getCloisterService();
-      const status = service.getStatus();
-      const current = computeStuckCount(
-        status.agentsNeedingAttention,
-        (id) => service.getAgentHealth(id),
-        buildAgentIssueMap(listRunningAgents()),
-        loadReviewStatuses(),
-      );
-      return jsonResponse({ current, incidents: [] });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  httpHandler(Effect.gen(function* () {
+    const service = getCloisterService();
+    const status = service.getStatus();
+    const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const current = computeStuckCount(
+      status.agentsNeedingAttention,
+      (id) => service.getAgentHealth(id),
+      buildAgentIssueMap(runningAgents),
+      loadReviewStatuses(),
+    );
+    return jsonResponse({ current, incidents: [] });
   })),
 );
 

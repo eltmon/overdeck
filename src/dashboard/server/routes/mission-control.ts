@@ -30,7 +30,7 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
-import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
@@ -172,7 +172,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
       }
 
-      const rtState = getAgentRuntimeState(checkId);
+      const rtState = await getAgentRuntimeStateAsync(checkId);
 
       sections.push({
         type: sectionType,
