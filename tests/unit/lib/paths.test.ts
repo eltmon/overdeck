@@ -12,6 +12,7 @@ import {
   CLAUDE_DIR,
   SYNC_TARGET,
   INIT_DIRS,
+  resolvePackageRootFromDir,
 } from '../../../src/lib/paths.js';
 
 describe('paths', () => {
@@ -78,6 +79,18 @@ describe('paths', () => {
 
     it('should be an array', () => {
       expect(Array.isArray(INIT_DIRS)).toBe(true);
+    });
+  });
+
+  describe('resolvePackageRootFromDir', () => {
+    it('should resolve the main repo root from a workspace dist/lib path', () => {
+      expect(resolvePackageRootFromDir('/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-711/dist/lib'))
+        .toBe('/home/eltmon/Projects/panopticon-cli');
+    });
+
+    it('should resolve the main repo root from a claude worktree dist/lib path', () => {
+      expect(resolvePackageRootFromDir('/home/eltmon/Projects/panopticon-cli/.claude/worktrees/pan-446-merge/dist/lib'))
+        .toBe('/home/eltmon/Projects/panopticon-cli');
     });
   });
 });

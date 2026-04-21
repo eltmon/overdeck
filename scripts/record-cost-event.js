@@ -36,10 +36,16 @@ const CLAUDE_DIR = join(homedir(), ".claude");
 join(homedir(), ".codex"), join(homedir(), ".cursor"), join(homedir(), ".gemini"), join(homedir(), ".opencode");
 join(CLAUDE_DIR, "skills"), join(CLAUDE_DIR, "commands"), join(CLAUDE_DIR, "agents");
 join(join(PANOPTICON_HOME, "templates"), "claude-md", "sections");
+function resolvePackageRootFromDir(currentDir) {
+	const distRoot = currentDir.endsWith("/lib") ? dirname(dirname(currentDir)) : dirname(currentDir);
+	const worktreeMatch = distRoot.match(/^(.*)\/workspaces\/feature-[^/]+(?:\/dist)?$/);
+	if (worktreeMatch && existsSync(join(worktreeMatch[1], "src")) && existsSync(join(worktreeMatch[1], "package.json"))) return worktreeMatch[1];
+	const claudeWorktreeMatch = distRoot.match(/^(.*)\/\.claude\/worktrees\/[^/]+(?:\/dist)?$/);
+	if (claudeWorktreeMatch && existsSync(join(claudeWorktreeMatch[1], "src")) && existsSync(join(claudeWorktreeMatch[1], "package.json"))) return claudeWorktreeMatch[1];
+	return distRoot;
+}
 const currentDir = dirname(fileURLToPath(import.meta.url));
-let packageRoot;
-if (currentDir.includes("/src/")) packageRoot = dirname(dirname(currentDir));
-else packageRoot = currentDir.endsWith("/lib") ? dirname(dirname(currentDir)) : dirname(currentDir);
+const packageRoot = currentDir.includes("/src/") ? dirname(dirname(currentDir)) : resolvePackageRootFromDir(currentDir);
 join(join(packageRoot, "templates"), "traefik");
 join(packageRoot, "scripts");
 join(packageRoot, "skills");

@@ -1,5 +1,5 @@
 import { homedir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 
 // Panopticon home directory (can be overridden for testing)
@@ -58,24 +58,35 @@ export const CLAUDE_MD_TEMPLATES = join(TEMPLATES_DIR, 'claude-md', 'sections');
 // Source templates directory (bundled with the package)
 // This is resolved at runtime from the package root
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+
+export function resolvePackageRootFromDir(currentDir: string): string {
+  const distRoot = currentDir.endsWith('/lib')
+    ? dirname(dirname(currentDir))
+    : dirname(currentDir);
+
+  const worktreeMatch = distRoot.match(/^(.*)\/workspaces\/feature-[^/]+(?:\/dist)?$/);
+  if (worktreeMatch && existsSync(join(worktreeMatch[1], 'src')) && existsSync(join(worktreeMatch[1], 'package.json'))) {
+    return worktreeMatch[1];
+  }
+
+  const claudeWorktreeMatch = distRoot.match(/^(.*)\/\.claude\/worktrees\/[^/]+(?:\/dist)?$/);
+  if (claudeWorktreeMatch && existsSync(join(claudeWorktreeMatch[1], 'src')) && existsSync(join(claudeWorktreeMatch[1], 'package.json'))) {
+    return claudeWorktreeMatch[1];
+  }
+
+  return distRoot;
+}
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = dirname(currentFile);
 
-// Handle both development (src/lib/) and production (dist/) modes
+// Handle both development (src/lib/) and production (dist/) modes.
 // In dev: /path/to/panopticon/src/lib/paths.ts -> /path/to/panopticon
-// In prod: /path/to/panopticon/dist/lib/paths.js -> /path/to/panopticon
-export let packageRoot: string;
-if (currentDir.includes('/src/')) {
-  // Development mode - go up from src/lib to package root
-  packageRoot = dirname(dirname(currentDir));
-} else {
-  // Production mode - go up from dist (or dist/lib) to package root
-  packageRoot = currentDir.endsWith('/lib')
-    ? dirname(dirname(currentDir))
-    : dirname(currentDir);
-}
+// In prod main: /path/to/panopticon/dist/lib/paths.js -> /path/to/panopticon
+// In prod worktree: /path/to/panopticon/workspaces/feature-pan-704/dist/lib/paths.js -> /path/to/panopticon
+export const packageRoot: string = currentDir.includes('/src/')
+  ? dirname(dirname(currentDir))
+  : resolvePackageRootFromDir(currentDir);
 
 export const SOURCE_TEMPLATES_DIR = join(packageRoot, 'templates');
 export const SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, 'traefik');
