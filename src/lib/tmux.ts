@@ -424,12 +424,15 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     // Explicitly delete the named buffer — paste-buffer -d only drops the default buffer.
     await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
     // Scale delay with prompt size — large pastes need more time to render before
-    // Enter arrives. 15ms/line, clamped 300ms–3s. (PAN-699: 300ms was insufficient
-    // for 200+ line prompts, causing Enter to be swallowed by Claude Code's paste
-    // handling and leaving reviewers idle.)
-    const delayMs = Math.max(300, Math.min(3000, keys.split('\n').length * 15));
+    // Enter arrives. Hybrid formula: 15ms/line + 50ms per 1000 chars, minimum 600ms.
+    // (PAN-699: 300ms was insufficient for small messages when Claude Code shows
+    // warning banners; 600ms provides headroom for TUI render latency.)
+    const lineDelay = keys.split('\n').length * 15;
+    const lengthDelay = Math.floor(keys.length / 1000) * 50;
+    const delayMs = Math.max(600, Math.min(3000, lineDelay + lengthDelay));
     await new Promise(r => setTimeout(r, delayMs));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+    logSendKeys(sessionName, '[Enter sent]', caller);
   } finally {
     await unlink(tmpFile).catch(() => {});
   }
@@ -450,7 +453,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
     tmuxExecSync(['load-buffer', '-b', bufferName, tmpFile]);
     tmuxExecSync(['paste-buffer', '-b', bufferName, '-t', sessionName]);
     try { tmuxExecSync(['delete-buffer', '-b', bufferName], { stdio: 'ignore' }); } catch {}
-    execSync('sleep 0.3');
+    execSync('sleep 0.6');
     tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
   } finally {
     try { unlinkSync(tmpFile); } catch {}
@@ -514,11 +517,26 @@ export async function listPaneValuesAsync(target: string, format: string): Promi
 export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
   const poll = 500;
+  let consecutivePromptPolls = 0;
+
   while (Date.now() - start < timeoutMs) {
+    if (!await sessionExistsAsync(sessionName)) return false;
+
     const output = await capturePaneAsync(sessionName, 10);
     const lines = output.split('\n').filter(l => l.trim());
-    const lastLine = lines[lines.length - 1] || '';
-    if (lastLine.includes('❯')) return true;
+    // Use lines.some() instead of lastLine — the status bar/footer is often the
+    // last line, so checking only lastLine misses the prompt. (feature/pan-704)
+    const hasPromptLine = lines.some(line => line.includes('❯'));
+
+    if (hasPromptLine) {
+      consecutivePromptPolls += 1;
+      if (consecutivePromptPolls >= 2 && await sessionExistsAsync(sessionName)) {
+        return true;
+      }
+    } else {
+      consecutivePromptPolls = 0;
+    }
+
     await new Promise(r => setTimeout(r, poll));
   }
   return false;
@@ -535,23 +553,37 @@ export async function confirmDelivery(
 ): Promise<boolean> {
   const start = Date.now();
   const poll = 1000;
-  const beforeLineCount = outputBefore.split('\n').filter(l => l.trim()).length;
+  const beforeText = outputBefore.trimEnd();
+  const processingPatterns = [
+    '●',
+    '⎿',
+    'Read',
+    '✻',
+    '✶',
+    '✽',
+    '✢',
+    'Generating',
+    'thinking',
+    'thought for',
+    'Retrying in',
+    'API Error',
+    "You've hit your limit",
+    'Tool use',
+  ];
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, poll));
     const after = await capturePaneAsync(sessionName, 50);
-    const afterLines = after.split('\n').filter(l => l.trim());
-    const afterLineCount = afterLines.length;
+    const afterText = after.trimEnd();
+    if (afterText === beforeText) continue;
 
-    if (afterLineCount > beforeLineCount + 1) return true;
+    const newOutput = afterText.startsWith(beforeText)
+      ? afterText.slice(beforeText.length)
+      : afterText;
 
-    const newOutput = afterLines.slice(beforeLineCount).join('\n');
-    if (
-      newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read') ||
-      newOutput.includes('✻') || newOutput.includes('·') || newOutput.includes('✶') ||
-      newOutput.includes('✽') || newOutput.includes('✢') || newOutput.includes('Generating') ||
-      newOutput.includes('thinking') || newOutput.includes('thought for')
-    ) return true;
+    if (processingPatterns.some(pattern => newOutput.includes(pattern))) {
+      return true;
+    }
   }
   return false;
 }
