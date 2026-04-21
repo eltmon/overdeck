@@ -133,7 +133,7 @@ export async function discoverSessionFile(
 
 /** Maximum bytes to read in a single incremental chunk (10 MB). */
 const MAX_READ_BYTES = 10 * 1024 * 1024;
-const MAX_FALLBACK_BYTES = 50 * 1024 * 1024;
+const MAX_FALLBACK_BYTES = 5 * 1024 * 1024;
 
 interface JsonlUsage {
   input_tokens?: number;
@@ -283,7 +283,7 @@ export async function parseConversationMessages(
   for (const line of lines) {
     let entry: JsonlEntry;
     try {
-      entry = JSON.parse(line) as JsonlEntry;
+      entry = JSON.parse(line.replace(/\r$/, '')) as JsonlEntry;
     } catch {
       continue;
     }
