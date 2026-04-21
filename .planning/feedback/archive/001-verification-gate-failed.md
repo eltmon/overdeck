@@ -2,59 +2,68 @@
 specialist: verification-gate
 issueId: PAN-699
 outcome: failed
-timestamp: 2026-04-20T23:04:21Z
+timestamp: 2026-04-21T18:32:56Z
 ---
 
 VERIFICATION FAILED for PAN-699 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (27184ms):
+Verification FAILED at test (25723ms):
 
-ctivity-logger.js" mock. Did you forget to return it from "vi.mock"?
-If you need to partially mock a module, you can use "importOriginal" helper inside:
+Element's getContext() method: without installing the canvas npm package
 
-vi.mock(import("../../../../../src/lib/activity-logger.js"), async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    // your mocked methods
-  }
-})
+stderr | src/components/__tests__/StandaloneTerminal.test.tsx
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
- ❯ Module.setReviewStatus src/lib/review-status.ts:228:21
-    226|     const entry = rMap[update.reviewStatus];
-    227|     if (entry) emitActivityEntry({ source: 'review-specialist', level:…
-    228|     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: …
-       |                     ^
-    229|   }
-    230|   if (update.testStatus && update.testStatus !== existing.testStatus) {
- ❯ tests/unit/dashboard/server/routes/unstick-route.test.ts:145:5
+stderr | src/components/ResourceBar.test.tsx
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/20]⎯
+stderr | src/components/inspector/StatusHistory.test.tsx
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
- FAIL |root|  tests/unit/dashboard/server/routes/unstick-route.test.ts > processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract > 200: clears reviewedAtCommit so deacon does not re-trigger post-review reset
-Error: [vitest] No "emitActivityTts" export is defined on the "../../../../../src/lib/activity-logger.js" mock. Did you forget to return it from "vi.mock"?
-If you need to partially mock a module, you can use "importOriginal" helper inside:
+stderr | src/hooks/__tests__/useNow.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-vi.mock(import("../../../../../src/lib/activity-logger.js"), async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    // your mocked methods
-  }
-})
+stderr | src/hooks/useResourceStats.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
- ❯ Module.setReviewStatus src/lib/review-status.ts:228:21
-    226|     const entry = rMap[update.reviewStatus];
-    227|     if (entry) emitActivityEntry({ source: 'review-specialist', level:…
-    228|     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: …
-       |                     ^
-    229|   }
-    230|   if (update.testStatus && update.testStatus !== existing.testStatus) {
- ❯ tests/unit/dashboard/server/routes/unstick-route.test.ts:179:5
+stderr | src/__tests__/pipeline-state.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/20]⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL |root|  tests/lib/cloister/review-agent.test.ts > buildReviewFeedbackBody > APPROVED body does not include resubmit instructions
+AssertionError: expected '# Review: APPROVED\n\n## Summary\n\nL…' to contain 'approved'
+
+- Expected
++ Received
+
+- approved
++ # Review: APPROVED
++
++ ## Summary
++
++ LGTM
++
++ ## ✅ CODE APPROVED — YOUR WORK IS COMPLETE
++
++ **Do NOT make any more changes.**
++ **Do NOT run `pan done` again.**
++ **Do NOT run `pan review request`.**
++
++ The specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.
++
+
+ ❯ tests/lib/cloister/review-agent.test.ts:195:18
+    193|     const approved: ReviewResult = { success: true, reviewResult: 'APP…
+    194|     const body = buildReviewFeedbackBody('PAN-999', approved);
+    195|     expect(body).toContain('approved');
+       |                  ^
+    196|     expect(body).not.toMatch(/pan done|rebase-and-submit|request-revie…
+    197|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
 
