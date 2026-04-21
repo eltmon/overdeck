@@ -306,6 +306,27 @@ export async function listSessionNamesAsync(): Promise<string[]> {
   }
 }
 
+/**
+ * Query the current window dimensions for a session. Returns null if the
+ * session does not exist, tmux fails, or the response is malformed.
+ */
+export async function getWindowDimensionsAsync(sessionName: string): Promise<{ cols: number; rows: number } | null> {
+  try {
+    const { stdout } = await tmuxExecAsync(
+      ['display-message', '-p', '-t', sessionName, '#{window_width},#{window_height}'],
+      { encoding: 'utf-8' },
+    );
+    const parts = String(stdout).trim().split(',');
+    if (parts.length !== 2) return null;
+    const cols = parseInt(parts[0]!, 10);
+    const rows = parseInt(parts[1]!, 10);
+    if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) return null;
+    return { cols, rows };
+  } catch {
+    return null;
+  }
+}
+
 export function sessionExists(name: string): boolean {
   try {
     tmuxExecSync(['has-session', '-t', name], { stdio: 'ignore' });
