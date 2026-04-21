@@ -1012,13 +1012,12 @@ async function fetchProjectTree(): Promise<unknown[]> {
         const hasRecentAgentActivity = lastActivity != null && (now - lastActivity) < recentMs;
         const isAgentLive = (agentStatus === 'active' || agentStatus === 'suspended') && (hasTmux || hasRecentAgentActivity);
 
-        const featureStat = await stat(featurePath).catch(() => null);
-        const isRecentWorkspace = featureStat ? (now - featureStat.mtimeMs) < recentMs : false;
+        const hasWorkspace = await pathExists(featurePath);
 
         const issueCanonicalState = issueStateMap.get(issueId) || '';
         const showByTrackerState = ['in_progress', 'in_review'].includes(issueCanonicalState);
 
-        if (!hasTmux && !isAgentLive && !isRecentWorkspace && !showByTrackerState) continue;
+        if (!hasTmux && !isAgentLive && !hasWorkspace && !showByTrackerState) continue;
 
         const [hasPlanning, hasPrd, hasState, isShadow] = await Promise.all([
           pathExists(planningDir),
@@ -1070,6 +1069,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
           issueId, title, branch: `feature/${issueLower}`,
           status: isAgentTrulyActive ? 'running' : hasState ? 'has_state' : 'idle',
           stateLabel, agentStatus, hasPlanning, hasPrd, hasState, isShadow,
+          readyForMerge: centralReviewStatus?.readyForMerge ?? false,
         });
       }
     }
@@ -1099,7 +1099,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
 
     // Add tracker issues without workspaces that are in active states
-    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review', 'done']);
+    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
     const projectPrefixes: string[] = [];
     if (project.config.issue_prefix) {
       projectPrefixes.push(project.config.issue_prefix.toUpperCase());

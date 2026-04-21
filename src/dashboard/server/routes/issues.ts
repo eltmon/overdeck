@@ -1926,6 +1926,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
       : '';
     const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
     const hasPlan = !!planPath && existsSync(planPath);
+    const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
 
     // bd query is best-effort: a missing/broken database must NOT prevent the
     // chip from coloring vBRIEF correctly. Errors are swallowed inside the
@@ -1949,6 +1950,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
       hasPlan,
       hasBeads: beadsCount > 0,
       beadsCount,
+      planningComplete,
       workspacePath,
     });
   })),

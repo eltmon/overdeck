@@ -72,7 +72,7 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-1') as { session_file: string };
     expect(row.session_file).toBe(correctedPath);
-    expect(db.pragma('user_version', { simple: true })).toBe(23);
+    expect(db.pragma('user_version', { simple: true })).toBe(24);
   });
 
   it('v16 → v17: creates favorites table and idx_favorites_type index', () => {
@@ -96,7 +96,7 @@ describe('schema migrations', () => {
       .get() as { name: string } | undefined;
     expect(index?.name).toBe('idx_favorites_type');
 
-    expect(db.pragma('user_version', { simple: true })).toBe(23);
+    expect(db.pragma('user_version', { simple: true })).toBe(24);
   });
 
   // ── v21 → v22: reviewed_at_commit column (PAN-653) ──────────────────────────
@@ -128,7 +128,7 @@ describe('schema migrations', () => {
     // After migration the column must exist
     const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
     expect(colsAfter.map(c => c.name)).toContain('reviewed_at_commit');
-    expect(db.pragma('user_version', { simple: true })).toBe(23);
+    expect(db.pragma('user_version', { simple: true })).toBe(24);
   });
 
   it('v21 → v22: can write and read reviewed_at_commit after migration', () => {
@@ -169,7 +169,7 @@ describe('schema migrations', () => {
     const names = cols.map(c => c.name);
     expect(names).toContain('reviewed_at_commit');
     expect(names).toContain('merge_retry_count');
-    expect(db.pragma('user_version', { simple: true })).toBe(23);
+    expect(db.pragma('user_version', { simple: true })).toBe(24);
   });
 
   // ── v22 → v23: merge_retry_count column (PAN-653) ──────────────────────────
@@ -197,7 +197,6 @@ describe('schema migrations', () => {
 
     const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
     expect(colsAfter.map(c => c.name)).toContain('merge_retry_count');
-    expect(db.pragma('user_version', { simple: true })).toBe(23);
   });
 
   it('v22 → v23: can write and read merge_retry_count after migration', () => {
@@ -227,6 +226,65 @@ describe('schema migrations', () => {
     expect(row.merge_retry_count).toBe(3);
   });
 
+  // ── v23 → v24: review_spawned_at and test_retry_count (PAN-699) ─────────────
+
+  it('v23 → v24: adds review_spawned_at and test_retry_count columns to review_status', () => {
+    initSchema(db);
+    db.pragma('user_version = 23');
+    db.exec(`
+      CREATE TABLE review_status_v23 AS SELECT
+        issue_id, review_status, test_status, merge_status,
+        verification_status, verification_notes, verification_cycle_count,
+        verification_max_cycles, review_notes, test_notes, merge_notes,
+        updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
+        stuck, stuck_reason, stuck_at, stuck_details, reviewed_at_commit
+      FROM review_status;
+      DROP TABLE review_status;
+      ALTER TABLE review_status_v23 RENAME TO review_status;
+    `);
+
+    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    expect(colsBefore.map(c => c.name)).not.toContain('review_spawned_at');
+    expect(colsBefore.map(c => c.name)).not.toContain('test_retry_count');
+
+    runMigrations(db);
+
+    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    expect(colsAfter.map(c => c.name)).toContain('review_spawned_at');
+    expect(colsAfter.map(c => c.name)).toContain('test_retry_count');
+    expect(db.pragma('user_version', { simple: true })).toBe(24);
+  });
+
+  it('v23 → v24: can write and read new columns after migration', () => {
+    initSchema(db);
+    db.pragma('user_version = 23');
+    db.exec(`
+      CREATE TABLE review_status_v23 AS SELECT
+        issue_id, review_status, test_status, merge_status,
+        verification_status, verification_notes, verification_cycle_count,
+        verification_max_cycles, review_notes, test_notes, merge_notes,
+        updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
+        stuck, stuck_reason, stuck_at, stuck_details, reviewed_at_commit
+      FROM review_status;
+      DROP TABLE review_status;
+      ALTER TABLE review_status_v23 RENAME TO review_status;
+    `);
+
+    db.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-MIGRATE-699', 'reviewing', 'pending', '2026-01-01T00:00:00.000Z', 0)
+    `).run();
+
+    runMigrations(db);
+
+    db.prepare(`UPDATE review_status SET review_spawned_at = ?, test_retry_count = ? WHERE issue_id = ?`)
+      .run('2026-04-20T12:00:00.000Z', 2, 'PAN-MIGRATE-699');
+    const row = db.prepare(`SELECT review_spawned_at, test_retry_count FROM review_status WHERE issue_id = ?`)
+      .get('PAN-MIGRATE-699') as { review_spawned_at: string; test_retry_count: number };
+    expect(row.review_spawned_at).toBe('2026-04-20T12:00:00.000Z');
+    expect(row.test_retry_count).toBe(2);
+  });
+
   it('leaves session_file unchanged when the corrected transcript is missing', () => {
     db.pragma('user_version = 15');
     initSchema(db);
@@ -253,6 +311,6 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-2') as { session_file: string };
     expect(row.session_file).toBe(stalePath);
-    expect(db.pragma('user_version', { simple: true })).toBe(23);
+    expect(db.pragma('user_version', { simple: true })).toBe(24);
   });
 });

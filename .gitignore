@@ -109,3 +109,4 @@ temp/
 apps/desktop/server/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.pan/review/

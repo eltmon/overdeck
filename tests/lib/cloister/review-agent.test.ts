@@ -107,7 +107,7 @@ describe('dispatchParallelReview', () => {
 
   it('reviewing→pending: sets reviewing optimistically then resets to pending on spawn failure', async () => {
     // dispatchParallelReview now manages the status lifecycle internally:
-    // 1. sets 'reviewing' before fire-and-forget
+    // 1. sets 'reviewing' + reviewSpawnedAt before fire-and-forget
     // 2. resets to 'pending' in .catch if spawn fails
     // Callers no longer set reviewStatus themselves, eliminating the race condition.
     const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
@@ -119,7 +119,9 @@ describe('dispatchParallelReview', () => {
 
     const calls = mockSetReviewStatus.mock.calls;
     expect(calls.length).toBe(2);
-    expect(calls[0]).toEqual(['PAN-999', { reviewStatus: 'reviewing' }]);
+    expect(calls[0][0]).toBe('PAN-999');
+    expect(calls[0][1].reviewStatus).toBe('reviewing');
+    expect(calls[0][1].reviewSpawnedAt).toEqual(expect.any(String));
     expect(calls[1]).toEqual(['PAN-999', { reviewStatus: 'pending' }]);
   });
 });

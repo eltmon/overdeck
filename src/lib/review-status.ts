@@ -52,6 +52,12 @@ export interface ReviewStatus {
   stuckAt?: string;
   /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
   stuckDetails?: string;
+  /** PAN-699: timestamp when review agents were dispatched (deacon timeout detection) */
+  reviewSpawnedAt?: string;
+  /** PAN-699: number of test-agent dispatch retries (circuit breaker) */
+  testRetryCount?: number;
+  /** Commits at time of review request — used to detect new commits after review */
+  lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
 }
 
 function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {

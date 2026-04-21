@@ -813,7 +813,27 @@ export async function dispatchParallelReview(
 
   // Set reviewing here so callers don't race against the async .catch that resets
   // to pending on spawn failure. All reviewStatus transitions live in this function.
-  setReviewStatus(opts.issueId, { reviewStatus: 'reviewing' });
+  try {
+    setReviewStatus(opts.issueId, {
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
+    return {
+      success: false,
+      message: 'Failed to initialize review status',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // Emit event so frontend ActivityPanel shows live pipeline progress
+  try {
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
+  } catch {
+    // Non-fatal: event emission is best-effort
+  }
 
   spawnFn(context)
     .then(result => {
