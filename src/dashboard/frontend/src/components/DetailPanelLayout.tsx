@@ -149,6 +149,19 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     setPinned(saved !== null);
   }, [issueId]);
 
+  // Validate pinned session against available terminals. If the pinned session
+  // is no longer in the tabs (e.g. review ended, merge session changed from
+  // merge-agent to work-agent for monorepo), fall back to auto-follow.
+  useEffect(() => {
+    if (!pinned || !pinnedSession) return;
+    const tab = availableTerminals.find(t => t.sessionName === pinnedSession);
+    if (!tab || tab.disabled) {
+      setPinned(false);
+      setPinnedSession(null);
+      savePinState(issueId, null);
+    }
+  }, [availableTerminals, pinned, pinnedSession, issueId]);
+
   const openTerminal = useCallback(() => {
     setPanelState(prev => {
       const newState: PanelState = { ...prev, panelMode: 'inspector+terminal' };
