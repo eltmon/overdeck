@@ -37,3 +37,4 @@ Implementing bead pan-569-f4a: Playwright UAT — all implementation beads compl
 - **[2026-04-21T04:35Z] review-agent → COMMENTED** — `.planning/feedback/008-review-agent-commented.md`
 - **[2026-04-21T04:47Z] review-agent → COMMENTED** — `.planning/feedback/009-review-agent-commented.md`
 - **[2026-04-21T04:49Z] verification-gate → FAILED** — `.planning/feedback/010-verification-gate-failed.md`
+- **[2026-04-21T04:54Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/011-review-agent-changes-requested.md`
