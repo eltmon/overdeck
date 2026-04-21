@@ -30,6 +30,8 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string;
       message: ChatMessage;
+      /** Timestamp of the preceding user message — used for duration display. */
+      durationStart: string;
     }
   | {
       kind: 'working';
@@ -68,6 +70,37 @@ export function deriveTimelineEntries(
   });
 }
 
+// ─── computeMessageDurationStart ──────────────────────────────────────────────
+
+/**
+ * Compute the duration-start timestamp for each message.
+ *
+ * For assistant messages, duration starts at the most recent user message
+ * (the request that triggered the response). This lets us keep createdAt as
+ * the actual response time (for correct chronological interleaving with work
+ * log entries) while still showing accurate response durations.
+ *
+ * Mirrors T3Code's computeMessageDurationStart.
+ */
+export function computeMessageDurationStart(
+  messages: ReadonlyArray<ChatMessage>,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  let lastBoundary: string | null = null;
+
+  for (const message of messages) {
+    if (message.role === 'user') {
+      lastBoundary = message.createdAt;
+    }
+    result.set(message.id, lastBoundary ?? message.createdAt);
+    if (message.role === 'assistant' && message.completedAt) {
+      lastBoundary = message.completedAt;
+    }
+  }
+
+  return result;
+}
+
 // ─── deriveMessagesTimelineRows ───────────────────────────────────────────────
 
 /**
@@ -81,6 +114,10 @@ export function deriveMessagesTimelineRows(
 ): MessagesTimelineRow[] {
   const rows: MessagesTimelineRow[] = [];
   let i = 0;
+
+  const durationStartByMessageId = computeMessageDurationStart(
+    timelineEntries.flatMap((entry) => (entry.kind === 'message' ? [entry.message] : [])),
+  );
 
   while (i < timelineEntries.length) {
     const entry = timelineEntries[i]!;
@@ -106,6 +143,7 @@ export function deriveMessagesTimelineRows(
         id: entry.id,
         createdAt: entry.createdAt,
         message: entry.message,
+        durationStart: durationStartByMessageId.get(entry.message.id) ?? entry.message.createdAt,
       });
       i++;
     }

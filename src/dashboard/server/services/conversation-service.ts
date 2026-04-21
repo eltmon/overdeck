@@ -424,9 +424,10 @@ export async function parseConversationMessages(
           id: entry.uuid ?? msg.id ?? `asst-${messages.length}`,
           role: 'assistant',
           text: assistantText,
-          // createdAt = when the user sent the request (for duration calculation)
-          // completedAt = when this assistant response finished
-          createdAt: lastUserTimestamp ?? entry.timestamp ?? new Date().toISOString(),
+          // createdAt = when the assistant response was generated (preserves
+          // chronological order for interleaving with work log entries).
+          // Duration start is computed separately in session-logic.ts.
+          createdAt: entry.timestamp ?? new Date().toISOString(),
           // Any terminal stop reason (end_turn, max_tokens, stop_sequence) marks the response as done.
           // tool_use means more exchanges are coming, so leave completedAt unset.
           // Use || fallback in case entry.timestamp is null (not just undefined).
