@@ -25,6 +25,7 @@ import {
   buildReviewFeedbackBody,
   waitForReviewer,
   getFilesChangedFromPR,
+  sanitizeReviewFilesChanged,
   selectCompletedReviewers,
   resolveTemplatePath,
   runParallelReview,
@@ -260,6 +261,24 @@ describe('waitForReviewer', () => {
 
 // ── getFilesChangedFromPR ─────────────────────────────────────────────────────
 
+describe('sanitizeReviewFilesChanged', () => {
+  it('excludes planning and Panopticon artifact files from reviewer context', () => {
+    expect(sanitizeReviewFilesChanged([
+      '.planning/STATE.md',
+      'src/lib/tmux.ts',
+      'docs/prds/active/PAN-704/plan.md',
+      '.pan/review/run-1/correctness.md',
+      '.panopticon/prompts/foo.md',
+      'src/dashboard/frontend/src/components/PlanningChips.tsx',
+      '',
+      '   ',
+    ])).toEqual([
+      'src/lib/tmux.ts',
+      'src/dashboard/frontend/src/components/PlanningChips.tsx',
+    ]);
+  });
+});
+
 describe('getFilesChangedFromPR', () => {
   it('parses gh CLI output into file list', async () => {
     const execFn = vi.fn().mockResolvedValue({
@@ -292,7 +311,7 @@ describe('getFilesChangedFromPR', () => {
     expect(files).toEqual(['src/a.ts', 'src/b.ts']);
   });
 
-  it('excludes planning and Panopticon artifact files from reviewer context', async () => {
+  it('excludes planning and Panopticon artifact files from gh output', async () => {
     const execFn = vi.fn().mockResolvedValue({
       stdout: '.planning/STATE.md\nsrc/lib/tmux.ts\ndocs/prds/active/PAN-704/plan.md\n.pan/review/run-1/correctness.md\n.panopticon/prompts/foo.md\nsrc/dashboard/frontend/src/components/PlanningChips.tsx\n',
       stderr: '',
@@ -869,6 +888,33 @@ describe('runParallelReview', () => {
     expect(postReviewFn).not.toHaveBeenCalled();
     expect(result.reviewResult).toBe('COMMENTED');
     expect(result.notes).toContain('correctness');
+  });
+
+  it('sanitizes pre-populated filesChanged before building reviewer prompts', async () => {
+    const spawnFn = vi.fn().mockResolvedValue(undefined);
+    const waitFn = vi.fn()
+      .mockResolvedValueOnce('completed')
+      .mockResolvedValueOnce('completed');
+    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
+    const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
+    const postReviewFn = vi.fn().mockResolvedValue(undefined);
+    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+
+    const { reviewId } = await runParallelReview(
+      {
+        ...baseContext(),
+        filesChanged: ['.planning/STATE.md', 'src/lib/tmux.ts', '.pan/review/old.md'],
+      },
+      ['.planning/STATE.md', 'src/lib/tmux.ts', '.pan/review/old.md'],
+      [{ name: 'correctness', focus: ['logic'] }],
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
+    );
+
+    const promptPath = join(tmpDir, '.pan', 'review', reviewId, 'correctness-prompt.md');
+    const prompt = readFileSync(promptPath, 'utf-8');
+    expect(prompt).toContain('src/lib/tmux.ts');
+    expect(prompt).not.toContain('.planning/STATE.md');
+    expect(prompt).not.toContain('.pan/review/old.md');
   });
 });
 

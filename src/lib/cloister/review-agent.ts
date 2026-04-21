@@ -112,6 +112,16 @@ export function getReviewAgents(): ReviewAgentConfig[] {
 /**
  * Get files changed in PR using gh CLI (non-blocking)
  */
+export function sanitizeReviewFilesChanged(filesChanged: string[]): string[] {
+  return filesChanged
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !line.startsWith('.planning/'))
+    .filter((line) => !line.startsWith('docs/prds/'))
+    .filter((line) => !line.startsWith('.pan/'))
+    .filter((line) => !line.startsWith('.panopticon/'));
+}
+
 export async function getFilesChangedFromPR(
   prUrl: string,
   projectPath: string,
@@ -123,14 +133,7 @@ export async function getFilesChangedFromPR(
       encoding: 'utf-8',
     });
 
-    return (stdout as string)
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .filter((line) => !line.startsWith('.planning/'))
-      .filter((line) => !line.startsWith('docs/prds/'))
-      .filter((line) => !line.startsWith('.pan/'))
-      .filter((line) => !line.startsWith('.panopticon/'));
+    return sanitizeReviewFilesChanged((stdout as string).split('\n'));
   } catch (error) {
     console.error('Failed to get files changed from PR:', error);
     return [];
@@ -640,10 +643,12 @@ export async function runParallelReview(
   const outputDir = join(context.projectPath, '.pan', 'review', reviewId);
   await mkdir(outputDir, { recursive: true });
 
+  const sanitizedFilesChanged = sanitizeReviewFilesChanged(filesChanged);
+
   // ── Phase 1: Spawn all reviewers in parallel ──────────────────────────────
   // Reviewers run from the main Panopticon codebase, so file paths must be
   // absolute (or explicitly relative to the workspace) for them to locate files.
-  const absoluteFilesChanged = filesChanged.map(f =>
+  const absoluteFilesChanged = sanitizedFilesChanged.map(f =>
     f.startsWith('/') ? f : join(context.projectPath, f),
   );
 
@@ -850,7 +855,7 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
 
   try {
     // Get files changed from PR if not provided
-    let filesChanged = context.filesChanged || [];
+    let filesChanged = sanitizeReviewFilesChanged(context.filesChanged || []);
     if (filesChanged.length === 0) {
       filesChanged = await getFilesChangedFromPR(context.prUrl, context.projectPath);
     }
