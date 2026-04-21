@@ -5,6 +5,7 @@ import { Agent } from '../types';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 import { MessagesTimeline } from './chat/MessagesTimeline';
 import type { ChatMessage } from './chat/chat-types';
+import { ActivityView } from './MissionControl/ActivityView';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -37,9 +38,39 @@ async function fetchOutput(agentId: string): Promise<string> {
 }
 
 
+function derivePlanningIssueId(agent: Agent): string | undefined {
+  if (agent.issueId) return agent.issueId;
+  // planning-pan-503 → PAN-503
+  const m = agent.id.match(/^planning-([a-z]+)-(\d+)$/i);
+  if (m) return `${m[1].toUpperCase()}-${m[2]}`;
+  return undefined;
+}
+
 export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
   const activeSession = sessionNameProp ?? agent.id;
   const displayTitle = titleProp ?? agent.id;
+
+  // Planning agents show ActivityView instead of a live terminal
+  const isPlanning = agent.agentPhase === 'planning' || agent.id.startsWith('planning-');
+  const planningIssueId = isPlanning ? derivePlanningIssueId(agent) : undefined;
+  if (isPlanning && planningIssueId) {
+    return (
+      <div className="flex flex-col h-full min-w-0" style={{ backgroundColor: '#0d1117' }}>
+        <div
+          className="flex items-center justify-between px-3 py-1.5 border-b shrink-0"
+          style={{ borderColor: '#232f48', backgroundColor: '#161b26' }}
+        >
+          <span className="text-xs font-medium" style={{ color: '#92a4c9' }}>{planningIssueId}</span>
+          <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: '#92a4c9' }} title="Close terminal">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto">
+          <ActivityView issueId={planningIssueId} />
+        </div>
+      </div>
+    );
+  }
   const terminalRef = useRef<HTMLPreElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
