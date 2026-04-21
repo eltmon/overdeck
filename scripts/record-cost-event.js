@@ -354,7 +354,11 @@ function initSchema(db) {
       stuck_at              TEXT,
       stuck_details         TEXT,
       -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
-      reviewed_at_commit    TEXT
+      reviewed_at_commit    TEXT,
+      -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
+      review_spawned_at     TEXT,
+      -- PAN-699: number of test-agent dispatch retries (circuit breaker)
+      test_retry_count      INTEGER DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -559,7 +563,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 23`);
+	db.pragma(`user_version = 24`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -567,7 +571,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 23) return;
+	if (currentVersion === 24) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -802,7 +806,15 @@ function runMigrations(db) {
 	if (currentVersion < 23) try {
 		db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`);
 	} catch {}
-	db.pragma(`user_version = 23`);
+	if (currentVersion < 24) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`);
+		} catch {}
+	}
+	db.pragma(`user_version = 24`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

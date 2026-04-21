@@ -101,9 +101,8 @@ export function ActionsSection({
   const reviewActionHint = !reviewStatus ? null : (() => {
     if (reviewStatus.verificationStatus === 'failed') {
       return {
-        label: 'Next: Review & Test',
-        detail: reviewStatus.verificationNotes || 'Verification failed.',
-        title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+        label: 'Fix build gate errors, then re-run',
+        title: 'Build gate (typecheck/lint) failed — fix the errors before review can start.',
       };
     }
     if (reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked') {
@@ -172,11 +171,10 @@ export function ActionsSection({
       )}
       {reviewActionHint && (
         <div
-          className="mt-2 rounded border border-warning/40 badge-bg-warning px-2 py-1.5 text-xs text-warning-foreground"
+          className="mt-2 rounded border border-warning/40 badge-bg-warning px-2 py-1 text-xs text-warning-foreground"
           title={reviewActionHint.title}
         >
-          <div className="font-medium">{reviewActionHint.label}</div>
-          <div className="mt-1 text-warning-foreground/80">{reviewActionHint.detail}</div>
+          <span className="font-medium">{reviewActionHint.label}</span>
         </div>
       )}
 

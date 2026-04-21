@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 import {
   DndContext,
@@ -1300,6 +1300,42 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const grouped = groupByStatus(filteredIssues, includeCompleted);
 
+  // Fetch planning-complete state for all Todo issues so we can sort
+  // "ready to start" items to the top of the Todo column.
+  const todoPlanningStates = useQueries({
+    queries: (grouped.todo ?? []).map(issue => ({
+      queryKey: ['planning-state', issue.identifier],
+      queryFn: async () => {
+        const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
+        if (!res.ok) return { planningComplete: false };
+        return res.json() as Promise<{ planningComplete: boolean }>;
+      },
+      staleTime: 30000,
+    })),
+  });
+
+  const planningCompleteById = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    (grouped.todo ?? []).forEach((issue, i) => {
+      map[issue.identifier] = todoPlanningStates[i]?.data?.planningComplete ?? false;
+    });
+    return map;
+  }, [grouped.todo, todoPlanningStates]);
+
+  // Sort Todo: planning-complete first, then updatedAt desc
+  const sortedGrouped = useMemo(() => {
+    const result = { ...grouped };
+    if (result.todo) {
+      result.todo = [...result.todo].sort((a, b) => {
+        const aReady = planningCompleteById[a.identifier] ? 1 : 0;
+        const bReady = planningCompleteById[b.identifier] ? 1 : 0;
+        if (aReady !== bReady) return bReady - aReady;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+    }
+    return result;
+  }, [grouped, planningCompleteById]);
+
   return (
     <div className="space-y-4">
       {/* Filter bar */}
@@ -1531,11 +1567,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <div className="px-4 py-3 border-b border-divider bg-surface-raised">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                      <span className="text-sm text-content-subtle">{grouped[status].length}</span>
+                      <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
                     </div>
                   </div>
                   <ColumnContent
-                    issues={grouped[status]}
+                    issues={sortedGrouped[status]}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -2166,7 +2202,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     queryFn: async () => {
       const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
       if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number }>;
+      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number; planningComplete: boolean }>;
     },
     enabled: !!issue.identifier,
     refetchInterval: 30000,
@@ -2174,6 +2210,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   });
   const hasPlan = planningStateQuery.data?.hasPlan ?? false;
   const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
+  const planningComplete = planningStateQuery.data?.planningComplete ?? false;
   const needsTaskGeneration = hasPlan && beadsCount === 0;
 
   const generateTasksMutation = useMutation({
@@ -2598,6 +2635,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Planning
               </button>
             )}
+            {/* Planning Complete badge — planning done, waiting for user to start work agent */}
+            {planningComplete && !isRunning && !isTerminal && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold badge-bg-success text-success-foreground border badge-border-success uppercase tracking-wide"
+                title="Planning complete — click Start Agent to begin implementation"
+              >
+                <Sparkles className="w-3 h-3" />
+                Ready
+              </span>
+            )}
             {/* Workspace location badge - shows for any agent with a workspace */}
             {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
               <span
@@ -2883,10 +2930,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 ref={startButtonRef}
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending || isStarting}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors rounded px-2 py-1 disabled:opacity-50"
                 title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
               >
                 {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
               </button>
             </>
           )}
@@ -2930,7 +2978,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               ref={startButtonRef}
               onClick={handleStartAgent}
               disabled={startAgentMutation.isPending || isStarting}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
               title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
             >
               {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}

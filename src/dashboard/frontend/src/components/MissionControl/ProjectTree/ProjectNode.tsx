@@ -20,6 +20,7 @@ export interface ProjectFeature {
   completedCount?: number;
   inProgressCount?: number;
   rawTrackerState?: string;
+  readyForMerge?: boolean;
 }
 
 interface ProjectNodeProps {

@@ -59,6 +59,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityTts: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({

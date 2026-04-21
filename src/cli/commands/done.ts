@@ -321,6 +321,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       comment: options.comment,
     }));
 
+    // Step 4b: Atomically initialize review status in SQLite so the pipeline
+    // can proceed even if the dashboard is offline. The HTTP trigger below is
+    // an optimization — deacon will pick this up if it fails.
+    setReviewStatus(issueId, {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      verificationStatus: 'pending',
+      verificationCycleCount: 0,
+      autoRequeueCount: 0,
+    });
+
     spinner.succeed(`Work complete: ${issueId}`);
     console.log('');
 

@@ -98,6 +98,10 @@ export const ReviewStatusSnapshot = Schema.Struct({
   stuckDetails: Schema.optional(Schema.String),
   /** Commit SHA at which review passed; deacon uses this to detect new pushes after review */
   reviewedAtCommit: Schema.optional(Schema.String),
+  /** PAN-699: timestamp when review agents were dispatched */
+  reviewSpawnedAt: Schema.optional(Schema.String),
+  /** PAN-699: number of test-agent dispatch retries */
+  testRetryCount: Schema.optional(Schema.Number),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

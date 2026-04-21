@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /**
  * Initialize the complete database schema.
@@ -84,7 +84,11 @@ export function initSchema(db: Database.Database): void {
       stuck_at              TEXT,
       stuck_details         TEXT,
       -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
-      reviewed_at_commit    TEXT
+      reviewed_at_commit    TEXT,
+      -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
+      review_spawned_at     TEXT,
+      -- PAN-699: number of test-agent dispatch retries (circuit breaker)
+      test_retry_count      INTEGER DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -641,6 +645,14 @@ export function runMigrations(db: Database.Database): void {
   // Deacon's circuit breaker for failed-merge retries — must persist across restarts.
   if (currentVersion < 23) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
+  }
+
+  // v23 → v24: add review_spawned_at and test_retry_count columns (PAN-699)
+  // review_spawned_at: tracks when parallel review was dispatched for orphan detection
+  // test_retry_count: circuit breaker for test-agent dispatch retries
+  if (currentVersion < 24) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

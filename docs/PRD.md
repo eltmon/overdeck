@@ -123,6 +123,8 @@ Panopticon sits **above** individual projects and manages them:
 
 ### Unified Architecture
 
+![Panopticon System Architecture](./diagrams/panopticon-architecture.png)
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      PANOPTICON v2.0                             │

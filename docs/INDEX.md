@@ -21,6 +21,7 @@
 | Document | Description |
 |----------|-------------|
 | [AGENTS.md](../AGENTS.md) | Agent system architecture and lifecycle |
+| [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
@@ -101,6 +102,7 @@
 | [SETTINGS-UI-DESIGN.md](./SETTINGS-UI-DESIGN.md) | Settings page design and implementation |
 | [god-view.md](./god-view.md) | God View — real-time agent activity command center (PAN-341) |
 | [DESKTOP-APP.md](./DESKTOP-APP.md) | Electron desktop app — tray, notifications, auto-start, IPC bridge, protocol handler |
+| [React Architecture Diagram](./diagrams/react-architecture.png) | Dashboard frontend component hierarchy (src/dashboard/frontend/src) — Zustand state, Effect RPC transport, feature pages, shared components, custom hooks |
 
 ---
 

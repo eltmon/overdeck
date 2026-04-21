@@ -63,6 +63,9 @@ export function derivePipelinePhase(
   } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
     phase = 'review-feedback';
     activeSession = workSession;
+  } else if (agent?.agentPhase === 'planning' && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+    phase = 'planning';
+    activeSession = workSession;
   } else if (agent?.status === 'healthy' || agent?.status === 'starting') {
     phase = 'working';
     activeSession = workSession;
@@ -74,13 +77,15 @@ export function derivePipelinePhase(
   // Build available tabs — only include tabs that are relevant to the current state
   const tabs: TerminalTab[] = [];
 
-  // Work tab: always show if agent exists
+  const isPlanningAgent = agent?.agentPhase === 'planning';
+
+  // Work/Planning tab: always show if agent exists
   if (workSession) {
     tabs.push({
-      id: 'working',
-      label: 'Work',
+      id: isPlanningAgent ? 'planning' : 'working',
+      label: isPlanningAgent ? 'Planning' : 'Work',
       sessionName: workSession,
-      isActive: phase === 'working' || phase === 'review-feedback',
+      isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback',
       disabled: deadSessions.has(workSession),
     });
   }
