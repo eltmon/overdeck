@@ -7,7 +7,7 @@
  * All file I/O uses fs/promises (no sync calls).
  */
 
-import { readdir, stat, readFile, watch } from 'node:fs/promises';
+import { readdir, stat, readFile, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
@@ -189,12 +189,20 @@ export async function parseConversationMessages(
   fromByteOffset = 0,
   priorState?: ParseState,
 ): Promise<ParseResult> {
-  const buffer = await readFile(sessionFile);
-  const text = buffer.toString('utf-8');
-  const newByteOffset = buffer.length;
+  // Read only new content from the byte offset — avoids re-reading the entire JSONL every tick
+  const fileStats = await stat(sessionFile);
+  const newByteOffset = fileStats.size;
+  const toRead = Math.max(0, newByteOffset - fromByteOffset);
 
-  // Parse only new content from the byte offset
-  const newText = text.slice(fromByteOffset);
+  let newText = '';
+  if (toRead > 0) {
+    const fh = await open(sessionFile, 'r');
+    const buf = Buffer.alloc(toRead);
+    await fh.read(buf, 0, toRead, fromByteOffset);
+    await fh.close();
+    newText = buf.toString('utf-8');
+  }
+
   const lines = newText.split('\n').filter((l) => l.trim());
 
   const messages: ChatMessage[] = [];
@@ -394,8 +402,7 @@ export async function parseConversationMessages(
   let streaming = false;
   const lastMsg = messages[messages.length - 1];
   if (lastMsg?.role === 'assistant' && !lastMsg.completedAt) {
-    const fileStat = await stat(sessionFile);
-    streaming = Date.now() - fileStat.mtimeMs < 5000;
+    streaming = Date.now() - fileStats.mtimeMs < 5000;
   }
 
   return {

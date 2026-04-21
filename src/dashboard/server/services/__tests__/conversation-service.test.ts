@@ -5,11 +5,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockReadFile = vi.fn();
 const mockStat = vi.fn();
 const mockReaddir = vi.fn();
+const mockOpen = vi.fn();
 
 vi.mock('node:fs/promises', () => ({
   readFile: mockReadFile,
   stat: mockStat,
   readdir: mockReaddir,
+  open: mockOpen,
   watch: vi.fn(() => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) })),
 }));
 
@@ -31,7 +33,24 @@ describe('parseConversationMessages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default stat: file was modified 10 seconds ago (not streaming)
-    mockStat.mockResolvedValue({ mtimeMs: Date.now() - 10_000, birthtimeMs: Date.now() - 10_000 });
+    mockStat.mockImplementation(async () => {
+      const buf = await mockReadFile();
+      return { mtimeMs: Date.now() - 10_000, birthtimeMs: Date.now() - 10_000, size: buf.length };
+    });
+    // Mock open to read from the buffer returned by mockReadFile at the given position
+    mockOpen.mockImplementation(async () => {
+      const buffer = await mockReadFile();
+      return {
+        read: (buf: Buffer, offset: number, length: number, position: number) => {
+          const toCopy = Math.min(length, Math.max(0, buffer.length - position));
+          if (toCopy > 0) {
+            buffer.copy(buf, offset, position, position + toCopy);
+          }
+          return Promise.resolve({ bytesRead: toCopy, buffer: buf });
+        },
+        close: () => Promise.resolve(),
+      };
+    });
   });
 
   it('returns empty result for an empty file', async () => {
@@ -181,7 +200,10 @@ describe('parseConversationMessages', () => {
     ];
     mockReadFile.mockResolvedValue(makeBuffer(lines));
     // File was modified 1 second ago — within the 5s streaming window
-    mockStat.mockResolvedValue({ mtimeMs: Date.now() - 1_000, birthtimeMs: Date.now() - 1_000 });
+    mockStat.mockImplementation(async () => {
+      const buf = await mockReadFile();
+      return { mtimeMs: Date.now() - 1_000, birthtimeMs: Date.now() - 1_000, size: buf.length };
+    });
 
     const { parseConversationMessages } = await import('../conversation-service.js');
     const result = await parseConversationMessages('/fake/session.jsonl');
