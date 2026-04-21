@@ -219,7 +219,7 @@ describe('searchSessions', () => {
       fileMtime: recentTs,
       tags: [],
     });
-    const result = await searchSessions({ filter: { since: 'today' } });
+    const result = await searchSessions({ filter: { since: '2h' } });
     expect(result.sessions.length).toBeGreaterThanOrEqual(1);
   });
 });
