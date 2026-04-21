@@ -6,7 +6,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -1394,6 +1394,13 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
       }
       throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
     }
+  }
+
+  // Wait for Claude prompt to be ready before sending — reduces dropped Enter
+  // when Claude Code is still initializing or rendering warning banners.
+  const promptReady = await waitForClaudePrompt(normalizedId, 5000);
+  if (!promptReady) {
+    console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
   }
 
   await sendKeysAsync(normalizedId, message);
