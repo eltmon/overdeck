@@ -76,7 +76,9 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
+      { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
+      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: FlaskConical, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
     ],
   },
   zai: {
@@ -196,7 +198,13 @@ export function getModelById(id: ModelId): ModelDef | undefined {
   if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');
   if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
 
-  // Kimi models
+  // Kimi models — order matters: specific patterns before broad ones
+  if (idLower.includes('k2.6-code-preview') || idLower.includes('k2.6-code')) {
+    return models.find(m => m.id === 'K2.6-code-preview');
+  }
+  if (idLower.includes('kimi-k2.6') || idLower.includes('k2.6')) {
+    return models.find(m => m.id === 'kimi-k2.6');
+  }
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
     return models.find(m => m.id === 'kimi-k2.5');
   }
