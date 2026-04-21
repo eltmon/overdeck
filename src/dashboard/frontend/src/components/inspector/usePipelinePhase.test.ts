@@ -295,6 +295,81 @@ describe('derivePipelinePhase precedence table', () => {
       expect(phase).toBe('planning');
     });
   });
+
+  describe('monorepo merge fallback', () => {
+    it('uses work agent session when mergeStatus is merging and work agent is healthy', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
+      });
+      const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+      expect(phase).toBe('merging');
+      expect(activeSession).toBe('agent-abc');
+      const mergeTab = availableTerminals.find(t => t.id === 'merging');
+      expect(mergeTab?.sessionName).toBe('agent-abc');
+    });
+
+    it('uses merge-agent session when work agent is stopped (polyrepo)', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'stopped' }),
+        reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
+      });
+      const { activeSession, availableTerminals } = derivePipelinePhase(input);
+      expect(activeSession).toBe('specialist-panopticon-pan-509-merge-agent');
+      const mergeTab = availableTerminals.find(t => t.id === 'merging');
+      expect(mergeTab?.sessionName).toBe('specialist-panopticon-pan-509-merge-agent');
+    });
+  });
+
+  describe('review tab disabled when review is complete', () => {
+    it('disables review tab when reviewStatus is passed', () => {
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({ reviewStatus: 'passed' }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
+      expect(reviewTab?.disabled).toBe(true);
+      expect(reviewTab?.isRunning).toBe(false);
+    });
+
+    it('disables review tab when reviewStatus is failed', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'failed' }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
+      expect(reviewTab?.disabled).toBe(true);
+      expect(reviewTab?.isRunning).toBe(false);
+    });
+
+    it('disables review tab when reviewStatus is blocked', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'blocked' }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
+      expect(reviewTab?.disabled).toBe(true);
+      expect(reviewTab?.isRunning).toBe(false);
+    });
+
+    it('disables parallel review tabs when reviewStatus is passed', () => {
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({
+          reviewStatus: 'passed',
+          reviewSessionNames: ['review-pan-509-1234567890-sme', 'review-pan-509-1234567890-security'],
+        }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const smeTab = availableTerminals.find(t => t.id === 'reviewing-sme');
+      const secTab = availableTerminals.find(t => t.id === 'reviewing-security');
+      expect(smeTab?.disabled).toBe(true);
+      expect(secTab?.disabled).toBe(true);
+      expect(smeTab?.isRunning).toBe(false);
+      expect(secTab?.isRunning).toBe(false);
+    });
+  });
 });
 
 // ─── availableTerminals tests ──────────────────────────────────────────────────

@@ -57,7 +57,14 @@ export function derivePipelinePhase(
 
   if (ms === 'queued' || ms === 'merging' || ms === 'verifying') {
     phase = 'merging';
-    activeSession = deadSessions.has(mergeSession) ? null : mergeSession;
+    // Monorepo merges use the work agent for rebase (no merge-agent is spawned).
+    // Polyrepo merges spawn a merge-agent (work agent is stopped by then).
+    // If the work agent is alive, it's handling the merge — stream it.
+    if (workSession && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+      activeSession = workSession;
+    } else {
+      activeSession = deadSessions.has(mergeSession) ? null : mergeSession;
+    }
   } else if (ms === 'merged') {
     phase = 'merged';
     activeSession = null;
@@ -104,6 +111,7 @@ export function derivePipelinePhase(
 
   // Review tab: show once review has started (not just pending)
   const reviewSubStatuses = reviewStatus?.reviewSubStatuses;
+  const isReviewDone = rs === 'passed' || rs === 'failed' || rs === 'blocked';
   if (rs && rs !== 'pending') {
     if (reviewSessionNames && reviewSessionNames.length > 0) {
       for (const sessionName of reviewSessionNames) {
@@ -114,8 +122,8 @@ export function derivePipelinePhase(
           label: `Review (${role})`,
           sessionName,
           isActive: phase === 'reviewing' && activeSession === sessionName,
-          disabled: deadSessions.has(sessionName) || isDone,
-          isRunning: phase === 'reviewing' && !isDone,
+          disabled: deadSessions.has(sessionName) || isDone || isReviewDone,
+          isRunning: phase === 'reviewing' && !isDone && !isReviewDone,
         });
       }
     } else {
@@ -124,8 +132,8 @@ export function derivePipelinePhase(
         label: 'Review',
         sessionName: reviewSession,
         isActive: phase === 'reviewing',
-        disabled: deadSessions.has(reviewSession),
-        isRunning: phase === 'reviewing',
+        disabled: deadSessions.has(reviewSession) || isReviewDone,
+        isRunning: phase === 'reviewing' && !isReviewDone,
       });
     }
   }
@@ -144,12 +152,16 @@ export function derivePipelinePhase(
 
   // Merge tab: show once merge has been queued or beyond
   if (ms && ms !== 'pending') {
+    // Monorepo merges stream the work agent (it handles rebase); polyrepo uses merge-agent.
+    const effectiveMergeSession = (workSession && (agent?.status === 'healthy' || agent?.status === 'starting'))
+      ? workSession
+      : mergeSession;
     tabs.push({
       id: 'merging',
       label: 'Merge',
-      sessionName: mergeSession,
+      sessionName: effectiveMergeSession,
       isActive: phase === 'merging',
-      disabled: ms === 'merged' || deadSessions.has(mergeSession),
+      disabled: ms === 'merged' || deadSessions.has(effectiveMergeSession),
       isRunning: phase === 'merging',
     });
   }
