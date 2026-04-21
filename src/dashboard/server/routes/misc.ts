@@ -71,6 +71,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
+import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
 
 const execAsync = promisify(exec);
 
@@ -756,6 +757,44 @@ const postDeaconPatrolRoute = HttpRouter.add(
         { status: 500 },
       );
       }}),
+);
+
+// ─── Route: GET /api/deacon/pause ────────────────────────────────────────────
+
+/**
+ * Read the persisted global Deacon pause flag. Distinct from runtime `isRunning`:
+ * paused means the patrol timer still fires but every cycle short-circuits.
+ */
+const getDeaconPauseRoute = HttpRouter.add(
+  'GET',
+  '/api/deacon/pause',
+  Effect.try({
+    try: () => jsonResponse({ paused: isDeaconGloballyPaused() }),
+    catch: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: 'Failed to read deacon pause flag: ' + msg }, { status: 500 });
+    },
+  }),
+);
+
+// ─── Route: POST /api/deacon/pause ───────────────────────────────────────────
+
+/**
+ * Toggle the persisted global Deacon pause flag. Body: `{ paused: boolean }`.
+ * Persists to `app_settings` so the flag survives dashboard restarts.
+ */
+const postDeaconPauseRoute = HttpRouter.add(
+  'POST',
+  '/api/deacon/pause',
+  httpHandler(Effect.gen(function* () {
+    const body = (yield* readJsonBody) as { paused?: unknown };
+    if (typeof body.paused !== 'boolean') {
+      return jsonResponse({ error: 'Body must include { paused: boolean }' }, { status: 400 });
+    }
+    setDeaconGloballyPaused(body.paused);
+    console.log(`[deacon] Global pause flag set to ${body.paused}`);
+    return jsonResponse({ paused: isDeaconGloballyPaused() });
+  })),
 );
 
 // ─── Route: GET /api/version ──────────────────────────────────────────────────
@@ -1728,6 +1767,8 @@ export const miscRouteLayer = Layer.mergeAll(
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,
+  getDeaconPauseRoute,
+  postDeaconPauseRoute,
   getVersionRoute,
   getRegisteredProjectsRoute,
   getConfirmationsRoute,

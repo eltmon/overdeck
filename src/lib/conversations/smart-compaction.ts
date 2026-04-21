@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { getProviderEnvForModel } from '../agents.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 
@@ -608,8 +609,21 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
     '--permission-mode', 'bypassPermissions',
   ];
 
+  let providerEnv: Record<string, string> = {};
+  try {
+    providerEnv = getProviderEnvForModel(useModel);
+    const injectedKeys = Object.keys(providerEnv);
+    if (injectedKeys.length > 0) {
+      console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
+    } else {
+      console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel} (anthropic, no provider env needed)`);
+    }
+  } catch (err) {
+    console.warn(`[smart-compaction] Provider env lookup failed for ${useModel}:`, err instanceof Error ? err.message : String(err));
+  }
+
   const child = spawn('claude', args, {
-    env: process.env as Record<string, string>,
+    env: { ...process.env, ...providerEnv } as Record<string, string>,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
