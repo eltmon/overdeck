@@ -70,7 +70,9 @@ setPipelineHandler((event) => {
         timestamp: new Date().toISOString(),
         payload: { issueId: event.issueId, status: event.status },
       } as any);
-    } catch { /* non-fatal — event store may not be ready during early boot */ }
+    } catch (err) {
+      console.error('[pipeline] Failed to append status_changed event:', err);
+    }
   }
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');
@@ -86,7 +88,9 @@ setAgentStoppedNotifier((agentId) => {
       timestamp: new Date().toISOString(),
       payload: { agentId },
     } as any);
-  } catch { /* non-fatal — event store may not be ready during early boot */ }
+  } catch (err) {
+    console.error('[pipeline] Failed to append agent.stopped event:', err);
+  }
 });
 console.log('[panopticon] Agent stopped notifier → domain events wired');
 
@@ -102,7 +106,9 @@ setMergeReadyNotifier((issueId) => {
       timestamp: new Date().toISOString(),
       payload: { issueId, status },
     } as any);
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    console.error('[pipeline] Failed to append merge-ready event:', err);
+  }
 });
 console.log('[panopticon] Merge-ready notifier → domain events wired');
 
