@@ -331,7 +331,7 @@ export async function copyToPRDDirectory(
 
 /**
  * Execute the full plan creation pipeline.
- * Used by both CLI `pan plan` and dashboard `POST /api/issues/:id/plan`.
+ * Used by dashboard `POST /api/issues/:id/plan` and `pan plan-finalize`.
  */
 export async function executePlan(
   issue: PlanIssue,

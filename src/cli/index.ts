@@ -50,7 +50,6 @@ import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
-import { planCommand } from './commands/plan.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
@@ -201,19 +200,10 @@ review
   .option('--session', 'Also clear saved Claude session')
   .action(resetReviewCommand);
 
-// pan plan <id> and pan plan finalize <id>
+// pan plan finalize <id>
 const planCmd = program
   .command('plan')
-  .description('Create execution plan for an issue, or finalize an existing plan');
-
-planCmd
-  .argument('<id>', 'issue ID to plan for')
-  .option('-o, --output <path>', 'Write the plan JSON to a file')
-  .option('--json', 'Emit plan as JSON (in addition to the interactive flow)')
-  .option('--skip-discovery', 'Skip the interactive discovery phase')
-  .option('--force', 'Create the plan even when the issue is not marked as complex')
-  .option('--shadow', 'Track status locally in shadow mode instead of updating the tracker')
-  .action(planCommand);
+  .description('Finalize an existing plan');
 
 planCmd
   .command('finalize')
