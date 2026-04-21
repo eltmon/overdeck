@@ -142,7 +142,47 @@ export const ReadModelServiceLive = Layer.effect(
       projectionCache?.save(buildSnapshot());
     };
 
-    const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.sync(() => buildSnapshot());
+    const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
+      // Refresh review statuses from DB before building snapshot.
+      // Defensive: the event-driven path should keep these in sync, but if an
+      // event is lost (e.g. pipeline notifier throws silently) the read model
+      // can drift. Reloading from SQLite guarantees the snapshot is authoritative.
+      try {
+        const { loadReviewStatuses: loadStatuses } = yield* Effect.promise(
+          () => import('../../lib/review-status.js'),
+        );
+        const statusMap = loadStatuses();
+        state = {
+          ...state,
+          reviewStatusByIssueId: Object.fromEntries(
+            Object.values(statusMap).map((status) => [
+              status.issueId,
+              toReviewStatusSnapshot(status),
+            ]),
+          ),
+        };
+      } catch (err) {
+        console.error('[ReadModel] Failed to refresh review statuses for snapshot:', err);
+      }
+
+      // Refresh issues from the shared issue service before building snapshot.
+      // IssueDataService polls trackers in the background; its cached issues are
+      // the freshest available without blocking on API calls.
+      try {
+        const { getSharedIssueService } = yield* Effect.promise(
+          () => import('./services/issue-service-singleton.js'),
+        );
+        const issueService = getSharedIssueService();
+        const currentIssues = JSON.parse(JSON.stringify(issueService.getIssues()));
+        if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
+          state = { ...state, issuesRaw: currentIssues };
+        }
+      } catch (err) {
+        console.error('[ReadModel] Failed to refresh issues for snapshot:', err);
+      }
+
+      return buildSnapshot();
+    });
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
