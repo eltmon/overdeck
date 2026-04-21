@@ -413,12 +413,22 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
   // separate delete-buffer round-trip.
   const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
+  // Use a named tmux buffer so concurrent sendKeysAsync calls (e.g. spawning
+  // 4 parallel reviewers) don't race on the global unnamed buffer.
+  const bufferName = `pan-${sendId}`;
 
   try {
     await writeFile(tmpFile, keys, 'utf-8');
-    await tmuxExecAsync(['load-buffer', tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-d', '-t', sessionName], { encoding: 'utf-8' });
-    await new Promise(r => setTimeout(r, 300));
+    await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName], { encoding: 'utf-8' });
+    // Explicitly delete the named buffer — paste-buffer -d only drops the default buffer.
+    await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
+    // Scale delay with prompt size — large pastes need more time to render before
+    // Enter arrives. 15ms/line, clamped 300ms–3s. (PAN-699: 300ms was insufficient
+    // for 200+ line prompts, causing Enter to be swallowed by Claude Code's paste
+    // handling and leaving reviewers idle.)
+    const delayMs = Math.max(300, Math.min(3000, keys.split('\n').length * 15));
+    await new Promise(r => setTimeout(r, delayMs));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } finally {
     await unlink(tmpFile).catch(() => {});
@@ -432,11 +442,14 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
+  const bufferName = `pan-${sendId}`;
   try {
     writeFileSync(tmpFile, keys);
-    tmuxExecSync(['load-buffer', tmpFile]);
-    tmuxExecSync(['paste-buffer', '-t', sessionName]);
+    tmuxExecSync(['load-buffer', '-b', bufferName, tmpFile]);
+    tmuxExecSync(['paste-buffer', '-b', bufferName, '-t', sessionName]);
+    try { tmuxExecSync(['delete-buffer', '-b', bufferName], { stdio: 'ignore' }); } catch {}
     execSync('sleep 0.3');
     tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
   } finally {
