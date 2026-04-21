@@ -7,7 +7,7 @@
  * All file I/O uses fs/promises (no sync calls).
  */
 
-import { readdir, stat, readFile, watch, open } from 'node:fs/promises';
+import { readdir, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
@@ -39,6 +39,8 @@ export interface ParseResult {
   unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
   /** Last sequence number assigned (persist across incremental calls). */
   lastSequence: number;
+  /** File modification time in ms from the stat call made during parsing. */
+  mtimeMs: number;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -195,6 +197,22 @@ export async function parseConversationMessages(
   // Read only new content from the byte offset — avoids re-reading the entire JSONL every tick
   const fileStats = await stat(sessionFile);
   const fileSize = fileStats.size;
+
+  // File was truncated or rotated since last read — signal reset to caller
+  if (fromByteOffset > fileSize) {
+    return {
+      messages: [],
+      workLog: [],
+      byteOffset: 0,
+      streaming: false,
+      totalCost: 0,
+      pendingToolUse: priorState?.pendingToolUse ?? new Map(),
+      unresolvedResults: priorState?.unresolvedResults ?? new Map(),
+      lastSequence: priorState?.lastSequence ?? 0,
+      mtimeMs: fileStats.mtimeMs,
+    };
+  }
+
   const toRead = Math.max(0, Math.min(fileSize - fromByteOffset, MAX_READ_BYTES));
   const isIncremental = fromByteOffset > 0;
 
@@ -471,6 +489,7 @@ export async function parseConversationMessages(
     pendingToolUse,
     unresolvedResults,
     lastSequence: sequence,
+    mtimeMs: fileStats.mtimeMs,
   };
 }
 
@@ -479,8 +498,11 @@ export async function summarizeConversationActivity(
 ): Promise<ConversationActivitySummary> {
   // Parse from the last compact boundary instead of the full file — avoids
   // re-reading potentially megabytes of history on every list enrichment tick.
-  const { messages, streaming, pendingToolUse } = await parseFromLastCompactBoundary(
+  // Pass an empty priorState so pendingToolUse stays populated rather than being
+  // flushed into workLog. This lets us detect genuinely pending tools.
+  const { messages, streaming, pendingToolUse, mtimeMs } = await parseFromLastCompactBoundary(
     sessionFile,
+    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
   );
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
@@ -496,8 +518,7 @@ export async function summarizeConversationActivity(
   // parallel tool calls where multiple tools are in flight simultaneously.
   // Time-bound: if the file hasn't been modified in 30s, the agent has likely crashed
   // and pending tools are stale — don't report a stale currentTool.
-  const fileStats = await stat(sessionFile);
-  const fileRecent = Date.now() - fileStats.mtimeMs < 30_000;
+  const fileRecent = Date.now() - mtimeMs < 30_000;
 
   let currentTool: string | null = null;
   if (fileRecent) {
@@ -539,24 +560,69 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
     return cached.boundaryOffset;
   }
 
-  // No cache or file shrank — read entire file
+  // No cache or file shrank — scan entire file in capped chunks
   if (!cached || fileSize < cached.scannedUpTo) {
-    const buffer = await readFile(sessionFile);
-    const text = buffer.toString('utf-8');
-
     let lastBoundaryOffset = 0;
-    let bytePos = 0;
-    const lines = text.split('\n');
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const entry = JSON.parse(line);
-          if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
-            lastBoundaryOffset = bytePos;
-          }
-        } catch { /* skip invalid lines */ }
+    let scanPos = 0;
+
+    while (scanPos < fileSize) {
+      const toRead = Math.min(fileSize - scanPos, MAX_READ_BYTES);
+      const fh = await open(sessionFile, 'r');
+      let buf: Buffer;
+      let bytesRead: number;
+      try {
+        buf = Buffer.alloc(toRead);
+        const result = await fh.read(buf, 0, toRead, scanPos);
+        bytesRead = result.bytesRead;
+      } finally {
+        await fh.close();
       }
-      bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+
+      if (bytesRead === 0) break;
+
+      let scanBytes = bytesRead;
+      const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+
+      if (lastNewline !== -1) {
+        scanBytes = lastNewline + 1;
+      } else if (scanPos + bytesRead < fileSize) {
+        // No newline in chunk and more file remains — read rest of file
+        const remaining = fileSize - scanPos;
+        const fullBuf = Buffer.alloc(remaining);
+        const fh2 = await open(sessionFile, 'r');
+        let fullBytesRead: number;
+        try {
+          const result = await fh2.read(fullBuf, 0, remaining, scanPos);
+          fullBytesRead = result.bytesRead;
+        } finally {
+          await fh2.close();
+        }
+        const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+        if (fullLastNewline !== -1) {
+          scanBytes = fullLastNewline + 1;
+          buf = fullBuf;
+        } else {
+          scanBytes = fullBytesRead;
+          buf = fullBuf;
+        }
+      }
+
+      const text = buf.toString('utf-8', 0, scanBytes);
+      let bytePos = scanPos;
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+              lastBoundaryOffset = bytePos;
+            }
+          } catch { /* skip invalid lines */ }
+        }
+        bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+      }
+
+      scanPos += scanBytes;
     }
 
     compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: fileSize });
@@ -641,9 +707,10 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
  */
 export async function parseFromLastCompactBoundary(
   sessionFile: string,
+  priorState?: ParseState,
 ): Promise<ParseResult> {
   const boundaryOffset = await findLastCompactBoundary(sessionFile);
-  return parseConversationMessages(sessionFile, boundaryOffset);
+  return parseConversationMessages(sessionFile, boundaryOffset, priorState);
 }
 
 // ─── File watcher ─────────────────────────────────────────────────────────────
