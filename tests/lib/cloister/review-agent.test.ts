@@ -77,10 +77,16 @@ describe('dispatchParallelReview', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
       reviewStatus: 'passed',
       reviewNotes: 'LGTM',
+      reviewRetryCount: 0,
+      recoveryStartedAt: undefined,
     });
   });
 
-  it('calls setReviewStatus with pending when spawnFn rejects', async () => {
+  // PAN-794: spawn rejection now writes terminal 'failed', not 'pending'.
+  // Writing 'pending' caused the orphan sweep to re-dispatch the same review
+  // indefinitely; a terminal failed status parks the issue until a new commit
+  // or human unstick opens a new recovery cycle.
+  it('calls setReviewStatus with failed when spawnFn rejects', async () => {
     const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
 
     const ret = await dispatchParallelReview(baseOpts, { spawnFn });
@@ -89,7 +95,10 @@ describe('dispatchParallelReview', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(spawnFn).toHaveBeenCalledOnce();
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', { reviewStatus: 'pending' });
+    const lastCall = mockSetReviewStatus.mock.calls[mockSetReviewStatus.mock.calls.length - 1];
+    expect(lastCall[0]).toBe('PAN-999');
+    expect(lastCall[1].reviewStatus).toBe('failed');
+    expect(typeof lastCall[1].reviewNotes).toBe('string');
   });
 
   it('maps CHANGES_REQUESTED to blocked status on success path', async () => {
@@ -102,14 +111,15 @@ describe('dispatchParallelReview', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
       reviewStatus: 'blocked',
       reviewNotes: 'Fix required',
+      reviewRetryCount: 0,
+      recoveryStartedAt: undefined,
     });
   });
 
-  it('reviewing→pending: sets reviewing optimistically then resets to pending on spawn failure', async () => {
-    // dispatchParallelReview now manages the status lifecycle internally:
+  it('reviewing→failed: sets reviewing optimistically then resets to failed on spawn failure (PAN-794)', async () => {
+    // dispatchParallelReview manages the status lifecycle internally:
     // 1. sets 'reviewing' + reviewSpawnedAt before fire-and-forget
-    // 2. resets to 'pending' in .catch if spawn fails
-    // Callers no longer set reviewStatus themselves, eliminating the race condition.
+    // 2. writes terminal 'failed' in .catch if spawn fails (PAN-794 — was 'pending')
     const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
 
     await dispatchParallelReview(baseOpts, { spawnFn });
@@ -122,7 +132,8 @@ describe('dispatchParallelReview', () => {
     expect(calls[0][0]).toBe('PAN-999');
     expect(calls[0][1].reviewStatus).toBe('reviewing');
     expect(calls[0][1].reviewSpawnedAt).toEqual(expect.any(String));
-    expect(calls[1]).toEqual(['PAN-999', { reviewStatus: 'pending' }]);
+    expect(calls[1][0]).toBe('PAN-999');
+    expect(calls[1][1].reviewStatus).toBe('failed');
   });
 });
 

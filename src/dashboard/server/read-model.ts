@@ -78,7 +78,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason'>): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -95,6 +95,13 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     stuckAt: status.stuckAt || undefined,
     stuckDetails: status.stuckDetails || undefined,
     reviewedAtCommit: status.reviewedAtCommit || undefined,
+    reviewSpawnedAt: status.reviewSpawnedAt || undefined,
+    testRetryCount: typeof status.testRetryCount === 'number' ? status.testRetryCount : undefined,
+    reviewRetryCount: typeof status.reviewRetryCount === 'number' ? status.reviewRetryCount : undefined,
+    recoveryStartedAt: status.recoveryStartedAt || undefined,
+    deaconIgnored: status.deaconIgnored === true ? true : undefined,
+    deaconIgnoredAt: status.deaconIgnoredAt || undefined,
+    deaconIgnoredReason: status.deaconIgnoredReason || undefined,
   };
 }
 

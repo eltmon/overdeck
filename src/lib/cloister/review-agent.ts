@@ -846,15 +846,26 @@ export async function dispatchParallelReview(
 
   spawnFn(context)
     .then(result => {
+      const mapped = reviewResultToReviewStatus(result.reviewResult);
+      // PAN-794: clean terminal result — reset the recovery cycle so stale infra
+      // failures from earlier cycles do not poison the breaker history window.
       setReviewStatus(opts.issueId, {
-        reviewStatus: reviewResultToReviewStatus(result.reviewResult),
+        reviewStatus: mapped,
         reviewNotes: result.notes,
+        reviewRetryCount: 0,
+        recoveryStartedAt: undefined,
       });
       console.log(`[review-agent] dispatchParallelReview finished for ${opts.issueId}: ${result.reviewResult}`);
     })
     .catch(err => {
+      // PAN-794: record a terminal 'failed' status instead of bouncing back to
+      // 'pending'. The old 'pending' reset caused the deacon orphan sweep to
+      // re-dispatch the same review indefinitely (the 25-hour infra-failure loop).
       console.error(`[review-agent] dispatchParallelReview failed for ${opts.issueId}:`, err);
-      setReviewStatus(opts.issueId, { reviewStatus: 'pending' });
+      setReviewStatus(opts.issueId, {
+        reviewStatus: 'failed',
+        reviewNotes: `Review dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     });
 
   return { success: true, message: `Parallel review dispatched for ${opts.issueId}` };

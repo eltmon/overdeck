@@ -10,6 +10,7 @@ import {
   getAllReviewStatusesFromDb,
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
+  setDeaconIgnored as dbSetDeaconIgnored,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -56,6 +57,16 @@ export interface ReviewStatus {
   reviewSpawnedAt?: string;
   /** PAN-699: number of test-agent dispatch retries (circuit breaker) */
   testRetryCount?: number;
+  /** PAN-794: number of consecutive parallel-review re-dispatch attempts within the current cycle */
+  reviewRetryCount?: number;
+  /** PAN-794: ISO timestamp when deacon began the current recovery cycle — acts as the history cutoff for the breaker */
+  recoveryStartedAt?: string;
+  /** Human-requested ignore flag: when true, Deacon patrol skips this issue entirely (distinct from `stuck`, which is a system-set failure marker). */
+  deaconIgnored?: boolean;
+  /** ISO timestamp when the ignore flag was set. */
+  deaconIgnoredAt?: string;
+  /** Optional free-form reason shown alongside the ignore toggle. */
+  deaconIgnoredReason?: string;
   /** Commits at time of review request — used to detect new commits after review */
   lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
 }
@@ -426,5 +437,25 @@ export function clearWorkspaceStuck(issueId: string): void {
     if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to clear stuck state for ${issueId}:`, err);
+  }
+}
+
+/**
+ * Set or clear the operator-requested deacon-ignore flag. When set, Deacon
+ * patrol skips the issue entirely on every cycle. Distinct from `stuck`, which
+ * is a system-set failure marker that also suppresses patrol.
+ */
+export function setDeaconIgnored(
+  issueId: string,
+  ignored: boolean,
+  reason?: string,
+): void {
+  try {
+    dbSetDeaconIgnored(issueId, ignored, reason);
+    console.log(`[review-status] deaconIgnored=${ignored} for ${issueId}${reason ? ` (${reason})` : ''}`);
+    const updated = getReviewStatus(issueId);
+    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
+  } catch (err) {
+    console.error(`[review-status] Failed to set deaconIgnored for ${issueId}:`, err);
   }
 }

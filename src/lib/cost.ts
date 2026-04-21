@@ -82,6 +82,8 @@ export interface ModelPricing {
 // ============== Pricing Data ==============
 
 export const DEFAULT_PRICING: ModelPricing[] = [
+  // Anthropic - 4.7 series
+  { provider: 'anthropic', model: 'claude-opus-4-7', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
   { provider: 'anthropic', model: 'claude-opus-4-6', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   { provider: 'anthropic', model: 'claude-sonnet-4-6', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },

@@ -74,6 +74,16 @@ function encodeClaudeProjectDir(cwdPath) {
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
+		model: "claude-opus-4-7",
+		inputPer1k: .005,
+		outputPer1k: .025,
+		cacheReadPer1k: 5e-4,
+		cacheWrite5mPer1k: .00625,
+		cacheWrite1hPer1k: .01,
+		currency: "USD"
+	},
+	{
+		provider: "anthropic",
 		model: "claude-opus-4-6",
 		inputPer1k: .005,
 		outputPer1k: .025,
@@ -358,7 +368,15 @@ function initSchema(db) {
       -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
       review_spawned_at     TEXT,
       -- PAN-699: number of test-agent dispatch retries (circuit breaker)
-      test_retry_count      INTEGER DEFAULT 0
+      test_retry_count      INTEGER DEFAULT 0,
+      -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
+      review_retry_count    INTEGER DEFAULT 0,
+      -- PAN-794: ISO timestamp marking the start of the current recovery cycle (breaker history cutoff)
+      recovery_started_at   TEXT,
+      -- Human-requested deacon ignore: when set, patrol skips this issue entirely
+      deacon_ignored          INTEGER NOT NULL DEFAULT 0,
+      deacon_ignored_at       TEXT,
+      deacon_ignored_reason   TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -416,6 +434,16 @@ function initSchema(db) {
       value       TEXT NOT NULL,  -- JSON string
       expires_at  TEXT,
       created_at  TEXT NOT NULL
+    );
+
+    -- ===== App Settings (global key/value) =====
+    -- Generic persisted settings that survive restarts. Currently used for the
+    -- global deacon pause flag; add keys here rather than spawning new tables
+    -- for every bool/string the dashboard wants to remember.
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key         TEXT PRIMARY KEY,
+      value       TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
     );
 
     -- ===== Rate Limits =====
@@ -563,7 +591,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 24`);
+	db.pragma(`user_version = 27`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -571,7 +599,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 24) return;
+	if (currentVersion === 27) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -814,7 +842,42 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`);
 		} catch {}
 	}
-	db.pragma(`user_version = 24`);
+	if (currentVersion < 25) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN review_retry_count INTEGER DEFAULT 0`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN recovery_started_at TEXT`);
+		} catch {}
+	}
+	if (currentVersion < 26) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored INTEGER NOT NULL DEFAULT 0`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_reason TEXT`);
+		} catch {}
+	}
+	if (currentVersion < 27) {
+		try {
+			db.exec(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key         TEXT PRIMARY KEY,
+          value       TEXT NOT NULL,
+          updated_at  TEXT NOT NULL
+        )
+      `);
+		} catch {}
+		try {
+			db.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`).run("deacon.globally_paused", "true", (/* @__PURE__ */ new Date()).toISOString());
+		} catch (err) {
+			console.warn("[schema] Failed to seed deacon.globally_paused:", err);
+		}
+	}
+	db.pragma(`user_version = 27`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

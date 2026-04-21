@@ -29,6 +29,7 @@ import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
 import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAnnouncement';
 import { StandaloneTerminal } from './components/StandaloneTerminal';
+import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
@@ -487,6 +488,9 @@ export default function App() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Upgrade Announcement — shown once after upgrading to 0.7.0 */}
         <UpgradeAnnouncement />
+
+        {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
+        <DeaconPauseBanner />
 
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (

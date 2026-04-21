@@ -61,12 +61,10 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
     baseUrl: 'https://api.kimi.com/coding/',
-    authType: 'credential-file',
-    credentialFile: '~/.kimi/credentials/kimi-code.json',
-    credentialHelper: '~/.panopticon/bin/kimi-token-helper.sh',
+    authType: 'static',
     models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tested: true,
-    description: 'Anthropic-compatible API via Kimi Code Plan (OAuth token refresh)',
+    description: 'Anthropic-compatible API via Kimi subscription API key',
   },
 
   openai: {

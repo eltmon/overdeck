@@ -58,6 +58,7 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
+  setDeaconIgnored,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
@@ -3098,6 +3099,10 @@ export function processUnstickRequest(
     stuckAt: undefined,
     stuckDetails: undefined,
     reviewedAtCommit: undefined,
+    // PAN-794: unstick opens a fresh recovery cycle — arm the breaker budget
+    // again so legitimate transient failures don't inherit prior cycle counts.
+    reviewRetryCount: 0,
+    recoveryStartedAt: undefined,
   });
   console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
@@ -3136,12 +3141,61 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
 
     // Pre-verify git state before mutating stuck flag.
     // For main_diverged: check that local main is not ahead of origin/main.
+    // PAN-794: review_infrastructure_failure is unrelated to git divergence —
+    // skip the git safe-state check so operators can unstick review-infra
+    // workspaces without touching the project's main branch.
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const gitSafeState = yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
+    const skipGitCheck = current?.stuckReason === 'review_infrastructure_failure';
+    const gitSafeState = skipGitCheck
+      ? true
+      : yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
 
     const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitSafeState);
     return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
+  }))
+);
+
+// ─── Route: POST /api/workspaces/:issueId/deacon-ignore ──────────────────
+
+/**
+ * Operator toggle: tell Deacon to stop patrolling this issue. Body:
+ *   { ignored: boolean, reason?: string }
+ *
+ * Idempotent — calling with ignored=true repeatedly refreshes the timestamp
+ * but otherwise no-ops. Separate from stuck/unstick: stuck is a system-set
+ * failure marker, deaconIgnored is an explicit human "hands off".
+ */
+const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/deacon-ignore',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!issueId) {
+      return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
+    }
+
+    const body = (yield* readJsonBody) as { ignored?: unknown; reason?: unknown };
+    if (typeof body.ignored !== 'boolean') {
+      return jsonResponse(
+        { success: false, error: 'Body must include { ignored: boolean }' },
+        { status: 400 },
+      );
+    }
+    const reason = typeof body.reason === 'string' && body.reason.trim().length > 0
+      ? body.reason.trim()
+      : undefined;
+
+    setDeaconIgnored(issueId, body.ignored, reason);
+    const updated = getReviewStatus(issueId);
+    return jsonResponse({
+      success: true,
+      issueId,
+      deaconIgnored: updated?.deaconIgnored ?? body.ignored,
+      deaconIgnoredAt: updated?.deaconIgnoredAt,
+      deaconIgnoredReason: updated?.deaconIgnoredReason,
+    });
   }))
 );
 
@@ -4412,6 +4466,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceRequestReviewRoute,
   postWorkspaceResetReviewRoute,
   postWorkspaceUnstickRoute,
+  postWorkspaceDeaconIgnoreRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
   postWorkspaceApproveRoute,

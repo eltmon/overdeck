@@ -102,6 +102,14 @@ export const ReviewStatusSnapshot = Schema.Struct({
   reviewSpawnedAt: Schema.optional(Schema.String),
   /** PAN-699: number of test-agent dispatch retries */
   testRetryCount: Schema.optional(Schema.Number),
+  /** PAN-794: parallel-review re-dispatch retry counter (current recovery cycle) */
+  reviewRetryCount: Schema.optional(Schema.Number),
+  /** PAN-794: ISO timestamp marking the start of the current recovery cycle */
+  recoveryStartedAt: Schema.optional(Schema.String),
+  /** Human-requested patrol opt-out — when true, Deacon ignores this issue. */
+  deaconIgnored: Schema.optional(Schema.Boolean),
+  deaconIgnoredAt: Schema.optional(Schema.String),
+  deaconIgnoredReason: Schema.optional(Schema.String),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

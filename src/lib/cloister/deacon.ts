@@ -22,6 +22,8 @@ const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
 import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-status.js';
+import { markWorkspaceStuck } from '../database/review-status-db.js';
+import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 
 // Review status file location (same as dashboard server)
@@ -1014,8 +1016,13 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     // PAN-653: If the workspace is marked stuck (e.g. main diverged during approve),
     // skip all recovery actions — Deacon must not respawn a stuck workspace.
     const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
-    if (getReviewStatus(agentIssueId)?.stuck) {
+    const agentReviewStatus = getReviewStatus(agentIssueId);
+    if (agentReviewStatus?.stuck) {
       console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): workspace is stuck`);
+      continue;
+    }
+    if (agentReviewStatus?.deaconIgnored) {
+      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): deacon-ignored by operator`);
       continue;
     }
 
@@ -1177,6 +1184,15 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  *
  * Resets orphaned statuses to 'pending' so the work can be retried.
  */
+/**
+ * PAN-794: Circuit-breaker threshold for consecutive parallel-review re-dispatches
+ * within a recovery cycle. After this many resets of reviewing → pending by the
+ * orphan sweep, the workspace is flagged stuck so it stops burning agent cycles.
+ * A clean review outcome (pass/blocked/fail), new commits, or manual unstick
+ * resets the counter (see review-agent.ts and checkPostReviewCommits below).
+ */
+const REVIEW_INFRA_BREAKER_THRESHOLD = 3;
+
 export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -1247,6 +1263,12 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     };
 
     for (const [issueId, status] of Object.entries(statuses)) {
+      // PAN-794: skip workspaces the breaker already marked stuck. A human unstick
+      // or a new commit is required to re-arm review dispatch for this issue.
+      if (status.stuck) continue;
+      // Operator-set ignore flag: skip all patrol re-dispatch for this issue
+      // until the human toggles it back off via the kanban button.
+      if (status.deaconIgnored) continue;
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
       // History contains the ground truth; the top-level status fields
@@ -1309,10 +1331,24 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         }
         if (!hasPassedReview) {
           console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but no review-agent is working on it`);
+          // PAN-794: an orphaned 'reviewing' with no active session is the
+          // signature of an infrastructure failure (spawn crash, tmux session
+          // died, dispatch never wrote a terminal status). Count each reset so
+          // the breaker can trip after a bounded number of failed recovery cycles.
+          const nextRetry = (status.reviewRetryCount ?? 0) + 1;
+          const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
           // Use setReviewStatus (not direct JSON write) so SQLite is updated too
-          setReviewStatus(issueId, { reviewStatus: 'pending' });
+          setReviewStatus(issueId, {
+            reviewStatus: 'pending',
+            reviewRetryCount: nextRetry,
+            recoveryStartedAt: recoveryStart,
+          });
           status.reviewStatus = 'pending';
-          actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
+          status.reviewRetryCount = nextRetry;
+          status.recoveryStartedAt = recoveryStart;
+          actions.push(
+            `Reset orphaned review for ${issueId} (no review-agent active; retry ${nextRetry}/${REVIEW_INFRA_BREAKER_THRESHOLD})`,
+          );
         }
       }
 
@@ -1328,6 +1364,31 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         !hasPassedReview &&
         status.prUrl
       ) {
+        // PAN-794: trip the circuit breaker before another re-dispatch if the
+        // current recovery cycle has already consumed its retry budget. The
+        // workspace is marked stuck with a specific review-infra reason so the
+        // dashboard can render the recovery UI and a human can unstick once the
+        // root cause (spawn script, review template, etc.) is addressed.
+        if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+          try {
+            markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
+              reviewRetryCount: status.reviewRetryCount ?? 0,
+              recoveryStartedAt: status.recoveryStartedAt,
+              lastReviewNotes: status.reviewNotes,
+            });
+            status.stuck = true;
+            status.stuckReason = 'review_infrastructure_failure';
+            actions.push(
+              `Tripped review-infra breaker for ${issueId} after ${status.reviewRetryCount} retries — marked stuck`,
+            );
+            console.warn(
+              `[deacon] Review-infra breaker tripped for ${issueId} (retries=${status.reviewRetryCount}); marked stuck`,
+            );
+          } catch (err) {
+            console.error(`[deacon] Failed to mark ${issueId} stuck after breaker trip:`, err);
+          }
+          continue;
+        }
         // Check completed.processed marker
         const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
@@ -1765,6 +1826,10 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // Reset merge retry counter so checkFailedMergeRetry can retry again after
         // the work agent pushes a fix (e.g. to address a CI check failure).
         mergeRetryCount: 0,
+        // PAN-794: new commits open a fresh recovery cycle — stale infra
+        // failures from the previous cycle must not poison the breaker budget.
+        reviewRetryCount: 0,
+        recoveryStartedAt: undefined,
       });
       // Also clear the CI transient retry counter so the next merge attempt
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
@@ -2481,8 +2546,13 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
       // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
       // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
-      if (getReviewStatus(issueId)?.stuck) {
+      const resolutionReviewStatus = getReviewStatus(issueId);
+      if (resolutionReviewStatus?.stuck) {
         console.log(`[deacon] Skipping stuck workspace ${issueId} in patrolWorkAgentResolutions`);
+        continue;
+      }
+      if (resolutionReviewStatus?.deaconIgnored) {
+        console.log(`[deacon] Skipping deacon-ignored workspace ${issueId} in patrolWorkAgentResolutions`);
         continue;
       }
 
@@ -2809,6 +2879,27 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];
   const actions: string[] = [];
+
+  // Global pause: skip the entire cycle when the operator has frozen Deacon.
+  // Persisted in app_settings; survives restarts. Per-cycle check so flipping
+  // the toggle at runtime takes effect on the next tick without restarting.
+  if (isDeaconGloballyPaused()) {
+    state.lastPatrol = new Date().toISOString();
+    saveState(state);
+    // Log once per minute-ish cadence is fine — the patrol interval itself is
+    // already ~60s, so logging every cycle is acceptable.
+    console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
+    addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
+    const skipped: PatrolResult = {
+      cycle: state.patrolCycle,
+      timestamp: state.lastPatrol,
+      specialists: [],
+      actionsToken: ['skipped: globally_paused'],
+      massDeathDetected: false,
+    };
+    lastPatrolResult = skipped;
+    return skipped;
+  }
 
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
