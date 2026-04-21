@@ -1,4 +1,4 @@
-import { Pin, PinOff } from 'lucide-react';
+import { Pin, PinOff, Loader2 } from 'lucide-react';
 
 export type PipelinePhase =
   | 'planning'
@@ -20,6 +20,8 @@ export interface TerminalTab {
   isActive: boolean;
   /** Disabled when the session doesn't exist yet */
   disabled: boolean;
+  /** Show a spinner when the underlying agent is actively processing */
+  isRunning?: boolean;
 }
 
 interface TerminalTabsProps {
@@ -148,7 +150,13 @@ export function TerminalTabs({
               }}
             >
               {tab.label}
-              {tab.isActive && (
+              {tab.isRunning && (
+                <Loader2
+                  className="ml-1 inline-block animate-spin"
+                  style={{ width: '10px', height: '10px', verticalAlign: 'middle' }}
+                />
+              )}
+              {tab.isActive && !tab.isRunning && (
                 <span
                   className="ml-1 inline-block w-1.5 h-1.5 rounded-full"
                   style={{ backgroundColor: phaseColors.text, verticalAlign: 'middle' }}

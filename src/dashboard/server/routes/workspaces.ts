@@ -2111,7 +2111,26 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       }
     }
 
-    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewSessionNames });
+    // Detect per-role completion by checking for output files
+    let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
+    if (reviewSessionNames && reviewSessionNames.length > 0) {
+      try {
+        const resolved = resolveProjectFromIssue(issueId);
+        if (resolved) {
+          const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          reviewSubStatuses = {};
+          for (const sessionName of reviewSessionNames) {
+            const parts = sessionName.split('-');
+            const role = parts[parts.length - 1] || 'review';
+            const reviewRunId = parts.slice(0, -1).join('-');
+            const outputFile = join(workspacePath, '.pan', 'review', reviewRunId, `${role}.md`);
+            reviewSubStatuses[role] = existsSync(outputFile) ? 'done' : 'running';
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewSessionNames, reviewSubStatuses });
   }))
 );
 
