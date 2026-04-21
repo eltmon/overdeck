@@ -189,11 +189,13 @@ describe('buildReviewFeedbackBody', () => {
     expect(body).toContain('PAN-999');
   });
 
-  it('APPROVED body does not include resubmit instructions', () => {
+  it('APPROVED body includes completion notice and warns against resubmit', () => {
     const approved: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const body = buildReviewFeedbackBody('PAN-999', approved);
-    expect(body).toContain('approved');
-    expect(body).not.toMatch(/pan done|rebase-and-submit|request-review/);
+    expect(body).toContain('APPROVED');
+    expect(body).toContain('CODE APPROVED');
+    expect(body).toContain('Do NOT run `pan done` again');
+    expect(body).toContain('Do NOT run `pan review request`');
   });
 });
 
