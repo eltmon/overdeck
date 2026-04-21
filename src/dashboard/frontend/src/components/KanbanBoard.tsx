@@ -30,7 +30,7 @@ import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { PlanChip, TasksChip, VBriefChip } from './PlanningChips';
+import { PlanChip, TasksChip, type PlanningState, usePlanningState, VBriefChip } from './PlanningChips';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
@@ -677,6 +677,7 @@ export function FeatureCard({
       agent.status !== 'dead'
   );
   const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-divider/70 bg-surface/80 px-2.5 py-2';
+  const planningState = usePlanningState(feature).data;
 
   // Check if derived status differs from raw Rally state
   const hasDerivedDiff = feature.derivedStatus && feature.rawTrackerState &&
@@ -745,9 +746,9 @@ export function FeatureCard({
 
           {canUseWorkspaceActions && (
             <div className={actionBarClass}>
-              <PlanChip issue={feature} onPlan={onPlan} isPlanningActive={isPlanningActive} />
-              <TasksChip issue={feature} onViewBeads={onViewBeads} />
-              <VBriefChip issue={feature} onViewVBrief={onViewVBrief} />
+              <PlanChip issue={feature} onPlan={onPlan} isPlanningActive={isPlanningActive} planningState={planningState} />
+              <TasksChip issue={feature} onViewBeads={onViewBeads} planningState={planningState} />
+              <VBriefChip issue={feature} onViewVBrief={onViewVBrief} planningState={planningState} />
             </div>
           )}
         </div>
@@ -2223,22 +2224,11 @@ export function IssueCard({ issue, workAgent, planningAgent, specialists = [], c
     4: 'bg-border',
   };
 
-  // Planning state still lives on IssueCard because Start Agent visibility
-  // depends on the current bead count; chip components subscribe separately.
-  const planningStateQuery = useQuery({
-    queryKey: ['planning-state', issue.identifier],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
-      if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number }>;
-    },
-    enabled: !!issue.identifier,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  });
-  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
+  const planningStateQuery = usePlanningState(issue);
+  const planningState = planningStateQuery.data;
+  const hasPlan = planningState?.hasPlan ?? false;
   const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
-  const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
+  const beadsCount = planningState?.beadsCount ?? 0;
 
   // Kill agent mutation
   const killMutation = useMutation({
@@ -2772,8 +2762,8 @@ export function IssueCard({ issue, workAgent, planningAgent, specialists = [], c
             <Eye className="w-3.5 h-3.5" />
             Watch
           </button>
-          <TasksChip issue={issue} onViewBeads={onViewBeads} />
-          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
+          <TasksChip issue={issue} onViewBeads={onViewBeads} planningState={planningState} />
+          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} planningState={planningState} />
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -2836,11 +2826,11 @@ export function IssueCard({ issue, workAgent, planningAgent, specialists = [], c
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
         <div className={actionBarClass}>
-          <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} />
+          <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} planningState={planningState} />
           {planLabelExists && (
             <>
-              <TasksChip issue={issue} onViewBeads={onViewBeads} />
-              <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
+              <TasksChip issue={issue} onViewBeads={onViewBeads} planningState={planningState} />
+              <VBriefChip issue={issue} onViewVBrief={onViewVBrief} planningState={planningState} />
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
@@ -2860,9 +2850,9 @@ export function IssueCard({ issue, workAgent, planningAgent, specialists = [], c
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
         <div className={actionBarClass}>
-          <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} />
-          <TasksChip issue={issue} onViewBeads={onViewBeads} />
-          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
+          <PlanChip issue={issue} onPlan={() => onPlan()} isPlanningActive={isPlanningActive} planningState={planningState} />
+          <TasksChip issue={issue} onViewBeads={onViewBeads} planningState={planningState} />
+          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} planningState={planningState} />
           {/* Resume Session only when there's an actual prior work agent to resume.
               For freshly-planned issues with no work agent yet, show Start Agent
               instead (gated on beads existing). */}
@@ -2924,8 +2914,8 @@ export function IssueCard({ issue, workAgent, planningAgent, specialists = [], c
       {/* Done items - Reopen + Close Out */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
         <div className={actionBarClass}>
-          <TasksChip issue={issue} onViewBeads={onViewBeads} />
-          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />
+          <TasksChip issue={issue} onViewBeads={onViewBeads} planningState={planningState} />
+          <VBriefChip issue={issue} onViewVBrief={onViewVBrief} planningState={planningState} />
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
         </div>

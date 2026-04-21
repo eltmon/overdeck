@@ -4,29 +4,33 @@ import type { Issue } from '../types';
 import { useAlert } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 
-interface PlanningState {
+export interface PlanningState {
   hasPlan: boolean;
   hasBeads: boolean;
   beadsCount: number;
 }
 
-interface PlanChipProps {
+interface PlanningStateProps {
+  planningState?: PlanningState;
+}
+
+interface PlanChipProps extends PlanningStateProps {
   issue: Issue;
   onPlan: (issue: Issue) => void;
   isPlanningActive?: boolean;
 }
 
-interface VBriefChipProps {
+interface VBriefChipProps extends PlanningStateProps {
   issue: Issue;
   onViewVBrief?: (issue: Issue) => void;
 }
 
-interface TasksChipProps {
+interface TasksChipProps extends PlanningStateProps {
   issue: Issue;
   onViewBeads?: (issue: Issue) => void;
 }
 
-function usePlanningState(issue: Issue) {
+export function usePlanningState(issue: Issue) {
   return useQuery({
     queryKey: ['planning-state', issue.identifier],
     queryFn: async () => {
@@ -40,7 +44,7 @@ function usePlanningState(issue: Issue) {
   });
 }
 
-export function PlanChip({ issue, onPlan, isPlanningActive = false }: PlanChipProps) {
+export function PlanChip({ issue, onPlan, isPlanningActive = false, planningState }: PlanChipProps) {
   if (isPlanningActive) {
     return (
       <button
@@ -58,12 +62,20 @@ export function PlanChip({ issue, onPlan, isPlanningActive = false }: PlanChipPr
     );
   }
 
-  return <PlanChipState issue={issue} onPlan={onPlan} />;
+  if (planningState) {
+    return <PlanChipButton issue={issue} onPlan={onPlan} hasPlan={planningState.hasPlan} />;
+  }
+
+  return <PlanChipStateFetcher issue={issue} onPlan={onPlan} />;
 }
 
-function PlanChipState({ issue, onPlan }: Pick<PlanChipProps, 'issue' | 'onPlan'>) {
+function PlanChipStateFetcher({ issue, onPlan }: Pick<PlanChipProps, 'issue' | 'onPlan'>) {
   const planningStateQuery = usePlanningState(issue);
   const hasPlan = planningStateQuery.data?.hasPlan ?? false;
+  return <PlanChipButton issue={issue} onPlan={onPlan} hasPlan={hasPlan} />;
+}
+
+function PlanChipButton({ issue, onPlan, hasPlan }: Pick<PlanChipProps, 'issue' | 'onPlan'> & { hasPlan: boolean }) {
   const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
 
   return (
@@ -86,10 +98,21 @@ function PlanChipState({ issue, onPlan }: Pick<PlanChipProps, 'issue' | 'onPlan'
   );
 }
 
-export function VBriefChip({ issue, onViewVBrief }: VBriefChipProps) {
+export function VBriefChip({ issue, onViewVBrief, planningState }: VBriefChipProps) {
+  if (planningState) {
+    return <VBriefChipButton issue={issue} onViewVBrief={onViewVBrief} hasPlan={planningState.hasPlan} />;
+  }
+
+  return <VBriefChipStateFetcher issue={issue} onViewVBrief={onViewVBrief} />;
+}
+
+function VBriefChipStateFetcher({ issue, onViewVBrief }: VBriefChipProps) {
   const planningStateQuery = usePlanningState(issue);
   const hasPlan = planningStateQuery.data?.hasPlan ?? false;
+  return <VBriefChipButton issue={issue} onViewVBrief={onViewVBrief} hasPlan={hasPlan} />;
+}
 
+function VBriefChipButton({ issue, onViewVBrief, hasPlan }: VBriefChipProps & { hasPlan: boolean }) {
   return (
     <button
       onClick={(e) => {
@@ -109,12 +132,25 @@ export function VBriefChip({ issue, onViewVBrief }: VBriefChipProps) {
   );
 }
 
-export function TasksChip({ issue, onViewBeads }: TasksChipProps) {
+export function TasksChip({ issue, onViewBeads, planningState }: TasksChipProps) {
+  if (planningState) {
+    return <TasksChipButton issue={issue} onViewBeads={onViewBeads} planningState={planningState} />;
+  }
+
+  return <TasksChipStateFetcher issue={issue} onViewBeads={onViewBeads} />;
+}
+
+function TasksChipStateFetcher({ issue, onViewBeads }: TasksChipProps) {
+  const planningStateQuery = usePlanningState(issue);
+  const planningState = planningStateQuery.data ?? { hasPlan: false, hasBeads: false, beadsCount: 0 };
+  return <TasksChipButton issue={issue} onViewBeads={onViewBeads} planningState={planningState} />;
+}
+
+function TasksChipButton({ issue, onViewBeads, planningState }: TasksChipProps & { planningState: PlanningState }) {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
-  const planningStateQuery = usePlanningState(issue);
-  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
-  const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
+  const hasPlan = planningState.hasPlan;
+  const beadsCount = planningState.beadsCount;
   const needsTaskGeneration = hasPlan && beadsCount === 0;
 
   const generateTasksMutation = useMutation({

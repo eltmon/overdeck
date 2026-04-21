@@ -67,16 +67,13 @@ describe('tmux send helpers', () => {
       .map(([, args]) => args as string[]);
     const loadBufferCalls = tmuxCalls.filter((args) => args.includes('load-buffer'));
     const pasteBufferCalls = tmuxCalls.filter((args) => args.includes('paste-buffer'));
-    const deleteBufferCalls = tmuxCalls.filter((args) => args.includes('delete-buffer'));
 
     expect(loadBufferCalls).toHaveLength(2);
     expect(pasteBufferCalls).toHaveLength(2);
-    expect(deleteBufferCalls).toHaveLength(2);
 
     const bufferNames = loadBufferCalls.map((args) => args[args.indexOf('-b') + 1]);
     expect(new Set(bufferNames).size).toBe(2);
     expect(pasteBufferCalls.map((args) => args[args.indexOf('-b') + 1]).sort()).toEqual([...bufferNames].sort());
-    expect(deleteBufferCalls.map((args) => args[args.indexOf('-b') + 1]).sort()).toEqual([...bufferNames].sort());
 
     vi.useRealTimers();
   });

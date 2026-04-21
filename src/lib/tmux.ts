@@ -417,21 +417,12 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
 
     await writeFile(tmpFile, keys, 'utf-8');
     await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
-
-    if (!await sessionExistsAsync(sessionName)) {
-      throw new Error(`tmux session ${sessionName} no longer exists before paste-buffer`);
-    }
     await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName, '-d'], { encoding: 'utf-8' });
 
     await new Promise(r => setTimeout(r, 300));
-
-    if (!await sessionExistsAsync(sessionName)) {
-      throw new Error(`tmux session ${sessionName} no longer exists before send-keys`);
-    }
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } finally {
     await unlink(tmpFile).catch(() => {});
-    await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
   }
 }
 

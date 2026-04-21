@@ -5,7 +5,7 @@ import type { Issue } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
 import { DialogProvider } from './DialogProvider';
 import { applyReviewStateToIssue, FeatureCard, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
-import { PlanChip, TasksChip, VBriefChip } from './PlanningChips';
+import { PlanChip, type PlanningState, TasksChip, VBriefChip } from './PlanningChips';
 import { useDashboardStore } from '../lib/store';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 
@@ -757,15 +757,17 @@ describe('PlanningChips', () => {
     issue = createIssue(),
     onPlan = vi.fn(),
     isPlanningActive = false,
+    planningState,
     queryClient,
   }: {
     issue?: Issue;
     onPlan?: ReturnType<typeof vi.fn>;
     isPlanningActive?: boolean;
+    planningState?: PlanningState;
     queryClient?: QueryClient;
   } = {}) => {
     const client = renderWithProviders(
-      <PlanChip issue={issue} onPlan={onPlan} isPlanningActive={isPlanningActive} />,
+      <PlanChip issue={issue} onPlan={onPlan} isPlanningActive={isPlanningActive} planningState={planningState} />,
       queryClient,
     );
     return { issue, onPlan, queryClient: client };
@@ -774,14 +776,16 @@ describe('PlanningChips', () => {
   const renderVBriefChip = ({
     issue = createIssue(),
     onViewVBrief = vi.fn(),
+    planningState,
     queryClient,
   }: {
     issue?: Issue;
     onViewVBrief?: ReturnType<typeof vi.fn>;
+    planningState?: PlanningState;
     queryClient?: QueryClient;
   } = {}) => {
     const client = renderWithProviders(
-      <VBriefChip issue={issue} onViewVBrief={onViewVBrief} />,
+      <VBriefChip issue={issue} onViewVBrief={onViewVBrief} planningState={planningState} />,
       queryClient,
     );
     return { issue, onViewVBrief, queryClient: client };
@@ -790,14 +794,16 @@ describe('PlanningChips', () => {
   const renderTasksChip = ({
     issue = createIssue(),
     onViewBeads = vi.fn(),
+    planningState,
     queryClient,
   }: {
     issue?: Issue;
     onViewBeads?: ReturnType<typeof vi.fn>;
+    planningState?: PlanningState;
     queryClient?: QueryClient;
   } = {}) => {
     const client = renderWithProviders(
-      <TasksChip issue={issue} onViewBeads={onViewBeads} />,
+      <TasksChip issue={issue} onViewBeads={onViewBeads} planningState={planningState} />,
       queryClient,
     );
 
@@ -906,6 +912,26 @@ describe('PlanningChips', () => {
 
     const button = await screen.findByRole('button', { name: 'vBRIEF' });
     expect(button.className).toContain('text-muted-foreground');
+  });
+
+  it('uses caller-provided planning state without fetching again', async () => {
+    const issue = createIssue();
+    const planningState: PlanningState = { hasPlan: true, hasBeads: false, beadsCount: 0 };
+    global.fetch = vi.fn(async () => {
+      throw new Error('caller-provided planning state should bypass planning-state fetch');
+    }) as typeof fetch;
+
+    renderWithProviders(
+      <>
+        <PlanChip issue={issue} onPlan={vi.fn()} planningState={planningState} />
+        <VBriefChip issue={issue} planningState={planningState} />
+        <TasksChip issue={issue} planningState={planningState} />
+      </>,
+    );
+
+    expect(await screen.findByText('See Plan')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'vBRIEF' }).className).toContain('text-success');
+    expect(screen.getByRole('button', { name: 'Generate Tasks' })).toBeDefined();
   });
 
   it('generates tasks when a plan exists but beads have not been created yet', async () => {
