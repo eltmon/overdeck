@@ -57,8 +57,10 @@ export function deriveTimelineEntries(
   ];
 
   return entries.sort((a, b) => {
-    const timeCmp = a.createdAt.localeCompare(b.createdAt);
-    if (timeCmp !== 0) return timeCmp;
+    // ISO 8601 timestamps sort lexicographically — use direct comparison,
+    // not localeCompare, to avoid locale-sensitive ordering surprises.
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
     if (a.sequence !== undefined && b.sequence !== undefined) {
       return a.sequence - b.sequence;
     }

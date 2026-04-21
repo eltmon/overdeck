@@ -281,11 +281,6 @@ export async function parseConversationMessages(
                 tone: block.is_error ? 'error' : pending.tone,
               });
             } else {
-              // Cap unresolved results to prevent unbounded growth in long sessions
-              if (unresolvedResults.size >= 1000) {
-                const firstKey = unresolvedResults.keys().next().value;
-                if (firstKey !== undefined) unresolvedResults.delete(firstKey);
-              }
               unresolvedResults.set(block.tool_use_id, {
                 resultText,
                 isError: block.is_error ?? false,
@@ -403,9 +398,18 @@ export async function parseConversationMessages(
     pendingToolUse.clear();
   }
 
-  // Sort by (createdAt, sequence) so the conversation view matches terminal order
-  messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
-  workLog.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
+  // Sort by (createdAt, sequence) so the conversation view matches terminal order.
+  // Use direct string comparison (not localeCompare) — ISO 8601 timestamps sort lexicographically.
+  messages.sort((a, b) => {
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
+    return (a.sequence ?? 0) - (b.sequence ?? 0);
+  });
+  workLog.sort((a, b) => {
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
+    return (a.sequence ?? 0) - (b.sequence ?? 0);
+  });
 
   // Streaming detection: agent is active if the last assistant message is incomplete,
   // or if there are pending/unresolved tools (mid-turn), or a user message arrived
@@ -435,7 +439,14 @@ export async function parseConversationMessages(
 export async function summarizeConversationActivity(
   sessionFile: string,
 ): Promise<ConversationActivitySummary> {
-  const { messages, workLog, streaming } = await parseConversationMessages(sessionFile);
+  // Pass an empty priorState so pendingToolUse stays populated rather than being
+  // flushed into workLog. This lets us detect genuinely pending tools (not stale
+  // workLog entries whose results were appended as separate records).
+  const { messages, streaming, pendingToolUse } = await parseConversationMessages(
+    sessionFile,
+    0,
+    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+  );
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
@@ -445,13 +456,15 @@ export async function summarizeConversationActivity(
     lastMsg?.role === 'user' ||
     (lastMsg?.role === 'assistant' && !lastMsg.completedAt);
 
-  // Find the most recent pending tool (tool_use sent but tool_result not yet received)
+  // Find the most recent pending tool (tool_use sent but tool_result not yet received).
+  // pendingToolUse holds the actual unpaired tool_uses, so this works correctly for
+  // parallel tool calls where multiple tools are in flight simultaneously.
   let currentTool: string | null = null;
-  for (let i = workLog.length - 1; i >= 0; i--) {
-    const entry = workLog[i];
-    if (entry.tone === 'tool' && !entry.result && entry.toolTitle) {
+  let maxSequence = -1;
+  for (const entry of pendingToolUse.values()) {
+    if (entry.toolTitle && (entry.sequence ?? -1) > maxSequence) {
+      maxSequence = entry.sequence ?? -1;
       currentTool = entry.toolTitle;
-      break;
     }
   }
 

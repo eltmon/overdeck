@@ -50,3 +50,5 @@ Implementing bead pan-569-f4a: Playwright UAT — all implementation beads compl
 - **[2026-04-21T05:48Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/021-review-agent-changes-requested.md`
 - **[2026-04-21T05:54Z] review-agent → COMMENTED** — `.planning/feedback/022-review-agent-commented.md`
 - **[2026-04-21T05:57Z] review-agent → COMMENTED** — `.planning/feedback/023-review-agent-commented.md`
+- **[2026-04-21T05:59Z] review-agent → COMMENTED** — `.planning/feedback/024-review-agent-commented.md`
+- **[2026-04-21T06:03Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/025-review-agent-changes-requested.md`
