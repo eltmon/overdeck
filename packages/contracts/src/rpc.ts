@@ -65,6 +65,7 @@ export const ChatMessage = Schema.Struct({
   createdAt: Schema.String,
   completedAt: Schema.optional(Schema.String),
   streaming: Schema.optional(Schema.Boolean),
+  sequence: Schema.optional(Schema.Number),
 })
 export type ChatMessage = typeof ChatMessage.Type
 
@@ -79,6 +80,7 @@ export const WorkLogEntry = Schema.Struct({
   changedFiles: Schema.optional(Schema.Array(Schema.String)),
   tone: Schema.Literals(['thinking', 'tool', 'info', 'error']),
   toolTitle: Schema.optional(Schema.String),
+  sequence: Schema.optional(Schema.Number),
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
 

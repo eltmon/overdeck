@@ -1,6 +1,6 @@
 {
   "name": "@eltmon/panctl",
-  "version": "0.7.2-canary.3",
+  "version": "0.7.2",
   "description": "Panopticon Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
