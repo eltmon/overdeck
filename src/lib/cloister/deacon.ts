@@ -1621,6 +1621,76 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
 }
 
 // ============================================================================
+// Stuck review detection (PAN-733)
+// ============================================================================
+
+/**
+ * Detect issues stuck in `reviewing` status with no active review session.
+ *
+ * When `dispatchParallelReview` sets `reviewing` + `reviewSpawnedAt` but the
+ * spawn crashes or the review agent exits without updating status, the issue
+ * can remain in `reviewing` forever. This check uses `reviewSpawnedAt` as a
+ * heartbeat: if it's >30 minutes old and no review session is active, reset
+ * to `pending` so deacon can retry dispatch on the next patrol.
+ *
+ * Guards:
+ *   - Only fires when reviewStatus === 'reviewing' AND reviewSpawnedAt is set
+ *   - Only resets if no active review session exists for the issue
+ *   - 30-minute threshold avoids resetting legitimate long-running reviews
+ */
+export async function checkStuckReviewing(): Promise<string[]> {
+  const actions: string[] = [];
+  const REVIEW_STUCK_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+  try {
+    const { loadReviewStatuses, setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    // Build set of issues with active review sessions
+    const activeReviewIssues = new Set<string>();
+    const projectStatuses = await getAllProjectSpecialistStatuses();
+    for (const projSpec of projectStatuses) {
+      if (!projSpec.isRunning) continue;
+      const rState = getAgentRuntimeState(projSpec.tmuxSession);
+      if (rState?.state === 'active' && rState.currentIssue && projSpec.specialistType === 'review-agent') {
+        activeReviewIssues.add(rState.currentIssue.toUpperCase());
+      }
+    }
+    // Also check global review-agent
+    const globalReviewSession = getTmuxSessionName('review-agent');
+    if (sessionExists(globalReviewSession)) {
+      const rState = getAgentRuntimeState(globalReviewSession);
+      if (rState?.state === 'active' && rState.currentIssue) {
+        activeReviewIssues.add(rState.currentIssue.toUpperCase());
+      }
+    }
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'reviewing') continue;
+      if (!status.reviewSpawnedAt) continue;
+      if (activeReviewIssues.has(issueId.toUpperCase())) continue;
+
+      const spawnedAt = new Date(status.reviewSpawnedAt).getTime();
+      if (now - spawnedAt < REVIEW_STUCK_THRESHOLD_MS) continue;
+
+      setReviewStatus(issueId, {
+        reviewStatus: 'pending',
+        reviewNotes: `Review reset by deacon: no active review session after ${Math.round((now - spawnedAt) / 60000)}min`,
+      });
+      const msg = `Reset stuck reviewing status for ${issueId} (no active session for ${Math.round((now - spawnedAt) / 60000)}min)`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking stuck reviewing statuses:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // CI transient retry tracking (shared by checkPostReviewCommits + checkFailedMergeRetry)
 // ============================================================================
 
@@ -2825,6 +2895,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const pendingTestActions = await checkPendingTestDispatch();
   actions.push(...pendingTestActions);
   for (const a of pendingTestActions) addLog('action', a, state.patrolCycle);
+
+  // Reset issues stuck in 'reviewing' with no active review session (PAN-733)
+  const stuckReviewActions = await checkStuckReviewing();
+  actions.push(...stuckReviewActions);
+  for (const a of stuckReviewActions) addLog('action', a, state.patrolCycle);
 
   // Kill orphaned planning sessions whose issue has already progressed past planning.
   // PAN-682 pattern: `planning-pan-<id>` tmux session survives hours after `complete-planning`

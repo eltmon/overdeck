@@ -63,6 +63,7 @@ vi.mock('../../../../src/lib/review-artifacts.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
+  getReviewStatus: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../../../src/lib/config.js', () => ({

@@ -321,7 +321,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       comment: options.comment,
     }));
 
-    // Step 4b: Atomically initialize review status in SQLite so the pipeline
+    // Step 4b: Guard against already-merged issues (e.g. merge completed in
+    // background while agent was finishing up). If already merged, skip the
+    // review pipeline entirely — no review status init, no HTTP trigger.
+    const { getReviewStatus } = await import('../../lib/review-status.js');
+    const currentStatus = getReviewStatus(issueId);
+    if (currentStatus?.mergeStatus === 'merged') {
+      spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
+      console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
+      console.log('');
+      return;
+    }
+
+    // Atomically initialize review status in SQLite so the pipeline
     // can proceed even if the dashboard is offline. The HTTP trigger below is
     // an optimization — deacon will pick this up if it fails.
     setReviewStatus(issueId, {

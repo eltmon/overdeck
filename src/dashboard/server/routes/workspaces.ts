@@ -3714,7 +3714,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const { postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
-    const { sessionExists } = await import('../../../lib/tmux.js');
+    const { sessionExistsAsync } = await import('../../../lib/tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
