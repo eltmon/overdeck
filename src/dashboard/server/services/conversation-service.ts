@@ -129,6 +129,9 @@ export async function discoverSessionFile(
 
 // ─── JSONL parsing ────────────────────────────────────────────────────────────
 
+/** Maximum bytes to read in a single incremental chunk (10 MB). */
+const MAX_READ_BYTES = 10 * 1024 * 1024;
+
 interface JsonlUsage {
   input_tokens?: number;
   output_tokens?: number;
@@ -191,16 +194,51 @@ export async function parseConversationMessages(
 ): Promise<ParseResult> {
   // Read only new content from the byte offset — avoids re-reading the entire JSONL every tick
   const fileStats = await stat(sessionFile);
-  const newByteOffset = fileStats.size;
-  const toRead = Math.max(0, newByteOffset - fromByteOffset);
+  const fileSize = fileStats.size;
+  const toRead = Math.max(0, Math.min(fileSize - fromByteOffset, MAX_READ_BYTES));
+  const isIncremental = fromByteOffset > 0;
 
   let newText = '';
+  let newByteOffset = fromByteOffset;
+
   if (toRead > 0) {
     const fh = await open(sessionFile, 'r');
     try {
       const buf = Buffer.alloc(toRead);
-      await fh.read(buf, 0, toRead, fromByteOffset);
-      newText = buf.toString('utf-8');
+      const { bytesRead } = await fh.read(buf, 0, toRead, fromByteOffset);
+
+      if (bytesRead > 0) {
+        const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+
+        if (lastNewline !== -1) {
+          // At least one complete line — advance only past complete lines
+          newText = buf.toString('utf-8', 0, lastNewline + 1);
+          newByteOffset = fromByteOffset + lastNewline + 1;
+        } else if (!isIncremental && fromByteOffset + bytesRead >= fileSize) {
+          // Full parse at EOF with no trailing newline — include trailing bytes
+          newText = buf.toString('utf-8', 0, bytesRead);
+          newByteOffset = fromByteOffset + bytesRead;
+        } else if (fromByteOffset + bytesRead >= fileSize) {
+          // Incremental parse at EOF with no newline — don't advance, wait for completion
+          newByteOffset = fromByteOffset;
+        } else {
+          // No newline in a full chunk and more file remains (line exceeds MAX_READ_BYTES).
+          // Read the entire remaining file to find a newline boundary.
+          const remaining = fileSize - fromByteOffset;
+          const fullBuf = Buffer.alloc(remaining);
+          const { bytesRead: fullBytesRead } = await fh.read(fullBuf, 0, remaining, fromByteOffset);
+          const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+          if (fullLastNewline !== -1) {
+            newText = fullBuf.toString('utf-8', 0, fullLastNewline + 1);
+            newByteOffset = fromByteOffset + fullLastNewline + 1;
+          } else if (!isIncremental) {
+            newText = fullBuf.toString('utf-8', 0, fullBytesRead);
+            newByteOffset = fromByteOffset + fullBytesRead;
+          } else {
+            newByteOffset = fromByteOffset;
+          }
+        }
+      }
     } finally {
       await fh.close();
     }
@@ -439,13 +477,10 @@ export async function parseConversationMessages(
 export async function summarizeConversationActivity(
   sessionFile: string,
 ): Promise<ConversationActivitySummary> {
-  // Pass an empty priorState so pendingToolUse stays populated rather than being
-  // flushed into workLog. This lets us detect genuinely pending tools (not stale
-  // workLog entries whose results were appended as separate records).
-  const { messages, streaming, pendingToolUse } = await parseConversationMessages(
+  // Parse from the last compact boundary instead of the full file — avoids
+  // re-reading potentially megabytes of history on every list enrichment tick.
+  const { messages, streaming, pendingToolUse } = await parseFromLastCompactBoundary(
     sessionFile,
-    0,
-    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
   );
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
@@ -459,12 +494,19 @@ export async function summarizeConversationActivity(
   // Find the most recent pending tool (tool_use sent but tool_result not yet received).
   // pendingToolUse holds the actual unpaired tool_uses, so this works correctly for
   // parallel tool calls where multiple tools are in flight simultaneously.
+  // Time-bound: if the file hasn't been modified in 30s, the agent has likely crashed
+  // and pending tools are stale — don't report a stale currentTool.
+  const fileStats = await stat(sessionFile);
+  const fileRecent = Date.now() - fileStats.mtimeMs < 30_000;
+
   let currentTool: string | null = null;
-  let maxSequence = -1;
-  for (const entry of pendingToolUse.values()) {
-    if (entry.toolTitle && (entry.sequence ?? -1) > maxSequence) {
-      maxSequence = entry.sequence ?? -1;
-      currentTool = entry.toolTitle;
+  if (fileRecent) {
+    let maxSequence = -1;
+    for (const entry of pendingToolUse.values()) {
+      if (entry.toolTitle && (entry.sequence ?? -1) > maxSequence) {
+        maxSequence = entry.sequence ?? -1;
+        currentTool = entry.toolTitle;
+      }
     }
   }
 
@@ -474,16 +516,17 @@ export async function summarizeConversationActivity(
 // ─── Compact boundary offset cache ───────────────────────────────────────────
 
 /**
- * In-memory cache mapping JSONL file path → last compact_boundary byte offset.
+ * In-memory cache mapping JSONL file path → last compact_boundary byte offset
+ * and the byte offset up to which we've scanned complete lines.
  * Persists across requests so we don't re-scan the entire file each time.
  */
-const compactOffsetCache = new Map<string, { boundaryOffset: number; fileSize: number }>();
+const compactOffsetCache = new Map<string, { boundaryOffset: number; scannedUpTo: number }>();
 
 /**
  * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
  *
- * Uses an in-memory cache keyed by file path + size. When the file grows beyond
- * the cached size, only the new portion is scanned. Returns 0 if no boundary found.
+ * Uses an in-memory cache keyed by file path. When the file grows beyond
+ * the cached scan position, only the new portion is scanned. Returns 0 if no boundary found.
  */
 export async function findLastCompactBoundary(sessionFile: string): Promise<number> {
   const fileStats = await stat(sessionFile);
@@ -492,12 +535,12 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
   const cached = compactOffsetCache.get(sessionFile);
 
   // If file hasn't grown since last scan, return cached offset without reading
-  if (cached && cached.fileSize === fileSize) {
+  if (cached && cached.scannedUpTo === fileSize) {
     return cached.boundaryOffset;
   }
 
   // No cache or file shrank — read entire file
-  if (!cached || fileSize < cached.fileSize) {
+  if (!cached || fileSize < cached.scannedUpTo) {
     const buffer = await readFile(sessionFile);
     const text = buffer.toString('utf-8');
 
@@ -516,39 +559,62 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
       bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
     }
 
-    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, fileSize });
+    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: fileSize });
     return lastBoundaryOffset;
   }
 
-  // File grew — read only the new portion
-  const newBytes = fileSize - cached.fileSize;
+  // File grew — read only the new portion, respecting complete-line boundaries
+  const newBytes = fileSize - cached.scannedUpTo;
+  const toRead = Math.min(newBytes, MAX_READ_BYTES);
   const fh = await open(sessionFile, 'r');
   let buf: Buffer;
+  let bytesRead: number;
   try {
-    buf = Buffer.alloc(newBytes);
-    await fh.read(buf, 0, newBytes, cached.fileSize);
+    buf = Buffer.alloc(toRead);
+    const result = await fh.read(buf, 0, toRead, cached.scannedUpTo);
+    bytesRead = result.bytesRead;
   } finally {
     await fh.close();
   }
 
-  // If new content starts mid-line, skip to the first complete line
-  let scanStart = 0;
-  if (buf.length > 0 && buf[0] !== 10 && cached.fileSize > 0) {
-    const nlIdx = buf.indexOf(10);
-    if (nlIdx !== -1) {
-      scanStart = nlIdx + 1;
+  let scanBytes = 0;
+  if (bytesRead > 0) {
+    const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+    if (lastNewline !== -1) {
+      scanBytes = lastNewline + 1;
+    } else if (cached.scannedUpTo + bytesRead < fileSize) {
+      // No newline in chunk and more file remains — read to EOF
+      const remaining = fileSize - cached.scannedUpTo;
+      const fullBuf = Buffer.alloc(remaining);
+      const fh2 = await open(sessionFile, 'r');
+      let fullBytesRead: number;
+      try {
+        const result = await fh2.read(fullBuf, 0, remaining, cached.scannedUpTo);
+        fullBytesRead = result.bytesRead;
+      } finally {
+        await fh2.close();
+      }
+      const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+      if (fullLastNewline !== -1) {
+        scanBytes = fullLastNewline + 1;
+        buf = fullBuf;
+        bytesRead = fullBytesRead;
+      } else {
+        // No newline even at EOF — don't scan partial trailing line
+        compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+        return cached.boundaryOffset;
+      }
     } else {
-      // No complete line in new content — nothing to scan
-      compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, fileSize });
+      // At EOF with no newline — don't scan partial trailing line
+      compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
       return cached.boundaryOffset;
     }
   }
 
-  const scanBuf = buf.slice(scanStart);
-  const text = scanBuf.toString('utf-8');
+  const text = buf.toString('utf-8', 0, scanBytes);
 
   let lastBoundaryOffset = cached.boundaryOffset;
-  let bytePos = cached.fileSize + scanStart;
+  let bytePos = cached.scannedUpTo;
   const lines = text.split('\n');
   for (const line of lines) {
     if (line.trim()) {
@@ -562,7 +628,7 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
     bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
   }
 
-  compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, fileSize });
+  compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: cached.scannedUpTo + scanBytes });
   return lastBoundaryOffset;
 }
 
@@ -643,9 +709,12 @@ export function watchConversation(
   }
 
   // Try fs.watch first (inotify on Linux)
+  // Create AbortController synchronously so stop() can always abort,
+  // even if called before the async startWatch() body runs.
+  abortController = new AbortController();
+
   async function startWatch(): Promise<void> {
     try {
-      abortController = new AbortController();
       const watcher = watch(sessionFile, { signal: abortController.signal });
       for await (const _event of watcher) {
         await handleChange();

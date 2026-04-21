@@ -615,6 +615,86 @@ describe('parseConversationMessages', () => {
     const sequences = result.messages.map((m) => m.sequence);
     expect(sequences).toEqual([0, 2, 3, 4, 6]);
   });
+
+  it('does not advance byteOffset past a partial trailing line on incremental read', async () => {
+    const firstLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-1',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      message: { content: [{ type: 'text', text: 'First message' }] },
+    });
+    const secondLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-2',
+      timestamp: '2024-01-01T00:00:01.000Z',
+      message: { content: [{ type: 'text', text: 'Second message' }] },
+    });
+    // First read: two complete lines + partial third line (no trailing newline)
+    const partialThird = JSON.stringify({
+      type: 'user',
+      uuid: 'u-3',
+      timestamp: '2024-01-01T00:00:02.000Z',
+      message: { content: [{ type: 'text', text: 'Partial' }] },
+    });
+    const firstRead = firstLine + '\n' + secondLine + '\n' + partialThird;
+    mockReadFile.mockResolvedValue(Buffer.from(firstRead));
+    mockStat.mockImplementation(async () => {
+      const buf = await mockReadFile();
+      return { mtimeMs: Date.now() - 1_000, birthtimeMs: Date.now() - 1_000, size: buf.length };
+    });
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const firstResult = await parseConversationMessages('/fake/session.jsonl', 0, {
+      pendingToolUse: new Map(),
+      unresolvedResults: new Map(),
+      lastSequence: 0,
+    });
+
+    // Should parse only the two complete lines
+    expect(firstResult.messages).toHaveLength(2);
+    expect(firstResult.byteOffset).toBe(Buffer.byteLength(firstLine + '\n' + secondLine + '\n'));
+
+    // Second read: partial line is now complete (newline appended)
+    const secondRead = firstLine + '\n' + secondLine + '\n' + partialThird + '\n';
+    mockReadFile.mockResolvedValue(Buffer.from(secondRead));
+
+    const secondResult = await parseConversationMessages('/fake/session.jsonl', firstResult.byteOffset, {
+      pendingToolUse: firstResult.pendingToolUse,
+      unresolvedResults: firstResult.unresolvedResults,
+      lastSequence: firstResult.lastSequence,
+    });
+
+    // Should now parse the previously partial line
+    expect(secondResult.messages).toHaveLength(1);
+    expect(secondResult.messages[0]).toMatchObject({ id: 'u-3', text: 'Partial' });
+    expect(secondResult.byteOffset).toBe(Buffer.byteLength(secondRead));
+  });
+
+  it('does not report stale currentTool when file has not been modified recently', async () => {
+    const lines = [
+      {
+        type: 'assistant',
+        timestamp: '2024-01-01T00:00:01.000Z',
+        message: {
+          id: 'msg-1',
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'ls' } },
+          ],
+          stop_reason: 'tool_use',
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+    // File modified 60 seconds ago — well past the 30s stale threshold
+    mockStat.mockResolvedValue({ mtimeMs: Date.now() - 60_000, birthtimeMs: Date.now() - 60_000, size: (await mockReadFile()).length });
+
+    const { summarizeConversationActivity } = await import('../conversation-service.js');
+    const result = await summarizeConversationActivity('/fake/session.jsonl');
+
+    expect(result.currentTool).toBeNull();
+    expect(result.isWorking).toBe(true);
+  });
 });
 
 describe('discoverSessionFile', () => {
