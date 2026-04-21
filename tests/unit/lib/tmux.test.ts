@@ -37,10 +37,13 @@ vi.mock('../../../src/lib/config-yaml.js', () => ({
 }));
 
 describe('tmux send helpers', () => {
-  it('uses unique temp file paths for concurrent async sends in the same millisecond', async () => {
+  it('uses unique temp files and named buffers for concurrent async sends in the same millisecond', async () => {
     vi.resetModules();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-20T14:36:45.000Z'));
+    execFileMock.mockClear();
+    writeFileMock.mockClear();
+    unlinkMock.mockClear();
 
     const { sendKeysAsync } = await import('../../../src/lib/tmux.js');
 
@@ -58,6 +61,22 @@ describe('tmux send helpers', () => {
 
     expect(tempPaths).toHaveLength(2);
     expect(new Set(tempPaths).size).toBe(2);
+
+    const tmuxCalls = execFileMock.mock.calls
+      .filter(([file]) => file === 'tmux')
+      .map(([, args]) => args as string[]);
+    const loadBufferCalls = tmuxCalls.filter((args) => args.includes('load-buffer'));
+    const pasteBufferCalls = tmuxCalls.filter((args) => args.includes('paste-buffer'));
+    const deleteBufferCalls = tmuxCalls.filter((args) => args.includes('delete-buffer'));
+
+    expect(loadBufferCalls).toHaveLength(2);
+    expect(pasteBufferCalls).toHaveLength(2);
+    expect(deleteBufferCalls).toHaveLength(2);
+
+    const bufferNames = loadBufferCalls.map((args) => args[args.indexOf('-b') + 1]);
+    expect(new Set(bufferNames).size).toBe(2);
+    expect(pasteBufferCalls.map((args) => args[args.indexOf('-b') + 1]).sort()).toEqual([...bufferNames].sort());
+    expect(deleteBufferCalls.map((args) => args[args.indexOf('-b') + 1]).sort()).toEqual([...bufferNames].sort());
 
     vi.useRealTimers();
   });

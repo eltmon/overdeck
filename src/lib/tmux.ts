@@ -408,6 +408,7 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
 
   const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
+  const bufId = `pan-sendkeys-${sendId}`;
 
   try {
     if (!await sessionExistsAsync(sessionName)) {
@@ -415,12 +416,12 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     }
 
     await writeFile(tmpFile, keys, 'utf-8');
-    await tmuxExecAsync(['load-buffer', tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['load-buffer', '-b', bufId, tmpFile], { encoding: 'utf-8' });
 
     if (!await sessionExistsAsync(sessionName)) {
       throw new Error(`tmux session ${sessionName} no longer exists before paste-buffer`);
     }
-    await tmuxExecAsync(['paste-buffer', '-d', '-t', sessionName], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufId, '-t', sessionName, '-d'], { encoding: 'utf-8' });
 
     await new Promise(r => setTimeout(r, 300));
 
@@ -430,6 +431,7 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
   } finally {
     await unlink(tmpFile).catch(() => {});
+    await tmuxExecAsync(['delete-buffer', '-b', bufId], { encoding: 'utf-8' }).catch(() => {});
   }
 }
 
