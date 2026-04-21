@@ -131,7 +131,7 @@ describe('TerminalPanel — stopped agent content rendering', () => {
     });
   });
 
-  it('renders MessagesTimeline when agent is stopped and conversation has messages', async () => {
+  it('renders pre element when agent is stopped even if conversation has messages', async () => {
     const messages = [
       { role: 'user', content: [{ type: 'text', text: 'hello' }] },
       { role: 'assistant', content: [{ type: 'text', text: 'world' }] },
@@ -139,27 +139,24 @@ describe('TerminalPanel — stopped agent content rendering', () => {
 
     renderPanel(
       makeAgent(),
-      makeFetch({ tmuxAlive: false, conversationMessages: messages }),
+      makeFetch({ tmuxAlive: false, conversationMessages: messages, output: 'last terminal output' }),
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('messages-timeline')).toBeInTheDocument();
+      expect(screen.getByText('last terminal output')).toBeInTheDocument();
     });
-    expect(screen.getByText('2 messages')).toBeInTheDocument();
-    // The pre/output element should NOT be rendered
-    expect(screen.queryByText('No saved output available.')).not.toBeInTheDocument();
+    // MessagesTimeline is not rendered — stopped agents show raw output only
+    expect(screen.queryByTestId('messages-timeline')).not.toBeInTheDocument();
   });
 
-  it('shows "Conversation" header label when messages are present', async () => {
-    const messages = [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }];
-
+  it('shows "Last output" header label when agent is stopped', async () => {
     renderPanel(
       makeAgent(),
-      makeFetch({ tmuxAlive: false, conversationMessages: messages }),
+      makeFetch({ tmuxAlive: false, conversationMessages: [], output: 'some output' }),
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Conversation')).toBeInTheDocument();
+      expect(screen.getByText('Last output')).toBeInTheDocument();
     });
   });
 

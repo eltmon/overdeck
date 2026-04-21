@@ -13,9 +13,9 @@ import {
 
 describe('work-types', () => {
   describe('WORK_TYPES registry', () => {
-    it('should have exactly 24 work types', () => {
+    it('should have exactly 25 work types', () => {
       const workTypes = Object.keys(WORK_TYPES);
-      expect(workTypes).toHaveLength(24);
+      expect(workTypes).toHaveLength(25);
     });
 
     it('should have all issue-agent phases', () => {
@@ -110,9 +110,9 @@ describe('work-types', () => {
   });
 
   describe('getAllWorkTypes', () => {
-    it('should return all 24 work type IDs', () => {
+    it('should return all 25 work type IDs', () => {
       const allTypes = getAllWorkTypes();
-      expect(allTypes).toHaveLength(24);
+      expect(allTypes).toHaveLength(25);
     });
 
     it('should return an array of strings', () => {
@@ -164,9 +164,9 @@ describe('work-types', () => {
       expect(types).toHaveLength(1);
     });
 
-    it('should return 1 workflow type', () => {
+    it('should return 2 workflow types', () => {
       const types = getWorkTypesByCategory('workflow');
-      expect(types).toHaveLength(1);
+      expect(types).toHaveLength(2);
     });
 
     it('should return 2 CLI types', () => {
@@ -299,7 +299,7 @@ describe('work-types', () => {
         subagent: 4,
         review: 6,
         'pre-work': 1,
-        workflow: 1,
+        workflow: 2,
         cli: 2,
       };
 
@@ -309,7 +309,7 @@ describe('work-types', () => {
       });
     });
 
-    it('should sum to exactly 23 work types', () => {
+    it('should sum to exactly 25 work types', () => {
       const categories: WorkTypeCategory[] = [
         'issue-agent',
         'specialist',
@@ -324,7 +324,7 @@ describe('work-types', () => {
         return sum + getWorkTypesByCategory(category).length;
       }, 0);
 
-      expect(total).toBe(24);
+      expect(total).toBe(25);
     });
   });
 });
