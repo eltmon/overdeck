@@ -362,77 +362,6 @@ const getIssueAnalyzeRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/issues/:id/plan ────────────────────────────────────────
-
-const postIssuePlanRoute = HttpRouter.add(
-  'POST',
-  '/api/issues/:id/plan',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
-    const linear = yield* LinearClient;
-
-    const { answers, tasks } = body as any;
-
-    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-      return jsonResponse({ error: 'Tasks are required' }, { status: 400 });
-    }
-
-    const issue = yield* Effect.promise(() =>
-      Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))),
-    );
-
-    if (!issue) {
-      return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-    }
-
-    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-
-    const { findPRDFiles, analyzeComplexity, executePlan } = yield* Effect.promise(() =>
-      import('../../../lib/planning/plan-utils.js'),
-    );
-
-    const prdFiles = yield* Effect.promise(() => findPRDFiles(issue.identifier, projectPath));
-
-    const planIssue = {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description || undefined,
-      url: issue.url,
-    };
-
-    const complexity = analyzeComplexity(planIssue, prdFiles);
-
-    const decisions: Array<{ question: string; answer: string }> = [];
-    if (answers) {
-      if (answers.scope) decisions.push({ question: 'Scope', answer: answers.scope });
-      if (answers.approach) decisions.push({ question: 'Technical approach', answer: answers.approach });
-      if (answers.edgeCases) decisions.push({ question: 'Edge cases', answer: answers.edgeCases });
-      if (answers.testing?.length > 0) decisions.push({ question: 'Testing', answer: answers.testing.join(', ') });
-      if (answers.outOfScope) decisions.push({ question: 'Out of scope', answer: answers.outOfScope });
-    }
-
-    const result = yield* Effect.promise(() =>
-      executePlan(planIssue, tasks, decisions, projectPath, { commitAndPush: true, prdFiles }),
-    );
-
-    return jsonResponse({
-      success: true,
-      complexity,
-      existingPRDs: prdFiles.length > 0 ? prdFiles.map((f: string) => f.replace(projectPath, '.')) : undefined,
-      tasks,
-      files: {
-        state: result.files.state.replace(projectPath, '.'),
-        prd: result.files.prd ? result.files.prd.replace(projectPath, '.') : undefined,
-      },
-      prdCommitted: result.prdCommitted,
-    });
-  })),
-);
-
 // ─── Route: GET /api/issues/:id/handoffs ─────────────────────────────────────
 
 const getIssueHandoffsRoute = HttpRouter.add(
@@ -2078,7 +2007,6 @@ const getIssueCostsRoute = HttpRouter.add(
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
   getIssueAnalyzeRoute,
-  postIssuePlanRoute,
   getIssueHandoffsRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
