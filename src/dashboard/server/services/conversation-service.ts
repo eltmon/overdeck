@@ -412,11 +412,11 @@ export async function parseConversationMessages(
   // (agent is about to respond), and the file was modified recently.
   let streaming = false;
   const lastMsg = messages[messages.length - 1];
-  const hasPendingActivity = pendingToolUse.size > 0 || unresolvedResults.size > 0;
+  const assistantIncomplete = lastMsg?.role === 'assistant' && !lastMsg.completedAt;
   const fileRecent = Date.now() - fileStats.mtimeMs < 5000;
-  if (lastMsg?.role === 'assistant' && !lastMsg.completedAt && fileRecent) {
+  if (assistantIncomplete && fileRecent) {
     streaming = true;
-  } else if ((lastMsg?.role === 'user' || hasPendingActivity) && fileRecent) {
+  } else if (lastMsg?.role === 'user' && fileRecent) {
     streaming = true;
   }
 

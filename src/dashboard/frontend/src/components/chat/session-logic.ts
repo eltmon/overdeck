@@ -56,7 +56,14 @@ export function deriveTimelineEntries(
     ),
   ];
 
-  return entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
+  return entries.sort((a, b) => {
+    const timeCmp = a.createdAt.localeCompare(b.createdAt);
+    if (timeCmp !== 0) return timeCmp;
+    if (a.sequence !== undefined && b.sequence !== undefined) {
+      return a.sequence - b.sequence;
+    }
+    return 0;
+  });
 }
 
 // ─── deriveMessagesTimelineRows ───────────────────────────────────────────────
