@@ -630,11 +630,8 @@ function canUseWorkspaceActionsForIssue(
   issue: Pick<Issue, 'identifier' | 'artifactType'>,
   registeredProjects: Array<{ issuePattern: string | null }> = [],
 ): boolean {
-  if (issue.artifactType?.includes('PortfolioItem')) {
-    return false;
-  }
-
-  if (parseIssueId(issue.identifier)?.format === 'standard') {
+  const parsedIssueId = parseIssueId(issue.identifier);
+  if (parsedIssueId && (parsedIssueId.format === 'standard' || parsedIssueId.format === 'rally')) {
     return true;
   }
 

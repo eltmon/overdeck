@@ -522,7 +522,7 @@ describe('FeatureCard', () => {
       icon: 'test',
     },
     source: 'rally',
-    artifactType: 'PortfolioItem/Feature',
+    artifactType: 'Grouping',
     totalChildCount: 3,
     completedChildCount: 1,
     inProgressChildCount: 1,
@@ -567,8 +567,15 @@ describe('FeatureCard', () => {
   };
 
   beforeEach(() => {
-    global.fetch = vi.fn(async () => {
-      throw new Error('Feature cards must not call planning routes for Rally feature identifiers');
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/planning-state')) {
+        return {
+          ok: true,
+          json: async () => ({ hasPlan: false, hasBeads: false, beadsCount: 0 }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
   });
 
@@ -577,13 +584,17 @@ describe('FeatureCard', () => {
     vi.restoreAllMocks();
   });
 
-  it('does not render workspace-backed planning actions for Rally feature identifiers like F1234', () => {
+  it('renders workspace-backed planning actions for Rally feature identifiers like F1234', async () => {
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+
     renderFeatureCard();
 
-    expect(screen.queryByRole('button', { name: /plan/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /tasks/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /vbrief/i })).toBeNull();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: /plan/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /tasks/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /vbrief/i })).toBeDefined();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/F1234/planning-state');
+    });
   });
 
   it('renders workspace-backed planning actions for custom-format feature identifiers that match a registered project pattern', async () => {
@@ -616,12 +627,11 @@ describe('FeatureCard', () => {
     });
   });
 
-  it('still toggles the feature card open without attempting workspace lookups', () => {
+  it('still toggles the feature card open when workspace-backed planning actions are available', () => {
     const { onToggle } = renderFeatureCard();
 
     fireEvent.click(screen.getByText('Feature title'));
     expect(onToggle).toHaveBeenCalled();
-    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 
