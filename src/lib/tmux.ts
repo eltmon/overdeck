@@ -518,9 +518,9 @@ export async function waitForClaudePrompt(sessionName: string, timeoutMs: number
 
     const output = await capturePaneAsync(sessionName, 10);
     const lines = output.split('\n').filter(l => l.trim());
-    const lastLine = lines[lines.length - 1] || '';
+    const hasPromptLine = lines.some(line => line.includes('❯'));
 
-    if (lastLine.includes('❯')) {
+    if (hasPromptLine) {
       consecutivePromptPolls += 1;
       if (consecutivePromptPolls >= 2 && await sessionExistsAsync(sessionName)) {
         return true;

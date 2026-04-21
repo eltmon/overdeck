@@ -1004,6 +1004,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     const waitForPromptFn = waitForPromptMatch![0];
 
     expect(waitForPromptFn).toContain("if (!await sessionExistsAsync(sessionName)) return false;");
+    expect(waitForPromptFn).toContain("const hasPromptLine = lines.some(line => line.includes('❯'));");
     expect(waitForPromptFn).toContain('consecutivePromptPolls >= 2');
 
     const sendKeysAsyncMatch = tmuxSrc.match(/export async function sendKeysAsync[\s\S]*?^}/m);
