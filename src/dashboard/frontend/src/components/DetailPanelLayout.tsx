@@ -154,6 +154,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   // merge-agent to work-agent for monorepo), fall back to auto-follow.
   useEffect(() => {
     if (!pinned || !pinnedSession) return;
+    if (availableTerminals.length === 0) return; // loading state — don't clear
     const tab = availableTerminals.find(t => t.sessionName === pinnedSession);
     if (!tab || tab.disabled) {
       setPinned(false);

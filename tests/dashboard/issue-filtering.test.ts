@@ -367,7 +367,7 @@ describe('getOneDayAgo helper', () => {
 
     // Should be different objects
     expect(date1).not.toBe(date2);
-    // But with same value
+    // With frozen clocks they have the same value
     expect(date1.getTime()).toBe(date2.getTime());
   });
 });

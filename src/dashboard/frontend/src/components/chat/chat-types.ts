@@ -11,6 +11,7 @@ export interface ChatMessage {
   createdAt: string;
   completedAt?: string;
   streaming?: boolean;
+  sequence?: number;
 }
 
 export interface WorkLogEntry {
@@ -24,6 +25,7 @@ export interface WorkLogEntry {
   changedFiles?: readonly string[];
   tone: 'thinking' | 'tool' | 'info' | 'error';
   toolTitle?: string;
+  sequence?: number;
 }
 
 export type ConversationEvent =

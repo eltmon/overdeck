@@ -13,8 +13,8 @@ import type { ChatMessage, WorkLogEntry } from './chat-types';
 // ─── Timeline entry types ─────────────────────────────────────────────────────
 
 export type TimelineEntry =
-  | { id: string; kind: 'message'; createdAt: string; message: ChatMessage }
-  | { id: string; kind: 'work'; createdAt: string; entry: WorkLogEntry };
+  | { id: string; kind: 'message'; createdAt: string; sequence?: number; message: ChatMessage }
+  | { id: string; kind: 'work'; createdAt: string; sequence?: number; entry: WorkLogEntry };
 
 // ─── Row types (after grouping consecutive work entries) ──────────────────────
 
@@ -49,14 +49,23 @@ export function deriveTimelineEntries(
 ): TimelineEntry[] {
   const entries: TimelineEntry[] = [
     ...messages.map(
-      (m): TimelineEntry => ({ id: m.id, kind: 'message', createdAt: m.createdAt, message: m }),
+      (m): TimelineEntry => ({ id: m.id, kind: 'message', createdAt: m.createdAt, sequence: m.sequence, message: m }),
     ),
     ...workLog.map(
-      (w): TimelineEntry => ({ id: w.id, kind: 'work', createdAt: w.createdAt, entry: w }),
+      (w): TimelineEntry => ({ id: w.id, kind: 'work', createdAt: w.createdAt, sequence: w.sequence, entry: w }),
     ),
   ];
 
-  return entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return entries.sort((a, b) => {
+    // ISO 8601 timestamps sort lexicographically — use direct comparison,
+    // not localeCompare, to avoid locale-sensitive ordering surprises.
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
+    if (a.sequence !== undefined && b.sequence !== undefined) {
+      return a.sequence - b.sequence;
+    }
+    return 0;
+  });
 }
 
 // ─── deriveMessagesTimelineRows ───────────────────────────────────────────────
