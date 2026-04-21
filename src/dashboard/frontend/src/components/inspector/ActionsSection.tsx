@@ -10,7 +10,6 @@ import { isReviewPipelineStuck } from '../../lib/pipeline-state';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
-type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unknown>;
 type ResetReviewMutation = UseMutationResult<unknown, Error, { rerun?: boolean } | undefined, unknown>;
 type SyncMutation = UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?: number }, Error, void, unknown>;
 
@@ -23,7 +22,6 @@ interface ActionsSectionProps {
   reviewMutation: AnyMutation;
   killMutation: AnyMutation;
   cancelMutation: AnyMutation;
-  reopenMutation: ReopenMutation;
   resetReviewMutation: ResetReviewMutation;
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
   createWorkspaceMutation: AnyMutation;
@@ -33,7 +31,6 @@ interface ActionsSectionProps {
   onReview: () => void;
   onKill: () => void;
   onCancel: () => void;
-  onReopen: () => void;
   onResetReview: () => void;
   onResetSession: () => void;
   onDismissPending: () => void;
@@ -52,7 +49,6 @@ export function ActionsSection({
   reviewMutation,
   killMutation,
   cancelMutation,
-  reopenMutation,
   resetReviewMutation,
   startAgentMutation,
   createWorkspaceMutation,
@@ -62,7 +58,6 @@ export function ActionsSection({
   onReview,
   onKill,
   onCancel,
-  onReopen,
   onResetReview,
   onResetSession,
   onDismissPending,
@@ -233,19 +228,6 @@ export function ActionsSection({
             className="flex items-center gap-1 px-2 py-1 text-xs text-destructive rounded badge-bg-destructive hover:bg-destructive/20"
           >
             <Square className="w-3 h-3" />Stop
-          </button>
-        )}
-
-        {/* Reopen button */}
-        {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (
-          <button
-            data-testid="reopen-btn"
-            onClick={onReopen}
-            disabled={reopenMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
-          >
-            {reopenMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
           </button>
         )}
 

@@ -688,7 +688,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
             console.log('');
             console.log(chalk.bold('To re-run planning:'));
-            console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
+            console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
             process.exit(1);
           }
         } catch (recoveryErr: any) {

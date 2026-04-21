@@ -166,7 +166,7 @@ export function analyzeIssue(options: TriageOptions): TriageResult {
   } else if (needsPRD) {
     recommendation = `Run 'pan prd ${issueId}' to clarify requirements before implementation`;
   } else if (needsPlanning) {
-    recommendation = `Run 'pan plan ${issueId}' to create execution plan`;
+    recommendation = `Click 'Plan' in the dashboard for ${issueId} to create an execution plan`;
   } else {
     recommendation = `Ready to implement - run 'pan start ${issueId}'`;
   }
