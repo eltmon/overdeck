@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
+/* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
   DndContext,
   DragOverlay,
@@ -18,6 +19,7 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
+*/
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText } from 'lucide-react';
@@ -961,9 +963,10 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     });
   }, []);
 
-  // DnD state
+  /* DnD state disabled pending rework
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
   const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
+  */
 
   // Undo state
   const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
@@ -991,7 +994,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
   const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
-  // DnD sensors
+  /* DnD sensors disabled pending rework
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -1000,6 +1003,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     }),
     useSensor(KeyboardSensor)
   );
+  */
 
   // Move status mutation
   const moveStatusMutation = useMutation({
@@ -1065,6 +1069,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     setUndoTimeoutId(timeoutId);
   }, [undoTimeoutId]);
 
+  /* Drag handlers disabled pending rework
   // Handle drag start
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -1116,6 +1121,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     showUndoNotification(issue.identifier, currentStatus, targetStatus);
     moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
   }, [issues, agents, moveStatusMutation, showUndoNotification]);
+  */
 
   // Confirm agent warning
   const confirmAgentMove = useCallback(() => {
@@ -1175,7 +1181,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     }
   }, [syncPromptDialog, moveStatusMutation, showUndoNotification, agents, queryClient]);
 
-  // Drop animation config
+  /* Drop animation config disabled pending rework
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
       styles: {
@@ -1185,6 +1191,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       },
     }),
   };
+  */
 
   // Fetch costs for all issues
   const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
@@ -1553,47 +1560,35 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           )}
         </div>
       ) : (
-        /* Kanban columns with DnD (current view - 4 columns, no backlog) */
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex gap-4 overflow-hidden pb-4">
-            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
-              <DroppableColumn key={status} status={status}>
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
-                  <div className="px-4 py-3 border-b border-divider bg-surface-raised">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                      <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
-                    </div>
+        /* Kanban columns - DnD disabled pending rework (PAN-TODO) */
+        <div className="flex gap-4 overflow-hidden pb-4">
+          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
+            <div key={status} className="flex-1 min-w-0">
+              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors`}>
+                <div className="px-4 py-3 border-b border-divider bg-surface-raised">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                    <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
                   </div>
-                  <ColumnContent
-                    issues={sortedGrouped[status]}
-                    agents={agents}
-                    specialists={specialists}
-                    issueCosts={issueCosts}
-                    costsLoading={costsLoading}
-                    selectedIssue={selectedIssue}
-                    onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
-                    onViewBeads={setBeadsDialogIssue}
-                    onViewVBrief={setVbriefDialogIssue}
-                    collapsedFeatures={collapsedFeatures}
-                    onToggleFeature={toggleFeature}
-                  />
                 </div>
-              </DroppableColumn>
-            ))}
-          </div>
-
-          {/* Drag Overlay - Ghost card following cursor */}
-          <DragOverlay dropAnimation={dropAnimation}>
-            {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
-          </DragOverlay>
-        </DndContext>
+                <ColumnContent
+                  issues={sortedGrouped[status]}
+                  agents={agents}
+                  specialists={specialists}
+                  issueCosts={issueCosts}
+                  costsLoading={costsLoading}
+                  selectedIssue={selectedIssue}
+                  onSelectIssue={onSelectIssue}
+                  onPlan={setPlanDialogIssue}
+                  onViewBeads={setBeadsDialogIssue}
+                  onViewVBrief={setVbriefDialogIssue}
+                  collapsedFeatures={collapsedFeatures}
+                  onToggleFeature={toggleFeature}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Undo Toast */}
@@ -1697,23 +1692,22 @@ function ColumnContent({
     );
 
     return (
-      <DraggableCardWrapper key={issue.id} issue={issue}>
-        <IssueCard
-          issue={issue}
-          workAgent={workAgent}
-          planningAgent={planningAgent}
-          specialists={issueSpecialists}
-          cost={issueCosts[issue.identifier.toLowerCase()]}
-          costsLoading={costsLoading}
-          isSelected={selectedIssue === issue.identifier}
-          onSelect={() => onSelectIssue(
-            selectedIssue === issue.identifier ? null : issue.identifier
-          )}
-          onPlan={() => onPlan(issue)}
-          onViewBeads={(i) => onViewBeads(i)}
-          onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
-        />
-      </DraggableCardWrapper>
+      <IssueCard
+        key={issue.id}
+        issue={issue}
+        workAgent={workAgent}
+        planningAgent={planningAgent}
+        specialists={issueSpecialists}
+        cost={issueCosts[issue.identifier.toLowerCase()]}
+        costsLoading={costsLoading}
+        isSelected={selectedIssue === issue.identifier}
+        onSelect={() => onSelectIssue(
+          selectedIssue === issue.identifier ? null : issue.identifier
+        )}
+        onPlan={() => onPlan(issue)}
+        onViewBeads={(i) => onViewBeads(i)}
+        onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
+      />
     );
   };
 
@@ -1770,6 +1764,7 @@ function ColumnContent({
   );
 }
 
+/* DnD components disabled pending rework
 // DroppableColumn component
 function DroppableColumn({ status, children }: { status: CanonicalState; children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({
@@ -1832,6 +1827,7 @@ function DragOverlayCard({ issue }: DragOverlayCardProps) {
     </div>
   );
 }
+*/
 
 // Agent Warning Dialog
 interface AgentWarningDialogProps {
