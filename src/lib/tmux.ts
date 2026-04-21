@@ -4,10 +4,19 @@ import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlink
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { randomUUID } from 'node:crypto';
 import { getPanopticonHome } from './paths.js';
 import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 
 const execFileAsync = promisify(execFile);
+
+const VALID_SESSION_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+function validateSessionName(name: string): void {
+  if (!VALID_SESSION_NAME_RE.test(name)) {
+    throw new Error(`Invalid tmux session name: ${name}`);
+  }
+}
 
 const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
 const MANAGED_TMUX_CONFIG_CONTENT = [
@@ -226,7 +235,6 @@ function logSendKeys(sessionName: string, keys: string, caller?: string): void {
       timestamp: new Date().toISOString(),
       sessionName,
       keysLength: keys.length,
-      keysPreview: keys.length > 200 ? keys.slice(0, 200) + '...' : keys,
       caller: callerInfo,
       pid: process.pid,
       tmuxConfigMode: getTmuxConfigMode(),
@@ -403,6 +411,7 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
  * MUST be used from the dashboard server and any async context.
  */
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
+  validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
   // Mirror the sync `sendKeys` pattern: one temp file, one load-buffer, one
@@ -411,7 +420,7 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
   // per line, which made large prompts take seconds (PAN-785).
   // `paste-buffer -d` drops the buffer in the same call so we don't need a
   // separate delete-buffer round-trip.
-  const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const sendId = randomUUID();
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
   // Use a named tmux buffer so concurrent sendKeysAsync calls (e.g. spawning
   // 4 parallel reviewers) don't race on the global unnamed buffer.
@@ -443,9 +452,10 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
  * Only use from CLI commands — NEVER from the dashboard server.
  */
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
+  validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
-  const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const sendId = randomUUID();
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
   const bufferName = `pan-${sendId}`;
   try {

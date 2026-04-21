@@ -133,6 +133,7 @@ export async function discoverSessionFile(
 
 /** Maximum bytes to read in a single incremental chunk (10 MB). */
 const MAX_READ_BYTES = 10 * 1024 * 1024;
+const MAX_FALLBACK_BYTES = 50 * 1024 * 1024;
 
 interface JsonlUsage {
   input_tokens?: number;
@@ -241,8 +242,8 @@ export async function parseConversationMessages(
           newByteOffset = fromByteOffset;
         } else {
           // No newline in a full chunk and more file remains (line exceeds MAX_READ_BYTES).
-          // Read the entire remaining file to find a newline boundary.
-          const remaining = fileSize - fromByteOffset;
+          // Read more to find a newline boundary, but cap to avoid OOM on pathological files.
+          const remaining = Math.min(fileSize - fromByteOffset, MAX_FALLBACK_BYTES);
           const fullBuf = Buffer.alloc(remaining);
           const { bytesRead: fullBytesRead } = await fh.read(fullBuf, 0, remaining, fromByteOffset);
           const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
@@ -564,65 +565,68 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
   if (!cached || fileSize < cached.scannedUpTo) {
     let lastBoundaryOffset = 0;
     let scanPos = 0;
-
-    while (scanPos < fileSize) {
-      const toRead = Math.min(fileSize - scanPos, MAX_READ_BYTES);
-      const fh = await open(sessionFile, 'r');
-      let buf: Buffer;
-      let bytesRead: number;
-      try {
-        buf = Buffer.alloc(toRead);
-        const result = await fh.read(buf, 0, toRead, scanPos);
-        bytesRead = result.bytesRead;
-      } finally {
-        await fh.close();
-      }
-
-      if (bytesRead === 0) break;
-
-      let scanBytes = bytesRead;
-      const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
-
-      if (lastNewline !== -1) {
-        scanBytes = lastNewline + 1;
-      } else if (scanPos + bytesRead < fileSize) {
-        // No newline in chunk and more file remains — read rest of file
-        const remaining = fileSize - scanPos;
-        const fullBuf = Buffer.alloc(remaining);
-        const fh2 = await open(sessionFile, 'r');
-        let fullBytesRead: number;
+    const fh = await open(sessionFile, 'r');
+    try {
+      while (scanPos < fileSize) {
+        const toRead = Math.min(fileSize - scanPos, MAX_READ_BYTES);
+        let buf: Buffer;
+        let bytesRead: number;
         try {
-          const result = await fh2.read(fullBuf, 0, remaining, scanPos);
-          fullBytesRead = result.bytesRead;
-        } finally {
-          await fh2.close();
+          buf = Buffer.alloc(toRead);
+          const result = await fh.read(buf, 0, toRead, scanPos);
+          bytesRead = result.bytesRead;
+        } catch {
+          break;
         }
-        const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
-        if (fullLastNewline !== -1) {
-          scanBytes = fullLastNewline + 1;
-          buf = fullBuf;
-        } else {
-          scanBytes = fullBytesRead;
-          buf = fullBuf;
-        }
-      }
 
-      const text = buf.toString('utf-8', 0, scanBytes);
-      let bytePos = scanPos;
-      const lines = text.split('\n');
-      for (const line of lines) {
-        if (line.trim()) {
+        if (bytesRead === 0) break;
+
+        let scanBytes = bytesRead;
+        const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+
+        if (lastNewline !== -1) {
+          scanBytes = lastNewline + 1;
+        } else if (scanPos + bytesRead < fileSize) {
+          // No newline in chunk and more file remains — read more, capped
+          const remaining = Math.min(fileSize - scanPos, MAX_FALLBACK_BYTES);
+          const fullBuf = Buffer.alloc(remaining);
+          let fullBytesRead: number;
           try {
-            const entry = JSON.parse(line);
-            if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
-              lastBoundaryOffset = bytePos;
-            }
-          } catch { /* skip invalid lines */ }
+            const result = await fh.read(fullBuf, 0, remaining, scanPos);
+            fullBytesRead = result.bytesRead;
+          } catch {
+            break;
+          }
+          const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+          if (fullLastNewline !== -1) {
+            scanBytes = fullLastNewline + 1;
+            buf = fullBuf;
+          } else {
+            scanBytes = fullBytesRead;
+            buf = fullBuf;
+          }
         }
-        bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
-      }
 
-      scanPos += scanBytes;
+        const text = buf.toString('utf-8', 0, scanBytes);
+        let bytePos = scanPos;
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const cleanLine = line.replace(/\r$/, '');
+              const entry = JSON.parse(cleanLine);
+              if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+                lastBoundaryOffset = bytePos;
+              }
+            } catch { /* skip invalid lines */ }
+          }
+          bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+        }
+
+        scanPos += scanBytes;
+      }
+    } finally {
+      await fh.close();
     }
 
     compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: fileSize });
@@ -633,69 +637,74 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
   const newBytes = fileSize - cached.scannedUpTo;
   const toRead = Math.min(newBytes, MAX_READ_BYTES);
   const fh = await open(sessionFile, 'r');
-  let buf: Buffer;
-  let bytesRead: number;
   try {
-    buf = Buffer.alloc(toRead);
-    const result = await fh.read(buf, 0, toRead, cached.scannedUpTo);
-    bytesRead = result.bytesRead;
-  } finally {
-    await fh.close();
-  }
-
-  let scanBytes = 0;
-  if (bytesRead > 0) {
-    const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
-    if (lastNewline !== -1) {
-      scanBytes = lastNewline + 1;
-    } else if (cached.scannedUpTo + bytesRead < fileSize) {
-      // No newline in chunk and more file remains — read to EOF
-      const remaining = fileSize - cached.scannedUpTo;
-      const fullBuf = Buffer.alloc(remaining);
-      const fh2 = await open(sessionFile, 'r');
-      let fullBytesRead: number;
-      try {
-        const result = await fh2.read(fullBuf, 0, remaining, cached.scannedUpTo);
-        fullBytesRead = result.bytesRead;
-      } finally {
-        await fh2.close();
-      }
-      const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
-      if (fullLastNewline !== -1) {
-        scanBytes = fullLastNewline + 1;
-        buf = fullBuf;
-        bytesRead = fullBytesRead;
-      } else {
-        // No newline even at EOF — don't scan partial trailing line
-        compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
-        return cached.boundaryOffset;
-      }
-    } else {
-      // At EOF with no newline — don't scan partial trailing line
+    let buf: Buffer;
+    let bytesRead: number;
+    try {
+      buf = Buffer.alloc(toRead);
+      const result = await fh.read(buf, 0, toRead, cached.scannedUpTo);
+      bytesRead = result.bytesRead;
+    } catch {
       compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
       return cached.boundaryOffset;
     }
-  }
 
-  const text = buf.toString('utf-8', 0, scanBytes);
-
-  let lastBoundaryOffset = cached.boundaryOffset;
-  let bytePos = cached.scannedUpTo;
-  const lines = text.split('\n');
-  for (const line of lines) {
-    if (line.trim()) {
-      try {
-        const entry = JSON.parse(line);
-        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
-          lastBoundaryOffset = bytePos;
+    let scanBytes = 0;
+    if (bytesRead > 0) {
+      const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+      if (lastNewline !== -1) {
+        scanBytes = lastNewline + 1;
+      } else if (cached.scannedUpTo + bytesRead < fileSize) {
+        // No newline in chunk and more file remains — read to EOF, capped
+        const remaining = Math.min(fileSize - cached.scannedUpTo, MAX_FALLBACK_BYTES);
+        const fullBuf = Buffer.alloc(remaining);
+        let fullBytesRead: number;
+        try {
+          const result = await fh.read(fullBuf, 0, remaining, cached.scannedUpTo);
+          fullBytesRead = result.bytesRead;
+        } catch {
+          compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+          return cached.boundaryOffset;
         }
-      } catch { /* skip invalid lines */ }
+        const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+        if (fullLastNewline !== -1) {
+          scanBytes = fullLastNewline + 1;
+          buf = fullBuf;
+        } else {
+          // No newline even at EOF — don't scan partial trailing line
+          compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+          return cached.boundaryOffset;
+        }
+      } else {
+        // At EOF with no newline — don't scan partial trailing line
+        compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+        return cached.boundaryOffset;
+      }
     }
-    bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
-  }
 
-  compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: cached.scannedUpTo + scanBytes });
-  return lastBoundaryOffset;
+    const text = buf.toString('utf-8', 0, scanBytes);
+
+    let lastBoundaryOffset = cached.boundaryOffset;
+    let bytePos = cached.scannedUpTo;
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.trim()) {
+        try {
+          const cleanLine = line.replace(/\r$/, '');
+          const entry = JSON.parse(cleanLine);
+          if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+            lastBoundaryOffset = bytePos;
+          }
+        } catch { /* skip invalid lines */ }
+      }
+      bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+    }
+
+    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: cached.scannedUpTo + scanBytes });
+    return lastBoundaryOffset;
+  } finally {
+    await fh.close();
+  }
 }
 
 /**
