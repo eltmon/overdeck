@@ -239,7 +239,7 @@ export function buildReviewFeedbackBody(issueId: string, result: ReviewResult): 
   if (result.reviewResult === 'CHANGES_REQUESTED') {
     body += `\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.\n`;
   } else if (result.reviewResult === 'APPROVED') {
-    body += `\n## Next Steps\n\nCode approved. It will proceed to testing.\n`;
+    body += `\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run \`pan done\` again.**\n**Do NOT run \`pan review request\`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n`;
   }
 
   return body;
@@ -810,6 +810,15 @@ export async function dispatchParallelReview(
     branch: opts.branch,
     workspace: opts.workspace,
   };
+
+  // Archive feedback from any previous review cycle so the work agent only
+  // sees current-cycle feedback when it reads .planning/feedback/.
+  try {
+    const { archiveFeedbackFiles } = await import('./feedback-writer.js');
+    await archiveFeedbackFiles(opts.workspace);
+  } catch {
+    // Non-fatal: archiving is best-effort
+  }
 
   // Set reviewing here so callers don't race against the async .catch that resets
   // to pending on spawn failure. All reviewStatus transitions live in this function.
