@@ -4,7 +4,7 @@
     "created": "2026-04-20T22:21:27Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-699: Conversation view renders tool calls out of terminal order",
-    "updated": "2026-04-21T06:12:04.633Z"
+    "updated": "2026-04-21T06:16:50.323Z"
   },
   "plan": {
     "id": "pan-699",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "557afeee-8e75-4507-8839-f0f54fd35a4f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 143,
+    "sequence": 153,
     "created": "2026-04-20T22:21:27Z",
-    "updated": "2026-04-21T06:12:04.633Z",
+    "updated": "2026-04-21T06:16:50.323Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/699",
@@ -75,7 +75,7 @@
             "completed": "2026-04-20T23:02:43.111Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.633Z"
+        "completed": "2026-04-21T06:16:50.322Z"
       },
       {
         "id": "parse-sequence",
@@ -119,7 +119,7 @@
             "completed": "2026-04-20T23:02:43.112Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.633Z"
+        "completed": "2026-04-21T06:16:50.323Z"
       },
       {
         "id": "parse-unresolved-results",
@@ -163,7 +163,7 @@
             "completed": "2026-04-20T23:02:43.112Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.633Z"
+        "completed": "2026-04-21T06:16:50.322Z"
       },
       {
         "id": "parse-sort",
@@ -207,7 +207,7 @@
             "completed": "2026-04-20T23:02:43.110Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.632Z"
+        "completed": "2026-04-21T06:16:50.322Z"
       },
       {
         "id": "parse-persist-state",
@@ -260,7 +260,7 @@
             "completed": "2026-04-20T23:02:43.110Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.633Z"
+        "completed": "2026-04-21T06:16:50.322Z"
       },
       {
         "id": "route-wire-sequence",
@@ -295,7 +295,7 @@
             "completed": "2026-04-20T23:02:43.111Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.633Z"
+        "completed": "2026-04-21T06:16:50.322Z"
       },
       {
         "id": "client-defensive-sort",
@@ -330,7 +330,7 @@
             "completed": "2026-04-20T23:02:43.109Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.632Z"
+        "completed": "2026-04-21T06:16:50.321Z"
       },
       {
         "id": "tests-unit",
@@ -401,7 +401,7 @@
             "completed": "2026-04-20T23:02:43.108Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.632Z"
+        "completed": "2026-04-21T06:16:50.321Z"
       },
       {
         "id": "tests-regression-fixture",
@@ -436,7 +436,7 @@
             "completed": "2026-04-20T23:02:43.107Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.631Z"
+        "completed": "2026-04-21T06:16:50.320Z"
       },
       {
         "id": "uat-playwright",
@@ -489,7 +489,7 @@
             "completed": "2026-04-20T23:02:43.109Z"
           }
         ],
-        "completed": "2026-04-21T06:12:04.632Z"
+        "completed": "2026-04-21T06:16:50.321Z"
       }
     ],
     "edges": [
