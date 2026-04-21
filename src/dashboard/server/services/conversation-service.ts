@@ -197,10 +197,13 @@ export async function parseConversationMessages(
   let newText = '';
   if (toRead > 0) {
     const fh = await open(sessionFile, 'r');
-    const buf = Buffer.alloc(toRead);
-    await fh.read(buf, 0, toRead, fromByteOffset);
-    await fh.close();
-    newText = buf.toString('utf-8');
+    try {
+      const buf = Buffer.alloc(toRead);
+      await fh.read(buf, 0, toRead, fromByteOffset);
+      newText = buf.toString('utf-8');
+    } finally {
+      await fh.close();
+    }
   }
 
   const lines = newText.split('\n').filter((l) => l.trim());
@@ -278,6 +281,11 @@ export async function parseConversationMessages(
                 tone: block.is_error ? 'error' : pending.tone,
               });
             } else {
+              // Cap unresolved results to prevent unbounded growth in long sessions
+              if (unresolvedResults.size >= 1000) {
+                const firstKey = unresolvedResults.keys().next().value;
+                if (firstKey !== undefined) unresolvedResults.delete(firstKey);
+              }
               unresolvedResults.set(block.tool_use_id, {
                 resultText,
                 isError: block.is_error ?? false,
@@ -392,6 +400,7 @@ export async function parseConversationMessages(
     for (const [, entry] of pendingToolUse) {
       workLog.push(entry);
     }
+    pendingToolUse.clear();
   }
 
   // Sort by (createdAt, sequence) so the conversation view matches terminal order
@@ -458,16 +467,18 @@ const compactOffsetCache = new Map<string, { boundaryOffset: number; fileSize: n
  * the cached size, only the new portion is scanned. Returns 0 if no boundary found.
  */
 export async function findLastCompactBoundary(sessionFile: string): Promise<number> {
-  const buffer = await readFile(sessionFile);
-  const fileSize = buffer.length;
-  const text = buffer.toString('utf-8');
+  const fileStats = await stat(sessionFile);
+  const fileSize = fileStats.size;
 
   const cached = compactOffsetCache.get(sessionFile);
 
-  // If file hasn't grown since last scan, return cached offset
+  // If file hasn't grown since last scan, return cached offset without reading
   if (cached && cached.fileSize === fileSize) {
     return cached.boundaryOffset;
   }
+
+  const buffer = await readFile(sessionFile);
+  const text = buffer.toString('utf-8');
 
   // Scan from the cached offset (or start) forward — compact boundaries only append
   const scanFrom = cached?.boundaryOffset ?? 0;
