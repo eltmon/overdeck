@@ -407,11 +407,17 @@ export async function parseConversationMessages(
   messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
   workLog.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0));
 
-  // Streaming detection: last assistant message has no stop_reason and file was modified < 5s ago
+  // Streaming detection: agent is active if the last assistant message is incomplete,
+  // or if there are pending/unresolved tools (mid-turn), or a user message arrived
+  // (agent is about to respond), and the file was modified recently.
   let streaming = false;
   const lastMsg = messages[messages.length - 1];
-  if (lastMsg?.role === 'assistant' && !lastMsg.completedAt) {
-    streaming = Date.now() - fileStats.mtimeMs < 5000;
+  const hasPendingActivity = pendingToolUse.size > 0 || unresolvedResults.size > 0;
+  const fileRecent = Date.now() - fileStats.mtimeMs < 5000;
+  if (lastMsg?.role === 'assistant' && !lastMsg.completedAt && fileRecent) {
+    streaming = true;
+  } else if ((lastMsg?.role === 'user' || hasPendingActivity) && fileRecent) {
+    streaming = true;
   }
 
   return {
@@ -477,18 +483,62 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
     return cached.boundaryOffset;
   }
 
-  const buffer = await readFile(sessionFile);
-  const text = buffer.toString('utf-8');
+  // No cache or file shrank — read entire file
+  if (!cached || fileSize < cached.fileSize) {
+    const buffer = await readFile(sessionFile);
+    const text = buffer.toString('utf-8');
 
-  // Scan from the cached offset (or start) forward — compact boundaries only append
-  const scanFrom = cached?.boundaryOffset ?? 0;
-  let lastBoundaryOffset = cached?.boundaryOffset ?? 0;
+    let lastBoundaryOffset = 0;
+    let bytePos = 0;
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.trim()) {
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+            lastBoundaryOffset = bytePos;
+          }
+        } catch { /* skip invalid lines */ }
+      }
+      bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+    }
 
-  // Walk through lines, tracking byte position
-  let bytePos = 0;
+    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, fileSize });
+    return lastBoundaryOffset;
+  }
+
+  // File grew — read only the new portion
+  const newBytes = fileSize - cached.fileSize;
+  const fh = await open(sessionFile, 'r');
+  let buf: Buffer;
+  try {
+    buf = Buffer.alloc(newBytes);
+    await fh.read(buf, 0, newBytes, cached.fileSize);
+  } finally {
+    await fh.close();
+  }
+
+  // If new content starts mid-line, skip to the first complete line
+  let scanStart = 0;
+  if (buf.length > 0 && buf[0] !== 10 && cached.fileSize > 0) {
+    const nlIdx = buf.indexOf(10);
+    if (nlIdx !== -1) {
+      scanStart = nlIdx + 1;
+    } else {
+      // No complete line in new content — nothing to scan
+      compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, fileSize });
+      return cached.boundaryOffset;
+    }
+  }
+
+  const scanBuf = buf.slice(scanStart);
+  const text = scanBuf.toString('utf-8');
+
+  let lastBoundaryOffset = cached.boundaryOffset;
+  let bytePos = cached.fileSize + scanStart;
   const lines = text.split('\n');
   for (const line of lines) {
-    if (bytePos >= scanFrom && line.trim()) {
+    if (line.trim()) {
       try {
         const entry = JSON.parse(line);
         if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
@@ -536,24 +586,46 @@ export function watchConversation(
   let byteOffset = 0;
   let priorState: ParseState | undefined;
   let stopped = false;
+  let isParsing = false;
   let abortController: AbortController | null = null;
   let pollInterval: ReturnType<typeof setTimeout> | null = null;
 
   async function handleChange(): Promise<void> {
-    if (stopped) return;
+    if (stopped || isParsing) return;
+    isParsing = true;
     try {
       const result = await parseConversationMessages(sessionFile, byteOffset, priorState);
-      if (result.byteOffset > byteOffset) {
+      if (result.byteOffset < byteOffset) {
+        // File was truncated or rotated — reset to full re-parse
+        byteOffset = 0;
+        priorState = undefined;
+        const fullResult = await parseConversationMessages(sessionFile, 0);
+        if (fullResult.byteOffset > 0) {
+          byteOffset = fullResult.byteOffset;
+          priorState = {
+            pendingToolUse: fullResult.pendingToolUse,
+            unresolvedResults: fullResult.unresolvedResults,
+            lastSequence: fullResult.lastSequence,
+          };
+          // Include in-flight tools so the live view shows pending work
+          const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];
+          callback({ ...fullResult, workLog });
+        }
+      } else if (result.byteOffset > byteOffset) {
         byteOffset = result.byteOffset;
         priorState = {
           pendingToolUse: result.pendingToolUse,
           unresolvedResults: result.unresolvedResults,
           lastSequence: result.lastSequence,
         };
-        callback(result);
+        // Include in-flight tools so the live view shows pending work
+        const workLog = [...result.workLog, ...result.pendingToolUse.values()];
+        callback({ ...result, workLog });
       }
     } catch {
       // File may have been rotated or is temporarily unavailable
+    } finally {
+      isParsing = false;
     }
   }
 
