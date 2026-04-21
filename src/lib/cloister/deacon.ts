@@ -1455,6 +1455,172 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 }
 
 // ============================================================================
+// PAN-699: Missing review status detection
+// ============================================================================
+
+/**
+ * Check for completed work agents that have no review status entry at all.
+ *
+ * This catches the gap where `pan done` wrote the completion marker but the
+ * HTTP trigger to the dashboard never arrived (dashboard down, network failure,
+ * etc). Deacon scans the agent directories and auto-triggers review dispatch.
+ */
+export async function checkMissingReviewStatuses(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    if (!existsSync(AGENTS_DIR)) return actions;
+
+    const { loadReviewStatuses } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+
+    const agentDirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory() && d.name.startsWith('agent-'));
+
+    for (const dir of agentDirs) {
+      const issueId = dir.name.replace('agent-', '').toUpperCase();
+      if (statuses[issueId]) continue; // already has a status row
+
+      const completedFile = join(AGENTS_DIR, dir.name, 'completed');
+      const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
+      if (!existsSync(completedFile) && !existsSync(processedFile)) continue;
+
+      // Work is done but no status row — auto-trigger review
+      const { resolveProjectFromIssue } = await import('../projects.js');
+      const resolved = resolveProjectFromIssue(issueId);
+      if (!resolved) {
+        actions.push(`Skipped missing-status review for ${issueId}: no project configured`);
+        continue;
+      }
+
+      const issueLower = issueId.toLowerCase();
+      const workspace = findWorkspacePath(resolved.projectPath, issueLower);
+      if (!workspace) {
+        actions.push(`Skipped missing-status review for ${issueId}: workspace unavailable`);
+        continue;
+      }
+
+      const { dispatchParallelReview } = await import('./review-agent.js');
+      try {
+        await dispatchParallelReview({
+          issueId,
+          workspace,
+          branch: `feature/${issueLower}`,
+        });
+        actions.push(`Auto-triggered review for ${issueId} (missing status entry)`);
+        console.log(`[deacon] Auto-triggered review for ${issueId} (missing status entry)`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        actions.push(`Failed to auto-trigger review for ${issueId}: ${msg}`);
+        console.error(`[deacon] Failed to auto-trigger review for ${issueId}:`, msg);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking missing review statuses:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// PAN-699: Pending test dispatch retry
+// ============================================================================
+
+/**
+ * Retry test-agent dispatch for issues where review passed but the test-agent
+ * never started or failed to dispatch.
+ *
+ * Conditions:
+ * - reviewStatus === 'passed' AND (testStatus === 'pending' for >5min OR testStatus === 'dispatch_failed')
+ * - Retries up to 3 times with exponential backoff tracked per-issue.
+ */
+export async function checkPendingTestDispatch(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const { loadReviewStatuses, setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'passed') continue;
+      if (status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') continue;
+
+      const retryCount = status.testRetryCount ?? 0;
+      if (retryCount >= 3) continue;
+
+      // For pending, only retry if it's been >5 minutes since review passed
+      if (status.testStatus === 'pending') {
+        const reviewPassedAt = status.history
+          ?.filter(h => h.type === 'review' && h.status === 'passed')
+          .pop()?.timestamp;
+        if (reviewPassedAt && now - new Date(reviewPassedAt).getTime() < 5 * 60 * 1000) {
+          continue;
+        }
+      }
+
+      const { resolveProjectFromIssue } = await import('../projects.js');
+      const resolved = resolveProjectFromIssue(issueId);
+      if (!resolved) continue;
+
+      const issueLower = issueId.toLowerCase();
+      const workAgentId = `agent-${issueLower}`;
+      const agentState = getAgentState(workAgentId);
+      const workspace = agentState?.workspace || findWorkspacePath(resolved.projectPath, issueLower);
+      const branch = `feature/${issueLower}`;
+
+      if (!workspace) {
+        actions.push(`Skipped test retry for ${issueId}: workspace unavailable`);
+        continue;
+      }
+
+      const { spawnEphemeralSpecialist } = await import('./specialists.js');
+      try {
+        const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+          issueId,
+          workspace,
+          branch,
+        });
+        if (result.success) {
+          setReviewStatus(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
+          actions.push(`Dispatched test-agent for ${issueId} (retry ${retryCount + 1})`);
+          console.log(`[deacon] Dispatched test-agent for ${issueId} (retry ${retryCount + 1})`);
+        } else if (result.error === 'specialist_busy') {
+          setReviewStatus(issueId, {
+            testStatus: 'dispatch_failed',
+            testNotes: 'Specialist busy',
+            testRetryCount: retryCount + 1,
+          });
+          actions.push(`Test-agent busy for ${issueId} — queued for next patrol retry`);
+        } else {
+          setReviewStatus(issueId, {
+            testStatus: 'dispatch_failed',
+            testNotes: result.message || String(result.error),
+            testRetryCount: retryCount + 1,
+          });
+          actions.push(`Test-agent dispatch failed for ${issueId}: ${result.message || result.error}`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setReviewStatus(issueId, {
+          testStatus: 'dispatch_failed',
+          testNotes: msg,
+          testRetryCount: retryCount + 1,
+        });
+        actions.push(`Test-agent dispatch error for ${issueId}: ${msg}`);
+        console.error(`[deacon] Test-agent dispatch error for ${issueId}:`, msg);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking pending test dispatch:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // CI transient retry tracking (shared by checkPostReviewCommits + checkFailedMergeRetry)
 // ============================================================================
 
@@ -2649,6 +2815,16 @@ export async function runPatrol(): Promise<PatrolResult> {
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
+
+  // Check for completed work with no review status entry at all (PAN-699)
+  const missingStatusActions = await checkMissingReviewStatuses();
+  actions.push(...missingStatusActions);
+  for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);
+
+  // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
+  const pendingTestActions = await checkPendingTestDispatch();
+  actions.push(...pendingTestActions);
+  for (const a of pendingTestActions) addLog('action', a, state.patrolCycle);
 
   // Kill orphaned planning sessions whose issue has already progressed past planning.
   // PAN-682 pattern: `planning-pan-<id>` tmux session survives hours after `complete-planning`

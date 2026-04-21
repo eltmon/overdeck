@@ -29,9 +29,11 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         review_notes, test_notes, merge_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
         stuck, stuck_reason, stuck_at, stuck_details,
-        reviewed_at_commit
+        reviewed_at_commit,
+        review_spawned_at,
+        test_retry_count
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -53,7 +55,9 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         stuck_reason          = excluded.stuck_reason,
         stuck_at              = excluded.stuck_at,
         stuck_details         = excluded.stuck_details,
-        reviewed_at_commit    = excluded.reviewed_at_commit
+        reviewed_at_commit    = excluded.reviewed_at_commit,
+        review_spawned_at     = excluded.review_spawned_at,
+        test_retry_count      = excluded.test_retry_count
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -76,6 +80,8 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.stuckAt ?? null,
       s.stuckDetails ?? null,
       s.reviewedAtCommit ?? null,
+      s.reviewSpawnedAt ?? null,
+      s.testRetryCount ?? null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -184,6 +190,10 @@ interface DbReviewStatusRow {
   stuck_details: string | null;
   // PAN-653: commit SHA at which review passed
   reviewed_at_commit: string | null;
+  // PAN-699: timestamp when review agents were dispatched
+  review_spawned_at: string | null;
+  // PAN-699: test-agent dispatch retry counter
+  test_retry_count: number | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -209,6 +219,8 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     stuckAt: row.stuck_at ?? undefined,
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
+    reviewSpawnedAt: row.review_spawned_at ?? undefined,
+    testRetryCount: row.test_retry_count ?? undefined,
     history: history.length > 0 ? history : undefined,
   });
 }

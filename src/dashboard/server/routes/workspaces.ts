@@ -2314,6 +2314,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
     const forceReview =
@@ -2456,6 +2457,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	              console.warn(`[review] Review artifact creation failed for ${issueId}: ${artifactErr.message}`);
 	            }
 
+            try {
+              eventStore.append({
+                type: 'pipeline.verification-started',
+                timestamp: new Date().toISOString(),
+                payload: { issueId },
+              } as any);
+            } catch { /* non-fatal */ }
+
             const verifyOutcome = await runVerificationForIssue(
               issueId,
               workspacePath,
@@ -2471,6 +2480,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewStatus: 'failed',
                 reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
               });
+              try {
+                eventStore.append({
+                  type: 'pipeline.verification-failed',
+                  timestamp: new Date().toISOString(),
+                  payload: { issueId, failedCheck: verifyOutcome.failedCheck },
+                } as any);
+              } catch { /* non-fatal */ }
               return;
             }
             if (verifyOutcome.outcome === 'error') {
@@ -2482,6 +2498,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewStatus: 'failed',
                 reviewNotes: `Verification error: ${verifyOutcome.message}`,
               });
+              try {
+                eventStore.append({
+                  type: 'pipeline.verification-failed',
+                  timestamp: new Date().toISOString(),
+                  payload: { issueId, message: verifyOutcome.message },
+                } as any);
+              } catch { /* non-fatal */ }
               return;
             }
 
@@ -2510,6 +2533,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             // PAN-511: set 'reviewing' only after dispatch succeeds
             setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
+            try {
+              eventStore.append({
+                type: 'pipeline.review-started',
+                timestamp: new Date().toISOString(),
+                payload: { issueId },
+              } as any);
+            } catch { /* non-fatal */ }
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
             completePendingOperation(issueId, error.message);

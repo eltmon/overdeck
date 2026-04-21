@@ -6,13 +6,13 @@ export function StatusHistory({ history }: { history: StatusHistoryEntry[] }) {
   const [expanded, setExpanded] = useState(false);
   const sorted = [...history].reverse();
   return (
-    <div className="mt-2 border-t border-divider pt-1.5">
+    <div className="px-3 py-1.5">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 text-[10px] text-content-subtle"
+        className="flex items-center gap-1 text-[10px] text-content-subtle hover:text-content transition-colors"
       >
         <span>{expanded ? '▾' : '▸'}</span>
-        <span>History ({history.length})</span>
+        <span>Previous attempts ({history.length})</span>
       </button>
       {expanded && (
         <div className="mt-1 space-y-0.5">
