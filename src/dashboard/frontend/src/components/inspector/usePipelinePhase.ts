@@ -36,7 +36,14 @@ export function derivePipelinePhase(
   const specialistSession = (role: string): string =>
     projectKey ? `specialist-${projectKey}-${issueId}-${role}` : `specialist-${role}`;
 
-  const reviewSession = specialistSession('review-agent');
+  // Parallel review sessions use review-<issueId>-<timestamp>-<role> naming.
+  // Prefer actual discovered session names from the backend when available.
+  const reviewSessionNames = reviewStatus?.reviewSessionNames;
+  const fallbackReviewSession = specialistSession('review-agent');
+  const reviewSession = reviewSessionNames && reviewSessionNames.length > 0
+    ? reviewSessionNames[0]
+    : fallbackReviewSession;
+
   const testSession = specialistSession('test-agent');
   const mergeSession = specialistSession('merge-agent');
 
@@ -59,7 +66,11 @@ export function derivePipelinePhase(
     activeSession = deadSessions.has(testSession) ? null : testSession;
   } else if (rs === 'reviewing') {
     phase = 'reviewing';
-    activeSession = deadSessions.has(reviewSession) ? null : reviewSession;
+    if (reviewSessionNames && reviewSessionNames.length > 0) {
+      activeSession = reviewSessionNames.find(s => !deadSessions.has(s)) || reviewSessionNames[0] || null;
+    } else {
+      activeSession = deadSessions.has(reviewSession) ? null : reviewSession;
+    }
   } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
     phase = 'review-feedback';
     activeSession = workSession;
@@ -92,13 +103,26 @@ export function derivePipelinePhase(
 
   // Review tab: show once review has started (not just pending)
   if (rs && rs !== 'pending') {
-    tabs.push({
-      id: 'reviewing',
-      label: 'Review',
-      sessionName: reviewSession,
-      isActive: phase === 'reviewing',
-      disabled: deadSessions.has(reviewSession),
-    });
+    if (reviewSessionNames && reviewSessionNames.length > 0) {
+      for (const sessionName of reviewSessionNames) {
+        const role = sessionName.split('-').pop() || 'review';
+        tabs.push({
+          id: `reviewing-${role}`,
+          label: `Review (${role})`,
+          sessionName,
+          isActive: phase === 'reviewing' && activeSession === sessionName,
+          disabled: deadSessions.has(sessionName),
+        });
+      }
+    } else {
+      tabs.push({
+        id: 'reviewing',
+        label: 'Review',
+        sessionName: reviewSession,
+        isActive: phase === 'reviewing',
+        disabled: deadSessions.has(reviewSession),
+      });
+    }
   }
 
   // Test tab: show once testing has started

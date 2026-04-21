@@ -26,6 +26,8 @@ export interface ReviewStatus {
   readyForMerge: boolean;
   autoRequeueCount?: number;
   history?: StatusHistoryEntry[];
+  /** Active parallel review session names (review-<issueId>-<timestamp>-<role>) */
+  reviewSessionNames?: string[];
 }
 
 export interface ContainerStatus {

@@ -2076,6 +2076,13 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
 
     let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
 
+    // Discover active parallel review sessions for this issue
+    let reviewSessionNames: string[] | undefined;
+    try {
+      const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+      reviewSessionNames = allSessions.filter(s => s.startsWith(`review-${issueId}-`));
+    } catch { /* non-fatal: tmux may not be available */ }
+
     // Only the merge queue is persistent — check it when no active phase is detected
     if (queuePosition === null) {
       try {
@@ -2104,7 +2111,7 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       }
     }
 
-    return jsonResponse({ ...base, queuePosition, activeSpecialist });
+    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewSessionNames });
   }))
 );
 
