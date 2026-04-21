@@ -3,6 +3,7 @@ import {
   deriveTimelineEntries,
   deriveMessagesTimelineRows,
   estimateMessagesTimelineRowHeight,
+  computeMessageDurationStart,
 } from '../session-logic';
 import type { ChatMessage, WorkLogEntry } from '../chat-types';
 
@@ -23,6 +24,55 @@ function work(overrides: Partial<WorkLogEntry> & { id: string; createdAt: string
     ...overrides,
   };
 }
+
+// ─── computeMessageDurationStart ──────────────────────────────────────────────
+
+describe('computeMessageDurationStart', () => {
+  it('sets duration start to the preceding user message timestamp', () => {
+    const messages: ChatMessage[] = [
+      msg({ id: 'u1', role: 'user', createdAt: '2024-01-01T00:00:00Z', text: 'hi' }),
+      msg({ id: 'a1', role: 'assistant', createdAt: '2024-01-01T00:00:05Z', text: 'ok' }),
+    ];
+    const map = computeMessageDurationStart(messages);
+    expect(map.get('a1')).toBe('2024-01-01T00:00:00Z');
+  });
+
+  it('falls back to message.createdAt when no user message precedes it', () => {
+    const messages: ChatMessage[] = [
+      msg({ id: 'a1', role: 'assistant', createdAt: '2024-01-01T00:00:05Z', text: 'ok' }),
+    ];
+    const map = computeMessageDurationStart(messages);
+    expect(map.get('a1')).toBe('2024-01-01T00:00:05Z');
+  });
+
+  it('uses the most recent user message for multiple assistant responses', () => {
+    const messages: ChatMessage[] = [
+      msg({ id: 'u1', role: 'user', createdAt: '2024-01-01T00:00:00Z', text: 'first' }),
+      msg({ id: 'a1', role: 'assistant', createdAt: '2024-01-01T00:00:02Z', text: 'resp 1' }),
+      msg({ id: 'u2', role: 'user', createdAt: '2024-01-01T00:00:10Z', text: 'second' }),
+      msg({ id: 'a2', role: 'assistant', createdAt: '2024-01-01T00:00:15Z', text: 'resp 2' }),
+    ];
+    const map = computeMessageDurationStart(messages);
+    expect(map.get('a1')).toBe('2024-01-01T00:00:00Z');
+    expect(map.get('a2')).toBe('2024-01-01T00:00:10Z');
+  });
+
+  it('advances boundary after a completed assistant message', () => {
+    const messages: ChatMessage[] = [
+      msg({ id: 'u1', role: 'user', createdAt: '2024-01-01T00:00:00Z', text: 'hi' }),
+      msg({
+        id: 'a1',
+        role: 'assistant',
+        createdAt: '2024-01-01T00:00:02Z',
+        completedAt: '2024-01-01T00:00:05Z',
+        text: 'ok',
+      }),
+      msg({ id: 'a2', role: 'assistant', createdAt: '2024-01-01T00:00:06Z', text: 'more' }),
+    ];
+    const map = computeMessageDurationStart(messages);
+    expect(map.get('a2')).toBe('2024-01-01T00:00:05Z');
+  });
+});
 
 // ─── deriveTimelineEntries ────────────────────────────────────────────────────
 
@@ -77,6 +127,21 @@ describe('deriveTimelineEntries', () => {
 
     expect((entry as { message: ChatMessage }).message).toEqual(m);
   });
+
+  it('interleaves assistant text and tools with same timestamp (stable sort)', () => {
+    // Simulates one assistant turn at T2 that produced both text and a tool_use.
+    // Messages are spread before workLog, so stable sort preserves message first.
+    const messages = [
+      msg({ id: 'u1', role: 'user', createdAt: '2024-01-01T00:00:00Z', text: 'do it' }),
+      msg({ id: 'a1', role: 'assistant', createdAt: '2024-01-01T00:00:02Z', text: 'Let me check...' }),
+    ];
+    const workLog = [
+      work({ id: 't1', createdAt: '2024-01-01T00:00:02Z', label: 'Bash' }),
+    ];
+
+    const entries = deriveTimelineEntries(messages, workLog);
+    expect(entries.map((e) => e.id)).toEqual(['u1', 'a1', 't1']);
+  });
 });
 
 // ─── deriveMessagesTimelineRows ───────────────────────────────────────────────
@@ -104,13 +169,14 @@ describe('deriveMessagesTimelineRows', () => {
     expect(workingRow.createdAt).toBe('2024-01-01T00:01:00Z');
   });
 
-  it('renders a message entry as a "message" row', () => {
+  it('renders a message entry as a "message" row with durationStart', () => {
     const m = msg({ id: 'm1', createdAt: '2024-01-01T00:00:00Z', role: 'user', text: 'hi' });
     const entries = deriveTimelineEntries([m], []);
     const rows = deriveMessagesTimelineRows(entries, false);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ kind: 'message', id: 'm1' });
+    expect((rows[0] as { durationStart: string }).durationStart).toBe('2024-01-01T00:00:00Z');
   });
 
   it('groups consecutive work entries into a single "work" row', () => {
@@ -152,7 +218,7 @@ describe('deriveMessagesTimelineRows', () => {
   });
 });
 
-// ─── estimateMessagesTimelineRowHeight ───────────────────────────────────────
+// ─── estimateMessagesTimelineRowHeight ────────────────────────────────────────
 
 describe('estimateMessagesTimelineRowHeight', () => {
   it('returns 40 for a working row', () => {
@@ -186,6 +252,7 @@ describe('estimateMessagesTimelineRowHeight', () => {
       id: 'm1',
       createdAt: '2024-01-01T00:00:00Z',
       message: msg({ id: 'm1', createdAt: '2024-01-01T00:00:00Z', role: 'user', text: 'Hello!' }),
+      durationStart: '2024-01-01T00:00:00Z',
     };
     expect(estimateMessagesTimelineRowHeight(row)).toBeGreaterThan(0);
   });
