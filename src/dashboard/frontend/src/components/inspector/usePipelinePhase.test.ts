@@ -366,4 +366,21 @@ describe('derivePipelinePhase availableTerminals', () => {
     // No specialist tabs when reviewStatus is absent
     expect(availableTerminals.filter(t => t.id !== 'working')).toHaveLength(0);
   });
+
+  it('marks done sub-reviewers as disabled with no spinner', () => {
+    const input = makeInput({
+      reviewStatus: makeReviewStatus({
+        reviewStatus: 'reviewing',
+        reviewSessionNames: ['review-pan-509-123-correctness', 'review-pan-509-123-performance'],
+        reviewSubStatuses: { correctness: 'done', performance: 'running' },
+      }),
+    });
+    const { availableTerminals } = derivePipelinePhase(input);
+    const correctnessTab = availableTerminals.find(t => t.id === 'reviewing-correctness');
+    const performanceTab = availableTerminals.find(t => t.id === 'reviewing-performance');
+    expect(correctnessTab?.disabled).toBe(true);
+    expect(correctnessTab?.isRunning).toBe(false);
+    expect(performanceTab?.disabled).toBe(false);
+    expect(performanceTab?.isRunning).toBe(true);
+  });
 });

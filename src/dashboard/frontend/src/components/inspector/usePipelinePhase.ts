@@ -98,20 +98,24 @@ export function derivePipelinePhase(
       sessionName: workSession,
       isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback',
       disabled: deadSessions.has(workSession),
+      isRunning: isPlanningAgent ? phase === 'planning' : phase === 'working',
     });
   }
 
   // Review tab: show once review has started (not just pending)
+  const reviewSubStatuses = reviewStatus?.reviewSubStatuses;
   if (rs && rs !== 'pending') {
     if (reviewSessionNames && reviewSessionNames.length > 0) {
       for (const sessionName of reviewSessionNames) {
         const role = sessionName.split('-').pop() || 'review';
+        const isDone = reviewSubStatuses?.[role] === 'done';
         tabs.push({
           id: `reviewing-${role}`,
           label: `Review (${role})`,
           sessionName,
           isActive: phase === 'reviewing' && activeSession === sessionName,
-          disabled: deadSessions.has(sessionName),
+          disabled: deadSessions.has(sessionName) || isDone,
+          isRunning: phase === 'reviewing' && !isDone,
         });
       }
     } else {
@@ -121,6 +125,7 @@ export function derivePipelinePhase(
         sessionName: reviewSession,
         isActive: phase === 'reviewing',
         disabled: deadSessions.has(reviewSession),
+        isRunning: phase === 'reviewing',
       });
     }
   }
@@ -133,6 +138,7 @@ export function derivePipelinePhase(
       sessionName: testSession,
       isActive: phase === 'testing',
       disabled: deadSessions.has(testSession),
+      isRunning: phase === 'testing',
     });
   }
 
@@ -144,6 +150,7 @@ export function derivePipelinePhase(
       sessionName: mergeSession,
       isActive: phase === 'merging',
       disabled: ms === 'merged' || deadSessions.has(mergeSession),
+      isRunning: phase === 'merging',
     });
   }
 

@@ -28,6 +28,8 @@ export interface ReviewStatus {
   history?: StatusHistoryEntry[];
   /** Active parallel review session names (review-<issueId>-<timestamp>-<role>) */
   reviewSessionNames?: string[];
+  /** Per-role completion status for parallel review sub-agents */
+  reviewSubStatuses?: Record<string, 'running' | 'done'>;
 }
 
 export interface ContainerStatus {
