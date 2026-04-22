@@ -1050,16 +1050,27 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       return res.json() as Promise<{ results: Array<{ issueId: string; success: boolean; error?: string; skipped?: boolean }> }>;
     },
     onSuccess: (data) => {
-      const results: BulkCloseResult[] = data.results.map(r => ({
-        issueId: r.issueId,
-        status: r.skipped ? 'skipped' : r.success ? 'done' : 'failed',
-        error: r.error,
-      }));
-      setBulkCloseResults(results);
+      setBulkCloseResults(prev => {
+        const backendMap = new Map(data.results.map(r => [r.issueId, r]));
+        return prev.map(p => {
+          const backend = backendMap.get(p.issueId);
+          if (backend) {
+            return {
+              issueId: p.issueId,
+              status: backend.skipped ? 'skipped' : backend.success ? 'done' : 'failed',
+              error: backend.error,
+            };
+          }
+          return p;
+        });
+      });
       refreshDashboardState(queryClient);
     },
     onError: (err: Error, issueIds) => {
-      setBulkCloseResults(issueIds.map(id => ({ issueId: id, status: 'failed', error: err.message })));
+      setBulkCloseResults(prev => {
+        const failedIds = new Set(issueIds);
+        return prev.map(p => failedIds.has(p.issueId) ? { ...p, status: 'failed' as const, error: err.message } : p);
+      });
     },
   });
 

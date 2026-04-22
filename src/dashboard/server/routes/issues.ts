@@ -52,6 +52,7 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { getAgentStateAsync } from '../../../lib/agents.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
@@ -1709,6 +1710,24 @@ const postIssueCloseOutRoute = HttpRouter.add(
   })),
 );
 
+const MAX_BULK_CLOSE_OUT = 50;
+
+async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const planningId = `planning-${issueId.toLowerCase()}`;
+
+  if (await sessionExistsAsync(agentId)) return true;
+  if (await sessionExistsAsync(planningId)) return true;
+
+  const agentState = await getAgentStateAsync(agentId);
+  if (agentState && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
+
+  const planningState = await getAgentStateAsync(planningId);
+  if (planningState && planningState.status !== 'stopped' && planningState.status !== 'failed') return true;
+
+  return false;
+}
+
 // ─── Route: POST /api/issues/bulk-close-out ──────────────────────────────────
 
 const postIssuesBulkCloseOutRoute = HttpRouter.add(
@@ -1719,8 +1738,23 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const body = yield* Effect.promise(() => request.json().catch(() => ({})));
     const issueIds = Array.isArray(body.issueIds) ? body.issueIds as string[] : [];
 
+    // Origin check
+    const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
+    const originStr = Array.isArray(origin) ? origin[0] : origin;
+    if (originStr && !originStr.startsWith('http://localhost:') && !originStr.startsWith('http://127.0.0.1:')) {
+      return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
+    }
+
+    // Input validation
     if (issueIds.length === 0) {
       return jsonResponse({ error: 'issueIds array is required' }, { status: 400 });
+    }
+    if (issueIds.length > MAX_BULK_CLOSE_OUT) {
+      return jsonResponse({ error: `Maximum ${MAX_BULK_CLOSE_OUT} issues allowed` }, { status: 400 });
+    }
+    const invalidIds = issueIds.filter(id => typeof id !== 'string' || id.trim().length === 0);
+    if (invalidIds.length > 0) {
+      return jsonResponse({ error: 'issueIds must be non-empty strings' }, { status: 400 });
     }
 
     const eventStore = yield* EventStoreService;
@@ -1730,6 +1764,13 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const results: Array<{ issueId: string; success: boolean; error?: string; skipped?: boolean }> = [];
 
     for (const id of issueIds) {
+      // Active-agent guard
+      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id));
+      if (hasActiveAgent) {
+        results.push({ issueId: id, success: false, error: 'Active agent found — close-out skipped', skipped: true });
+        continue;
+      }
+
       const githubCheck = isGitHubIssue(id);
       let projectPath = '';
 
@@ -1784,7 +1825,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
           issueId: id,
           success: result.success,
           error: result.success ? undefined : failedStep?.error,
-          skipped: result.steps.some((s: any) => s.skipped),
+          skipped: false,
         });
       } catch (err: any) {
         results.push({ issueId: id, success: false, error: err?.message || 'Unknown error' });
