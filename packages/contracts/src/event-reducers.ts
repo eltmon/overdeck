@@ -182,10 +182,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       // Stop hook, so without this fold a killed agent shows activity: "idle"
       // forever. Retain the row (don't delete) so the projection cache has the
       // last-known snapshot for forensics.
-      const prevRuntime = state.agentRuntimeById[event.payload.agentId]
+      const runtimeById = state.agentRuntimeById ?? {}
+      const prevRuntime = runtimeById[event.payload.agentId]
       const nextRuntimeById = prevRuntime
         ? {
-            ...state.agentRuntimeById,
+            ...runtimeById,
             [event.payload.agentId]: {
               ...prevRuntime,
               activity: 'stopped' as const,
@@ -196,7 +197,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               updatedAtSequence: event.sequence,
             },
           }
-        : state.agentRuntimeById
+        : runtimeById
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
