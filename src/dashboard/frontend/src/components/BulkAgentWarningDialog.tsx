@@ -15,7 +15,7 @@ export function BulkAgentWarningDialog({ isOpen, onClose, onProceed, issues, age
   // Pre-index active agents by lowercased issueId for O(1) lookup — O(agents) instead of O(issues × agents)
   const activeAgentsByIssueId = new Map<string, Agent[]>();
   for (const agent of agents) {
-    if (agent.issueId && agent.status !== 'dead' && agent.status !== 'stopped') {
+    if (agent.issueId && agent.status !== 'dead' && agent.status !== 'stopped' && agent.status !== 'failed') {
       const key = agent.issueId.toLowerCase();
       const list = activeAgentsByIssueId.get(key) ?? [];
       list.push(agent);

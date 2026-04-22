@@ -105,26 +105,26 @@ function renderWithDialog(ui: JSX.Element) {
 }
 
 const defaultProps = {
-  mergeMutation: makeMutation(),
+  issueId: 'PAN-331',
+  hasPlan: false,
+  beadsCount: 0,
   reviewMutation: makeMutation(),
-  killMutation: makeMutation(),
   cancelMutation: makeMutation(),
   reopenMutation: makeMutation(),
-  resetReviewMutation: makeMutation(),
   startAgentMutation: makeMutation(),
   createWorkspaceMutation: makeMutation(),
   syncMainMutation: makeSyncMutation(),
   resetSessionMutation: makeMutation(),
-  onMerge: vi.fn(),
   onReview: vi.fn(),
   onKillSuccess: vi.fn(),
   onCancel: vi.fn(),
   onReopen: vi.fn(),
-  onResetReview: vi.fn(),
   onResetSession: vi.fn(),
   onDismissPending: vi.fn(),
   onStartAgent: vi.fn(),
   onCreateWorkspace: vi.fn(),
+  onViewBeads: vi.fn(),
+  onViewVBrief: vi.fn(),
 };
 
 describe('ActionsSection', () => {
@@ -239,24 +239,22 @@ describe('ActionsSection', () => {
     expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
   });
 
-  it('calls onMerge when Merge clicked', () => {
-    const onMerge = vi.fn();
+  it('shows Merge button when ready for merge', () => {
     const reviewStatus = makeReviewStatus({ readyForMerge: true });
-    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} onMerge={onMerge} />);
-    fireEvent.click(screen.getByTestId('merge-btn'));
-    expect(onMerge).toHaveBeenCalledOnce();
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
   });
 
-  it('shows MERGED badge when mergeStatus is merged', () => {
+  it('shows Merged badge when mergeStatus is merged', () => {
     const reviewStatus = makeReviewStatus({ mergeStatus: 'merged' });
     renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
-    expect(screen.getByText('MERGED')).toBeInTheDocument();
+    expect(screen.getByText('Merged')).toBeInTheDocument();
   });
 
   it('shows Reopen button when review has a terminal status', () => {
     const reviewStatus = makeReviewStatus({ reviewStatus: 'passed' });
     renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
-    expect(screen.getByTestId('reopen-btn')).toBeInTheDocument();
+    expect(screen.getByText('Reopen')).toBeInTheDocument();
   });
 
   it('shows Recover instead of Reset Pipeline when the pipeline is stuck', () => {
