@@ -137,21 +137,25 @@ export const AgentStateServiceLive = Layer.effect(
     };
 
     const initial = seedFromCache();
+    let maxCachedSequence = 0;
     if (Object.keys(initial).length > 0) {
+      for (const snap of Object.values(initial)) {
+        if (snap.updatedAtSequence > maxCachedSequence) maxCachedSequence = snap.updatedAtSequence;
+      }
       yield* SubscriptionRef.set(ref, initial);
       setAgentRuntimeMirror(initial);
       console.log(
-        `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache`,
+        `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache (seq=${maxCachedSequence})`,
       );
     }
 
-    // ── Replay runtime events from the event log ─────────────────────────────
-    // Covers events that appended after the last projection_cache write (e.g.
-    // server crash before flush). The reducer is idempotent per event so
-    // re-applying older events is harmless — the cache gets re-upserted with
-    // the same data.
+    // ── Replay runtime events NEWER than the cache ────────────────────────────
+    // Covers events that appended after the last projection_cache upsert (e.g.
+    // server crash before a fold committed). Starting from maxCachedSequence
+    // avoids redundantly replaying the entire 7-day event log (~14k events
+    // observed in practice) — the projection_cache already captured those.
     try {
-      const stored = store.readFrom(0);
+      const stored = store.readFrom(maxCachedSequence);
       let replayed = 0;
       for (const ev of stored) {
         if (isRuntimeEvent(ev)) {
