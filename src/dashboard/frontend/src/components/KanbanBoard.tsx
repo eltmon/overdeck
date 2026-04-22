@@ -1747,6 +1747,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onToggleFeature={toggleFeature}
                     bulkSelectedIds={bulkSelection.selectedIds}
                     onBulkToggle={bulkSelection.toggle}
+                    planningStateById={planningStateById}
                   />
                 </div>
               </div>
@@ -1850,6 +1851,7 @@ function ColumnContent({
   onToggleFeature,
   bulkSelectedIds,
   onBulkToggle,
+  planningStateById,
 }: {
   issues: Issue[];
   agents: Agent[];
@@ -1865,6 +1867,7 @@ function ColumnContent({
   onToggleFeature: (featureId: string) => void;
   bulkSelectedIds?: Set<string>;
   onBulkToggle?: (issueId: string) => void;
+  planningStateById?: Record<string, PlanningState>;
 }) {
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
@@ -1900,7 +1903,7 @@ function ColumnContent({
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
-        planningState={planningStateById[issue.identifier]}
+        planningState={planningStateById?.[issue.identifier]}
       />
     );
   };
