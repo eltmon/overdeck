@@ -49,7 +49,7 @@ async function listConversationAttachmentPaths(name: string): Promise<string[]> 
   }
 }
 
-async function readSessionAttachmentBasenames(sessionFile: string): Promise<Set<string>> {
+async function readSessionAttachmentBasenames(sessionFile: string, name: string): Promise<Set<string>> {
   try {
     const referenced = new Set<string>();
     const stream = createReadStream(sessionFile, { encoding: 'utf-8' });
@@ -78,7 +78,7 @@ async function readSessionAttachmentBasenames(sessionFile: string): Promise<Set<
         }
         if (text) {
           for (const attachmentPath of extractConversationAttachmentPaths(text)) {
-            if (await isManagedConversationAttachmentPath(attachmentPath)) {
+            if (await isConversationAttachmentPath(name, attachmentPath)) {
               referenced.add(basename(attachmentPath));
             }
           }
@@ -89,7 +89,7 @@ async function readSessionAttachmentBasenames(sessionFile: string): Promise<Set<
         // above does not reach.
         for (const match of line.matchAll(/"@(\/[^"]+)"/g)) {
           const attachmentPath = match[1];
-          if (await isManagedConversationAttachmentPath(attachmentPath)) {
+          if (await isConversationAttachmentPath(name, attachmentPath)) {
             referenced.add(basename(attachmentPath));
           }
         }
@@ -117,7 +117,7 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
     return;
   }
 
-  const referencedBasenames = await readSessionAttachmentBasenames(conversation.sessionFile);
+  const referencedBasenames = await readSessionAttachmentBasenames(conversation.sessionFile, conversation.name);
 
   // Re-stat the session file to tighten against a /stop race: a JSONL write
   // may have landed while we were reading attachment basenames.

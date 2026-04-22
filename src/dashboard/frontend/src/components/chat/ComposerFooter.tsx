@@ -93,31 +93,20 @@ function revokePreviewUrl(previewUrl: string): void {
   }
 }
 
-function encodeImageBytes(bytes: Uint8Array): string {
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
-  }
-  return btoa(binary);
-}
-
 async function uploadConversationImage(
   conversationName: string,
   file: File,
 ): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const base64 = encodeImageBytes(bytes);
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('filename', file.name);
+  formData.append('mimeType', file.type);
+
   const res = await fetch(
     `/api/conversations/${encodeURIComponent(conversationName)}/upload-image`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename: file.name,
-        data: base64,
-        mimeType: file.type,
-      }),
+      body: formData,
     },
   );
   if (!res.ok) {
@@ -446,7 +435,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
         <div className={styles.composerToolbar}>
           <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} />
           <div className={styles.composerToolbarDivider} />
-          <EffortPicker value={effort} onChange={setEffort} disabled={true} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+          <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           <div className={styles.composerToolbarSpacer} />
 

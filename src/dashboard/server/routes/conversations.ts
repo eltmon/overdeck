@@ -15,17 +15,15 @@ import { jsonResponse } from "../http-helpers.js";
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
-const execAsync = promisify(exec);
-
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import type * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
   listConversations,
@@ -92,6 +90,47 @@ function shellQuote(str: string): string {
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+
+const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
+const UPLOAD_RATE_LIMIT_MAX = 10;
+const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkUploadRateLimit(remoteAddress: string): boolean {
+  const now = Date.now();
+  const entry = uploadRateLimit.get(remoteAddress);
+  if (!entry || now > entry.resetAt) {
+    uploadRateLimit.set(remoteAddress, { count: 1, resetAt: now + UPLOAD_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= UPLOAD_RATE_LIMIT_MAX) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
+// ─── Messages cache ───────────────────────────────────────────────────────────
+
+const messagesCache = new Map<string, { mtimeMs: number; size: number; result: Awaited<ReturnType<typeof parseConversationMessages>> }>();
+
+async function getCachedMessages(
+  sessionFile: string,
+  isSpecialist: boolean,
+): Promise<Awaited<ReturnType<typeof parseConversationMessages>>> {
+  const fileStats = await stat(sessionFile);
+  const cacheKey = `${sessionFile}:${isSpecialist}`;
+  const cached = messagesCache.get(cacheKey);
+  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+    return cached.result;
+  }
+  const result = isSpecialist
+    ? await parseFromLastCompactBoundary(sessionFile)
+    : await parseConversationMessages(sessionFile, 0);
+  messagesCache.set(cacheKey, { mtimeMs: fileStats.mtimeMs, size: fileStats.size, result });
+  return result;
+}
+
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
 
 function getTrustedOrigins(): string[] {
@@ -99,12 +138,23 @@ function getTrustedOrigins(): string[] {
   const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
   const origins = new Set<string>();
   origins.add(dashboardUrl);
-  // Also trust common local development origins
-  origins.add('http://localhost:3011');
-  origins.add('http://localhost:3000');
-  origins.add('http://127.0.0.1:3011');
-  origins.add('http://127.0.0.1:3000');
+  // Only trust local development origins outside production
+  if (process.env['NODE_ENV'] !== 'production') {
+    origins.add('http://localhost:3011');
+    origins.add('http://localhost:3000');
+    origins.add('http://127.0.0.1:3011');
+    origins.add('http://127.0.0.1:3000');
+  }
   return Array.from(origins);
+}
+
+function normalizeOrigin(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
 }
 
 function getHeader(
@@ -121,17 +171,19 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   const referer = getHeader(request, 'referer');
   const trusted = getTrustedOrigins();
 
-  // If Origin is present, it must match a trusted origin
+  // If Origin is present, it must exactly match a trusted origin
   if (origin) {
-    if (trusted.some((t) => origin === t || origin.startsWith(`${t}/`))) {
+    const normalized = normalizeOrigin(origin);
+    if (normalized && trusted.includes(normalized)) {
       return { ok: true };
     }
     return { ok: false, error: 'Invalid origin' };
   }
 
-  // If no Origin but Referer is present, check it
+  // If no Origin but Referer is present, normalize and check it
   if (referer) {
-    if (trusted.some((t) => referer === t || referer.startsWith(`${t}/`))) {
+    const normalized = normalizeOrigin(referer);
+    if (normalized && trusted.includes(normalized)) {
       return { ok: true };
     }
     return { ok: false, error: 'Invalid referer' };
@@ -211,39 +263,6 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-type UploadValidation = { ok: true; bytes: Buffer } | { ok: false; reason: 'format' | 'size' };
-
-function validateUploadData(data: string): UploadValidation {
-  const trimmed = data.trim();
-  if (!trimmed || trimmed.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)) {
-    return { ok: false, reason: 'format' };
-  }
-  // Cap base64 string length before decoding to prevent memory DoS.
-  // Base64 is ~4/3 of binary size, so ceil(MAX_UPLOAD_BYTES * 4/3) is the max valid length.
-  const maxBase64Length = Math.ceil(MAX_UPLOAD_BYTES * 4 / 3);
-  if (trimmed.length > maxBase64Length) {
-    return { ok: false, reason: 'size' };
-  }
-  try {
-    const bytes = Buffer.from(trimmed, 'base64');
-    if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) {
-      return { ok: false, reason: 'size' };
-    }
-    if (bytes.toString('base64') !== trimmed) {
-      return { ok: false, reason: 'format' };
-    }
-    return { ok: true, bytes };
-  } catch {
-    return { ok: false, reason: 'format' };
-  }
-}
-
-/** @deprecated Use validateUploadData for distinct format/size errors. */
-function decodeUploadBytes(data: string): Buffer | null {
-  const result = validateUploadData(data);
-  return result.ok ? result.bytes : null;
-}
-
 function safeUploadExtension(filename: string, mimeType: string): string {
   const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
   if (!mimeExtension) return '';
@@ -253,33 +272,29 @@ function safeUploadExtension(filename: string, mimeType: string): string {
 
 export async function handleConversationImageUpload(
   name: string,
-  body: Record<string, unknown>,
+  filename: string,
+  bytes: Buffer,
+  mimeType: string,
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
   if (!conv) {
     return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
   }
 
-  const filename = typeof body['filename'] === 'string' ? body['filename'].trim() : '';
-  const data = typeof body['data'] === 'string' ? body['data'] : '';
-  const mimeType = typeof body['mimeType'] === 'string' ? body['mimeType'].trim() : '';
-
-  if (!filename || !data || !mimeType) {
-    return jsonResponse({ error: 'filename, data, and mimeType are required' }, { status: 400 });
+  if (!filename || !mimeType) {
+    return jsonResponse({ error: 'filename and mimeType are required' }, { status: 400 });
   }
 
   if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
     return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
 
-  const validation = validateUploadData(data);
-  if (!validation.ok) {
-    const error = validation.reason === 'size'
-      ? `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes`
-      : 'Invalid base64 image data';
-    return jsonResponse({ error }, { status: 400 });
+  if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) {
+    return jsonResponse(
+      { error: `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes` },
+      { status: 400 },
+    );
   }
-  const bytes = validation.bytes;
 
   if (!validateImageMagicBytes(bytes, mimeType)) {
     return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
@@ -967,9 +982,7 @@ const getConversationMessagesRoute = HttpRouter.add(
           // Specialists: parse only from the last compact_boundary so the display
           // shows only the current context window, not the full 30-day history.
           const isSpecialist = !conv && /^specialist-/.test(name);
-          const result = isSpecialist
-            ? await parseFromLastCompactBoundary(sessionFile)
-            : await parseConversationMessages(sessionFile, 0);
+          const result = await getCachedMessages(sessionFile, isSpecialist);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
           if (result.totalCost > 0 && conv) {
@@ -1011,12 +1024,31 @@ const postConversationUploadImageRoute = HttpRouter.add(
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
+
+    const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
+    if (!checkUploadRateLimit(remoteAddress)) {
+      return jsonResponse({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    const body = yield* readJsonBody;
+    const multipart = yield* request.multipart;
+    const files = multipart['file'] as Multipart.PersistedFile[] | undefined;
+    const filenameField = multipart['filename'] as string | string[] | undefined;
+    const mimeTypeField = multipart['mimeType'] as string | string[] | undefined;
+
+    const file = files?.[0];
+    const filename = Array.isArray(filenameField) ? filenameField[0] : filenameField;
+    const mimeType = Array.isArray(mimeTypeField) ? mimeTypeField[0] : mimeTypeField;
+
+    if (!file || !filename || !mimeType) {
+      return jsonResponse({ error: 'file, filename, and mimeType are required' }, { status: 400 });
+    }
+
     return yield* Effect.promise(async () => {
       try {
-        return await handleConversationImageUpload(name, body);
+        const bytes = await readFile(file.path);
+        return await handleConversationImageUpload(name, filename, bytes, mimeType);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] upload image failed:', msg);

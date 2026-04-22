@@ -93,33 +93,25 @@ describe('conversations route — DB integration', () => {
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
-    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
-    const response = await handleConversationImageUpload('upload-test', {
-      filename: 'evidence.txt',
-      data: pngData,
-      mimeType: 'image/png',
-    });
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const response = await handleConversationImageUpload('upload-test', 'evidence.txt', bytes, 'image/png');
 
     const body = decodeJsonResponse(response);
     expect(response.status).toBe(200);
     expect(body.path).toEqual(expect.stringMatching(new RegExp(`${getConversationAttachmentDir('upload-test').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.+\\.png$`)));
-    expect(readFileSync(body.path as string)).toEqual(Buffer.from(Uint8Array.from([137, 80, 78, 71])));
+    expect(readFileSync(body.path as string)).toEqual(Buffer.from([137, 80, 78, 71]));
   });
 
-  it('rejects invalid upload payloads before writing files', async () => {
+  it('rejects unsupported mimeType before writing files', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
-    const response = await handleConversationImageUpload('upload-test', {
-      filename: 'evidence.png',
-      data: 'not-base64',
-      mimeType: 'image/png',
-    });
+    const response = await handleConversationImageUpload('upload-test', 'evidence.png', Buffer.from([0]), 'image/tiff');
 
     expect(response.status).toBe(400);
-    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data' });
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Unsupported mimeType: image/tiff' });
   });
 
   it('rejects oversized upload payloads before writing files', async () => {
@@ -128,30 +120,20 @@ describe('conversations route — DB integration', () => {
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
-    const oversizedData = Buffer.alloc(5 * 1024 * 1024 + 1, 1).toString('base64');
-    const response = await handleConversationImageUpload('upload-test', {
-      filename: 'oversized.png',
-      data: oversizedData,
-      mimeType: 'image/png',
-    });
+    const oversized = Buffer.alloc(5 * 1024 * 1024 + 1, 1);
+    const response = await handleConversationImageUpload('upload-test', 'oversized.png', oversized, 'image/png');
 
     expect(response.status).toBe(400);
     expect(decodeJsonResponse(response)).toEqual({ error: 'Payload exceeds maximum size of 5242880 bytes' });
   });
 
-  it('rejects base64 strings exceeding max length before decoding', async () => {
+  it('rejects empty upload payloads', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
-    // A valid base64 string that is longer than the allowed max (ceil(5MB * 4/3) = 6,991,021 chars)
-    const hugeData = 'A'.repeat(7_000_000);
-    const response = await handleConversationImageUpload('upload-test', {
-      filename: 'huge.png',
-      data: hugeData,
-      mimeType: 'image/png',
-    });
+    const response = await handleConversationImageUpload('upload-test', 'empty.png', Buffer.alloc(0), 'image/png');
 
     expect(response.status).toBe(400);
     expect(decodeJsonResponse(response)).toEqual({ error: 'Payload exceeds maximum size of 5242880 bytes' });
@@ -164,12 +146,8 @@ describe('conversations route — DB integration', () => {
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
 
-    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
-    const uploadResponse = await handleConversationImageUpload('owner-conv', {
-      filename: 'owned.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const uploadResponse = await handleConversationImageUpload('owner-conv', 'owned.png', bytes, 'image/png');
     const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
 
     const { extractConversationAttachmentPaths, hasConversationAttachment } = await import('../../services/conversation-attachments.js');
@@ -204,12 +182,8 @@ describe('conversations route — DB integration', () => {
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
 
-    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
-    const uploadResponse = await handleConversationImageUpload('owner-conv', {
-      filename: 'owned.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const uploadResponse = await handleConversationImageUpload('owner-conv', 'owned.png', bytes, 'image/png');
     const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
 
     expect(await removeConversationAttachment('other-conv', uploadedPath)).toBe(false);
@@ -232,12 +206,8 @@ describe('conversations route — DB integration', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
-    const uploadResponse = await handleConversationImageUpload('unsent-conv', {
-      filename: 'draft.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const uploadResponse = await handleConversationImageUpload('unsent-conv', 'draft.png', bytes, 'image/png');
     const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
 
     markConversationEnded('unsent-conv');
@@ -259,17 +229,9 @@ describe('conversations route — DB integration', () => {
     const sessionFile = join(TEST_HOME, 'archived-session.jsonl');
     updateSessionFile('archived-conv', sessionFile);
 
-    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
-    const keptUpload = await handleConversationImageUpload('archived-conv', {
-      filename: 'kept.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
-    const prunedUpload = await handleConversationImageUpload('archived-conv', {
-      filename: 'pruned.png',
-      data: pngData,
-      mimeType: 'image/png',
-    });
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const keptUpload = await handleConversationImageUpload('archived-conv', 'kept.png', bytes, 'image/png');
+    const prunedUpload = await handleConversationImageUpload('archived-conv', 'pruned.png', bytes, 'image/png');
 
     const keptPath = decodeJsonResponse(keptUpload).path as string;
     const prunedPath = decodeJsonResponse(prunedUpload).path as string;
@@ -380,20 +342,31 @@ function getTrustedOrigins(): string[] {
   return ['http://localhost:3011', 'http://localhost:3000', 'http://127.0.0.1:3011', 'http://127.0.0.1:3000'];
 }
 
+function normalizeOrigin(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
 function validateOrigin(headers: Record<string, string | undefined>): { ok: true } | { ok: false; error: string } {
   const origin = headers['origin'];
   const referer = headers['referer'];
   const trusted = getTrustedOrigins();
 
   if (origin) {
-    if (trusted.some((t) => origin === t || origin.startsWith(`${t}/`))) {
+    const normalized = normalizeOrigin(origin);
+    if (normalized && trusted.includes(normalized)) {
       return { ok: true };
     }
     return { ok: false, error: 'Invalid origin' };
   }
 
   if (referer) {
-    if (trusted.some((t) => referer === t || referer.startsWith(`${t}/`))) {
+    const normalized = normalizeOrigin(referer);
+    if (normalized && trusted.includes(normalized)) {
       return { ok: true };
     }
     return { ok: false, error: 'Invalid referer' };
@@ -417,6 +390,10 @@ describe('validateOrigin', () => {
 
   it('rejects untrusted Referer', () => {
     expect(validateOrigin({ referer: 'https://evil.com/' })).toEqual({ ok: false, error: 'Invalid referer' });
+  });
+
+  it('rejects prefix-match origin attack', () => {
+    expect(validateOrigin({ origin: 'https://evil.com/?origin=http://localhost:3000' })).toEqual({ ok: false, error: 'Invalid origin' });
   });
 
   it('rejects requests with neither Origin nor Referer', () => {
