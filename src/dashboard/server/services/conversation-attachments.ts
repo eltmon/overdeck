@@ -83,6 +83,16 @@ async function readSessionAttachmentBasenames(sessionFile: string): Promise<Set<
             }
           }
         }
+        // Also search the raw JSON line for @/attachment paths. This catches
+        // tool-use and other shapes where the path may be in nested fields
+        // (e.g. tool_use.input, tool_result.content) that structured extraction
+        // above does not reach.
+        for (const match of line.matchAll(/"@(\/[^"]+)"/g)) {
+          const attachmentPath = match[1];
+          if (await isManagedConversationAttachmentPath(attachmentPath)) {
+            referenced.add(basename(attachmentPath));
+          }
+        }
       }
     } finally {
       rl.close();
@@ -153,7 +163,14 @@ export function extractConversationAttachmentPaths(message: string): string[] {
 export async function isManagedConversationAttachmentPath(attachmentPath: string): Promise<boolean> {
   try {
     const attachmentsRoot = resolve(getConversationAttachmentsRoot());
-    const candidate = await realpath(attachmentPath);
+    let candidate: string;
+    try {
+      candidate = await realpath(attachmentPath);
+    } catch {
+      // File may not exist (e.g. deleted attachment) — fall back to resolve
+      // for the containment check. resolve() still collapses .. segments.
+      candidate = resolve(attachmentPath);
+    }
     return candidate.startsWith(`${attachmentsRoot}${sep}`);
   } catch {
     return false;
@@ -163,7 +180,13 @@ export async function isManagedConversationAttachmentPath(attachmentPath: string
 export async function isConversationAttachmentPath(name: string, attachmentPath: string): Promise<boolean> {
   try {
     const attachmentDir = resolve(getConversationAttachmentDir(name));
-    const candidate = await realpath(attachmentPath);
+    let candidate: string;
+    try {
+      candidate = await realpath(attachmentPath);
+    } catch {
+      // File may not exist — fall back to resolve for containment check.
+      candidate = resolve(attachmentPath);
+    }
     return candidate.startsWith(`${attachmentDir}${sep}`);
   } catch {
     return false;

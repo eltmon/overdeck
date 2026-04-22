@@ -35,6 +35,9 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 - [x] Fix: Add assertSafeName boundary check in conversation-attachments module (round 6)
 - [x] Fix: mtime comparison >= to prevent same-tick attachment deletion on stop/archive (round 6)
 - [x] Fix: Remove summarizeConversationActivity from list endpoint to prevent per-poll JSONL parsing (round 6)
+- [x] Fix: readSessionAttachmentBasenames searches raw JSON line for @/ paths (tool-use shapes) (round 7)
+- [x] Fix: isManagedConversationAttachmentPath falls back to resolve for deleted files (round 7)
+- [x] Fix: Remove dead imports getProviderForModel and HttpServerResponse (round 7)
 - [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
 - [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
@@ -42,6 +45,7 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 - [x] Push branch and resubmit for review via /rebase-and-submit
 - [x] Address review round 5b commented feedback
 - [x] Address review round 6 changes-requested feedback
+- [x] Address review round 7 changes-requested feedback
 - [ ] Await review approval, then run `pan approve PAN-539`
 
 ## Key Decisions
@@ -72,3 +76,6 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 - [2026-04-22T22:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round6.md`
   - Issues: (1) delete-image missing getConversationByName guard + assertSafeName, (2) mtime comparison same-tick race, (3) list endpoint JSONL parsing performance regression
   - Status: FIXED. Added conversation guard to delete-image. Added assertSafeName to conversation-attachments. Changed mtime comparison from > to >=. Removed summarizeConversationActivity from list endpoint.
+- [2026-04-22T23:01Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round7.md`
+  - Issues: (1) JSONL reference extraction misses tool-use-shaped entries, (2) managed-but-deleted attachment silently falls through to unmanaged branch, (3) dead/shadowed imports
+  - Status: FIXED. readSessionAttachmentBasenames now searches raw JSON line for @/ paths. isManagedConversationAttachmentPath and isConversationAttachmentPath fall back to resolve() when realpath() throws (deleted files). Removed dead imports getProviderForModel and HttpServerResponse.

@@ -25,7 +25,7 @@ import { promisify } from 'node:util';
 const execAsync = promisify(exec);
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   listConversations,
@@ -56,7 +56,6 @@ import {
   setOptionAsync,
   waitForClaudePrompt,
 } from '../../../lib/tmux.js';
-import { getProviderForModel } from '../../../lib/providers.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
