@@ -36,6 +36,7 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 
 ## Remaining Work
 - [x] Push branch and resubmit for review via /rebase-and-submit
+- [x] Address review round 5b commented feedback
 - [ ] Await review approval, then run `pan approve PAN-539`
 
 ## Key Decisions
