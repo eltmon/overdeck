@@ -244,6 +244,10 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   }, [conversation.name, conversation.sessionAlive]);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
+    if (sending) {
+      event.preventDefault();
+      return;
+    }
     const items = Array.from(event.clipboardData.items);
     const imageFiles = items
       .filter((item) => item.type.startsWith('image/'))
@@ -253,14 +257,18 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     if (imageFiles.length === 0) return;
     event.preventDefault();
     enqueueImages(imageFiles);
-  }, [enqueueImages]);
+  }, [enqueueImages, sending]);
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (sending) {
+      event.preventDefault();
+      return;
+    }
     const imageFiles = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
     event.preventDefault();
     enqueueImages(imageFiles);
-  }, [enqueueImages]);
+  }, [enqueueImages, sending]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (Array.from(event.dataTransfer.items).some((item) => item.type.startsWith('image/'))) {
