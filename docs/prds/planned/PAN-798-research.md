@@ -338,7 +338,7 @@ Research needed:
 | # | Research Item | Blocks | Estimated Effort | Status |
 |---|---------------|--------|------------------|--------|
 | 1 | Complete pattern audit | — | 2-3h | ✅ Complete |
-| 2 | Hook reliability (PAN-759) | P2 readiness removal (6 call sites) | 4-8h | Open |
+| 2 | Hook reliability (PAN-759) | P2 readiness removal (6 call sites) | 4-8h | ✅ Finding documented; fix spec'd, not implemented |
 | 3 | `messageReceived` feasibility | P2 delivery removal | 2-4h | Open |
 | 4 | `activity` granularity | P1 Deacon health | 1-2h | Open |
 | 5 | Thinking duration detection | P1 stuck detection | 2-3h | Open |
@@ -355,4 +355,393 @@ Research needed:
 
 ---
 
-**Next Step:** Pick a research item and assign it, or begin implementation on items with no blockers (P0 model field, P0 `output.log` removal planning).
+## Results
+
+### #2 — Hook Reliability Root Cause (PAN-759)
+
+- **Finding:** The SessionStart hook that was supposed to write `ready.json` **simply did not exist**. Evidence:
+  - `src/cli/commands/setup/hooks.ts:151` lists the hook scripts to install: `['pre-tool-hook', 'heartbeat-hook', 'stop-hook', 'specialist-stop-hook', ...]` — `session-start-hook` was NOT in this list
+  - `hooksAlreadyConfigured()` at line 93 only checks `['PreToolUse', 'PostToolUse', 'Stop']` — `SessionStart` was not checked
+  - The settings.json registration code (lines 256-322) registers PreToolUse, PostToolUse, and Stop hooks, but NEVER registers a SessionStart hook
+  - This is why `src/lib/agents.ts:263` correctly states "ready.json is currently not written by any hook (PAN-759)" — there was no hook to write it
+  - This is NOT a race condition, permissions issue, or Claude Code version breakage — it's a missing installation/registration step
+
+- **Decision:** 
+  1. **Root cause identified** — Hooks were never unreliable; the SessionStart hook was simply never created or registered
+  2. **Fix required before implementation** — Create `scripts/session-start-hook` (follow pattern of existing hooks: agent ID from `$PANOPTICON_AGENT_ID` or tmux session name, write `ready.json` with `{"ready":true}`)
+  3. **Update `src/cli/commands/setup/hooks.ts`** to:
+     - Add `'session-start-hook'` to the `hookScripts` array (line 151)
+     - Add `SessionStart` to `hooksAlreadyConfigured()` check (line 93)
+     - Add settings.json registration block for `settings.hooks.SessionStart` (after Stop block, ~line 322)
+  4. **Existing agents will need to re-run `pan setup hooks`** to get the new hook registered in their Claude Code settings.json
+  5. Once registered, `waitForReadySignal()` will receive `ready.json` immediately on session start, making the tmux fallback unnecessary
+  6. The `waitForClaudePrompt()` call sites can be migrated to use `waitForReadySignal()` (or the ready.json check directly) once the hook is confirmed firing reliably in practice
+
+- **Impact:** 
+  - **Unblocks P2 readiness removal** — all 6 `waitForClaudePrompt()` call sites can be migrated once the fix is implemented
+  - `waitForReadySignal()` (agents.ts:244) will work as designed — no more tmux fallback needed for session readiness
+  - Dashboard routes (`conversations.ts`) and specialist flows can trust the hook signal
+  - **Action required:** Implement the missing SessionStart hook and registration, then test on a fresh agent
+
+---
+
+### #3 — messageReceived Sequence Counter Feasibility
+
+- **Finding:** 
+  - `confirmDelivery()` (tmux.ts:559) checks 14 patterns: `●`, `⎿`, `Read`, `✻`, `✶`, `✽`, `✢`, `Generating`, `thinking`, `thought for`, `Retrying in`, `API Error`, `"You've hit your limit"`, `Tool use`
+  - It compares pane output before/after message send and returns `true` if ANY pattern appears in new output
+  - **High false-positive risk:** if any processing pattern exists in pre-existing pane content (e.g., scrollback shows "API Error" from prior work), `confirmDelivery()` returns `true` even if the NEW message was never processed
+  - **No evidence of value:** Git history shows multiple "delivery" and "prompt detection" fixes (commits ca745cf8, 8b4622b0, f325518a, 256e5438) but no tests validating effectiveness. No telemetry or logs show `confirmDelivery()` ever catching real failures
+  - **The load-buffer + paste-buffer + 600ms delay pattern (async-tmux.md) is already reliable** — sendKeysAsync() waits dynamically (600-3000ms based on message size) before sending Enter, so raw delivery is effectively guaranteed
+
+- **Decision:** 
+  1. **Recommend deletion, not replacement** — If `confirmDelivery()` has never caught a real failure and has false-positive risk, the load-buffer pattern alone is sufficient
+  2. If you want structured delivery confirmation, use a simpler mechanism:
+     - Hook writes `messageReceived: <sequence>` immediately after Claude reads stdin (may require PreToolUse hook)
+     - Sender polls `runtime.json.messageReceived` and compares sequence number
+     - This is more reliable than regex and has no false positives
+  3. If replacement is required: option B is `processing: boolean` (hook sets true at turn start, clears at prompt return) — simpler than sequence counter
+
+- **Impact:**
+  - **Unblocks P2 delivery removal** if deletion is approved; sequence counter adds complexity without clear value
+  - Removing `confirmDelivery()` simplifies: `specialists.ts:2484,2495` delivery confirmation, removes 14-pattern regex maintenance
+  - False-positive risk to delivery detection is eliminated
+
+---
+
+### #4 — activity Field Granularity
+
+- **Finding:**
+  - Deacon's 17 ACTIVE_STATUS_PATTERNS (deacon.ts:822-840): `/computing/i`, `/fermenting/i`, `/thinking/i`, `/reading/i`, `/writing/i`, `/editing/i`, `/searching/i`, `/running/i`, `/executing/i`, `/tool use/i`, `/\bBash\b/`, `/\bRead\b/`, `/\bWrite\b/`, `/\bEdit\b/`, `/\bGrep\b/`, `/\bGlob\b/`, `/\bTask\b/`
+  - These patterns cover: Claude Code's status line (computing, fermenting, thinking, tool use) + specific tool names (Bash, Read, Write, Edit, Grep, Glob, Task)
+  - Dashboard and health checks only need **binary active/idle**, not tool-type granularity
+  - Hook granularity varies: PostToolUse hook can detect which tool was called, but Claude Code's status display shows aggregated states ("computing", "thinking") not individual tool names
+  - The 17 active patterns don't distinguish between tool types meaningfully for Deacon purposes
+
+- **Decision:**
+  1. **Simplified activity enum:** `'computing' | 'thinking' | 'idle' | null` (3 values, not tool-specific)
+  2. Rationale:
+     - Hook sees tool names (Bash, Read, Edit) but Deacon doesn't need that granularity
+     - Dashboard displays status (Active, Thinking, Idle) — no tool breakdown needed
+     - Keeps runtime.json schema simple and stable (tool names may change)
+  3. Alternative: keep tool names in hook output but aggregate to coarse `activity` value in runtime.json
+  4. The distinction between "computing" vs tool-specific states is handled by `currentTool` field if dashboard needs it later
+
+- **Impact:**
+  - **Unblocks P1 Deacon health removal** — `isAgentActiveInTmux()` simplifies to `runtime.json.activity !== 'idle'`
+  - Eliminates need to enumerate all 17 patterns in production code
+  - Hook writes simpler enum; no regex parsing in Deacon
+
+---
+
+### #5 — Thinking Duration Detection Without tmux
+
+- **Finding:**
+  - `parseThinkingDuration()` (deacon.ts:935-944) parses regex `/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/`
+  - Stuck threshold is 10 minutes (deacon.ts:917: `const STUCK_THINKING_THRESHOLD_MS = 10 * 60 * 1000`)
+  - If thinking duration ≥ 10m, Deacon sends Escape (attempt 1), Ctrl+C (attempt 2), or respawns (attempt 3+) (deacon.ts:1032-1068)
+  - **Key insight:** Thinking is already a **visible status**, not a pre-tool-use state — Claude Code displays "Thinking… (Xm Ys)" in the status line when a thinking block is running
+  - **Alternative mechanism exists:** If `thinkingSince` timestamp is in `runtime.json`, can compute duration via `Date.now() - new Date(thinkingSince)` — no parsing needed
+  - **Hook extension required:** PostToolUse hook must set `thinkingSince = now` when thinking starts, clear it when thinking completes
+
+- **Decision:**
+  1. **Add `thinkingSince: string | null` to runtime.json** (ISO 8601 timestamp)
+  2. Hook populates it: set when thinking block starts, clear when exits back to prompt
+  3. Deacon compares `Date.now() - new Date(runtime.json.thinkingSince)` to threshold
+  4. **Problem:** Hook only fires on PostToolUse, not mid-thinking. Solution: hook should detect thinking state from Claude's status output and set/clear `thinkingSince` accordingly
+  5. Eliminate `parseThinkingDuration()` regex entirely
+
+- **Impact:**
+  - **Unblocks P1 stuck detection** — no regex parsing, deterministic timestamp-based detection
+  - Removes fragility: if Claude Code changes status format, stuck detection won't break
+  - Requires hook extension to detect thinking state (may require reading Claude Code's status bar text, which we're trying to eliminate)
+
+---
+
+### #6 — Interactive Dialog Detection (exclude-from-context)
+
+- **Finding:**
+  - `checkStuckWorkAgents()` (deacon.ts:989-991) detects exclude dialog with: `.includes('Do you want to make this edit to exclude')` AND (`.includes('Esc to cancel')` AND `.includes('Tab to amend')`))
+  - When detected, sends Escape to dismiss (deacon.ts:993-996)
+  - **This dialog is a Claude Code UI state**, not agent output — it blocks stdin waiting for user input
+  - **Alternative:** Hook system can detect this by checking if Claude Code is in a dialog state (not currently done)
+  - **Workaround:** Pre-configure `.claudeignore` to prevent the dialog, or add Claude Code CLI flag to disable it (if available)
+  - **Current behavior:** Simple `.includes()` works but is fragile if dialog text changes
+
+- **Decision:**
+  1. **Hook-based detection (preferred):** Extend hook system to detect interactive dialog states and set `runtime.json.waitingOnHuman = true` with `waitingReason = "exclude-from-context"`
+  2. **If hooks can't detect:** Pre-configure `.claudeignore` to prevent the dialog from appearing (investigate Claude Code `--no-exclude-prompt` or equivalent flag)
+  3. **Fallback:** Keep the `.includes()` checks but add more robust detection (dialog must have ALL three strings, not just two)
+  4. **Action:** If detected as waiting-on-human, alert the user rather than auto-dismiss (safer than sending Escape)
+
+- **Impact:**
+  - **Unblocks P1 stuck detection dialog handling** if hook extension is viable
+  - If pre-configuration via `.claudeignore` works, removes need for runtime detection entirely
+  - Safer than auto-dismiss (which could interrupt legitimate interactions)
+
+---
+
+### #7 — Review Agent Result Markers
+
+- **Finding:**
+  - `parseAgentOutput()` (review-agent.ts:139) scans for: `REVIEW_RESULT:`, `FILES_REVIEWED:`, `SECURITY_ISSUES:`, `PERFORMANCE_ISSUES:`, `NOTES:`
+  - These markers are printed to stdout by the review specialist (Claude Code session) itself
+  - No human-readable fallback exists (unlike merge-agent which has fallback patterns)
+  - Review results are stored in SQLite's `review_status` table
+  - **Specialists are Claude Code sessions** — they can write files via tool calls (Write tool)
+
+- **Decision:**
+  1. **Review specialist writes `review-results.json`** instead of printing markers to stdout:
+     ```json
+     {
+       "result": "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED",
+       "filesReviewed": ["src/foo.ts", "src/bar.ts"],
+       "securityIssues": ["SQL injection in query builder"],
+       "performanceIssues": ["N+1 in loop"],
+       "notes": "Overall looks good but fix these security issues",
+       "timestamp": "2026-04-22T..."
+     }
+     ```
+  2. Dashboard/review-agent.ts reads this file instead of parsing stdout
+  3. No fallback needed — structured file is authoritative
+
+- **Impact:**
+  - **Unblocks P3 review agent migration** — removes stdout pattern parsing
+  - Simplifies review agent code (no need to write markers)
+  - Enables reviewers to write detailed notes without formatting constraints
+
+---
+
+### #8 — Health Check Output Requirements
+
+- **Finding:**
+  - `getAgentOutput()` (health.ts:91) captures N lines from tmux and returns trimmed raw text (no pattern scanning)
+  - `checkAgentHealthAsync()` (health-filtering.ts:13) captures 5 lines and returns `{alive, lastOutput}`
+  - **Callers identified:** agents.ts (status route), health-filtering.ts (dashboard health API), misc.ts (health endpoint)
+  - **Downstream parsing:** Callers return this raw output to dashboard/APIs; dashboard does NOT scan for patterns (it displays raw text in UI)
+  - **Actual health determination:** Already happens via `runtime.json.state` and `runtime.json.lastActivity` (health-filtering.ts:38-121 shows this)
+  - Raw `lastOutput` is only used for: displaying last terminal output in UI (informational only)
+
+- **Decision:**
+  1. **Replace raw output with `runtime.json` data:**
+     - Determine health from: `state`, `lastActivity`, `lastError` (if defined)
+     - Return structured health object: `{status: 'healthy'|'warning'|'stuck', reason: string}`
+  2. **For "last output" display:** Tail the JSONL session file (last 5 tool results) instead of tmux capture
+  3. **Error tracking:** If needed, hook writes `runtime.json.lastError` on API failures
+
+- **Impact:**
+  - **Unblocks P1 health removal** — no tmux involvement
+  - Health checks already implement logic correctly (reading runtime.json); just need to formalize interface
+
+---
+
+### #9 — WebSocket Terminal Ring Buffer Design
+
+- **Finding:**
+  - PTY hub (`ws-terminal.ts`) spawns `node-pty` and streams output to WebSocket clients
+  - Current snapshot capture: `captureFreshSnapshot()` (ws-terminal.ts:89) calls `capturePaneAsync()` for 500 lines
+  - Ring buffer would attach to: `activePtyHubs` Map entry, one buffer per PTY session
+  - Raw bytes vs parsed lines: Raw bytes preserve ANSI escape sequences (needed for terminal colors/styles)
+  - Buffer size: 500 lines matches current tmux default; reasonable for UI scroll history
+
+- **Decision:**
+  1. **Attach ring buffer to each PTY hub entry:**
+     ```typescript
+     interface PtyHubEntry {
+       pty: PtyProcess;
+       ws?: WebSocket;
+       ringBuffer: RingBuffer<Uint8Array>;  // Fixed 500-line FIFO
+     }
+     ```
+  2. **Capture raw bytes** (preserve ANSI) — no parsing overhead
+  3. **Buffer lifecycle:** Populate on `pty.onData()`, serve on WebSocket connect via `onSnapshot()` route
+  4. **Eviction:** Buffer auto-drops oldest lines when 501st line arrives; cleaned up when hub destroyed
+
+- **Impact:**
+  - **Unblocks P4 WebSocket snapshot removal** — two tmux captures eliminated
+  - Memory overhead: minimal (500 lines × ~100 bytes avg = 50KB per PTY)
+  - Faster initial snapshot (in-memory, not subprocess)
+
+---
+
+### #10 — JSONL Session File Format & Access
+
+- **Finding:**
+  - JSONL files are at `~/.claude/projects/<project>/<session>.jsonl`
+  - Schema (inferred from Claude Code docs): one JSON object per line, types include:
+    - `tool_use`: `{type: 'tool_use', tool: string, input: object}`
+    - `tool_result`: `{type: 'tool_result', result: string, error?: string}`
+    - `user_message`: `{type: 'user_message', content: string}`
+    - `assistant_message`: `{type: 'assistant_message', content: string}`
+  - **Large files problem:** Reading entire 10MB JSONL for "last 50 messages" is inefficient
+  - **Session name → JSONL path:** Must infer from agent ID (e.g., `agent-pan-123` → look in `~/.claude/projects/*/` for `.jsonl` files matching pattern)
+  - **Specialists:** Each specialist Claude Code session has its own JSONL file in the session directory
+
+- **Decision:**
+  1. **Tailing strategy:** Read file from end, scan backwards for newlines until reaching desired message count (avoid reading full file)
+  2. **Path resolution:** Store JSONL path in `runtime.json.jsonlPath` when agent starts (hook writes this)
+  3. **Filtering for specialists:** Don't filter by issueId (each specialist works on single issue); read full session JSONL
+  4. **Performance:** Cache recently-read JSONL metadata (line count, last-read position) for fast incremental reads
+
+- **Impact:**
+  - **Unblocks P3 dashboard transcripts** — ActivityView renders from JSONL instead of tmux
+  - Eliminates `mission-control.ts:161,297` tmux captures (2 call sites)
+  - Removes issueId filter logic — specialists already know their context
+
+---
+
+### #11 — Specialist Event File Protocol
+
+- **Finding:**
+  - Merge agent uses: stdout markers (`MERGE_RESULT:`, etc.) + git pattern regexes (`scanGitPatterns()`, 8 patterns)
+  - Test agent: extracts test count from output (`Failed\s*│\s*(\d+)\s*│`)
+  - **Specialists are Claude Code sessions** — they can call Write tool to create files
+  - Git operations: push, force-push, fetch, [rejected], non-fast-forward, retry, [remote rejected], up-to-date
+  - Test metrics: passed count, failed count, skipped count, duration, individual test names
+
+- **Decision:**
+  1. **git-events.jsonl** (append-only, one operation per line):
+     ```jsonl
+     {"op":"push","ref":"main","remote":"origin","ts":"2026-04-22T..."}
+     {"op":"rejected","ref":"feature/pan-123","ts":"2026-04-22T..."}
+     ```
+  2. **test-results.json** (single JSON, overwritten per run):
+     ```json
+     {"passed":42,"failed":3,"skipped":1,"duration":35000,"ts":"2026-04-22T..."}
+     ```
+  3. **merge-results.json** (single JSON, overwrites per attempt):
+     ```json
+     {"result":"success","resolvedFiles":["src/conflict.ts"],"failedFiles":[],"tests":"pass","validation":"passed","ts":"..."}
+     ```
+  4. **Discovery:** Merge agent writes to workspace root or `.panopticon/agents/<id>/` — store path in runtime.json
+  5. **Polling:** Merge agent polls for file existence instead of tmux text (5s poll, 15m timeout)
+
+- **Impact:**
+  - **Unblocks P3 merge/test agent migration** — eliminates `merge-agent.ts:412,684,1071,1744` tmux scans
+  - Structured output simplifies merge logic (no pattern matching)
+  - Enables merge agent to poll for file instead of tmux (cleaner, more reliable)
+
+---
+
+### #12 — Heartbeat File Deprecation Plan
+
+- **Finding:**
+  - Heartbeat files at `~/.panopticon/heartbeats/<sessionname>.json` written by hooks on PostToolUse
+  - Consumers: deacon.ts:260 (reads via `checkHeartbeat()`), mission-control.ts (activity display)
+  - **Both redundant with `runtime.json.lastActivity`** — heartbeat just contains timestamp, which runtime.json already has
+  - No semantic difference between heartbeat timestamp and lastActivity
+
+- **Decision:**
+  1. **Migrate all heartbeat readers to `runtime.json.lastActivity`**
+  2. **Cleanup:** Delete `~/.panopticon/heartbeats/` directory after migration
+  3. **Hook removal:** Stop writing heartbeat files entirely
+  4. **Single source of truth:** `runtime.json` becomes the only agent state file
+
+- **Impact:**
+  - **Unblocks cleanup** — removes file I/O overhead and orphaned file accumulation
+  - Simplifies health checks (`checkHeartbeat()` → direct `runtime.json` read)
+  - Deacon code simplifies (deacon.ts:254-283 becomes simple JSON read)
+
+---
+
+### #13 — Backwards Compatibility During Migration
+
+- **Finding:**
+  - 22 tmux call sites across 12 files, 4 categories of risk:
+    1. **High risk if kept:** `confirmDelivery()` (false positives), `checkLazyAgent()` (broad regexes), `parseThinkingDuration()` (format fragility)
+    2. **Medium risk:** `checkStuckWorkAgents()` (dialog detection), specialist result parsing
+    3. **Low risk if dropped:** Transcript capture (JSONL replacement exists), health checks (runtime.json exists)
+  4. **Migration risk:** If hooks are unreliable (PAN-759), removing tmux fallbacks causes startup hangs
+
+- **Decision:**
+  1. **Sequenced rollout (not a flag switch):**
+     - Phase 1: Fix hook reliability (PAN-759) + extend hooks with new fields (activity, thinkingSince, messageReceived, waitingOnHuman)
+     - Phase 2: Implement structured event files (git-events.jsonl, test-results.json, review-results.json) + JSONL readers
+     - Phase 3: Remove high-risk patterns (confirmDelivery, parseThinkingDuration) + ring buffer for terminal snapshot
+     - Phase 4: Migrate remaining transcripts and health checks to JSONL/runtime.json
+  2. **No feature flags needed** — each phase makes clear progress; regressions caught by tests
+  3. **Test strategy:** 
+     - Unit tests: verify hook writes + JSONL parsing
+     - Integration tests: specialist workflows with new event files
+     - E2E: full agent lifecycle with no tmux capture calls
+
+- **Impact:**
+  - **Clarifies implementation sequence** — Phase 1 blocks everything; Phases 2-4 can proceed in parallel once Phase 1 completes
+  - **Risk mitigation:** Don't remove tmux until replacement is verified working
+  - **Testing**: prevents regressions (current tests may not cover edge cases tmux handles)
+
+---
+
+### #14 — confirmDelivery() Value Assessment
+
+- **Finding:**
+  - 14 processing patterns checked (●, ⎿, Read, ✻, Generating, thinking, etc.)
+  - **No evidence it ever catches real failures:** Git history shows 6 commits addressing delivery/prompt detection but none validate confirmDelivery() success rate
+  - **False-positive risk is high:** Pre-existing pane content containing any pattern triggers false confirmation
+  - **Already redundant:** `sendKeysAsync()` uses load-buffer + 600-3000ms delay + paste-buffer, which is inherently reliable
+  - **Blocking delays:** confirmDelivery() polls for 10s with 1s intervals, adding 10s latency on every message in worst case
+
+- **Decision:**
+  1. **Recommend deletion, not replacement**
+  2. Rationale:
+     - No telemetry shows it catches failures (suggesting it's not needed)
+     - False-positive risk outweighs benefit
+     - Load-buffer + delay is already sufficient (documented in async-tmux.md)
+     - Removes 10s blocking poll, improving responsiveness
+  3. **If delivery confirmation is required for audit trail:** Use simple hook-based sequence counter (incrementing integer, not regex-based)
+  4. Remove from: `tmux.ts:559`, specialist calls at `specialists.ts:2484,2495`
+
+- **Impact:**
+  - **Immediate performance gain:** Eliminates 10s poll latency from every message
+  - **Simplifies P2 delivery removal** — delete confirmDelivery() entirely rather than replace
+  - **Reduces code fragility** — no pattern maintenance, no false positive risk
+
+---
+
+### #15 — Lazy Pattern Simplification
+
+- **Finding:**
+  - 17 LAZY_PATTERNS (deacon.ts:617-635): ranging from "what would you like" to "future PR" to infrastructure-specific
+  - **All trigger same action:** `sendAntiLazyMessage()` (deacon.ts:711)
+  - Single anti-lazy message content (deacon.ts:640): generic "stop being lazy, do all the work now"
+  - **No differentiation:** Different lazy patterns don't trigger different actions or different message content
+
+- **Decision:**
+  1. **Collapse all 17 patterns to single `state === 'waiting-on-human'` check**
+  2. **Rationale:**
+     - All patterns indicate the same condition: agent asking for direction/permission at idle prompt
+     - Hook can detect this: when Claude enters interactive prompt, sets `runtime.json.waitingOnHuman = true`
+     - No regex maintenance, no false classifications
+  3. **Optional:** Add `waitingReason` field to categorize the type of wait (e.g., "needs_clarification", "scope_deferral", "time_estimate_rejection") — but don't make action different per type
+  4. **Remove:** Entire `LAZY_PATTERNS` array, `checkLazyAgent()` regex loops
+
+- **Impact:**
+  - **Unblocks P1 Deacon lazy detection removal** — single boolean check replaces 17-pattern scan
+  - **Eliminates most subjective regex matching** — hook-based state is deterministic
+  - **Reduces Deacon code complexity** — `checkAndCorrectLazyAgents()` simplifies significantly
+
+---
+
+## Summary Table
+
+| # | Research Item | Status | Finding | Decision | Blocker(s) |
+|---|---|---|---|---|---|
+| 2 | Hook Reliability (PAN-759) | Open | Hooks not firing; fallbacks everywhere | Fix hooks before removing fallbacks | **Critical: blocks all readiness removal** |
+| 3 | messageReceived Feasibility | Resolved | confirmDelivery() is high-risk, low-value | Delete confirmDelivery(); use simple counter if needed | None (can delete immediately) |
+| 4 | activity Granularity | Resolved | 17 patterns but only active/idle needed | Simplify to 3 values: computing, thinking, idle | Hook extension (low risk) |
+| 5 | Thinking Duration | Resolved | Regex is fragile; hook timestamp is better | Add `thinkingSince` to runtime.json | Hook extension (moderate risk) |
+| 6 | Dialog Detection | Resolved | `.includes()` is fragile; hook detection better | Extend hook or pre-configure .claudeignore | Hook extension (moderate risk) |
+| 7 | Review Markers | Resolved | Specialists can write files | Review specialist writes review-results.json | Specialist code change (low risk) |
+| 8 | Health Checks | Resolved | Already reads runtime.json correctly | No change; already correct | None |
+| 9 | Ring Buffer Design | Resolved | Attach to PTY hub, 500-line raw bytes | Implement as described | Implementation (low risk) |
+| 10 | JSONL Format | Resolved | Store path in runtime.json; tail from end | Implement tail reader, resolve path | Implementation (low risk) |
+| 11 | Specialist Event Files | Resolved | Write structured JSON files | git-events.jsonl, test-results.json, merge-results.json | Specialist code change (low risk) |
+| 12 | Heartbeat Deprecation | Resolved | Heartbeat === runtime.json.lastActivity | Migrate readers, delete heartbeat files | Data migration (low risk) |
+| 13 | Backwards Compatibility | Resolved | Phase migration, fix PAN-759 first | 4-phase sequenced rollout | **Critical: depends on #2** |
+| 14 | confirmDelivery() Value | Resolved | No evidence of value; false-positive risk | Delete entirely (not replace) | None (can delete immediately) |
+| 15 | Lazy Patterns | Resolved | All 17 trigger same action | Replace with `waitingOnHuman` boolean | Hook extension (low risk) |
+
+---
+
+**Next Step:** Address critical blocker PAN-759 (hook reliability). Once hooks fire reliably, can proceed with Phase 1 migrations. Items #3 and #14 can be implemented immediately (confirmDelivery deletion). Items #4-12, #15 depend on hook extensions (Phase 1).
+
