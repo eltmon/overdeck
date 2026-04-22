@@ -32,6 +32,7 @@ import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { useResetIssue } from '../hooks/useResetIssue';
+import { useKillAgent } from '../hooks/useKillAgent';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
@@ -2291,7 +2292,6 @@ interface IssueCardProps {
 
 function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -2465,17 +2465,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     </button>
   );
 
-  // Kill agent mutation
-  const killMutation = useMutation({
-    mutationFn: async (agentId: string) => {
-      const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to kill agent');
-      return res.json();
-    },
-    onSuccess: async () => {
-      await refreshDashboardState(queryClient);
-    },
-  });
+  const { confirmAndKill, isPending: killPending } = useKillAgent(agent?.id);
 
   // Send message mutation
   const [messageInput, setMessageInput] = useState('');
@@ -2499,9 +2489,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (agent && await confirm({ title: 'Kill Agent', message: `Kill agent ${agent.id}?`, variant: 'destructive', confirmLabel: 'Kill' })) {
-      killMutation.mutate(agent.id);
-    }
+    await confirmAndKill();
   };
 
   const handleWatch = (e: React.MouseEvent) => {
@@ -3050,11 +3038,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <button
             onClick={handleKill}
-            disabled={killMutation.isPending}
+            disabled={killPending}
             className="flex items-center text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors"
             title="Kill"
           >
-            {killMutation.isPending ? (
+            {killPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <X className="w-3.5 h-3.5" />
