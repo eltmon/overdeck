@@ -14,12 +14,10 @@ import {
   User,
   Tag,
   FileText,
-  ListTodo,
   RefreshCw,
   Box,
   Play,
   GitMerge,
-  ScrollText,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -29,9 +27,9 @@ import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/util
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
+import { ArtifactLinks } from './ArtifactLinks';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import { useKillAgent } from '../hooks/useKillAgent';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
@@ -232,6 +230,18 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
     refetchInterval: 30000,
     staleTime: 10000,
+  });
+
+  const { data: planningState } = useQuery({
+    queryKey: ['planning-state', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/planning-state`);
+      if (!res.ok) throw new Error('Failed to fetch planning state');
+      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number; planningComplete: boolean }>;
+    },
+    enabled: !!issueId,
+    refetchInterval: 30000,
+    staleTime: 15000,
   });
 
   const startAgentMutation = useMutation({
@@ -524,10 +534,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
-  const { killMutation, confirmAndKill: handleKill } = useKillAgent(agent?.id, {
-    onSuccess: () => onClose(),
-  });
-
   const refreshDbMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/refresh-db`, {
@@ -782,14 +788,14 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 <span>PRD</span>
               </button>
             )}
-            <button onClick={() => setShowBeads(true)} className="flex items-center gap-1.5 text-primary hover:text-primary/80">
-              <ListTodo className="w-3 h-3" />
-              <span>Beads Tasks</span>
-            </button>
-            <button onClick={() => setShowVBrief(true)} className="flex items-center gap-1.5 text-signal-review hover:text-signal-review/80">
-              <ScrollText className="w-3 h-3" />
-              <span>vBRIEF</span>
-            </button>
+            <ArtifactLinks
+              issueId={issueId}
+              hasPlan={planningState?.hasPlan ?? false}
+              beadsCount={planningState?.beadsCount ?? 0}
+              onViewBeads={() => setShowBeads(true)}
+              onViewVBrief={() => setShowVBrief(true)}
+              variant="inspector"
+            />
           </div>
         </div>
 
@@ -953,7 +959,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           workspace={workspace}
           mergeMutation={mergeMutation}
           reviewMutation={reviewMutation}
-          killMutation={killMutation}
           cancelMutation={cancelMutation}
           resetReviewMutation={resetReviewMutation}
           startAgentMutation={startAgentMutation}
@@ -963,7 +968,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           reopenMutation={reopenMutation}
           onMerge={handleMerge}
           onReview={handleReview}
-          onKill={handleKill}
+          onKillSuccess={onClose}
           onCancel={handleCancel}
           onResetReview={handleResetReview}
           onResetSession={() => resetSessionMutation.mutate()}
