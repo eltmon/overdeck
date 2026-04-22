@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-20T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-569: Bulk-close issues from kanban board"
+    "description": "Plan for PAN-569: Bulk-close issues from kanban board",
+    "updated": "2026-04-22T19:58:37.460Z"
   },
   "plan": {
     "id": "pan-569",
@@ -11,13 +12,22 @@
     "status": "approved",
     "uid": "a3d7e1f4-8b2c-4d9a-b6e5-1f3a7c9d2e8b",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 47,
     "created": "2026-04-20T12:00:00Z",
-    "updated": "2026-04-20T12:00:00Z",
+    "updated": "2026-04-22T19:58:37.460Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/569", "label": "PAN-569", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/569",
+        "label": "PAN-569",
+        "type": "issue"
+      }
     ],
-    "tags": ["dashboard", "kanban", "bulk-actions", "close-out"],
+    "tags": [
+      "dashboard",
+      "kanban",
+      "bulk-actions",
+      "close-out"
+    ],
     "narratives": {
       "Problem": "Closing issues on the kanban board is one-at-a-time. Sprint cleanup with many done issues is tedious and time-consuming.",
       "Proposal": "Add multi-select checkboxes to issue cards and column headers, a floating bulk action bar, and a POST /api/issues/bulk-close-out endpoint that runs the full closeOut lifecycle sequentially per issue. Show progress modal during execution."
@@ -26,7 +36,7 @@
       {
         "id": "bulk-close-endpoint",
         "title": "Add POST /api/issues/bulk-close-out endpoint",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -40,33 +50,46 @@
           {
             "id": "bulk-close-endpoint.ac1",
             "title": "POST /api/issues/bulk-close-out accepts { issueIds: string[] } and returns { results: Array<{ issueId, success, error?, skipped? }> }",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
             "id": "bulk-close-endpoint.ac2",
             "title": "Each issue runs the full closeOut() lifecycle (verify merge, archive, teardown, close on tracker, clear review status)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
             "id": "bulk-close-endpoint.ac3",
             "title": "If one issue fails, remaining issues still proceed (no short-circuit)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
             "id": "bulk-close-endpoint.ac4",
             "title": "Route is wired into issuesRouteLayer and accessible at /api/issues/bulk-close-out",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       },
       {
         "id": "use-bulk-selection-hook",
         "title": "Create useBulkSelection hook for multi-select state",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -80,27 +103,37 @@
           {
             "id": "use-bulk-selection-hook.ac1",
             "title": "Hook exports toggle, selectAll, deselectAll, clear, isSelected, count, and selectedIds",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
             "id": "use-bulk-selection-hook.ac2",
             "title": "Toggling an already-selected ID removes it; toggling an unselected ID adds it",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
             "id": "use-bulk-selection-hook.ac3",
             "title": "clear() resets selection to empty set",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.457Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       },
       {
         "id": "issue-card-checkbox",
         "title": "Add selection checkbox and selected styling to IssueCard",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -114,27 +147,37 @@
           {
             "id": "issue-card-checkbox.ac1",
             "title": "Each IssueCard renders a checkbox in the top-left corner",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
             "id": "issue-card-checkbox.ac2",
             "title": "Clicking the checkbox toggles selection without triggering the card's single-select onClick",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
             "id": "issue-card-checkbox.ac3",
             "title": "Selected cards have a visually distinct highlight (border or background change)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.457Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       },
       {
         "id": "column-select-all",
         "title": "Add select-all checkbox to kanban column headers",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -148,27 +191,37 @@
           {
             "id": "column-select-all.ac1",
             "title": "Each kanban column header has a select-all checkbox",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
           },
           {
             "id": "column-select-all.ac2",
             "title": "Checking it selects all issues in that column; unchecking deselects them",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
           },
           {
             "id": "column-select-all.ac3",
             "title": "Checkbox shows indeterminate state when some (but not all) column issues are selected",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       },
       {
         "id": "bulk-action-bar",
         "title": "Create floating BulkActionBar component",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -182,33 +235,46 @@
           {
             "id": "bulk-action-bar.ac1",
             "title": "Bar appears at bottom when 1+ issues are selected, hidden when none selected",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
             "id": "bulk-action-bar.ac2",
             "title": "Shows count of selected issues (e.g., '3 issues selected')",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
             "id": "bulk-action-bar.ac3",
             "title": "Cancel button clears all selections",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
             "id": "bulk-action-bar.ac4",
             "title": "Close Out button triggers the bulk close-out flow",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.459Z"
       },
       {
         "id": "active-agent-guardrail",
         "title": "Active-agent warning for bulk close-out",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -222,27 +288,37 @@
           {
             "id": "active-agent-guardrail.ac1",
             "title": "If any selected issues have running agents, a warning dialog appears before execution",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
             "id": "active-agent-guardrail.ac2",
             "title": "Dialog lists which issues have active agents",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
             "id": "active-agent-guardrail.ac3",
             "title": "Proceeding skips issues with active agents; those appear as skipped in results",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       },
       {
         "id": "progress-modal",
         "title": "Progress modal for bulk close-out execution",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -256,27 +332,37 @@
           {
             "id": "progress-modal.ac1",
             "title": "Modal appears during execution showing per-issue status (pending/running/done/failed/skipped)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
           },
           {
             "id": "progress-modal.ac2",
             "title": "Modal cannot be dismissed while operation is in progress",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
           },
           {
             "id": "progress-modal.ac3",
             "title": "On completion, shows summary counts and a Close button that clears selection",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.460Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       },
       {
         "id": "wire-bulk-flow",
         "title": "Wire bulk close-out mutation into KanbanBoard",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -290,27 +376,37 @@
           {
             "id": "wire-bulk-flow.ac1",
             "title": "Clicking Close Out in the action bar triggers the full flow: guardrail → confirm → execute → progress → refresh",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.455Z"
           },
           {
             "id": "wire-bulk-flow.ac2",
             "title": "Dashboard state refreshes after bulk operation completes (issues appear in done column)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.455Z"
           },
           {
             "id": "wire-bulk-flow.ac3",
             "title": "Selection is cleared after the operation completes and progress modal is closed",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.455Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.458Z"
       },
       {
         "id": "list-view-checkboxes",
         "title": "Add selection checkboxes to list view rows",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-20T12:00:00Z",
         "metadata": {
@@ -324,28 +420,71 @@
           {
             "id": "list-view-checkboxes.ac1",
             "title": "ListIssueRow renders a selection checkbox",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
             "id": "list-view-checkboxes.ac2",
             "title": "Selections persist when switching between kanban and list views",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           }
-        ]
+        ],
+        "completed": "2026-04-22T19:58:37.460Z"
       }
     ],
     "edges": [
-      { "from": "use-bulk-selection-hook", "to": "issue-card-checkbox", "type": "blocks" },
-      { "from": "use-bulk-selection-hook", "to": "column-select-all", "type": "blocks" },
-      { "from": "use-bulk-selection-hook", "to": "bulk-action-bar", "type": "blocks" },
-      { "from": "use-bulk-selection-hook", "to": "list-view-checkboxes", "type": "blocks" },
-      { "from": "bulk-close-endpoint", "to": "wire-bulk-flow", "type": "blocks" },
-      { "from": "bulk-action-bar", "to": "wire-bulk-flow", "type": "blocks" },
-      { "from": "issue-card-checkbox", "to": "wire-bulk-flow", "type": "blocks" },
-      { "from": "active-agent-guardrail", "to": "wire-bulk-flow", "type": "blocks" },
-      { "from": "progress-modal", "to": "wire-bulk-flow", "type": "blocks" }
+      {
+        "from": "use-bulk-selection-hook",
+        "to": "issue-card-checkbox",
+        "type": "blocks"
+      },
+      {
+        "from": "use-bulk-selection-hook",
+        "to": "column-select-all",
+        "type": "blocks"
+      },
+      {
+        "from": "use-bulk-selection-hook",
+        "to": "bulk-action-bar",
+        "type": "blocks"
+      },
+      {
+        "from": "use-bulk-selection-hook",
+        "to": "list-view-checkboxes",
+        "type": "blocks"
+      },
+      {
+        "from": "bulk-close-endpoint",
+        "to": "wire-bulk-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "bulk-action-bar",
+        "to": "wire-bulk-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-card-checkbox",
+        "to": "wire-bulk-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "active-agent-guardrail",
+        "to": "wire-bulk-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "progress-modal",
+        "to": "wire-bulk-flow",
+        "type": "blocks"
+      }
     ]
   }
 }
