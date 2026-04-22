@@ -159,9 +159,7 @@
     },
   },
   "overrides": {
-    "@effect/platform-bun>@effect/platform-node-shared": "4.0.0-beta.43",
     "@effect/platform-node-shared": "4.0.0-beta.43",
-    "@effect/platform-node>@effect/platform-node-shared": "4.0.0-beta.43",
   },
   "catalog": {
     "@effect/language-service": "0.84.2",

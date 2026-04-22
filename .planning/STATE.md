@@ -38,6 +38,7 @@ Review-agent APPROVED PAN-539 at 2026-04-22T23:11Z. All 5 vBRIEF items implement
 - [x] Fix: readSessionAttachmentBasenames searches raw JSON line for @/ paths (tool-use shapes) (round 7)
 - [x] Fix: isManagedConversationAttachmentPath falls back to resolve for deleted files (round 7)
 - [x] Fix: Remove dead imports getProviderForModel and HttpServerResponse (round 7)
+- [x] Fix: Remove invalid Bun override keys with > character from package.json (test-agent)
 - [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
 - [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
@@ -79,4 +80,12 @@ Review-agent APPROVED PAN-539 at 2026-04-22T23:11Z. All 5 vBRIEF items implement
 - [2026-04-22T23:01Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round7.md`
   - Issues: (1) JSONL reference extraction misses tool-use-shaped entries, (2) managed-but-deleted attachment silently falls through to unmanaged branch, (3) dead/shadowed imports
   - Status: FIXED. readSessionAttachmentBasenames now searches raw JSON line for @/ paths. isManagedConversationAttachmentPath and isConversationAttachmentPath fall back to resolve() when realpath() throws (deleted files). Removed dead imports getProviderForModel and HttpServerResponse.
+- [2026-04-22T23:11Z] review-agent → APPROVED — `.planning/feedback/archive/001-review-agent-approved.md`
+  - Status: APPROVED. All 5 vBRIEF items implemented. No blockers.
+- [2026-04-22T23:14Z] test-agent → FAILED — `.planning/feedback/archive/001-test-agent-failed.md`
+  - Issue: Playwright/npm test blocked by pre-existing package.json override corruption (`@effect/platform-node>@effect/platform-node-shared` contains `>` which is not URL-safe)
+  - Status: FIXED. Removed invalid Bun override keys with `>` character. `@effect/platform-node-shared` override retained as direct package name.
+  - Issues: (1) JSONL reference extraction misses tool-use-shaped entries, (2) managed-but-deleted attachment silently falls through to unmanaged branch, (3) dead/shadowed imports
+  - Status: FIXED. readSessionAttachmentBasenames now searches raw JSON line for @/ paths. isManagedConversationAttachmentPath and isConversationAttachmentPath fall back to resolve() when realpath() throws (deleted files). Removed dead imports getProviderForModel and HttpServerResponse.
 - **[2026-04-22T23:11Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
+- **[2026-04-22T23:14Z] test-agent → FAILED** — `.planning/feedback/001-test-agent-failed.md`
