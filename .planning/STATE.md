@@ -35,6 +35,7 @@ Implementation complete. Waiting for inspections and tests to pass.
 ## Specialist Feedback
 - None currently
 - **[2026-04-22T19:58Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-04-22T20:06Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
 
 ## Problem
 
