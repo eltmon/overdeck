@@ -35,8 +35,9 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { DomainEvent } from '@panopticon/contracts';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
@@ -788,7 +789,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 // heartbeat-hook (bash) continues to write runtime.json directly in Phase 3.
 // Phase 4 rewrites it as a POST-emitter and Phase 5 stops writing the file.
 
-const mapLegacyState = (
+export const mapLegacyState = (
   legacy: string | undefined,
   tool: string | undefined,
 ): { kind: string; [k: string]: unknown } | null => {
@@ -821,7 +822,7 @@ const mapLegacyState = (
  * Returns null if the body doesn't map to a runtime event (e.g. legacy
  * 'uninitialized' ghost).
  */
-const bodyToEvent = (
+export const bodyToEvent = (
   agentId: string,
   body: Record<string, unknown>,
   timestamp: string,
@@ -909,6 +910,12 @@ const bodyToEvent = (
   }
 };
 
+// Runtime-event decoder. We validate the assembled event (with a placeholder
+// sequence) against the DomainEvent union — bad payloads (unknown kind, bad
+// activity enum, missing required field) are rejected with 400 rather than
+// silently corrupting the AgentRuntimeSnapshot.
+const decodeDomainEvent = Schema.decodeUnknownResult(DomainEvent);
+
 const postAgentHeartbeatRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/heartbeat',
@@ -921,18 +928,28 @@ const postAgentHeartbeatRoute = HttpRouter.add(
     const body = (yield* readJsonBody) as Record<string, unknown>;
     const timestamp = (body['timestamp'] as string) ?? new Date().toISOString();
 
-    const event = bodyToEvent(id, body, timestamp);
-    if (!event) {
-      // Legacy 'uninitialized' or an unknown kind — accept but no-op so hooks
+    const raw = bodyToEvent(id, body, timestamp);
+    if (!raw) {
+      // Legacy 'uninitialized' or unknown kind — accept but no-op so hooks
       // don't retry forever.
       return jsonResponse({ success: true, emitted: false });
+    }
+
+    // Placeholder sequence — appendAsync assigns the real server-side number.
+    const candidate = { ...raw, sequence: 0 };
+    const decoded = decodeDomainEvent(candidate);
+    if (decoded._tag === 'Failure') {
+      return jsonResponse(
+        { success: false, error: 'invalid event', detail: String(decoded.failure) },
+        { status: 400 },
+      );
     }
 
     const { AgentStateService } = yield* Effect.promise(
       () => import('../services/agent-state-service.js'),
     );
     const agentState = yield* AgentStateService;
-    yield* agentState.emit(event as never);
+    yield* agentState.emit(decoded.success as never);
 
     return jsonResponse({ success: true, emitted: true });
   })),
