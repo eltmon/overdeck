@@ -1713,12 +1713,15 @@ const postIssueCloseOutRoute = HttpRouter.add(
 
 const MAX_BULK_CLOSE_OUT = 50;
 
+const VALID_TMUX_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
 async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
   const agentId = normalizeAgentId(issueId);
   const planningId = `planning-${issueId.toLowerCase()}`;
 
-  if (await sessionExistsAsync(agentId)) return true;
-  if (await sessionExistsAsync(planningId)) return true;
+  // Only query tmux for valid session names (GitHub IDs like owner/repo#123 produce invalid names)
+  if (VALID_TMUX_NAME_RE.test(agentId) && await sessionExistsAsync(agentId)) return true;
+  if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
 
   const agentState = await getAgentStateAsync(agentId);
   if (agentState && agentState.status !== 'dead' && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
@@ -1747,10 +1750,15 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
 
-    // Content-Type enforcement
+    // Content-Type enforcement — exact match, no substring trickery
     const contentType = (request.headers as Record<string, string | string[] | undefined>)['content-type'];
     const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-    if (!contentTypeStr?.toLowerCase().includes('application/json')) {
+    const isJsonContentType = (() => {
+      if (!contentTypeStr) return false;
+      const [mime] = contentTypeStr.toLowerCase().split(';');
+      return mime.trim() === 'application/json';
+    })();
+    if (!isJsonContentType) {
       return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
     }
 
@@ -1762,13 +1770,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
     const originStr = Array.isArray(origin) ? origin[0] : origin;
     const isValidOrigin = (() => {
-      if (!originStr) {
-        // Fallback: check Host header for local requests
-        const host = (request.headers as Record<string, string | string[] | undefined>)['host'];
-        const hostStr = Array.isArray(host) ? host[0] : host;
-        if (!hostStr) return false;
-        return hostStr.startsWith('localhost:') || hostStr.startsWith('127.0.0.1:');
-      }
+      if (!originStr) return false;
       try {
         const url = new URL(originStr);
         return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
@@ -1815,8 +1817,10 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
       }
       if (!projectPath) {
-        const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
-        projectPath = getProjectPath(undefined, issuePrefix);
+        const issuePrefix = extractPrefix(id);
+        if (issuePrefix) {
+          projectPath = getProjectPath(undefined, issuePrefix);
+        }
       }
       if (!projectPath) {
         results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false });

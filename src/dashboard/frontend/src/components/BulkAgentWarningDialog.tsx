@@ -12,11 +12,20 @@ interface BulkAgentWarningDialogProps {
 export function BulkAgentWarningDialog({ isOpen, onClose, onProceed, issues, agents }: BulkAgentWarningDialogProps) {
   if (!isOpen || issues.length === 0) return null;
 
-  const issuesWithAgents = issues.map(issue => {
-    const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
-    const runningAgents = issueAgents.filter(a => a.status !== 'dead' && a.status !== 'stopped');
-    return { issue, runningAgents };
-  }).filter(({ runningAgents }) => runningAgents.length > 0);
+  // Pre-index active agents by lowercased issueId for O(1) lookup — O(agents) instead of O(issues × agents)
+  const activeAgentsByIssueId = new Map<string, Agent[]>();
+  for (const agent of agents) {
+    if (agent.issueId && agent.status !== 'dead' && agent.status !== 'stopped') {
+      const key = agent.issueId.toLowerCase();
+      const list = activeAgentsByIssueId.get(key) ?? [];
+      list.push(agent);
+      activeAgentsByIssueId.set(key, list);
+    }
+  }
+
+  const issuesWithAgents = issues
+    .map(issue => ({ issue, runningAgents: activeAgentsByIssueId.get(issue.identifier.toLowerCase()) ?? [] }))
+    .filter(({ runningAgents }) => runningAgents.length > 0);
 
   if (issuesWithAgents.length === 0) return null;
 

@@ -1027,8 +1027,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   // Bulk selection state — key based on filters so selection survives data refreshes
   const internalBulkSelection = useBulkSelection(`${cycleFilter}-${includeCompleted}-${Array.from(selectedProjects).sort().join(',')}`);
-  const bulkSelection = bulkSelectedIds
-    ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle!, selectAll: onBulkSelectAll!, deselectAll: onBulkDeselectAll!, clear: () => onBulkDeselectAll!(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
+  const bulkSelection = bulkSelectedIds && onBulkToggle && onBulkSelectAll && onBulkDeselectAll
+    ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle, selectAll: onBulkSelectAll, deselectAll: onBulkDeselectAll, clear: () => onBulkDeselectAll(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
     : internalBulkSelection;
 
   // Bulk close-out mutation
@@ -1061,7 +1061,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
               error: backend.error,
             };
           }
-          // Backend response omitted this issueId — mark as failed so modal doesn't hang
+          // Backend response omitted this issueId — if already marked skipped (active-agent guardrail), preserve it
+          if (p.status === 'skipped') return p;
+          // Otherwise mark as failed so modal doesn't hang
           return { issueId: p.issueId, status: 'failed' as const, error: 'Missing from server response' };
         });
       });
