@@ -168,9 +168,32 @@ export const AgentModelSetEvent = Schema.Struct({
 })
 export type AgentModelSetEvent = typeof AgentModelSetEvent.Type
 
+export const AgentCurrentIssueSetEvent = Schema.Struct({
+  type: Schema.Literal("agent.current_issue_set"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    currentIssue: Schema.optional(IssueId),
+  }),
+})
+export type AgentCurrentIssueSetEvent = typeof AgentCurrentIssueSetEvent.Type
+
+export const AgentResolutionChangedEvent = Schema.Struct({
+  type: Schema.Literal("agent.resolution_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    resolution: AgentResolution,
+    resolutionCount: Schema.Number,
+  }),
+})
+export type AgentResolutionChangedEvent = typeof AgentResolutionChangedEvent.Type
+
 /**
  * Bootstrap-only event emitted by AgentStateService when it seeds a runtime
- * snapshot from projection_cache or runtime.json fallback. Not emitted by hooks.
+ * snapshot from projection_cache. Not emitted by hooks.
  */
 export const AgentStateRestoredEvent = Schema.Struct({
   type: Schema.Literal("agent.state_restored"),
@@ -583,6 +606,8 @@ export const DomainEvent = Schema.Union([
   AgentWaitingClearedEvent,
   AgentMessageReceivedEvent,
   AgentModelSetEvent,
+  AgentCurrentIssueSetEvent,
+  AgentResolutionChangedEvent,
   AgentStateRestoredEvent,
   PlanningStartedEvent,
   PlanningFailedEvent,

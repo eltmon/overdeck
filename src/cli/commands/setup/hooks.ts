@@ -157,6 +157,7 @@ export async function setupHooksCommand(): Promise<void> {
     'stop-hook',
     'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
     'specialist-stop-hook',
+    'work-agent-stop-hook',   // PAN-800: chained from stop-hook; emits agent.resolution_changed
     'session-start-hook',     // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
     'record-cost-event.js',
     'tldr-read-enforcer',

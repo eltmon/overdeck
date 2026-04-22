@@ -561,6 +561,44 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'agent.current_issue_set': {
+      const { agentId, currentIssue } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        currentIssue,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.resolution_changed': {
+      const { agentId, resolution, resolutionCount } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        resolution,
+        resolutionCount,
+        resolutionUpdatedAt: event.timestamp,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
     case 'agent.state_restored': {
       const { agentId, snapshot } = event.payload
       // Seed directly from the restored snapshot but use the new event's sequence

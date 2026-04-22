@@ -32,6 +32,7 @@ import type {
 } from '@panopticon/contracts';
 import { initEventStore, getSharedDb } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
+import { setAgentRuntimeMirror, getRuntimeSnapshotSync as getMirrorSnapshot } from '../../../lib/agent-runtime-mirror.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ const RUNTIME_EVENT_TYPES: ReadonlySet<string> = new Set([
   'agent.waiting_cleared',
   'agent.message_received',
   'agent.model_set',
+  'agent.current_issue_set',
+  'agent.resolution_changed',
   'agent.state_restored',
   // Lifecycle event: pan kill bypasses the Stop hook, so the reducer folds
   // agent.stopped into the runtime snapshot to prevent "idle forever" ghosts.
@@ -85,6 +88,9 @@ export class AgentStateService extends ServiceMap.Service<
 >()('panopticon/dashboard/AgentStateService') {}
 
 // ─── Live implementation ──────────────────────────────────────────────────────
+
+// Re-export the cross-process-safe mirror accessor.
+export const getRuntimeSnapshotSync = getMirrorSnapshot;
 
 export const AgentStateServiceLive = Layer.effect(
   AgentStateService,
@@ -133,6 +139,7 @@ export const AgentStateServiceLive = Layer.effect(
     const initial = seedFromCache();
     if (Object.keys(initial).length > 0) {
       yield* SubscriptionRef.set(ref, initial);
+      setAgentRuntimeMirror(initial);
       console.log(
         `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache`,
       );
@@ -196,9 +203,6 @@ function applyEventToRef(
     const nextState = applyReducerEvent(fakeState, ev as unknown as DomainEvent);
     const next = nextState.agentRuntimeById;
 
-    // Upsert every snapshot whose reference changed this fold. Reference
-    // equality is sufficient because the reducer returns the same object when
-    // no fields changed (e.g. thinking_stopped on unknown agent).
     for (const [id, snap] of Object.entries(next)) {
       if (current[id] === snap) continue;
       try {
@@ -216,6 +220,7 @@ function applyEventToRef(
       }
     }
 
+    setAgentRuntimeMirror(next);
     return next;
   });
 }

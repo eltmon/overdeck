@@ -21,7 +21,7 @@ export type AgentStatus = typeof AgentStatus.Type
 export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"])
 export type AgentPhase = typeof AgentPhase.Type
 
-export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear"])
+export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned"])
 export type AgentResolution = typeof AgentResolution.Type
 
 export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
@@ -88,6 +88,13 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   claudeSessionId: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   lastMessageAt: Schema.optional(Schema.String),  // last user→agent message delivered
+  // Lifecycle resolution signal emitted by work-agent-stop-hook. Values mirror
+  // AgentResolution so the enrichment poller can consume this as input.
+  resolution: Schema.optional(AgentResolution),
+  resolutionCount: Schema.optional(Schema.Number),
+  resolutionUpdatedAt: Schema.optional(Schema.String),
+  // For specialists: the issue currently being processed.
+  currentIssue: Schema.optional(IssueId),
   updatedAtSequence: SequenceNumber,              // event sequence that produced this snapshot
 })
 export type AgentRuntimeSnapshot = typeof AgentRuntimeSnapshot.Type
