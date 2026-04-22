@@ -7,6 +7,7 @@ import { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../../lib/pipeline-state';
+import { ResetIssueButton } from '../ResetIssueButton';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -16,6 +17,7 @@ type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unkn
 
 interface ActionsSectionProps {
   agent?: Agent;
+  issueId: string;
   reviewStatus?: ReviewStatus;
   reviewStatusLoading?: boolean;
   workspace?: WorkspaceInfo;
@@ -29,7 +31,6 @@ interface ActionsSectionProps {
   syncMainMutation: SyncMutation;
   resetSessionMutation: AnyMutation;
   reopenMutation?: ReopenMutation;
-  resetIssueMutation?: AnyMutation;
   onMerge: () => void;
   onReview: () => void;
   onKill: () => void;
@@ -40,13 +41,13 @@ interface ActionsSectionProps {
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
   onReopen?: () => void;
-  onResetIssue?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
 
 export function ActionsSection({
   agent,
+  issueId,
   reviewStatus,
   reviewStatusLoading,
   workspace,
@@ -60,7 +61,6 @@ export function ActionsSection({
   syncMainMutation,
   resetSessionMutation,
   reopenMutation,
-  resetIssueMutation,
   onMerge,
   onReview,
   onKill,
@@ -71,7 +71,6 @@ export function ActionsSection({
   onStartAgent,
   onCreateWorkspace,
   onReopen,
-  onResetIssue,
   lifecycle,
   agentLaunchState,
 }: ActionsSectionProps) {
@@ -403,23 +402,7 @@ export function ActionsSection({
             )}
 
             {/* Reset Issue */}
-            {onResetIssue && (
-              <div className="min-w-0">
-                <div className="text-xs font-medium text-content">Reset Issue</div>
-                <div className="text-[11px] text-content-subtle mt-0.5" title="Deletes the workspace, feature branch, STATE.md, and all beads. Moves the issue back to Todo. Use when the current approach is completely wrong and you want to start over from planning.">
-                  Deletes the workspace, branch, STATE.md, beads, and vBRIEF. Moves the issue back to Todo. Start over from planning.
-                </div>
-                <button
-                  onClick={onResetIssue}
-                  disabled={resetIssueMutation?.isPending}
-                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
-                  title="Reset Issue: deletes workspace + branch + STATE.md + beads, moves to Todo"
-                >
-                  {resetIssueMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-                  {resetIssueMutation?.isPending ? 'Resetting...' : 'Reset Issue'}
-                </button>
-              </div>
-            )}
+            <ResetIssueButton issueId={issueId} variant="danger-zone" />
 
             {/* Cancel Issue */}
             <div className="min-w-0">
