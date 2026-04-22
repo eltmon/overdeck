@@ -12,6 +12,7 @@ import { isReviewPipelineStuck } from '../../lib/pipeline-state';
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
 type ResetReviewMutation = UseMutationResult<unknown, Error, { rerun?: boolean } | undefined, unknown>;
 type SyncMutation = UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?: number }, Error, void, unknown>;
+type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unknown>;
 
 interface ActionsSectionProps {
   agent?: Agent;
@@ -27,6 +28,8 @@ interface ActionsSectionProps {
   createWorkspaceMutation: AnyMutation;
   syncMainMutation: SyncMutation;
   resetSessionMutation: AnyMutation;
+  reopenMutation?: ReopenMutation;
+  resetIssueMutation?: AnyMutation;
   onMerge: () => void;
   onReview: () => void;
   onKill: () => void;
@@ -36,6 +39,8 @@ interface ActionsSectionProps {
   onDismissPending: () => void;
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
+  onReopen?: () => void;
+  onResetIssue?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
@@ -54,6 +59,8 @@ export function ActionsSection({
   createWorkspaceMutation,
   syncMainMutation,
   resetSessionMutation,
+  reopenMutation,
+  resetIssueMutation,
   onMerge,
   onReview,
   onKill,
@@ -63,6 +70,8 @@ export function ActionsSection({
   onDismissPending,
   onStartAgent,
   onCreateWorkspace,
+  onReopen,
+  onResetIssue,
   lifecycle,
   agentLaunchState,
 }: ActionsSectionProps) {
@@ -366,28 +375,68 @@ export function ActionsSection({
         </div>
       )}
 
-      {/* Danger Zone — Cancel Issue (collapsed by default) */}
+      {/* Danger Zone — destructive actions (collapsed by default) */}
       {reviewStatus?.mergeStatus !== 'merged' && (
         <details className="mt-6 rounded border border-destructive/30 group">
           <summary className="px-3 py-2 bg-destructive/5 rounded cursor-pointer list-none select-none flex items-center gap-1.5 group-open:rounded-b-none group-open:border-b group-open:border-destructive/30">
             <ChevronRight className="w-3 h-3 text-destructive transition-transform group-open:rotate-90" />
             <span className="text-xs font-semibold uppercase tracking-wider text-destructive">Danger Zone</span>
           </summary>
-          <div className="px-3 py-3 space-y-2.5">
+          <div className="px-3 py-3 space-y-4">
+            {/* Reopen */}
+            {onReopen && reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed') && (
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-content">Reopen for more work</div>
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, and all planning artifacts intact.">
+                  Moves the issue back to In Progress. The workspace, branch, PR, and all planning artifacts are preserved.
+                </div>
+                <button
+                  onClick={onReopen}
+                  disabled={reopenMutation?.isPending}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-white transition-colors disabled:opacity-50"
+                  title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + beads"
+                >
+                  {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {reopenMutation?.isPending ? 'Reopening...' : 'Reopen'}
+                </button>
+              </div>
+            )}
+
+            {/* Reset Issue */}
+            {onResetIssue && (
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-content">Reset Issue</div>
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Deletes the workspace, feature branch, and all beads. Moves the issue back to Todo. Use when the current approach is completely wrong and you want to start over from planning.">
+                  Deletes the workspace, branch, beads, and vBRIEF. Moves the issue back to Todo. Start over from planning.
+                </div>
+                <button
+                  onClick={onResetIssue}
+                  disabled={resetIssueMutation?.isPending}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
+                  title="Reset Issue: deletes workspace + branch + beads, moves to Todo"
+                >
+                  {resetIssueMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                  {resetIssueMutation?.isPending ? 'Resetting...' : 'Reset Issue'}
+                </button>
+              </div>
+            )}
+
+            {/* Cancel Issue */}
             <div className="min-w-0">
               <div className="text-xs font-medium text-content">Cancel this issue</div>
-              <div className="text-[11px] text-content-subtle mt-0.5">
+              <div className="text-[11px] text-content-subtle mt-0.5" title="Permanently stops the agent, deletes the workspace and branch, closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
                 Permanently stops the agent, deletes the workspace and branch, closes the PR, and moves the issue to Canceled. This cannot be undone.
               </div>
+              <button
+                onClick={onCancel}
+                disabled={cancelMutation.isPending}
+                className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
+                title="Cancel Issue: permanent — stops agent, deletes workspace + branch, closes PR, moves to Canceled"
+              >
+                {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
+              </button>
             </div>
-            <button
-              onClick={onCancel}
-              disabled={cancelMutation.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
-            >
-              {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-              {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
-            </button>
           </div>
         </details>
       )}
