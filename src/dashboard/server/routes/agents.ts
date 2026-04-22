@@ -761,7 +761,153 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/agents/:id/heartbeat ───────────────────────────────────
+// ─── Route: POST /api/agents/:id/heartbeat (PAN-800 ingestion) ──────────────
+//
+// Typed event ingestion for agent runtime state. Hooks POST a Schema-validated
+// body describing a single runtime transition; the handler translates to an
+// agent.* DomainEvent and hands it to AgentStateService.emit (which durably
+// appendAsyncs via EventStore).
+//
+// Two body shapes are accepted during the migration window:
+//
+// 1. New shape (discriminated by `kind`):
+//      {kind: "activity", activity: "working"|"idle"|..., tool?: string}
+//      {kind: "thinking_start", lastToolAt: ISO}
+//      {kind: "thinking_stop", resolvedBy: "tool"|"waiting"|"idle"|"stopped"}
+//      {kind: "waiting_start", reason: WaitingReason, message?: string}
+//      {kind: "waiting_clear", clearedBy: ...}
+//      {kind: "message_received", direction: ..., source: ...}
+//      {kind: "model_set", model: string, claudeSessionId?: string}
+//
+// 2. Legacy shape (PAN-80 era heartbeat-hook, removed in Phase 5):
+//      {state: "active"|"idle"|"stopped"|"suspended"|"waiting-on-human", tool?, timestamp?}
+//    Mapped to an activity/waiting event. The old state-enum values that have
+//    no direct analogue ("suspended", "uninitialized") fold to "idle" or are
+//    dropped — see mapLegacyState().
+//
+// heartbeat-hook (bash) continues to write runtime.json directly in Phase 3.
+// Phase 4 rewrites it as a POST-emitter and Phase 5 stops writing the file.
+
+const mapLegacyState = (
+  legacy: string | undefined,
+  tool: string | undefined,
+): { kind: string; [k: string]: unknown } | null => {
+  switch (legacy) {
+    case 'active':
+      // Legacy 'active' with a tool → working. Without a tool we can only say
+      // something happened; defaults to working since the legacy hook always
+      // fires on PostToolUse which implies a tool ran.
+      return { kind: 'activity', activity: 'working', tool };
+    case 'idle':
+      return { kind: 'activity', activity: 'idle' };
+    case 'stopped':
+      return { kind: 'activity', activity: 'stopped' };
+    case 'suspended':
+      // No runtime analogue — deacon suspension was separate from activity.
+      // Fold to idle; Phase 5 removes suspend/resume from the runtime surface.
+      return { kind: 'activity', activity: 'idle' };
+    case 'waiting-on-human':
+      return { kind: 'waiting_start', reason: 'other' };
+    case 'uninitialized':
+      // Ghost state — don't emit anything.
+      return null;
+    default:
+      return null;
+  }
+};
+
+/**
+ * Translate a decoded body into an unsigned DomainEvent (no sequence yet).
+ * Returns null if the body doesn't map to a runtime event (e.g. legacy
+ * 'uninitialized' ghost).
+ */
+const bodyToEvent = (
+  agentId: string,
+  body: Record<string, unknown>,
+  timestamp: string,
+): Record<string, unknown> | null => {
+  let source = body;
+  if (typeof body['kind'] !== 'string') {
+    const mapped = mapLegacyState(
+      body['state'] as string | undefined,
+      body['tool'] as string | undefined,
+    );
+    if (!mapped) return null;
+    source = mapped;
+  }
+  const kind = source['kind'] as string;
+  switch (kind) {
+    case 'activity':
+      return {
+        type: 'agent.activity_changed',
+        timestamp,
+        payload: {
+          agentId,
+          activity: source['activity'],
+          currentTool: source['tool'] as string | undefined,
+        },
+      };
+    case 'thinking_start':
+      return {
+        type: 'agent.thinking_started',
+        timestamp,
+        payload: {
+          agentId,
+          lastToolAt: (source['lastToolAt'] as string) ?? timestamp,
+        },
+      };
+    case 'thinking_stop':
+      return {
+        type: 'agent.thinking_stopped',
+        timestamp,
+        payload: {
+          agentId,
+          resolvedBy: source['resolvedBy'] ?? 'tool',
+        },
+      };
+    case 'waiting_start':
+      return {
+        type: 'agent.waiting_started',
+        timestamp,
+        payload: {
+          agentId,
+          reason: source['reason'] ?? 'other',
+          message: source['message'] as string | undefined,
+        },
+      };
+    case 'waiting_clear':
+      return {
+        type: 'agent.waiting_cleared',
+        timestamp,
+        payload: {
+          agentId,
+          clearedBy: source['clearedBy'] ?? 'user_response',
+        },
+      };
+    case 'message_received':
+      return {
+        type: 'agent.message_received',
+        timestamp,
+        payload: {
+          agentId,
+          direction: source['direction'] ?? 'to_agent',
+          source: source['source'] ?? 'user',
+        },
+      };
+    case 'model_set':
+      return {
+        type: 'agent.model_set',
+        timestamp,
+        payload: {
+          agentId,
+          model: source['model'],
+          claudeSessionId: source['claudeSessionId'] as string | undefined,
+        },
+      };
+    default:
+      return null;
+  }
+};
 
 const postAgentHeartbeatRoute = HttpRouter.add(
   'POST',
@@ -769,15 +915,50 @@ const postAgentHeartbeatRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
+    if (!id.trim()) {
+      return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
+    }
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const timestamp = (body['timestamp'] as string) ?? new Date().toISOString();
 
-    const { state, tool, timestamp } = body as any;
-    saveAgentRuntimeState(id, {
-      state,
-      lastActivity: timestamp || new Date().toISOString(),
-      currentTool: tool,
-    });
-    return jsonResponse({ success: true });
+    const event = bodyToEvent(id, body, timestamp);
+    if (!event) {
+      // Legacy 'uninitialized' or an unknown kind — accept but no-op so hooks
+      // don't retry forever.
+      return jsonResponse({ success: true, emitted: false });
+    }
+
+    const { AgentStateService } = yield* Effect.promise(
+      () => import('../services/agent-state-service.js'),
+    );
+    const agentState = yield* AgentStateService;
+    yield* agentState.emit(event as never);
+
+    return jsonResponse({ success: true, emitted: true });
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/runtime (PAN-800) ────────────────────────────
+// Exposes AgentRuntimeSnapshot to out-of-process readers (CLI, tests).
+
+const getAgentRuntimeRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/runtime',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) {
+      return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
+    }
+    const { AgentStateService } = yield* Effect.promise(
+      () => import('../services/agent-state-service.js'),
+    );
+    const agentState = yield* AgentStateService;
+    const snapshot = yield* agentState.get(id);
+    if (!snapshot) {
+      return jsonResponse({ success: false, error: 'not found' }, { status: 404 });
+    }
+    return jsonResponse({ success: true, snapshot });
   })),
 );
 
@@ -1958,6 +2139,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentPendingQuestionsRoute,
   postAgentAnswerQuestionRoute,
   postAgentHeartbeatRoute,
+  getAgentRuntimeRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,
