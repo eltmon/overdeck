@@ -9,11 +9,20 @@ import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
+/** Conversation names are sanitized to [a-zA-Z0-9_-]{1,64} on creation.
+ *  Re-validate here for defense-in-depth against path traversal. */
+function assertSafeName(name: string): void {
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) {
+    throw new Error('Invalid conversation name');
+  }
+}
+
 export function getConversationAttachmentsRoot(): string {
   return join(getPanopticonHome(), CONVERSATION_ATTACHMENTS_DIR);
 }
 
 export function getConversationAttachmentDir(name: string): string {
+  assertSafeName(name);
   return join(getConversationAttachmentsRoot(), name);
 }
 
@@ -24,6 +33,7 @@ export async function ensureConversationAttachmentDir(name: string): Promise<str
 }
 
 export async function cleanupConversationAttachments(name: string): Promise<void> {
+  assertSafeName(name);
   await rm(getConversationAttachmentDir(name), { recursive: true, force: true });
 }
 
@@ -118,7 +128,10 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
 
       try {
         const attachmentMtimeMs = (await stat(attachmentPath)).mtimeMs;
-        if (attachmentMtimeMs > sessionMtimeMs) {
+        // >= preserves attachments uploaded in the same mtime tick as the
+        // session JSONL write, preventing a race where a just-uploaded file
+        // is deleted on stop/archive.
+        if (attachmentMtimeMs >= sessionMtimeMs) {
           return;
         }
       } catch {

@@ -31,12 +31,17 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 - [x] Fix: removePendingImage HTTP side effects moved outside React state updater (commit: 824ed90f)
 - [x] Fix: CSRF gate rejects requests with neither Origin nor Referer (commit: 824ed90f)
 - [x] Fix: Cache summarizeConversationActivity by mtimeMs+size to avoid per-poll re-parse (commit: 824ed90f)
+- [x] Fix: Add getConversationByName guard to delete-image route (round 6)
+- [x] Fix: Add assertSafeName boundary check in conversation-attachments module (round 6)
+- [x] Fix: mtime comparison >= to prevent same-tick attachment deletion on stop/archive (round 6)
+- [x] Fix: Remove summarizeConversationActivity from list endpoint to prevent per-poll JSONL parsing (round 6)
 - [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
 - [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
 ## Remaining Work
 - [x] Push branch and resubmit for review via /rebase-and-submit
 - [x] Address review round 5b commented feedback
+- [x] Address review round 6 changes-requested feedback
 - [ ] Await review approval, then run `pan approve PAN-539`
 
 ## Key Decisions
@@ -61,4 +66,9 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 - [2026-04-22T20:24Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round5.md`
   - Issues: (1) Attachment-path regex matches prose @paths, (2) generateAiTitle spawn lost timeout/UTF-8 guard, (3) removePendingImage HTTP in state updater, (4) CSRF gate allows no Origin/Referer, (5) summarizeConversationActivity re-parses every JSONL on list poll
   - Status: FIXED in commit 824ed90f. All five issues resolved with regression tests. Feedback archived.
-- **[2026-04-22T22:38Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-22T22:38Z] review-agent → COMMENTED — `.planning/feedback/archive/001-review-agent-commented-round5b.md`
+  - Issues: (1) Unnecessary 2s setTimeout after switchModel, (2) /summary-fork missing cwd containment, (3) mtime cleanup /stop-timing race
+  - Status: FIXED in commit bac3217a. All three issues resolved.
+- [2026-04-22T22:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round6.md`
+  - Issues: (1) delete-image missing getConversationByName guard + assertSafeName, (2) mtime comparison same-tick race, (3) list endpoint JSONL parsing performance regression
+  - Status: FIXED. Added conversation guard to delete-image. Added assertSafeName to conversation-attachments. Changed mtime comparison from > to >=. Removed summarizeConversationActivity from list endpoint.

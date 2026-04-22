@@ -64,7 +64,6 @@ import {
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
-  summarizeConversationActivity,
 } from '../services/conversation-service.js';
 import {
   maybeCompactBeforeRespawn,
@@ -630,19 +629,7 @@ const getConversationsRoute = HttpRouter.add(
               Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
             const sessionAlive = !conv.forkStatus && (withinGrace || (await tmuxSessionExists(conv.tmuxSession)));
 
-            let isWorking = false;
-            let currentTool: string | null = null;
-            if (sessionAlive && conv.sessionFile) {
-              try {
-                const summary = await summarizeConversationActivity(conv.sessionFile);
-                isWorking = summary.isWorking;
-                currentTool = summary.currentTool;
-              } catch {
-                isWorking = false;
-              }
-            }
-
-            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name) };
+            return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
           }),
         );
 
@@ -1055,6 +1042,10 @@ const postConversationDeleteImageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
         const path = typeof body['path'] === 'string' ? body['path'].trim() : '';
         if (!path) {
           return jsonResponse({ error: 'path is required' }, { status: 400 });

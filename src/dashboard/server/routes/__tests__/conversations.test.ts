@@ -273,6 +273,9 @@ describe('conversations route — DB integration', () => {
 
     const keptPath = decodeJsonResponse(keptUpload).path as string;
     const prunedPath = decodeJsonResponse(prunedUpload).path as string;
+    // Ensure session file has a strictly newer mtime than the pruned attachment
+    // so the >= comparison correctly prunes it.
+    await new Promise((r) => setTimeout(r, 50));
     writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `keep this\n@${keptPath}` }] } })}\n`);
 
     markConversationEnded('archived-conv');
