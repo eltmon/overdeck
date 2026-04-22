@@ -758,6 +758,8 @@ export function ListIssueRow({
   selectedIssue,
   onSelectIssue,
   onPlan,
+  isBulkSelected,
+  onBulkToggle,
 }: {
   issue: Issue;
   agents: Agent[];
@@ -767,6 +769,8 @@ export function ListIssueRow({
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
   onPlan: (issue: Issue) => void;
+  isBulkSelected?: boolean;
+  onBulkToggle?: () => void;
 }) {
   const isSelected = selectedIssue === issue.identifier;
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
@@ -809,9 +813,23 @@ export function ListIssueRow({
       ref={rowRef}
       onClick={() => onSelectIssue(isSelected ? null : issue.identifier)}
       className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors cursor-pointer ${
-        isSelected ? 'bg-surface-overlay' : ''
+        isSelected ? 'bg-surface-overlay' : isBulkSelected ? 'bg-primary/[0.03]' : ''
       }`}
     >
+      {/* Bulk selection checkbox */}
+      {onBulkToggle && (
+        <input
+          type="checkbox"
+          checked={isBulkSelected || false}
+          onChange={(e) => {
+            e.stopPropagation();
+            onBulkToggle();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+          aria-label={`Select ${issue.identifier}`}
+        />
+      )}
       {/* Status indicator */}
       <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
 
@@ -1576,6 +1594,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
+                    isBulkSelected={bulkSelection.isSelected(issue.identifier)}
+                    onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
                 ))}
               </div>
@@ -1609,6 +1629,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
+                    isBulkSelected={bulkSelection.isSelected(issue.identifier)}
+                    onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
                 ))}
               </div>
@@ -1644,6 +1666,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
+                    isBulkSelected={bulkSelection.isSelected(issue.identifier)}
+                    onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
                 ))}
               </div>
