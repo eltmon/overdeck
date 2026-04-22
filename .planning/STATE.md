@@ -39,6 +39,8 @@ Review-agent APPROVED PAN-539 at 2026-04-22T23:11Z. All 5 vBRIEF items implement
 - [x] Fix: isManagedConversationAttachmentPath falls back to resolve for deleted files (round 7)
 - [x] Fix: Remove dead imports getProviderForModel and HttpServerResponse (round 7)
 - [x] Fix: Remove invalid Bun override keys with > character from package.json (test-agent)
+- [x] Fix: Archive route unconditionally cleans up all attachments via cleanupConversationAttachments (round 8)
+- [x] Fix: realpath fallback walks parent directories to preserve symlink containment (round 8)
 - [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
 - [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
@@ -47,6 +49,7 @@ Review-agent APPROVED PAN-539 at 2026-04-22T23:11Z. All 5 vBRIEF items implement
 - [x] Address review round 5b commented feedback
 - [x] Address review round 6 changes-requested feedback
 - [x] Address review round 7 changes-requested feedback
+- [x] Address review round 8 changes-requested feedback
 - [ ] Await review approval, then run `pan approve PAN-539`
 
 ## Key Decisions
@@ -85,7 +88,13 @@ Review-agent APPROVED PAN-539 at 2026-04-22T23:11Z. All 5 vBRIEF items implement
 - [2026-04-22T23:14Z] test-agent → FAILED — `.planning/feedback/archive/001-test-agent-failed.md`
   - Issue: Playwright/npm test blocked by pre-existing package.json override corruption (`@effect/platform-node>@effect/platform-node-shared` contains `>` which is not URL-safe)
   - Status: FIXED. Removed invalid Bun override keys with `>` character. `@effect/platform-node-shared` override retained as direct package name.
+- [2026-04-22T23:21Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round8.md`
+  - Issues: (1) Unsent paste attachments leak on archive path — mtime cleanup preserves them, (2) realpath fallback degrades to plain resolve() weakening symlink containment
+  - Status: FIXED. Archive route now calls cleanupConversationAttachments for unconditional cleanup. Added resolveForContainment helper that walks parent directories with realpath instead of falling back to resolve().
+  - Issue: Playwright/npm test blocked by pre-existing package.json override corruption (`@effect/platform-node>@effect/platform-node-shared` contains `>` which is not URL-safe)
+  - Status: FIXED. Removed invalid Bun override keys with `>` character. `@effect/platform-node-shared` override retained as direct package name.
   - Issues: (1) JSONL reference extraction misses tool-use-shaped entries, (2) managed-but-deleted attachment silently falls through to unmanaged branch, (3) dead/shadowed imports
   - Status: FIXED. readSessionAttachmentBasenames now searches raw JSON line for @/ paths. isManagedConversationAttachmentPath and isConversationAttachmentPath fall back to resolve() when realpath() throws (deleted files). Removed dead imports getProviderForModel and HttpServerResponse.
 - **[2026-04-22T23:11Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
 - **[2026-04-22T23:14Z] test-agent → FAILED** — `.planning/feedback/001-test-agent-failed.md`
+- **[2026-04-22T23:21Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

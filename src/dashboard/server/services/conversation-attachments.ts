@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
-import { basename, join, resolve, sep } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { Conversation } from '../../../lib/database/conversations-db.js';
@@ -160,17 +160,34 @@ export function extractConversationAttachmentPaths(message: string): string[] {
   );
 }
 
+/** Resolve a path for containment checking, walking parent directories with
+ *  realpath to preserve symlink detection even when the target file is missing. */
+async function resolveForContainment(attachmentPath: string): Promise<string> {
+  try {
+    return await realpath(attachmentPath);
+  } catch {
+    // File does not exist — walk up the directory tree and realpath the
+    // nearest existing parent, then append the remaining segments.
+    let dir = dirname(attachmentPath);
+    const remaining = [basename(attachmentPath)];
+    while (dir !== '/' && dir !== '.') {
+      try {
+        const realDir = await realpath(dir);
+        return join(realDir, ...remaining);
+      } catch {
+        remaining.unshift(basename(dir));
+        dir = dirname(dir);
+      }
+    }
+    // Nothing in the path exists — fall back to resolve (still safe against ..)
+    return resolve(attachmentPath);
+  }
+}
+
 export async function isManagedConversationAttachmentPath(attachmentPath: string): Promise<boolean> {
   try {
     const attachmentsRoot = resolve(getConversationAttachmentsRoot());
-    let candidate: string;
-    try {
-      candidate = await realpath(attachmentPath);
-    } catch {
-      // File may not exist (e.g. deleted attachment) — fall back to resolve
-      // for the containment check. resolve() still collapses .. segments.
-      candidate = resolve(attachmentPath);
-    }
+    const candidate = await resolveForContainment(attachmentPath);
     return candidate.startsWith(`${attachmentsRoot}${sep}`);
   } catch {
     return false;
@@ -180,13 +197,7 @@ export async function isManagedConversationAttachmentPath(attachmentPath: string
 export async function isConversationAttachmentPath(name: string, attachmentPath: string): Promise<boolean> {
   try {
     const attachmentDir = resolve(getConversationAttachmentDir(name));
-    let candidate: string;
-    try {
-      candidate = await realpath(attachmentPath);
-    } catch {
-      // File may not exist — fall back to resolve for containment check.
-      candidate = resolve(attachmentPath);
-    }
+    const candidate = await resolveForContainment(attachmentPath);
     return candidate.startsWith(`${attachmentDir}${sep}`);
   } catch {
     return false;

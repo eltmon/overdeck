@@ -78,6 +78,7 @@ import {
   isManagedConversationAttachmentPath,
   removeConversationAttachment,
   cleanupUnreferencedConversationAttachments,
+  cleanupConversationAttachments,
 } from '../services/conversation-attachments.js';
 
 const execAsync = promisify(exec);
@@ -1157,10 +1158,9 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Mark as ended and archived
         markConversationEnded(name);
         archiveConversation(name);
-        // Brief pause to allow any in-flight JSONL writes to complete before
-        // pruning attachments that may have just been referenced.
-        await new Promise((r) => setTimeout(r, 500));
-        await cleanupUnreferencedConversationAttachments(conv);
+        // Unconditionally remove all attachments — archiving is permanent and
+        // unsent paste uploads should not leak.
+        await cleanupConversationAttachments(name);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
