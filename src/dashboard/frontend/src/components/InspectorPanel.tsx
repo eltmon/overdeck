@@ -31,6 +31,7 @@ import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { useResetIssue } from '../hooks/useResetIssue';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
@@ -480,27 +481,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
-  const resetIssueMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteWorkspace: true }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to reset issue');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      toast.success(`${issueId} reset — workspace and branch deleted`);
-      await refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 8000 });
-    },
-  });
+  const { resetMutation: resetIssueMutation, confirmAndReset: handleResetIssue } = useResetIssue(issueId);
 
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
@@ -627,17 +608,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       confirmLabel: 'Reopen',
     })) {
       reopenMutation.mutate(undefined);
-    }
-  };
-
-  const handleResetIssue = async () => {
-    if (await confirm({
-      title: 'Reset Issue',
-      message: `Reset ${issueId}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and feature branch (including STATE.md)\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
-      variant: 'destructive',
-      confirmLabel: 'Reset Issue',
-    })) {
-      resetIssueMutation.mutate();
     }
   };
 
