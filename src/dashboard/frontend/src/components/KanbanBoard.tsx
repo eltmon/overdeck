@@ -1025,8 +1025,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
   const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
-  // Bulk selection state
-  const internalBulkSelection = useBulkSelection(issues.map(i => i.identifier).sort().join(','));
+  // Bulk selection state — key based on filters so selection survives data refreshes
+  const internalBulkSelection = useBulkSelection(`${cycleFilter}-${includeCompleted}-${Array.from(selectedProjects).sort().join(',')}`);
   const bulkSelection = bulkSelectedIds
     ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle!, selectAll: onBulkSelectAll!, deselectAll: onBulkDeselectAll!, clear: () => onBulkDeselectAll!(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
     : internalBulkSelection;
@@ -1074,13 +1074,20 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     },
   });
 
-  const handleBulkCloseOut = useCallback(() => {
-    const selectedIssues = issues.filter(i => bulkSelection.isSelected(i.identifier));
-    const issuesWithAgents = selectedIssues.filter(issue => {
+  // Memoize selected issues and active-agent filtering to avoid O(n²) rebuilds
+  const selectedIssues = useMemo(
+    () => issues.filter(i => bulkSelection.isSelected(i.identifier)),
+    [issues, bulkSelection]
+  );
+  const issuesWithAgents = useMemo(
+    () => selectedIssues.filter(issue => {
       const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
       return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped' && a.status !== 'failed');
-    });
+    }),
+    [selectedIssues, agents]
+  );
 
+  const handleBulkCloseOut = useCallback(() => {
     if (issuesWithAgents.length > 0) {
       setShowBulkWarning(true);
     } else {
@@ -1090,15 +1097,10 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       setShowBulkProgress(true);
       bulkCloseOutMutation.mutate(ids);
     }
-  }, [issues, agents, bulkSelection, bulkCloseOutMutation]);
+  }, [issuesWithAgents, selectedIssues, bulkCloseOutMutation]);
 
   const handleProceedAfterWarning = useCallback(() => {
     setShowBulkWarning(false);
-    const selectedIssues = issues.filter(i => bulkSelection.isSelected(i.identifier));
-    const issuesWithAgents = selectedIssues.filter(issue => {
-      const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
-      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped' && a.status !== 'failed');
-    });
     const issuesWithoutAgents = selectedIssues.filter(i => !issuesWithAgents.some(wa => wa.identifier === i.identifier));
     const ids = issuesWithoutAgents.map(i => i.identifier);
 
@@ -1112,7 +1114,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     if (ids.length > 0) {
       bulkCloseOutMutation.mutate(ids);
     }
-  }, [issues, agents, bulkSelection, bulkCloseOutMutation]);
+  }, [selectedIssues, issuesWithAgents, bulkCloseOutMutation]);
 
   const handleCloseProgress = useCallback(() => {
     setShowBulkProgress(false);

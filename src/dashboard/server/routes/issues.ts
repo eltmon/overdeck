@@ -53,7 +53,7 @@ import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
-import type { LifecycleContext } from '../../../lib/lifecycle/types.js';
+import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
@@ -1701,12 +1701,12 @@ const postIssueCloseOutRoute = HttpRouter.add(
     return jsonResponse({
       success: result.success,
       issueId: result.issueId,
-      steps: result.steps.map((s: any) => ({
+      steps: result.steps.map((s: StepResult) => ({
         name: s.step,
         status: s.success ? (s.skipped ? 'skipped' : 'passed') : 'failed',
         message: s.error || (s.details ? s.details.join('; ') : undefined),
       })),
-      error: result.success ? undefined : result.steps.find((s: any) => !s.success)?.error,
+      error: result.success ? undefined : result.steps.find((s: StepResult) => !s.success)?.error,
     });
   })),
 );
@@ -1737,12 +1737,22 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* Effect.promise(() => request.json().catch(() => ({})));
-    const issueIds = Array.isArray(body.issueIds) ? body.issueIds as string[] : [];
+    const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
+    const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
 
-    // Origin check
+    // Origin check — parse as URL and validate hostname exactly
     const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
     const originStr = Array.isArray(origin) ? origin[0] : origin;
-    if (!originStr || (!originStr.startsWith('http://localhost:') && !originStr.startsWith('http://127.0.0.1:'))) {
+    const isValidOrigin = (() => {
+      if (!originStr) return false;
+      try {
+        const url = new URL(originStr);
+        return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      } catch {
+        return false;
+      }
+    })();
+    if (!isValidOrigin) {
       return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
     }
 
@@ -1753,84 +1763,95 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     if (issueIds.length > MAX_BULK_CLOSE_OUT) {
       return jsonResponse({ error: `Maximum ${MAX_BULK_CLOSE_OUT} issues allowed` }, { status: 400 });
     }
-    const invalidIds = issueIds.filter(id => typeof id !== 'string' || id.trim().length === 0);
-    if (invalidIds.length > 0) {
-      return jsonResponse({ error: 'issueIds must be non-empty strings' }, { status: 400 });
-    }
 
     const eventStore = yield* EventStoreService;
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
     const issueDataService = getIssueDataService();
 
-    const results: Array<{ issueId: string; success: boolean; error?: string; skipped?: boolean }> = [];
+    const results = yield* Effect.forEach(
+      issueIds,
+      (id) => Effect.gen(function* () {
+        const githubCheck = isGitHubIssue(id);
+        let projectPath = '';
 
-    for (const id of issueIds) {
-      // Active-agent guard
-      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id));
-      if (hasActiveAgent) {
-        results.push({ issueId: id, success: false, error: 'Active agent found — close-out skipped', skipped: true });
-        continue;
-      }
-
-      const githubCheck = isGitHubIssue(id);
-      let projectPath = '';
-
-      if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-        const localPaths = getGitHubLocalPaths();
-        projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-      }
-      if (!projectPath) {
-        const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
-        projectPath = getProjectPath(undefined, issuePrefix);
-      }
-      if (!projectPath) {
-        results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}` });
-        continue;
-      }
-
-      const ctx: LifecycleContext = {
-        issueId: id,
-        projectPath,
-        ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-          ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-          : {}),
-      };
-
-      const issueSource = issueDataService.getIssueSource(id);
-      if (issueSource === 'rally') {
-        const rallyConfig = getRallyConfig();
-        if (rallyConfig) {
-          ctx.rally = {
-            apiKey: rallyConfig.apiKey,
-            server: rallyConfig.server,
-            workspace: rallyConfig.workspace,
-            project: rallyConfig.project,
-          };
+        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+          const localPaths = getGitHubLocalPaths();
+          projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
         }
-      }
+        if (!projectPath) {
+          const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
+          projectPath = getProjectPath(undefined, issuePrefix);
+        }
+        if (!projectPath) {
+          return { issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false };
+        }
 
-      try {
-        const result = yield* Effect.promise(() => closeOut(ctx));
-        if (result.success) {
-          issueDataService.invalidateTracker('github').catch((e) => { console.error('Failed to invalidate github tracker:', e); });
-          issueDataService.invalidateTracker('linear').catch((e) => { console.error('Failed to invalidate linear tracker:', e); });
+        const ctx: LifecycleContext = {
+          issueId: id,
+          projectPath,
+          ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+            ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+            : {}),
+        };
+
+        const issueSource = issueDataService.getIssueSource(id);
+        if (issueSource === 'rally') {
+          const rallyConfig = getRallyConfig();
+          if (rallyConfig) {
+            ctx.rally = {
+              apiKey: rallyConfig.apiKey,
+              server: rallyConfig.server,
+              workspace: rallyConfig.workspace,
+              project: rallyConfig.project,
+            };
+          }
+        }
+
+        const closeResult = yield* Effect.tryPromise({
+          try: () => closeOut(ctx),
+          catch: (error) => ({
+            workflow: 'close-out' as const,
+            issueId: id,
+            success: false,
+            steps: [{
+              step: 'close-out',
+              success: false,
+              skipped: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            }],
+            duration: 0,
+          }),
+        });
+
+        if (closeResult.success) {
           yield* eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),
             payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
           });
-          try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch (e) { console.error('Failed to patch issue status:', e); }
+          try {
+            issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' });
+          } catch (e) {
+            console.error('Failed to patch issue status:', e);
+          }
         }
-        const failedStep = result.steps.find((s: any) => !s.success);
-        results.push({
+
+        const failedStep = closeResult.steps.find((s: StepResult) => !s.success);
+        return {
           issueId: id,
-          success: result.success,
-          error: result.success ? undefined : failedStep?.error,
+          success: closeResult.success,
+          error: closeResult.success ? undefined : failedStep?.error,
           skipped: false,
-        });
-      } catch (err: any) {
-        results.push({ issueId: id, success: false, error: err?.message || 'Unknown error' });
-      }
+        };
+      }),
+      { concurrency: 3 }
+    );
+
+    // Invalidate trackers once if any issue closed successfully
+    const anySucceeded = results.some(r => r.success);
+    if (anySucceeded) {
+      issueDataService.invalidateTracker('github').catch((e: Error) => { console.error('Failed to invalidate github tracker:', e); });
+      issueDataService.invalidateTracker('linear').catch((e: Error) => { console.error('Failed to invalidate linear tracker:', e); });
     }
 
     return jsonResponse({ results });
