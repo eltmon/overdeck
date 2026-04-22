@@ -1,6 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+
+vi.mock('../../hooks/useKillAgent', () => ({
+  useKillAgent: vi.fn((_agentId: string | undefined, options?: { onSuccess?: () => void }) => ({
+    confirmAndKill: async () => {
+      options?.onSuccess?.();
+      return true;
+    },
+    isPending: false,
+  })),
+}));
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActionsSection } from './ActionsSection';
+import { DialogProvider } from '../DialogProvider';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
@@ -82,6 +94,16 @@ function makeReviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   };
 }
 
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+function renderWithDialog(ui: JSX.Element) {
+  return rtlRender(
+    <QueryClientProvider client={testQueryClient}>
+      <DialogProvider>{ui}</DialogProvider>
+    </QueryClientProvider>
+  );
+}
+
 const defaultProps = {
   mergeMutation: makeMutation(),
   reviewMutation: makeMutation(),
@@ -95,7 +117,7 @@ const defaultProps = {
   resetSessionMutation: makeMutation(),
   onMerge: vi.fn(),
   onReview: vi.fn(),
-  onKill: vi.fn(),
+  onKillSuccess: vi.fn(),
   onCancel: vi.fn(),
   onReopen: vi.fn(),
   onResetReview: vi.fn(),
@@ -107,7 +129,7 @@ const defaultProps = {
 
 describe('ActionsSection', () => {
   it('shows loading skeleton when reviewStatusLoading is true', () => {
-    const { container } = render(<ActionsSection {...defaultProps} reviewStatusLoading={true} />);
+    const { container } = renderWithDialog(<ActionsSection {...defaultProps} reviewStatusLoading={true} />);
     expect(screen.getByText('Actions')).toBeInTheDocument();
     const skeletons = container.querySelectorAll('.animate-pulse');
     expect(skeletons.length).toBeGreaterThan(0);
@@ -116,12 +138,12 @@ describe('ActionsSection', () => {
   });
 
   it('shows Start Agent button when no agent', () => {
-    render(<ActionsSection {...defaultProps} />);
+    renderWithDialog(<ActionsSection {...defaultProps} />);
     expect(screen.getByText('Start Agent')).toBeInTheDocument();
   });
 
   it('shows Resume Session and Reset Session when stopped agent has resumable lifecycle', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         agent={makeAgent({ status: 'stopped' })}
@@ -133,7 +155,7 @@ describe('ActionsSection', () => {
   });
 
   it('shows lifecycle reason for stopped agent actions', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         agent={makeAgent({ status: 'stopped' })}
@@ -145,18 +167,18 @@ describe('ActionsSection', () => {
 
   it('calls onStartAgent when Start Agent clicked', () => {
     const onStartAgent = vi.fn();
-    render(<ActionsSection {...defaultProps} onStartAgent={onStartAgent} />);
+    renderWithDialog(<ActionsSection {...defaultProps} onStartAgent={onStartAgent} />);
     fireEvent.click(screen.getByText('Start Agent'));
     expect(onStartAgent).toHaveBeenCalledOnce();
   });
 
   it('shows Starting... while launching a fresh agent', () => {
-    render(<ActionsSection {...defaultProps} agentLaunchState="starting" />);
+    renderWithDialog(<ActionsSection {...defaultProps} agentLaunchState="starting" />);
     expect(screen.getByText('Starting...')).toBeInTheDocument();
   });
 
   it('shows Resuming... while resuming a stopped agent', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         agent={makeAgent({ status: 'stopped' })}
@@ -168,7 +190,7 @@ describe('ActionsSection', () => {
   });
 
   it('shows Start Agent instead of Resume Session for orphaned stopped agents', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         agent={makeAgent({ status: 'stopped' })}
@@ -190,67 +212,67 @@ describe('ActionsSection', () => {
   });
 
   it('hides Start Agent when agent is running', () => {
-    render(<ActionsSection {...defaultProps} agent={makeAgent()} />);
+    renderWithDialog(<ActionsSection {...defaultProps} agent={makeAgent()} />);
     expect(screen.queryByText('Start Agent')).not.toBeInTheDocument();
   });
 
   it('shows Stop button when agent is active', () => {
-    render(<ActionsSection {...defaultProps} agent={makeAgent()} />);
+    renderWithDialog(<ActionsSection {...defaultProps} agent={makeAgent()} />);
     expect(screen.getByText('Stop')).toBeInTheDocument();
   });
 
   it('shows Cancel Issue button for non-merged issues', () => {
-    render(<ActionsSection {...defaultProps} reviewStatus={makeReviewStatus()} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={makeReviewStatus()} />);
     expect(screen.getByText('Cancel Issue')).toBeInTheDocument();
   });
 
-  it('calls onKill when Stop clicked', () => {
-    const onKill = vi.fn();
-    render(<ActionsSection {...defaultProps} agent={makeAgent()} onKill={onKill} />);
+  it('calls onKillSuccess when Stop clicked', () => {
+    const onKillSuccess = vi.fn();
+    renderWithDialog(<ActionsSection {...defaultProps} agent={makeAgent()} onKillSuccess={onKillSuccess} />);
     fireEvent.click(screen.getByText('Stop'));
-    expect(onKill).toHaveBeenCalledOnce();
+    expect(onKillSuccess).toHaveBeenCalledOnce();
   });
 
   it('shows Merge button when ready for merge', () => {
     const reviewStatus = makeReviewStatus({ readyForMerge: true });
-    render(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
     expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
   });
 
   it('calls onMerge when Merge clicked', () => {
     const onMerge = vi.fn();
     const reviewStatus = makeReviewStatus({ readyForMerge: true });
-    render(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} onMerge={onMerge} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} onMerge={onMerge} />);
     fireEvent.click(screen.getByTestId('merge-btn'));
     expect(onMerge).toHaveBeenCalledOnce();
   });
 
   it('shows MERGED badge when mergeStatus is merged', () => {
     const reviewStatus = makeReviewStatus({ mergeStatus: 'merged' });
-    render(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
     expect(screen.getByText('MERGED')).toBeInTheDocument();
   });
 
   it('shows Reopen button when review has a terminal status', () => {
     const reviewStatus = makeReviewStatus({ reviewStatus: 'passed' });
-    render(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
     expect(screen.getByTestId('reopen-btn')).toBeInTheDocument();
   });
 
   it('shows Recover instead of Reset Pipeline when the pipeline is stuck', () => {
     const reviewStatus = makeReviewStatus({ mergeStatus: 'failed', verificationStatus: 'failed' });
-    render(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
     expect(screen.getByText('Recover')).toBeInTheDocument();
     expect(screen.queryByText('Reset Pipeline')).not.toBeInTheDocument();
   });
 
   it('shows Review & Test button always', () => {
-    render(<ActionsSection {...defaultProps} />);
+    renderWithDialog(<ActionsSection {...defaultProps} />);
     expect(screen.getByTestId('review-test-btn')).toBeInTheDocument();
   });
 
   it('shows Re-Review label when merge failed after review and test passed', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         reviewStatus={makeReviewStatus({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false })}
@@ -260,7 +282,7 @@ describe('ActionsSection', () => {
   });
 
   it('shows pipeline section for verification-only failure states', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         reviewStatus={makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending', verificationStatus: 'failed', verificationNotes: 'frontend-typecheck failed' })}
@@ -271,7 +293,7 @@ describe('ActionsSection', () => {
   });
 
   it('promotes Review & Test when verification failed and rerun is the next step', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         reviewStatus={makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending', verificationStatus: 'failed' })}
@@ -283,7 +305,7 @@ describe('ActionsSection', () => {
   });
 
   it('shows next-step hint for verification failure in workspace detail pane', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         reviewStatus={makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending', verificationStatus: 'failed', verificationNotes: 'frontend-typecheck failed' })}
@@ -294,7 +316,7 @@ describe('ActionsSection', () => {
   });
 
   it('shows next-step hint for merge failure in workspace detail pane', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         reviewStatus={makeReviewStatus({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false })}
@@ -306,12 +328,12 @@ describe('ActionsSection', () => {
 
   it('shows Create Workspace button when workspace does not exist and no agent', () => {
     const workspace: WorkspaceInfo = { exists: false, issueId: 'PAN-331' };
-    render(<ActionsSection {...defaultProps} workspace={workspace} />);
+    renderWithDialog(<ActionsSection {...defaultProps} workspace={workspace} />);
     expect(screen.getByText('Create Workspace')).toBeInTheDocument();
   });
 
   it('shows sync error message when syncMainMutation fails', () => {
-    render(
+    renderWithDialog(
       <ActionsSection
         {...defaultProps}
         syncMainMutation={makeSyncMutation({ isError: true, error: new Error('Network error') })}
@@ -333,7 +355,7 @@ describe('ActionsSection', () => {
       },
     };
     const onDismissPending = vi.fn();
-    render(<ActionsSection {...defaultProps} workspace={workspace} onDismissPending={onDismissPending} />);
+    renderWithDialog(<ActionsSection {...defaultProps} workspace={workspace} onDismissPending={onDismissPending} />);
     expect(screen.getByText('Merge conflict detected')).toBeInTheDocument();
     expect(screen.getByText('Operation failed')).toBeInTheDocument();
   });
