@@ -151,11 +151,13 @@ export async function setupHooksCommand(): Promise<void> {
 
   // 3. Copy hook scripts to ~/.panopticon/bin/
   const hookScripts = [
+    'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
     'pre-tool-hook',
     'heartbeat-hook',
     'stop-hook',
+    'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
     'specialist-stop-hook',
-    'session-start-hook', // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
+    'session-start-hook',     // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
     'record-cost-event.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
@@ -277,8 +279,9 @@ export async function setupHooksCommand(): Promise<void> {
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
   addHookIfMissing('PostToolUse', 'heartbeat-hook');
   addHookIfMissing('Stop', 'stop-hook');
-  // PAN-800: SessionStart hook.
+  // PAN-800: SessionStart + Notification hooks.
   addHookIfMissing('SessionStart', 'session-start-hook');
+  addHookIfMissing('Notification', 'notification-hook');
 
   // TLDR helpers (optional — only when python3 is available).
   if (python3Available) {

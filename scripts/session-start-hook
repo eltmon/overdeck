@@ -1,35 +1,24 @@
 #!/bin/bash
-# ~/.panopticon/bin/session-start-hook
-# Called by Claude Code when a session starts (SessionStart event).
-# Emits agent.activity_changed(idle) and optionally agent.model_set to the
-# dashboard so the runtime snapshot becomes current before the first tool fires.
+# ~/.panopticon/bin/session-start-hook  (PAN-800)
 #
-# PAN-800 — installed by `pan setup hooks`. Replaces the waitForReadySignal
-# tmux fallback referenced in PAN-759 (the hook that was supposed to exist
-# from the start but never did).
+# Fires on Claude Code SessionStart. Emits agent.activity_changed(idle) so the
+# runtime snapshot is current before the first tool fires, and emits
+# agent.model_set when the model is inferable from the payload or env.
 #
-# Must never block Claude Code: strict timeout + silent failure.
+# This hook replaces the waitForReadySignal tmux fallback referenced in
+# PAN-759 — the hook that was supposed to exist from the start but was never
+# registered in ~/.claude/settings.json by the installer.
 
 set +e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
 INPUT=$(cat 2>/dev/null || echo '{}')
 
-# Resolve authoritative agent ID. PAN-69 attribution: refuse to emit if the
-# ID can't be resolved unambiguously — no "main-cli" fallback.
-if [ -n "$PANOPTICON_AGENT_ID" ]; then
-  AGENT_ID="$PANOPTICON_AGENT_ID"
-elif [ -n "$TMUX" ]; then
-  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
-else
-  exit 0  # Not an agent session — don't emit.
-fi
-[ -z "$AGENT_ID" ] && exit 0
-
-DASHBOARD_URL="${PANOPTICON_DASHBOARD_URL:-http://localhost:3010}"
-URL="$DASHBOARD_URL/api/agents/$AGENT_ID/heartbeat"
-
-# Extract session_id and model if the JSON payload has them. jq is optional;
-# skip silently if absent.
 CLAUDE_SESSION_ID=""
 MODEL=""
 if command -v jq >/dev/null 2>&1; then
@@ -38,32 +27,21 @@ if command -v jq >/dev/null 2>&1; then
 fi
 [ -z "$MODEL" ] && MODEL="${ANTHROPIC_MODEL:-}"
 
-TIMESTAMP=$(date -Iseconds)
+TS=$(date -Iseconds)
 
-# Emit agent.activity_changed(idle). 0.5s timeout, silent failure. On failure
-# the hook does nothing — Phase 4 will add a pending-events.jsonl fallback
-# when all hooks migrate to POST-emitters.
-curl -s -m 0.5 -o /dev/null \
-  -X POST "$URL" \
-  -H 'Content-Type: application/json' \
-  --data "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TIMESTAMP\"}" \
-  2>/dev/null || true
+pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
 
-# Emit agent.model_set if we learned the model.
 if [ -n "$MODEL" ]; then
-  if [ -n "$CLAUDE_SESSION_ID" ]; then
-    curl -s -m 0.5 -o /dev/null \
-      -X POST "$URL" \
-      -H 'Content-Type: application/json' \
-      --data "{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"claudeSessionId\":\"$CLAUDE_SESSION_ID\",\"timestamp\":\"$TIMESTAMP\"}" \
-      2>/dev/null || true
+  if command -v jq >/dev/null 2>&1; then
+    BODY=$(jq -n --arg model "$MODEL" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
+      'if $sid == "" then {kind: "model_set", model: $model, timestamp: $ts}
+       else {kind: "model_set", model: $model, claudeSessionId: $sid, timestamp: $ts} end')
+  elif [ -n "$CLAUDE_SESSION_ID" ]; then
+    BODY="{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"claudeSessionId\":\"$CLAUDE_SESSION_ID\",\"timestamp\":\"$TS\"}"
   else
-    curl -s -m 0.5 -o /dev/null \
-      -X POST "$URL" \
-      -H 'Content-Type: application/json' \
-      --data "{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"timestamp\":\"$TIMESTAMP\"}" \
-      2>/dev/null || true
+    BODY="{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"timestamp\":\"$TS\"}"
   fi
+  pan_emit_event "$AGENT_ID" "$BODY"
 fi
 
 exit 0
