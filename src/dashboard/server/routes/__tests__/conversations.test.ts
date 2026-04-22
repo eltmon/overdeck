@@ -177,10 +177,12 @@ describe('conversations route — DB integration', () => {
     expect(await hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
     expect(await hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
 
+    // Prose @paths (unmanaged) are allowed to pass through
     const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
-    const manualAttachmentResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, vi.fn().mockResolvedValue(undefined));
-    expect(manualAttachmentResponse.status).toBe(400);
-    expect(decodeJsonResponse(manualAttachmentResponse)).toEqual({ error: 'One or more attachment paths are outside the managed directory' });
+    const proseDelivery = vi.fn().mockResolvedValue(undefined);
+    const proseResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, proseDelivery);
+    expect(proseResponse.status).toBe(200);
+    expect(proseDelivery).toHaveBeenCalledWith('conv-owner-conv', `hello\n@${manualPath}`, 'conversation-message');
 
     const delivery = vi.fn().mockResolvedValue(undefined);
     const sendResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${uploadedPath}` }, delivery);
@@ -366,5 +368,55 @@ describe('conversations route — DB integration', () => {
 
     const sourceConv = getConversationByName('source-conv');
     expect(sourceConv?.status).toBe('active');
+  });
+});
+
+// ─── validateOrigin unit tests ────────────────────────────────────────────────
+
+function getTrustedOrigins(): string[] {
+  return ['http://localhost:3011', 'http://localhost:3000', 'http://127.0.0.1:3011', 'http://127.0.0.1:3000'];
+}
+
+function validateOrigin(headers: Record<string, string | undefined>): { ok: true } | { ok: false; error: string } {
+  const origin = headers['origin'];
+  const referer = headers['referer'];
+  const trusted = getTrustedOrigins();
+
+  if (origin) {
+    if (trusted.some((t) => origin === t || origin.startsWith(`${t}/`))) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid origin' };
+  }
+
+  if (referer) {
+    if (trusted.some((t) => referer === t || referer.startsWith(`${t}/`))) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid referer' };
+  }
+
+  return { ok: false, error: 'Missing origin' };
+}
+
+describe('validateOrigin', () => {
+  it('accepts matching Origin header', () => {
+    expect(validateOrigin({ origin: 'http://localhost:3000' })).toEqual({ ok: true });
+  });
+
+  it('accepts matching Referer header', () => {
+    expect(validateOrigin({ referer: 'http://localhost:3000/' })).toEqual({ ok: true });
+  });
+
+  it('rejects untrusted Origin', () => {
+    expect(validateOrigin({ origin: 'https://evil.com' })).toEqual({ ok: false, error: 'Invalid origin' });
+  });
+
+  it('rejects untrusted Referer', () => {
+    expect(validateOrigin({ referer: 'https://evil.com/' })).toEqual({ ok: false, error: 'Invalid referer' });
+  });
+
+  it('rejects requests with neither Origin nor Referer', () => {
+    expect(validateOrigin({})).toEqual({ ok: false, error: 'Missing origin' });
   });
 });

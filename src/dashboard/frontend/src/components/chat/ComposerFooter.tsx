@@ -176,14 +176,14 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
 
   const removePendingImage = useCallback((id: string) => {
     removedImageIdsRef.current.add(id);
-    setPendingImages((images) => {
-      const image = images.find((candidate) => candidate.id === id);
-      if (image) {
-        revokePreviewUrl(image.previewUrl);
-        if (image.serverPath) {
-          deleteUploadedImage(conversation.name, image.serverPath);
-        }
+    const image = pendingImagesRef.current.find((candidate) => candidate.id === id);
+    if (image) {
+      revokePreviewUrl(image.previewUrl);
+      if (image.serverPath) {
+        deleteUploadedImage(conversation.name, image.serverPath);
       }
+    }
+    setPendingImages((images) => {
       const next = images.filter((candidate) => candidate.id !== id);
       pendingImagesRef.current = next;
       return next;

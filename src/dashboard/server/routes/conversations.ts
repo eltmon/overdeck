@@ -138,8 +138,8 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
     return { ok: false, error: 'Invalid referer' };
   }
 
-  // No Origin or Referer — allow (same-origin from older browsers, tests, CLI tools)
-  return { ok: true };
+  // Require at least one of Origin or Referer for CSRF protection
+  return { ok: false, error: 'Missing origin' };
 }
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
@@ -315,16 +315,13 @@ export async function handleConversationMessage(
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
   for (const attachmentPath of allAttachmentPaths) {
     const managed = await isManagedConversationAttachmentPath(attachmentPath);
-    if (!managed) {
-      return jsonResponse({ error: 'One or more attachment paths are outside the managed directory' }, { status: 400 });
+    if (managed) {
+      const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
+      if (!hasAttachment) {
+        return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
+      }
     }
-  }
-
-  for (const attachmentPath of allAttachmentPaths) {
-    const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
-    if (!hasAttachment) {
-      return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
-    }
+    // Unmanaged @paths in prose are allowed to pass through
   }
 
   await deliverMessage(conv.tmuxSession, message, 'conversation-message');
@@ -545,18 +542,34 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     );
     let out = '';
     let errOut = '';
-    child.stdout.on('data', (data: Buffer) => { out += data.toString('utf-8'); });
-    child.stderr.on('data', (data: Buffer) => { errOut += data.toString('utf-8'); });
-    child.on('error', (err: Error) => reject(err));
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error('claude title generation timed out after 30s'));
+    }, 30_000);
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', (data: string) => { out += data; });
+    child.stderr.on('data', (data: string) => { errOut += data; });
+    child.on('error', (err: Error) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
     child.on('close', (code: number | null) => {
+      clearTimeout(timeout);
       if (code !== 0) {
         reject(new Error(errOut || `claude title generation exited with code ${code}`));
       } else {
         resolve(out);
       }
     });
-    child.stdin.write(prompt, 'utf-8');
-    child.stdin.end();
+    try {
+      child.stdin.write(prompt, 'utf-8');
+      child.stdin.end();
+    } catch (err) {
+      clearTimeout(timeout);
+      child.kill('SIGTERM');
+      reject(err);
+    }
   });
 
   // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }

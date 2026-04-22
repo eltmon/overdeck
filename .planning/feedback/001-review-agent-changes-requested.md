@@ -2,27 +2,27 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-22T20:24:26Z
+timestamp: 2026-04-22T20:40:30Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-Feature is functionally complete — requirements review confirms all 5 vBRIEF items and 21 ACs satisfied end-to-end, and the correctness reviewer's "missing TTL cleanup" blocker is resolved by the intentional redesign to lifecycle-based per-conversation cleanup. However, the security review surfaced two critical shell-injection RCEs in routes/conversations.ts (user message in generateAiTitle's exec pipeline, and cwd/issueId/effort/model in the launcher-script template) that must be fixed before merge, plus incomplete validateOrigin coverage on mutating routes that exposes them to CSRF. A performance concern (full JSONL scan on every cleanup) and a latent path-traversal via an unused sanitizeName are high-priority but non-blocking.
+Requirements coverage is complete (5/5 vBRIEF items, 19/21 ACs fully met with 2 intentional security-driven drifts). No blockers, no critical issues. Four high-priority fixes are warranted before merge: (1) the `@/path` attachment regex matches prose and causes legitimate messages to 400 — flagged by both correctness and security; (2) `generateAiTitle` spawn lost its 30 s timeout and can split multi-byte UTF-8 across chunks plus has an unguarded stdin error; (3) `removePendingImage` performs HTTP side effects inside a React state updater, causing duplicate DELETEs under Strict Mode; (4) CSRF gate allows requests with neither Origin nor Referer. Medium: cache `summarizeConversationActivity` by mtimeMs so list polling doesn't re-parse every JSONL. The PR is a net security win (shell-injection closed, magic-byte validation, size caps, consistent origin checks) — recommend request-changes with the four fixes, then approve.
 
 ## Security Issues
 
-- Shell command injection in generateAiTitle via user message
-- Shell injection in spawnConversationSession launcher script template
-- Incomplete validateOrigin coverage on mutating routes
-- Latent path traversal via unused sanitizeName
-- Internal error messages echoed to clients
-- MIME type trusted without magic-byte validation
+- CSRF gate allows requests with no Origin and no Referer
+- Attachment-path regex matches `@/path` tokens in prose
+- Hard-coded trust for localhost:3000
+- Title-generation spawn env allowlist is a no-op
+- Base64 canonicalization round-trip cost
 
 ## Performance Issues
 
-- Full session JSONL scan during attachment cleanup on every stop/archive and lifecycle poll
+- Conversations list endpoint parses every session JSONL per refresh
+- Base64 encoding duplicates image data in browser memory
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 

@@ -498,9 +498,18 @@ export async function parseConversationMessages(
   };
 }
 
+/** In-memory cache mapping sessionFile path → { mtimeMs, size, summary } */
+const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; summary: ConversationActivitySummary }>();
+
 export async function summarizeConversationActivity(
   sessionFile: string,
 ): Promise<ConversationActivitySummary> {
+  const fileStats = await stat(sessionFile);
+  const cached = activitySummaryCache.get(sessionFile);
+  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+    return cached.summary;
+  }
+
   // Parse from the last compact boundary instead of the full file — avoids
   // re-reading potentially megabytes of history on every list enrichment tick.
   // Pass an empty priorState so pendingToolUse stays populated rather than being
@@ -536,7 +545,9 @@ export async function summarizeConversationActivity(
     }
   }
 
-  return { messages, streaming, isWorking, currentTool };
+  const summary: ConversationActivitySummary = { messages, streaming, isWorking, currentTool };
+  activitySummaryCache.set(sessionFile, { mtimeMs, size: fileStats.size, summary });
+  return summary;
 }
 
 // ─── Compact boundary offset cache ───────────────────────────────────────────

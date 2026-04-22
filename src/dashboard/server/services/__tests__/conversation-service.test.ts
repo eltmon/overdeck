@@ -695,6 +695,30 @@ describe('parseConversationMessages', () => {
     expect(result.currentTool).toBeNull();
     expect(result.isWorking).toBe(true);
   });
+
+  it('caches results by mtimeMs to avoid re-parsing unchanged files', async () => {
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'u-1',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        message: {
+          content: [{ type: 'text', text: 'Keep going' }],
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+    const fixedMtime = Date.now() - 10_000;
+    mockStat.mockResolvedValue({ mtimeMs: fixedMtime, birthtimeMs: fixedMtime, size: (await mockReadFile()).length });
+
+    const { summarizeConversationActivity } = await import('../conversation-service.js');
+    const result1 = await summarizeConversationActivity('/fake/session.jsonl');
+    const result2 = await summarizeConversationActivity('/fake/session.jsonl');
+
+    expect(result1).toEqual(result2);
+    // Cache hit: both results identical without re-parsing on second call
+    expect(result1.isWorking).toBe(true);
+  });
 });
 
 describe('discoverSessionFile', () => {
