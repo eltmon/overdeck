@@ -1715,9 +1715,15 @@ const MAX_BULK_CLOSE_OUT = 50;
 
 const VALID_TMUX_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
+/** Normalize an issue ID to a planning session name, mirroring normalizeAgentId logic. */
+function normalizePlanningId(issueId: string): string {
+  if (issueId.startsWith('planning-')) return issueId;
+  return `planning-${issueId.toLowerCase()}`;
+}
+
 async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
   const agentId = normalizeAgentId(issueId);
-  const planningId = `planning-${issueId.toLowerCase()}`;
+  const planningId = normalizePlanningId(issueId);
 
   // Only query tmux for valid session names (GitHub IDs like owner/repo#123 produce invalid names)
   if (VALID_TMUX_NAME_RE.test(agentId) && await sessionExistsAsync(agentId)) return true;

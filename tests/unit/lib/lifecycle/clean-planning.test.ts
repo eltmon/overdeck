@@ -51,16 +51,14 @@ describe('cleanPlanningArtifacts', () => {
   });
 
   it('should remove tracked STATE.md and commit', async () => {
-    // ls-files returns STATE.md as tracked, others empty
+    // Single ls-files call with all files — return tracked files based on args
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
-      const fullCmd = args ? `${cmd} ${args.join(' ')}` : cmd;
-      if (fullCmd.includes('ls-files') && fullCmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (fullCmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (fullCmd.includes('diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         // Throw to indicate staged changes exist
         return Promise.reject(new Error('exit 1'));
       }
@@ -99,14 +97,12 @@ describe('cleanPlanningArtifacts', () => {
 
   it('should remove tracked feedback/ directory and commit', async () => {
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
-      const fullCmd = args ? `${cmd} ${args.join(' ')}` : cmd;
-      if (fullCmd.includes('ls-files') && fullCmd.includes('feedback')) {
-        return Promise.resolve({ stdout: '.planning/feedback/001-test.md\n', stderr: '' });
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/feedback/')) tracked.push('.planning/feedback/001-test.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (fullCmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (fullCmd.includes('diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         return Promise.reject(new Error('exit 1'));
       }
       return Promise.resolve({ stdout: '', stderr: '' });
@@ -132,14 +128,12 @@ describe('cleanPlanningArtifacts', () => {
   it('should skip commit when git rm produces no staged changes', async () => {
     // Files are "tracked" by ls-files but git rm produces no diff (already removed)
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
-      const fullCmd = args ? `${cmd} ${args.join(' ')}` : cmd;
-      if (fullCmd.includes('ls-files') && fullCmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (fullCmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (fullCmd.includes('diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         // No staged changes
         return Promise.resolve({ stdout: '', stderr: '' });
       }
@@ -165,23 +159,14 @@ describe('cleanPlanningArtifacts', () => {
 
   it('should remove multiple tracked files in one git rm call', async () => {
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
-      const fullCmd = args ? `${cmd} ${args.join(' ')}` : cmd;
-      if (fullCmd.includes('ls-files') && fullCmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        if (args.includes('.planning/PLANNING_PROMPT.md') && !args.includes('.archived')) tracked.push('.planning/PLANNING_PROMPT.md');
+        if (args.includes('.planning/feedback/')) tracked.push('.planning/feedback/001-test.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (fullCmd.includes('ls-files') && fullCmd.includes('PLANNING_PROMPT.md') && !fullCmd.includes('archived')) {
-        return Promise.resolve({ stdout: '.planning/PLANNING_PROMPT.md\n', stderr: '' });
-      }
-      if (fullCmd.includes('ls-files') && fullCmd.includes('archived')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (fullCmd.includes('ls-files') && fullCmd.includes('feedback')) {
-        return Promise.resolve({ stdout: '.planning/feedback/001-test.md\n', stderr: '' });
-      }
-      if (fullCmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (fullCmd.includes('diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         return Promise.reject(new Error('exit 1'));
       }
       return Promise.resolve({ stdout: '', stderr: '' });
@@ -197,14 +182,12 @@ describe('cleanPlanningArtifacts', () => {
 
   it('should return failed when git rm throws unexpectedly', async () => {
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
-      const fullCmd = args ? `${cmd} ${args.join(' ')}` : cmd;
-      if (fullCmd.includes('ls-files') && fullCmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (fullCmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (fullCmd.includes('rm')) {
+      if (args?.includes('rm')) {
         return Promise.reject(new Error('permission denied'));
       }
       return Promise.resolve({ stdout: '', stderr: '' });

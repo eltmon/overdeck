@@ -43,37 +43,24 @@ export async function cleanPlanningArtifacts(
 
   try {
     // Build the list of files git is currently tracking in .planning/
-    // that match our ephemeral set. We include feedback/ glob separately.
+    // that match our ephemeral set. Single git ls-files call — was N serial
+    // subprocesses (one per ephemeral file + one for feedback/).
     let trackedFiles: string[] = [];
-
-    // Check individual ephemeral files
-    for (const file of EPHEMERAL_PLANNING_FILES) {
-      try {
-        const { stdout } = await execFileAsync(
-          'git',
-          ['ls-files', '--', file],
-          { cwd: projectPath, encoding: 'utf-8' },
-        );
-        if (stdout.trim()) {
-          trackedFiles.push(file);
-        }
-      } catch {
-        // git ls-files failure is non-fatal
-      }
-    }
-
-    // Check feedback/ directory
     try {
       const { stdout } = await execFileAsync(
         'git',
-        ['ls-files', '--', '.planning/feedback/'],
+        ['ls-files', '--', ...EPHEMERAL_PLANNING_FILES, '.planning/feedback/'],
         { cwd: projectPath, encoding: 'utf-8' },
       );
-      if (stdout.trim()) {
+      trackedFiles = stdout.trim().split('\n').filter(Boolean);
+      // If any feedback files are tracked, replace them with the directory so
+      // git rm removes the entire feedback/ tree (matches original behavior).
+      if (trackedFiles.some(f => f.startsWith('.planning/feedback/'))) {
+        trackedFiles = trackedFiles.filter(f => !f.startsWith('.planning/feedback/'));
         trackedFiles.push('.planning/feedback/');
       }
     } catch {
-      // Non-fatal
+      // git ls-files failure is non-fatal
     }
 
     if (trackedFiles.length === 0) {

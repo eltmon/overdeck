@@ -1027,9 +1027,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   // Bulk selection state — key based on filters so selection survives data refreshes
   const internalBulkSelection = useBulkSelection(`${cycleFilter}-${includeCompleted}-${Array.from(selectedProjects).sort().join(',')}`);
-  const bulkSelection = bulkSelectedIds && onBulkToggle && onBulkSelectAll && onBulkDeselectAll
-    ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle, selectAll: onBulkSelectAll, deselectAll: onBulkDeselectAll, clear: () => onBulkDeselectAll(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
-    : internalBulkSelection;
+  const bulkSelection = useMemo(() =>
+    bulkSelectedIds && onBulkToggle && onBulkSelectAll && onBulkDeselectAll
+      ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle, selectAll: onBulkSelectAll, deselectAll: onBulkDeselectAll, clear: () => onBulkDeselectAll(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
+      : internalBulkSelection,
+    [bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll, internalBulkSelection]
+  );
 
   // Bulk close-out mutation
   const [bulkCloseResults, setBulkCloseResults] = useState<BulkCloseResult[]>([]);
