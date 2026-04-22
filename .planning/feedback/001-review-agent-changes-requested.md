@@ -2,27 +2,27 @@
 specialist: review-agent
 issueId: PAN-569
 outcome: changes-requested
-timestamp: 2026-04-22T20:18:51Z
+timestamp: 2026-04-22T20:31:25Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-All 27 acceptance criteria are implemented and the feature works end-to-end, but two correctness issues should be fixed before merge: (1) successful close-outs containing any skipped sub-step are misreported as "Skipped" with wrong aggregate counts, and (2) the bulk-close endpoint has no server-side active-agent guard, so any caller can tear down a running agent's workspace. Also recommend adding input validation/size cap and an origin check to the destructive bulk endpoint. Other findings (per-card planning-state polling, selection-clear on list mutation, serial cache invalidation) are good follow-up items.
+Feature is functionally complete (27/27 vBRIEF ACs implemented) with no blockers or critical issues, but three high-priority defects warrant fixing before merge: CSRF guard fails open when the Origin header is missing on the destructive bulk close-out route; client and server disagree on which agent statuses count as "active" (`failed` vs `dead`), causing silent skips and confusing UX; and `useBulkSelection` clears the user's selection on any background issue-list mutation including its own `onSuccess` refresh. Medium-priority cleanups (`ctx: any`, silent `.catch(() => {})`, serial lifecycle loop) are worth bundling in the same pass. Security, XSS, and injection surfaces are otherwise clean; input validation and origin checks (when present) are solid.
 
 ## Security Issues
 
-- Unvalidated issueIds array elements and no size cap on bulk-close endpoint
-- Destructive bulk endpoint with no auth/CSRF/origin check
-- Swallowed cache-invalidation errors hide tracker desyncs
-- Upstream error strings rendered in tooltips may leak tokens
+- CSRF guard fails open on missing Origin header
+- ctx: any defeats structural checks on close-out context
+- Hardcoded agent-ID prefix duplication risks safety-gate drift
+- Silent .catch(() => {}) on tracker invalidation and patchIssue (insufficient logging)
 
 ## Performance Issues
 
-- Per-card planning-state polling causes O(n) network traffic
-- Bulk close-out runs serially and re-invalidates tracker caches per issue
-- O(selected x agents) scans in warning dialog and bulk handlers
+- Bulk close-out processes issues strictly serially
+- Repeated O(selectedIssues × agents) filtering on frontend
+- issuesKey rebuilds full joined string every render
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
