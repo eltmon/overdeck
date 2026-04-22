@@ -1731,11 +1731,29 @@ async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
 
 // ─── Route: POST /api/issues/bulk-close-out ──────────────────────────────────
 
+/** Validate issue ID format (PAN-123, TEAM-456, or GitHub owner/repo#number) */
+function isValidIssueId(id: string): boolean {
+  if (typeof id !== 'string') return false;
+  // Linear-style: PREFIX-123
+  if (/^[A-Z][A-Z0-9]*-\d+$/.test(id)) return true;
+  // GitHub-style: owner/repo#number
+  if (/^[^/]+\/[^/]+#\d+$/.test(id)) return true;
+  return false;
+}
+
 const postIssuesBulkCloseOutRoute = HttpRouter.add(
   'POST',
   '/api/issues/bulk-close-out',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+
+    // Content-Type enforcement
+    const contentType = (request.headers as Record<string, string | string[] | undefined>)['content-type'];
+    const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
+    if (!contentTypeStr?.toLowerCase().includes('application/json')) {
+      return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
+    }
+
     const body = yield* Effect.promise(() => request.json().catch(() => ({})));
     const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
     const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
@@ -1744,7 +1762,13 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
     const originStr = Array.isArray(origin) ? origin[0] : origin;
     const isValidOrigin = (() => {
-      if (!originStr) return false;
+      if (!originStr) {
+        // Fallback: check Host header for local requests
+        const host = (request.headers as Record<string, string | string[] | undefined>)['host'];
+        const hostStr = Array.isArray(host) ? host[0] : host;
+        if (!hostStr) return false;
+        return hostStr.startsWith('localhost:') || hostStr.startsWith('127.0.0.1:');
+      }
       try {
         const url = new URL(originStr);
         return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
@@ -1764,88 +1788,99 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       return jsonResponse({ error: `Maximum ${MAX_BULK_CLOSE_OUT} issues allowed` }, { status: 400 });
     }
 
+    const invalidIds = issueIds.filter(id => !isValidIssueId(id));
+    if (invalidIds.length > 0) {
+      return jsonResponse({ error: `Invalid issue ID format: ${invalidIds.join(', ')}` }, { status: 400 });
+    }
+
     const eventStore = yield* EventStoreService;
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
     const issueDataService = getIssueDataService();
 
-    const results = yield* Effect.forEach(
-      issueIds,
-      (id) => Effect.gen(function* () {
-        const githubCheck = isGitHubIssue(id);
-        let projectPath = '';
+    // Sequential execution — closeOut touches filesystem/git, parallel runs risk index-lock races
+    const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
+    for (const id of issueIds) {
+      // Server-side active-agent guardrail
+      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id));
+      if (hasActiveAgent) {
+        results.push({ issueId: id, success: false, error: 'Skipped: active agent running', skipped: true });
+        continue;
+      }
 
-        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-          const localPaths = getGitHubLocalPaths();
-          projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-        }
-        if (!projectPath) {
-          const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
-          projectPath = getProjectPath(undefined, issuePrefix);
-        }
-        if (!projectPath) {
-          return { issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false };
-        }
+      const githubCheck = isGitHubIssue(id);
+      let projectPath = '';
 
-        const ctx: LifecycleContext = {
+      if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+        const localPaths = getGitHubLocalPaths();
+        projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+      }
+      if (!projectPath) {
+        const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
+        projectPath = getProjectPath(undefined, issuePrefix);
+      }
+      if (!projectPath) {
+        results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false });
+        continue;
+      }
+
+      const ctx: LifecycleContext = {
+        issueId: id,
+        projectPath,
+        ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+          ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+          : {}),
+      };
+
+      const issueSource = issueDataService.getIssueSource(id);
+      if (issueSource === 'rally') {
+        const rallyConfig = getRallyConfig();
+        if (rallyConfig) {
+          ctx.rally = {
+            apiKey: rallyConfig.apiKey,
+            server: rallyConfig.server,
+            workspace: rallyConfig.workspace,
+            project: rallyConfig.project,
+          };
+        }
+      }
+
+      const closeResult = yield* Effect.tryPromise({
+        try: () => closeOut(ctx),
+        catch: (error) => ({
+          workflow: 'close-out' as const,
           issueId: id,
-          projectPath,
-          ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-            ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-            : {}),
-        };
-
-        const issueSource = issueDataService.getIssueSource(id);
-        if (issueSource === 'rally') {
-          const rallyConfig = getRallyConfig();
-          if (rallyConfig) {
-            ctx.rally = {
-              apiKey: rallyConfig.apiKey,
-              server: rallyConfig.server,
-              workspace: rallyConfig.workspace,
-              project: rallyConfig.project,
-            };
-          }
-        }
-
-        const closeResult = yield* Effect.tryPromise({
-          try: () => closeOut(ctx),
-          catch: (error) => ({
-            workflow: 'close-out' as const,
-            issueId: id,
+          success: false,
+          steps: [{
+            step: 'close-out',
             success: false,
-            steps: [{
-              step: 'close-out',
-              success: false,
-              skipped: false,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            }],
-            duration: 0,
-          }),
+            skipped: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }],
+          duration: 0,
+        }),
+      });
+
+      if (closeResult.success) {
+        yield* eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
         });
-
-        if (closeResult.success) {
-          yield* eventStore.append({
-            type: 'issue.statusChanged',
-            timestamp: new Date().toISOString(),
-            payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
-          });
-          try {
-            issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' });
-          } catch (e) {
-            console.error('Failed to patch issue status:', e);
-          }
+        try {
+          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' });
+        } catch (e) {
+          console.error('Failed to patch issue status:', e);
         }
+      }
 
-        const failedStep = closeResult.steps.find((s: StepResult) => !s.success);
-        return {
-          issueId: id,
-          success: closeResult.success,
-          error: closeResult.success ? undefined : failedStep?.error,
-          skipped: false,
-        };
-      }),
-      { concurrency: 3 }
-    );
+      const failedStep = closeResult.steps.find((s: StepResult) => !s.success);
+      results.push({
+        issueId: id,
+        success: closeResult.success,
+        error: closeResult.success ? undefined : failedStep?.error,
+        skipped: false,
+      });
+    }
 
     // Invalidate trackers once if any issue closed successfully
     const anySucceeded = results.some(r => r.success);

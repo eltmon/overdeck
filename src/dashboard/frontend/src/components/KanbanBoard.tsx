@@ -1061,7 +1061,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
               error: backend.error,
             };
           }
-          return p;
+          // Backend response omitted this issueId — mark as failed so modal doesn't hang
+          return { issueId: p.issueId, status: 'failed' as const, error: 'Missing from server response' };
         });
       });
       refreshDashboardState(queryClient);
@@ -1074,18 +1075,21 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     },
   });
 
-  // Memoize selected issues and active-agent filtering to avoid O(n²) rebuilds
+  // Memoize selected issues and active-agent filtering — pre-index agents by issueId for O(1) lookup
   const selectedIssues = useMemo(
     () => issues.filter(i => bulkSelection.isSelected(i.identifier)),
     [issues, bulkSelection]
   );
-  const issuesWithAgents = useMemo(
-    () => selectedIssues.filter(issue => {
-      const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
-      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped' && a.status !== 'failed');
-    }),
-    [selectedIssues, agents]
-  );
+  const issuesWithAgents = useMemo(() => {
+    // Build a Set of issueIds that have at least one active agent
+    const activeAgentIssueIds = new Set<string>();
+    for (const agent of agents) {
+      if (agent.issueId && agent.status !== 'dead' && agent.status !== 'stopped' && agent.status !== 'failed') {
+        activeAgentIssueIds.add(agent.issueId.toLowerCase());
+      }
+    }
+    return selectedIssues.filter(issue => activeAgentIssueIds.has(issue.identifier.toLowerCase()));
+  }, [selectedIssues, agents]);
 
   const handleBulkCloseOut = useCallback(() => {
     if (issuesWithAgents.length > 0) {
@@ -1434,24 +1438,24 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const grouped = groupByStatus(filteredIssues, includeCompleted);
 
-  // Fetch planning-complete state for all Todo issues so we can sort
-  // "ready to start" items to the top of the Todo column.
+  // Fetch planning state for all Todo issues so we can sort
+  // "ready to start" items to the top and pass full state to cards (avoids per-card fan-out).
   const todoPlanningStates = useQueries({
     queries: (grouped.todo ?? []).map(issue => ({
       queryKey: ['planning-state', issue.identifier],
       queryFn: async () => {
         const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
-        if (!res.ok) return { planningComplete: false };
-        return res.json() as Promise<{ planningComplete: boolean }>;
+        if (!res.ok) return { hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false };
+        return res.json() as Promise<PlanningState>;
       },
       staleTime: 30000,
     })),
   });
 
-  const planningCompleteById = useMemo(() => {
-    const map: Record<string, boolean> = {};
+  const planningStateById = useMemo(() => {
+    const map: Record<string, PlanningState> = {};
     (grouped.todo ?? []).forEach((issue, i) => {
-      map[issue.identifier] = todoPlanningStates[i]?.data?.planningComplete ?? false;
+      map[issue.identifier] = todoPlanningStates[i]?.data ?? { hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false };
     });
     return map;
   }, [grouped.todo, todoPlanningStates]);
@@ -1461,14 +1465,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     const result = { ...grouped };
     if (result.todo) {
       result.todo = [...result.todo].sort((a, b) => {
-        const aReady = planningCompleteById[a.identifier] ? 1 : 0;
-        const bReady = planningCompleteById[b.identifier] ? 1 : 0;
+        const aReady = planningStateById[a.identifier]?.planningComplete ? 1 : 0;
+        const bReady = planningStateById[b.identifier]?.planningComplete ? 1 : 0;
         if (aReady !== bReady) return bReady - aReady;
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
     }
     return result;
-  }, [grouped, planningCompleteById]);
+  }, [grouped, planningStateById]);
 
   return (
     <div className="space-y-4">
@@ -1896,6 +1900,7 @@ function ColumnContent({
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
+        planningState={planningStateById[issue.identifier]}
       />
     );
   };
@@ -2463,6 +2468,13 @@ export function DeaconIgnoreButton({
   );
 }
 
+interface PlanningState {
+  hasPlan: boolean;
+  hasBeads: boolean;
+  beadsCount: number;
+  planningComplete: boolean;
+}
+
 interface IssueCardProps {
   issue: Issue;
   workAgent?: Agent;
@@ -2477,9 +2489,10 @@ interface IssueCardProps {
   onViewVBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
+  planningState?: PlanningState;
 }
 
-function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle }: IssueCardProps) {
+function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp }: IssueCardProps) {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
@@ -2552,20 +2565,21 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   // Only fetched when this card has any chance of having a plan (anything past
   // backlog where the agent could have produced one). We poll every 30s so the
   // chip flips from red→green right after Generate Tasks runs.
+  // If parent passes planningState prop, skip the per-card fetch (avoids fan-out).
   const planningStateQuery = useQuery({
     queryKey: ['planning-state', issue.identifier],
     queryFn: async () => {
       const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
       if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number; planningComplete: boolean }>;
+      return res.json() as Promise<PlanningState>;
     },
-    enabled: !!issue.identifier,
+    enabled: !!issue.identifier && !planningStateProp,
     refetchInterval: 30000,
     staleTime: 15000,
   });
-  const hasPlan = planningStateQuery.data?.hasPlan ?? false;
-  const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
-  const planningComplete = planningStateQuery.data?.planningComplete ?? false;
+  const hasPlan = planningStateProp?.hasPlan ?? planningStateQuery.data?.hasPlan ?? false;
+  const beadsCount = planningStateProp?.beadsCount ?? planningStateQuery.data?.beadsCount ?? 0;
+  const planningComplete = planningStateProp?.planningComplete ?? planningStateQuery.data?.planningComplete ?? false;
   const artifactLinks = (
     <ArtifactLinks
       issueId={issue.identifier || ''}
