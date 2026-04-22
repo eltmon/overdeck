@@ -13,12 +13,12 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { exec, spawn } from 'node:child_process';
+import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { createReadStream } from 'node:fs';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -85,6 +85,14 @@ import {
 const execAsync = promisify(exec);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
+/** Quote a string for safe use in a bash script using single-quote wrapping. */
+function shellQuote(str: string): string {
+  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
+}
+
+const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
 
 function getTrustedOrigins(): string[] {
@@ -139,6 +147,26 @@ const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/gif', '.gif'],
   ['image/webp', '.webp'],
 ]);
+
+/** Validate image magic bytes match the declared MIME type. */
+function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
+  switch (mimeType) {
+    case 'image/png':
+      return bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    case 'image/jpeg':
+      return bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
+    case 'image/gif':
+      return bytes.length >= 4 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38;
+    case 'image/webp':
+      return (
+        bytes.length >= 12 &&
+        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+      );
+    default:
+      return false;
+  }
+}
 
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
@@ -244,6 +272,10 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error }, { status: 400 });
   }
   const bytes = validation.bytes;
+
+  if (!validateImageMagicBytes(bytes, mimeType)) {
+    return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
+  }
 
   const extension = safeUploadExtension(filename, mimeType);
   if (!extension) {
@@ -411,6 +443,9 @@ async function spawnConversationSession(
   let runtimeCommand = `claude ${permissionFlags}`;
   const providerEnvExports: string[] = [];
   if (model) {
+    if (!SAFE_MODEL_PATTERN.test(model)) {
+      throw new Error('Invalid model name');
+    }
     runtimeCommand = getAgentRuntimeBaseCommand(model);
     if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
       runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
@@ -424,23 +459,27 @@ async function spawnConversationSession(
     }
   }
 
+  if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
+    throw new Error('Invalid effort level');
+  }
+
   const envExports = [
     `export TERM=xterm-256color`,
     `export COLORTERM=truecolor`,
     `export LANG=C.UTF-8`,
     `export LC_ALL=C.UTF-8`,
-    ...(issueId ? [`export PANOPTICON_ISSUE_ID="${issueId}"`] : []),
+    ...(issueId ? [`export PANOPTICON_ISSUE_ID=${shellQuote(issueId)}`] : []),
     ...providerEnvExports,
   ].join('\n');
 
   const sessionArgs = [
-    resume ? `--resume "${claudeSessionId}"` : `--session-id "${claudeSessionId}"`,
-    ...(effort ? [`--effort "${effort}"`] : []),
+    resume ? `--resume ${shellQuote(claudeSessionId)}` : `--session-id ${shellQuote(claudeSessionId)}`,
+    ...(effort ? [`--effort ${shellQuote(effort)}`] : []),
   ].join(' ');
 
   await writeFile(launcherScript, `#!/bin/bash
 ${envExports}
-cd "${cwd}"
+cd -- ${shellQuote(cwd)}
 trap '' HUP
 ${runtimeCommand} ${sessionArgs}
 echo ""
@@ -456,7 +495,7 @@ while true; do sleep 60; done
   }
 
   // Spawn the session
-  await createSessionAsync(tmuxSession, cwd, `bash '${launcherScript}'`, {
+  await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
     env: {
       TERM: 'xterm-256color',
     },
@@ -491,10 +530,34 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     firstMessage,
   ].join('\n');
 
-  const { stdout } = await execAsync(
-    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --model claude-haiku-4-5-20251001 --dangerously-skip-permissions --permission-mode bypassPermissions`,
-    { encoding: 'utf-8', timeout: 30_000 },
-  );
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const child = spawn(
+      'claude',
+      [
+        '-p',
+        '--output-format', 'json',
+        '--json-schema', schema,
+        '--model', 'claude-haiku-4-5-20251001',
+        '--dangerously-skip-permissions',
+        '--permission-mode', 'bypassPermissions',
+      ],
+      { env: { ...process.env, PATH: process.env.PATH } },
+    );
+    let out = '';
+    let errOut = '';
+    child.stdout.on('data', (data: Buffer) => { out += data.toString('utf-8'); });
+    child.stderr.on('data', (data: Buffer) => { errOut += data.toString('utf-8'); });
+    child.on('error', (err: Error) => reject(err));
+    child.on('close', (code: number | null) => {
+      if (code !== 0) {
+        reject(new Error(errOut || `claude title generation exited with code ${code}`));
+      } else {
+        resolve(out);
+      }
+    });
+    child.stdin.write(prompt, 'utf-8');
+    child.stdin.end();
+  });
 
   // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
   const parsed = JSON.parse(stdout.trim());
@@ -564,7 +627,8 @@ const getConversationsRoute = HttpRouter.add(
         return jsonResponse(enriched);
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to list conversations: ' + msg }, { status: 500 });
+        console.error('[conversations] list conversations failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         }})
   }),
 );
@@ -590,7 +654,8 @@ const getConversationRoute = HttpRouter.add(
         return jsonResponse({ ...conv, sessionAlive });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to get conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] get conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -606,6 +671,11 @@ const postConversationRoute = HttpRouter.add(
   'POST',
   '/api/conversations',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
@@ -666,7 +736,8 @@ const postConversationRoute = HttpRouter.add(
         return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to create conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] create conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -704,7 +775,8 @@ const postConversationStopRoute = HttpRouter.add(
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to stop conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] stop conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -716,6 +788,11 @@ const postConversationResumeRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/resume',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -760,7 +837,8 @@ const postConversationResumeRoute = HttpRouter.add(
         return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, reattached: false, sessionAlive: true });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] resume conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         }})
   }),
 );
@@ -775,6 +853,11 @@ const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/switch-model',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -813,7 +896,8 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         return jsonResponse({ ...conv, status: 'active', model, reattached: false, sessionAlive: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to switch model: ' + msg }, { status: 500 });
+        console.error('[conversations] switch model failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -897,7 +981,8 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to load messages: ' + msg }, { status: 500 });
+        console.error('[conversations] load messages failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -922,7 +1007,8 @@ const postConversationUploadImageRoute = HttpRouter.add(
         return await handleConversationImageUpload(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to upload image: ' + msg }, { status: 500 });
+        console.error('[conversations] upload image failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -955,7 +1041,8 @@ const postConversationDeleteImageRoute = HttpRouter.add(
         return jsonResponse({ ok: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to delete image: ' + msg }, { status: 500 });
+        console.error('[conversations] delete image failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -978,7 +1065,8 @@ const postConversationMessageRoute = HttpRouter.add(
         return await handleConversationMessage(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to send message: ' + msg }, { status: 500 });
+        console.error('[conversations] send message failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1007,6 +1095,11 @@ const patchConversationRoute = HttpRouter.add(
   'PATCH',
   '/api/conversations/:name',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -1016,7 +1109,8 @@ const patchConversationRoute = HttpRouter.add(
         return jsonResponse(result.body, { status: result.status });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to update conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] update conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1053,7 +1147,8 @@ const postConversationArchiveRoute = HttpRouter.add(
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to archive conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] archive conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1097,6 +1192,11 @@ const postConversationRestartAllRoute = HttpRouter.add(
   'POST',
   '/api/conversations/restart-all',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     return yield* Effect.promise(async () => {
       try {
         const allConvs = listConversations();
@@ -1138,7 +1238,8 @@ const postConversationRestartAllRoute = HttpRouter.add(
         return jsonResponse({ restarted: results.length, results });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to restart conversations: ' + msg }, { status: 500 });
+        console.error('[conversations] restart conversations failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1150,6 +1251,11 @@ const postConversationFavoriteRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/favorite',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     return yield* Effect.promise(async () => {
@@ -1160,7 +1266,8 @@ const postConversationFavoriteRoute = HttpRouter.add(
         return jsonResponse({ favorited: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to favorite conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] favorite conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1172,6 +1279,11 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
   'DELETE',
   '/api/conversations/:name/favorite',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     return yield* Effect.promise(async () => {
@@ -1182,7 +1294,8 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
         return jsonResponse({ favorited: false });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to unfavorite conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] unfavorite conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1223,6 +1336,11 @@ const postConversationSummaryForkRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/summary-fork',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     const body = yield* readJsonBody;
@@ -1287,7 +1405,8 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to create summary fork: ' + msg }, { status: 500 });
+        console.error('[conversations] create summary fork failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),

@@ -51,3 +51,4 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [2026-04-22T20:09Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
   - Issues: (1) Path traversal in /delete-image via symlink escape, (2) symlink escape in attachment path containment check, (3) missing CSRF/origin protection on destructive JSON POSTs, (4) full JSONL reparse during attachment cleanup on every stop/archive
   - Status: FIXED. `isManagedConversationAttachmentPath` and `isConversationAttachmentPath` now use `realpath` to resolve symlinks before containment checks. `validateOrigin` added to upload-image, delete-image, stop, archive, and message endpoints. `readSessionAttachmentBasenames` replaced full JSONL parse with line-by-line stream reading.
+- **[2026-04-22T20:24Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

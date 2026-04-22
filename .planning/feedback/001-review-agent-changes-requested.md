@@ -2,24 +2,27 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-22T20:09:39Z
+timestamp: 2026-04-22T20:24:26Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-One blocker (path traversal in POST /api/conversations/:name/delete-image allows arbitrary file deletion under $HOME via a CSRF-able JSON POST — directly violates the CLAUDE.md "JSONL files are sacred" guarantee) and one critical TypeScript error (missing `Conversation` type import breaks dashboard-server typecheck). Two high-priority warnings around attachment cleanup (symlink escape and parser-based false negatives causing silent data loss) and one performance warning (full JSONL reparse on every stop/archive) should be fixed together via a reference-index refactor. Requirements coverage is strong (20/22 ACs complete; 2 are deliberate design improvements with stale AC text). Request changes before merge.
+Feature is functionally complete — requirements review confirms all 5 vBRIEF items and 21 ACs satisfied end-to-end, and the correctness reviewer's "missing TTL cleanup" blocker is resolved by the intentional redesign to lifecycle-based per-conversation cleanup. However, the security review surfaced two critical shell-injection RCEs in routes/conversations.ts (user message in generateAiTitle's exec pipeline, and cwd/issueId/effort/model in the launcher-script template) that must be fixed before merge, plus incomplete validateOrigin coverage on mutating routes that exposes them to CSRF. A performance concern (full JSONL scan on every cleanup) and a latent path-traversal via an unused sanitizeName are high-priority but non-blocking.
 
 ## Security Issues
 
-- Path traversal in /delete-image → arbitrary file deletion under $HOME
-- Symlink escape in attachment path containment check
-- Missing CSRF/origin protection on destructive JSON POSTs
+- Shell command injection in generateAiTitle via user message
+- Shell injection in spawnConversationSession launcher script template
+- Incomplete validateOrigin coverage on mutating routes
+- Latent path traversal via unused sanitizeName
+- Internal error messages echoed to clients
+- MIME type trusted without magic-byte validation
 
 ## Performance Issues
 
-- Full JSONL reparse during attachment cleanup on every stop/archive
+- Full session JSONL scan during attachment cleanup on every stop/archive and lifecycle poll
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 

@@ -2,24 +2,24 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-22T19:55:04Z
+timestamp: 2026-04-22T20:09:39Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-No blockers or critical issues. Four high-priority items to address before merge: (1) cap upload body size before base64 decode to prevent memory DoS on the dashboard server; (2) tighten `@`-attachment regex and reject messages containing tokens that resolve outside the managed root, preventing prompt-injection smuggling into the agent's tmux pane; (3) fix a paste-during-send race in `ComposerFooter` that orphans blob URLs and server files; (4) split conflated decode/size error messages. Requirements coverage is effectively 100% — one vBRIEF AC text diverges from the (superior) implemented cleanup design and should be reconciled. Positive: defensive upload handling (UUID filenames, MIME allowlist, path containment) and reference-aware cleanup are well-constructed.
+One blocker (path traversal in POST /api/conversations/:name/delete-image allows arbitrary file deletion under $HOME via a CSRF-able JSON POST — directly violates the CLAUDE.md "JSONL files are sacred" guarantee) and one critical TypeScript error (missing `Conversation` type import breaks dashboard-server typecheck). Two high-priority warnings around attachment cleanup (symlink escape and parser-based false negatives causing silent data loss) and one performance warning (full JSONL reparse on every stop/archive) should be fixed together via a reference-index refactor. Requirements coverage is strong (20/22 ACs complete; 2 are deliberate design improvements with stale AC text). Request changes before merge.
 
 ## Security Issues
 
-- Unbounded upload body enables memory-pressure DoS
-- @-attachment regex permits token smuggling into agent pane
+- Path traversal in /delete-image → arbitrary file deletion under $HOME
+- Symlink escape in attachment path containment check
+- Missing CSRF/origin protection on destructive JSON POSTs
 
 ## Performance Issues
 
-- Full JSONL scan on every conv-find summary request
-- JSON output eagerly computes expensive session summary
+- Full JSONL reparse during attachment cleanup on every stop/archive
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 

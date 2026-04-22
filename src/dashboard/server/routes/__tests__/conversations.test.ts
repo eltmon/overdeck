@@ -164,7 +164,7 @@ describe('conversations route — DB integration', () => {
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
 
-    const pngData = Buffer.from(Uint8Array.from([1, 2, 3, 4])).toString('base64');
+    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
     const uploadResponse = await handleConversationImageUpload('owner-conv', {
       filename: 'owned.png',
       data: pngData,
@@ -202,7 +202,7 @@ describe('conversations route — DB integration', () => {
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
 
-    const pngData = Buffer.from(Uint8Array.from([4, 3, 2, 1])).toString('base64');
+    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
     const uploadResponse = await handleConversationImageUpload('owner-conv', {
       filename: 'owned.png',
       data: pngData,
@@ -230,7 +230,7 @@ describe('conversations route — DB integration', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    const pngData = Buffer.from(Uint8Array.from([5, 6, 7, 8])).toString('base64');
+    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
     const uploadResponse = await handleConversationImageUpload('unsent-conv', {
       filename: 'draft.png',
       data: pngData,
@@ -257,7 +257,7 @@ describe('conversations route — DB integration', () => {
     const sessionFile = join(TEST_HOME, 'archived-session.jsonl');
     updateSessionFile('archived-conv', sessionFile);
 
-    const pngData = Buffer.from(Uint8Array.from([7, 8, 9, 10])).toString('base64');
+    const pngData = Buffer.from(Uint8Array.from([137, 80, 78, 71])).toString('base64');
     const keptUpload = await handleConversationImageUpload('archived-conv', {
       filename: 'kept.png',
       data: pngData,
