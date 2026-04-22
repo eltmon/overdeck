@@ -39,6 +39,10 @@ import { RecoverButton } from './RecoverButton';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
+import { useBulkSelection } from '../hooks/useBulkSelection';
+import { BulkActionBar } from './BulkActionBar';
+import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
+import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 
 
 // Difficulty badge colors
@@ -997,6 +1001,89 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
   const onSelectIssue = externalOnSelectIssue || setInternalSelectedIssue;
 
+  // Bulk selection state
+  const internalBulkSelection = useBulkSelection(issues.map(i => i.identifier).join(','));
+  const bulkSelection = bulkSelectedIds
+    ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle!, selectAll: onBulkSelectAll!, deselectAll: onBulkDeselectAll!, clear: () => onBulkDeselectAll!(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
+    : internalBulkSelection;
+
+  // Bulk close-out mutation
+  const [bulkCloseResults, setBulkCloseResults] = useState<BulkCloseResult[]>([]);
+  const [showBulkProgress, setShowBulkProgress] = useState(false);
+  const [showBulkWarning, setShowBulkWarning] = useState(false);
+
+  const bulkCloseOutMutation = useMutation({
+    mutationFn: async (issueIds: string[]) => {
+      const res = await fetch('/api/issues/bulk-close-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text.length < 200 ? text : `Failed to bulk close out (${res.status})`);
+      }
+      return res.json() as Promise<{ results: Array<{ issueId: string; success: boolean; error?: string; skipped?: boolean }> }>;
+    },
+    onSuccess: (data) => {
+      const results: BulkCloseResult[] = data.results.map(r => ({
+        issueId: r.issueId,
+        status: r.skipped ? 'skipped' : r.success ? 'done' : 'failed',
+        error: r.error,
+      }));
+      setBulkCloseResults(results);
+      refreshDashboardState(queryClient);
+    },
+    onError: (err: Error, issueIds) => {
+      setBulkCloseResults(issueIds.map(id => ({ issueId: id, status: 'failed', error: err.message })));
+    },
+  });
+
+  const handleBulkCloseOut = useCallback(() => {
+    const selectedIssues = issues.filter(i => bulkSelection.isSelected(i.identifier));
+    const issuesWithAgents = selectedIssues.filter(issue => {
+      const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
+      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped');
+    });
+
+    if (issuesWithAgents.length > 0) {
+      setShowBulkWarning(true);
+    } else {
+      // No active agents — proceed directly
+      const ids = selectedIssues.map(i => i.identifier);
+      setBulkCloseResults(ids.map(id => ({ issueId: id, status: 'pending' })));
+      setShowBulkProgress(true);
+      bulkCloseOutMutation.mutate(ids);
+    }
+  }, [issues, agents, bulkSelection, bulkCloseOutMutation]);
+
+  const handleProceedAfterWarning = useCallback(() => {
+    setShowBulkWarning(false);
+    const selectedIssues = issues.filter(i => bulkSelection.isSelected(i.identifier));
+    const issuesWithAgents = selectedIssues.filter(issue => {
+      const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
+      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped');
+    });
+    const issuesWithoutAgents = selectedIssues.filter(i => !issuesWithAgents.some(wa => wa.identifier === i.identifier));
+    const ids = issuesWithoutAgents.map(i => i.identifier);
+
+    // Mark skipped issues
+    const results: BulkCloseResult[] = [
+      ...issuesWithAgents.map(i => ({ issueId: i.identifier, status: 'skipped' as const })),
+      ...ids.map(id => ({ issueId: id, status: 'pending' as const })),
+    ];
+    setBulkCloseResults(results);
+    setShowBulkProgress(true);
+    if (ids.length > 0) {
+      bulkCloseOutMutation.mutate(ids);
+    }
+  }, [issues, agents, bulkSelection, bulkCloseOutMutation]);
+
+  const handleCloseProgress = useCallback(() => {
+    setShowBulkProgress(false);
+    bulkSelection.clear();
+  }, [bulkSelection]);
+
   // Event-sourced state from Zustand store (PAN-433 read model)
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
@@ -1573,7 +1660,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         <div className="flex gap-4 overflow-hidden pb-4">
           {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
             const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
-            const selectedInColumn = columnIssueIds.filter(id => bulkSelectedIds?.has(id));
+            const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
             const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
             const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
@@ -1583,24 +1670,22 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <div className="px-4 py-3 border-b border-divider bg-surface-raised">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        {onBulkToggle && onBulkSelectAll && onBulkDeselectAll && (
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            ref={(el) => {
-                              if (el) el.indeterminate = someSelected;
-                            }}
-                            onChange={() => {
-                              if (allSelected) {
-                                onBulkDeselectAll(columnIssueIds);
-                              } else {
-                                onBulkSelectAll(columnIssueIds);
-                              }
-                            }}
-                            className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
-                            aria-label={`Select all ${COLUMN_TITLES[status]}`}
-                          />
-                        )}
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected;
+                          }}
+                          onChange={() => {
+                            if (allSelected) {
+                              bulkSelection.deselectAll(columnIssueIds);
+                            } else {
+                              bulkSelection.selectAll(columnIssueIds);
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+                          aria-label={`Select all ${COLUMN_TITLES[status]}`}
+                        />
                         <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
                       </div>
                       <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
@@ -1619,8 +1704,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onViewVBrief={setVbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
                     onToggleFeature={toggleFeature}
-                    bulkSelectedIds={bulkSelectedIds}
-                    onBulkToggle={onBulkToggle}
+                    bulkSelectedIds={bulkSelection.selectedIds}
+                    onBulkToggle={bulkSelection.toggle}
                   />
                 </div>
               </div>
@@ -1685,6 +1770,29 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onClose={() => setVbriefDialogIssue(null)}
         />
       )}
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        count={bulkSelection.count}
+        onCloseOut={handleBulkCloseOut}
+        onCancel={bulkSelection.clear}
+      />
+
+      {/* Bulk Agent Warning Dialog */}
+      <BulkAgentWarningDialog
+        isOpen={showBulkWarning}
+        onClose={() => setShowBulkWarning(false)}
+        onProceed={handleProceedAfterWarning}
+        issues={issues.filter(i => bulkSelection.isSelected(i.identifier))}
+        agents={agents}
+      />
+
+      {/* Bulk Close Out Progress */}
+      <BulkCloseOutProgress
+        isOpen={showBulkProgress}
+        results={bulkCloseResults}
+        onClose={handleCloseProgress}
+      />
     </div>
   );
 }
