@@ -20,7 +20,6 @@ import {
   Play,
   GitMerge,
   ScrollText,
-  XCircle,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -995,6 +994,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           createWorkspaceMutation={createWorkspaceMutation}
           syncMainMutation={syncMainMutation}
           resetSessionMutation={resetSessionMutation}
+          reopenMutation={reopenMutation}
+          resetIssueMutation={resetIssueMutation}
           onMerge={handleMerge}
           onReview={handleReview}
           onKill={handleKill}
@@ -1004,54 +1005,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
+          onReopen={handleReopen}
+          onResetIssue={() => resetIssueMutation.mutate()}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />
-
-        {/* Danger Zone */}
-        <div className="px-3 py-2 border-b border-divider">
-          <div className="flex items-center gap-1.5 mb-2">
-            <AlertTriangle className="w-3 h-3 text-destructive" />
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
-              Danger Zone
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {/* Reopen */}
-            {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (
-              <button
-                data-testid="reopen-btn"
-                onClick={handleReopen}
-                disabled={reopenMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
-              >
-                {reopenMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
-              </button>
-            )}
-            {/* Reset Issue */}
-            {issue && (
-              <button
-                data-testid="reset-issue-btn"
-                onClick={async () => {
-                  if (await confirm({
-                    title: 'Reset Issue',
-                    message: `Reset ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and branch\n- Clear all beads and vBRIEF\n- Move the issue back to Todo`,
-                    variant: 'destructive',
-                    confirmLabel: 'Reset Issue',
-                  })) {
-                    resetIssueMutation.mutate();
-                  }
-                }}
-                disabled={resetIssueMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-destructive rounded badge-bg-destructive hover:bg-destructive/20 disabled:opacity-50"
-              >
-                {resetIssueMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-                {resetIssueMutation.isPending ? 'Resetting...' : 'Reset Issue'}
-              </button>
-            )}
-          </div>
-        </div>
 
         {/* Issue labels/tags for no-agent view */}
         {!agent && issue && issue.labels.length > 3 && (
