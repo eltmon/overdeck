@@ -110,3 +110,6 @@ apps/desktop/server/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .pan/review/
+
+# Sibling projects sometimes cloned into working tree (separate repos)
+multica/
