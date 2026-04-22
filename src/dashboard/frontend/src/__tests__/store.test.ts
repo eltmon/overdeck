@@ -47,6 +47,7 @@ const emptyState: DashboardState = {
   bootstrapComplete: false,
   sequence: 0,
   agentsById: {},
+  agentRuntimeById: {},
   specialistsByName: {},
   reviewStatusByIssueId: {},
   resources: null,
