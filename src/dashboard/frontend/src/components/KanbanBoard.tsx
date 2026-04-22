@@ -1666,6 +1666,8 @@ function ColumnContent({
   onViewVBrief,
   collapsedFeatures,
   onToggleFeature,
+  bulkSelectedIds,
+  onBulkToggle,
 }: {
   issues: Issue[];
   agents: Agent[];
@@ -1679,6 +1681,8 @@ function ColumnContent({
   onViewVBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
   onToggleFeature: (featureId: string) => void;
+  bulkSelectedIds?: Set<string>;
+  onBulkToggle?: (issueId: string) => void;
 }) {
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
@@ -1712,6 +1716,8 @@ function ColumnContent({
         onPlan={() => onPlan(issue)}
         onViewBeads={(i) => onViewBeads(i)}
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
+        isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
+        onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
       />
     );
   };
@@ -2291,9 +2297,11 @@ interface IssueCardProps {
   onPlan: () => void; // Lifted to parent to survive re-renders
   onViewBeads?: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
+  isBulkSelected?: boolean;
+  onBulkToggle?: () => void;
 }
 
-function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
+function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle }: IssueCardProps) {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
@@ -2564,10 +2572,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       ref={cardRef}
       data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
-      className={`group relative overflow-hidden rounded-2xl border border-divider/70 cursor-pointer transition-all shadow-[0_6px_22px_rgba(0,0,0,0.08)] ${isSessionLost ? 'border-warning/50' : ''} ${
+      className={`group relative overflow-hidden rounded-2xl border cursor-pointer transition-all shadow-[0_6px_22px_rgba(0,0,0,0.08)] ${isSessionLost ? 'border-warning/50' : ''} ${
         isSelected
           ? 'ring-2 ring-warning/70 shadow-[0_12px_30px_rgba(245,158,11,0.18)]'
-          : 'hover:-translate-y-0.5 hover:border-divider-strong hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
+          : isBulkSelected
+            ? 'border-primary/50 bg-primary/[0.03] shadow-[0_6px_22px_rgba(0,0,0,0.08)]'
+            : 'hover:-translate-y-0.5 border-divider/70 hover:border-divider-strong hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
       } bg-[linear-gradient(145deg,var(--color-surface)_0%,rgba(255,255,255,0.03)_100%)]`}
     >
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${cardTone}`} />
@@ -2587,6 +2597,19 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
+              {onBulkToggle && (
+                <input
+                  type="checkbox"
+                  checked={isBulkSelected || false}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onBulkToggle();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+                  aria-label={`Select ${issue.identifier}`}
+                />
+              )}
               {issue.project && (
                 <span
                   className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_0_4px_rgba(255,255,255,0.05)]"
