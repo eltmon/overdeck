@@ -49,7 +49,7 @@
         "subItems": [
           {
             "id": "backend-upload-endpoint.ac1",
-            "title": "POST /api/conversations/:name/upload-image returns { path } with an absolute OS temp file path",
+            "title": "POST /api/conversations/:name/upload-image returns { path } with an absolute file path in the conversation attachment directory",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
