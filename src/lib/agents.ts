@@ -368,7 +368,7 @@ import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
 } from './agent-runtime.js';
-import { getRuntimeSnapshotSync } from './agent-runtime-mirror.js';
+import { getRuntimeSnapshotSync, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
@@ -430,10 +430,13 @@ export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null 
 }
 
 export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
-  // Try sync mirror first (fast path for in-process).
-  const syncHit = getAgentRuntimeState(agentId);
-  if (syncHit) return syncHit;
-  // Fall through to HTTP for cross-process callers.
+  // In-process (inside the dashboard): the sync mirror is authoritative. Do
+  // NOT fall back to HTTP — that would fetch our own server, which may still
+  // be inside Layer construction and cause a startup deadlock.
+  if (isAgentStateServiceInProcess()) {
+    return getAgentRuntimeState(agentId);
+  }
+  // Cross-process (CLI, external lib callers): sync mirror is empty, hit HTTP.
   const snap = await fetchAgentRuntimeSnapshot(agentId);
   return snapshotToRuntimeState(snap);
 }

@@ -32,7 +32,7 @@ import type {
 } from '@panopticon/contracts';
 import { initEventStore, getSharedDb } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
-import { setAgentRuntimeMirror, getRuntimeSnapshotSync as getMirrorSnapshot } from '../../../lib/agent-runtime-mirror.js';
+import { setAgentRuntimeMirror, getRuntimeSnapshotSync as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
 
@@ -95,6 +95,10 @@ export const getRuntimeSnapshotSync = getMirrorSnapshot;
 export const AgentStateServiceLive = Layer.effect(
   AgentStateService,
   Effect.gen(function* () {
+    // Flag lib-side adapters to prefer the in-process mirror over HTTP.
+    // Without this, agent-enrichment / ReadModel bootstrap would fetch() our
+    // own HTTP server before it finished listening — a circular deadlock.
+    markAgentStateServiceInProcess();
     const store = yield* Effect.promise(() => initEventStore());
     const ref = yield* SubscriptionRef.make<Record<string, AgentRuntimeSnapshot>>({});
 

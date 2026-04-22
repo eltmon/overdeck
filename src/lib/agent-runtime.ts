@@ -14,14 +14,10 @@ import type { AgentRuntimeSnapshot, Activity, AgentResolution, WaitingReason } f
 const DASHBOARD_URL = process.env['PANOPTICON_DASHBOARD_URL'] || 'http://localhost:3011'
 const DEFAULT_TIMEOUT_MS = 1500
 
-async function withTimeout<T>(p: Promise<T>, ms = DEFAULT_TIMEOUT_MS): Promise<T> {
+function abortSignal(ms: number): AbortSignal {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), ms)
-  try {
-    return await p
-  } finally {
-    clearTimeout(timer)
-  }
+  setTimeout(() => controller.abort(), ms).unref?.()
+  return controller.signal
 }
 
 export async function getAgentRuntimeSnapshot(
@@ -30,7 +26,7 @@ export async function getAgentRuntimeSnapshot(
   if (!agentId) return null
   const url = `${DASHBOARD_URL}/api/agents/${encodeURIComponent(agentId)}/runtime`
   try {
-    const res = await withTimeout(fetch(url))
+    const res = await fetch(url, { signal: abortSignal(DEFAULT_TIMEOUT_MS) })
     if (!res.ok) return null
     const body = (await res.json()) as { success: boolean; snapshot?: AgentRuntimeSnapshot }
     return body.success && body.snapshot ? body.snapshot : null
@@ -60,13 +56,12 @@ export async function emitAgentEvent(agentId: string, body: HeartbeatBody): Prom
   if (!agentId) return false
   const url = `${DASHBOARD_URL}/api/agents/${encodeURIComponent(agentId)}/heartbeat`
   try {
-    const res = await withTimeout(
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, timestamp: new Date().toISOString() }),
-      }),
-    )
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, timestamp: new Date().toISOString() }),
+      signal: abortSignal(DEFAULT_TIMEOUT_MS),
+    })
     return res.ok
   } catch {
     return false
