@@ -384,7 +384,7 @@ export function ActionsSection({
           </summary>
           <div className="px-3 py-3 space-y-4">
             {/* Reopen */}
-            {onReopen && reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed') && (
+            {onReopen && (
               <div className="min-w-0">
                 <div className="text-xs font-medium text-content">Reopen for more work</div>
                 <div className="text-[11px] text-content-subtle mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">

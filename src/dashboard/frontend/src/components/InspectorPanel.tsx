@@ -630,6 +630,17 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     }
   };
 
+  const handleResetIssue = async () => {
+    if (await confirm({
+      title: 'Reset Issue',
+      message: `Reset ${issueId}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and feature branch (including STATE.md)\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
+      variant: 'destructive',
+      confirmLabel: 'Reset Issue',
+    })) {
+      resetIssueMutation.mutate();
+    }
+  };
+
   const handleResetReview = async () => {
     if (await confirm({
       title: 'Reset & Re-run Pipeline',
@@ -1006,7 +1017,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
           onReopen={handleReopen}
-          onResetIssue={() => resetIssueMutation.mutate()}
+          onResetIssue={handleResetIssue}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />
