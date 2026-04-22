@@ -178,10 +178,30 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'agent.stopped': {
       const { [event.payload.agentId]: _removed, ...rest } = state.agentsById
+      // PAN-800 — mark the runtime snapshot stopped too. pan kill bypasses the
+      // Stop hook, so without this fold a killed agent shows activity: "idle"
+      // forever. Retain the row (don't delete) so the projection cache has the
+      // last-known snapshot for forensics.
+      const prevRuntime = state.agentRuntimeById[event.payload.agentId]
+      const nextRuntimeById = prevRuntime
+        ? {
+            ...state.agentRuntimeById,
+            [event.payload.agentId]: {
+              ...prevRuntime,
+              activity: 'stopped' as const,
+              currentTool: undefined,
+              thinking: undefined,
+              waiting: undefined,
+              lastActivity: event.timestamp,
+              updatedAtSequence: event.sequence,
+            },
+          }
+        : state.agentRuntimeById
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: rest,
+        agentRuntimeById: nextRuntimeById,
       }
     }
 
