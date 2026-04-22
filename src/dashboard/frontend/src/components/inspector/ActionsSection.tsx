@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle, ChevronRight,
+  XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle, ChevronRight,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent, WorkAgentLifecycle } from '../../types';
@@ -8,6 +8,7 @@ import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../../lib/pipeline-state';
 import { ResetIssueButton } from '../ResetIssueButton';
+import { StopAgentButton } from '../StopAgentButton';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -23,7 +24,6 @@ interface ActionsSectionProps {
   workspace?: WorkspaceInfo;
   mergeMutation: AnyMutation;
   reviewMutation: AnyMutation;
-  killMutation: AnyMutation;
   cancelMutation: AnyMutation;
   resetReviewMutation: ResetReviewMutation;
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
@@ -33,7 +33,6 @@ interface ActionsSectionProps {
   reopenMutation?: ReopenMutation;
   onMerge: () => void;
   onReview: () => void;
-  onKill: () => void;
   onCancel: () => void;
   onResetReview: () => void;
   onResetSession: () => void;
@@ -41,6 +40,7 @@ interface ActionsSectionProps {
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
   onReopen?: () => void;
+  onKillSuccess?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
@@ -53,7 +53,6 @@ export function ActionsSection({
   workspace,
   mergeMutation,
   reviewMutation,
-  killMutation,
   cancelMutation,
   resetReviewMutation,
   startAgentMutation,
@@ -63,7 +62,6 @@ export function ActionsSection({
   reopenMutation,
   onMerge,
   onReview,
-  onKill,
   onCancel,
   onResetReview,
   onResetSession,
@@ -71,6 +69,7 @@ export function ActionsSection({
   onStartAgent,
   onCreateWorkspace,
   onReopen,
+  onKillSuccess,
   lifecycle,
   agentLaunchState,
 }: ActionsSectionProps) {
@@ -230,13 +229,11 @@ export function ActionsSection({
 
         {/* Stop Agent */}
         {agent && agent.status !== 'stopped' && (
-          <button
-            onClick={onKill}
-            disabled={killMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-destructive rounded badge-bg-destructive hover:bg-destructive/20"
-          >
-            <Square className="w-3 h-3" />Stop
-          </button>
+          <StopAgentButton
+            agentId={agent?.id}
+            variant="inspector"
+            onSuccess={onKillSuccess}
+          />
         )}
 
         {/* Recover failed review/test/merge pipeline */}

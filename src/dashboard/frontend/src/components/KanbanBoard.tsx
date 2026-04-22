@@ -31,8 +31,9 @@ import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
-import { useKillAgent } from '../hooks/useKillAgent';
 import { ResetIssueButton } from './ResetIssueButton';
+import { StopAgentButton } from './StopAgentButton';
+import { ArtifactLinks } from './ArtifactLinks';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
@@ -2377,57 +2378,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const hasPlan = planningStateQuery.data?.hasPlan ?? false;
   const beadsCount = planningStateQuery.data?.beadsCount ?? 0;
   const planningComplete = planningStateQuery.data?.planningComplete ?? false;
-  const needsTaskGeneration = hasPlan && beadsCount === 0;
-
-  const generateTasksMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/generate-tasks`, { method: 'POST' });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body?.success === false) {
-        throw new Error(body?.error || (body?.errors?.[0] ?? 'Failed to generate tasks'));
-      }
-      return body as { success: true; created: string[]; count: number };
-    },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ['planning-state', issue.identifier] });
-      await refreshDashboardState(queryClient);
-      void showAlert({ title: 'Tasks generated', message: `Created ${data.count} bead${data.count === 1 ? '' : 's'} from the vBRIEF plan.` });
-    },
-    onError: (err: Error) => {
-      void showAlert({ title: 'Generate tasks failed', message: err.message, variant: 'error' });
-    },
-  });
-
-  const handleTasksClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (needsTaskGeneration) {
-      if (!generateTasksMutation.isPending) generateTasksMutation.mutate();
-    } else {
-      onViewBeads && onViewBeads(issue);
-    }
-  };
-
-  // Reusable chip elements — colored by planning state.
-  // vBRIEF green when a plan exists; Tasks red when plan exists but no beads
-  // (and the click action becomes "Generate Tasks" instead of "view beads").
-  const tasksChip = (
-    <button
-      onClick={handleTasksClick}
-      disabled={generateTasksMutation.isPending}
-      className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${
-        needsTaskGeneration
-          ? 'text-destructive hover:text-destructive/80 font-medium'
-          : beadsCount > 0
-            ? 'text-success hover:text-success/80'
-            : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title={needsTaskGeneration ? 'Generate beads from vBRIEF plan' : 'Tasks'}
-    >
-      {generateTasksMutation.isPending
-        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        : <List className="w-3.5 h-3.5" />}
-      {needsTaskGeneration ? 'Generate Tasks' : 'Tasks'}
-    </button>
+  const artifactLinks = (
+    <ArtifactLinks
+      issueId={issue.identifier || ''}
+      hasPlan={hasPlan}
+      beadsCount={beadsCount}
+      onViewBeads={() => onViewBeads && onViewBeads(issue)}
+      onViewVBrief={() => onViewVBrief && onViewVBrief(issue)}
+      variant="card"
+    />
   );
 
   // Plan/See Plan chip — opens the planning dialog. Green "See Plan" when a
@@ -2450,23 +2409,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     </button>
   );
 
-  const vbriefChip = (
-    <button
-      onClick={(e) => { e.stopPropagation(); onViewVBrief && onViewVBrief(issue); }}
-      className={`flex items-center gap-1 text-xs transition-colors ${
-        hasPlan
-          ? 'text-success hover:text-success/80'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title="vBRIEF"
-    >
-      <ScrollText className="w-3.5 h-3.5" />
-      vBRIEF
-    </button>
-  );
-
-  const { confirmAndKill, isPending: killPending } = useKillAgent(agent?.id);
-
   // Send message mutation
   const [messageInput, setMessageInput] = useState('');
   const [showMessageInput, setShowMessageInput] = useState(false);
@@ -2486,16 +2428,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       setShowMessageInput(false);
     },
   });
-
-  const handleKill = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await confirmAndKill();
-  };
-
-  const handleWatch = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect();
-  };
 
   const handleTell = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -3003,18 +2935,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {/* Action buttons for running agents */}
       {isRunning && (
         <div className={actionBarClass}>
-          <button
-            onClick={handleWatch}
-            className={`flex items-center gap-1 text-xs transition-colors ${
-              isSelected ? 'text-primary' : 'text-content-subtle hover:text-content'
-            }`}
-            title="Watch"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            Watch
-          </button>
-          {tasksChip}
-          {vbriefChip}
+          {artifactLinks}
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -3030,24 +2951,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
-          {/* Model badge - centered between Tell and Kill */}
+          {/* Model badge */}
           {activeAgent && activeAgent.model && (
             <span className="flex-1 text-center text-[10px] text-content-body font-medium">
               {getFriendlyModelName(activeAgent.model)}
             </span>
           )}
-          <button
-            onClick={handleKill}
-            disabled={killPending}
-            className="flex items-center text-xs text-destructive-foreground hover:text-destructive-foreground/80 transition-colors"
-            title="Kill"
-          >
-            {killPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <X className="w-3.5 h-3.5" />
-            )}
-          </button>
+          <StopAgentButton agentId={agent?.id} variant="card" />
         </div>
       )}
 
@@ -3091,8 +3001,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
           {planLabelExists && (
             <>
-              {tasksChip}
-              {vbriefChip}
+              {artifactLinks}
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
@@ -3125,8 +3034,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           ) : (
             planChip
           )}
-          {tasksChip}
-          {vbriefChip}
+          {artifactLinks}
           {/* Resume Session only when there's an actual prior work agent to resume.
               For freshly-planned issues with no work agent yet, show Start Agent
               instead (gated on beads existing). */}
