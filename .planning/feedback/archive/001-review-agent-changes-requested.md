@@ -2,25 +2,25 @@
 specialist: review-agent
 issueId: PAN-569
 outcome: changes-requested
-timestamp: 2026-04-22T22:53:18Z
+timestamp: 2026-04-22T23:05:15Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-All 27 vBRIEF acceptance criteria are implemented and the `exec`→`execFile` hardening in `clean-planning.ts` is a real security improvement. However, two critical issues should block merge: (1) a client-side bug in `KanbanBoard.tsx:1045-1065` that overwrites pre-marked `skipped` results with `failed: "Missing from server response"` whenever users proceed past the active-agent warning, and (2) a spoofable `Host`-header fallback in the new bulk-close-out route's origin check that weakens CSRF protection on a destructive endpoint. Additional high-priority correctness issues in `issues.ts` (tmux session name built from un-normalized GitHub IDs; dead `split('-')[0]` prefix fallback) and in `KanbanBoard.tsx` (non-null assertions on optional bulk props) should land together. Performance concerns (O(N×M) agent scans in the warning dialog; per-card planning-state polling) are non-blocking. Recommend changes before merge.
+Feature scope is complete (28/28 acceptance criteria implemented with evidence) and security hygiene is reasonable (localhost origin, strict content-type, ID regex, 50-item cap, execFile migration). However, the PR diff removes shared MergeButton/RecoverButton components added in commit 8b7fc0b4 on main and re-inlines duplicated logic in KanbanBoard.tsx and ActionsSection.tsx — this is a silent regression that must be resolved by rebasing. Additional high-priority items: client/server mismatch on "active agent" predicate (client misses `failed`), permissive GitHub ID regex, origin-only CSRF on a highly destructive endpoint, and O(n) planning-state fetch fan-out in the kanban board. Recommend changes requested: rebase + unify predicate + tighten regex + empty-array guard before merge; treat CSRF/auth layer and bulk planning-state endpoint as follow-up tickets.
 
 ## Security Issues
 
-- Host-header fallback enables CSRF on bulk-close-out endpoint
-- Content-Type substring match permits pathological values
+- Origin-only CSRF protection on bulk-close-out endpoint
+- Permissive GitHub issue-ID regex allows shell metacharacters
+- Missing audit logging and rate limiting on bulk destructive endpoint
 
 ## Performance Issues
 
-- O(selectedIssues × agents) scans in BulkAgentWarningDialog
-- Per-card planning-state polling fan-out
-- Nested selectedIssues×issuesWithAgents membership check
+- N-per-issue planning-state fetch fan-out in KanbanBoard
+- Repeated git ls-files subprocesses in cleanPlanningArtifacts
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
