@@ -926,6 +926,10 @@ interface KanbanBoardProps {
   selectedIssue?: string | null;
   onSelectIssue?: (issueId: string | null) => void;
   onPlanDialogChange?: (issueId: string | null) => void;
+  bulkSelectedIds?: Set<string>;
+  onBulkToggle?: (issueId: string) => void;
+  onBulkSelectAll?: (issueIds: string[]) => void;
+  onBulkDeselectAll?: (issueIds: string[]) => void;
 }
 
 type CycleFilter = 'current' | 'all' | 'backlog' | 'canceled';
@@ -938,7 +942,7 @@ interface UndoEntry {
   timestamp: number;
 }
 
-export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange }: KanbanBoardProps) {
+export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange, bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
@@ -1567,29 +1571,62 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       ) : (
         /* Kanban columns - DnD disabled pending rework (PAN-TODO) */
         <div className="flex gap-4 overflow-hidden pb-4">
-          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
-            <div key={status} className="flex-1 min-w-0">
-              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors`}>
-                <div className="px-4 py-3 border-b border-divider bg-surface-raised">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                    <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
+          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
+            const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
+            const selectedInColumn = columnIssueIds.filter(id => bulkSelectedIds?.has(id));
+            const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
+            const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
+
+            return (
+              <div key={status} className="flex-1 min-w-0">
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors`}>
+                  <div className="px-4 py-3 border-b border-divider bg-surface-raised">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {onBulkToggle && onBulkSelectAll && onBulkDeselectAll && (
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = someSelected;
+                            }}
+                            onChange={() => {
+                              if (allSelected) {
+                                onBulkDeselectAll(columnIssueIds);
+                              } else {
+                                onBulkSelectAll(columnIssueIds);
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+                            aria-label={`Select all ${COLUMN_TITLES[status]}`}
+                          />
+                        )}
+                        <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                      </div>
+                      <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
+                    </div>
                   </div>
+                  <ColumnContent
+                    issues={sortedGrouped[status]}
+                    agents={agents}
+                    specialists={specialists}
+                    issueCosts={issueCosts}
+                    costsLoading={costsLoading}
+                    selectedIssue={selectedIssue}
+                    onSelectIssue={onSelectIssue}
+                    onPlan={setPlanDialogIssue}
+                    onViewBeads={setBeadsDialogIssue}
+                    onViewVBrief={setVbriefDialogIssue}
+                    collapsedFeatures={collapsedFeatures}
+                    onToggleFeature={toggleFeature}
+                    bulkSelectedIds={bulkSelectedIds}
+                    onBulkToggle={onBulkToggle}
+                  />
                 </div>
-                <ColumnContent
-                  issues={sortedGrouped[status]}
-                  agents={agents}
-                  specialists={specialists}
-                  issueCosts={issueCosts}
-                  costsLoading={costsLoading}
-                  selectedIssue={selectedIssue}
-                  onSelectIssue={onSelectIssue}
-                  onPlan={setPlanDialogIssue}
-                  onViewBeads={setBeadsDialogIssue}
-                  onViewVBrief={setVbriefDialogIssue}
-                  collapsedFeatures={collapsedFeatures}
-                  onToggleFeature={toggleFeature}
-                />
+              </div>
+            );
+          })}
+        </div>
               </div>
             </div>
           ))}
