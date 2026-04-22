@@ -26,8 +26,13 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [x] Fix: Symlink escape in attachment path containment - use `realpath` instead of `resolve` (new)
 - [x] Fix: CSRF/origin protection on destructive JSON POSTs - add `validateOrigin` to upload-image, delete-image, stop, archive, message endpoints (new)
 - [x] Fix: Full JSONL reparse during attachment cleanup - replace `parseConversationMessages` with line-by-line stream reading in `readSessionAttachmentBasenames` (new)
+- [x] Fix: Attachment-path regex prose matching - allow unmanaged @paths, only validate managed uploads (commit: 824ed90f)
+- [x] Fix: generateAiTitle spawn timeout, UTF-8 encoding, stdin guard (commit: 824ed90f)
+- [x] Fix: removePendingImage HTTP side effects moved outside React state updater (commit: 824ed90f)
+- [x] Fix: CSRF gate rejects requests with neither Origin nor Referer (commit: 824ed90f)
+- [x] Fix: Cache summarizeConversationActivity by mtimeMs+size to avoid per-poll re-parse (commit: 824ed90f)
 - [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
-- [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3568/3568)
+- [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
 ## Remaining Work
 - [ ] Push branch and resubmit for review via /rebase-and-submit
@@ -51,5 +56,6 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [2026-04-22T20:09Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
   - Issues: (1) Path traversal in /delete-image via symlink escape, (2) symlink escape in attachment path containment check, (3) missing CSRF/origin protection on destructive JSON POSTs, (4) full JSONL reparse during attachment cleanup on every stop/archive
   - Status: FIXED. `isManagedConversationAttachmentPath` and `isConversationAttachmentPath` now use `realpath` to resolve symlinks before containment checks. `validateOrigin` added to upload-image, delete-image, stop, archive, and message endpoints. `readSessionAttachmentBasenames` replaced full JSONL parse with line-by-line stream reading.
-- **[2026-04-22T20:24Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-22T20:40Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-22T20:24Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round5.md`
+  - Issues: (1) Attachment-path regex matches prose @paths, (2) generateAiTitle spawn lost timeout/UTF-8 guard, (3) removePendingImage HTTP in state updater, (4) CSRF gate allows no Origin/Referer, (5) summarizeConversationActivity re-parses every JSONL on list poll
+  - Status: FIXED in commit 824ed90f. All five issues resolved with regression tests. Feedback archived.
