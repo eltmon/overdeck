@@ -119,7 +119,7 @@ describe('conversations route — DB integration', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data or payload exceeds 5242880 bytes' });
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data' });
   });
 
   it('rejects oversized upload payloads before writing files', async () => {
@@ -136,7 +136,25 @@ describe('conversations route — DB integration', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid base64 image data or payload exceeds 5242880 bytes' });
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Payload exceeds maximum size of 5242880 bytes' });
+  });
+
+  it('rejects base64 strings exceeding max length before decoding', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    // A valid base64 string that is longer than the allowed max (ceil(5MB * 4/3) = 6,991,021 chars)
+    const hugeData = 'A'.repeat(7_000_000);
+    const response = await handleConversationImageUpload('upload-test', {
+      filename: 'huge.png',
+      data: hugeData,
+      mimeType: 'image/png',
+    });
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Payload exceeds maximum size of 5242880 bytes' });
   });
 
   it('rejects attachment reuse across conversations while preserving referenced uploads', async () => {

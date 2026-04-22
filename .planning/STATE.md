@@ -39,3 +39,4 @@ All implementation and feedback fixes are complete. Branch rebased onto main and
   - Issue: 24 test failures in ActionsSection.test.tsx — StopAgentButton and ResetIssueButton using hooks that require DialogProvider/QueryClientProvider contexts not present in tests
   - Status: FIXED in commit 5cdd1ae5. Added vi.mock for useConfirm, useAlert, useKillAgent, useResetIssue. Fixed two broken assertions (onKill → onKillSuccess prop name, Reopen button test).
 - **[2026-04-22T19:44Z] verification-gate → FAILED** — `.planning/feedback/032-verification-gate-failed.md`
+- **[2026-04-22T19:55Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

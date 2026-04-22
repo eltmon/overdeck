@@ -126,20 +126,37 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-function decodeUploadBytes(data: string): Buffer | null {
+type UploadValidation = { ok: true; bytes: Buffer } | { ok: false; reason: 'format' | 'size' };
+
+function validateUploadData(data: string): UploadValidation {
   const trimmed = data.trim();
   if (!trimmed || trimmed.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)) {
-    return null;
+    return { ok: false, reason: 'format' };
+  }
+  // Cap base64 string length before decoding to prevent memory DoS.
+  // Base64 is ~4/3 of binary size, so ceil(MAX_UPLOAD_BYTES * 4/3) is the max valid length.
+  const maxBase64Length = Math.ceil(MAX_UPLOAD_BYTES * 4 / 3);
+  if (trimmed.length > maxBase64Length) {
+    return { ok: false, reason: 'size' };
   }
   try {
     const bytes = Buffer.from(trimmed, 'base64');
     if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) {
-      return null;
+      return { ok: false, reason: 'size' };
     }
-    return bytes.toString('base64') === trimmed ? bytes : null;
+    if (bytes.toString('base64') !== trimmed) {
+      return { ok: false, reason: 'format' };
+    }
+    return { ok: true, bytes };
   } catch {
-    return null;
+    return { ok: false, reason: 'format' };
   }
+}
+
+/** @deprecated Use validateUploadData for distinct format/size errors. */
+function decodeUploadBytes(data: string): Buffer | null {
+  const result = validateUploadData(data);
+  return result.ok ? result.bytes : null;
 }
 
 function safeUploadExtension(filename: string, mimeType: string): string {
@@ -170,10 +187,14 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
 
-  const bytes = decodeUploadBytes(data);
-  if (!bytes) {
-    return jsonResponse({ error: `Invalid base64 image data or payload exceeds ${MAX_UPLOAD_BYTES} bytes` }, { status: 400 });
+  const validation = validateUploadData(data);
+  if (!validation.ok) {
+    const error = validation.reason === 'size'
+      ? `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes`
+      : 'Invalid base64 image data';
+    return jsonResponse({ error }, { status: 400 });
   }
+  const bytes = validation.bytes;
 
   const extension = safeUploadExtension(filename, mimeType);
   if (!extension) {
