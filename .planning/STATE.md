@@ -1,9 +1,9 @@
 # PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: Submitted for Review
+## Status: Approved — Awaiting Human Merge
 
 ## Current Phase
-All implementation and feedback fixes are complete. Submitted via `pan done PAN-539`. Review & test pipeline auto-triggered.
+Review-agent APPROVED PAN-539 at 2026-04-22T23:11Z. All 5 vBRIEF items implemented. Specialist pipeline running tests; will queue for human merge approval upon pass.
 
 ## Completed Work
 - [x] Backend: Added POST /api/conversations/:name/upload-image endpoint with MIME validation, temp-file naming, and async writes (commit: cf85bf1f)
@@ -79,3 +79,4 @@ All implementation and feedback fixes are complete. Submitted via `pan done PAN-
 - [2026-04-22T23:01Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round7.md`
   - Issues: (1) JSONL reference extraction misses tool-use-shaped entries, (2) managed-but-deleted attachment silently falls through to unmanaged branch, (3) dead/shadowed imports
   - Status: FIXED. readSessionAttachmentBasenames now searches raw JSON line for @/ paths. isManagedConversationAttachmentPath and isConversationAttachmentPath fall back to resolve() when realpath() throws (deleted files). Removed dead imports getProviderForModel and HttpServerResponse.
+- **[2026-04-22T23:11Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
