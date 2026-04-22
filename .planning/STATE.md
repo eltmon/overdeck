@@ -40,6 +40,7 @@ Implementation complete. Waiting for inspections and tests to pass.
 - **[2026-04-22T20:31Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-22T20:42Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-22T22:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-22T22:45Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
 
 ## Problem
 
