@@ -1,217 +1,314 @@
-# tmux capture-pane Usage Audit — Full Report
+# PAN-798: Tmux capture-pane Audit
+
+**Scope:** All `capturePaneAsync()` call sites and pattern-scanning locations in `src/`  
+**Date:** 2026-04-22  
+**Related:** `PAN-798.md` (master PRD), `PAN-798-research.md`
+
+---
 
 ## Executive Summary
 
-There are **20 call sites** across **9 files** extracting data from tmux scrollback. Every single one can be replaced with structured data sources, file-based hooks, or RPC. The captures fall into **6 categories**: transcript display, readiness detection, delivery confirmation, health/stuck monitoring, model extraction, and terminal streaming.
+- **22 total call sites** across **12 files**
+- **20 perform pattern scanning** — 70+ distinct patterns/regexes
+- **2 are pure passthrough** (return/save/display raw output, no scanning)
+- Every single pattern-scanning location can be replaced with structured data sources
 
 ---
 
-## Category 1: Transcript Display (Dashboard)
+## Part 1: Call Site Analysis
 
-### 1. `src/dashboard/server/routes/mission-control.ts:161`
-- **Captures**: 500 lines of agent/planning output
-- **Used for**: ActivityView dashboard panel showing live agent transcripts
-- **Replacement**: Stream from `output.log` (already written by `agents.ts:stopAgentAsync` and append-mode logging). Add a live `tail -f` WebSocket or in-memory stream. The `runtime.json` hook already tracks `lastOutput` per cycle.
+### Category: Transcript Display (Dashboard)
 
-### 2. `src/dashboard/server/routes/mission-control.ts:297,306`
-- **Captures**: 100 lines of specialist output (review/test/merge agents)
-- **Used for**: Specialist live output panel in ActivityView
-- **Replacement**: Specialists already write `runtime.json` and heartbeat files. Stream from those or add specialist-specific `output.log` files. The `specialists.ts` module controls specialist lifecycle — add a `specialistOutput` field to the heartbeat or a dedicated log stream.
+| # | File:Line | Captures | Used For | Replacement |
+|---|-----------|----------|----------|-------------|
+| 1 | `mission-control.ts:161` | 500 lines | ActivityView agent transcript | JSONL session file |
+| 2 | `mission-control.ts:297,306` | 100 lines | Specialist live output panel | JSONL session file |
+| 3 | `agents.ts:526` | Configurable (default 100) | Agent output endpoint | JSONL session file |
 
-### 3. `src/dashboard/server/routes/agents.ts:526`
-- **Captures**: Configurable lines (default 100) of agent stdout
-- **Used for**: GET `/api/agents/:id/output` endpoint for log streaming
-- **Replacement**: Read from `output.log` directly. The `stopAgentAsync` already saves full capture to `~/.panopticon/agents/<id>/output.log`. For live agents, stream from an append-mode log file or add `lastOutput` to `runtime.json` heartbeat.
+### Category: Readiness Detection
 
----
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 4 | `tmux.ts:527` | `waitForClaudePrompt()` | 10 lines every 500ms/15s | Wait for `❯` prompt | `ready.json` hook |
+| 5 | `conversations.ts:81` | `waitForClaudeReady()` | 200 lines every 500ms/30s | Wait for `❯` prompt | `ready.json` hook |
+| 6 | `agents.ts:244` | `waitForReadySignal()` | 200 lines | Fallback when hook misses | Fix PAN-759 |
+| 7 | `agents.ts:1041` | `startAgent` inline | 200 lines | Detect "bypass permissions on" | `ready.json` hook |
 
-## Category 2: Readiness Detection (Claude Prompt Waiting)
+**Note:** `waitForClaudePrompt()` is called from **6 sites** total: `agents.ts:1401`, `specialists.ts:2436,2459`, `conversations.ts:560,613,969`.
 
-### 4. `src/lib/tmux.ts:527-553` — `waitForClaudePrompt()`
-- **Captures**: 10 lines every 500ms for 15s
-- **Used for**: Blocking until Claude shows `❯` prompt before sending next message
-- **Replacement**: Claude Code hooks already write `ready.json` on session start (see `agents.ts:244-274` which already prefers `ready.json`). Extend the hook system to write `ready.json` after every tool use completion, or add a `prompt-ready` heartbeat to `runtime.json`.
+### Category: Delivery Confirmation
 
-### 5. `src/dashboard/server/routes/conversations.ts:81-92` — `waitForClaudeReady()`
-- **Captures**: 200 lines every 500ms for 30s
-- **Used for**: Waiting for Claude to be ready when spawning new conversation sessions
-- **Replacement**: Same as above — rely on `ready.json` hook. The `SessionStart` hook already fires; ensure it fires reliably and remove the tmux fallback.
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 8 | `tmux.ts:559` | `confirmDelivery()` | 50 lines before/after | Verify message received | `messageReceived` sequence |
+| 9 | `specialists.ts:2484,2495` | — | 50 lines before + retry | Specialist delivery confirmation | `messageReceived` sequence |
 
-### 6. `src/lib/agents.ts:266` — `waitForReadySignal()`
-- **Captures**: 200 lines
-- **Used for**: Fallback when `ready.json` hook not written (PAN-759)
-- **Replacement**: Fix the hook reliability issue (PAN-759 root cause). The hook system should be the sole source of truth. The comment already says "fallback" — remove the fallback once hooks are reliable.
+### Category: Health & Stuck Detection (Deacon)
 
-### 7. `src/lib/agents.ts:1057` — Agent spawn readiness check
-- **Captures**: 200 lines
-- **Used for**: Checking if spawned agent shows "bypass permissions on" or "Claude Code" text
-- **Replacement**: The `SessionStart` hook writes `ready.json`. If the hook isn't firing, fix the hook. No tmux needed.
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 10 | `deacon.ts:651` | `checkLazyAgent()` | 20 lines | Detect lazy patterns at idle prompt | `runtime.json.state` + `waitingReason` |
+| 11 | `deacon.ts:849` | `isAgentActiveInTmux()` | 5 lines (bottom 8) | Check if agent is working | `runtime.json.activity` |
+| 12 | `deacon.ts:935` | `parseThinkingDuration()` | Called from #11, #13 | Extract thinking duration | `runtime.json.thinkingSince` |
+| 13 | `deacon.ts:955` | `checkStuckWorkAgents()` | 10 lines | Detect stuck agents + dialog | `runtime.json.thinkingSince` + `waitingOnHuman` |
 
----
+### Category: Health Checks (No Pattern Scanning)
 
-## Category 3: Delivery Confirmation
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 14 | `health.ts:91` | `getAgentOutput()` | Configurable | Return raw output | `runtime.json.state` |
+| 15 | `health-filtering.ts:13` | `checkAgentHealthAsync()` | 5 lines | Return `{alive, lastOutput}` | `runtime.json.state` |
 
-### 8. `src/lib/tmux.ts:559-599` — `confirmDelivery()`
-- **Captures**: 50 lines before and after sending keys
-- **Used for**: Comparing pane state to verify Claude received and started processing a message
-- **Replacement**: This is the hardest replacement. Options:
-  - **Option A**: Add a `message-received` acknowledgment to `runtime.json` (Claude Code writes a hook after reading stdin)
-  - **Option B**: Use `sendKeysAsync` with the `load-buffer` + `paste-buffer` pattern (already in rules) and trust tmux delivery. The 300ms delay in the paste pattern is specifically to ensure delivery.
-  - **Option C**: Add a `processing` field to `runtime.json` that Claude sets true when it starts processing input.
+**Note:** These do NOT scan patterns — they return raw tmux text. Downstream consumers may scan that text; this needs verification (see research item #8).
 
-### 9. `src/lib/cloister/specialists.ts:2484,2495`
-- **Captures**: 50 lines before sending, 50 lines before retry
-- **Used for**: Confirming specialist task delivery using `confirmDelivery()`
-- **Replacement**: Same as #8. Specialists are Claude Code sessions — they should use the same hook-based acknowledgment. The `specialists.ts` already manages specialist lifecycle; add delivery confirmation to the specialist protocol.
+### Category: Model & Metadata Extraction
 
----
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 16 | `workspaces.ts:931` | `getWorkspaceRoute()` | 50 lines | Extract model name from tmux | `runtime.json.model` |
 
-## Category 4: Health & Stuck Detection (Deacon)
+### Category: Terminal Streaming (WebSocket)
 
-### 10. `src/lib/cloister/deacon.ts:664` — `checkLazyAgent()`
-- **Captures**: 20 lines
-- **Used for**: Detecting lazy patterns ("what would you like me to do", "options:", "stop here") when agent is at idle prompt
-- **Replacement**: Add `intent` or `status` field to `runtime.json` that Claude Code sets based on its internal state. Lazy patterns indicate Claude is asking for direction — this should be a structured state (`waiting-on-human`, `needs-clarification`) not parsed from text.
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 17 | `ws-terminal.ts:89` | `captureFreshSnapshot()` | 500 lines | Initial WebSocket snapshot | PTY hub ring buffer |
+| 18 | `ws-terminal.ts:101` | `captureViewportSnapshot()` | 0 lines (viewport) | Hub join snapshot | PTY hub viewport state |
 
-### 11. `src/lib/cloister/deacon.ts:851` — `isAgentActiveInTmux()`
-- **Captures**: 5 lines (bottom 8 non-blank)
-- **Used for**: Checking if agent is actively working (computing, thinking, reading, Bash, Read, Write, Edit, etc.)
-- **Replacement**: Claude Code already knows what it's doing. Add `activity` field to `runtime.json` with values: `computing`, `thinking`, `reading`, `bash`, `read`, `write`, `edit`, `idle`. The `PostToolUse` hook can update this after every tool invocation.
+### Category: Agent Lifecycle
 
-### 12. `src/lib/cloister/deacon.ts:978` — `checkStuckWorkAgents()`
-- **Captures**: 10 lines
-- **Used for**: Parsing "Thinking… (Xm Ys)" duration and detecting exclude-from-context dialog
-- **Replacement**:
-  - Thinking duration: Add `thinkingSince` timestamp to `runtime.json`. Claude sets it when thinking starts, clears when done.
-  - Exclude-from-context dialog: Add `dialogs` array to `runtime.json` with active modal states. Or detect this via the `PostToolUse` hook pattern.
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 19 | `agents.ts:1224` | `stopAgentAsync()` | 5000 lines | Save output before kill | JSONL session file |
 
-### 13. `src/lib/health.ts:93` — `getAgentOutput()`
-- **Captures**: Configurable lines
-- **Used for**: Health monitoring — getting recent terminal output
-- **Replacement**: Read from `output.log` or `runtime.json.lastOutput`. Health checks should query structured state, not parse tmux.
+### Category: Git Pattern Scanning (Merge Agent)
 
-### 14. `src/dashboard/lib/health-filtering.ts:26` — `checkAgentHealthAsync()`
-- **Captures**: 5 lines
-- **Used for**: Quick health check — is agent active?
-- **Replacement**: Query `runtime.json` `status` field. Already structured, already written by hooks.
+| # | File:Line | Function | Captures | Used For | Replacement |
+|---|-----------|----------|----------|----------|-------------|
+| 20 | `merge-agent.ts:660` | `captureTmuxOutput()` | 50 lines | Scan git operations | `git-events.jsonl` |
+| 21 | `merge-agent.ts:1017` | `scanGitPatterns()` | Captured text | Emit `git_operations` rows | `git-events.jsonl` |
+| 22 | `merge-agent.ts:1071` | `pollMergeCompletion()` | Captured text | Extract test failure count | `test-results.json` |
 
 ---
 
-## Category 5: Model & Metadata Extraction
+## Part 2: Detailed Pattern Breakdown
 
-### 15. `src/dashboard/server/routes/workspaces.ts:931`
-- **Captures**: 50 lines
-- **Used for**: Extracting model info via regex `[(](?:oai|cx|go)?@?(?:gpt-[0-9.]+...)[^\]]*\]`
-- **Replacement**: The model is known at spawn time (passed to Claude Code via `--model` or config). Write `model` to `runtime.json` at session start. Or parse from the agent config file. Never parse from tmux text.
+### `waitForClaudePrompt()` (`tmux.ts:527`) — `activity_detection`
+
+**Pattern:** `❯` (Claude Code prompt indicator, `.includes()` on each line)  
+**Logic:** Requires 2+ consecutive polls with session existence verification.  
+**Called from:** 6 sites (see above).
+
+### `confirmDelivery()` (`tmux.ts:559`) — `delivery_confirmation` — **HIGH RISK**
+
+**14 processing patterns checked:**
+- `●`, `⎿`, `Read`, `✻`, `✶`, `✽`, `✢`
+- `Generating`, `thinking`, `thought for`
+- `Retrying in`, `API Error`, `"You've hit your limit"`, `Tool use`
+
+**Logic:** Compares pane output before/after send. Returns `true` if any pattern appears in the delta.  
+**Risk:** False positive if pattern exists in pre-existing pane content.
+
+### `waitForReadySignal()` (`agents.ts:244`) — `activity_detection`
+
+**Patterns:** `bypass permissions on`, `⏵⏵`  
+**Logic:** Returns `true` if either indicator found in 200-line capture.
+
+### `startAgent` inline check (`agents.ts:1041`) — `activity_detection`
+
+**Patterns:** `bypass permissions on`, `Claude Code`  
+**Logic:** Sets `ready = true` after detecting Claude Code initialized.
+
+### `checkLazyAgent()` (`deacon.ts:651`) — `stuck_detection` — **HIGH RISK**
+
+**17 active-status patterns (regex):**
+`/computing/i`, `/fermenting/i`, `/thinking/i`, `/reading/i`, `/writing/i`, `/editing/i`, `/searching/i`, `/running/i`, `/executing/i`, `/tool use/i`, `/\bBash\b/`, `/\bRead\b/`, `/\bWrite\b/`, `/\bEdit\b/`, `/\bGrep\b/`, `/\bGlob\b/`, `/\bTask\b/`
+
+**Idle prompt detection:**
+- `/^[>\$#]\s*$/` (regex on last line)
+- `lastLine.endsWith('?')`
+- `lastLine.includes('What would you like')`
+
+**17 lazy patterns (regex):**
+- `/what would you like me to do\??/i`
+- `/option\s*[123]:/i`, `/options?:/i`
+- `/would you prefer/i`
+- `/should I (continue|proceed|stop)/i`
+- `/this would take \d+[-–]\d+ hours/i`
+- `/estimated \d+ hours/i`
+- `/manual intervention/i`, `/requires human/i`
+- `/stop here/i`
+- `/deferred (to|for) (future|later|follow-up)/i`
+- `/future PR/i`, `/follow-up issue/i`
+- `/documented for later/i`, `/remaining work documented/i`
+- `/targeted approach/i`
+- `/infrastructure.*(complete|done).*tests.*(fail|broken)/i`
+
+**Logic:** If active pattern matches → not lazy. If at prompt AND lazy pattern matches → lazy.  
+**Risk:** Broad lazy patterns could interrupt working agents; missed active patterns could misclassify computing agents.
+
+### `isAgentActiveInTmux()` (`deacon.ts:849`) — `activity_detection`
+
+**Patterns:** Same 17 active-status regexes as `checkLazyAgent()`.  
+**Special case:** If `thinking|fermenting` matches → calls `parseThinkingDuration()`. If duration ≥ 10 min → returns `false` (stuck).  
+**Logic:** Checks bottom 8 non-blank lines.
+
+### `parseThinkingDuration()` (`deacon.ts:935`) — `metadata_extraction` — **HIGH RISK**
+
+**Regex:** `/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/`  
+**Logic:** Extracts minutes and seconds, converts to milliseconds.  
+**Risk:** Format fragility — if Claude Code changes status text, stuck detection breaks.
+
+### `checkStuckWorkAgents()` (`deacon.ts:955`) — `stuck_detection` + `dialog_intervention`
+
+**Dialog detection:**
+- `.includes('Do you want to make this edit to exclude')`
+- `.includes('Esc to cancel') && .includes('Tab to amend')`
+
+**Thinking detection:** Calls `parseThinkingDuration()`. If ≥ 10 min → three-stage recovery (Escape → Ctrl+C → kill + respawn).
+
+**Risk:** Simple `.includes()` could misfire if those strings appear in legitimate output.
+
+### `parseAgentOutput()` (`review-agent.ts:139`) — `result_extraction`
+
+**Structured markers:** `REVIEW_RESULT:`, `FILES_REVIEWED:`, `SECURITY_ISSUES:`, `PERFORMANCE_ISSUES:`, `NOTES:`  
+**Logic:** `.startsWith()` on each line. Populates `ReviewResult` object.  
+**Note:** No human-readable fallback. Markers are printed to stdout by the review agent itself.
+
+### `parseAgentOutput()` (`merge-agent.ts:412`) — `result_extraction`
+
+**Structured markers:** `MERGE_RESULT:`, `RESOLVED_FILES:`, `FAILED_FILES:`, `TESTS:`, `VALIDATION:`, `REASON:`, `NOTES:`  
+**Human-readable fallback:**
+- Success: `merge task complete`, `successfully merged`, `merge complete`, `pushed merge commit`, `successfully merged and pushed`
+- Failure: `merge failed`, `merge task failed`, `could not merge`, `conflict not resolved`
+- Test detection: `tests: pass`, `tests passed`, `/\d+ passed/`, `tests: fail`, `tests failed`
+
+**Logic:** Structured markers first, fallback to human-readable indicators.
+
+### `scanGitPatterns()` (`merge-agent.ts:684`) — `metadata_extraction`
+
+**8 git pattern regexes:**
+| Pattern | Operation |
+|---------|-----------|
+| `/force-with-lease/i` | `force_push_cmd` |
+| `/git push/i` | `push_attempt` |
+| `/git fetch/i` | `fetch_attempt` |
+| `/\[rejected\]/i` | `push_rejected` |
+| `/non-fast-forward/i` | `non_ff` |
+| `/retrying/i` | `retry` |
+| `/\[remote rejected\]/i` | `remote_rejected` |
+| `/Everything up-to-date/i` | `push_noop` |
+
+**Logic:** Line-by-line scan. Emits `git_operations` DB row with deduplication.  
+**Risk:** False positives produce spurious audit records but don't affect functionality.
+
+### `pollMergeCompletion()` test baseline (`merge-agent.ts:1071`) — `metadata_extraction`
+
+**Regex:** `/Failed\s*│\s*(\d+)\s*│/`  
+**Logic:** Extracts failed test count from Vitest-style output table.
+
+### `resolveConflictsWithAgent()` (`merge-agent.ts:1744`) — `result_extraction`
+
+**Patterns:** `MERGE_RESULT:` (`.includes()`), `merge task complete`, `successfully merged`, `merge complete`, `merge failed`, `merge task failed` (lowercased `.includes()`).  
+**Logic:** Polls every 5s for 15min. Calls `parseAgentOutput()` when marker detected.
+
+### `waitForClaudeReady()` (`conversations.ts:81`) — `activity_detection`
+
+**Pattern:** `❯` (`.includes()`)  
+**Logic:** Polls every 500ms for 30s.
+
+### `getWorkspaceRoute()` (`workspaces.ts:931`) — `metadata_extraction`
+
+**Regex 1:** `/\[((?:oai|cx|go)?@?(?:gpt-[0-9.]+(?:-mini|-nano|-pro)?|o[1-4](?:-mini)?(?:-high)?|gemini-[0-9.]+(?:-pro|-flash|-lite)?))[^\]]*\]/i`  
+**Regex 2:** `/\[(Opus|Sonnet|Haiku)[^\]]*\]/i`  
+**Logic:** Extracts model identifier from square brackets in tmux output (e.g., `[Sonnet 4.6]`).
+
+### `mission-control.ts:297` — `other`
+
+**Patterns:** `issueId.toUpperCase()`, `issueId`, `issueLower` (`.includes()`)  
+**Logic:** Filters specialist output — only includes lines mentioning the current issue ID. Shows "Waiting" placeholder otherwise.
 
 ---
 
-## Category 6: Terminal Streaming (WebSocket)
+## Part 3: Risk Assessment
 
-### 16. `src/dashboard/server/ws-terminal.ts:80-91` — `captureFreshSnapshot()`
-- **Captures**: 500 lines (configurable via `SNAPSHOT_SCROLLBACK_LINES`) with ANSI escape sequences
-- **Used for**: Initial scrollback when client connects to `/ws/terminal` before live PTY stream starts
-- **Replacement**: This is the **only legitimate use case** for historical terminal content. Replace with:
-  - **Option A**: PTY hub maintains an in-memory ring buffer of last N lines. Serve from buffer on connect.
-  - **Option B**: Write scrollback to a rotating log file (`terminal.scrollback.log`) and serve from file.
-  - **Option C**: Use `node-pty`'s `onData` handler to accumulate scrollback in memory before the WebSocket attaches.
+### High Risk
 
-### 17. `src/dashboard/server/ws-terminal.ts:100-102` — `captureViewportSnapshot()`
-- **Captures**: 0 lines (viewport only) with escape sequences
-- **Used for**: Capturing visible viewport when joining existing PTY hub
-- **Replacement**: Same as #16. The PTY hub knows the current viewport state. Maintain it in memory.
+1. **`confirmDelivery()`** — False positives on stale output could mask real delivery failures. 14 patterns; if any appear in pre-existing content, delivery is falsely confirmed.
+2. **`checkLazyAgent()`** — 34 regexes total. Overly broad lazy patterns could interrupt working agents; missed active patterns could misclassify computing agents.
+3. **`parseThinkingDuration()`** — Regex must match Claude Code's evolving status format. Format change = broken stuck detection.
+4. **`checkStuckWorkAgents()`** — Dialog detection uses simple `.includes()`; could misfire if strings appear in legitimate output.
 
----
+### Medium Risk
 
-## Category 7: Agent Lifecycle (Save Before Kill)
+5. **`parseAgentOutput()` (review-agent)** — No human-readable fallback. Agents may omit markers.
+6. **`parseAgentOutput()` (merge-agent)** — Human-readable fallback adds ambiguity. False positives possible.
 
-### 18. `src/lib/agents.ts:1224` — `stopAgentAsync()`
-- **Captures**: 5000 lines
-- **Used for**: Saving full terminal output to `output.log` before killing session
-- **Replacement**: This is a **write**, not a read concern. Replace with continuous append-mode logging. Instead of capturing at stop, stream to `output.log` continuously via `tee` or hook-based logging. Then remove this capture entirely.
+### Low Risk
+
+7. **`scanGitPatterns()`** — False positives produce spurious audit records only.
+8. **Model extraction** — Non-critical enrichment; fallback exists.
+9. **`waitForClaudePrompt()` / `waitForClaudeReady()`** — Timeout handles misses.
 
 ---
 
-## Category 8: Git Pattern Scanning (Merge Agent)
+## Part 4: Testing Recommendations
 
-### 19. `src/lib/cloister/merge-agent.ts:660-666` — `captureTmuxOutput()`
-- **Captures**: 50 lines (default)
-- **Used for**: Polling loop scanning for git operations in merge specialist output
-- **Replacement**: The merge specialist should write structured git events to `runtime.json` or a dedicated `git-events.jsonl` file. Patterns like `force-with-lease`, `git push`, `[rejected]` are events — emit them as events.
-
-### 20. `src/lib/cloister/merge-agent.ts:1017-1022` — `scanGitPatterns()`
-- **Captures**: Scans captured tmux output
-- **Used for**: Emitting to `git_operations` database table
-- **Replacement**: Same as #19. The merge agent should emit structured git events directly, not be parsed from tmux text.
-
-### 21. `src/lib/cloister/merge-agent.ts:1070-1077`
-- **Captures**: Specialist output from tmux
-- **Used for**: Extracting test failure baseline via regex `Failed\s*│\s*(\d+)\s*│`
-- **Replacement**: The test specialist should write structured test results to `test-results.json` or similar. Parse structured data, not tmux text.
+1. **`waitForClaudePrompt()`** — Unit tests for timeout, double-poll confirmation, session-death mid-poll.
+2. **`confirmDelivery()`** — Test each of the 14 patterns in isolation; verify no false positive when pattern exists in `outputBefore`.
+3. **`parseThinkingDuration()`** — Edge cases: `0m 5s`, `59m 59s`, missing minutes group, non-ASCII ellipsis variants.
+4. **`checkLazyAgent()`** — Verify no false lazy detection when agent shows any active-status pattern.
+5. **`checkStuckWorkAgents()`** — Test exclude-dialog dismissal; test thinking-duration threshold boundary (exactly 10 min vs 10 min + 1s).
+6. **Result extraction** — Verify both structured-marker and human-readable fallback paths for merge-agent.
+7. **`scanGitPatterns()`** — Verify each regex matches expected git output lines.
+8. **Model extraction** — Test with actual output containing `[Sonnet 4.6]`, `[gpt-5.4]`, `[o3]`.
 
 ---
 
-## Implementation Priority
+## Part 5: Call Sites That Capture But Do NOT Scan
 
-| Priority | File | Reason |
-|----------|------|--------|
-| **P0** | `src/lib/agents.ts:1224` | Continuous logging replaces 5000-line capture |
-| **P0** | `src/dashboard/server/routes/workspaces.ts:931` | Model is known at spawn time |
-| **P1** | `src/lib/cloister/deacon.ts` (all 3) | Health/stuck detection needs structured state |
-| **P1** | `src/lib/health.ts:93` | Health checks should use structured data |
-| **P1** | `src/dashboard/lib/health-filtering.ts:26` | Same as above |
-| **P2** | `src/lib/tmux.ts:527-553,559-599` | Readiness + delivery need hook extensions |
-| **P2** | `src/lib/cloister/specialists.ts:2484,2495` | Same as above |
-| **P2** | `src/lib/agents.ts:266,1057` | Remove ready.json fallbacks |
-| **P2** | `src/dashboard/server/routes/conversations.ts:81-92` | Same as above |
-| **P3** | `src/dashboard/server/routes/mission-control.ts` (all 3) | Stream from logs instead |
-| **P3** | `src/dashboard/server/routes/agents.ts:526` | Same as above |
-| **P3** | `src/lib/cloister/merge-agent.ts` (all 3) | Structured git/test events |
-| **P4** | `src/dashboard/server/ws-terminal.ts` (both) | PTY hub in-memory buffer |
+These locations call `capturePaneAsync()` but perform no pattern matching — they simply return, save, or display raw output:
+
+| # | File:Line | Function | Action |
+|---|-----------|----------|--------|
+| 1 | `agents.ts:1224` | `stopAgentAsync()` | Saves 5000 lines to `output.log` |
+| 2 | `health.ts:91` | `getAgentOutput()` | Returns trimmed output as-is |
+| 3 | `health-filtering.ts:13` | `checkAgentHealthAsync()` | Returns `{alive, lastOutput}` |
+| 4 | `agents.ts:526` | `getAgentOutputRoute()` | Returns raw output for dashboard |
+| 5 | `mission-control.ts:161` | — | Captures 500 lines for transcript |
+| 6 | `mission-control.ts:297` | — | Captures and appends raw specialist output |
+| 7 | `ws-terminal.ts:89` | `captureFreshSnapshot()` | Terminal streaming via WebSocket |
+
+**Important:** While these call sites don't scan patterns themselves, downstream consumers of their raw output may. This needs verification (see research item #8).
 
 ---
 
-## Hook Extensions Needed
+## Part 6: Category Summary
 
-To fully eliminate `capture-pane`, extend the Claude Code hook system (already writing `runtime.json`, `ready.json`) to include:
-
-1. **`status`**: `active | idle | suspended | stopped | waiting-on-human | thinking | computing`
-2. **`activity`**: `bash | read | write | edit | idle | thinking | reading` (what tool is active)
-3. **`thinkingSince`**: ISO timestamp when thinking started (null when not thinking)
-4. **`dialogs`**: Array of active modal dialogs (`exclude-from-context`, etc.)
-5. **`lastOutput`**: Last N lines of output (or path to continuous log)
-6. **`messageReceived`**: Boolean/sequence acknowledging last input
-7. **`model`**: Model identifier (set once at start)
-8. **`gitEvents`**: Stream of git operations (for merge agent)
-9. **`testResults`**: Structured test output (for test specialist)
-
-All hooks should write atomically (write temp + rename) to prevent partial reads.
+| Category | Count | Description |
+|----------|-------|-------------|
+| `activity_detection` | 6 | Detecting ready/active/working state |
+| `result_extraction` | 4 | Extracting pass/fail/files-reviewed results |
+| `delivery_confirmation` | 1 | Verifying message delivery |
+| `stuck_detection` | 2 | Detecting hung/blocked agents |
+| `dialog_intervention` | 1 | Detecting interactive prompts |
+| `metadata_extraction` | 4 | Extracting model name, git ops, test counts |
+| `other` | 2 | IssueId filtering, raw output passthrough |
 
 ---
 
-## Files to Modify
+## Audit Completeness
 
-| File | Changes |
-|------|---------|
-| `src/lib/agents.ts` | Remove `capturePaneAsync` calls; implement continuous logging; rely on `ready.json` |
-| `src/lib/tmux.ts` | Deprecate `capturePaneAsync`; remove `waitForClaudePrompt` and `confirmDelivery` or make them no-ops |
-| `src/lib/cloister/deacon.ts` | Replace all captures with `runtime.json` field reads |
-| `src/lib/cloister/merge-agent.ts` | Replace captures with structured event emission |
-| `src/lib/cloister/specialists.ts` | Replace delivery confirmation with hook acknowledgment |
-| `src/lib/health.ts` | Read from `output.log` or `runtime.json` |
-| `src/dashboard/lib/health-filtering.ts` | Read `status` from `runtime.json` |
-| `src/dashboard/server/routes/agents.ts` | Stream from `output.log` |
-| `src/dashboard/server/routes/mission-control.ts` | Stream from logs/structured sources |
-| `src/dashboard/server/routes/conversations.ts` | Remove tmux readiness check |
-| `src/dashboard/server/routes/workspaces.ts` | Read model from config/hook |
-| `src/dashboard/server/ws-terminal.ts` | Add in-memory scrollback buffer to PTY hub |
+- [x] All `capturePaneAsync()` call sites identified (22 total)
+- [x] All `captureTmuxOutput()` call sites identified
+- [x] All `.includes()`, `.indexOf()`, `.match()`, `.test()`, `.search()`, `.startsWith()`, `.endsWith()` on captured tmux text documented
+- [x] Status markers documented
+- [x] Model extraction regex documented
+- [x] Thinking duration parsing documented
+- [x] Exclude-from-context dialog detection documented
+- [x] Risk assessment completed
+- [x] Testing recommendations provided
+- [x] Raw passthrough call sites identified
 
----
-
-## Final Notes
-
-- **`output.log` is already implemented** for stopped agents. Extend it to live mode with append + flush.
-- **`runtime.json` is already written** by hooks. Extend the schema with the fields above.
-- **The only hard case** is delivery confirmation (#8, #9). The `load-buffer` + `paste-buffer` + 300ms delay pattern is already reliable per `.claude/rules/async-tmux.md`. Trust tmux delivery; don't verify via capture.
-- **PTY hub scrollback** (#16, #17) should maintain an in-memory ring buffer. 500 lines × 200 chars = ~100KB per terminal. Trivial memory cost.
-- **Zero capture-pane calls remain** after these changes. The function can be deleted from `src/lib/tmux.ts`.
+**Total pattern-scanning locations:** 20  
+**Total files affected:** 12  
+**Total distinct patterns/regexes:** 70+
