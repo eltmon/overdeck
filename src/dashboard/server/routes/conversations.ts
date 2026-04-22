@@ -84,6 +84,55 @@ import {
 
 const execAsync = promisify(exec);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+// ─── CSRF / Origin validation ────────────────────────────────────────────────
+
+function getTrustedOrigins(): string[] {
+  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
+  const origins = new Set<string>();
+  origins.add(dashboardUrl);
+  // Also trust common local development origins
+  origins.add('http://localhost:3011');
+  origins.add('http://localhost:3000');
+  origins.add('http://127.0.0.1:3011');
+  origins.add('http://127.0.0.1:3000');
+  return Array.from(origins);
+}
+
+function getHeader(
+  request: HttpServerRequest.HttpServerRequest,
+  name: string,
+): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: true } | { ok: false; error: string } {
+  const origin = getHeader(request, 'origin');
+  const referer = getHeader(request, 'referer');
+  const trusted = getTrustedOrigins();
+
+  // If Origin is present, it must match a trusted origin
+  if (origin) {
+    if (trusted.some((t) => origin === t || origin.startsWith(`${t}/`))) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid origin' };
+  }
+
+  // If no Origin but Referer is present, check it
+  if (referer) {
+    if (trusted.some((t) => referer === t || referer.startsWith(`${t}/`))) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid referer' };
+  }
+
+  // No Origin or Referer — allow (same-origin from older browsers, tests, CLI tools)
+  return { ok: true };
+}
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
@@ -232,14 +281,18 @@ export async function handleConversationMessage(
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
-  const unmanagedPath = allAttachmentPaths.find((attachmentPath) => !isManagedConversationAttachmentPath(attachmentPath));
-  if (unmanagedPath) {
-    return jsonResponse({ error: 'One or more attachment paths are outside the managed directory' }, { status: 400 });
+  for (const attachmentPath of allAttachmentPaths) {
+    const managed = await isManagedConversationAttachmentPath(attachmentPath);
+    if (!managed) {
+      return jsonResponse({ error: 'One or more attachment paths are outside the managed directory' }, { status: 400 });
+    }
   }
 
-  const missingAttachment = allAttachmentPaths.find((attachmentPath) => !hasConversationAttachment(conv.name, attachmentPath));
-  if (missingAttachment) {
-    return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
+  for (const attachmentPath of allAttachmentPaths) {
+    const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
+    if (!hasAttachment) {
+      return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
+    }
   }
 
   await deliverMessage(conv.tmuxSession, message, 'conversation-message');
@@ -630,6 +683,11 @@ const postConversationStopRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/stop',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
@@ -851,6 +909,11 @@ const postConversationUploadImageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/upload-image',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -871,6 +934,11 @@ const postConversationDeleteImageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/delete-image',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -897,6 +965,11 @@ const postConversationMessageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/message',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -955,6 +1028,11 @@ const postConversationArchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/archive',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {

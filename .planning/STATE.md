@@ -23,6 +23,9 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [x] Fix: Split conflated upload error messages into "format" vs "size" (commit: 25d996e8)
 - [x] Fix: Path injection protection - reject messages with unmanaged @attachment paths (commit: 70d07ea9)
 - [x] Fix: Paste/drop race condition - block image paste/drop while sending (commit: 1c289e77)
+- [x] Fix: Symlink escape in attachment path containment - use `realpath` instead of `resolve` (new)
+- [x] Fix: CSRF/origin protection on destructive JSON POSTs - add `validateOrigin` to upload-image, delete-image, stop, archive, message endpoints (new)
+- [x] Fix: Full JSONL reparse during attachment cleanup - replace `parseConversationMessages` with line-by-line stream reading in `readSessionAttachmentBasenames` (new)
 - [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
 - [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3568/3568)
 
@@ -45,3 +48,6 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [2026-04-22T19:55Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
   - Issues: (1) Memory DoS via oversized base64 strings, (2) path injection via @paths, (3) paste/drop race during send, (4) conflated error messages
   - Status: FIXED in commits 25d996e8, 70d07ea9, 1c289e77. All four issues resolved with regression tests.
+- [2026-04-22T20:09Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+  - Issues: (1) Path traversal in /delete-image via symlink escape, (2) symlink escape in attachment path containment check, (3) missing CSRF/origin protection on destructive JSON POSTs, (4) full JSONL reparse during attachment cleanup on every stop/archive
+  - Status: FIXED. `isManagedConversationAttachmentPath` and `isConversationAttachmentPath` now use `realpath` to resolve symlinks before containment checks. `validateOrigin` added to upload-image, delete-image, stop, archive, and message endpoints. `readSessionAttachmentBasenames` replaced full JSONL parse with line-by-line stream reading.

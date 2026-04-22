@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs';
-import { readdir, mkdir, rm, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
 import { basename, join, resolve, sep } from 'node:path';
+import { createInterface } from 'node:readline';
 
 import type { Conversation } from '../../../lib/database/conversations-db.js';
 import { getPanopticonHome } from '../../../lib/paths.js';
-import { parseConversationMessages } from './conversation-service.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
@@ -40,14 +41,42 @@ async function listConversationAttachmentPaths(name: string): Promise<string[]> 
 
 async function readSessionAttachmentBasenames(sessionFile: string): Promise<Set<string>> {
   try {
-    const { messages } = await parseConversationMessages(sessionFile);
     const referenced = new Set<string>();
-    for (const message of messages) {
-      for (const attachmentPath of extractConversationAttachmentPaths(message.text)) {
-        if (isManagedConversationAttachmentPath(attachmentPath)) {
-          referenced.add(basename(attachmentPath));
+    const stream = createReadStream(sessionFile, { encoding: 'utf-8' });
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    try {
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        let text: string | undefined;
+        try {
+          const entry = JSON.parse(line);
+          // Extract text from known Claude Code JSONL shapes
+          if (typeof entry?.message?.content === 'string') {
+            text = entry.message.content;
+          } else if (Array.isArray(entry?.message?.content)) {
+            text = entry.message.content
+              .map((c: unknown) => (typeof c === 'string' ? c : (c as { text?: string })?.text ?? ''))
+              .join('');
+          } else if (typeof entry?.message?.text === 'string') {
+            text = entry.message.text;
+          } else if (typeof entry?.text === 'string') {
+            text = entry.text;
+          }
+        } catch {
+          // Not valid JSON — fall back to raw line regex
+          text = line;
+        }
+        if (text) {
+          for (const attachmentPath of extractConversationAttachmentPaths(text)) {
+            if (await isManagedConversationAttachmentPath(attachmentPath)) {
+              referenced.add(basename(attachmentPath));
+            }
+          }
         }
       }
+    } finally {
+      rl.close();
+      stream.destroy();
     }
     return referenced;
   } catch {
@@ -97,24 +126,32 @@ export function extractConversationAttachmentPaths(message: string): string[] {
   );
 }
 
-export function isManagedConversationAttachmentPath(attachmentPath: string): boolean {
-  const attachmentsRoot = resolve(getConversationAttachmentsRoot());
-  const candidate = resolve(attachmentPath);
-  return candidate.startsWith(`${attachmentsRoot}${sep}`);
+export async function isManagedConversationAttachmentPath(attachmentPath: string): Promise<boolean> {
+  try {
+    const attachmentsRoot = resolve(getConversationAttachmentsRoot());
+    const candidate = await realpath(attachmentPath);
+    return candidate.startsWith(`${attachmentsRoot}${sep}`);
+  } catch {
+    return false;
+  }
 }
 
-export function isConversationAttachmentPath(name: string, attachmentPath: string): boolean {
-  const attachmentDir = resolve(getConversationAttachmentDir(name));
-  const candidate = resolve(attachmentPath);
-  return candidate.startsWith(`${attachmentDir}${sep}`);
+export async function isConversationAttachmentPath(name: string, attachmentPath: string): Promise<boolean> {
+  try {
+    const attachmentDir = resolve(getConversationAttachmentDir(name));
+    const candidate = await realpath(attachmentPath);
+    return candidate.startsWith(`${attachmentDir}${sep}`);
+  } catch {
+    return false;
+  }
 }
 
-export function hasConversationAttachment(name: string, attachmentPath: string): boolean {
-  return isConversationAttachmentPath(name, attachmentPath) && existsSync(attachmentPath);
+export async function hasConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {
+  return (await isConversationAttachmentPath(name, attachmentPath)) && existsSync(attachmentPath);
 }
 
 export async function removeConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {
-  if (!isConversationAttachmentPath(name, attachmentPath)) return false;
+  if (!(await isConversationAttachmentPath(name, attachmentPath))) return false;
   await rm(attachmentPath, { force: true });
   return true;
 }

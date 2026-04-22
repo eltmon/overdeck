@@ -1,26 +1,25 @@
 ---
 specialist: review-agent
-issueId: PAN-569
+issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-22T23:05:15Z
+timestamp: 2026-04-22T19:55:04Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-Feature scope is complete (28/28 acceptance criteria implemented with evidence) and security hygiene is reasonable (localhost origin, strict content-type, ID regex, 50-item cap, execFile migration). However, the PR diff removes shared MergeButton/RecoverButton components added in commit 8b7fc0b4 on main and re-inlines duplicated logic in KanbanBoard.tsx and ActionsSection.tsx — this is a silent regression that must be resolved by rebasing. Additional high-priority items: client/server mismatch on "active agent" predicate (client misses `failed`), permissive GitHub ID regex, origin-only CSRF on a highly destructive endpoint, and O(n) planning-state fetch fan-out in the kanban board. Recommend changes requested: rebase + unify predicate + tighten regex + empty-array guard before merge; treat CSRF/auth layer and bulk planning-state endpoint as follow-up tickets.
+No blockers or critical issues. Four high-priority items to address before merge: (1) cap upload body size before base64 decode to prevent memory DoS on the dashboard server; (2) tighten `@`-attachment regex and reject messages containing tokens that resolve outside the managed root, preventing prompt-injection smuggling into the agent's tmux pane; (3) fix a paste-during-send race in `ComposerFooter` that orphans blob URLs and server files; (4) split conflated decode/size error messages. Requirements coverage is effectively 100% — one vBRIEF AC text diverges from the (superior) implemented cleanup design and should be reconciled. Positive: defensive upload handling (UUID filenames, MIME allowlist, path containment) and reference-aware cleanup are well-constructed.
 
 ## Security Issues
 
-- Origin-only CSRF protection on bulk-close-out endpoint
-- Permissive GitHub issue-ID regex allows shell metacharacters
-- Missing audit logging and rate limiting on bulk destructive endpoint
+- Unbounded upload body enables memory-pressure DoS
+- @-attachment regex permits token smuggling into agent pane
 
 ## Performance Issues
 
-- N-per-issue planning-state fetch fan-out in KanbanBoard
-- Repeated git ls-files subprocesses in cleanPlanningArtifacts
+- Full JSONL scan on every conv-find summary request
+- JSON output eagerly computes expensive session summary
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
@@ -28,7 +27,7 @@ Feature scope is complete (28/28 acceptance criteria implemented with evidence) 
 2. Fix the code for EVERY issue listed
 3. Run tests locally to verify your fixes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-569 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
+5. Invoke the /rebase-and-submit skill for PAN-539 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.
 

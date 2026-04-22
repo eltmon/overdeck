@@ -174,8 +174,8 @@ describe('conversations route — DB integration', () => {
 
     const { extractConversationAttachmentPaths, hasConversationAttachment } = await import('../../services/conversation-attachments.js');
     expect(extractConversationAttachmentPaths(`hello\n@${uploadedPath}`)).toEqual([uploadedPath]);
-    expect(hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
-    expect(hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
+    expect(await hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
+    expect(await hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
 
     const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
     const manualAttachmentResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, vi.fn().mockResolvedValue(undefined));
