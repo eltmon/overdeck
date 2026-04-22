@@ -1709,6 +1709,92 @@ const postIssueCloseOutRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/issues/bulk-close-out ──────────────────────────────────
+
+const postIssuesBulkCloseOutRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/bulk-close-out',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* Effect.promise(() => request.json().catch(() => ({})));
+    const issueIds = Array.isArray(body.issueIds) ? body.issueIds as string[] : [];
+
+    if (issueIds.length === 0) {
+      return jsonResponse({ error: 'issueIds array is required' }, { status: 400 });
+    }
+
+    const eventStore = yield* EventStoreService;
+    const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
+    const issueDataService = getIssueDataService();
+
+    const results: Array<{ issueId: string; success: boolean; error?: string; skipped?: boolean }> = [];
+
+    for (const id of issueIds) {
+      const githubCheck = isGitHubIssue(id);
+      let projectPath = '';
+
+      if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+        const localPaths = getGitHubLocalPaths();
+        projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+      }
+      if (!projectPath) {
+        const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
+        projectPath = getProjectPath(undefined, issuePrefix);
+      }
+      if (!projectPath) {
+        results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}` });
+        continue;
+      }
+
+      const ctx: any = {
+        issueId: id,
+        projectPath,
+        ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+          ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+          : {}),
+      };
+
+      const issueSource = issueDataService.getIssueSource(id);
+      if (issueSource === 'rally') {
+        const rallyConfig = getRallyConfig();
+        if (rallyConfig) {
+          ctx.rally = {
+            apiKey: rallyConfig.apiKey,
+            server: rallyConfig.server,
+            workspace: rallyConfig.workspace,
+            project: rallyConfig.project,
+          };
+        }
+      }
+
+      try {
+        const result = yield* Effect.promise(() => closeOut(ctx));
+        if (result.success) {
+          issueDataService.invalidateTracker('github').catch(() => {});
+          issueDataService.invalidateTracker('linear').catch(() => {});
+          yield* eventStore.append({
+            type: 'issue.statusChanged',
+            timestamp: new Date().toISOString(),
+            payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
+          });
+          try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
+        }
+        const failedStep = result.steps.find((s: any) => !s.success);
+        results.push({
+          issueId: id,
+          success: result.success,
+          error: result.success ? undefined : failedStep?.error,
+          skipped: result.steps.some((s: any) => s.skipped),
+        });
+      } catch (err: any) {
+        results.push({ issueId: id, success: false, error: err?.message || 'Unknown error' });
+      }
+    }
+
+    return jsonResponse({ results });
+  })),
+);
+
 // ─── Route: GET /api/issues/:id/beads ────────────────────────────────────────
 
 const getIssueBeadsRoute = HttpRouter.add(
@@ -2020,6 +2106,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCleanupWorkspaceRoute,
   postIssueDeepWipeRoute,
   postIssueCloseOutRoute,
+  postIssuesBulkCloseOutRoute,
   getIssueBeadsRoute,
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
