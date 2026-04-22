@@ -387,14 +387,14 @@ export function ActionsSection({
             {onReopen && reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed') && (
               <div className="min-w-0">
                 <div className="text-xs font-medium text-content">Reopen for more work</div>
-                <div className="text-[11px] text-content-subtle mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, and all planning artifacts intact.">
-                  Moves the issue back to In Progress. The workspace, branch, PR, and all planning artifacts are preserved.
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">
+                  Moves the issue back to In Progress. The workspace, branch, PR, STATE.md, and all planning artifacts are preserved.
                 </div>
                 <button
                   onClick={onReopen}
                   disabled={reopenMutation?.isPending}
                   className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-white transition-colors disabled:opacity-50"
-                  title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + beads"
+                  title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + STATE.md + beads"
                 >
                   {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                   {reopenMutation?.isPending ? 'Reopening...' : 'Reopen'}
@@ -406,14 +406,14 @@ export function ActionsSection({
             {onResetIssue && (
               <div className="min-w-0">
                 <div className="text-xs font-medium text-content">Reset Issue</div>
-                <div className="text-[11px] text-content-subtle mt-0.5" title="Deletes the workspace, feature branch, and all beads. Moves the issue back to Todo. Use when the current approach is completely wrong and you want to start over from planning.">
-                  Deletes the workspace, branch, beads, and vBRIEF. Moves the issue back to Todo. Start over from planning.
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Deletes the workspace, feature branch, STATE.md, and all beads. Moves the issue back to Todo. Use when the current approach is completely wrong and you want to start over from planning.">
+                  Deletes the workspace, branch, STATE.md, beads, and vBRIEF. Moves the issue back to Todo. Start over from planning.
                 </div>
                 <button
                   onClick={onResetIssue}
                   disabled={resetIssueMutation?.isPending}
                   className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
-                  title="Reset Issue: deletes workspace + branch + beads, moves to Todo"
+                  title="Reset Issue: deletes workspace + branch + STATE.md + beads, moves to Todo"
                 >
                   {resetIssueMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
                   {resetIssueMutation?.isPending ? 'Resetting...' : 'Reset Issue'}
@@ -424,14 +424,14 @@ export function ActionsSection({
             {/* Cancel Issue */}
             <div className="min-w-0">
               <div className="text-xs font-medium text-content">Cancel this issue</div>
-              <div className="text-[11px] text-content-subtle mt-0.5" title="Permanently stops the agent, deletes the workspace and branch, closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
-                Permanently stops the agent, deletes the workspace and branch, closes the PR, and moves the issue to Canceled. This cannot be undone.
+              <div className="text-[11px] text-content-subtle mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
+                Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, and moves the issue to Canceled. This cannot be undone.
               </div>
               <button
                 onClick={onCancel}
                 disabled={cancelMutation.isPending}
                 className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
-                title="Cancel Issue: permanent — stops agent, deletes workspace + branch, closes PR, moves to Canceled"
+                title="Cancel Issue: permanent — stops agent, deletes workspace + branch + STATE.md, closes PR, moves to Canceled"
               >
                 {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
                 {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
