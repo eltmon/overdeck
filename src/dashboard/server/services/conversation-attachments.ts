@@ -99,6 +99,17 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
 
   const referencedBasenames = await readSessionAttachmentBasenames(conversation.sessionFile);
 
+  // Re-stat the session file to tighten against a /stop race: a JSONL write
+  // may have landed while we were reading attachment basenames.
+  try {
+    const freshStats = await stat(conversation.sessionFile);
+    if (freshStats.mtimeMs > sessionMtimeMs) {
+      sessionMtimeMs = freshStats.mtimeMs;
+    }
+  } catch {
+    // ignore
+  }
+
   await Promise.all(
     attachmentPaths.map(async (attachmentPath) => {
       if (referencedBasenames.has(basename(attachmentPath))) {

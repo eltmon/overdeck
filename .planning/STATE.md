@@ -1,9 +1,9 @@
 # PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: Ready for Review
+## Status: Submitted for Review
 
 ## Current Phase
-All implementation and feedback fixes are complete. Full test suite passes (3568/3568). Ready to resubmit for review.
+All implementation and feedback fixes are complete. Submitted via `pan done PAN-539`. Review & test pipeline auto-triggered.
 
 ## Completed Work
 - [x] Backend: Added POST /api/conversations/:name/upload-image endpoint with MIME validation, temp-file naming, and async writes (commit: cf85bf1f)
@@ -35,7 +35,8 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
 ## Remaining Work
-- [ ] Push branch and resubmit for review via /rebase-and-submit
+- [x] Push branch and resubmit for review via /rebase-and-submit
+- [ ] Await review approval, then run `pan approve PAN-539`
 
 ## Key Decisions
 - Upload endpoint lives in conversations.ts, not an agent route, because ComposerFooter already targets conversation-specific message APIs.
@@ -59,3 +60,4 @@ All implementation and feedback fixes are complete. Full test suite passes (3568
 - [2026-04-22T20:24Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round5.md`
   - Issues: (1) Attachment-path regex matches prose @paths, (2) generateAiTitle spawn lost timeout/UTF-8 guard, (3) removePendingImage HTTP in state updater, (4) CSRF gate allows no Origin/Referer, (5) summarizeConversationActivity re-parses every JSONL on list poll
   - Status: FIXED in commit 824ed90f. All five issues resolved with regression tests. Feedback archived.
+- **[2026-04-22T22:38Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`

@@ -141,6 +141,15 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   // Require at least one of Origin or Referer for CSRF protection
   return { ok: false, error: 'Missing origin' };
 }
+
+/** Validate a caller-supplied cwd does not contain path-traversal segments. */
+function validateCwdContainment(cwd: string): boolean {
+  if (!cwd.startsWith('/')) return false;
+  const segments = cwd.split('/').filter(Boolean);
+  if (segments.includes('..')) return false;
+  return true;
+}
+
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
@@ -783,6 +792,9 @@ const postConversationStopRoute = HttpRouter.add(
 
         await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
+        // Brief pause to allow any in-flight JSONL writes to complete before
+        // pruning attachments that may have just been referenced.
+        await new Promise((r) => setTimeout(r, 500));
         await cleanupUnreferencedConversationAttachments(conv);
 
         return jsonResponse({ success: true });
@@ -1155,6 +1167,9 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Mark as ended and archived
         markConversationEnded(name);
         archiveConversation(name);
+        // Brief pause to allow any in-flight JSONL writes to complete before
+        // pruning attachments that may have just been referenced.
+        await new Promise((r) => setTimeout(r, 500));
         await cleanupUnreferencedConversationAttachments(conv);
 
         return jsonResponse({ success: true });
@@ -1377,6 +1392,10 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
           ? body['cwd'].trim()
           : undefined;
+
+        if (cwd && !validateCwdContainment(cwd)) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
 
         if (typeof body['model'] === 'string' && !model) {
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });

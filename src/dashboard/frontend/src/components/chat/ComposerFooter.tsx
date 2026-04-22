@@ -320,10 +320,9 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     try {
       // If the selected model differs from the conversation's current model,
       // kill the session and restart with the new model before sending.
+      // switchModel already waits for the new session to be ready before returning.
       if (model !== conversation.model && conversation.sessionAlive) {
         await switchModel(conversation.name, model);
-        // Wait for the new session to spawn before sending the message
-        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
       await sendConversationMessage(conversation.name, composedMessage);
