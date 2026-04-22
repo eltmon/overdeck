@@ -34,6 +34,8 @@ import { useUIPreferences } from '../hooks/useUIPreferences';
 import { ResetIssueButton } from './ResetIssueButton';
 import { StopAgentButton } from './StopAgentButton';
 import { ArtifactLinks } from './ArtifactLinks';
+import { MergeButton } from './MergeButton';
+import { RecoverButton } from './RecoverButton';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
@@ -2947,9 +2949,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             Tell
           </button>
           {canonical === 'in_review' && !isTerminal && (
-            <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
+            <RecoverButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
           )}
-          <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
+          <MergeButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           {/* Model badge */}
           {activeAgent && activeAgent.model && (
@@ -3074,7 +3076,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             </div>
           )}
           <div className={actionBarClass}>
-            <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
+            <MergeButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
             {((activeAgent?.lifecycle?.canResumeSession ?? false) || isSessionLost || isResuming) && (
             <button
               onClick={handleResumeSession}
@@ -3086,7 +3088,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
           )}
-            <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
+            <RecoverButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
             <ReopenSection issue={issue} inline />
             <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           </div>
@@ -3123,136 +3125,6 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       />
       </div>
     </div>
-  );
-}
-
-// Recover button - clears failed pipeline state and re-dispatches review/test
-function ResetPipelineButton({
-  issue,
-  reviewStatus,
-}: {
-  issue: Issue;
-  reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus'>;
-}) {
-  const confirm = useConfirm();
-  const queryClient = useQueryClient();
-  const [isPending, setIsPending] = useState(false);
-  const isRecoverable = isReviewPipelineStuck(reviewStatus);
-
-  if (!isRecoverable) {
-    return null;
-  }
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        if (await confirm({
-          title: 'Recover Pipeline',
-          message: `Recover ${issue.identifier}?\n\nThis will:\n• Clear failed review, test, and merge state\n• Reset circuit breaker counters\n• Remove queued specialist tasks\n• Re-dispatch review and test as needed`,
-          confirmLabel: 'Recover',
-        })) {
-          setIsPending(true);
-          try {
-            const res = await fetch(`/api/review/${issue.identifier}/reset`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ rerun: true }),
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              console.error('Pipeline reset failed:', err);
-            }
-            await refreshDashboardState(queryClient);
-          } catch (err) {
-            console.error('Pipeline reset error:', err);
-          } finally {
-            setIsPending(false);
-          }
-        }
-      }}
-      disabled={isPending}
-      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-      title="Recover from the failed review/test/merge state and rerun the pipeline"
-    >
-      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-      {isPending ? 'Recovering...' : 'Recover'}
-    </button>
-  );
-}
-
-function MergeIssueButton({
-  issue,
-  reviewStatus,
-}: {
-  issue: Issue;
-  reviewStatus?: { readyForMerge?: boolean; mergeStatus?: string };
-}) {
-  const confirm = useConfirm();
-  const showAlert = useAlert();
-  const queryClient = useQueryClient();
-
-  const mergeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/merge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        let message = `Failed to merge (${res.status})`;
-        try {
-          const data = JSON.parse(text);
-          message = data.error || message;
-        } catch {
-          message = text.length < 200 ? text : message;
-        }
-        throw new Error(message);
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      await refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      showAlert({ message: `Failed to merge: ${err.message}`, variant: 'error' });
-    },
-  });
-
-  const isBusy =
-    reviewStatus?.mergeStatus === 'queued' ||
-    reviewStatus?.mergeStatus === 'merging' ||
-    reviewStatus?.mergeStatus === 'verifying';
-
-  if (!reviewStatus?.readyForMerge || reviewStatus?.mergeStatus === 'merged') {
-    return null;
-  }
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        if (await confirm({
-          title: 'Merge to Main',
-          message: `Merge ${issue.identifier} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`,
-          confirmLabel: 'Merge',
-        })) {
-          mergeMutation.mutate();
-        }
-      }}
-      disabled={mergeMutation.isPending || isBusy}
-      className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors disabled:opacity-50"
-      title="Merge"
-    >
-      {(mergeMutation.isPending || isBusy) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
-      {reviewStatus?.mergeStatus === 'queued'
-        ? 'Queued'
-        : reviewStatus?.mergeStatus === 'verifying'
-          ? 'Verifying'
-          : reviewStatus?.mergeStatus === 'merging'
-            ? 'Merging'
-            : 'Merge'}
-    </button>
   );
 }
 

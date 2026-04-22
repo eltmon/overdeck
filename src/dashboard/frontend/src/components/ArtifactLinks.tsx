@@ -65,7 +65,7 @@ export function ArtifactLinks({
             ) : (
               <List className="w-3 h-3" />
             )}
-            <span>{needsTaskGeneration ? 'Generate Tasks' : 'Beads Tasks'}</span>
+            <span>{needsTaskGeneration ? 'Generate Tasks' : 'Tasks'}</span>
           </button>
         )}
         {hasPlan && (
