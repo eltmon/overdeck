@@ -512,99 +512,13 @@ export interface PatrolResult {
  * Specialists: 5 minute idle timeout
  * Work agents: NEVER auto-suspend after completion (stay available for merge)
  */
+// checkAndSuspendIdleAgents deleted in PAN-800 Phase 5.
+// The old implementation read runtime.json + wrote 'suspended' state +
+// tmux-regex-checked via isAgentActiveInTmux — all paths the new
+// AgentStateService supersedes. Active intervention (auto-suspend) is
+// out of scope for PAN-800 and tracked under PAN-188.
 export async function checkAndSuspendIdleAgents(): Promise<string[]> {
-  const actions: string[] = [];
-  // Specialist sessions (global or per-project) all start with "specialist-"
-  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
-
-  // Get all running agents
-  const agents = listRunningAgents();
-
-  for (const agent of agents) {
-    if (!agent.tmuxActive) {
-      continue; // Skip if tmux session is already gone
-    }
-
-    // Get runtime state (from hooks)
-    const runtimeState = getAgentRuntimeState(agent.id);
-
-    // P0 FIX: Sync state.json lastActivity with runtime heartbeat
-    // This keeps the dashboard accurate and prevents stale state display
-    if (runtimeState && runtimeState.lastActivity) {
-      const state = getAgentState(agent.id);
-      if (state) {
-        const runtimeLastActivity = runtimeState.lastActivity;
-        const stateLastActivity = state.lastActivity;
-
-        // Update state.json if runtime is more recent (or state has no timestamp)
-        if (!stateLastActivity || new Date(runtimeLastActivity) > new Date(stateLastActivity)) {
-          state.lastActivity = runtimeLastActivity;
-          saveAgentState(state);
-        }
-      }
-    }
-
-    // Only suspend idle agents
-    if (!runtimeState || runtimeState.state !== 'idle') {
-      continue;
-    }
-
-    // PAN-154: Check tmux output for active status indicators before marking idle
-    // Agents that are computing/thinking/reading are NOT idle despite hook state
-    const activeInTmux = await isAgentActiveInTmux(agent.id);
-    if (activeInTmux) {
-      continue; // Agent is actively working, skip suspension
-    }
-
-    // Calculate idle time
-    const lastActivity = new Date(runtimeState.lastActivity);
-    const idleMs = Date.now() - lastActivity.getTime();
-    const idleMinutes = idleMs / (1000 * 60);
-
-    // Determine timeout based on agent type
-    const isSpecialist = isSpecialistSession(agent.id);
-
-    // NEVER auto-suspend work agents — they wait for review/test feedback
-    // and must stay alive to receive results. Only suspend specialists.
-    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialist;
-    if (isWorkAgent) {
-      continue;
-    }
-
-    const timeoutMinutes = 5; // Specialists only
-
-    // Check if idle timeout exceeded
-    if (idleMinutes > timeoutMinutes) {
-      console.log(`[deacon] Auto-suspending ${agent.id} (idle for ${Math.round(idleMinutes)} minutes)`);
-
-      try {
-        // Get session ID if available (would come from hook state or API)
-        // For now, we'll save the agent ID as a placeholder - in a real implementation,
-        // Claude would report its session ID via a hook or we'd extract it from the API
-        const sessionId = runtimeState.sessionId || `session-${agent.id}`;
-
-        // Save session ID for later resume
-        saveSessionId(agent.id, sessionId);
-
-        // Kill tmux session (async to avoid blocking event loop - PAN-72)
-        await killSessionAsync(agent.id).catch(() => { /* no session to kill */ });
-
-        // Update state
-        saveAgentRuntimeState(agent.id, {
-          state: 'suspended',
-          suspendedAt: new Date().toISOString(),
-          sessionId,
-        });
-
-        actions.push(`Auto-suspended ${agent.id} after ${Math.round(idleMinutes)}min idle`);
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[deacon] Failed to suspend ${agent.id}:`, msg);
-      }
-    }
-  }
-
-  return actions;
+  return [];
 }
 
 // ============================================================================

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
-import { existsSync, unlinkSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { getAgentState, getAgentDir, getAgentRuntimeFile, getLatestSessionId } from '../../lib/agents.js';
+import { getAgentState, getAgentDir, getLatestSessionId } from '../../lib/agents.js';
 import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { resolveIssueId } from '../../lib/issue-id.js';
 
@@ -44,16 +44,9 @@ export async function resetSessionCommand(id: string): Promise<void> {
     unlinkSync(sessionsFile);
   }
 
-  // Clear claudeSessionId from runtime.json (preserve other fields).
-  // Must write directly — saveAgentRuntimeState merges with existing file.
-  const runtimeFile = getAgentRuntimeFile(agentId);
-  if (existsSync(runtimeFile)) {
-    try {
-      const runtime = JSON.parse(readFileSync(runtimeFile, 'utf8'));
-      delete runtime.claudeSessionId;
-      writeFileSync(runtimeFile, JSON.stringify(runtime, null, 2));
-    } catch { /* non-fatal */ }
-  }
+  // claudeSessionId lives on the AgentRuntimeSnapshot in AgentStateService.
+  // The next SessionStart hook fire will emit agent.model_set with the fresh
+  // session id, overwriting the stale one — no explicit clear needed.
 
   console.log(chalk.green(`✓ Reset session for ${agentId}`));
   console.log(chalk.dim(`  Previous session: ${previousSessionId}`));

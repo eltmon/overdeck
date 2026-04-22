@@ -769,73 +769,28 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 // agent.* DomainEvent and hands it to AgentStateService.emit (which durably
 // appendAsyncs via EventStore).
 //
-// Two body shapes are accepted during the migration window:
-//
-// 1. New shape (discriminated by `kind`):
-//      {kind: "activity", activity: "working"|"idle"|..., tool?: string}
-//      {kind: "thinking_start", lastToolAt: ISO}
-//      {kind: "thinking_stop", resolvedBy: "tool"|"waiting"|"idle"|"stopped"}
-//      {kind: "waiting_start", reason: WaitingReason, message?: string}
-//      {kind: "waiting_clear", clearedBy: ...}
-//      {kind: "message_received", direction: ..., source: ...}
-//      {kind: "model_set", model: string, claudeSessionId?: string}
-//
-// 2. Legacy shape (PAN-80 era heartbeat-hook, removed in Phase 5):
-//      {state: "active"|"idle"|"stopped"|"suspended"|"waiting-on-human", tool?, timestamp?}
-//    Mapped to an activity/waiting event. The old state-enum values that have
-//    no direct analogue ("suspended", "uninitialized") fold to "idle" or are
-//    dropped — see mapLegacyState().
-//
-// heartbeat-hook (bash) continues to write runtime.json directly in Phase 3.
-// Phase 4 rewrites it as a POST-emitter and Phase 5 stops writing the file.
-
-export const mapLegacyState = (
-  legacy: string | undefined,
-  tool: string | undefined,
-): { kind: string; [k: string]: unknown } | null => {
-  switch (legacy) {
-    case 'active':
-      // Legacy 'active' with a tool → working. Without a tool we can only say
-      // something happened; defaults to working since the legacy hook always
-      // fires on PostToolUse which implies a tool ran.
-      return { kind: 'activity', activity: 'working', tool };
-    case 'idle':
-      return { kind: 'activity', activity: 'idle' };
-    case 'stopped':
-      return { kind: 'activity', activity: 'stopped' };
-    case 'suspended':
-      // No runtime analogue — deacon suspension was separate from activity.
-      // Fold to idle; Phase 5 removes suspend/resume from the runtime surface.
-      return { kind: 'activity', activity: 'idle' };
-    case 'waiting-on-human':
-      return { kind: 'waiting_start', reason: 'other' };
-    case 'uninitialized':
-      // Ghost state — don't emit anything.
-      return null;
-    default:
-      return null;
-  }
-};
+// Body shape (discriminated by `kind`):
+//   {kind: "activity",          activity, tool?}
+//   {kind: "thinking_start",    lastToolAt}
+//   {kind: "thinking_stop",     resolvedBy}
+//   {kind: "waiting_start",     reason, message?}
+//   {kind: "waiting_clear",     clearedBy}
+//   {kind: "message_received",  direction, source}
+//   {kind: "model_set",         model, claudeSessionId?}
+//   {kind: "resolution_set",    resolution, resolutionCount}
+//   {kind: "current_issue_set", currentIssue?}
 
 /**
  * Translate a decoded body into an unsigned DomainEvent (no sequence yet).
- * Returns null if the body doesn't map to a runtime event (e.g. legacy
- * 'uninitialized' ghost).
+ * Returns null if the body doesn't map to a runtime event.
  */
 export const bodyToEvent = (
   agentId: string,
   body: Record<string, unknown>,
   timestamp: string,
 ): Record<string, unknown> | null => {
-  let source = body;
-  if (typeof body['kind'] !== 'string') {
-    const mapped = mapLegacyState(
-      body['state'] as string | undefined,
-      body['tool'] as string | undefined,
-    );
-    if (!mapped) return null;
-    source = mapped;
-  }
+  const source = body;
+  if (typeof source['kind'] !== 'string') return null;
   const kind = source['kind'] as string;
   switch (kind) {
     case 'activity':
@@ -903,6 +858,25 @@ export const bodyToEvent = (
           agentId,
           model: source['model'],
           claudeSessionId: source['claudeSessionId'] as string | undefined,
+        },
+      };
+    case 'resolution_set':
+      return {
+        type: 'agent.resolution_changed',
+        timestamp,
+        payload: {
+          agentId,
+          resolution: source['resolution'],
+          resolutionCount: Number(source['resolutionCount'] ?? 1),
+        },
+      };
+    case 'current_issue_set':
+      return {
+        type: 'agent.current_issue_set',
+        timestamp,
+        payload: {
+          agentId,
+          currentIssue: source['currentIssue'] as string | undefined,
         },
       };
     default:

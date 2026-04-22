@@ -348,180 +348,153 @@ function markAgentStopped(state: AgentState): void {
 }
 
 // ============================================================================
-// Hook-based State Management (PAN-80)
+// Agent Runtime State (PAN-800: event-sourced, no more runtime.json)
 // ============================================================================
+//
+// Persistence: append-only `events` SQLite table → AgentStateService's
+// SubscriptionRef → projection_cache rows keyed 'agent-runtime:<id>'.
+//
+// Writes: emitAgentEvent POSTs to /api/agents/:id/heartbeat. Reads: in-process
+// lib uses getRuntimeSnapshotSync; CLI/out-of-process uses
+// getAgentRuntimeSnapshot (HTTP).
+//
+// The functions below are adapters over AgentRuntimeSnapshot. Each caller
+// ideally uses the typed snapshot directly — the adapters exist because
+// ~30 call sites across the cloister consumed the old shape and migrating
+// every field access in one PR would have been mechanical noise.
 
-/**
- * Agent runtime state (hook-based tracking)
- */
+import type { AgentRuntimeSnapshot } from '@panopticon/contracts';
+import {
+  getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
+  emitAgentEvent,
+} from './agent-runtime.js';
+import { getRuntimeSnapshotSync } from './agent-runtime-mirror.js';
+
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
+/** Callers consume this shape; data comes from AgentRuntimeSnapshot. */
 export interface AgentRuntimeState {
+  // 'suspended' retained for backward-compat with callers that still compare
+  // against it defensively. The new event path never emits suspended — PAN-800
+  // drops the auto-suspend feature; PAN-188 reintroduces it.
   state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' | 'waiting-on-human';
   lastActivity: string;
   currentTool?: string;
-  sessionId?: string;
-  claudeSessionId?: string; // Claude Code session ID (written by heartbeat hook)
-  suspendedAt?: string;
-  resumedAt?: string;
-  currentIssue?: string; // Issue ID the agent is currently working on
-  resolution?: AgentResolution; // Lifecycle completion signal (PAN-309)
-  resolutionCount?: number;     // How many times this resolution was set
-  resolutionUpdatedAt?: string; // When resolution was last updated
+  claudeSessionId?: string;
+  /**
+   * For specialists: the issue currently being processed. Tracked per-agent in
+   * the AgentStateService snapshot (see agent.current_issue_set event).
+   */
+  currentIssue?: string;
+  resolution?: AgentResolution;
+  resolutionCount?: number;
+  resolutionUpdatedAt?: string;
   waitingReason?: string;
   waitingStartedAt?: string;
   waitingNotification?: string;
 }
 
+function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
+  if (!snap) return null;
+  // Map Activity → legacy state. The legacy 'active' value collapses working
+  // and thinking — neither consumer ever distinguished them.
+  let state: AgentRuntimeState['state'];
+  switch (snap.activity) {
+    case 'working': state = 'active'; break;
+    case 'thinking': state = 'active'; break;
+    case 'idle': state = 'idle'; break;
+    case 'stopped': state = 'stopped'; break;
+    case 'waiting': state = 'waiting-on-human'; break;
+    default: state = 'uninitialized';
+  }
+  return {
+    state,
+    lastActivity: snap.lastActivity,
+    currentTool: snap.currentTool,
+    claudeSessionId: snap.claudeSessionId,
+    currentIssue: snap.currentIssue,
+    resolution: snap.resolution as AgentResolution | undefined,
+    resolutionCount: snap.resolutionCount,
+    resolutionUpdatedAt: snap.resolutionUpdatedAt,
+    waitingReason: snap.waiting?.reason,
+    waitingStartedAt: snap.waiting?.startedAt,
+    waitingNotification: snap.waiting?.message,
+  };
+}
+
+export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null {
+  // Sync path: read from the in-process mirror (empty in fresh CLI processes,
+  // populated inside the dashboard server). CLI commands should prefer
+  // getAgentRuntimeStateAsync so they fall through to HTTP.
+  return snapshotToRuntimeState(getRuntimeSnapshotSync(agentId));
+}
+
+export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
+  // Try sync mirror first (fast path for in-process).
+  const syncHit = getAgentRuntimeState(agentId);
+  if (syncHit) return syncHit;
+  // Fall through to HTTP for cross-process callers.
+  const snap = await fetchAgentRuntimeSnapshot(agentId);
+  return snapshotToRuntimeState(snap);
+}
+
 /**
- * Activity log entry
+ * Emit events derived from a legacy-shape patch. Callers gradually migrate to
+ * direct emitAgentEvent calls; this adapter keeps existing code working.
  */
+export async function saveAgentRuntimeState(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
+  if (patch.currentIssue !== undefined) {
+    await emitAgentEvent(agentId, {
+      kind: 'current_issue_set',
+      currentIssue: patch.currentIssue || undefined,
+    });
+  }
+
+  if (patch.resolution !== undefined && patch.resolutionCount !== undefined) {
+    await emitAgentEvent(agentId, {
+      kind: 'resolution_set',
+      resolution: patch.resolution,
+      resolutionCount: patch.resolutionCount,
+    });
+  }
+
+  if (patch.state !== undefined) {
+    if (patch.state === 'waiting-on-human') {
+      await emitAgentEvent(agentId, {
+        kind: 'waiting_start',
+        reason: (patch.waitingReason as 'tool_permission' | 'user_question' | 'disambiguation' | 'other') || 'other',
+        message: patch.waitingNotification,
+      });
+    } else if (patch.state === 'active') {
+      await emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool });
+    } else if (patch.state === 'idle') {
+      await emitAgentEvent(agentId, { kind: 'activity', activity: 'idle' });
+    } else if (patch.state === 'stopped') {
+      await emitAgentEvent(agentId, { kind: 'activity', activity: 'stopped' });
+    }
+  } else if (patch.currentTool !== undefined) {
+    await emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool });
+  }
+
+  if (patch.claudeSessionId) {
+    // model_set requires a model — use existing snapshot's model if present.
+    const snap = getAgentRuntimeState(agentId);
+    if (snap || patch.claudeSessionId) {
+      await emitAgentEvent(agentId, {
+        kind: 'model_set',
+        model: 'unknown',
+        claudeSessionId: patch.claudeSessionId,
+      });
+    }
+  }
+}
+
+/** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
 export interface ActivityEntry {
   ts: string;
   tool: string;
   action?: string;
   state?: 'active' | 'idle';
-}
-
-/**
- * Get the path to an agent's runtime state file (separate from config state)
- */
-export function getAgentRuntimeFile(agentId: string): string {
-  return join(getAgentDir(agentId), 'runtime.json');
-}
-
-/**
- * Get agent runtime state (from hooks)
- *
- * Reads from runtime.json (new) with fallback to state.json (legacy migration).
- * This separation prevents bash hooks from corrupting AgentState config.
- */
-export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null {
-  const runtimeFile = getAgentRuntimeFile(agentId);
-  const stateFile = join(getAgentDir(agentId), 'state.json');
-
-  // Try runtime.json first (new location)
-  if (existsSync(runtimeFile)) {
-    try {
-      const content = readFileSync(runtimeFile, 'utf8');
-      return JSON.parse(content) as AgentRuntimeState;
-    } catch {
-      // Fall through to legacy
-    }
-  }
-
-  // Fallback to state.json (legacy — runtime fields were mixed in)
-  if (existsSync(stateFile)) {
-    try {
-      const content = readFileSync(stateFile, 'utf8');
-      const parsed = JSON.parse(content);
-      // Only use if it has runtime-specific fields
-      if (parsed.state && parsed.lastActivity) {
-        return parsed as AgentRuntimeState;
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  // No state at all — uninitialized
-  if (!existsSync(stateFile) && !existsSync(runtimeFile)) {
-    return {
-      state: 'uninitialized',
-      lastActivity: new Date().toISOString(),
-    };
-  }
-
-  return null;
-}
-
-export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
-  const runtimeFile = getAgentRuntimeFile(agentId);
-  const stateFile = join(getAgentDir(agentId), 'state.json');
-
-  // Try runtime.json first (new location)
-  if (existsSync(runtimeFile)) {
-    try {
-      const content = await readFile(runtimeFile, 'utf-8');
-      return JSON.parse(content) as AgentRuntimeState;
-    } catch {
-      // Fall through to legacy
-    }
-  }
-
-  // Fallback to state.json (legacy — runtime fields were mixed in)
-  if (existsSync(stateFile)) {
-    try {
-      const content = await readFile(stateFile, 'utf-8');
-      const parsed = JSON.parse(content);
-      // Only use if it has runtime-specific fields
-      if (parsed.state && parsed.lastActivity) {
-        return parsed as AgentRuntimeState;
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  // No state at all — uninitialized
-  if (!existsSync(stateFile) && !existsSync(runtimeFile)) {
-    return {
-      state: 'uninitialized',
-      lastActivity: new Date().toISOString(),
-    };
-  }
-
-  return null;
-}
-
-/**
- * Save agent runtime state to runtime.json (separate from AgentState config)
- *
- * This writes ONLY to runtime.json, never touching state.json.
- * This separation is critical: bash hooks write runtime.json on every tool call,
- * while AgentState in state.json is only written at lifecycle events (spawn/stop/handoff).
- */
-export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRuntimeState>): void {
-  const dir = getAgentDir(agentId);
-  mkdirSync(dir, { recursive: true });
-
-  const runtimeFile = getAgentRuntimeFile(agentId);
-
-  let existing: AgentRuntimeState | null = null;
-  if (existsSync(runtimeFile)) {
-    try {
-      existing = JSON.parse(readFileSync(runtimeFile, 'utf8'));
-    } catch {
-      // Ignore corrupt file
-    }
-  }
-
-  const previousState = existing?.state;
-  const merged: AgentRuntimeState = {
-    ...(existing || { state: 'uninitialized', lastActivity: new Date().toISOString() }),
-    ...state,
-  };
-
-  if (merged.state !== 'waiting-on-human') {
-    merged.waitingReason = undefined;
-    merged.waitingStartedAt = undefined;
-    merged.waitingNotification = undefined;
-  } else if (!merged.waitingStartedAt) {
-    merged.waitingStartedAt = merged.lastActivity;
-  }
-
-  writeFileSync(runtimeFile, JSON.stringify(merged, null, 2));
-
-  if (previousState !== merged.state || state.waitingReason || state.waitingNotification || state.resolution || state.currentTool) {
-    console.log(
-      `[agents] runtime ${agentId}: ${previousState ?? 'none'} -> ${merged.state}`
-        + (merged.waitingReason ? ` waitingReason=${merged.waitingReason}` : '')
-        + (merged.waitingNotification ? ` waitingNotification=${merged.waitingNotification}` : '')
-        + (merged.resolution ? ` resolution=${merged.resolution}` : '')
-        + (merged.currentTool ? ` tool=${merged.currentTool}` : '')
-        + ` lastActivity=${merged.lastActivity}`
-    );
-  }
 }
 
 /**
@@ -1543,12 +1516,10 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
       }
     }
 
-    // Update runtime state
     const resumedAt = new Date().toISOString();
     console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
-    saveAgentRuntimeState(normalizedId, {
+    await saveAgentRuntimeState(normalizedId, {
       state: 'active',
-      resumedAt,
       lastActivity: resumedAt,
     });
 
