@@ -148,7 +148,7 @@ export async function createSummaryFork(
   console.log(`[summary-fork] Forking conv=${conv.name} launchModel=${launchModel || 'default'} summaryModel=${summaryModel || 'default'} localOnly=${options.localSummaryOnly || false}`);
   const { summary, summaryModel: usedSummaryModel } = options.localSummaryOnly
     ? { summary: await generateFallbackSummary(conv.sessionFile), summaryModel: null }
-    : await generateSummaryForFork(conv.sessionFile, summaryModel);
+    : await generateSummaryForFork(conv.sessionFile, summaryModel ?? undefined);
   const { sessionId, sessionFile } = await reserveSummaryForkSession(cwd);
 
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
