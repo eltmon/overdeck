@@ -40,7 +40,7 @@ export function BulkAgentWarningDialog({ isOpen, onClose, onProceed, issues, age
                 <li key={issue.identifier} className="flex items-center justify-between rounded-lg border border-divider/70 bg-surface px-3 py-2">
                   <span className="text-sm font-medium text-content">{issue.identifier}</span>
                   <span className="text-xs text-content-subtle">
-                    {runningAgents.map(a => a.name || a.type).join(', ')}
+                    {runningAgents.map(a => a.id).join(', ')}
                   </span>
                 </li>
               ))}

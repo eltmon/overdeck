@@ -1019,6 +1019,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
   const onSelectIssue = externalOnSelectIssue || setInternalSelectedIssue;
 
+  // Event-sourced state from Zustand store (PAN-433 read model)
+  const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
+  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
+  const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
+
   // Bulk selection state
   const internalBulkSelection = useBulkSelection(issues.map(i => i.identifier).join(','));
   const bulkSelection = bulkSelectedIds
@@ -1101,12 +1107,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     setShowBulkProgress(false);
     bulkSelection.clear();
   }, [bulkSelection]);
-
-  // Event-sourced state from Zustand store (PAN-433 read model)
-  const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
-  const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
   /* DnD sensors disabled pending rework
   const sensors = useSensors(
@@ -1735,10 +1735,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
               </div>
             );
           })}
-        </div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
