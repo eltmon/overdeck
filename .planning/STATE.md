@@ -34,3 +34,4 @@ All implementation and feedback fixes are complete. Branch rebased onto main and
 - [2026-04-18T16:03Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/031-review-agent-changes-requested.md`
   - Issues: cleanupUnreferencedConversationAttachments deleting unsent attachments on stop/archive/lifecycle; missing tests for unsent upload protection
   - Status: FIXED in commits d565a858, 1cc46533, 7a1fcf1e. mtime guard added. Regression tests added.
+- **[2026-04-22T19:44Z] verification-gate → FAILED** — `.planning/feedback/032-verification-gate-failed.md`

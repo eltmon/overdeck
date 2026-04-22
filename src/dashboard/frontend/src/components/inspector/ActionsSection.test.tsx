@@ -12,7 +12,27 @@ vi.mock('../../hooks/useKillAgent', () => ({
 import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActionsSection } from './ActionsSection';
-import { DialogProvider } from '../DialogProvider';
+vi.mock('../DialogProvider', () => ({
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+  useAlert: () => vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../hooks/useKillAgent', () => ({
+  useKillAgent: (_agentId: string | undefined, options?: { onSuccess?: () => void }) => ({
+    confirmAndKill: vi.fn().mockImplementation(async () => {
+      options?.onSuccess?.();
+      return true;
+    }),
+    isPending: false,
+  }),
+}));
+
+vi.mock('../../hooks/useResetIssue', () => ({
+  useResetIssue: () => ({
+    confirmAndReset: vi.fn().mockResolvedValue(true),
+    isPending: false,
+  }),
+})); (fix(dashboard): mock DialogProvider and useKillAgent in ActionsSection tests)
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
@@ -230,7 +250,7 @@ describe('ActionsSection', () => {
 
   it('calls onKillSuccess when Stop clicked', () => {
     const onKillSuccess = vi.fn();
-    renderWithDialog(<ActionsSection {...defaultProps} agent={makeAgent()} onKillSuccess={onKillSuccess} />);
+    renderWithDialog(<ActionsSection {...defaultProps} agent={makeAgent()} onKillSuccess={onKillSuccess} />); (fix(dashboard): mock DialogProvider and useKillAgent in ActionsSection tests)
     fireEvent.click(screen.getByText('Stop'));
     expect(onKillSuccess).toHaveBeenCalledOnce();
   });
@@ -255,7 +275,7 @@ describe('ActionsSection', () => {
 
   it('shows Reopen button when review has a terminal status', () => {
     const reviewStatus = makeReviewStatus({ reviewStatus: 'passed' });
-    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} onReopen={vi.fn()} />); (fix(dashboard): mock DialogProvider and useKillAgent in ActionsSection tests)
     expect(screen.getByText('Reopen')).toBeInTheDocument();
   });
 
