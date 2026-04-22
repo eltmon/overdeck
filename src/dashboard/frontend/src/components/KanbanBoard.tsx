@@ -31,8 +31,8 @@ import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
-import { useResetIssue } from '../hooks/useResetIssue';
 import { useKillAgent } from '../hooks/useKillAgent';
+import { ResetIssueButton } from './ResetIssueButton';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { ReviewStatusSnapshot } from '@panopticon/contracts';
@@ -3029,7 +3029,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
           )}
           <MergeIssueButton issue={issue} reviewStatus={reviewStatus} />
-          <ResetIssueButton issue={issue} />
+          <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           {/* Model badge - centered between Tell and Kill */}
           {activeAgent && activeAgent.model && (
             <span className="flex-1 text-center text-[10px] text-content-body font-medium">
@@ -3152,7 +3152,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
             </button>
           ) : null}
-          <ResetIssueButton issue={issue} />
+          <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
         </div>
       )}
 
@@ -3180,7 +3180,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           )}
             <ResetPipelineButton issue={issue} reviewStatus={reviewStatus} />
             <ReopenSection issue={issue} inline />
-            <ResetIssueButton issue={issue} />
+            <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           </div>
         </>
       )}
@@ -3344,32 +3344,6 @@ function MergeIssueButton({
           : reviewStatus?.mergeStatus === 'merging'
             ? 'Merging'
             : 'Merge'}
-    </button>
-  );
-}
-
-
-// Reset button — wipe all work (agent, workspace, beads, vBRIEF) and return to Todo
-function ResetIssueButton({ issue }: { issue: Issue }) {
-  const { confirmAndReset, isPending } = useResetIssue(issue.identifier);
-  const canonical = STATUS_LABELS[issue.status];
-
-  if (canonical === 'done' || canonical === 'canceled' || canonical === 'backlog' || canonical === 'todo') {
-    return null;
-  }
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        await confirmAndReset();
-      }}
-      disabled={isPending}
-      className="flex items-center gap-1 text-xs text-content-subtle hover:text-destructive/70 transition-colors disabled:opacity-50"
-      title="Reset Issue — wipe all work and return to Todo"
-    >
-      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-      <span>{isPending ? 'Resetting...' : 'Reset Issue'}</span>
     </button>
   );
 }

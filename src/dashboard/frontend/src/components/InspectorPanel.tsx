@@ -31,7 +31,6 @@ import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import { useResetIssue } from '../hooks/useResetIssue';
 import { useKillAgent } from '../hooks/useKillAgent';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
@@ -481,8 +480,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       toast.error(err.message, { duration: 8000 });
     },
   });
-
-  const { resetMutation: resetIssueMutation, confirmAndReset: handleResetIssue } = useResetIssue(issueId);
 
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
@@ -950,6 +947,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         {/* Actions */}
         <ActionsSection
           agent={agent}
+          issueId={issueId}
           reviewStatus={reviewStatus}
           reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
@@ -963,7 +961,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           syncMainMutation={syncMainMutation}
           resetSessionMutation={resetSessionMutation}
           reopenMutation={reopenMutation}
-          resetIssueMutation={resetIssueMutation}
           onMerge={handleMerge}
           onReview={handleReview}
           onKill={handleKill}
@@ -974,7 +971,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
           onReopen={handleReopen}
-          onResetIssue={handleResetIssue}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />
