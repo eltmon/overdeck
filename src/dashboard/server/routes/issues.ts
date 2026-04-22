@@ -52,7 +52,8 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
-import { getAgentStateAsync } from '../../../lib/agents.js';
+import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
+import type { LifecycleContext } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
@@ -1713,17 +1714,17 @@ const postIssueCloseOutRoute = HttpRouter.add(
 const MAX_BULK_CLOSE_OUT = 50;
 
 async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  const agentId = normalizeAgentId(issueId);
   const planningId = `planning-${issueId.toLowerCase()}`;
 
   if (await sessionExistsAsync(agentId)) return true;
   if (await sessionExistsAsync(planningId)) return true;
 
   const agentState = await getAgentStateAsync(agentId);
-  if (agentState && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
+  if (agentState && agentState.status !== 'dead' && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
 
   const planningState = await getAgentStateAsync(planningId);
-  if (planningState && planningState.status !== 'stopped' && planningState.status !== 'failed') return true;
+  if (planningState && planningState.status !== 'dead' && planningState.status !== 'stopped' && planningState.status !== 'failed') return true;
 
   return false;
 }
@@ -1741,7 +1742,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     // Origin check
     const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
     const originStr = Array.isArray(origin) ? origin[0] : origin;
-    if (originStr && !originStr.startsWith('http://localhost:') && !originStr.startsWith('http://127.0.0.1:')) {
+    if (!originStr || (!originStr.startsWith('http://localhost:') && !originStr.startsWith('http://127.0.0.1:'))) {
       return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
     }
 
@@ -1787,7 +1788,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         continue;
       }
 
-      const ctx: any = {
+      const ctx: LifecycleContext = {
         issueId: id,
         projectPath,
         ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
@@ -1811,14 +1812,14 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       try {
         const result = yield* Effect.promise(() => closeOut(ctx));
         if (result.success) {
-          issueDataService.invalidateTracker('github').catch(() => {});
-          issueDataService.invalidateTracker('linear').catch(() => {});
+          issueDataService.invalidateTracker('github').catch((e) => { console.error('Failed to invalidate github tracker:', e); });
+          issueDataService.invalidateTracker('linear').catch((e) => { console.error('Failed to invalidate linear tracker:', e); });
           yield* eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),
             payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
           });
-          try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
+          try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch (e) { console.error('Failed to patch issue status:', e); }
         }
         const failedStep = result.steps.find((s: any) => !s.success);
         results.push({

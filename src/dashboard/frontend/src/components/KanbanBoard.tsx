@@ -1026,7 +1026,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
   // Bulk selection state
-  const internalBulkSelection = useBulkSelection(issues.map(i => i.identifier).join(','));
+  const internalBulkSelection = useBulkSelection(issues.map(i => i.identifier).sort().join(','));
   const bulkSelection = bulkSelectedIds
     ? { selectedIds: bulkSelectedIds, toggle: onBulkToggle!, selectAll: onBulkSelectAll!, deselectAll: onBulkDeselectAll!, clear: () => onBulkDeselectAll!(Array.from(bulkSelectedIds)), isSelected: (id: string) => bulkSelectedIds.has(id), count: bulkSelectedIds.size }
     : internalBulkSelection;
@@ -1078,7 +1078,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     const selectedIssues = issues.filter(i => bulkSelection.isSelected(i.identifier));
     const issuesWithAgents = selectedIssues.filter(issue => {
       const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
-      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped');
+      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped' && a.status !== 'failed');
     });
 
     if (issuesWithAgents.length > 0) {
@@ -1097,7 +1097,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     const selectedIssues = issues.filter(i => bulkSelection.isSelected(i.identifier));
     const issuesWithAgents = selectedIssues.filter(issue => {
       const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issue.identifier.toLowerCase());
-      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped');
+      return issueAgents.some(a => a.status !== 'dead' && a.status !== 'stopped' && a.status !== 'failed');
     });
     const issuesWithoutAgents = selectedIssues.filter(i => !issuesWithAgents.some(wa => wa.identifier === i.identifier));
     const ids = issuesWithoutAgents.map(i => i.identifier);
