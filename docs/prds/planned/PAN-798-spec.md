@@ -2,16 +2,17 @@
 
 **Status:** Draft / Planning  
 **Created:** 2026-04-22  
-**Related:** `PAN-798-audit.md`, `PAN-798-pattern-audit.md`
+**Updated:** 2026-04-22 (pattern audit integrated)  
+**Related:** `PAN-798-audit.md`, `PAN-798-pattern-audit-results.md`, `PAN-798-research-needed.md`
 
 ---
 
 ## Problem Statement
 
-The codebase shells out to `tmux capture-pane` at 21 call sites across 9 files to extract data that should be available through structured channels. This is:
+The codebase shells out to `tmux capture-pane` at **22 call sites** across **12 files** to extract data that should be available through structured channels. **20 of these call sites** perform pattern scanning on the captured text — 70+ distinct patterns/regexes in total. This is:
 
-- **Fragile** — regex-parsing terminal output with ANSI sequences and spinner states
-- **Expensive** — one subprocess per read, often polled in loops
+- **Fragile** — regex-parsing terminal output with ANSI sequences, spinner states, and evolving Claude Code UI text
+- **Expensive** — one subprocess per read, often polled in loops (every 500ms–5s)
 - **Blocking** — `capturePaneAsync` shells out synchronously (async wrapper, but still a process spawn)
 - **Wrong abstraction** — terminal text is a rendering surface, not a data API
 
@@ -27,6 +28,36 @@ All structured state, activity, results, and metadata must flow through:
 - `runtime.json` — agent runtime state (already exists, written by hooks)
 - JSONL session files — conversation history (already exists, written by Claude Code)
 - Event logs / structured output files — specialist results (new, but simple)
+
+---
+
+## Pattern Audit Summary
+
+From `PAN-798-pattern-audit-results.md`:
+
+| Category | Count | Risk |
+|---|---|---|
+| `activity_detection` | 6 | Medium |
+| `result_extraction` | 4 | Medium |
+| `delivery_confirmation` | 1 | **High** |
+| `stuck_detection` | 2 | **High** |
+| `dialog_intervention` | 1 | Medium |
+| `metadata_extraction` | 4 | Low |
+| `other` | 2 | Low |
+
+**Total pattern-scanning locations:** 20  
+**Total files affected:** 12  
+**Total distinct patterns/regexes:** 70+
+
+### High-Risk Patterns (require careful replacement)
+
+1. **`confirmDelivery()`** — 14 processing patterns (`●`, `⎿`, `Read`, `✻`, `thinking`, `API Error`, etc.). False positive risk: if any pattern exists in pre-existing pane content, delivery is falsely confirmed. Called from `specialists.ts:2491,2497`.
+
+2. **`checkLazyAgent()`** — 17 active-status regexes + 17 lazy regexes. Overly broad lazy patterns could interrupt working agents; missed active patterns could misclassify computing agents as lazy.
+
+3. **`parseThinkingDuration()`** — Regex `/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/` must match Claude Code's evolving status format. If format changes, stuck agent recovery breaks.
+
+4. **`checkStuckWorkAgents()`** — Exclude-dialog detection uses simple `.includes()` on `"Do you want to make this edit to exclude"` and `"Esc to cancel"` + `"Tab to amend"`. Could misfire if those strings appear in legitimate output.
 
 ---
 
@@ -73,6 +104,7 @@ Already at `~/.panopticon/agents/<id>/runtime.json`. Written by bash hooks on `P
 | `thinkingSince` | `string (ISO 8601) \| null` | PostToolUse hook (start) / completion hook (clear) | `deacon.ts:978` "Thinking… (Xm Ys)" duration parsing |
 | `messageReceived` | `number (sequence)` | PostToolUse hook after stdin read | `tmux.ts:559` `confirmDelivery()` |
 | `waitingOnHuman` | `boolean` | Hook when interactive dialog appears | `deacon.ts:985` exclude-from-context dialog detection |
+| `waitingReason` | `string` | Hook when dialog appears | `deacon.ts:664` lazy pattern detection |
 
 **Existing fields (no change):**
 - `state`, `lastActivity`, `currentTool`, `sessionId`, `claudeSessionId` — already drive Deacon, dashboard, health checks
@@ -85,6 +117,7 @@ Already at `~/.claude/projects/*/*.jsonl`. Written natively by Claude Code. Cont
 - `mission-control.ts:161` ActivityView agent transcript (500 lines)
 - `agents.ts:526` agent output endpoint
 - `agents.ts:1224` save-before-kill 5000-line capture
+- `mission-control.ts:297` specialist live output filter (issueId matching)
 
 **Implementation:** Dashboard renders a human-readable timeline from JSONL instead of raw terminal text. No new file needed.
 
@@ -92,11 +125,19 @@ Already at `~/.claude/projects/*/*.jsonl`. Written natively by Claude Code. Cont
 
 **`git-events.jsonl`** — written by merge specialist
 - One line per git operation: `{"op":"push","ref":"main","remote":"origin","time":"..."}`
-- Replaces: `merge-agent.ts:660-666` `captureTmuxOutput()` git pattern scanning
+- Replaces: `merge-agent.ts:684` `scanGitPatterns()` (8 git pattern regexes)
 
 **`test-results.json`** — written by test specialist
 - Structured test run summary: `{"passed":42,"failed":3,"skipped":1,"time":"..."}`
-- Replaces: `merge-agent.ts:1070-1077` test failure count regex from tmux
+- Replaces: `merge-agent.ts:1071` test failure count regex from tmux
+
+**`review-results.json`** — written by review specialist
+- Structured review result: `{"result":"APPROVED","filesReviewed":["src/foo.ts"],"securityIssues":[],"performanceIssues":[],"notes":"..."}`
+- Replaces: `review-agent.ts:139` `parseAgentOutput()` (`REVIEW_RESULT:`, `FILES_REVIEWED:`, `SECURITY_ISSUES:`, `PERFORMANCE_ISSUES:`, `NOTES:`)
+
+**`merge-results.json`** — written by merge specialist
+- Structured merge result: `{"result":"success","resolvedFiles":[],"failedFiles":[],"tests":"pass","validation":"passed","reason":"...","notes":"..."}`
+- Replaces: `merge-agent.ts:412` `parseAgentOutput()` (`MERGE_RESULT:`, `RESOLVED_FILES:`, `FAILED_FILES:`, `TESTS:`, `VALIDATION:`, `REASON:`, `NOTES:`) and human-readable fallback patterns
 
 ### WebSocket Terminal (in-memory ring buffer)
 
@@ -113,58 +154,67 @@ The PTY hub (`ws-terminal.ts`) already accumulates live terminal data in `ptyPro
 ### P0 — Remove the worst offenders
 
 #### `src/lib/agents.ts:1224` — `stopAgentAsync()`
-**Today:** Captures 5000 lines from tmux and writes to `output.log`.
+**Today:** Captures 5000 lines from tmux and saves to `output.log`.
 **Target:** Delete `output.log` entirely. Historical transcript comes from JSONL. If something needs "last output", read `runtime.json.lastOutput` or tail the JSONL.
 
 #### `src/dashboard/server/routes/workspaces.ts:931` — model extraction
-**Today:** Regex scrapes model name from tmux output.
+**Today:** Regex scrapes model name from tmux output (`/\[((?:oai|cx|go)?@?(?:gpt-[0-9.]+...)[^\]]*\]/i` or `/\[(Opus|Sonnet|Haiku)[^\]]*\]/i`).
 **Target:** Write `model` to `runtime.json` at session start. Dashboard reads from there.
 
 ### P1 — Deacon health/stuck detection (structured state)
 
-#### `src/lib/cloister/deacon.ts:664` — `checkLazyAgent()`
-**Today:** Captures 20 lines, searches for "what would you like me to do", "options:", "stop here".
+#### `src/lib/cloister/deacon.ts:651` — `checkLazyAgent()`
+**Today:** Captures 20 lines, searches 17 active-status regexes (`/computing/i`, `/fermenting/i`, `/thinking/i`, `/bash/i`, `/read/i`, etc.) then 17 lazy patterns (`"what would you like me to do"`, `"options:"`, `"stop here"`, `"future PR"`, etc.).
 **Target:** Rely on `runtime.json.state === 'waiting-on-human'` and `runtime.json.waitingReason`. If the agent is asking for direction, the hook should already know.
 
-#### `src/lib/cloister/deacon.ts:851` — `isAgentActiveInTmux()`
-**Today:** Captures 5 lines, regex-matches computing/thinking/reading/bash/read/write/edit patterns.
+#### `src/lib/cloister/deacon.ts:849` — `isAgentActiveInTmux()`
+**Today:** Captures 5 lines, regex-matches 17 active-status patterns on bottom 8 non-blank lines. Special case for `thinking|fermenting` → calls `parseThinkingDuration()`.
 **Target:** Read `runtime.json.activity` directly. PostToolUse hook already knows what tool is active.
 
-#### `src/lib/cloister/deacon.ts:978` — `checkStuckWorkAgents()`
-**Today:** Captures 10 lines, parses "Thinking… (Xm Ys)" duration, detects exclude-from-context dialog.
-**Target:**
-- Thinking duration: compare `Date.now()` against `runtime.json.thinkingSince`. No parsing needed.
-- Exclude dialog: `runtime.json.waitingOnHuman` tells us an interactive dialog is blocking.
+#### `src/lib/cloister/deacon.ts:935` — `parseThinkingDuration()`
+**Today:** Regex `/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/` extracts minutes/seconds from tmux text.
+**Target:** Not needed. `checkStuckWorkAgents()` compares `Date.now()` against `runtime.json.thinkingSince` instead.
 
-#### `src/lib/health.ts:93` — `getAgentOutput()`
-**Today:** Captures configurable lines for health monitoring.
+#### `src/lib/cloister/deacon.ts:955` — `checkStuckWorkAgents()`
+**Today:** Captures 10 lines, detects exclude-from-context dialog (`"Do you want to make this edit to exclude"`, `"Esc to cancel"` + `"Tab to amend"`), parses thinking duration.
+**Target:**
+- Exclude dialog: `runtime.json.waitingOnHuman === true` tells us an interactive dialog is blocking.
+- Thinking duration: compare `Date.now()` against `runtime.json.thinkingSince`. No parsing needed.
+
+#### `src/lib/health.ts:91` — `getAgentOutput()`
+**Today:** Captures configurable lines and returns raw output as-is (no pattern scanning).
 **Target:** Read `runtime.json.activity` and `runtime.json.state`. Health checks should query structured state, not parse tmux.
 
-#### `src/dashboard/lib/health-filtering.ts:26` — `checkAgentHealthAsync()`
-**Today:** Captures 5 lines for quick active/idle check.
+#### `src/dashboard/lib/health-filtering.ts:13` — `checkAgentHealthAsync()`
+**Today:** Captures 5 lines, returns `{alive, lastOutput}` with raw output (no pattern scanning).
 **Target:** Read `runtime.json.state` directly.
 
 ### P2 — Readiness and delivery (trust hooks, remove fallbacks)
 
-#### `src/lib/tmux.ts:527-553` — `waitForClaudePrompt()`
-**Today:** Polls tmux every 500ms for 15s waiting for `❯` prompt.
-**Target:** `ready.json` is already written by SessionStart hook. Ensure it fires reliably after every tool use completion. Remove the tmux fallback.
+#### `src/lib/tmux.ts:527` — `waitForClaudePrompt()`
+**Today:** Polls tmux every 500ms for 15s waiting for `❯` prompt. Requires 2+ consecutive polls with session existence verification.
+**Called from:** `agents.ts:1401`, `specialists.ts:2436,2459`, `conversations.ts:560,613,969`.
+**Target:** `ready.json` is already written by SessionStart hook. Ensure it fires reliably after every tool use completion. Remove the tmux fallback from all 6 call sites.
 
-#### `src/dashboard/server/routes/conversations.ts:81-92` — `waitForClaudeReady()`
-**Today:** Polls tmux every 500ms for 30s.
+#### `src/dashboard/server/routes/conversations.ts:81` — `waitForClaudeReady()`
+**Today:** Polls tmux every 500ms for 30s waiting for `❯`.
 **Target:** Same as above — rely on `ready.json` hook.
 
-#### `src/lib/agents.ts:266` — `waitForReadySignal()`
-**Today:** Captures 200 lines, fallback when `ready.json` hook not written.
+#### `src/lib/agents.ts:244` — `waitForReadySignal()`
+**Today:** Captures 200 lines, searches for `"bypass permissions on"` or `"⏵⏵"`. Fallback when `ready.json` hook not written.
 **Target:** Fix PAN-759 (hook reliability root cause). Remove this fallback.
 
-#### `src/lib/tmux.ts:559-599` — `confirmDelivery()`
-**Today:** Captures before/after, searches for processing patterns (`●`, `⎿`, `Read`, `thinking`, etc.).
-**Target:** Add `messageReceived` sequence number to `runtime.json`. The hook increments it after Claude reads stdin. Senders check the sequence instead of comparing pane text.
+#### `src/lib/agents.ts:1041` — `startAgent` inline prompt-ready check
+**Today:** Captures 200 lines, searches for `"bypass permissions on"` or `"Claude Code"`.
+**Target:** Trust `ready.json` hook. Remove tmux check.
+
+#### `src/lib/tmux.ts:559` — `confirmDelivery()`
+**Today:** Captures before/after, searches 14 processing patterns (`●`, `⎿`, `Read`, `✻`, `Generating`, `thinking`, `thought for`, `Retrying in`, `API Error`, `"You've hit your limit"`, `Tool use`). High false-positive risk.
+**Target:** Add `messageReceived` sequence number to `runtime.json`. The hook increments it after Claude reads stdin. Senders check the sequence instead of comparing pane text. **See research question #3 — feasibility uncertain.**
 
 #### `src/lib/cloister/specialists.ts:2484,2495` — specialist delivery confirmation
 **Today:** Uses `confirmDelivery()` before sending and before retry.
-**Target:** Same `messageReceived` sequence approach.
+**Target:** Same `messageReceived` sequence approach, if feasible.
 
 ### P3 — Dashboard transcripts (stream from JSONL)
 
@@ -172,27 +222,35 @@ The PTY hub (`ws-terminal.ts`) already accumulates live terminal data in `ptyPro
 **Today:** Captures 500 lines for live agent transcript panel.
 **Target:** Read and render from JSONL session file. No tmux involvement.
 
-#### `src/dashboard/server/routes/mission-control.ts:297,306` — specialist live output
-**Today:** Captures 100 lines for specialist panel.
-**Target:** Same — JSONL for transcript, `runtime.json` for status/activity.
+#### `src/dashboard/server/routes/mission-control.ts:297` — specialist live output filter
+**Today:** Captures 100 lines, filters by issueId mentions (`output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower)`). Shows "Waiting" placeholder if no match.
+**Target:** JSONL for transcript. Specialists already know their issueId — no filtering needed.
 
 #### `src/dashboard/server/routes/agents.ts:526` — agent output endpoint
 **Today:** Configurable lines from tmux for log streaming.
 **Target:** Stream from JSONL session file.
 
-### P3 — Merge/test structured events
+### P3 — Merge/test/review structured events
 
-#### `src/lib/cloister/merge-agent.ts:660-666` — `captureTmuxOutput()`
-**Today:** Polls tmux, scans for `force-with-lease`, `git push`, `[rejected]`, etc.
-**Target:** Merge specialist writes structured git events to `git-events.jsonl` as they happen. Merge agent tails the file.
+#### `src/lib/cloister/review-agent.ts:139` — `parseAgentOutput()`
+**Today:** Scans for `REVIEW_RESULT:`, `FILES_REVIEWED:`, `SECURITY_ISSUES:`, `PERFORMANCE_ISSUES:`, `NOTES:` markers from tmux output.
+**Target:** Review specialist writes `review-results.json`. No human-readable fallback exists (unlike merge-agent), so structured file is the only path.
 
-#### `src/lib/cloister/merge-agent.ts:1017-1022` — `scanGitPatterns()`
-**Today:** Scans captured tmux output for git operations.
-**Target:** Read from `git-events.jsonl`.
+#### `src/lib/cloister/merge-agent.ts:412` — `parseAgentOutput()`
+**Today:** Scans for structured markers (`MERGE_RESULT:`, `RESOLVED_FILES:`, etc.) with human-readable fallback (`"merge task complete"`, `"successfully merged"`, `"merge failed"`, etc.).
+**Target:** Merge specialist writes `merge-results.json`. Remove human-readable fallback — structured file is authoritative.
 
-#### `src/lib/cloister/merge-agent.ts:1070-1077` — test failure baseline
+#### `src/lib/cloister/merge-agent.ts:684` — `scanGitPatterns()`
+**Today:** Scans for 8 git patterns: `force-with-lease`, `git push`, `git fetch`, `[rejected]`, `non-fast-forward`, `retrying`, `[remote rejected]`, `Everything up-to-date`.
+**Target:** Merge specialist writes `git-events.jsonl`.
+
+#### `src/lib/cloister/merge-agent.ts:1071` — test failure baseline
 **Today:** Regex `Failed\s*│\s*(\d+)\s*│` from tmux.
 **Target:** Test specialist writes `test-results.json`.
+
+#### `src/lib/cloister/merge-agent.ts:1744` — `resolveConflictsWithAgent()` sync-main polling
+**Today:** Polls every 5s for 15min, searches for `MERGE_RESULT:` or human-readable markers (`"merge task complete"`, `"successfully merged"`, etc.).
+**Target:** Poll for `merge-results.json` file existence instead of tmux text.
 
 ### P4 — WebSocket terminal (in-memory buffer)
 
@@ -222,8 +280,13 @@ The existing hook system (bash scripts that write `runtime.json` on `PostToolUse
 - If dialog is dismissed, clear `waitingOnHuman`
 - Increment `messageReceived` sequence when Claude reads stdin (this may require a PreToolUse or stdin-read hook — needs validation)
 
+### Specialist hooks (new)
+- Review specialist: write `review-results.json` after completion
+- Merge specialist: write `merge-results.json` after completion; append `git-events.jsonl` per git operation
+- Test specialist: write `test-results.json` after completion
+
 ### Hook reliability (PAN-759)
-The `ready.json` / `runtime.json` hooks must fire reliably. If they don't, fix the hook system rather than adding tmux fallbacks.
+The `ready.json` / `runtime.json` hooks must fire reliably. If they don't, fix the hook system rather than adding tmux fallbacks. **All 6 `waitForClaudePrompt()` call sites are blocked on this.**
 
 ---
 
@@ -231,20 +294,22 @@ The `ready.json` / `runtime.json` hooks must fire reliably. If they don't, fix t
 
 | Priority | File | Change |
 |----------|------|--------|
-| P0 | `src/lib/agents.ts` | Remove `output.log` and 5000-line capture; remove `waitForReadySignal()` fallback; add `model` to `runtime.json` |
+| P0 | `src/lib/agents.ts` | Remove `output.log` and 5000-line capture; remove `waitForReadySignal()` fallback; remove `startAgent` inline prompt check; add `model` to `runtime.json` |
 | P0 | `src/lib/tmux.ts` | Deprecate `capturePaneAsync`; remove `waitForClaudePrompt()` and `confirmDelivery()` |
 | P0 | `src/dashboard/server/routes/workspaces.ts` | Read model from `runtime.json` |
-| P1 | `src/lib/cloister/deacon.ts` | Replace all captures with `runtime.json` reads; use `activity`, `thinkingSince`, `waitingOnHuman` |
+| P1 | `src/lib/cloister/deacon.ts` | Replace all captures with `runtime.json` reads; delete `parseThinkingDuration()`; use `activity`, `thinkingSince`, `waitingOnHuman` |
 | P1 | `src/lib/health.ts` | Read `runtime.json` instead of tmux capture |
 | P1 | `src/dashboard/lib/health-filtering.ts` | Read `runtime.json.state` instead of tmux capture |
-| P2 | `src/dashboard/server/routes/conversations.ts` | Remove tmux readiness check; rely on `ready.json` |
-| P2 | `src/lib/cloister/specialists.ts` | Use `messageReceived` sequence for delivery confirmation |
-| P3 | `src/dashboard/server/routes/mission-control.ts` | Stream ActivityView from JSONL session files |
+| P2 | `src/dashboard/server/routes/conversations.ts` | Remove tmux readiness checks (3 call sites); rely on `ready.json` |
+| P2 | `src/lib/cloister/specialists.ts` | Use `messageReceived` sequence for delivery confirmation; remove `waitForClaudePrompt()` calls |
+| P2 | `src/lib/agents.ts` | Remove `waitForClaudePrompt()` call at `:1401` |
+| P3 | `src/dashboard/server/routes/mission-control.ts` | Stream ActivityView from JSONL session files; remove issueId filter logic |
 | P3 | `src/dashboard/server/routes/agents.ts` | Stream agent output from JSONL session files |
-| P3 | `src/lib/cloister/merge-agent.ts` | Read git events from `git-events.jsonl`; read test results from `test-results.json` |
-| P3 | `src/lib/cloister/specialists.ts` | Merge/test specialists write structured event files |
+| P3 | `src/lib/cloister/review-agent.ts` | Read from `review-results.json` instead of tmux markers |
+| P3 | `src/lib/cloister/merge-agent.ts` | Read from `merge-results.json` and `git-events.jsonl`; remove `scanGitPatterns()`; remove human-readable fallback; poll for file instead of tmux text |
+| P3 | `src/lib/cloister/specialists.ts` | Merge/test/review specialists write structured event files |
 | P4 | `src/dashboard/server/ws-terminal.ts` | Add in-memory ring buffer to PTY hub; serve snapshots from buffer |
-| — | Hook scripts | Extend `runtime.json` writes with new fields |
+| — | Hook scripts | Extend `runtime.json` writes with new fields; add specialist event file writes |
 
 ---
 
@@ -266,6 +331,54 @@ export interface AgentRuntimeState {
 }
 ```
 
+### Specialist Result Files (new)
+
+```typescript
+// review-results.json
+interface ReviewResultFile {
+  result: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED';
+  filesReviewed: string[];
+  securityIssues: string[];
+  performanceIssues: string[];
+  notes: string;
+  timestamp: string;
+}
+
+// merge-results.json
+interface MergeResultFile {
+  result: 'success' | 'failure';
+  resolvedFiles: string[];
+  failedFiles: string[];
+  tests: 'pass' | 'fail' | 'skipped';
+  validation: 'passed' | 'failed';
+  reason: string;
+  notes: string;
+  timestamp: string;
+}
+
+// git-events.jsonl (one line per event)
+interface GitEvent {
+  op: 'push' | 'force_push' | 'fetch' | 'rejected' | 'non_fast_forward' | 'retry' | 'remote_rejected' | 'noop';
+  ref?: string;
+  remote?: string;
+  branch?: string;
+  issueId?: string;
+  status?: string;
+  error?: string;
+  ts: string;
+}
+
+// test-results.json
+interface TestResultsFile {
+  passed: number;
+  failed: number;
+  skipped: number;
+  duration?: number;
+  failedTests?: string[];
+  timestamp: string;
+}
+```
+
 ---
 
 ## Success Criteria
@@ -278,6 +391,7 @@ export interface AgentRuntimeState {
 - [ ] WebSocket terminal initial snapshot served from PTY hub in-memory buffer (no tmux)
 - [ ] `output.log` eliminated
 - [ ] Heartbeat JSON files (`~/.panopticon/heartbeats/*.json`) eliminated — `lastActivity` lives in `runtime.json`
+- [ ] All specialist result markers (`REVIEW_RESULT:`, `MERGE_RESULT:`, etc.) eliminated in favor of structured files
 
 ---
 
