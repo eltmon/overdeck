@@ -32,6 +32,7 @@ import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { useResetIssue } from '../hooks/useResetIssue';
+import { useKillAgent } from '../hooks/useKillAgent';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
@@ -526,16 +527,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
-  const killMutation = useMutation({
-    mutationFn: async () => {
-      if (!agent) throw new Error('No agent');
-      const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to kill');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      onClose();
-    },
+  const { killMutation, confirmAndKill: handleKill } = useKillAgent(agent?.id, {
+    onSuccess: () => onClose(),
   });
 
   const refreshDbMutation = useMutation({
@@ -618,12 +611,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       confirmLabel: 'Reset & Re-run',
     })) {
       resetReviewMutation.mutate({ rerun: true });
-    }
-  };
-
-  const handleKill = async () => {
-    if (agent && await confirm({ title: 'Kill Agent', message: `Kill agent ${agent.id}?`, variant: 'destructive', confirmLabel: 'Kill' })) {
-      killMutation.mutate();
     }
   };
 
