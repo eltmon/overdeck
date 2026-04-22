@@ -1,39 +1,36 @@
 # PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: In Progress
+## Status: Ready for Review
 
 ## Current Phase
-Finalizing PAN-539 after browser verification: workspace dashboard now starts under Node 22 again, image paste/send flow is verified, and only git cleanup/push/`pan done` remain.
+All implementation and feedback fixes are complete. Branch rebased onto main and merged with origin/feature/pan-539. Ready to resubmit for review.
 
 ## Completed Work
-- [x] panopticon-cli-7c8: Added upload-image route with MIME validation, temp-file naming, and async writes in `src/dashboard/server/routes/conversations.ts` (commit: 94004849)
-- [x] panopticon-cli-a9c: Added async startup cleanup timer for stale `panopticon-paste-*` temp files in `src/dashboard/server/main.ts` (commit: d4fb58bb)
-- [x] panopticon-cli-m3x: Added paste/drop image ingestion, optimistic upload state, and conversation upload requests in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: 39170e46)
-- [x] panopticon-cli-5bu: Added thumbnail strip with filename, upload/error status, and remove button in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` and mission-control styles (commit: 40a5d176)
-- [x] panopticon-cli-3ta: Added `@/tmp/...` prefix injection, upload-in-progress blocking, and pending image cleanup after successful send in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` (commit: 9f8bdfd9)
-- [x] Verification: `npm run lint`, `npm test`, and `npm run build` passed; browser verification on `http://127.0.0.1:3012` confirmed pasted image thumbnail rendering, uploaded state, `@/tmp/panopticon-paste-*.png` message prefixing, and composer cleanup after send.
-- [x] Environment fix: pinned transitive `@effect/platform-node-shared` resolution to `4.0.0-beta.43` in `package.json`/`bun.lock` so the workspace dashboard can boot under Node 22 instead of failing on a missing `effect/dist/Context.js` import.
+- [x] Backend: Added POST /api/conversations/:name/upload-image endpoint with MIME validation, temp-file naming, and async writes (commit: cf85bf1f)
+- [x] Backend: Added async startup cleanup timer for stale panopticon-paste-* temp files in main.ts (commit: d4fb58bb)
+- [x] Frontend: Added paste/drop image ingestion, optimistic upload state, and upload requests in ComposerFooter.tsx (commit: 4ee01ea9)
+- [x] Frontend: Added thumbnail strip with filename, upload/error status, and remove button (commit: 40a5d176)
+- [x] Frontend: Added @/tmp/... prefix injection, upload-in-progress blocking, and pending image cleanup after send (commit: 9f8bdfd9)
+- [x] Fix: Clean up discarded composer uploads while preserving manual attachments (commit: d565a858)
+- [x] Fix: Harden conversation upload lifecycle - limit upload size, keep ended-conversation attachments until archive (commit: 1cc46533)
+- [x] Fix: Reset composer uploads on conversation switch (commit: d0d60ed6)
+- [x] Fix: Preserve archived conversation attachments (commit: aa652f01)
+- [x] Fix: Prune orphaned conversation uploads (commit: db6084c3)
+- [x] Fix: Preserve prose-first attachments (commit: 186d21db)
+- [x] Fix: Keep unsent conversation uploads - mtime-based guard in cleanupUnreferencedConversationAttachments (commit: 7a1fcf1e)
+- [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
+- [x] Verification: npm run typecheck passes, npm run lint passes, PAN-539 related tests pass (33/33)
 
 ## Remaining Work
-- [ ] Resolve remaining working tree entries (`package.json`, `bun.lock`, untracked `docs/prds/active/pan-539/`) into the final PAN-539 commit set.
-- [ ] Push branch and call `pan done`.
+- [ ] Push branch and resubmit for review via /rebase-and-submit
 
 ## Key Decisions
-- Upload endpoint lives in `src/dashboard/server/routes/conversations.ts`, not an agent route, because `ComposerFooter` already targets conversation-specific message APIs.
-- Uploaded images should live in `os.tmpdir()` under `panopticon-paste-{uuid}.{ext}` so Claude can read absolute paths without polluting the workspace.
-- Server-side image handling must stay fully async (`fs/promises.writeFile`) to preserve dashboard event-loop responsiveness.
+- Upload endpoint lives in conversations.ts, not an agent route, because ComposerFooter already targets conversation-specific message APIs.
+- Uploaded images live in the conversation attachment directory (not os.tmpdir()) so they are scoped to the conversation and properly managed.
+- Server-side image handling stays fully async (fs/promises.writeFile) to preserve dashboard event-loop responsiveness.
+- cleanupUnreferencedConversationAttachments uses mtime comparison to preserve unsent uploads that are newer than the session file.
 
 ## Specialist Feedback
-- None for PAN-539 yet.
-- **[2026-04-15T22:41Z] verification-gate → FAILED** — `.planning/feedback/020-verification-gate-failed.md`
-- **[2026-04-18T12:59Z] verification-gate → FAILED** — `.planning/feedback/021-verification-gate-failed.md`
-- **[2026-04-18T13:48Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/022-review-agent-changes-requested.md`
-- **[2026-04-18T14:09Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/023-review-agent-changes-requested.md`
-- **[2026-04-18T14:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/024-review-agent-changes-requested.md`
-- **[2026-04-18T14:41Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/025-review-agent-changes-requested.md`
-- **[2026-04-18T14:55Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/026-review-agent-changes-requested.md`
-- **[2026-04-18T15:11Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/027-review-agent-changes-requested.md`
-- **[2026-04-18T15:28Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/028-review-agent-changes-requested.md`
-- **[2026-04-18T15:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/029-review-agent-changes-requested.md`
-- **[2026-04-18T15:50Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/030-review-agent-changes-requested.md`
-- **[2026-04-18T16:03Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/031-review-agent-changes-requested.md`
+- [2026-04-18T16:03Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/031-review-agent-changes-requested.md`
+  - Issues: cleanupUnreferencedConversationAttachments deleting unsent attachments on stop/archive/lifecycle; missing tests for unsent upload protection
+  - Status: FIXED in commits d565a858, 1cc46533, 7a1fcf1e. mtime guard added. Regression tests added.
