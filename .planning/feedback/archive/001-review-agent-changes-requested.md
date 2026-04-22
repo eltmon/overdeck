@@ -2,24 +2,25 @@
 specialist: review-agent
 issueId: PAN-569
 outcome: changes-requested
-timestamp: 2026-04-22T22:37:24Z
+timestamp: 2026-04-22T22:53:18Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-Requirements are fully met (27/27 vBRIEF acceptance criteria) and the PR improves security by replacing shell-interpolated `exec` with `execFile` in clean-planning. However, two blockers prevent merge: (1) the branch is stale against main and will regress the shared MergeButton/RecoverButton refactor from 8b7fc0b4, and (2) the bulk endpoint runs `closeOut()` with `concurrency: 3` against the same projectPath, contradicting the vBRIEF and risking git index-lock races. Additionally, `hasActiveAgentForIssue()` is defined but never called, making the active-agent guardrail client-only — a direct POST will wipe workspaces of running agents. Progress modal can hang if the response omits an ID. Minor medium-severity hardening recommended around issue-ID validation, Origin check, and memoizing agent lookups.
+All 27 vBRIEF acceptance criteria are implemented and the `exec`→`execFile` hardening in `clean-planning.ts` is a real security improvement. However, two critical issues should block merge: (1) a client-side bug in `KanbanBoard.tsx:1045-1065` that overwrites pre-marked `skipped` results with `failed: "Missing from server response"` whenever users proceed past the active-agent warning, and (2) a spoofable `Host`-header fallback in the new bulk-close-out route's origin check that weakens CSRF protection on a destructive endpoint. Additional high-priority correctness issues in `issues.ts` (tmux session name built from un-normalized GitHub IDs; dead `split('-')[0]` prefix fallback) and in `KanbanBoard.tsx` (non-null assertions on optional bulk props) should land together. Performance concerns (O(N×M) agent scans in the warning dialog; per-card planning-state polling) are non-blocking. Recommend changes before merge.
 
 ## Security Issues
 
-- Missing issueId format validation on bulk endpoint
-- Origin check accepts missing Host and does not enforce Content-Type
+- Host-header fallback enables CSRF on bulk-close-out endpoint
+- Content-Type substring match permits pathological values
 
 ## Performance Issues
 
-- Repeated O(selected × agents) scans during bulk-close warning
-- Per-card planning-state fan-out generates many small HTTP requests
+- O(selectedIssues × agents) scans in BulkAgentWarningDialog
+- Per-card planning-state polling fan-out
+- Nested selectedIssues×issuesWithAgents membership check
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
