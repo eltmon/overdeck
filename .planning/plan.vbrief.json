@@ -4,7 +4,7 @@
     "created": "2026-04-20T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-569: Bulk-close issues from kanban board",
-    "updated": "2026-04-22T22:48:33.487Z"
+    "updated": "2026-04-22T23:00:51.263Z"
   },
   "plan": {
     "id": "pan-569",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "a3d7e1f4-8b2c-4d9a-b6e5-1f3a7c9d2e8b",
     "author": "agent:claude-opus-4-6",
-    "sequence": 245,
+    "sequence": 263,
     "created": "2026-04-20T12:00:00Z",
-    "updated": "2026-04-22T22:48:33.487Z",
+    "updated": "2026-04-22T23:00:51.263Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/569",
@@ -84,7 +84,7 @@
             "completed": "2026-04-22T19:58:37.458Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.487Z"
+        "completed": "2026-04-22T23:00:51.263Z"
       },
       {
         "id": "use-bulk-selection-hook",
@@ -128,7 +128,7 @@
             "completed": "2026-04-22T19:58:37.457Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.487Z"
+        "completed": "2026-04-22T23:00:51.263Z"
       },
       {
         "id": "issue-card-checkbox",
@@ -172,7 +172,7 @@
             "completed": "2026-04-22T19:58:37.457Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.486Z"
+        "completed": "2026-04-22T23:00:51.262Z"
       },
       {
         "id": "column-select-all",
@@ -216,7 +216,7 @@
             "completed": "2026-04-22T19:58:37.459Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.487Z"
+        "completed": "2026-04-22T23:00:51.263Z"
       },
       {
         "id": "bulk-action-bar",
@@ -269,7 +269,7 @@
             "completed": "2026-04-22T19:58:37.456Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.486Z"
+        "completed": "2026-04-22T23:00:51.262Z"
       },
       {
         "id": "active-agent-guardrail",
@@ -313,7 +313,7 @@
             "completed": "2026-04-22T19:58:37.456Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.487Z"
+        "completed": "2026-04-22T23:00:51.263Z"
       },
       {
         "id": "progress-modal",
@@ -357,7 +357,7 @@
             "completed": "2026-04-22T19:58:37.460Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.487Z"
+        "completed": "2026-04-22T23:00:51.263Z"
       },
       {
         "id": "wire-bulk-flow",
@@ -401,7 +401,7 @@
             "completed": "2026-04-22T19:58:37.455Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.486Z"
+        "completed": "2026-04-22T23:00:51.262Z"
       },
       {
         "id": "list-view-checkboxes",
@@ -436,7 +436,7 @@
             "completed": "2026-04-22T19:58:37.458Z"
           }
         ],
-        "completed": "2026-04-22T22:48:33.487Z"
+        "completed": "2026-04-22T23:00:51.263Z"
       }
     ],
     "edges": [
