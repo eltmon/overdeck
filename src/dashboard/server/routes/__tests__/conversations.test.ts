@@ -179,7 +179,8 @@ describe('conversations route — DB integration', () => {
 
     const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
     const manualAttachmentResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, vi.fn().mockResolvedValue(undefined));
-    expect(manualAttachmentResponse.status).toBe(200);
+    expect(manualAttachmentResponse.status).toBe(400);
+    expect(decodeJsonResponse(manualAttachmentResponse)).toEqual({ error: 'One or more attachment paths are outside the managed directory' });
 
     const delivery = vi.fn().mockResolvedValue(undefined);
     const sendResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${uploadedPath}` }, delivery);

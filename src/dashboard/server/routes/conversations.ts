@@ -231,9 +231,13 @@ export async function handleConversationMessage(
     return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
   }
 
-  const attachmentPaths = extractConversationAttachmentPaths(message)
-    .filter((attachmentPath) => isManagedConversationAttachmentPath(attachmentPath));
-  const missingAttachment = attachmentPaths.find((attachmentPath) => !hasConversationAttachment(conv.name, attachmentPath));
+  const allAttachmentPaths = extractConversationAttachmentPaths(message);
+  const unmanagedPath = allAttachmentPaths.find((attachmentPath) => !isManagedConversationAttachmentPath(attachmentPath));
+  if (unmanagedPath) {
+    return jsonResponse({ error: 'One or more attachment paths are outside the managed directory' }, { status: 400 });
+  }
+
+  const missingAttachment = allAttachmentPaths.find((attachmentPath) => !hasConversationAttachment(conv.name, attachmentPath));
   if (missingAttachment) {
     return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
   }
