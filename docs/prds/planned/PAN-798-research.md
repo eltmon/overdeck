@@ -6,9 +6,9 @@ This document tracks all open questions, incomplete audits, and research needed 
 
 ## 1. Complete Pattern Audit
 
-**Status:** ✅ **COMPLETE** — see `PAN-798-pattern-audit-results.md`  
+**Status:** ✅ **COMPLETE** — see `PAN-798-audit.md` (Part 2: Detailed Pattern Breakdown)  
 **Owner:** Research agent (completed 2026-04-22)  
-**Deliverable:** `PAN-798-pattern-audit-results.md`
+**Deliverable:** `PAN-798-audit.md`
 
 **Key findings:**
 - 20 pattern-scanning locations across 12 files
