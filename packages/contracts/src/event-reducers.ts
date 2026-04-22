@@ -10,6 +10,7 @@
  */
 
 import type {
+  AgentRuntimeSnapshot,
   AgentSnapshot,
   DashboardSnapshot,
   DomainEvent,
@@ -23,6 +24,12 @@ import type {
 export interface ReadModelState {
   sequence: number
   agentsById: Record<string, AgentSnapshot>
+  /**
+   * PAN-800 — per-agent runtime state derived from agent.* runtime events.
+   * Kept separate from agentsById because it updates on every tool call; merging
+   * would cause the whole AgentSnapshot to re-diff on the frontend.
+   */
+  agentRuntimeById: Record<string, AgentRuntimeSnapshot>
   specialistsByName: Record<string, SpecialistSnapshot>
   reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>
   resources: ResourceStats | null
@@ -49,6 +56,7 @@ export interface DashboardLifecycleState {
 export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   sequence: 0,
   agentsById: {},
+  agentRuntimeById: {},
   specialistsByName: {},
   reviewStatusByIssueId: {},
   resources: null,
@@ -76,6 +84,33 @@ const MAX_AGENT_OUTPUT_LINES = 200
 const MAX_ACTIVITY_ENTRIES = 50
 const MAX_DETAILED_ENTRIES = 200
 const MAX_TTS_ENTRIES = 50
+
+// ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
+
+function defaultRuntimeSnapshot(agentId: string, timestamp: string, sequence: number): AgentRuntimeSnapshot {
+  return {
+    id: agentId,
+    activity: 'idle',
+    lastActivity: timestamp,
+    updatedAtSequence: sequence,
+  }
+}
+
+/**
+ * Bump runtimeSnapshotSequence on the corresponding AgentSnapshot (if present)
+ * so low-frequency subscribers can cheaply detect a runtime change. No-op if
+ * the agent has no lifecycle snapshot yet (a runtime event arrived before
+ * agent.created — unusual but defensive).
+ */
+function bumpRuntimeSnapshotSequence(
+  agentsById: Record<string, AgentSnapshot>,
+  agentId: string,
+  sequence: number,
+): Record<string, AgentSnapshot> {
+  const agent = agentsById[agentId]
+  if (!agent) return agentsById
+  return { ...agentsById, [agentId]: { ...agent, runtimeSnapshotSequence: sequence } }
+}
 
 // ─── syncSnapshot — bootstrap from a full DashboardSnapshot ──────────────────
 
@@ -361,6 +396,166 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.items_unblocked':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    // ─── PAN-800 Agent Runtime Events ──────────────────────────────────────
+    case 'agent.activity_changed': {
+      const { agentId, activity, currentTool } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        activity,
+        currentTool: activity === 'working' ? currentTool : undefined,
+        // Clear thinking/waiting on transitions away from those activities.
+        thinking: activity === 'thinking' ? prev.thinking : undefined,
+        waiting: activity === 'waiting' ? prev.waiting : undefined,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.thinking_started': {
+      const { agentId, lastToolAt } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        activity: 'thinking',
+        currentTool: undefined,
+        thinking: { since: event.timestamp, lastToolAt },
+        waiting: undefined,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.thinking_stopped': {
+      const { agentId } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+      if (!prev) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      // Clear the thinking state but leave activity for the follow-up event
+      // (agent.activity_changed / waiting_started / stopped) to set.
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        thinking: undefined,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.waiting_started': {
+      const { agentId, reason, message } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        activity: 'waiting',
+        currentTool: undefined,
+        thinking: undefined,
+        waiting: {
+          reason,
+          startedAt: event.timestamp,
+          message,
+        },
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.waiting_cleared': {
+      const { agentId } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+      if (!prev) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        waiting: undefined,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.message_received': {
+      const { agentId } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        lastMessageAt: event.timestamp,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.model_set': {
+      const { agentId, model, claudeSessionId } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        model,
+        claudeSessionId: claudeSessionId ?? prev.claudeSessionId,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.state_restored': {
+      const { agentId, snapshot } = event.payload
+      // Seed directly from the restored snapshot but use the new event's sequence
+      // so downstream consumers key off a monotonic value.
+      const next: AgentRuntimeSnapshot = {
+        ...snapshot,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
 
     case 'activity.entry': {
       const entry = event.payload as Record<string, unknown>;
