@@ -3407,7 +3407,7 @@ function ResetIssueButton({ issue }: { issue: Issue }) {
         e.stopPropagation();
         if (await confirm({
           title: 'Reset Issue',
-          message: `Reset ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and branch\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
+          message: `Reset ${issue.identifier}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and feature branch (including STATE.md)\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
           variant: 'destructive',
           confirmLabel: 'Reset Issue',
         })) {
