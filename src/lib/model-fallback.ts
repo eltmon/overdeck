@@ -27,6 +27,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-haiku-4-5': 'anthropic',
 
   // OpenAI models (current)
+  'gpt-5.5': 'openai',
+  'gpt-5.5-mini': 'openai',
+  'gpt-5.5-nano': 'openai',
+  'gpt-5.5-pro': 'openai',
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
   'gpt-5.4-nano': 'openai',
@@ -80,6 +84,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
+  'gpt-5.5': 'claude-sonnet-4-6', // Flagship model → Sonnet
+  'gpt-5.5-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
+  'gpt-5.5-nano': 'claude-haiku-4-5', // Economy model → Haiku
+  'gpt-5.5-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
   'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
   'gpt-5.4-nano': 'claude-haiku-4-5', // Economy model → Haiku
@@ -134,11 +142,15 @@ const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-6';
  */
 const MODEL_TIER_RANK: Record<string, number> = {
   // OpenAI tiers
+  'gpt-5.5-pro': 3,
+  'gpt-5.5': 2,
   'gpt-5.4-pro': 3,
   'gpt-5.4': 2,
   'o3': 2,
   'o4-mini': 1,
+  'gpt-5.5-mini': 0,
   'gpt-5.4-mini': 0,
+  'gpt-5.5-nano': -1, // API-only, no OAuth tier
   'gpt-5.4-nano': -1, // API-only, no OAuth tier
 };
 

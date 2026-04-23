@@ -11,7 +11,24 @@ interface RestartResult {
 
 export function StoppedAgentsBanner() {
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const stoppedAgents = agents.filter((a) => a.status === 'stopped');
+
+  /** Phases where an agent is considered actively in the pipeline.
+   *  Stopped agents in these phases + not completed = likely crashed/orphaned. */
+  const PIPELINE_PHASES = new Set([
+    'planning', 'exploration', 'implementation', 'testing',
+    'documentation', 'review', 'review-response', 'pre_push', 'post_push',
+  ]);
+
+  const stoppedAgents = agents.filter((a) => {
+    if (a.status !== 'stopped') return false;
+    // Exclude agents that finished their work normally
+    if (a.runtimeState === 'completed') return false;
+    if (a.resolution === 'completed' || a.resolution === 'done') return false;
+    if (a.lifecycle?.isCompleted) return false;
+    // Only care about agents that were in an active pipeline phase
+    if (!a.agentPhase) return false;
+    return PIPELINE_PHASES.has(a.agentPhase);
+  });
   const [dismissed, setDismissed] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [results, setResults] = useState<RestartResult[] | null>(null);

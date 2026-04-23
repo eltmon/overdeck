@@ -634,9 +634,10 @@ program
 
     if (options.detach) {
       // Run in background
+      const { openDashboardLogStdio } = await import('../lib/platform-lifecycle.js');
       const child = spawn(node22, [bundledServer], {
             detached: true,
-            stdio: 'ignore',
+            stdio: openDashboardLogStdio(),
             env: {
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),

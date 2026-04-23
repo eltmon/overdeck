@@ -79,6 +79,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'openai',
     label: 'OpenAI',
     models: [
+      { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
     ],
   },

@@ -238,8 +238,28 @@ If you still have remaining tasks, continue working on them. Do NOT stop until a
     emit_resolution "needs_input"
     ;;
   UNCLEAR)
-    # Escalate to stuck after 2+ consecutive UNCLEAR.
-    emit_resolution "unclear"
+    # Escalate to stuck after 2+ consecutive UNCLEAR — the hook has looked at
+    # this agent's tail twice and still can't tell what it's doing, which is
+    # itself signal. Check the runtime snapshot for the previous resolution
+    # before writing, since emit_resolution's own count read can't see the
+    # event we're about to emit.
+    escalate_to_stuck=false
+    esc_snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+    if [ -n "$esc_snap" ] && command -v jq >/dev/null 2>&1; then
+      esc_prev_resolution=$(echo "$esc_snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
+      esc_prev_count=$(echo "$esc_snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
+      # Stay stuck once escalated (don't ratchet back to unclear on subsequent
+      # UNCLEAR verdicts — deacon's poke logic counts consecutive stuck heartbeats).
+      if { [ "$esc_prev_resolution" = "unclear" ] && [ "$esc_prev_count" -ge 1 ]; } \
+         || [ "$esc_prev_resolution" = "stuck" ]; then
+        escalate_to_stuck=true
+      fi
+    fi
+    if [ "$escalate_to_stuck" = "true" ]; then
+      emit_resolution "stuck"
+    else
+      emit_resolution "unclear"
+    fi
     ;;
 esac
 

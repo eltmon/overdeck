@@ -110,6 +110,10 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   if (backingModel.includes('haiku')) return prefix ? `Haiku 4.5 (${prefix})` : 'Haiku 4.5';
 
   // OpenAI models
+  if (backingModel.includes('gpt-5.5-pro')) return prefix ? `GPT-5.5 Pro (${prefix})` : 'GPT-5.5 Pro';
+  if (backingModel.includes('gpt-5.5-mini')) return prefix ? `GPT-5.5 Mini (${prefix})` : 'GPT-5.5 Mini';
+  if (backingModel.includes('gpt-5.5-nano')) return prefix ? `GPT-5.5 Nano (${prefix})` : 'GPT-5.5 Nano';
+  if (backingModel.includes('gpt-5.5')) return prefix ? `GPT-5.5 (${prefix})` : 'GPT-5.5';
   if (backingModel.includes('gpt-5.4-pro')) return prefix ? `GPT-5.4 Pro (${prefix})` : 'GPT-5.4 Pro';
   if (backingModel.includes('gpt-5.4-mini')) return prefix ? `GPT-5.4 Mini (${prefix})` : 'GPT-5.4 Mini';
   if (backingModel.includes('gpt-5.4-nano')) return prefix ? `GPT-5.4 Nano (${prefix})` : 'GPT-5.4 Nano';

@@ -367,6 +367,97 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
+  'gpt-5.5': {
+    model: 'gpt-5.5',
+    provider: 'openai',
+    displayName: 'GPT-5.5',
+    costPer1MTokens: 10.5, // $3.00 in / $18.00 out
+    contextWindow: 1050000, // 1.05M context
+    minTier: 'plus', // ChatGPT Plus/Pro only
+    skills: {
+      'code-generation': 97,
+      'code-review': 94,
+      debugging: 96,
+      planning: 95,
+      documentation: 92,
+      testing: 94,
+      security: 91,
+      performance: 92,
+      synthesis: 94,
+      speed: 65,
+      'context-length': 100, // 1.05M context
+    },
+    notes: 'OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. 1.05M context, 128K max output.',
+  },
+
+  'gpt-5.5-mini': {
+    model: 'gpt-5.5-mini',
+    provider: 'openai',
+    displayName: 'GPT-5.5 Mini',
+    costPer1MTokens: 1.25, // ~$0.50 in / $2.00 out
+    contextWindow: 400000,
+    minTier: 'free', // Available in ChatGPT Free tier
+    skills: {
+      'code-generation': 85,
+      'code-review': 81,
+      debugging: 79,
+      planning: 76,
+      documentation: 83,
+      testing: 79,
+      security: 72,
+      performance: 76,
+      synthesis: 79,
+      speed: 92, // 2x faster than predecessor
+      'context-length': 90, // 400K context
+    },
+    notes: 'Fast and efficient mid-tier model. 400K context. Available in ChatGPT Free/Plus tiers.',
+  },
+
+  'gpt-5.5-nano': {
+    model: 'gpt-5.5-nano',
+    provider: 'openai',
+    displayName: 'GPT-5.5 Nano',
+    costPer1MTokens: 0.875, // $0.25 in / $1.50 out
+    contextWindow: 128000,
+    skills: {
+      'code-generation': 73,
+      'code-review': 68,
+      debugging: 65,
+      planning: 61,
+      documentation: 71,
+      testing: 65,
+      security: 56,
+      performance: 61,
+      synthesis: 64,
+      speed: 97, // Fastest OpenAI model
+      'context-length': 75,
+    },
+    notes: 'API-only. Best for classification, extraction, ranking, sub-agents.',
+  },
+
+  'gpt-5.5-pro': {
+    model: 'gpt-5.5-pro',
+    provider: 'openai',
+    displayName: 'GPT-5.5 Pro',
+    costPer1MTokens: 119.0, // $18 in / $220 out
+    contextWindow: 1050000,
+    minTier: 'pro', // ChatGPT Pro only
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 97,
+      security: 97,
+      performance: 96,
+      synthesis: 99,
+      speed: 50,
+      'context-length': 100,
+    },
+    notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only.',
+  },
+
   // Retired OpenAI model IDs — replaced by newer versions, kept for backward compat
   'gpt-5.2-codex': { model: 'gpt-5.2-codex', provider: 'openai', displayName: 'GPT-5.2 Codex (deprecated)', costPer1MTokens: 20.0, contextWindow: 128000, skills: { 'code-generation': 92, 'code-review': 90, debugging: 88, planning: 85, documentation: 85, testing: 85, security: 80, performance: 82, synthesis: 88, speed: 50, 'context-length': 75 } },
   'o3-deep-research': { model: 'o3-deep-research', provider: 'openai', displayName: 'O3 Deep Research (deprecated)', costPer1MTokens: 5.0, contextWindow: 200000, skills: { 'code-generation': 88, 'code-review': 95, debugging: 98, planning: 95, documentation: 88, testing: 88, security: 92, performance: 92, synthesis: 95, speed: 25, 'context-length': 95 } },
