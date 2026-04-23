@@ -1,556 +1,488 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-20T22:21:27Z",
+    "created": "2026-04-20T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-699: Conversation view renders tool calls out of terminal order",
-    "updated": "2026-04-21T18:35:11.971Z"
+    "description": "Plan for PAN-569: Bulk-close issues from kanban board",
+    "updated": "2026-04-23T00:33:34.829Z"
   },
   "plan": {
-    "id": "pan-699",
-    "title": "Conversation view renders tool calls out of terminal order",
+    "id": "pan-569",
+    "title": "Bulk-close issues from kanban board",
     "status": "approved",
-    "uid": "557afeee-8e75-4507-8839-f0f54fd35a4f",
-    "author": "agent:claude-opus-4-7",
-    "sequence": 283,
-    "created": "2026-04-20T22:21:27Z",
-    "updated": "2026-04-21T18:35:11.971Z",
+    "uid": "a3d7e1f4-8b2c-4d9a-b6e5-1f3a7c9d2e8b",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 317,
+    "created": "2026-04-20T12:00:00Z",
+    "updated": "2026-04-23T00:33:34.829Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/699",
-        "label": "PAN-699",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/569",
+        "label": "PAN-569",
         "type": "issue"
       }
     ],
     "tags": [
       "dashboard",
-      "conversation",
-      "ordering",
-      "bug"
+      "kanban",
+      "bulk-actions",
+      "close-out"
     ],
     "narratives": {
-      "Problem": "parseConversationMessages emits entries in JSONL read order and never sorts. Parallel tool calls, buffered writes, and compact boundaries render out of terminal order. tool_result arriving before tool_use is orphaned. pendingToolUse map is rebuilt each incremental parse call, so cross-batch tool pairing is also broken.",
-      "Proposal": "Capture a monotonic sequence per JSONL line, keep an unresolvedResults map for backward pairing, persist parse state across incremental calls, and sort messages + workLog by (createdAt, sequence) before returning. Propagate sequence through the wire contract so the client can sort defensively."
+      "Problem": "Closing issues on the kanban board is one-at-a-time. Sprint cleanup with many done issues is tedious and time-consuming.",
+      "Proposal": "Add multi-select checkboxes to issue cards and column headers, a floating bulk action bar, and a POST /api/issues/bulk-close-out endpoint that runs the full closeOut lifecycle sequentially per issue. Show progress modal during execution."
     },
     "items": [
       {
-        "id": "contract-sequence",
-        "title": "Add optional sequence field to ChatMessage and WorkLogEntry contracts",
+        "id": "bulk-close-endpoint",
+        "title": "Add POST /api/issues/bulk-close-out endpoint",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-20T22:21:27Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-699"
-        },
-        "narrative": {
-          "Action": "In packages/contracts/src/rpc.ts, add `sequence: Schema.optional(Schema.Number)` to ChatMessage and WorkLogEntry. Rebuild contracts (cd packages/contracts && npm run build)."
-        },
-        "subItems": [
-          {
-            "id": "contract-sequence.ac1",
-            "title": "ChatMessage schema exposes optional numeric `sequence` field",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.111Z"
-          },
-          {
-            "id": "contract-sequence.ac2",
-            "title": "WorkLogEntry schema exposes optional numeric `sequence` field",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.111Z"
-          },
-          {
-            "id": "contract-sequence.ac3",
-            "title": "packages/contracts builds cleanly; `npm run typecheck` passes at repo root",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.111Z"
-          }
-        ],
-        "completed": "2026-04-21T18:35:11.971Z"
-      },
-      {
-        "id": "parse-sequence",
-        "title": "Emit monotonic sequence on every parsed message and workLog entry",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-20T22:21:27Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-699"
-        },
-        "narrative": {
-          "Action": "In conversation-service.ts `parseConversationMessages`, maintain a local `sequence` counter that increments per JSONL line processed. Stash it on every ChatMessage and WorkLogEntry produced (user, assistant, pendingAssistant flush, tool_use, tool_result-resolved workLog push)."
-        },
-        "subItems": [
-          {
-            "id": "parse-sequence.ac1",
-            "title": "Every ChatMessage returned by parseConversationMessages has a numeric sequence",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.112Z"
-          },
-          {
-            "id": "parse-sequence.ac2",
-            "title": "Every WorkLogEntry returned by parseConversationMessages has a numeric sequence matching the JSONL line index of its tool_use",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.112Z"
-          },
-          {
-            "id": "parse-sequence.ac3",
-            "title": "sequence values are strictly monotonically increasing in emission order within a single parse call",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.112Z"
-          }
-        ],
-        "completed": "2026-04-21T18:35:11.971Z"
-      },
-      {
-        "id": "parse-unresolved-results",
-        "title": "Two-pass pairing: handle tool_result that arrives before tool_use",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-20T22:21:27Z",
+        "created": "2026-04-20T12:00:00Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-569"
         },
         "narrative": {
-          "Action": "Add an `unresolvedResults: Map<tool_use_id, {result, isError, sequence, createdAt}>` alongside `pendingToolUse`. On tool_result: if no matching pendingToolUse, stash in unresolvedResults (never drop). On tool_use: check unresolvedResults first and merge into a completed WorkLogEntry immediately if present. Never orphan a tool_result."
+          "Action": "Add new Effect HTTP route in src/dashboard/server/routes/issues.ts. Accepts { issueIds: string[] }, iterates sequentially calling closeOut() per issue via the existing lifecycle module, collects per-issue results. Emits per-issue issue.statusChanged events (already handled by closeOut). Wire route into issuesRouteLayer."
         },
         "subItems": [
           {
-            "id": "parse-unresolved-results.ac1",
-            "title": "tool_result preceding its tool_use in the JSONL is paired correctly into workLog",
+            "id": "bulk-close-endpoint.ac1",
+            "title": "POST /api/issues/bulk-close-out accepts { issueIds: string[] } and returns { results: Array<{ issueId, success, error?, skipped? }> }",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.111Z"
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
-            "id": "parse-unresolved-results.ac2",
-            "title": "No tool_result is silently dropped — all tool_result entries either pair with a tool_use or remain in unresolvedResults carried state",
+            "id": "bulk-close-endpoint.ac2",
+            "title": "Each issue runs the full closeOut() lifecycle (verify merge, archive, teardown, close on tracker, clear review status)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.111Z"
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
-            "id": "parse-unresolved-results.ac3",
-            "title": "Existing forward-paired case (tool_use then tool_result) still works identically",
+            "id": "bulk-close-endpoint.ac3",
+            "title": "If one issue fails, remaining issues still proceed (no short-circuit)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.112Z"
+            "completed": "2026-04-22T19:58:37.458Z"
+          },
+          {
+            "id": "bulk-close-endpoint.ac4",
+            "title": "Route is wired into issuesRouteLayer and accessible at /api/issues/bulk-close-out",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.458Z"
           }
         ],
-        "completed": "2026-04-21T18:35:11.971Z"
+        "completed": "2026-04-23T00:33:34.828Z"
       },
       {
-        "id": "parse-sort",
-        "title": "Sort messages and workLog by (createdAt, sequence) before returning",
+        "id": "use-bulk-selection-hook",
+        "title": "Create useBulkSelection hook for multi-select state",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-20T22:21:27Z",
+        "created": "2026-04-20T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-569"
         },
         "narrative": {
-          "Action": "After the JSONL walk in parseConversationMessages, sort `messages` and `workLog` independently by (createdAt ISO string compare, then sequence). Return sorted arrays. Preserve streaming/totalCost/byteOffset fields unchanged."
+          "Action": "Create src/dashboard/frontend/src/hooks/useBulkSelection.ts. Hook manages a Set<string> of selected issue IDs. Exports: selectedIds, toggle(id), selectAll(ids), deselectAll(ids), clear(), isSelected(id), count. Clear selection when issues list changes identity (prevents stale selections)."
         },
         "subItems": [
           {
-            "id": "parse-sort.ac1",
-            "title": "Returned messages array is sorted by (createdAt, sequence)",
+            "id": "use-bulk-selection-hook.ac1",
+            "title": "Hook exports toggle, selectAll, deselectAll, clear, isSelected, count, and selectedIds",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.109Z"
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
-            "id": "parse-sort.ac2",
-            "title": "Returned workLog array is sorted by (createdAt, sequence)",
+            "id": "use-bulk-selection-hook.ac2",
+            "title": "Toggling an already-selected ID removes it; toggling an unselected ID adds it",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.109Z"
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
-            "id": "parse-sort.ac3",
-            "title": "Identical timestamps are deterministically ordered by sequence",
+            "id": "use-bulk-selection-hook.ac3",
+            "title": "clear() resets selection to empty set",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.110Z"
+            "completed": "2026-04-22T19:58:37.457Z"
           }
         ],
-        "completed": "2026-04-21T18:35:11.970Z"
+        "completed": "2026-04-23T00:33:34.828Z"
       },
       {
-        "id": "parse-persist-state",
-        "title": "Persist pendingToolUse, unresolvedResults, and sequence across incremental parse calls",
+        "id": "issue-card-checkbox",
+        "title": "Add selection checkbox and selected styling to IssueCard",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-20T22:21:27Z",
+        "created": "2026-04-20T12:00:00Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-569"
         },
         "narrative": {
-          "Action": "Extend ParseResult with `parseState: { pendingToolUse, unresolvedResults, lastSequence }`. parseConversationMessages accepts an optional prior parseState as a second/third argument (alongside byteOffset) and seeds its maps + counter from it. Update the watchConversation caller in conversation-service.ts and any agents.ts callers to thread parseState through successive calls. Flushing of unpaired pendingToolUse only happens at boundaries that own the full window (e.g. summarizeConversationActivity, parseFromLastCompactBoundary non-incremental use), never mid-stream in the watcher."
+          "Action": "Add a checkbox to the top-left corner of each IssueCard in KanbanBoard.tsx. Wire it to useBulkSelection.toggle(). Apply subtle highlight border/background when selected. Checkbox click must not trigger the existing single-select (onSelect) behavior — use stopPropagation."
         },
         "subItems": [
           {
-            "id": "parse-persist-state.ac1",
-            "title": "A tool_use in parse call N pairs correctly with its tool_result in parse call N+1",
+            "id": "issue-card-checkbox.ac1",
+            "title": "Each IssueCard renders a checkbox in the top-left corner",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.110Z"
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
-            "id": "parse-persist-state.ac2",
-            "title": "sequence counter continues monotonically across incremental calls (does not reset to 0)",
+            "id": "issue-card-checkbox.ac2",
+            "title": "Clicking the checkbox toggles selection without triggering the card's single-select onClick",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.110Z"
+            "completed": "2026-04-22T19:58:37.457Z"
           },
           {
-            "id": "parse-persist-state.ac3",
-            "title": "watchConversation and agents.ts conversation route thread parseState through successive reads",
+            "id": "issue-card-checkbox.ac3",
+            "title": "Selected cards have a visually distinct highlight (border or background change)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.110Z"
-          },
-          {
-            "id": "parse-persist-state.ac4",
-            "title": "Unpaired tool_use entries are only flushed by non-incremental entry points, not by the watcher",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.110Z"
+            "completed": "2026-04-22T19:58:37.457Z"
           }
         ],
-        "completed": "2026-04-21T18:35:11.970Z"
+        "completed": "2026-04-23T00:33:34.828Z"
       },
       {
-        "id": "route-wire-sequence",
-        "title": "Thread sequence through the agents.ts conversation response",
+        "id": "column-select-all",
+        "title": "Add select-all checkbox to kanban column headers",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-20T22:21:27Z",
+        "created": "2026-04-20T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-569"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/routes/agents.ts, ensure the conversation response shape passes each message/workLog entry's `sequence` through untouched. Update any intermediate mapping that would drop unknown fields."
+          "Action": "Add a checkbox to each kanban column header. When checked, calls selectAll() with all issue IDs in that column. When unchecked, calls deselectAll() for those IDs. Checkbox shows indeterminate state when some but not all column issues are selected."
         },
         "subItems": [
           {
-            "id": "route-wire-sequence.ac1",
-            "title": "GET /api/agents/:id/conversation returns `sequence` on every message and workLog entry",
+            "id": "column-select-all.ac1",
+            "title": "Each kanban column header has a select-all checkbox",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.110Z"
+            "completed": "2026-04-22T19:58:37.459Z"
           },
           {
-            "id": "route-wire-sequence.ac2",
-            "title": "No backwards-compatibility break: clients that ignore sequence still render correctly",
+            "id": "column-select-all.ac2",
+            "title": "Checking it selects all issues in that column; unchecking deselects them",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.111Z"
-          }
-        ],
-        "completed": "2026-04-21T18:35:11.971Z"
-      },
-      {
-        "id": "client-defensive-sort",
-        "title": "MessagesTimeline defensive client-side sort by (createdAt, sequence)",
-        "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-20T22:21:27Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-699"
-        },
-        "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx, apply a `.toSorted((a,b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0))` to the combined timeline before render. Server is authoritative; this is a belt-and-braces tiebreaker."
-        },
-        "subItems": [
-          {
-            "id": "client-defensive-sort.ac1",
-            "title": "Rendered timeline is sorted by (createdAt, sequence) regardless of server array order",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.109Z"
+            "completed": "2026-04-22T19:58:37.459Z"
           },
           {
-            "id": "client-defensive-sort.ac2",
-            "title": "Sort is stable and does not re-run on every render unless inputs change (useMemo or equivalent)",
+            "id": "column-select-all.ac3",
+            "title": "Checkbox shows indeterminate state when some (but not all) column issues are selected",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.109Z"
+            "completed": "2026-04-22T19:58:37.459Z"
           }
         ],
-        "completed": "2026-04-21T18:35:11.970Z"
+        "completed": "2026-04-23T00:33:34.829Z"
       },
       {
-        "id": "tests-unit",
-        "title": "Unit tests for conversation-service ordering and pairing",
+        "id": "bulk-action-bar",
+        "title": "Create floating BulkActionBar component",
         "status": "completed",
         "priority": "high",
-        "created": "2026-04-20T22:21:27Z",
+        "created": "2026-04-20T12:00:00Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-569"
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/services/conversation-service.test.ts with synthetic JSONL fixtures covering: (a) parallel tool calls in one assistant turn, (b) tool_result before its tool_use, (c) incremental parse boundary splitting a tool_use/tool_result pair, (d) three entries with identical timestamps using sequence as tiebreaker, (e) compact boundary mid-turn."
+          "Action": "Create src/dashboard/frontend/src/components/BulkActionBar.tsx. Fixed-position bar at bottom of viewport, appears when selectedIds.size > 0. Shows 'N issues selected', 'Close Out' button, and 'Cancel' button (clears selection). Animate in/out with CSS transition."
         },
         "subItems": [
           {
-            "id": "tests-unit.ac1",
-            "title": "Parallel tool call fixture: messages + workLog sorted in terminal order, both tools paired",
+            "id": "bulk-action-bar.ac1",
+            "title": "Bar appears at bottom when 1+ issues are selected, hidden when none selected",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.108Z"
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
-            "id": "tests-unit.ac2",
-            "title": "Backward-pairing fixture: tool_result preceding tool_use is correctly merged into workLog",
+            "id": "bulk-action-bar.ac2",
+            "title": "Shows count of selected issues (e.g., '3 issues selected')",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.108Z"
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
-            "id": "tests-unit.ac3",
-            "title": "Incremental fixture: two parseConversationMessages calls with state threading produce the same output as one full parse",
+            "id": "bulk-action-bar.ac3",
+            "title": "Cancel button clears all selections",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.108Z"
+            "completed": "2026-04-22T19:58:37.456Z"
           },
           {
-            "id": "tests-unit.ac4",
-            "title": "Timestamp-tie fixture: three entries at identical timestamp are ordered by sequence",
+            "id": "bulk-action-bar.ac4",
+            "title": "Close Out button triggers the bulk close-out flow",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.108Z"
-          },
-          {
-            "id": "tests-unit.ac5",
-            "title": "Compact boundary fixture: parseFromLastCompactBoundary returns correctly ordered post-boundary content",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.108Z"
-          },
-          {
-            "id": "tests-unit.ac6",
-            "title": "All new tests pass under `npm test`",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.108Z"
+            "completed": "2026-04-22T19:58:37.456Z"
           }
         ],
-        "completed": "2026-04-21T18:35:11.970Z"
+        "completed": "2026-04-23T00:33:34.828Z"
       },
       {
-        "id": "tests-regression-fixture",
-        "title": "Regression fixture from a real mis-ordered session",
+        "id": "active-agent-guardrail",
+        "title": "Active-agent warning for bulk close-out",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-569"
+        },
+        "narrative": {
+          "Action": "Before executing bulk close-out, check if any selected issues have running agents. If so, show a warning dialog listing those issues and their agents. User can 'Proceed (skip issues with agents)' or 'Cancel'. Skipped issues appear in results as skipped. Reuse the existing AgentWarningDialog pattern/styling."
+        },
+        "subItems": [
+          {
+            "id": "active-agent-guardrail.ac1",
+            "title": "If any selected issues have running agents, a warning dialog appears before execution",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
+          },
+          {
+            "id": "active-agent-guardrail.ac2",
+            "title": "Dialog lists which issues have active agents",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
+          },
+          {
+            "id": "active-agent-guardrail.ac3",
+            "title": "Proceeding skips issues with active agents; those appear as skipped in results",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.456Z"
+          }
+        ],
+        "completed": "2026-04-23T00:33:34.828Z"
+      },
+      {
+        "id": "progress-modal",
+        "title": "Progress modal for bulk close-out execution",
         "status": "completed",
         "priority": "medium",
-        "created": "2026-04-20T22:21:27Z",
+        "created": "2026-04-20T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-569"
+        },
+        "narrative": {
+          "Action": "Show a modal during bulk close-out execution with per-issue status rows (pending → running → done/failed/skipped). Modal is non-dismissable during execution. On completion, show summary (N succeeded, N failed, N skipped) with a Close button. Clear selection on close."
+        },
+        "subItems": [
+          {
+            "id": "progress-modal.ac1",
+            "title": "Modal appears during execution showing per-issue status (pending/running/done/failed/skipped)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
+          },
+          {
+            "id": "progress-modal.ac2",
+            "title": "Modal cannot be dismissed while operation is in progress",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.459Z"
+          },
+          {
+            "id": "progress-modal.ac3",
+            "title": "On completion, shows summary counts and a Close button that clears selection",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.460Z"
+          }
+        ],
+        "completed": "2026-04-23T00:33:34.829Z"
+      },
+      {
+        "id": "wire-bulk-flow",
+        "title": "Wire bulk close-out mutation into KanbanBoard",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-569"
+        },
+        "narrative": {
+          "Action": "In KanbanBoard.tsx, add useMutation for POST /api/issues/bulk-close-out. Wire Close Out button in BulkActionBar → agent guardrail check → confirmation → mutation → progress modal → refresh dashboard state on completion. Selection clears after successful completion."
+        },
+        "subItems": [
+          {
+            "id": "wire-bulk-flow.ac1",
+            "title": "Clicking Close Out in the action bar triggers the full flow: guardrail → confirm → execute → progress → refresh",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.455Z"
+          },
+          {
+            "id": "wire-bulk-flow.ac2",
+            "title": "Dashboard state refreshes after bulk operation completes (issues appear in done column)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.455Z"
+          },
+          {
+            "id": "wire-bulk-flow.ac3",
+            "title": "Selection is cleared after the operation completes and progress modal is closed",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-22T19:58:37.455Z"
+          }
+        ],
+        "completed": "2026-04-23T00:33:34.827Z"
+      },
+      {
+        "id": "list-view-checkboxes",
+        "title": "Add selection checkboxes to list view rows",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-04-20T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-699"
+          "issueLabel": "pan-569"
         },
         "narrative": {
-          "Action": "Capture (or scrub and commit) a real ~/.claude JSONL session that currently renders out of order. Store under src/dashboard/server/services/__fixtures__/pan-699-regression.jsonl with any user/secret content redacted. Add a snapshot test asserting the expected ordered output."
+          "Action": "Add selection checkboxes to ListIssueRow component (list-grouped view). Same toggle behavior as IssueCard checkboxes. BulkActionBar works across both views since it reads from the same useBulkSelection hook."
         },
         "subItems": [
           {
-            "id": "tests-regression-fixture.ac1",
-            "title": "Fixture JSONL exists in __fixtures__/ and is scrubbed of any secrets / PII",
+            "id": "list-view-checkboxes.ac1",
+            "title": "ListIssueRow renders a selection checkbox",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.107Z"
+            "completed": "2026-04-22T19:58:37.458Z"
           },
           {
-            "id": "tests-regression-fixture.ac2",
-            "title": "Snapshot test asserts ordered messages + workLog and fails if ordering regresses",
+            "id": "list-view-checkboxes.ac2",
+            "title": "Selections persist when switching between kanban and list views",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-04-20T23:02:43.107Z"
+            "completed": "2026-04-22T19:58:37.458Z"
           }
         ],
-        "completed": "2026-04-21T18:35:11.969Z"
-      },
-      {
-        "id": "uat-playwright",
-        "title": "Playwright UAT: conversation view renders in terminal order",
-        "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-20T22:21:27Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-699"
-        },
-        "narrative": {
-          "Action": "Add a Playwright spec under the existing dashboard UAT harness that opens an agent with a known-good session fixture and asserts the rendered conversation matches expected order (including parallel tool calls). Must use an isolated browser instance/profile — no shared state with other agents' sessions. All required login/setup reproducible inside the isolated session."
-        },
-        "subItems": [
-          {
-            "id": "uat-playwright.ac1",
-            "title": "Playwright spec runs against an isolated browser instance/profile",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.108Z"
-          },
-          {
-            "id": "uat-playwright.ac2",
-            "title": "Spec opens the dashboard conversation view and asserts rendered order matches expected sequence for a parallel-tool-call session",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.109Z"
-          },
-          {
-            "id": "uat-playwright.ac3",
-            "title": "Spec does not depend on any other agent's Playwright browser or shared login state",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.109Z"
-          },
-          {
-            "id": "uat-playwright.ac4",
-            "title": "Spec passes locally via the project's dashboard UAT runner",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-20T23:02:43.109Z"
-          }
-        ],
-        "completed": "2026-04-21T18:35:11.970Z"
+        "completed": "2026-04-23T00:33:34.829Z"
       }
     ],
     "edges": [
       {
-        "from": "contract-sequence",
-        "to": "parse-sequence",
+        "from": "use-bulk-selection-hook",
+        "to": "issue-card-checkbox",
         "type": "blocks"
       },
       {
-        "from": "contract-sequence",
-        "to": "route-wire-sequence",
+        "from": "use-bulk-selection-hook",
+        "to": "column-select-all",
         "type": "blocks"
       },
       {
-        "from": "contract-sequence",
-        "to": "client-defensive-sort",
+        "from": "use-bulk-selection-hook",
+        "to": "bulk-action-bar",
         "type": "blocks"
       },
       {
-        "from": "parse-sequence",
-        "to": "parse-sort",
+        "from": "use-bulk-selection-hook",
+        "to": "list-view-checkboxes",
         "type": "blocks"
       },
       {
-        "from": "parse-sequence",
-        "to": "parse-persist-state",
+        "from": "bulk-close-endpoint",
+        "to": "wire-bulk-flow",
         "type": "blocks"
       },
       {
-        "from": "parse-unresolved-results",
-        "to": "parse-persist-state",
+        "from": "bulk-action-bar",
+        "to": "wire-bulk-flow",
         "type": "blocks"
       },
       {
-        "from": "parse-sort",
-        "to": "tests-unit",
+        "from": "issue-card-checkbox",
+        "to": "wire-bulk-flow",
         "type": "blocks"
       },
       {
-        "from": "parse-unresolved-results",
-        "to": "tests-unit",
+        "from": "active-agent-guardrail",
+        "to": "wire-bulk-flow",
         "type": "blocks"
       },
       {
-        "from": "parse-persist-state",
-        "to": "tests-unit",
-        "type": "blocks"
-      },
-      {
-        "from": "parse-sort",
-        "to": "tests-regression-fixture",
-        "type": "blocks"
-      },
-      {
-        "from": "route-wire-sequence",
-        "to": "uat-playwright",
-        "type": "blocks"
-      },
-      {
-        "from": "client-defensive-sort",
-        "to": "uat-playwright",
+        "from": "progress-modal",
+        "to": "wire-bulk-flow",
         "type": "blocks"
       }
     ]
