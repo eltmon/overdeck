@@ -1113,7 +1113,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
         if (existsSync(completedProcessedFile)) {
-          const agentState = getAgentState(agentIdForCheck) as (ReturnType<typeof getAgentState> & { stoppedByUser?: boolean }) | null;
+          const agentState = getAgentState(agentIdForCheck);
           if (agentState?.status === 'stopped' && agentState.stoppedByUser) {
             actions.push(`Skipped pending review for ${issueId}: work agent was explicitly stopped`);
             continue;
@@ -3227,7 +3227,7 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       // stoppedByUser is set by markAgentStopped (kill, pan work done, etc.).
       // recoverOrphanedAgents does NOT set this flag, so orphaned/crashed agents
       // pass through here and get resumed.
-      const deliberatelyStopped = (state as ReturnType<typeof getAgentState> & { stoppedByUser?: boolean }).stoppedByUser === true;
+      const deliberatelyStopped = state.stoppedByUser === true;
       if (deliberatelyStopped) {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
         continue;
