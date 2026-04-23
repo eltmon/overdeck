@@ -72,7 +72,7 @@ export async function runExternalMergeSweep(
     // If it hasn't, something went wrong — we'll still enqueue to retry.
     if (localRow.canonical_state === 'merged') {
       // Re-enqueue the merged label via setCanonicalState (updates updated_at)
-      setCanonicalState(issueId, 'merged');
+      setCanonicalState(issueId, 'merged', 'external_merge_detected');
       console.log(
         `[reconciler:external-merge-sweep] Re-enqueued merged label for ${issueId}`
       );
@@ -81,7 +81,7 @@ export async function runExternalMergeSweep(
 
     // Issue is closed on GitHub without merged/wontfix labels, and local state
     // doesn't reflect closure. Assume external merge and update canonical state.
-    setCanonicalState(issueId, 'merged');
+    setCanonicalState(issueId, 'merged', 'external_merge_detected');
     console.log(
       `[reconciler:external-merge-sweep] Detected external merge for ${issueId}, enqueued merged label`
     );

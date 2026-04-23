@@ -55,18 +55,20 @@ export function drainIntentQueue(): LabelIntent[] {
  */
 export function setCanonicalState(
   issueId: string,
-  canonicalState: CanonicalState
+  canonicalState: CanonicalState,
+  reason?: string,
 ): void {
   const db = getDatabase();
   const now = new Date().toISOString();
 
   db.prepare(
-    `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at, pending_mutation)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(issue_id) DO UPDATE SET
        canonical_state = excluded.canonical_state,
-       updated_at = excluded.updated_at`
-  ).run(issueId, canonicalState, now, now);
+       updated_at = excluded.updated_at,
+       pending_mutation = COALESCE(excluded.pending_mutation, pending_mutation)`
+  ).run(issueId, canonicalState, now, now, reason ?? null);
 }
 
 /**

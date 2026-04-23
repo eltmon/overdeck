@@ -20,14 +20,15 @@ export async function runPushStep(
   // Select issues whose local state changed since the last successful sync
   const rows = db
     .prepare(
-      `SELECT issue_id, canonical_state FROM issue_state WHERE updated_at > last_synced_at`
+      `SELECT issue_id, canonical_state, pending_mutation FROM issue_state WHERE updated_at > last_synced_at`
     )
-    .all() as Array<{ issue_id: string; canonical_state: string }>;
+    .all() as Array<{ issue_id: string; canonical_state: string; pending_mutation: string | null }>;
 
   if (rows.length === 0) return;
 
   for (const row of rows) {
     const issueId = row.issue_id;
+    const auditReason = row.pending_mutation ?? undefined;
 
     // Parse issue number from issue ID (e.g. "PAN-805" → 805)
     const issueNumber = parseInt(issueId.split('-').pop() || '', 10);
@@ -56,12 +57,12 @@ export async function runPushStep(
         targetLabel: '',
         action: 'add',
         outcome: 'skipped',
-        reason: 'no_diff',
+        reason: auditReason ?? 'no_diff',
         retryCount: 0,
       });
 
       db.prepare(
-        `UPDATE issue_state SET last_synced_at = ? WHERE issue_id = ?`
+        `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ?`
       ).run(now, issueId);
       continue;
     }
@@ -75,6 +76,7 @@ export async function runPushStep(
         action: 'add',
         outcome: result.ok ? 'success' : result.status === 429 ? 'rate_limited' : 'failure',
         retryCount: result.retryCount,
+        reason: auditReason,
         httpStatus: result.status,
       });
     }
@@ -88,6 +90,7 @@ export async function runPushStep(
         action: 'remove',
         outcome: result.ok ? 'success' : result.status === 429 ? 'rate_limited' : 'failure',
         retryCount: result.retryCount,
+        reason: auditReason,
         httpStatus: result.status,
       });
     }
@@ -95,7 +98,7 @@ export async function runPushStep(
     // Update last_synced_at regardless of partial success so we don't retry
     // infinitely on the same tick; failures will be handled by next tick.
     db.prepare(
-      `UPDATE issue_state SET last_synced_at = ? WHERE issue_id = ?`
+      `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ?`
     ).run(now, issueId);
   }
 }
