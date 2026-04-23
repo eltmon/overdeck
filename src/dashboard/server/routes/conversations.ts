@@ -44,6 +44,7 @@ import {
   setFavorite,
   removeFavorite,
   updateForkStatus,
+  type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
   sendKeysAsync,
