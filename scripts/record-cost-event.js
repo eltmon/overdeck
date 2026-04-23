@@ -26,6 +26,7 @@ join(PANOPTICON_HOME, "backups");
 const COSTS_DIR = join(PANOPTICON_HOME, "costs");
 join(PANOPTICON_HOME, "heartbeats");
 join(PANOPTICON_HOME, "archives");
+join(PANOPTICON_HOME, "logs");
 const TRAEFIK_DIR = join(PANOPTICON_HOME, "traefik");
 join(TRAEFIK_DIR, "dynamic");
 join(TRAEFIK_DIR, "certs");

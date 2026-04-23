@@ -21,6 +21,7 @@ import {
 } from '@panopticon/contracts';
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panopticon/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
+import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -321,10 +322,20 @@ export const ReadModelServiceLive = Layer.effect(
             workspace: a.workspace || undefined,
             runtime: a.runtime || undefined,
             model: a.model || undefined,
-            // Reconcile on-disk status with live tmux state: if the tmux session is
-            // active but state.json says 'stopped', the agent is actually running
-            // (e.g. resumed outside the API, or state.json write was missed).
-            status: toAgentStatus(a.tmuxActive && a.status === 'stopped' ? 'running' : a.status),
+            // Reconcile on-disk status with live tmux state:
+            // - tmux active but state.json says 'stopped' → actually running (resumed outside API)
+            // - tmux inactive but state.json says 'running' → actually stopped (reboot/crash)
+            status: (() => {
+              let reconciled = a.status as AgentStatus | string;
+              if (a.tmuxActive && a.status === 'stopped') {
+                reconciled = 'running';
+                logDeaconEvent(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
+              } else if (!a.tmuxActive && a.status === 'running') {
+                reconciled = 'stopped';
+                logDeaconEvent(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
+              }
+              return toAgentStatus(reconciled);
+            })(),
             startedAt: a.startedAt || undefined,
             lastActivity: a.lastActivity || undefined,
             branch: a.branch || undefined,
