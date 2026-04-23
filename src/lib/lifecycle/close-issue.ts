@@ -18,6 +18,7 @@ import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix } from '../issue-id.js';
+import { setCanonicalState } from './reconciler/index.js';
 
 const execAsync = promisify(exec);
 
@@ -325,23 +326,20 @@ async function applyLabelGitHub(ctx: LifecycleContext): Promise<StepResult> {
   const { owner, repo, number } = ctx.github;
 
   try {
+    // PAN-805: workflow labels are owned by the reconciler — enqueue state so it
+    // computes deltas and removes in-progress/in-review/needs-close-out.
+    setCanonicalState(ctx.issueId, 'merged');
+
     // Ensure label exists
     await execAsync(
       `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
       { encoding: 'utf-8' },
     );
-    // Add label
+    // Add label (closed-out is a human-driven marker, not a workflow label)
     await execAsync(
       `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}"`,
       { encoding: 'utf-8' },
     );
-    // Remove workflow labels
-    for (const label of WORKFLOW_LABELS) {
-      await execAsync(
-        `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}" 2>/dev/null || true`,
-        { encoding: 'utf-8' },
-      );
-    }
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on GitHub`]);
   } catch (err) {
     return stepSkipped(step, [`Label management failed (non-fatal): ${(err as Error).message}`]);

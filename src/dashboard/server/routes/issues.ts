@@ -52,6 +52,7 @@ import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
+import { setCanonicalState } from '../../../lib/lifecycle/reconciler/index.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
@@ -1947,6 +1948,11 @@ const postIssueCloseOutRoute = HttpRouter.add(
       }
     }
 
+    // PAN-805: enqueue workflow-label intent via reconciler before close-out
+    if (githubCheck.isGitHub) {
+      setCanonicalState(id, 'merged');
+    }
+
     const result = yield* Effect.promise(() => closeOut(ctx));
 
     if (result.success) {
@@ -2114,6 +2120,11 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
             project: rallyConfig.project,
           };
         }
+      }
+
+      // PAN-805: enqueue workflow-label intent via reconciler before close-out
+      if (githubCheck.isGitHub) {
+        setCanonicalState(id, 'merged');
       }
 
       const closeResult = yield* Effect.tryPromise({
