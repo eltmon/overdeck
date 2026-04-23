@@ -4,7 +4,7 @@
     "created": "2026-04-23T10:38:50.728Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-805: Epic A — Labels as display, internal state as source of truth",
-    "updated": "2026-04-23T21:17:21.923Z"
+    "updated": "2026-04-23T21:24:58.901Z"
   },
   "plan": {
     "id": "pan-805",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "5c3c14bf-190b-44e0-8dbd-c099d876a24b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 50,
+    "sequence": 74,
     "created": "2026-04-23T10:38:50.728Z",
-    "updated": "2026-04-23T21:17:21.923Z",
+    "updated": "2026-04-23T21:24:58.901Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/805",
@@ -91,7 +91,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.922Z"
+        "completed": "2026-04-23T21:24:58.901Z"
       },
       {
         "id": "reconciler-scaffold",
@@ -140,7 +140,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.921Z"
+        "completed": "2026-04-23T21:24:58.899Z"
       },
       {
         "id": "reconciler-github-client",
@@ -189,7 +189,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.922Z"
+        "completed": "2026-04-23T21:24:58.901Z"
       },
       {
         "id": "reconciler-audit-writer",
@@ -230,7 +230,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.919Z"
+        "completed": "2026-04-23T21:24:58.898Z"
       },
       {
         "id": "reconciler-desired-labels",
@@ -263,7 +263,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.923Z"
+        "completed": "2026-04-23T21:24:58.901Z"
       },
       {
         "id": "reconciler-push",
@@ -312,7 +312,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.919Z"
+        "completed": "2026-04-23T21:24:58.898Z"
       },
       {
         "id": "reconciler-pull",
@@ -361,7 +361,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.919Z"
+        "completed": "2026-04-23T21:24:58.898Z"
       },
       {
         "id": "reconciler-external-merge-sweep",
@@ -402,7 +402,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.913Z"
+        "completed": "2026-04-23T21:24:58.894Z"
       },
       {
         "id": "reconciler-boot-backfill",
@@ -443,7 +443,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.920Z"
+        "completed": "2026-04-23T21:24:58.899Z"
       },
       {
         "id": "reconciler-boot-wiring",
@@ -476,7 +476,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.913Z"
+        "completed": "2026-04-23T21:24:58.894Z"
       },
       {
         "id": "delete-repair-functions",
@@ -525,7 +525,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.922Z"
+        "completed": "2026-04-23T21:24:58.900Z"
       },
       {
         "id": "delete-boot-repair-wiring",
@@ -558,7 +558,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.921Z"
+        "completed": "2026-04-23T21:24:58.900Z"
       },
       {
         "id": "migrate-transition-in-progress",
@@ -607,7 +607,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.918Z"
+        "completed": "2026-04-23T21:24:58.897Z"
       },
       {
         "id": "migrate-update-to-in-review",
@@ -648,7 +648,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.918Z"
+        "completed": "2026-04-23T21:24:58.897Z"
       },
       {
         "id": "migrate-bulk-close",
@@ -689,7 +689,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.916Z"
+        "completed": "2026-04-23T21:24:58.896Z"
       },
       {
         "id": "remove-closes-directive",
@@ -722,7 +722,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.921Z"
+        "completed": "2026-04-23T21:24:58.900Z"
       },
       {
         "id": "post-merge-explicit-close",
@@ -763,7 +763,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.917Z"
+        "completed": "2026-04-23T21:24:58.897Z"
       },
       {
         "id": "ci-enforcement-script",
@@ -804,7 +804,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.915Z"
+        "completed": "2026-04-23T21:24:58.895Z"
       },
       {
         "id": "test-respawn-flood",
@@ -845,7 +845,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.915Z"
+        "completed": "2026-04-23T21:24:58.895Z"
       },
       {
         "id": "test-rate-limit-recovery",
@@ -886,7 +886,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.916Z"
+        "completed": "2026-04-23T21:24:58.896Z"
       },
       {
         "id": "test-external-merge",
@@ -927,7 +927,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.911Z"
+        "completed": "2026-04-23T21:24:58.893Z"
       },
       {
         "id": "test-closes-absence",
@@ -960,7 +960,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.920Z"
+        "completed": "2026-04-23T21:24:58.898Z"
       },
       {
         "id": "test-ci-enforcement",
@@ -1001,7 +1001,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.912Z"
+        "completed": "2026-04-23T21:24:58.893Z"
       },
       {
         "id": "test-multi-dev-pull-sync",
@@ -1042,7 +1042,7 @@
             }
           }
         ],
-        "completed": "2026-04-23T21:17:21.914Z"
+        "completed": "2026-04-23T21:24:58.895Z"
       }
     ],
     "edges": [
