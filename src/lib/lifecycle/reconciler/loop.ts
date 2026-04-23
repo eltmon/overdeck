@@ -1,3 +1,5 @@
+import { createGitHubClient } from './github-client.js';
+import { runPushStep } from './push.js';
 import type { ReconcilerConfig, ReconcilerState } from './types.js';
 
 /**
@@ -10,7 +12,7 @@ import type { ReconcilerConfig, ReconcilerState } from './types.js';
  * Mutex ensures only one tick runs at a time.
  */
 export async function tick(
-  _config: ReconcilerConfig,
+  config: ReconcilerConfig,
   state: ReconcilerState
 ): Promise<void> {
   if (state.mutex) {
@@ -22,10 +24,14 @@ export async function tick(
   const start = Date.now();
 
   try {
+    const gh = createGitHubClient(config);
+
+    // Step 1: push local changes to GitHub
+    await runPushStep(config, gh);
+
     // Step placeholders — implemented in subsequent beads
-    // await runPushStep(config);
-    // await runPullStep(config);
-    // await runExternalMergeSweep(config);
+    // await runPullStep(config, gh);
+    // await runExternalMergeSweep(config, gh);
     console.log('[reconciler] Tick completed in', Date.now() - start, 'ms');
   } catch (err) {
     console.warn('[reconciler] Tick failed:', err);
