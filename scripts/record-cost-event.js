@@ -619,8 +619,32 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
+
+    -- ===== Issue State (PAN-805: reconciler source of truth) =====
+    CREATE TABLE IF NOT EXISTS issue_state (
+      issue_id         TEXT PRIMARY KEY,
+      canonical_state  TEXT NOT NULL CHECK(canonical_state IN ('todo','in_progress','in_review','merged','closed_wontfix')),
+      last_synced_at   TEXT NOT NULL,
+      pending_mutation TEXT,
+      updated_at       TEXT NOT NULL
+    );
+
+    -- ===== Label Sync Audit (PAN-805: every API attempt logged) =====
+    CREATE TABLE IF NOT EXISTS label_sync_audit (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id      TEXT NOT NULL,
+      attempted_at  TEXT NOT NULL,
+      target_label  TEXT NOT NULL,
+      action        TEXT NOT NULL CHECK(action IN ('add','remove')),
+      outcome       TEXT NOT NULL CHECK(outcome IN ('success','failure','rate_limited','skipped')),
+      reason        TEXT,
+      retry_count   INTEGER NOT NULL DEFAULT 0,
+      http_status   INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_issue_time
+      ON label_sync_audit(issue_id, attempted_at);
   `);
-	db.pragma(`user_version = 27`);
+	db.pragma(`user_version = 28`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -628,7 +652,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 27) return;
+	if (currentVersion === 28) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -906,7 +930,38 @@ function runMigrations(db) {
 			console.warn("[schema] Failed to seed deacon.globally_paused:", err);
 		}
 	}
-	db.pragma(`user_version = 27`);
+	if (currentVersion < 28) {
+		try {
+			db.exec(`
+        CREATE TABLE IF NOT EXISTS issue_state (
+          issue_id         TEXT PRIMARY KEY,
+          canonical_state  TEXT NOT NULL CHECK(canonical_state IN ('todo','in_progress','in_review','merged','closed_wontfix')),
+          last_synced_at   TEXT NOT NULL,
+          pending_mutation TEXT,
+          updated_at       TEXT NOT NULL
+        )
+      `);
+		} catch {}
+		try {
+			db.exec(`
+        CREATE TABLE IF NOT EXISTS label_sync_audit (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          issue_id      TEXT NOT NULL,
+          attempted_at  TEXT NOT NULL,
+          target_label  TEXT NOT NULL,
+          action        TEXT NOT NULL CHECK(action IN ('add','remove')),
+          outcome       TEXT NOT NULL CHECK(outcome IN ('success','failure','rate_limited','skipped')),
+          reason        TEXT,
+          retry_count   INTEGER NOT NULL DEFAULT 0,
+          http_status   INTEGER
+        )
+      `);
+		} catch {}
+		try {
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_issue_time ON label_sync_audit(issue_id, attempted_at)`);
+		} catch {}
+	}
+	db.pragma(`user_version = 28`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
