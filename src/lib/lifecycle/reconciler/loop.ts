@@ -1,5 +1,6 @@
 import { createGitHubClient } from './github-client.js';
 import { runPushStep } from './push.js';
+import { runPullStep } from './pull.js';
 import type { ReconcilerConfig, ReconcilerState } from './types.js';
 
 /**
@@ -29,8 +30,10 @@ export async function tick(
     // Step 1: push local changes to GitHub
     await runPushStep(config, gh);
 
-    // Step placeholders — implemented in subsequent beads
-    // await runPullStep(config, gh);
+    // Step 2: pull remote state and reconcile local canonical_state
+    await runPullStep(config, gh);
+
+    // Step placeholder — implemented in subsequent bead
     // await runExternalMergeSweep(config, gh);
     console.log('[reconciler] Tick completed in', Date.now() - start, 'ms');
   } catch (err) {
