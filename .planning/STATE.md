@@ -1,9 +1,9 @@
 # PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: COMPLETE — Ready for Merge
+## Status: In Review — Round 10 Fixes Addressed
 
 ## Current Phase
-All checks passed (2026-04-23T00:15Z). Review: passed. Tests: passed. Work is complete and ready for human merge approval.
+Review-agent CHANGES_REQUESTED at 2026-04-23T00:21Z. Addressed all 6 issues (critical import + 5 security/perf items). Tests/typecheck/lint pass. Resubmitting for review.
 
 ## Completed Work
 - [x] Backend: Added POST /api/conversations/:name/upload-image endpoint with MIME validation, temp-file naming, and async writes (commit: cf85bf1f)
@@ -54,6 +54,12 @@ All checks passed (2026-04-23T00:15Z). Review: passed. Tests: passed. Work is co
 - [x] Review approved at 2026-04-23T00:12:54Z
 - [x] All tests passed at 2026-04-23T00:15Z
 - [x] Ready for human merge approval
+- [x] Fix: Missing Conversation type import in routes/conversations.ts (round 10)
+- [x] Fix: Unbounded cwd on summary-fork endpoint — validateCwdContainment now uses realpath, checks directory exists, and requires homedir containment (round 10)
+- [x] Fix: Full JSONL rescan on stop/archive — added bounded LRU cache (100 entries) for readSessionAttachmentBasenames keyed by mtimeMs (round 10)
+- [x] Fix: Upload rate-limit keyed on raw remoteAddress — now checks X-Forwarded-For header first, falls back to remoteAddress (round 10)
+- [x] Fix: Dev-origin trust active whenever NODE_ENV not production — now only trusts localhost origins when NODE_ENV === 'development' (round 10)
+- [x] Fix: @-path extraction regex does not decode JSON-escaped paths — raw JSON line search now JSON-decodes captured values to handle \/ escapes (round 10)
 
 ## Key Decisions
 - Upload endpoint lives in conversations.ts, not an agent route, because ComposerFooter already targets conversation-specific message APIs.
@@ -104,3 +110,4 @@ All checks passed (2026-04-23T00:15Z). Review: passed. Tests: passed. Work is co
 - **[2026-04-22T23:29Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-23T00:07Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
 - **[2026-04-23T00:12Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
+- **[2026-04-23T00:21Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
