@@ -211,10 +211,17 @@ Use UNCLEAR only as a last resort when the tail is genuinely ambiguous (e.g. no 
 
 Respond with EXACTLY one word, nothing else: FORGOT_COMPLETION | STILL_WORKING | STOPPED_FOR_INPUT | UNCLEAR"
 
-RESULT=$(echo "$ANALYSIS_PROMPT" | claude -p --model "$COMPLETION_MODEL" 2>/dev/null || echo "UNCLEAR")
+CLAUDE_STDERR="$LOG_DIR/work-agent-stop-hook.claude-stderr.log"
+RESULT=$(echo "$ANALYSIS_PROMPT" | claude -p --model "$COMPLETION_MODEL" 2>>"$CLAUDE_STDERR")
+CLAUDE_RC=$?
+if [ $CLAUDE_RC -ne 0 ] || [ -z "$RESULT" ]; then
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID claude -p failed rc=$CLAUDE_RC (see $CLAUDE_STDERR), fallback to UNCLEAR" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  RESULT="UNCLEAR"
+fi
 VERDICT=$(echo "$RESULT" | tr -d '[:space:]' | head -c 30)
 
-echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID ($ISSUE_ID) -> $VERDICT (model: $COMPLETION_MODEL)" \
+echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID ($ISSUE_ID) -> $VERDICT (model: $COMPLETION_MODEL, rc=$CLAUDE_RC)" \
   >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 
 case "$VERDICT" in

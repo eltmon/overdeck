@@ -23,6 +23,7 @@ import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix } from './projects.js';
+import { logAgentLifecycle } from './persistent-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -360,6 +361,10 @@ export function saveAgentState(state: AgentState): void {
   const dir = getAgentDir(state.id);
   mkdirSync(dir, { recursive: true });
 
+  // Detect status transition for audit trail
+  const oldState = getAgentState(state.id);
+  const oldStatus = oldState?.status;
+
   if (state.status === 'running' || state.status === 'starting') {
     delete state.stoppedAt;
   } else if (state.status === 'stopped' && !state.stoppedAt) {
@@ -370,18 +375,26 @@ export function saveAgentState(state: AgentState): void {
     join(dir, 'state.json'),
     JSON.stringify(state, null, 2)
   );
+
+  if (oldStatus && oldStatus !== state.status) {
+    logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
+  }
 }
 
 function markAgentRunning(state: AgentState): void {
+  const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
   delete state.stoppedAt;
+  logAgentLifecycle(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
 }
 
 function markAgentStopped(state: AgentState): void {
+  const oldStatus = state.status;
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
   (state as AgentState & { stoppedByUser?: boolean }).stoppedByUser = true;
+  logAgentLifecycle(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, user-initiated)`);
 }
 
 // ============================================================================
@@ -1441,6 +1454,7 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
  */
 export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
+  logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeState(normalizedId);
@@ -1459,25 +1473,31 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     || isCrashed;
 
   if (!canResume) {
+    const reason = `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`;
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
-      error: `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`
+      error: reason
     };
   }
 
   // Get saved session ID from any available source
   const sessionId = getLatestSessionId(normalizedId);
   if (!sessionId) {
+    const reason = 'No saved session ID found — this agent is not resumable. Start a fresh agent instead.';
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
-      error: 'No saved session ID found — this agent is not resumable. Start a fresh agent instead.'
+      error: reason
     };
   }
 
   if (!agentState || !hasWorkspace || isPlaceholder) {
+    const reason = 'Saved Claude session is orphaned because the backing workspace/agent state is missing or placeholder-only. Start a fresh agent instead.';
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
-      error: 'Saved Claude session is orphaned because the backing workspace/agent state is missing or placeholder-only. Start a fresh agent instead.'
+      error: reason
     };
   }
 
@@ -1558,6 +1578,7 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
 
     const resumedAt = new Date().toISOString();
     console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
+    logAgentLifecycle(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',
       lastActivity: resumedAt,
@@ -1572,6 +1593,7 @@ ${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --danger
     return { success: true, messageDelivered };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `resumeAgent FAILED: ${msg}`);
     return {
       success: false,
       error: `Failed to resume agent: ${msg}`
@@ -1610,16 +1632,20 @@ export function detectCrashedAgents(): AgentState[] {
  */
 export function recoverAgent(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
+  logAgentLifecycle(normalizedId, 'recoverAgent called');
   const state = getAgentState(normalizedId);
 
   if (!state) {
+    logAgentLifecycle(normalizedId, 'recoverAgent BLOCKED: no state.json');
     return null;
   }
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
   if (!state.workspace || !state.model) {
-    console.error(`[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`);
+    const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
+    console.error(reason);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
     return null;
   }
 
@@ -1677,6 +1703,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   markAgentRunning(state);
   saveAgentState(state);
 
+  logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount}`);
   return state;
 }
 

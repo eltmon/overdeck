@@ -25,6 +25,7 @@ import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
+import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -2950,6 +2951,7 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
   try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
   catch { return []; }
 
+  logDeaconEvent(`recoverOrphanedAgents started${context ? ` (${context})` : ''}: scanning ${dirs.length} directorie(s)`);
   const actions: string[] = [];
   for (const dir of dirs) {
     const stateFile = join(AGENTS_DIR, dir, 'state.json');
@@ -2966,6 +2968,7 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
             if (result !== '1') continue; // pane is alive — truly still running
             // Pane is dead — kill the zombie tmux session and fall through to recovery
             try { await killSessionAsync(dir); } catch { /* ignore */ }
+            logDeaconEvent(`recoverOrphanedAgents: killed dead planning pane ${dir}`);
           } catch {
             continue; // can't check — assume alive
           }
@@ -2981,14 +2984,22 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
       const msg = `Recovered orphaned agent ${dir} (${oldStatus}→stopped)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
+      logDeaconEvent(`recoverOrphanedAgents: ${msg} — tmux session missing, state.json reset`);
+      logAgentLifecycle(dir, `status changed: ${oldStatus} → stopped (orphaned: tmux session missing at boot)`);
       // Notify server layer so the read model and frontend update
       if (agentStoppedNotifier) {
         try { agentStoppedNotifier(dir); } catch { /* non-fatal */ }
       }
-    } catch { /* non-fatal */ }
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logDeaconEvent(`recoverOrphanedAgents: error processing ${dir}: ${reason}`);
+    }
   }
   if (actions.length > 0 && context) {
     console.log(`[deacon] ${context}: ${actions.length} orphaned agent(s) reset to stopped`);
+    logDeaconEvent(`recoverOrphanedAgents completed (${context}): ${actions.length} orphaned agent(s) reset to stopped`);
+  } else {
+    logDeaconEvent(`recoverOrphanedAgents completed: no orphaned agents found`);
   }
   return actions;
 }
@@ -3010,10 +3021,15 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
     return actions;
   }
 
+  logDeaconEvent(`cleanupOrphanedPlanningSessions started: found ${planningSessions.length} planning session(s)`);
+
   for (const planningSession of planningSessions) {
     // planning-pan-596 → agent-pan-596
     const workAgentSession = planningSession.replace(/^planning-/, 'agent-');
-    if (!sessionExists(workAgentSession)) continue;
+    if (!sessionExists(workAgentSession)) {
+      logDeaconEvent(`cleanupOrphanedPlanningSessions: ${planningSession} kept — work agent ${workAgentSession} not running`);
+      continue;
+    }
 
     try {
       await killSessionAsync(planningSession).catch(() => {});
@@ -3025,19 +3041,30 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
       if (existsSync(stateFile)) {
         const agentState = JSON.parse(readFileSync(stateFile, 'utf-8'));
         if (agentState.status === 'running' || agentState.status === 'starting') {
+          const oldStatus = agentState.status;
           agentState.status = 'stopped';
           agentState.stoppedAt = new Date().toISOString();
           writeFileSync(stateFile, JSON.stringify(agentState, null, 2));
           if (agentStoppedNotifier) {
             try { agentStoppedNotifier(planningSession); } catch { /* non-fatal */ }
           }
+          logAgentLifecycle(planningSession, `status changed: ${oldStatus} → stopped (orphaned planning session killed)`);
         }
       }
-    } catch { /* non-fatal */ }
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logDeaconEvent(`cleanupOrphanedPlanningSessions: error updating state for ${planningSession}: ${reason}`);
+    }
 
     const msg = `Killed orphaned ${planningSession} (work agent ${workAgentSession} is running)`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);
+    logDeaconEvent(`cleanupOrphanedPlanningSessions: ${msg}`);
+  }
+  if (actions.length > 0) {
+    logDeaconEvent(`cleanupOrphanedPlanningSessions completed: killed ${actions.length} orphaned session(s)`);
+  } else {
+    logDeaconEvent(`cleanupOrphanedPlanningSessions completed: no orphaned sessions found`);
   }
 
   return actions;
@@ -3067,20 +3094,37 @@ async function cleanupOrphanedReviewSessions(): Promise<string[]> {
     return actions;
   }
 
+  logDeaconEvent(`cleanupOrphanedReviewSessions started: found ${reviewSessions.length} review session(s)`);
+
   for (const reviewSession of reviewSessions) {
     // review-PAN-540-1713456789000-correctness → agent-pan-540
     const match = reviewSession.match(/^review-([a-z]+-\d+)-\d+/);
-    if (!match) continue;
+    if (!match) {
+      logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} skipped — unparseable session name`);
+      continue;
+    }
     const workAgentSession = `agent-${match[1]}`;
-    if (sessionExists(workAgentSession)) continue;
+    if (sessionExists(workAgentSession)) {
+      logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — work agent ${workAgentSession} exists`);
+      continue;
+    }
 
     try {
       await killSessionAsync(reviewSession).catch(() => {});
-    } catch { /* non-fatal */ }
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logDeaconEvent(`cleanupOrphanedReviewSessions: error killing ${reviewSession}: ${reason}`);
+    }
 
     const msg = `Killed orphaned ${reviewSession} (work agent ${workAgentSession} not running)`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);
+    logDeaconEvent(`cleanupOrphanedReviewSessions: ${msg}`);
+  }
+  if (actions.length > 0) {
+    logDeaconEvent(`cleanupOrphanedReviewSessions completed: killed ${actions.length} orphaned session(s)`);
+  } else {
+    logDeaconEvent(`cleanupOrphanedReviewSessions completed: no orphaned sessions found`);
   }
 
   return actions;
@@ -3101,11 +3145,22 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
   } catch { return resumed; }
 
+  logDeaconEvent(`autoResumeStoppedWorkAgents started: scanning ${dirs.length} agent directorie(s)`);
+
   for (const agentId of dirs) {
     const state = getAgentState(agentId);
-    if (!state) continue;
-    if (state.status !== 'stopped') continue;
-    if (state.phase !== 'implementation') continue;
+    if (!state) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — no state.json`);
+      continue;
+    }
+    if (state.status !== 'stopped') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
+      continue;
+    }
+    if (state.phase !== 'implementation') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation)`);
+      continue;
+    }
 
     // Skip if the agent has a completed marker (or processed completion) — unless
     // review or test found issues that need fixing (blocked / failed).
@@ -3118,39 +3173,64 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         review?.reviewStatus === 'failed' ||
         review?.testStatus === 'failed'
       ) {
-        // Agent needs to fix review/test issues — resume it
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} resuming despite completed marker — review/test needs fixing (review=${review?.reviewStatus}, test=${review?.testStatus})`);
       } else {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — completed marker exists and review/test passed`);
         continue;
       }
     }
 
     // Skip if workspace is missing
-    if (!state.workspace || !existsSync(state.workspace)) continue;
+    if (!state.workspace || !existsSync(state.workspace)) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
+      continue;
+    }
 
     // Skip if already merge-ready (review+test passed) or already merged
     const review = getReviewStatus(state.issueId);
-    if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') continue;
-    if (review?.mergeStatus === 'merged') continue;
+    if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — already merge-ready`);
+      continue;
+    }
+    if (review?.mergeStatus === 'merged') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — already merged`);
+      continue;
+    }
 
     // Skip if the agent was deliberately stopped by a user (runtime state is 'stopped')
     const runtimeState = getAgentRuntimeState(agentId);
-    if (runtimeState?.state === 'stopped' || runtimeState?.state === 'idle') continue;
+    if (runtimeState?.state === 'stopped' || runtimeState?.state === 'idle') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (runtime.state=${runtimeState.state})`);
+      continue;
+    }
 
+    logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeState?.state || 'null'})`);
     try {
       const result = await resumeAgent(agentId);
       if (result.success) {
         resumed.push(agentId);
-        console.log(`[deacon] Auto-resumed ${agentId} (was orphaned by system event)`);
+        const msg = `Auto-resumed ${agentId} (was orphaned by system event)`;
+        console.log(`[deacon] ${msg}`);
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
+        logAgentLifecycle(agentId, `resumed by deacon auto-recovery (session restored after system event)`);
       } else {
-        console.warn(`[deacon] Failed to auto-resume ${agentId}: ${result.error}`);
+        const msg = `Failed to auto-resume ${agentId}: ${result.error}`;
+        console.warn(`[deacon] ${msg}`);
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
+        logAgentLifecycle(agentId, `auto-resume FAILED: ${result.error}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[deacon] Auto-resume error for ${agentId}: ${msg}`);
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} auto-resume threw: ${msg}`);
+      logAgentLifecycle(agentId, `auto-resume threw exception: ${msg}`);
     }
   }
   if (resumed.length > 0) {
     console.log(`[deacon] Auto-resumed ${resumed.length} work agent(s): ${resumed.join(', ')}`);
+    logDeaconEvent(`autoResumeStoppedWorkAgents completed: resumed ${resumed.length} agent(s): ${resumed.join(', ')}`);
+  } else {
+    logDeaconEvent(`autoResumeStoppedWorkAgents completed: no agents resumed`);
   }
   return resumed;
 }
@@ -3163,20 +3243,39 @@ export function startDeacon(): void {
 
   config = loadConfig();
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
+  logDeaconEvent(`startDeacon: health monitor starting (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
   // Recover agents whose tmux sessions were killed by a system crash
-  recoverOrphanedAgents('Startup recovery').catch((err) => console.error('[deacon] Startup recovery error:', err));
+  recoverOrphanedAgents('Startup recovery').catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[deacon] Startup recovery error:', err);
+    logDeaconEvent(`startDeacon: recoverOrphanedAgents error: ${msg}`);
+  });
 
   // Auto-resume work agents that were stopped by a crash/reboot
-  void autoResumeStoppedWorkAgents();
+  autoResumeStoppedWorkAgents().catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[deacon] Auto-resume error:', err);
+    logDeaconEvent(`startDeacon: autoResumeStoppedWorkAgents error: ${msg}`);
+  });
 
   // Run initial patrol
-  runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));
+  runPatrol().catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[deacon] Patrol error:', err);
+    logDeaconEvent(`startDeacon: runPatrol error: ${msg}`);
+  });
 
   // Schedule regular patrols
   deaconInterval = setInterval(() => {
-    runPatrol().catch((err) => console.error('[deacon] Patrol error:', err));
+    runPatrol().catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[deacon] Patrol error:', err);
+      logDeaconEvent(`patrol error: ${msg}`);
+    });
   }, config.patrolIntervalMs);
+
+  logDeaconEvent('startDeacon: health monitor started');
 }
 
 /**

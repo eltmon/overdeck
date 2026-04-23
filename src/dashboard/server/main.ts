@@ -150,8 +150,12 @@ process.once('SIGINT', () => {
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
+emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
 // Mark any in-progress forks as failed — they were interrupted by the restart.
-{ const n = clearStuckForks(); if (n) console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`); }
+{ const n = clearStuckForks(); if (n) {
+  console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`);
+  emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Marked ${n} stuck fork(s) as failed on startup` });
+} }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
 // Startup label-cleanup sweep (PAN-676/PAN-670) DISABLED — the five repair
@@ -178,6 +182,7 @@ try {
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
     console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
+    emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
   }
   await resumeQueuedMerges();
 } catch (err: any) {
@@ -193,8 +198,10 @@ await processPendingLifecycle();
 if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
     console.error('[panopticon] Cloister auto-start failed:', err);
+    emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });
   console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
+  emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
