@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
+import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
@@ -19,6 +20,8 @@ import {
   PANOPTICON_HOME,
 } from '../paths.js';
 import { resolveGitHubIssue } from '../tracker-utils.js';
+import { setCanonicalState } from '../lifecycle/reconciler/index.js';
+import { createGitHubClient } from '../lifecycle/reconciler/github-client.js';
 
 import {
   getSessionId,
@@ -40,6 +43,21 @@ import { appendGitOperation, type GitOperationType } from '../git-activity.js';
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
 const MERGE_HISTORY_FILE = join(MERGE_HISTORY_DIR, 'history.jsonl');
+
+/**
+ * Read GitHub token from ~/.panopticon.env or process.env.
+ */
+function getGitHubToken(): string | null {
+  try {
+    const envFile = join(homedir(), '.panopticon.env');
+    if (existsSync(envFile)) {
+      const content = readFileSync(envFile, 'utf-8');
+      const match = content.match(/GITHUB_TOKEN=(.+)/);
+      if (match) return match[1].trim();
+    }
+  } catch { /* ignore */ }
+  return process.env.GITHUB_TOKEN || null;
+}
 
 /**
  * Context for a merge conflict resolution request
@@ -251,33 +269,35 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not clean planning artifacts: ${err}`);
   }
 
-  // 3. Clean up workflow labels + apply 'merged' label (non-fatal)
-  // MUST run BEFORE closing the issue — once closed on GitHub, label edits fail silently.
-  // This was the root cause of in-review labels persisting after merge (PAN-453 incident).
+  // 3. Enqueue merged label via reconciler (PAN-805). Replaces direct
+  // cleanupMergedLabels call — the reconciler owns all workflow label writes.
   try {
-    const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
-    const ghResolved = resolveGitHubIssue(issueId);
-    const labelCtx = ghResolved.isGitHub
-      ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
-      : { issueId, projectPath };
-    const labelResult = await cleanupMergedLabels(labelCtx);
-    if (labelResult.success && !labelResult.skipped) {
-      console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
-      logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
-    } else if (labelResult.skipped) {
-      console.log(`[merge-agent] Label cleanup skipped: ${labelResult.details?.join('; ')}`);
-    } else {
-      console.warn(`[merge-agent] Label cleanup failed (non-fatal): ${labelResult.error}`);
-    }
+    setCanonicalState(issueId, 'merged');
+    console.log(`[merge-agent] ✓ Enqueued merged label via reconciler for ${issueId}`);
   } catch (err) {
-    console.warn(`[merge-agent] Could not clean labels: ${err}`);
+    console.warn(`[merge-agent] Could not enqueue merged label: ${err}`);
   }
 
   // 3b. Close issue on tracker (fire-and-forget with circuit breaker)
-  // This is decoupled from the merge lifecycle: failure to close the issue on the
-  // tracker does NOT block the merge or cause retries. The close-out ceremony handles
-  // any issues that weren't auto-closed.
-  closeIssueWithCircuitBreaker(issueId, projectPath);
+  // PAN-805: GitHub issues are closed via explicit API (github-client with .ok +
+  // retry semantics) instead of relying on Closes #NNN in PR body.
+  const ghResolved = resolveGitHubIssue(issueId);
+  if (ghResolved.isGitHub) {
+    const token = getGitHubToken();
+    if (token) {
+      const gh = createGitHubClient({
+        githubToken: token,
+        repo: `${ghResolved.owner}/${ghResolved.repo}`,
+        intervalMs: 30000,
+      });
+      closeIssueViaApi(issueId, ghResolved.number, gh);
+    } else {
+      console.warn(`[merge-agent] GITHUB_TOKEN not available — deferring issue close to close-out ceremony`);
+    }
+  } else {
+    // Linear / Rally — keep existing closeIssueWithCircuitBreaker path
+    closeIssueWithCircuitBreaker(issueId, projectPath);
+  }
 
   // 4. Compact old beads (via lifecycle module)
   try {
@@ -345,6 +365,44 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Issue moved to Done — awaiting close-out.`);
   announceMerge('completed', issueId);
   logActivity('merge_complete', `Merged ${issueId}. Issue moved to Done — awaiting close-out.`);
+}
+
+/**
+ * Close a GitHub issue via the reconciler's github-client (PAN-805).
+ * Fire-and-forget with circuit-breaker semantics.
+ */
+function closeIssueViaApi(
+  issueId: string,
+  issueNumber: number,
+  gh: import('../lifecycle/reconciler/github-client.js').GitHubClient,
+): void {
+  const failures = _closeIssueFailures.get(issueId) || 0;
+  if (failures >= MAX_CLOSE_RETRIES) {
+    console.log(`[merge-agent] Circuit breaker open for ${issueId} issue close (${failures} failures). Will be closed during close-out ceremony.`);
+    return;
+  }
+
+  (async () => {
+    try {
+      const result = await gh.closeIssue(issueNumber);
+      if (result.ok) {
+        console.log(`[merge-agent] ✓ Closed GitHub issue #${issueNumber} via API`);
+        logActivity('issue_closed', `Closed GitHub issue #${issueNumber} via API`);
+        _closeIssueFailures.delete(issueId);
+      } else {
+        const newCount = (_closeIssueFailures.get(issueId) || 0) + 1;
+        _closeIssueFailures.set(issueId, newCount);
+        console.warn(`[merge-agent] ✗ GitHub close issue #${issueNumber} failed: ${result.status} (attempt ${newCount}/${MAX_CLOSE_RETRIES})`);
+        if (newCount >= MAX_CLOSE_RETRIES) {
+          console.warn(`[merge-agent] Circuit breaker tripped for ${issueId} after ${newCount} failures. Issue close deferred to close-out ceremony.`);
+        }
+      }
+    } catch (err) {
+      const newCount = (_closeIssueFailures.get(issueId) || 0) + 1;
+      _closeIssueFailures.set(issueId, newCount);
+      console.warn(`[merge-agent] Could not close GitHub issue #${issueNumber} (attempt ${newCount}/${MAX_CLOSE_RETRIES}): ${err}`);
+    }
+  })();
 }
 
 /**
