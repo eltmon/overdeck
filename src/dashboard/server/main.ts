@@ -182,17 +182,15 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 
-// Cloister/Deacon auto-start DISABLED (temporary debug) — deacon's startup
-// recovery was auto-resuming agents with stopped state files, slowing
-// dashboard boot and interfering with manual agent control. Re-enable with
-// `pan admin cloister start` once the regression is investigated.
-//
-// if (shouldAutoStart()) {
-//   getCloisterService().start().catch((err) => {
-//     console.error('[panopticon] Cloister auto-start failed:', err);
-//   });
-//   console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
-// }
+// Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
+// work agents that forgot to call `pan work done`, nudges dead-end agents,
+// and detects stuck thinking loops. Without it, stalled agents are invisible.
+if (shouldAutoStart()) {
+  getCloisterService().start().catch((err) => {
+    console.error('[panopticon] Cloister auto-start failed:', err);
+  });
+  console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
+}
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 
