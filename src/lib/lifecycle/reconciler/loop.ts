@@ -1,6 +1,7 @@
 import { createGitHubClient } from './github-client.js';
 import { runPushStep } from './push.js';
 import { runPullStep } from './pull.js';
+import { runExternalMergeSweep } from './external-merge-sweep.js';
 import type { ReconcilerConfig, ReconcilerState } from './types.js';
 
 /**
@@ -33,8 +34,8 @@ export async function tick(
     // Step 2: pull remote state and reconcile local canonical_state
     await runPullStep(config, gh);
 
-    // Step placeholder — implemented in subsequent bead
-    // await runExternalMergeSweep(config, gh);
+    // Step 3: detect externally-merged issues and enqueue label writes
+    await runExternalMergeSweep(config, gh);
     console.log('[reconciler] Tick completed in', Date.now() - start, 'ms');
   } catch (err) {
     console.warn('[reconciler] Tick failed:', err);
