@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AgentList } from './components/AgentList';
@@ -29,6 +29,7 @@ import { DetailPanelLayout } from './components/DetailPanelLayout';
 import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAnnouncement';
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
+import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
@@ -184,6 +185,23 @@ async function respondToConfirmation(id: string, confirmed: boolean): Promise<vo
   if (!res.ok) throw new Error('Failed to respond to confirmation');
 }
 
+interface CliproxyStatus {
+  running: boolean;
+  pid: number | null;
+  checkedAt: string;
+}
+
+async function fetchCliproxyStatus(): Promise<CliproxyStatus> {
+  const res = await fetch('/api/cliproxy/status');
+  if (!res.ok) throw new Error('Failed to fetch CLIProxy status');
+  return res.json();
+}
+
+async function restartCliproxy(): Promise<void> {
+  const res = await fetch('/api/cliproxy/restart', { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to restart CLIProxy');
+}
+
 export default function App() {
   const terminalPath = window.location.pathname;
   const terminalSession = new URLSearchParams(window.location.search).get('terminal');
@@ -256,6 +274,8 @@ export default function App() {
     setConversationRoute(selectedConvId, viewMode);
   }, [selectedConvId, setConversationRoute]);
 
+  const queryClient = useQueryClient();
+
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
@@ -290,6 +310,30 @@ export default function App() {
   });
 
   const missingKeyTrackers = trackerStatus?.configured.filter(t => !t.hasKey) || [];
+
+  // CLIProxy health check — poll every 10s
+  const { data: cliproxyStatus } = useQuery({
+    queryKey: ['cliproxy-status'],
+    queryFn: fetchCliproxyStatus,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 0,
+  });
+
+  const showCliproxyBanner = cliproxyStatus && !cliproxyStatus.running;
+
+  const restartCliproxyMutation = useMutation({
+    mutationFn: restartCliproxy,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['cliproxy-status'] });
+      toast.success('CLIProxy restarted successfully');
+    },
+    onError: (err: Error) => {
+      toast.error('Failed to restart CLIProxy: ' + err.message);
+    },
+  });
 
   // URL-synced tab navigation
   const setActiveTab = useCallback((tab: Tab) => {
@@ -490,6 +534,9 @@ export default function App() {
         {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
         <DeaconPauseBanner />
 
+        {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
+        <StoppedAgentsBanner />
+
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (
           <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0">
@@ -542,6 +589,23 @@ export default function App() {
               title="Dismiss"
             >
               ✕
+            </button>
+          </div>
+        )}
+
+        {/* CLIProxy Down Banner — shown when the GPT subscription sidecar is not running */}
+        {showCliproxyBanner && (
+          <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-center gap-3 shrink-0">
+            <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0" />
+            <p className="text-warning-foreground text-sm font-semibold flex-1">
+              CLIProxy is down — GPT subscription agents will fail.
+            </p>
+            <button
+              onClick={() => restartCliproxyMutation.mutate()}
+              disabled={restartCliproxyMutation.isPending}
+              className="px-3 py-1.5 bg-warning/20 hover:bg-warning/30 text-warning-foreground text-sm font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            >
+              {restartCliproxyMutation.isPending ? 'Restarting…' : 'Restart CLIProxy'}
             </button>
           </div>
         )}
