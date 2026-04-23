@@ -9,6 +9,32 @@ import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
+/** Bounded LRU cache for readSessionAttachmentBasenames to avoid full JSONL
+ *  rescans when the session file has not changed. Key = sessionFile:mtimeMs. */
+const SESSION_ATTACHMENT_CACHE_MAX = 100;
+const sessionAttachmentCache = new Map<string, Set<string>>();
+
+function getAttachmentCacheKey(sessionFile: string, mtimeMs: number): string {
+  return `${sessionFile}:${mtimeMs}`;
+}
+
+function setAttachmentCache(sessionFile: string, mtimeMs: number, basenames: Set<string>): void {
+  const key = getAttachmentCacheKey(sessionFile, mtimeMs);
+  sessionAttachmentCache.set(key, basenames);
+  // Evict oldest entries if over max
+  if (sessionAttachmentCache.size > SESSION_ATTACHMENT_CACHE_MAX) {
+    const firstKey = sessionAttachmentCache.keys().next().value;
+    if (firstKey !== undefined) {
+      sessionAttachmentCache.delete(firstKey);
+    }
+  }
+}
+
+function getAttachmentCache(sessionFile: string, mtimeMs: number): Set<string> | undefined {
+  const key = getAttachmentCacheKey(sessionFile, mtimeMs);
+  return sessionAttachmentCache.get(key);
+}
+
 /** Conversation names are sanitized to [a-zA-Z0-9_-]{1,64} on creation.
  *  Re-validate here for defense-in-depth against path traversal. */
 function assertSafeName(name: string): void {
@@ -51,6 +77,18 @@ async function listConversationAttachmentPaths(name: string): Promise<string[]> 
 
 async function readSessionAttachmentBasenames(sessionFile: string, name: string): Promise<Set<string>> {
   try {
+    let mtimeMs: number;
+    try {
+      mtimeMs = (await stat(sessionFile)).mtimeMs;
+    } catch {
+      return new Set<string>();
+    }
+
+    const cached = getAttachmentCache(sessionFile, mtimeMs);
+    if (cached) {
+      return cached;
+    }
+
     const referenced = new Set<string>();
     const stream = createReadStream(sessionFile, { encoding: 'utf-8' });
     const rl = createInterface({ input: stream, crlfDelay: Infinity });
@@ -98,6 +136,7 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
       rl.close();
       stream.destroy();
     }
+    setAttachmentCache(sessionFile, mtimeMs, referenced);
     return referenced;
   } catch {
     return new Set<string>();
