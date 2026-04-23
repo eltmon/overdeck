@@ -74,7 +74,7 @@ export async function runPushStep(
         targetLabel: label,
         action: 'add',
         outcome: result.ok ? 'success' : result.status === 429 ? 'rate_limited' : 'failure',
-        retryCount: 0,
+        retryCount: result.retryCount,
         httpStatus: result.status,
       });
     }
@@ -87,7 +87,7 @@ export async function runPushStep(
         targetLabel: label,
         action: 'remove',
         outcome: result.ok ? 'success' : result.status === 429 ? 'rate_limited' : 'failure',
-        retryCount: 0,
+        retryCount: result.retryCount,
         httpStatus: result.status,
       });
     }

@@ -22,6 +22,7 @@ export interface GitHubResult {
   ok: boolean;
   status: number;
   retryAfter?: number;
+  retryCount: number;
 }
 
 export interface ListIssuesParams {
@@ -53,7 +54,7 @@ async function fetchWithRetry(
   url: string,
   init: RequestInit,
   attempt: number,
-): Promise<Response> {
+): Promise<{ response: Response; attemptsMade: number }> {
   const res = await fetch(url, init);
 
   if (!res.ok && isRetryable(res.status) && attempt < MAX_RETRIES) {
@@ -70,7 +71,7 @@ async function fetchWithRetry(
     return fetchWithRetry(url, init, attempt + 1);
   }
 
-  return res;
+  return { response: res, attemptsMade: attempt };
 }
 
 function makeAuthHeaders(token: string): Record<string, string> {
@@ -90,7 +91,7 @@ export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
   return {
     async addLabel(issueNumber: number, label: string): Promise<GitHubResult> {
       const url = `${base}/issues/${issueNumber}/labels`;
-      const res = await fetchWithRetry(
+      const { response: res, attemptsMade } = await fetchWithRetry(
         url,
         { method: 'POST', headers, body: JSON.stringify({ labels: [label] }) },
         1,
@@ -101,12 +102,13 @@ export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
         retryAfter: res.headers.get('retry-after')
           ? parseInt(res.headers.get('retry-after')!, 10)
           : undefined,
+        retryCount: attemptsMade - 1,
       };
     },
 
     async removeLabel(issueNumber: number, label: string): Promise<GitHubResult> {
       const url = `${base}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`;
-      const res = await fetchWithRetry(
+      const { response: res, attemptsMade } = await fetchWithRetry(
         url,
         { method: 'DELETE', headers },
         1,
@@ -117,12 +119,13 @@ export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
         retryAfter: res.headers.get('retry-after')
           ? parseInt(res.headers.get('retry-after')!, 10)
           : undefined,
+        retryCount: attemptsMade - 1,
       };
     },
 
     async listIssueLabels(issueNumber: number): Promise<string[]> {
       const url = `${base}/issues/${issueNumber}/labels`;
-      const res = await fetchWithRetry(url, { method: 'GET', headers }, 1);
+      const { response: res } = await fetchWithRetry(url, { method: 'GET', headers }, 1);
       if (!res.ok) {
         throw new Error(
           `[github-client] listIssueLabels #${issueNumber} failed: ${res.status}`
@@ -134,7 +137,7 @@ export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
 
     async closeIssue(issueNumber: number): Promise<GitHubResult> {
       const url = `${base}/issues/${issueNumber}`;
-      const res = await fetchWithRetry(
+      const { response: res, attemptsMade } = await fetchWithRetry(
         url,
         { method: 'PATCH', headers, body: JSON.stringify({ state: 'closed' }) },
         1,
@@ -145,6 +148,7 @@ export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
         retryAfter: res.headers.get('retry-after')
           ? parseInt(res.headers.get('retry-after')!, 10)
           : undefined,
+        retryCount: attemptsMade - 1,
       };
     },
 
@@ -156,7 +160,7 @@ export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
       if (params.page) query.set('page', String(params.page));
 
       const url = `${base}/issues?${query.toString()}`;
-      const res = await fetchWithRetry(url, { method: 'GET', headers }, 1);
+      const { response: res } = await fetchWithRetry(url, { method: 'GET', headers }, 1);
       if (!res.ok) {
         throw new Error(`[github-client] listIssues failed: ${res.status}`);
       }
