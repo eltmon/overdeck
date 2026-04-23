@@ -114,6 +114,7 @@ const defaultProps = {
   startAgentMutation: makeMutation(),
   createWorkspaceMutation: makeMutation(),
   syncMainMutation: makeSyncMutation(),
+  copySettingsMutation: makeMutation(),
   resetSessionMutation: makeMutation(),
   onReview: vi.fn(),
   onKillSuccess: vi.fn(),
@@ -125,6 +126,7 @@ const defaultProps = {
   onCreateWorkspace: vi.fn(),
   onViewBeads: vi.fn(),
   onViewVBrief: vi.fn(),
+  onCopySettings: vi.fn(),
 };
 
 describe('ActionsSection', () => {

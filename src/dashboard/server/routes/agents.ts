@@ -22,7 +22,6 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   GET    /api/agents/:id/cloister-health
  *   GET    /api/agents/:id/handoff/suggestion
  *   POST   /api/agents/:id/handoff
- *   GET    /api/agents/:id/handoffs
  *   GET    /api/agents/:id/cost
  *   POST   /api/agents/:id/reset-session
  *   POST   /api/agents
@@ -43,7 +42,6 @@ import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
 import { checkAllTriggers } from '../../../lib/cloister/triggers.js';
 import { performHandoff } from '../../../lib/cloister/handoff.js';
-import { readAgentHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
@@ -1234,19 +1232,6 @@ const postAgentHandoffRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/agents/:id/handoffs ─────────────────────────────────────
-
-const getAgentHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/agents/:id/handoffs',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-
-    const handoffs = readAgentHandoffEvents(id);
-    return jsonResponse({ handoffs });
-  })),
-);
 
 // ─── Route: GET /api/agents/:id/cost ─────────────────────────────────────────
 
@@ -2139,7 +2124,6 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentCloisterHealthRoute,
   getAgentHandoffSuggestionRoute,
   postAgentHandoffRoute,
-  getAgentHandoffsRoute,
   getAgentCostRoute,
   postAgentsRoute,
   postAgentsRestartAllRoute,

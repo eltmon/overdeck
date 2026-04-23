@@ -7,7 +7,6 @@ import { httpHandler } from './http-handler.js';
  *   GET  /api/issues
  *   GET  /api/issues/:id/analyze
  *   POST /api/issues/:id/plan
- *   GET  /api/issues/:id/handoffs
  *   POST /api/issues/:issueId/close
  *   POST /api/issues/:id/start-planning
  *   POST /api/issues/:id/abort-planning
@@ -26,7 +25,7 @@ import { httpHandler } from './http-handler.js';
 
 import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -43,7 +42,6 @@ import { clearReviewStatus } from '../review-status.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
-import { readIssueHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -361,19 +359,6 @@ const getIssueAnalyzeRoute = HttpRouter.add(
         estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
       },
     });
-  })),
-);
-
-// ─── Route: GET /api/issues/:id/handoffs ─────────────────────────────────────
-
-const getIssueHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/issues/:id/handoffs',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['id'] ?? '';
-    const handoffs = readIssueHandoffEvents(issueId);
-    return jsonResponse({ handoffs });
   })),
 );
 
@@ -1398,6 +1383,233 @@ const postIssueReopenRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/issues/:id/restart-from-plan ────────────────────────────
+
+const postIssueRestartFromPlanRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/restart-from-plan',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const lifecycle = yield* IssueLifecycle;
+    const eventStore = yield* EventStoreService;
+    const issueLower = id.toLowerCase();
+
+    // 1. Resolve workspace path
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    }
+    if (!projectPath) {
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
+      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
+    }
+
+    const workspacePath = projectPath
+      ? join(projectPath, 'workspaces', `feature-${issueLower}`)
+      : '';
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
+    }
+
+    // 2. Kill work agent tmux session and remove agent state dir
+    yield* Effect.promise(async () => {
+      const workAgentSession = `agent-${issueLower}`;
+      try {
+        if (await sessionExistsAsync(workAgentSession)) {
+          await killSessionAsync(workAgentSession);
+          console.log(`[restart-from-plan] Killed work agent session ${workAgentSession}`);
+        }
+      } catch { /* non-fatal */ }
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+      if (existsSync(agentStateDir)) {
+        try {
+          await rm(agentStateDir, { recursive: true, force: true });
+          console.log(`[restart-from-plan] Removed agent state dir ${agentStateDir}`);
+        } catch { /* non-fatal */ }
+      }
+    });
+
+    // 2b. Clean up stale specialist artifacts (.pan/ and feedback) that survive git resets
+    yield* Effect.promise(async () => {
+      const dirsToClean = [
+        join(workspacePath, '.pan', 'review'),
+        join(workspacePath, '.pan', 'prompts'),
+        join(workspacePath, '.pan', 'events'),
+        join(workspacePath, '.planning', 'feedback'),
+      ];
+      for (const dir of dirsToClean) {
+        if (existsSync(dir)) {
+          try {
+            await rm(dir, { recursive: true, force: true });
+            console.log(`[restart-from-plan] Cleaned ${dir}`);
+          } catch { /* non-fatal */ }
+        }
+      }
+    });
+
+    // 3. Find the planning commit and reset to it
+    // Planning commits come from two sources:
+    //   - complete-planning endpoint: "Complete planning for PAN-XXX"
+    //   - agent start flow: "chore: planning artifacts for PAN-XXX before agent start"
+    // Fall back to finding the commit that added plan.vbrief.json.
+    // If no commit is found, fall back to manual file cleanup preserving .planning/ and .beads/.
+    const resetResult = yield* Effect.promise(async (): Promise<{ success: boolean; error?: string; commit?: string; method?: string }> => {
+      try {
+        let planningCommit = '';
+        let method = '';
+
+        // Try 1: complete-planning endpoint message
+        if (!planningCommit) {
+          try {
+            const { stdout } = await execAsync(
+              `git log --grep="Complete planning for ${id}" --format=%H -1`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+            );
+            planningCommit = stdout.trim();
+            if (planningCommit) method = 'complete-planning message';
+          } catch { /* ignore */ }
+        }
+
+        // Try 2: agent start flow message
+        if (!planningCommit) {
+          try {
+            const { stdout } = await execAsync(
+              `git log --grep="chore: planning artifacts for ${id}" --format=%H -1`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+            );
+            planningCommit = stdout.trim();
+            if (planningCommit) method = 'agent-start message';
+          } catch { /* ignore */ }
+        }
+
+        // Try 3: commit that added plan.vbrief.json (message-agnostic)
+        if (!planningCommit) {
+          try {
+            const { stdout } = await execAsync(
+              `git log --diff-filter=A --format=%H -1 -- .planning/plan.vbrief.json`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+            );
+            planningCommit = stdout.trim();
+            if (planningCommit) method = 'plan.vbrief.json add';
+          } catch { /* ignore */ }
+        }
+
+        if (planningCommit) {
+          await execAsync(`git reset --hard ${planningCommit}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+          console.log(`[restart-from-plan] Reset branch to planning commit ${planningCommit} for ${id}`);
+          return { success: true, commit: planningCommit, method };
+        }
+
+        // Fallback: manual cleanup — preserve .planning/ and .beads/, reset everything else to main
+        console.log(`[restart-from-plan] No planning commit for ${id}, using manual cleanup`);
+        method = 'manual-cleanup';
+
+        // 3a. Save planning artifacts and beads to temp
+        const tmpDir = join(homedir(), '.panopticon', 'tmp', `restart-${issueLower}`);
+        await mkdir(tmpDir, { recursive: true });
+        const planningDir = join(workspacePath, '.planning');
+        const beadsDir = join(workspacePath, '.beads');
+        if (existsSync(planningDir)) {
+          await execAsync(`cp -r "${planningDir}" "${tmpDir}/.planning"`, { encoding: 'utf-8' });
+        }
+        if (existsSync(beadsDir)) {
+          await execAsync(`cp -r "${beadsDir}" "${tmpDir}/.beads"`, { encoding: 'utf-8' });
+        }
+
+        // 3b. Reset all tracked files to main state
+        try {
+          await execAsync(`git checkout main -- .`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
+        } catch { /* main may not have all files */ }
+
+        // 3c. Remove untracked files and directories (preserve .planning and .beads)
+        try {
+          await execAsync(`git clean -fd -e .planning -e .beads`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
+        } catch { /* ignore */ }
+
+        // 3d. Restore saved artifacts
+        if (existsSync(join(tmpDir, '.planning'))) {
+          await execAsync(`rm -rf "${planningDir}" && cp -r "${tmpDir}/.planning" "${planningDir}"`, { encoding: 'utf-8' });
+        }
+        if (existsSync(join(tmpDir, '.beads'))) {
+          await execAsync(`rm -rf "${beadsDir}" && cp -r "${tmpDir}/.beads" "${beadsDir}"`, { encoding: 'utf-8' });
+        }
+        // Clean up temp
+        try { await rm(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+
+        console.log(`[restart-from-plan] Manual cleanup complete for ${id}`);
+        return { success: true, commit: 'manual-cleanup', method };
+      } catch (err: any) {
+        return { success: false, error: err.message || 'Git reset failed' };
+      }
+    });
+
+    if (!resetResult.success) {
+      return jsonResponse({ success: false, error: resetResult.error }, { status: 400 });
+    }
+
+    // 4. Reset specialist pipeline states
+    clearReviewStatus(id.toUpperCase());
+
+    // 5. Append "Restarted from Plan" section to STATE.md
+    yield* Effect.promise(async () => {
+      const statePath = join(workspacePath, '.planning', 'STATE.md');
+      if (existsSync(statePath)) {
+        const date = new Date().toISOString().slice(0, 10);
+        const lines = [
+          '',
+          `## Restarted from Plan — ${date}`,
+          '',
+          `**Branch reset to planning commit:** ${resetResult.commit}`,
+          '',
+          'All implementation work has been reset. Specialist states cleared. Resume implementation from the plan.',
+        ];
+        await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
+      }
+    });
+
+    // 6. Move issue to In Progress
+    yield* lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catch(() => Effect.void));
+
+    // 7. Emit events
+    yield* eventStore.append({
+      type: 'agent.stopped',
+      timestamp: new Date().toISOString(),
+      payload: { agentId: `agent-${issueLower}` },
+    } as any);
+    yield* eventStore.append({
+      type: 'issue.statusChanged',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: id, status: 'In Progress', canonicalStatus: 'in_progress' },
+    });
+    yield* eventStore.append({
+      type: 'pipeline.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        issueId: id,
+        status: {
+          issueId: id,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+        },
+      },
+    });
+    try { getIssueDataService().patchIssue(id, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+
+    return jsonResponse({
+      success: true,
+      message: `Issue ${id} restarted from plan. Branch reset to ${resetResult.commit}`,
+      issueId: id,
+      newState: 'In Progress',
+      planningCommit: resetResult.commit,
+    });
+  })),
+);
+
 // ─── Route: POST /api/issues/:id/move-status ─────────────────────────────────
 
 const postIssueMoveStatusRoute = HttpRouter.add(
@@ -1632,6 +1844,47 @@ const postIssueDeepWipeRoute = HttpRouter.add(
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
       },
+    });
+  })),
+);
+
+// ─── Route: POST /api/issues/:id/copy-settings ───────────────────────────────
+
+const postIssueCopySettingsRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/copy-settings',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    }
+    if (!projectPath) {
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
+      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
+    }
+
+    const workspacePath = projectPath
+      ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
+      : '';
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const { copyPanopticonSettingsToWorkspace } = yield* Effect.promise(() =>
+      import('../../../lib/workspace-manager.js')
+    );
+
+    const result = copyPanopticonSettingsToWorkspace(workspacePath);
+    return jsonResponse({
+      success: result.errors.length === 0 || result.copied.length > 0,
+      copied: result.copied.map(p => p.replace(workspacePath + '/', '')),
+      errors: result.errors,
     });
   })),
 );
@@ -2201,7 +2454,6 @@ const getIssueCostsRoute = HttpRouter.add(
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
   getIssueAnalyzeRoute,
-  getIssueHandoffsRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
   postIssueAbortPlanningRoute,
@@ -2210,9 +2462,11 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueResetRoute,
   postIssueCancelRoute,
   postIssueReopenRoute,
+  postIssueRestartFromPlanRoute,
   postIssueMoveStatusRoute,
   postIssueCleanupWorkspaceRoute,
   postIssueDeepWipeRoute,
+  postIssueCopySettingsRoute,
   postIssueCloseOutRoute,
   postIssuesBulkCloseOutRoute,
   getIssueBeadsRoute,

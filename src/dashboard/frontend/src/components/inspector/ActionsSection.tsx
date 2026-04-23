@@ -11,6 +11,7 @@ import { ResetIssueButton } from '../ResetIssueButton';
 import { StopAgentButton } from '../StopAgentButton';
 import { MergeButton } from '../MergeButton';
 import { RecoverButton } from '../RecoverButton';
+import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ArtifactLinks } from '../ArtifactLinks';
 
 // Convenience alias — most mutations use void variables and unknown data
@@ -31,6 +32,7 @@ interface ActionsSectionProps {
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
   createWorkspaceMutation: AnyMutation;
   syncMainMutation: SyncMutation;
+  copySettingsMutation: AnyMutation;
   resetSessionMutation: AnyMutation;
   reopenMutation?: ReopenMutation;
   onReview: () => void;
@@ -39,6 +41,7 @@ interface ActionsSectionProps {
   onDismissPending: () => void;
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
+  onCopySettings: () => void;
   onReopen?: () => void;
   onKillSuccess?: () => void;
   onViewBeads: () => void;
@@ -60,6 +63,7 @@ export function ActionsSection({
   startAgentMutation,
   createWorkspaceMutation,
   syncMainMutation,
+  copySettingsMutation,
   resetSessionMutation,
   reopenMutation,
   onReview,
@@ -68,6 +72,7 @@ export function ActionsSection({
   onDismissPending,
   onStartAgent,
   onCreateWorkspace,
+  onCopySettings,
   onReopen,
   onKillSuccess,
   onViewBeads,
@@ -268,6 +273,17 @@ export function ActionsSection({
                    {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
                  </button>
                )}
+               {workspace?.exists && (
+                 <button
+                   onClick={onCopySettings}
+                   disabled={copySettingsMutation.isPending || copySettingsMutation.isSuccess}
+                   className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
+                   title="Copy Panopticon global settings (projects, models, hooks) into workspace"
+                 >
+                   {copySettingsMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : copySettingsMutation.isSuccess ? <Check className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
+                   {copySettingsMutation.isPending ? 'Copying...' : copySettingsMutation.isSuccess ? 'Settings Copied' : 'Copy Settings'}
+                 </button>
+               )}
              </>
            )}
          </div>
@@ -347,6 +363,16 @@ export function ActionsSection({
           {syncMainMutation.data.alreadyUpToDate ? 'Already up to date with main' : `Synced ${syncMainMutation.data.commitCount ?? 0} commit(s) from main`}
         </div>
       )}
+      {copySettingsMutation.isError && (
+        <div className="text-xs text-destructive badge-bg-destructive px-2 py-1 rounded mt-2">
+          {copySettingsMutation.error instanceof Error ? copySettingsMutation.error.message : 'Failed to copy settings'}
+        </div>
+      )}
+      {copySettingsMutation.isSuccess && (
+        <div className="text-xs text-success badge-bg-success px-2 py-1 rounded mt-2">
+          Copied Panopticon settings into workspace
+        </div>
+      )}
 
       {/* Issue Actions */}
       <div className="mt-4">
@@ -395,6 +421,15 @@ export function ActionsSection({
                   </button>
                 </div>
               )}
+
+              {/* Restart from Plan */}
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-content">Restart from Plan</div>
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.">
+                  Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.
+                </div>
+                <RestartFromPlanButton issueId={issueId} />
+              </div>
 
               {/* Reset Issue */}
               <ResetIssueButton issueId={issueId} variant="danger-zone" />

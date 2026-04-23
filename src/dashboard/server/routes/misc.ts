@@ -20,10 +20,6 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/registered-projects
  *   GET  /api/confirmations
  *   POST /api/confirmations/:id/respond
- *   GET  /api/handoffs
- *   GET  /api/handoffs/stats
- *   GET  /api/specialist-handoffs
- *   GET  /api/specialist-handoffs/stats
  *   GET  /api/skills
  *   GET  /api/planning/:issueId/status
  *   POST /api/planning/:issueId/message
@@ -53,8 +49,6 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { cpus as osCpus, freemem, totalmem } from 'node:os';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { readHandoffEvents, getHandoffStats } from '../../../lib/cloister/handoff-logger.js';
-import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../../lib/cloister/specialist-handoff-logger.js';
 import { createSessionAsync, killSessionAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
@@ -882,104 +876,6 @@ const postConfirmationRespondRoute = HttpRouter.add(
   }),
 );
 
-// ─── Route: GET /api/handoffs ─────────────────────────────────────────────────
-
-const getHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/handoffs',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url, 'http://localhost');
-    const limitParam = url.searchParams.get('limit');
-    const limit = limitParam ? parseInt(limitParam) : 50;
-
-    return yield* Effect.try({
-      try: () => {
-        const handoffs = readHandoffEvents(limit);
-        return jsonResponse({ handoffs, total: handoffs.length });
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting handoffs:', error);
-        return jsonResponse(
-          { error: 'Failed to get handoffs: ' + msg },
-          { status: 500 },
-        );
-      },
-    });
-  }),
-);
-
-// ─── Route: GET /api/handoffs/stats ──────────────────────────────────────────
-
-const getHandoffsStatsRoute = HttpRouter.add(
-  'GET',
-  '/api/handoffs/stats',
-  Effect.try({
-    try: () => {
-      const stats = getHandoffStats();
-      return jsonResponse(stats);
-    },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting handoff stats:', error);
-      return jsonResponse(
-        { error: 'Failed to get handoff stats: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
-);
-
-// ─── Route: GET /api/specialist-handoffs ─────────────────────────────────────
-
-const getSpecialistHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/specialist-handoffs',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url, 'http://localhost');
-    const limitParam = url.searchParams.get('limit');
-    const limit = limitParam ? parseInt(limitParam) : 50;
-
-    return yield* Effect.try({
-      try: () => {
-        const handoffs = readSpecialistHandoffs(limit);
-        return jsonResponse({ handoffs, total: handoffs.length });
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting specialist handoffs:', error);
-        return jsonResponse(
-          { error: 'Failed to get specialist handoffs: ' + msg },
-          { status: 500 },
-        );
-      },
-    });
-  }),
-);
-
-// ─── Route: GET /api/specialist-handoffs/stats ───────────────────────────────
-
-const getSpecialistHandoffsStatsRoute = HttpRouter.add(
-  'GET',
-  '/api/specialist-handoffs/stats',
-  Effect.tryPromise({
-    try: async () => {
-      const stats = await getSpecialistHandoffStats();
-      return jsonResponse(stats);
-    },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting specialist handoff stats:', error);
-      return jsonResponse(
-        { error: 'Failed to get specialist handoff stats: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
-);
-
 // ─── Route: GET /api/skills ───────────────────────────────────────────────────
 
 const getSkillsRoute = HttpRouter.add(
@@ -1773,10 +1669,6 @@ export const miscRouteLayer = Layer.mergeAll(
   getRegisteredProjectsRoute,
   getConfirmationsRoute,
   postConfirmationRespondRoute,
-  getHandoffsRoute,
-  getHandoffsStatsRoute,
-  getSpecialistHandoffsRoute,
-  getSpecialistHandoffsStatsRoute,
   getSkillsRoute,
   getPlanningStatusRoute,
   postPlanningMessageRoute,

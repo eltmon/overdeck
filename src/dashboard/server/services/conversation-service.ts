@@ -161,6 +161,7 @@ interface JsonlEntry {
 interface ContentBlock {
   type?: string;
   text?: string;
+  thinking?: string;
   id?: string;
   name?: string;
   input?: unknown;
@@ -387,6 +388,8 @@ export async function parseConversationMessages(
       for (const block of content as ContentBlock[]) {
         if (block.type === 'text' && block.text) {
           assistantText += block.text;
+        } else if (block.type === 'thinking' && block.thinking) {
+          assistantText += block.thinking;
         } else if (block.type === 'tool_use' && block.id) {
           // WorkLogEntry for the tool call
           const toolEntry: WorkLogEntry = {

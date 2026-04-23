@@ -98,6 +98,91 @@ export function migratePanopticonToPan(projectPath: string): PanMigrationResult 
 }
 
 /**
+ * Copy Panopticon global configuration into a workspace so that agents testing
+ * Panopticon itself have the same projects, model assignments, and hooks.
+ *
+ * Copies:
+ *   - ~/.panopticon/config.yaml      → <workspace>/.panopticon/config.yaml
+ *   - ~/.panopticon/projects.yaml    → <workspace>/.panopticon/projects.yaml
+ *   - ~/.panopticon/settings.json    → <workspace>/.panopticon/settings.json
+ *   - ~/.claude/settings.json hooks  → <workspace>/.claude/settings.json (merged)
+ *
+ * Safe to call multiple times — merges rather than overwrites.
+ */
+export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copied: string[]; errors: string[] } {
+  const result = { copied: [] as string[], errors: [] as string[] };
+  const panopticonDir = join(workspacePath, '.panopticon');
+  const claudeDir = join(workspacePath, '.claude');
+
+  mkdirSync(panopticonDir, { recursive: true });
+  if (!existsSync(claudeDir)) {
+    mkdirSync(claudeDir, { recursive: true });
+  }
+
+  const filesToCopy = [
+    { source: join(homedir(), '.panopticon', 'config.yaml'), target: join(panopticonDir, 'config.yaml') },
+    { source: join(homedir(), '.panopticon', 'projects.yaml'), target: join(panopticonDir, 'projects.yaml') },
+    { source: join(homedir(), '.panopticon', 'settings.json'), target: join(panopticonDir, 'settings.json') },
+  ];
+
+  for (const { source, target } of filesToCopy) {
+    if (!existsSync(source)) continue;
+    try {
+      copyFileSync(source, target);
+      result.copied.push(target);
+    } catch (err: any) {
+      result.errors.push(`${source}: ${err.message}`);
+    }
+  }
+
+  // Merge global ~/.claude/settings.json into workspace .claude/settings.json
+  const globalSettingsPath = join(homedir(), '.claude', 'settings.json');
+  const workspaceSettingsPath = join(claudeDir, 'settings.json');
+
+  if (existsSync(globalSettingsPath)) {
+    try {
+      const globalSettings = JSON.parse(readFileSync(globalSettingsPath, 'utf-8'));
+      let workspaceSettings: Record<string, unknown> = {};
+      if (existsSync(workspaceSettingsPath)) {
+        try {
+          workspaceSettings = JSON.parse(readFileSync(workspaceSettingsPath, 'utf-8'));
+        } catch {
+          // Unparseable — start fresh
+          workspaceSettings = {};
+        }
+      }
+
+      // Deep-merge hooks so workspace settings (e.g. caveman) are preserved
+      const mergedHooks: Record<string, unknown> = {};
+      if (globalSettings.hooks) {
+        Object.assign(mergedHooks, globalSettings.hooks);
+      }
+      if (workspaceSettings.hooks) {
+        for (const [key, value] of Object.entries(workspaceSettings.hooks as Record<string, unknown>)) {
+          if (Array.isArray(value) && Array.isArray(mergedHooks[key])) {
+            mergedHooks[key] = [...(mergedHooks[key] as unknown[]), ...value];
+          } else {
+            mergedHooks[key] = value;
+          }
+        }
+      }
+
+      const merged = { ...globalSettings, ...workspaceSettings };
+      if (Object.keys(mergedHooks).length > 0) {
+        merged.hooks = mergedHooks;
+      }
+
+      writeFileSync(workspaceSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');
+      result.copied.push(workspaceSettingsPath);
+    } catch (err: any) {
+      result.errors.push(`${globalSettingsPath}: ${err.message}`);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Ensure .pan/events/, .pan/review/, and .pan/prompts/ are excluded from git tracking
  * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
  * since project-specific skills should be committed.
@@ -990,6 +1075,17 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   } catch (cavemanErr: unknown) {
     // Non-fatal — workspace works without caveman
     result.steps.push(`Caveman setup skipped: ${cavemanErr instanceof Error ? cavemanErr.message : String(cavemanErr)}`);
+  }
+
+  // Copy Panopticon global settings into workspace so agents testing Panopticon
+  // itself have the same projects, model assignments, and hooks.
+  try {
+    const settingsResult = copyPanopticonSettingsToWorkspace(workspacePath);
+    if (settingsResult.copied.length > 0) {
+      result.steps.push(`Copied Panopticon settings into workspace (${settingsResult.copied.length} file(s))`);
+    }
+  } catch (settingsErr: unknown) {
+    result.steps.push(`Panopticon settings copy skipped: ${settingsErr instanceof Error ? settingsErr.message : String(settingsErr)}`);
   }
 
   result.success = result.errors.length === 0;

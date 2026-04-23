@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { getProviderEnvForModel } from '../agents.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
+const FORK_SUMMARY_TIMEOUT_MS = 300_000;
 
 const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -832,7 +833,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   recentOps.edited.forEach(f => fileOps.edited.add(f));
 
   // Generate summaries
-  const llmTimeoutMs = isFork ? 120_000 : undefined;
+  const llmTimeoutMs = isFork ? FORK_SUMMARY_TIMEOUT_MS : undefined;
   let summary: string;
   let serializedHistory = serializeConversation(messagesToSummarize);
   let hasHistory = serializedHistory.trim().length > 0;
@@ -856,7 +857,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
     // passes (carrying <previous-summary> forward) so arbitrarily large
     // JSONL files fit the selected model's context window.
     if (isFork) {
-      const forkTimeoutMs = llmTimeoutMs ?? 120_000;
+      const forkTimeoutMs = llmTimeoutMs ?? FORK_SUMMARY_TIMEOUT_MS;
       // Summarize from the previous compact boundary (if any) forward — the
       // previousSummary already covers everything before boundaryStart.
       const forkEntries = boundaryStart > 0 ? entries.slice(boundaryStart) : entries;

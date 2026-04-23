@@ -445,16 +445,17 @@ describe('resolveReviewerModel', () => {
     expect(model).toBe('claude-haiku-4-5');
   });
 
-  // Regression: haiku and sonnet must resolve to distinct concrete model IDs.
-  // Previously both were routed through review:correctness, producing the same model.
-  // The exact IDs depend on enabled providers (provider-aware routing), so we only
-  // assert distinctness and that aliases are not passed through verbatim.
-  it('haiku alias resolves to a distinct model from sonnet alias (real reviewer role)', () => {
-    const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
+  // All reviewer aliases (opus/sonnet/haiku) resolve to specialist-review-agent
+  // so they consistently respect the user's configured reviewer model override.
+  it('all reviewer aliases resolve to the same configured reviewer model', () => {
+    const opus = resolveReviewerModel({ name: 'correctness', model: 'opus', focus: [] }, 'any-default');
     const sonnet = resolveReviewerModel({ name: 'correctness', model: 'sonnet', focus: [] }, 'any-default');
-    expect(haiku).not.toBe('haiku');
+    const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
+    expect(opus).not.toBe('opus');
     expect(sonnet).not.toBe('sonnet');
-    expect(haiku).not.toBe(sonnet);
+    expect(haiku).not.toBe('haiku');
+    expect(opus).toBe(sonnet);
+    expect(sonnet).toBe(haiku);
   });
 
   it('opus alias is resolved (not passed through verbatim) for a real reviewer role', () => {
