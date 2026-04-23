@@ -26,6 +26,7 @@ import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
 import { compactBeads } from './compact-beads.js';
+import { setCanonicalState } from './reconciler/index.js';
 import { extractNumber, extractPrefix } from '../issue-id.js';
 
 const execAsync = promisify(exec);
@@ -438,15 +439,9 @@ async function resetIssueToTodo(ctx: LifecycleContext): Promise<StepResult> {
         `gh issue reopen ${number} --repo ${owner}/${repo}`,
         { encoding: 'utf-8' },
       ).catch(() => {});  // May already be open
-      // Remove lifecycle labels
-      const labelsToRemove = ['in-review', 'in-progress', 'planned', 'planning', 'Review: Approved', 'Review: Failed', 'ready-for-merge'];
-      for (const label of labelsToRemove) {
-        await execAsync(
-          `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}"`,
-          { encoding: 'utf-8' },
-        ).catch(() => {});  // Label may not exist
-      }
-      return stepOk(step, [`Reset GitHub issue #${number}: reopened and cleared labels`]);
+      // PAN-805: workflow labels are owned by the reconciler
+      setCanonicalState(ctx.issueId, 'todo');
+      return stepOk(step, [`Reset GitHub issue #${number}: reopened and enqueued label reset`]);
     }
 
     // Linear: reopen to Todo
@@ -521,11 +516,9 @@ async function resetIssueToCanceled(ctx: LifecycleContext): Promise<StepResult> 
   try {
     if (ctx.github) {
       const { owner, repo, number } = ctx.github;
-      await execAsync(
-        `gh issue edit ${number} --repo ${owner}/${repo} --add-label "wontfix"`,
-        { encoding: 'utf-8' },
-      ).catch(() => {});
-      return stepOk(step, [`Marked GitHub issue #${number} as canceled/wontfix`]);
+      // PAN-805: workflow labels are owned by the reconciler
+      setCanonicalState(ctx.issueId, 'closed_wontfix');
+      return stepOk(step, [`Marked GitHub issue #${number} as canceled/wontfix (reconciler enqueued)`]);
     }
 
     const linearApiKey = getLinearApiKey();

@@ -335,9 +335,9 @@ async function applyLabelGitHub(ctx: LifecycleContext): Promise<StepResult> {
       `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
       { encoding: 'utf-8' },
     );
-    // Add label (closed-out is a human-driven marker, not a workflow label)
+    // Add label (closed-out is a human-driven marker, not a workflow label) — PAN-805-exempt
     await execAsync(
-      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}"`,
+      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}"`, // PAN-805-exempt: human-driven marker
       { encoding: 'utf-8' },
     );
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on GitHub`]);

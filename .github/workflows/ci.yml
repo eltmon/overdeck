@@ -70,6 +70,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check direct label writes
+        run: npm run lint:labels
+
   test:
     runs-on: ubuntu-latest
 
