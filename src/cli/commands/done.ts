@@ -14,6 +14,7 @@ import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
+import { setCanonicalState } from '../../lib/lifecycle/reconciler/index.js';
 
 interface DoneOptions {
   comment?: string;
@@ -99,27 +100,18 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
       'Content-Type': 'application/json',
     };
 
-    // Get current labels
-    const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      headers,
-    });
-    const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
+    // PAN-805: route label transition through reconciler instead of direct API write
+    setCanonicalState(issueId, 'in_review');
 
-    // Clean up workflow labels and get target labels for in_review state
-    const targetLabels = cleanupWorkflowLabels(currentLabels, 'in_review');
-
-    // Update labels (set all at once to replace)
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      method: 'PUT', headers,
-      body: JSON.stringify({ labels: targetLabels }),
-    });
-
-    // Add completion comment
+    // Add completion comment (direct API call with .ok check)
     if (comment) {
-      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
+      const commentRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
         method: 'POST', headers,
         body: JSON.stringify({ body: `🤖 **Agent completed work:**\n\n${comment}` }),
       });
+      if (!commentRes.ok) {
+        console.warn(`[done] Comment POST failed: ${commentRes.status} ${commentRes.statusText}`);
+      }
     }
 
     return true;
