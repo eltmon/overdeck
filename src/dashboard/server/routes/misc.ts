@@ -1245,16 +1245,22 @@ const deletePlanningSessionRoute = HttpRouter.add(
     const sessionName = `planning-${issueId.toLowerCase()}`;
 
     return yield* Effect.promise(async () => {
-    try {
-        await killSessionAsync(sessionName).catch(() => { /* no planning session to kill */ });
+      try {
+        await killSessionAsync(sessionName);
         return jsonResponse({ success: true });
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
+        // tmux reports "can't find session" when the session is already gone — treat as success.
+        if (/can't find session|session not found|no session found/i.test(msg)) {
+          return jsonResponse({ success: true, alreadyStopped: true });
+        }
+        console.error(`[delete-planning] kill-session failed for ${sessionName}:`, msg);
         return jsonResponse(
           { error: 'Failed to stop planning: ' + msg },
           { status: 500 },
         );
-        }})
+      }
+    });
   }),
 );
 
