@@ -97,6 +97,15 @@ const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
 const UPLOAD_RATE_LIMIT_MAX = 10;
 const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
 
+function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
+  // Prefer X-Forwarded-For when behind a proxy; fall back to direct remoteAddress
+  const forwarded = getHeader(request, 'x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return Option.getOrElse(request.remoteAddress, () => 'unknown');
+}
+
 function checkUploadRateLimit(remoteAddress: string): boolean {
   const now = Date.now();
   const entry = uploadRateLimit.get(remoteAddress);
@@ -1037,7 +1046,7 @@ const postConversationUploadImageRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
 
-    const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
+    const remoteAddress = getClientIp(request);
     if (!checkUploadRateLimit(remoteAddress)) {
       return jsonResponse({ error: 'Rate limit exceeded' }, { status: 429 });
     }
