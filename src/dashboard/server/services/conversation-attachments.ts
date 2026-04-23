@@ -124,11 +124,22 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
         // Also search the raw JSON line for @/attachment paths. This catches
         // tool-use and other shapes where the path may be in nested fields
         // (e.g. tool_use.input, tool_result.content) that structured extraction
-        // above does not reach.
-        for (const match of line.matchAll(/"@(\/[^"]+)"/g)) {
-          const attachmentPath = match[1];
-          if (await isConversationAttachmentPath(name, attachmentPath)) {
-            referenced.add(basename(attachmentPath));
+        // above does not reach. We JSON-decode the captured value to handle
+        // escaped slashes (\/) that appear in raw JSON strings.
+        for (const match of line.matchAll(/"@([^"]+)"/g)) {
+          const rawValue = match[1];
+          // Only consider values that look like attachment paths
+          if (!rawValue.startsWith('/') && !rawValue.startsWith('\\/')) continue;
+          let attachmentPath: string;
+          try {
+            attachmentPath = JSON.parse(`"${rawValue}"`);
+          } catch {
+            attachmentPath = rawValue;
+          }
+          if (typeof attachmentPath === 'string' && attachmentPath.startsWith('/')) {
+            if (await isConversationAttachmentPath(name, attachmentPath)) {
+              referenced.add(basename(attachmentPath));
+            }
           }
         }
       }
