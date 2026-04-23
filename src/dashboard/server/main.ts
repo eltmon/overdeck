@@ -27,6 +27,7 @@ import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { getGitHubConfig } from './services/tracker-config.js';
 import { startReconciler } from '../../lib/lifecycle/reconciler/index.js';
+import { backfillIssueState } from '../../lib/lifecycle/reconciler/backfill.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
@@ -171,6 +172,9 @@ emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck 
 } }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
+
+// Backfill issue_state from local data before reconciler starts (PAN-805)
+backfillIssueState();
 
 // Start label reconciler (PAN-805) — replaces the five repair* sweeps.
 const ghConfig = getGitHubConfig();
