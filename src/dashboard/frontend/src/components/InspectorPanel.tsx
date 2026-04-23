@@ -27,7 +27,6 @@ import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/util
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { ArtifactLinks } from './ArtifactLinks';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
@@ -391,25 +390,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
-  const mergeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/merge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to merge');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      await refreshDashboardState(queryClient);
-      onClose();
-    },
-  });
-
   const cancelMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/issues/${issueId}/cancel`, {
@@ -450,25 +430,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
     onError: (err: Error) => {
       toast.error(err.message, { duration: 8000 });
-    },
-  });
-
-  const resetReviewMutation = useMutation({
-    mutationFn: async (options?: { rerun?: boolean }) => {
-      const res = await fetch(`/api/review/${issueId}/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rerun: options?.rerun ?? false }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to reset review cycles');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      await refreshDashboardState(queryClient);
     },
   });
 
@@ -576,16 +537,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     }
   };
 
-  const handleMerge = async () => {
-    if (await confirm({
-      title: 'Merge to Main',
-      message: `Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`,
-      confirmLabel: 'Merge',
-    })) {
-      mergeMutation.mutate();
-    }
-  };
-
   const handleCancel = async () => {
     if (await confirm({
       title: 'Cancel Issue',
@@ -604,16 +555,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       confirmLabel: 'Reopen',
     })) {
       reopenMutation.mutate(undefined);
-    }
-  };
-
-  const handleResetReview = async () => {
-    if (await confirm({
-      title: 'Reset & Re-run Pipeline',
-      message: `Reset all review/test/merge cycles for ${issueId}?\n\nThis will:\n- Clear review, test, and merge status\n- Reset the circuit breaker counter\n- Remove queued specialist tasks\n- Re-dispatch to review specialist\n\nTracker status will NOT change.`,
-      confirmLabel: 'Reset & Re-run',
-    })) {
-      resetReviewMutation.mutate({ rerun: true });
     }
   };
 
@@ -788,14 +729,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 <span>PRD</span>
               </button>
             )}
-            <ArtifactLinks
-              issueId={issueId}
-              hasPlan={planningState?.hasPlan ?? false}
-              beadsCount={planningState?.beadsCount ?? 0}
-              onViewBeads={() => setShowBeads(true)}
-              onViewVBrief={() => setShowVBrief(true)}
-              variant="inspector"
-            />
           </div>
         </div>
 
@@ -957,25 +890,25 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           reviewStatus={reviewStatus}
           reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
-          mergeMutation={mergeMutation}
+          hasPlan={planningState?.hasPlan ?? false}
+          beadsCount={planningState?.beadsCount ?? 0}
           reviewMutation={reviewMutation}
           cancelMutation={cancelMutation}
-          resetReviewMutation={resetReviewMutation}
           startAgentMutation={startAgentMutation}
           createWorkspaceMutation={createWorkspaceMutation}
           syncMainMutation={syncMainMutation}
           resetSessionMutation={resetSessionMutation}
           reopenMutation={reopenMutation}
-          onMerge={handleMerge}
           onReview={handleReview}
           onKillSuccess={onClose}
           onCancel={handleCancel}
-          onResetReview={handleResetReview}
           onResetSession={() => resetSessionMutation.mutate()}
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
           onReopen={handleReopen}
+          onViewBeads={() => setShowBeads(true)}
+          onViewVBrief={() => setShowVBrief(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />

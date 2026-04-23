@@ -9,7 +9,7 @@ const { mockExecAsync } = vi.hoisted(() => ({
 }));
 
 vi.mock('child_process', () => ({
-  exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 
 vi.mock('util', async (importOriginal) => {
@@ -51,15 +51,14 @@ describe('cleanPlanningArtifacts', () => {
   });
 
   it('should remove tracked STATE.md and commit', async () => {
-    // ls-files returns STATE.md as tracked, others empty
-    mockExecAsync.mockImplementation((cmd: string) => {
-      if (cmd.includes('ls-files') && cmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+    // Single ls-files call with all files — return tracked files based on args
+    mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (cmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (cmd.includes('git diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         // Throw to indicate staged changes exist
         return Promise.reject(new Error('exit 1'));
       }
@@ -75,28 +74,35 @@ describe('cleanPlanningArtifacts', () => {
 
     // Verify git rm was called
     const gitRmCall = mockExecAsync.mock.calls.find(
-      (call: string[]) => call[0].includes('git rm'),
+      (call: unknown[]) => {
+        const args = call[1] as string[] | undefined;
+        return args?.includes('rm');
+      },
     );
     expect(gitRmCall).toBeDefined();
-    expect(gitRmCall![0]).toContain('.planning/STATE.md');
+    const gitRmArgs = gitRmCall![1] as string[];
+    expect(gitRmArgs).toContain('.planning/STATE.md');
 
     // Verify commit was made with issueId in message
     const commitCall = mockExecAsync.mock.calls.find(
-      (call: string[]) => call[0].includes('git commit'),
+      (call: unknown[]) => {
+        const args = call[1] as string[] | undefined;
+        return args?.includes('commit');
+      },
     );
     expect(commitCall).toBeDefined();
-    expect(commitCall![0]).toContain('PAN-337');
+    const commitArgs = commitCall![1] as string[];
+    expect(commitArgs.some(a => a.includes('PAN-337'))).toBe(true);
   });
 
   it('should remove tracked feedback/ directory and commit', async () => {
-    mockExecAsync.mockImplementation((cmd: string) => {
-      if (cmd.includes('ls-files') && cmd.includes('feedback')) {
-        return Promise.resolve({ stdout: '.planning/feedback/001-test.md\n', stderr: '' });
+    mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/feedback/')) tracked.push('.planning/feedback/001-test.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (cmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (cmd.includes('git diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         return Promise.reject(new Error('exit 1'));
       }
       return Promise.resolve({ stdout: '', stderr: '' });
@@ -109,22 +115,25 @@ describe('cleanPlanningArtifacts', () => {
     expect(result.skipped).toBe(false);
 
     const gitRmCall = mockExecAsync.mock.calls.find(
-      (call: string[]) => call[0].includes('git rm'),
+      (call: unknown[]) => {
+        const args = call[1] as string[] | undefined;
+        return args?.includes('rm');
+      },
     );
     expect(gitRmCall).toBeDefined();
-    expect(gitRmCall![0]).toContain('.planning/feedback/');
+    const gitRmArgs = gitRmCall![1] as string[];
+    expect(gitRmArgs).toContain('.planning/feedback/');
   });
 
   it('should skip commit when git rm produces no staged changes', async () => {
     // Files are "tracked" by ls-files but git rm produces no diff (already removed)
-    mockExecAsync.mockImplementation((cmd: string) => {
-      if (cmd.includes('ls-files') && cmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+    mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (cmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (cmd.includes('git diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         // No staged changes
         return Promise.resolve({ stdout: '', stderr: '' });
       }
@@ -140,29 +149,24 @@ describe('cleanPlanningArtifacts', () => {
 
     // Verify no commit was made
     const commitCall = mockExecAsync.mock.calls.find(
-      (call: string[]) => call[0].includes('git commit'),
+      (call: unknown[]) => {
+        const args = call[1] as string[] | undefined;
+        return args?.includes('commit');
+      },
     );
     expect(commitCall).toBeUndefined();
   });
 
   it('should remove multiple tracked files in one git rm call', async () => {
-    mockExecAsync.mockImplementation((cmd: string) => {
-      if (cmd.includes('ls-files') && cmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+    mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        if (args.includes('.planning/PLANNING_PROMPT.md') && !args.includes('.archived')) tracked.push('.planning/PLANNING_PROMPT.md');
+        if (args.includes('.planning/feedback/')) tracked.push('.planning/feedback/001-test.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (cmd.includes('ls-files') && cmd.includes('PLANNING_PROMPT.md') && !cmd.includes('archived')) {
-        return Promise.resolve({ stdout: '.planning/PLANNING_PROMPT.md\n', stderr: '' });
-      }
-      if (cmd.includes('ls-files') && cmd.includes('archived')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (cmd.includes('ls-files') && cmd.includes('feedback')) {
-        return Promise.resolve({ stdout: '.planning/feedback/001-test.md\n', stderr: '' });
-      }
-      if (cmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (cmd.includes('git diff --cached --quiet')) {
+      if (args?.includes('diff') && args?.includes('--cached')) {
         return Promise.reject(new Error('exit 1'));
       }
       return Promise.resolve({ stdout: '', stderr: '' });
@@ -177,14 +181,13 @@ describe('cleanPlanningArtifacts', () => {
   });
 
   it('should return failed when git rm throws unexpectedly', async () => {
-    mockExecAsync.mockImplementation((cmd: string) => {
-      if (cmd.includes('ls-files') && cmd.includes('STATE.md')) {
-        return Promise.resolve({ stdout: '.planning/STATE.md\n', stderr: '' });
+    mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
+      if (args?.includes('ls-files')) {
+        const tracked: string[] = [];
+        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
-      if (cmd.includes('ls-files')) {
-        return Promise.resolve({ stdout: '', stderr: '' });
-      }
-      if (cmd.includes('git rm')) {
+      if (args?.includes('rm')) {
         return Promise.reject(new Error('permission denied'));
       }
       return Promise.resolve({ stdout: '', stderr: '' });
