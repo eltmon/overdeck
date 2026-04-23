@@ -2,8 +2,6 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
-import { ActivityView } from './MissionControl/ActivityView';
-import { deriveAgentIssueId } from './AgentOutputPanel';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 
 interface TerminalPanelProps {
@@ -92,44 +90,6 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
   const borderColor = '#232f48';
   const bgTerminal = '#0d1117';
   const textSecondary = '#92a4c9';
-
-  // Planning agents get ActivityView instead of XTerminal
-  const isPlanningAgent = agent.agentPhase === 'planning' || agent.id.startsWith('planning-');
-  const planningIssueId = isPlanningAgent ? deriveAgentIssueId(agent.id, agent.issueId) : null;
-
-  if (isPlanningAgent && planningIssueId) {
-    return (
-      <div
-        className="flex flex-col h-full min-w-0"
-        style={{ backgroundColor: bgTerminal }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-3 py-1.5 border-b shrink-0"
-          style={{ borderColor, backgroundColor: '#161b26' }}
-        >
-          <span className="text-xs font-medium" style={{ color: textSecondary }}>
-            {agent.id}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onClose}
-              className="p-1 rounded transition-colors hover:bg-white/10"
-              style={{ color: textSecondary }}
-              title="Close"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* ActivityView for planning agents */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ActivityView issueId={planningIssueId} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

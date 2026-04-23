@@ -860,7 +860,16 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     });
 
     if (!skipKill) {
-      yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
+      yield* Effect.promise(async () => {
+        try {
+          await killSessionAsync(sessionName);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!/can't find session|session not found|no session found/i.test(msg)) {
+            console.error(`[complete-planning] kill-session failed for ${sessionName}:`, msg);
+          }
+        }
+      });
     }
 
     // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"

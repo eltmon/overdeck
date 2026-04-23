@@ -303,9 +303,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       if (!stopRes.ok) throw new Error('Failed to stop planning');
       const stopData = await stopRes.json();
 
-      // Then mark planning as complete (changes label from "Planning" to "Planned")
+      // Then mark planning as complete (changes label from "Planning" to "Planned").
+      // skipKill: true because the DELETE above already killed the tmux session —
+      // avoid a redundant kill that would always log "no such session" noise.
       const completeRes = await fetch(`/api/issues/${issue.identifier}/complete-planning`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skipKill: true }),
       });
       if (!completeRes.ok) {
         console.warn('Failed to mark planning complete, continuing anyway');
