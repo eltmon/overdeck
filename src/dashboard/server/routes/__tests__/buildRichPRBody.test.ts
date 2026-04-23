@@ -107,4 +107,28 @@ describe('buildRichPRBody', () => {
     expect(body).toContain('#42');
     expect(body).not.toContain('## Acceptance Criteria');
   });
+
+  it('emits no Closes #NNN / Fixes # / Resolves # directives (PAN-805)', async () => {
+    await mkdir(join(workspacePath, '.planning'), { recursive: true });
+    await mkdir(join(workspacePath, '.beads'), { recursive: true });
+
+    const plan = {
+      vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+      plan: {
+        id: 'p', title: 'T', status: 'in_progress',
+        items: [{ id: 'i1', title: 'AC One', status: 'completed' }],
+        edges: [],
+      },
+    };
+    await writeFile(join(workspacePath, '.planning', 'plan.vbrief.json'), JSON.stringify(plan));
+
+    const bead = { id: 'b1', title: 'pan-5: Task one', status: 'closed', labels: ['pan-5'] };
+    await writeFile(join(workspacePath, '.beads', 'issues.jsonl'), JSON.stringify(bead));
+
+    const body = await buildRichPRBody('PAN-5', workspacePath);
+    const lower = body.toLowerCase();
+    expect(lower).not.toContain('closes #');
+    expect(lower).not.toContain('fixes #');
+    expect(lower).not.toContain('resolves #');
+  });
 });
