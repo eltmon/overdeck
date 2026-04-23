@@ -84,6 +84,7 @@ function getProviderAuthMode(model: string): string | undefined {
 /** Map abstract/future model names to CLIProxy-supported names.
  *  The CLIProxy registry has gpt-5.4 but not gpt-5.4-pro. */
 const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
+  'gpt-5.5-pro': 'gpt-5.5',
   'gpt-5.4-pro': 'gpt-5.4',
 };
 
@@ -103,7 +104,7 @@ export function getAgentRuntimeBaseCommand(model: string): string {
   // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
   // The provider env vars are injected separately by getProviderEnvForModel.
   if (provider.name === 'openai' && getProviderAuthMode(model) === 'subscription') {
-    // CLIProxy supports gpt-5.4 but not the -pro variant; map aliases to real names.
+    // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
     return `claude ${permissionFlags} --model ${resolvedModel}`;
   }

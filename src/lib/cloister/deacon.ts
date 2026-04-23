@@ -2666,6 +2666,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...orphanedAgentActions);
   for (const a of orphanedAgentActions) addLog('action', a, state.patrolCycle);
 
+  // Auto-resume stopped work agents that have pending review feedback or were
+  // orphaned by a crash. Runs on every patrol so agents don't stay stuck if
+  // they stop between patrol cycles. (PAN-805)
+  const resumeActions = await autoResumeStoppedWorkAgents();
+  actions.push(...resumeActions);
+  for (const a of resumeActions) addLog('action', a, state.patrolCycle);
+
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
@@ -3133,8 +3140,16 @@ async function cleanupOrphanedReviewSessions(): Promise<string[]> {
 /**
  * Auto-resume work agents that were stopped by a system crash/reboot
  * but still have incomplete work. Scans all agent state directories for
- * stopped implementation-phase agents and resumes them if they were not
- * deliberately stopped by a user (detected via runtime.state === 'stopped').
+ * stopped implementation-phase agents and resumes them.
+ *
+ * Resumption rules:
+ * - Agents with pending review feedback (blocked/failed/verification-failed)
+ *   are ALWAYS resumed — the specialist pipeline needs them to fix issues.
+ * - Agents without pending feedback are skipped if stoppedByUser=true (the
+ *   user deliberately killed them via pan kill / pan work done).
+ * - Orphaned agents (tmux session missing, no stoppedByUser flag) are resumed.
+ *
+ * Called by runPatrol() on every patrol cycle AND during deacon startup.
  */
 async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const resumed: string[] = [];
@@ -3197,14 +3212,38 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
-    // Skip if the agent was deliberately stopped by a user (runtime state is 'stopped')
-    const runtimeState = getAgentRuntimeState(agentId);
-    if (runtimeState?.state === 'stopped' || runtimeState?.state === 'idle') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (runtime.state=${runtimeState.state})`);
-      continue;
+    // Resume agents with pending review feedback regardless of why they stopped.
+    // Review/test/verification failures mean the specialist pipeline needs the
+    // agent to fix issues — auto-resume must NOT block on runtime.state here.
+    const hasPendingReviewFeedback =
+      review?.reviewStatus === 'blocked' ||
+      review?.reviewStatus === 'failed' ||
+      review?.testStatus === 'failed' ||
+      review?.verificationStatus === 'failed';
+    if (hasPendingReviewFeedback) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
+    } else {
+      // No pending feedback: skip if the user deliberately stopped the agent.
+      // stoppedByUser is set by markAgentStopped (kill, pan work done, etc.).
+      // recoverOrphanedAgents does NOT set this flag, so orphaned/crashed agents
+      // pass through here and get resumed.
+      const deliberatelyStopped = (state as ReturnType<typeof getAgentState> & { stoppedByUser?: boolean }).stoppedByUser === true;
+      if (deliberatelyStopped) {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
+        continue;
+      }
+
+      // Fallback: runtime.state === 'idle' means the agent is genuinely idle,
+      // not crashed. Skip auto-resume unless review feedback arrives later.
+      const runtimeState = getAgentRuntimeState(agentId);
+      if (runtimeState?.state === 'idle') {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — idle (runtime.state=idle, no review feedback)`);
+        continue;
+      }
     }
 
-    logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeState?.state || 'null'})`);
+    const runtimeStateForLog = getAgentRuntimeState(agentId);
+    logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeStateForLog?.state || 'null'})`);
     try {
       const result = await resumeAgent(agentId);
       if (result.success) {
@@ -3245,21 +3284,21 @@ export function startDeacon(): void {
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
   logDeaconEvent(`startDeacon: health monitor starting (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
-  // Recover agents whose tmux sessions were killed by a system crash
-  recoverOrphanedAgents('Startup recovery').catch((err) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[deacon] Startup recovery error:', err);
-    logDeaconEvent(`startDeacon: recoverOrphanedAgents error: ${msg}`);
-  });
+  // Recover agents whose tmux sessions were killed by a system crash, THEN
+  // auto-resume the ones that were orphaned. We MUST await recovery so that
+  // state.json is updated to 'stopped' before autoResume scans it — otherwise
+  // autoResume sees 'running' and skips, leaving the agent permanently stuck.
+  recoverOrphanedAgents('Startup recovery')
+    .then(async () => {
+      await autoResumeStoppedWorkAgents();
+    })
+    .catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[deacon] Startup recovery/auto-resume error:', err);
+      logDeaconEvent(`startDeacon: startup recovery chain error: ${msg}`);
+    });
 
-  // Auto-resume work agents that were stopped by a crash/reboot
-  autoResumeStoppedWorkAgents().catch((err) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[deacon] Auto-resume error:', err);
-    logDeaconEvent(`startDeacon: autoResumeStoppedWorkAgents error: ${msg}`);
-  });
-
-  // Run initial patrol
+  // Run initial patrol (includes autoResumeStoppedWorkAgents via runPatrol)
   runPatrol().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[deacon] Patrol error:', err);

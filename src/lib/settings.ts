@@ -3,7 +3,7 @@ import { SETTINGS_FILE } from './paths.js';
 
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
-export type OpenAIModel = 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'gpt-5.4-pro' | 'o3' | 'o4-mini' | 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
+export type OpenAIModel = 'gpt-5.5' | 'gpt-5.5-mini' | 'gpt-5.5-nano' | 'gpt-5.5-pro' | 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'gpt-5.4-pro' | 'o3' | 'o4-mini' | 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
@@ -211,7 +211,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini']
+    ? ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google

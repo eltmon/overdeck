@@ -71,7 +71,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openai',
     displayName: 'OpenAI',
     compatibility: 'claudish',
-    models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'],
+    models: ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'],
     tested: true,
     description: 'Route via claudish: oai@model (API key) or cx@model (ChatGPT OAuth subscription)',
   },
@@ -131,7 +131,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check OpenAI models
-  if (['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini', 'gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+  if (['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini', 'gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 
