@@ -18,6 +18,12 @@ import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
+import { isGitHubIssue } from './tracker-utils.js';
+import {
+  getCanonicalState,
+  setCanonicalState,
+  ensureIssueState,
+} from './lifecycle/reconciler/index.js';
 import { getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
@@ -885,6 +891,25 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
 }
 
 export async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
+  // PAN-805: GitHub issues are managed by the reconciler — mutate local
+  // issue_state instead of calling the tracker API directly.
+  if (isGitHubIssue(issueId)) {
+    const current = getCanonicalState(issueId);
+    if (current === 'in_progress') {
+      console.log(`[agents] ${issueId} already in_progress (reconciler idempotency)`);
+      return;
+    }
+    if (current === null) {
+      // Lazy-insert for any issue that escaped the boot backfill
+      ensureIssueState(issueId, 'in_progress');
+      console.log(`[agents] Lazy-inserted ${issueId} into issue_state as in_progress`);
+    } else {
+      setCanonicalState(issueId, 'in_progress');
+      console.log(`[agents] Set ${issueId} canonical_state → in_progress (reconciler)`);
+    }
+    return;
+  }
+
   return transitionIssueState(issueId, 'in_progress', workspacePath);
 }
 
