@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /**
  * Initialize the complete database schema.
@@ -310,6 +310,30 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
+
+    -- ===== Issue State (PAN-805: reconciler source of truth) =====
+    CREATE TABLE IF NOT EXISTS issue_state (
+      issue_id         TEXT PRIMARY KEY,
+      canonical_state  TEXT NOT NULL CHECK(canonical_state IN ('todo','in_progress','in_review','merged','closed_wontfix')),
+      last_synced_at   TEXT NOT NULL,
+      pending_mutation TEXT,
+      updated_at       TEXT NOT NULL
+    );
+
+    -- ===== Label Sync Audit (PAN-805: every API attempt logged) =====
+    CREATE TABLE IF NOT EXISTS label_sync_audit (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id      TEXT NOT NULL,
+      attempted_at  TEXT NOT NULL,
+      target_label  TEXT NOT NULL,
+      action        TEXT NOT NULL CHECK(action IN ('add','remove')),
+      outcome       TEXT NOT NULL CHECK(outcome IN ('success','failure','rate_limited','skipped')),
+      reason        TEXT,
+      retry_count   INTEGER NOT NULL DEFAULT 0,
+      http_status   INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_issue_time
+      ON label_sync_audit(issue_id, attempted_at);
   `);
 
   // Record schema version
@@ -708,6 +732,40 @@ export function runMigrations(db: Database.Database): void {
     } catch (err) {
       console.warn('[schema] Failed to seed deacon.globally_paused:', err);
     }
+  }
+
+  // v27 → v28: add issue_state and label_sync_audit tables (PAN-805).
+  // Reconciler source-of-truth tables for label sync.
+  if (currentVersion < 28) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS issue_state (
+          issue_id         TEXT PRIMARY KEY,
+          canonical_state  TEXT NOT NULL CHECK(canonical_state IN ('todo','in_progress','in_review','merged','closed_wontfix')),
+          last_synced_at   TEXT NOT NULL,
+          pending_mutation TEXT,
+          updated_at       TEXT NOT NULL
+        )
+      `);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS label_sync_audit (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          issue_id      TEXT NOT NULL,
+          attempted_at  TEXT NOT NULL,
+          target_label  TEXT NOT NULL,
+          action        TEXT NOT NULL CHECK(action IN ('add','remove')),
+          outcome       TEXT NOT NULL CHECK(outcome IN ('success','failure','rate_limited','skipped')),
+          reason        TEXT,
+          retry_count   INTEGER NOT NULL DEFAULT 0,
+          http_status   INTEGER
+        )
+      `);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_issue_time ON label_sync_audit(issue_id, attempted_at)`);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
