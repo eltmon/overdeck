@@ -322,6 +322,10 @@ export interface AgentState {
   startedAt: string;
   lastActivity?: string;
   stoppedAt?: string;
+  /** True when markAgentStopped was called (user-initiated stop). Cleared on
+   *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
+   *  deliberate stop from a crash/orphan. */
+  stoppedByUser?: boolean;
   branch?: string; // Git branch name for this agent
 
   // Model routing & handoffs (Phase 4)
@@ -387,6 +391,10 @@ function markAgentRunning(state: AgentState): void {
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
   delete state.stoppedAt;
+  // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without
+  // this the flag is sticky across the stop→resume→crash sequence and autoResume
+  // would permanently skip the agent on any subsequent orphan recovery.
+  delete state.stoppedByUser;
   logAgentLifecycle(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
 }
 
@@ -394,9 +402,12 @@ function markAgentStopped(state: AgentState): void {
   const oldStatus = state.status;
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
-  (state as AgentState & { stoppedByUser?: boolean }).stoppedByUser = true;
+  state.stoppedByUser = true;
   logAgentLifecycle(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, user-initiated)`);
 }
+
+/** Test-only internals. Do not import outside of test files. */
+export const __testInternals = { markAgentRunning, markAgentStopped };
 
 // ============================================================================
 // Agent Runtime State (PAN-800: event-sourced, no more runtime.json)
