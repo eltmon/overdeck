@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import { createRequire as createRequire$1 } from "module";
 import { promisify } from "util";
 //#region \0rolldown/runtime.js
-var __commonJSMin = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 //#endregion
 //#region ../src/lib/paths.ts
@@ -1398,6 +1398,11 @@ var require_anchors = /* @__PURE__ */ __commonJSMin(((exports) => {
 				prevAnchors.add(anchor);
 				return anchor;
 			},
+			/**
+			* With circular references, the source node is only resolved after all
+			* of its child nodes are. This is why anchors are set only after all of
+			* the nodes have been created.
+			*/
 			setAnchors: () => {
 				for (const source of aliasObjects) {
 					const ref = sourceObjects.get(source);
@@ -3150,6 +3155,14 @@ var require_binary = /* @__PURE__ */ __commonJSMin(((exports) => {
 		identify: (value) => value instanceof Uint8Array,
 		default: false,
 		tag: "tag:yaml.org,2002:binary",
+		/**
+		* Returns a Buffer in node and an Uint8Array in browsers
+		*
+		* To use the resulting buffer as an image, you'll want to do something like:
+		*
+		*   const blob = new Blob([buffer], { type: 'image/jpeg' })
+		*   document.querySelector('#photo').src = URL.createObjectURL(blob)
+		*/
 		resolve(src, onError) {
 			if (typeof node_buffer.Buffer === "function") return node_buffer.Buffer.from(src, "base64");
 			else if (typeof atob === "function") {
@@ -4835,6 +4848,7 @@ var require_resolve_block_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 					onError(token, "UNEXPECTED_TOKEN", token.message);
 					length += token.source.length;
 					break;
+				/* istanbul ignore next should not happen */
 				default: {
 					onError(token, "UNEXPECTED_TOKEN", `Unexpected token in block scalar header: ${token.type}`);
 					const ts = token.source;
@@ -4884,6 +4898,7 @@ var require_resolve_flow_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 				_type = Scalar.Scalar.QUOTE_DOUBLE;
 				value = doubleQuotedValue(source, _onError);
 				break;
+			/* istanbul ignore next should not happen */
 			default:
 				onError(scalar, "UNEXPECTED_TOKEN", `Expected a flow scalar value, but found: ${type}`);
 				return {
@@ -4913,6 +4928,7 @@ var require_resolve_flow_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function plainValue(source, onError) {
 		let badChar = "";
 		switch (source[0]) {
+			/* istanbul ignore next should not happen */
 			case "	":
 				badChar = "a tab character";
 				break;
@@ -6573,6 +6589,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 				return it.sep ?? it.start;
 			}
 			case "block-seq": return parent.items[parent.items.length - 1].start;
+			/* istanbul ignore next should not happen */
 			default: return [];
 		}
 	}
@@ -6825,6 +6842,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 						});
 						return;
 					}
+					/* istanbul ignore next should not happen */
 					default:
 						yield* this.pop();
 						yield* this.pop(token);
@@ -6942,6 +6960,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 					}
 					yield* this.pop();
 					break;
+				/* istanbul ignore next should not happen */
 				default:
 					yield* this.pop();
 					yield* this.step();
