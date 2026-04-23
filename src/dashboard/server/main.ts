@@ -27,6 +27,7 @@ import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
+import { startCliproxyWatchdog } from './routes/cliproxy.js';
 
 declare const Bun: unknown;
 
@@ -118,6 +119,10 @@ console.log('[panopticon] ConversationLifecycleService started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
 startTtsSummarizer();
+
+// Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
+startCliproxyWatchdog();
+console.log('[panopticon] CLIProxy watchdog started (30s interval)');
 
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
