@@ -62,3 +62,6 @@ Implementing beads one at a time — building reconciler sub-modules (GitHub cli
 - **[2026-04-23T12:55Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 - **[2026-04-23T13:28Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
 - **[2026-04-23T13:55Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-04-23T15:56Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-23T16:18Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-23T16:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
