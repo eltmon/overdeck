@@ -15,7 +15,7 @@ import { jsonResponse } from "../http-helpers.js";
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, stat, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -194,12 +194,23 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   return { ok: false, error: 'Missing origin' };
 }
 
-/** Validate a caller-supplied cwd does not contain path-traversal segments. */
-function validateCwdContainment(cwd: string): boolean {
+/** Validate a caller-supplied cwd is an existing directory under the user's home. */
+async function validateCwdContainment(cwd: string): Promise<boolean> {
   if (!cwd.startsWith('/')) return false;
   const segments = cwd.split('/').filter(Boolean);
   if (segments.includes('..')) return false;
-  return true;
+
+  try {
+    const resolved = await realpath(cwd);
+    const stats = await stat(resolved);
+    if (!stats.isDirectory()) return false;
+    const home = homedir();
+    // Require the resolved cwd to be under the user's home directory
+    if (!resolved.startsWith(`${home}/`) && resolved !== home) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
@@ -1416,7 +1427,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           ? body['cwd'].trim()
           : undefined;
 
-        if (cwd && !validateCwdContainment(cwd)) {
+        if (cwd && !(await validateCwdContainment(cwd))) {
           return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
         }
 
