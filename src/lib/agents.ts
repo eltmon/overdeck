@@ -26,6 +26,43 @@ import { findProjectByPath, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * BFS-walk a process subtree rooted at `rootPid` looking for a claude-family
+ * runtime (comm == 'claude' or 'claudish'). Returns true if any process in the
+ * tree matches, false if the tree exists but no match, false on any error.
+ *
+ * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
+ * process, which is bash for work-agent launchers (`bash launcher.sh`) but
+ * claude directly for specialists (`exec claude ...`).
+ */
+async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
+  const queue: string[] = [rootPid];
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const pid = queue.shift()!;
+    if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
+    seen.add(pid);
+
+    try {
+      const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
+      const name = comm.trim();
+      if (name === 'claude' || name === 'claudish') return true;
+    } catch {
+      continue;
+    }
+
+    try {
+      const { stdout: kids } = await execAsync(`pgrep -P ${pid}`);
+      for (const kid of kids.trim().split('\n').filter(Boolean)) {
+        queue.push(kid);
+      }
+    } catch {
+      // pgrep exits non-zero when there are no children — not an error.
+    }
+  }
+  return false;
+}
+
 function getProviderAuthMode(model: string): string | undefined {
   const provider = getProviderForModel(model);
   if (provider.name === 'openai') {
@@ -1357,19 +1394,19 @@ ${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonne
 
   // Guard: if tmux session exists but Claude Code has exited, resume instead
   // of typing the message into a bare bash shell.
+  //
+  // Launchers differ: specialists `exec claude` so pane_pid IS claude, but
+  // work-agent launchers run `bash launcher.sh` so pane_pid is bash and claude
+  // runs as a descendant. Walk the pane's process subtree and treat the pane
+  // as live if any descendant is a claude runtime.
   const panePids = await listPaneValuesAsync(normalizedId, '#{pane_pid}');
-  if (panePids.length > 0) {
-    try {
-      const { stdout: comm } = await execAsync(`ps -p ${panePids[0]} -o comm=`);
-      if (comm.trim() !== 'claude') throw new Error('not claude');
-    } catch {
-      console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
-      const resumeResult = await resumeAgent(normalizedId, message);
-      if (resumeResult.success) {
-        return;
-      }
-      throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
+  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0]))) {
+    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
+    const resumeResult = await resumeAgent(normalizedId, message);
+    if (resumeResult.success) {
+      return;
     }
+    throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
   // Wait for Claude prompt to be ready before sending — reduces dropped Enter
