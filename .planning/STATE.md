@@ -1,9 +1,9 @@
 # PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: In Review — Resubmitted
+## Status: Approved — Awaiting Human Merge
 
 ## Current Phase
-Review-agent COMMENTED (aborted due to timeout) at 2026-04-23T00:07Z. Resubmitted via `pan done PAN-539` at 2026-04-23T00:10Z. Review & test pipeline re-triggered automatically. Awaiting new review results.
+Review-agent APPROVED PAN-539 at 2026-04-23T00:12:54Z. All 22/22 ACs met, full test coverage, no security issues. Performance/hardening items noted (non-blocking). Specialist pipeline running tests; will queue for human merge approval upon pass.
 
 ## Completed Work
 - [x] Backend: Added POST /api/conversations/:name/upload-image endpoint with MIME validation, temp-file naming, and async writes (commit: cf85bf1f)
@@ -51,7 +51,8 @@ Review-agent COMMENTED (aborted due to timeout) at 2026-04-23T00:07Z. Resubmitte
 - [x] Address review round 7 changes-requested feedback
 - [x] Address review round 8 changes-requested feedback
 - [x] Resubmitted for review after review-agent timeout (2026-04-23T00:10Z)
-- [ ] Await new review results
+- [x] Review approved at 2026-04-23T00:12:54Z
+- [ ] Await test pass and human merge approval
 
 ## Key Decisions
 - Upload endpoint lives in conversations.ts, not an agent route, because ComposerFooter already targets conversation-specific message APIs.
@@ -101,3 +102,4 @@ Review-agent COMMENTED (aborted due to timeout) at 2026-04-23T00:07Z. Resubmitte
 - **[2026-04-22T23:21Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-22T23:29Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-23T00:07Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-23T00:12Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
