@@ -2,27 +2,25 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-22T20:24:26Z
+timestamp: 2026-04-22T23:29:50Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-Feature is functionally complete — requirements review confirms all 5 vBRIEF items and 21 ACs satisfied end-to-end, and the correctness reviewer's "missing TTL cleanup" blocker is resolved by the intentional redesign to lifecycle-based per-conversation cleanup. However, the security review surfaced two critical shell-injection RCEs in routes/conversations.ts (user message in generateAiTitle's exec pipeline, and cwd/issueId/effort/model in the launcher-script template) that must be fixed before merge, plus incomplete validateOrigin coverage on mutating routes that exposes them to CSRF. A performance concern (full JSONL scan on every cleanup) and a latent path-traversal via an unused sanitizeName are high-priority but non-blocking.
+Feature is functionally complete with 19/21 ACs met and strong security hygiene (shell-injection eliminated, MIME+magic-byte+size caps, realpath containment). One critical correctness bug — basename-only referenced-set in attachment GC is not conversation-scoped and will regress the moment filenames become non-UUID — plus a hardcoded `disabled={true}` on EffortPicker (user cannot change effort) should be fixed before merge. Three low-severity security warnings (dev-origin trust, loose origin prefix match, no per-conversation upload quota) and two performance warnings (full conversation reparse on every messages request, client-side base64 memory amplification) are recommended follow-ups. The two "missing" ACs are vBRIEF documentation drift — the shipped reference-counted cleanup in a per-conversation dir is stricter than the originally planned tmpdir+TTL approach.
 
 ## Security Issues
 
-- Shell command injection in generateAiTitle via user message
-- Shell injection in spawnConversationSession launcher script template
-- Incomplete validateOrigin coverage on mutating routes
-- Latent path traversal via unused sanitizeName
-- Internal error messages echoed to clients
-- MIME type trusted without magic-byte validation
+- Origin/Referer prefix match is too loose
+- Dev-time origins trusted unconditionally in all environments
+- No rate limiting on image upload endpoint
 
 ## Performance Issues
 
-- Full session JSONL scan during attachment cleanup on every stop/archive and lifecycle poll
+- Full conversation re-parse on every messages request
+- Image upload duplicates large payloads in browser memory
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
