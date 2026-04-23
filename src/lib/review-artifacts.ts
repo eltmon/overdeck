@@ -34,7 +34,7 @@ export interface ReviewArtifactCreationResult {
 export async function buildRichReviewArtifactBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${extractNumber(issueId) ?? issueId}`);
+  lines.push(`#${extractNumber(issueId) ?? issueId}`);
   lines.push('');
 
   try {

@@ -18,14 +18,14 @@ describe('buildRichPRBody', () => {
     await rm(workspacePath, { recursive: true, force: true });
   });
 
-  it('includes closes reference from issue number even with no plan', async () => {
+  it('includes issue reference from issue number even with no plan', async () => {
     const body = await buildRichPRBody('PAN-42', workspacePath);
-    expect(body).toContain('Closes #42');
+    expect(body).toContain('#42');
   });
 
-  it('includes closes reference for a different issue number', async () => {
+  it('includes issue reference for a different issue number', async () => {
     const body = await buildRichPRBody('PAN-123', workspacePath);
-    expect(body).toContain('Closes #123');
+    expect(body).toContain('#123');
   });
 
   it('omits AC section when no plan exists', async () => {
@@ -104,7 +104,7 @@ describe('buildRichPRBody', () => {
     await writeFile(join(workspacePath, '.planning', 'plan.vbrief.json'), '{invalid json}');
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
-    expect(body).toContain('Closes #42');
+    expect(body).toContain('#42');
     expect(body).not.toContain('## Acceptance Criteria');
   });
 });

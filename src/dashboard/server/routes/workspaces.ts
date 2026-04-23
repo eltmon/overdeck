@@ -453,7 +453,7 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${extractNumber(issueId) ?? issueId}`);
+  lines.push(`#${extractNumber(issueId) ?? issueId}`);
   lines.push('');
 
   // Acceptance criteria checklist from vBRIEF plan items
