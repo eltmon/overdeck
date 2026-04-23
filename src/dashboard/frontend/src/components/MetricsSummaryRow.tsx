@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Users, AlertTriangle, ArrowRightLeft, TrendingUp, Layers } from 'lucide-react';
+import { DollarSign, Users, AlertTriangle } from 'lucide-react';
 
 interface MetricsSummaryData {
   today: {
@@ -15,35 +15,9 @@ interface MetricsSummaryData {
   };
 }
 
-interface HandoffStats {
-  totalHandoffs: number;
-  todayEscalations: number;
-  byTrigger: Record<string, number>;
-  successRate: number;
-}
-
-interface SpecialistHandoffStats {
-  totalHandoffs: number;
-  todayCount: number;
-  successRate: number;
-  queueDepth: number;
-}
-
 async function fetchMetricsSummary(): Promise<MetricsSummaryData> {
   const res = await fetch('/api/metrics/summary');
   if (!res.ok) throw new Error('Failed to fetch metrics summary');
-  return res.json();
-}
-
-async function fetchHandoffStats(): Promise<HandoffStats> {
-  const res = await fetch('/api/handoffs/stats');
-  if (!res.ok) throw new Error('Failed to fetch handoff stats');
-  return res.json();
-}
-
-async function fetchSpecialistHandoffStats(): Promise<SpecialistHandoffStats> {
-  const res = await fetch('/api/specialist-handoffs/stats');
-  if (!res.ok) throw new Error('Failed to fetch specialist handoff stats');
   return res.json();
 }
 
@@ -87,24 +61,9 @@ export function MetricsSummaryRow() {
     refetchInterval: 30000,
   });
 
-  const { data: handoffStats } = useQuery({
-    queryKey: ['handoff-stats'],
-    queryFn: fetchHandoffStats,
-    refetchInterval: 30000,
-  });
-
-  const { data: specialistStats } = useQuery({
-    queryKey: ['specialist-handoff-stats'],
-    queryFn: fetchSpecialistHandoffStats,
-    refetchInterval: 30000,
-  });
-
   if (!metrics) return null;
 
-  const todayEscalations = handoffStats?.todayEscalations ?? 0;
-
   const stuckColor = metrics.today.stuckCount > 0 ? 'text-destructive' : 'text-muted-foreground';
-  const queueColor = (specialistStats?.queueDepth ?? 0) > 10 ? 'text-warning' : 'text-muted-foreground';
 
   return (
     <div className="flex items-stretch mb-4 rounded-xl border border-border bg-card">
@@ -128,25 +87,6 @@ export function MetricsSummaryRow() {
         value={metrics.today.stuckCount}
         subtext={metrics.today.warningCount > 0 ? `${metrics.today.warningCount} warn` : undefined}
         valueClass={stuckColor}
-      />
-      <MetricTile
-        icon={<ArrowRightLeft className="w-4 h-4" />}
-        label="Handoffs"
-        value={specialistStats?.todayCount ?? 0}
-        subtext={specialistStats ? `${(specialistStats.successRate * 100).toFixed(0)}%` : undefined}
-        valueClass="text-signal-cost"
-      />
-      <MetricTile
-        icon={<TrendingUp className="w-4 h-4" />}
-        label="Escalations"
-        value={todayEscalations}
-        subtext="model handoffs today"
-      />
-      <MetricTile
-        icon={<Layers className="w-4 h-4" />}
-        label="Merge Queue"
-        value={specialistStats?.queueDepth ?? 0}
-        valueClass={queueColor}
       />
     </div>
   );

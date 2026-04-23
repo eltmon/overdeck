@@ -510,6 +510,25 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }),
   });
 
+  const copySettingsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/copy-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to copy settings');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      toast.success('Panopticon settings copied into workspace');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to copy settings');
+    },
+  });
+
   const handleCopy = useCallback(() => {
     copyToClipboard(tmuxCommand);
     setCopied(true);
@@ -897,6 +916,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           startAgentMutation={startAgentMutation}
           createWorkspaceMutation={createWorkspaceMutation}
           syncMainMutation={syncMainMutation}
+          copySettingsMutation={copySettingsMutation}
           resetSessionMutation={resetSessionMutation}
           reopenMutation={reopenMutation}
           onReview={handleReview}
@@ -906,6 +926,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
+          onCopySettings={() => copySettingsMutation.mutate()}
           onReopen={handleReopen}
           onViewBeads={() => setShowBeads(true)}
           onViewVBrief={() => setShowVBrief(true)}

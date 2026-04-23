@@ -369,6 +369,7 @@ export function createSession(
     try {
       tmuxExecSync(['send-keys', '-t', name, `bash ${tmpFile}`]);
       tmuxExecSync(['send-keys', '-t', name, 'C-m']);
+      execSync('sleep 2');
     } finally {
       try { unlinkSync(tmpFile); } catch {}
     }

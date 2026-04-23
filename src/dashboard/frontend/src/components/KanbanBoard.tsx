@@ -2522,8 +2522,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
   const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
-  // Only show "Watch Planning" when there's an actual live tmux session — 'starting'/'failed'/'stopped'/'dead' all mean no session to attach to
-  const isPlanningActive = planningAgent != null && (planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
+  // Show "Watch Planning" when planning agent is starting or has a live session
+  const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
 
   // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
   const agent = activeAgent || planningAgent;
@@ -2940,7 +2940,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <button
                 onClick={(e) => { e.stopPropagation(); onPlan(); }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-signal-review text-signal-review-foreground animate-pulse hover:bg-signal-review/30 transition-colors cursor-pointer"
-                title="Click to watch planning session"
+                title="Planning in progress — click to watch"
               >
                 <Sparkles className="w-3 h-3" />
                 Planning
