@@ -61,6 +61,8 @@ export function setCanonicalState(
   const db = getDatabase();
   const now = new Date().toISOString();
 
+  // New rows get epoch last_synced_at so the push step immediately picks them up.
+  // Existing rows preserve their last_synced_at via the ON CONFLICT clause.
   db.prepare(
     `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at, pending_mutation)
      VALUES (?, ?, ?, ?, ?)
@@ -68,7 +70,7 @@ export function setCanonicalState(
        canonical_state = excluded.canonical_state,
        updated_at = excluded.updated_at,
        pending_mutation = COALESCE(excluded.pending_mutation, pending_mutation)`
-  ).run(issueId, canonicalState, now, now, reason ?? null);
+  ).run(issueId, canonicalState, '1970-01-01T00:00:00.000Z', now, reason ?? null);
 }
 
 /**

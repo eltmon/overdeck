@@ -26,7 +26,7 @@ import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloist
 import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { getGitHubConfig } from './services/tracker-config.js';
-import { startReconciler } from '../../lib/lifecycle/reconciler/index.js';
+import { startReconciler, stopReconciler } from '../../lib/lifecycle/reconciler/index.js';
 import { backfillIssueState } from '../../lib/lifecycle/reconciler/backfill.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
@@ -154,12 +154,14 @@ process.once('SIGTERM', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopReconciler();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopReconciler();
 });
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
@@ -183,7 +185,7 @@ if (ghConfig && ghConfig.repos.length > 0) {
   startReconciler({
     githubToken: ghConfig.token,
     repo: `${primaryRepo.owner}/${primaryRepo.repo}`,
-    intervalMs: parseInt(process.env.RECONCILER_INTERVAL_MS || '30000', 10),
+    intervalMs: parseInt(process.env.PANOPTICON_RECONCILER_INTERVAL_MS || '30000', 10),
   });
 } else {
   console.warn('[panopticon] No GitHub config found — label reconciler not started');

@@ -11,15 +11,33 @@
     "status": "approved",
     "uid": "5c3c14bf-190b-44e0-8dbd-c099d876a24b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-23T10:38:50.728Z",
-    "updated": "2026-04-23T10:38:50.728Z",
+    "updated": "2026-04-23T13:56:59.294Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/805", "label": "PAN-805", "type": "issue" },
-      { "uri": "docs/prds/active/1.0-stabilization-plan.md", "label": "1.0 Stabilization Master PRD", "type": "prd" },
-      { "uri": "docs/prds/active/1.0-audit-results.md", "label": "Epic D audit results", "type": "prd" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/805",
+        "label": "PAN-805",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/active/1.0-stabilization-plan.md",
+        "label": "1.0 Stabilization Master PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/prds/active/1.0-audit-results.md",
+        "label": "Epic D audit results",
+        "type": "prd"
+      }
     ],
-    "tags": ["lifecycle", "reconciler", "github-labels", "sqlite", "epic"],
+    "tags": [
+      "lifecycle",
+      "reconciler",
+      "github-labels",
+      "sqlite",
+      "epic"
+    ],
     "narratives": {
       "Problem": "GitHub labels are used as the state-machine source of truth via fire-and-forget writes with no idempotency, no audit, and five boot-time repair sweeps that flood the API on every restart. Silent rate-limit drops cause label drift (PAN-676, PAN-698).",
       "Proposal": "Introduce a reconciler service that owns all label writes. Internal SQLite state becomes authoritative, labels become a display mirror. Bidirectional sync: push local intent, pull remote changes. Every API attempt is audited. Delete the boot repair sweeps; migrate all direct-write call sites through the reconciler queue; add CI enforcement to prevent regression."
@@ -28,378 +46,1156 @@
       {
         "id": "schema-issue-state-audit",
         "title": "Add issue_state and label_sync_audit tables to schema.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Bump SCHEMA_VERSION from 27 to 28 in src/lib/database/schema.ts. Add the two new tables with CREATE TABLE IF NOT EXISTS plus an index on label_sync_audit(issue_id, attempted_at). Create a new db accessor module src/lib/database/issue-state-db.ts exporting typed getters/setters for issue_state and an audit writer for label_sync_audit." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Bump SCHEMA_VERSION from 27 to 28 in src/lib/database/schema.ts. Add the two new tables with CREATE TABLE IF NOT EXISTS plus an index on label_sync_audit(issue_id, attempted_at). Create a new db accessor module src/lib/database/issue-state-db.ts exporting typed getters/setters for issue_state and an audit writer for label_sync_audit."
+        },
         "subItems": [
-          { "id": "schema-issue-state-audit.ac1", "title": "issue_state table exists with columns issue_id (PK), canonical_state, last_synced_at, pending_mutation, updated_at", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "schema-issue-state-audit.ac2", "title": "label_sync_audit table exists with id (PK AUTOINCREMENT), issue_id, attempted_at, target_label, action (CHECK add|remove), outcome (CHECK success|failure|rate_limited|skipped), reason, retry_count DEFAULT 0, http_status", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "schema-issue-state-audit.ac3", "title": "SCHEMA_VERSION bumped to 28 and schema init is idempotent (running initSchema twice does not error)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "schema-issue-state-audit.ac4", "title": "issue-state-db.ts exports getIssueState(id), upsertIssueState(row), writeAuditRow(entry) with strict TypeScript types", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "schema-issue-state-audit.ac1",
+            "title": "issue_state table exists with columns issue_id (PK), canonical_state, last_synced_at, pending_mutation, updated_at",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-issue-state-audit.ac2",
+            "title": "label_sync_audit table exists with id (PK AUTOINCREMENT), issue_id, attempted_at, target_label, action (CHECK add|remove), outcome (CHECK success|failure|rate_limited|skipped), reason, retry_count DEFAULT 0, http_status",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-issue-state-audit.ac3",
+            "title": "SCHEMA_VERSION bumped to 28 and schema init is idempotent (running initSchema twice does not error)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-issue-state-audit.ac4",
+            "title": "issue-state-db.ts exports getIssueState(id), upsertIssueState(row), writeAuditRow(entry) with strict TypeScript types",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-scaffold",
         "title": "Create reconciler module scaffold with loop, mutex, and config",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Create src/lib/lifecycle/reconciler/ with index.ts (public API), loop.ts (fixed-interval tick driver + single-instance in-process mutex), config.ts (reads PANOPTICON_RECONCILER_INTERVAL_MS env var, default 30000). loop.ts exports startReconciler() and stopReconciler(); each tick is wrapped in try/catch so one failure does not kill the loop. No push/pull/sweep logic in this bead — just the runner and an empty tick fn." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Create src/lib/lifecycle/reconciler/ with index.ts (public API), loop.ts (fixed-interval tick driver + single-instance in-process mutex), config.ts (reads PANOPTICON_RECONCILER_INTERVAL_MS env var, default 30000). loop.ts exports startReconciler() and stopReconciler(); each tick is wrapped in try/catch so one failure does not kill the loop. No push/pull/sweep logic in this bead — just the runner and an empty tick fn."
+        },
         "subItems": [
-          { "id": "reconciler-scaffold.ac1", "title": "startReconciler() begins ticking at the configured interval; stopReconciler() clears the timer cleanly", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-scaffold.ac2", "title": "Calling startReconciler() twice without stopping is a no-op (mutex prevents double-start) and logs a WARN", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-scaffold.ac3", "title": "PANOPTICON_RECONCILER_INTERVAL_MS env var overrides the default 30000; invalid values fall back to default with a WARN log", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-scaffold.ac4", "title": "A thrown error inside the tick fn is caught and logged; the next tick still runs", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-scaffold.ac1",
+            "title": "startReconciler() begins ticking at the configured interval; stopReconciler() clears the timer cleanly",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-scaffold.ac2",
+            "title": "Calling startReconciler() twice without stopping is a no-op (mutex prevents double-start) and logs a WARN",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-scaffold.ac3",
+            "title": "PANOPTICON_RECONCILER_INTERVAL_MS env var overrides the default 30000; invalid values fall back to default with a WARN log",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-scaffold.ac4",
+            "title": "A thrown error inside the tick fn is caught and logged; the next tick still runs",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-github-client",
         "title": "Reconciler GitHub client with .ok check and 429/5xx retry",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add src/lib/lifecycle/reconciler/github-client.ts — a thin wrapped fetch for label add/remove, issue state fetch, and list-issues. Every call checks response.ok; on 429 or 5xx retries with exponential backoff (initial 1s, cap 60s, max 5 attempts); honors Retry-After header when present. Emits structured error logs with issueId, operation, status, body snippet. Never swallows errors — throws after max retries." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add src/lib/lifecycle/reconciler/github-client.ts — a thin wrapped fetch for label add/remove, issue state fetch, and list-issues. Every call checks response.ok; on 429 or 5xx retries with exponential backoff (initial 1s, cap 60s, max 5 attempts); honors Retry-After header when present. Emits structured error logs with issueId, operation, status, body snippet. Never swallows errors — throws after max retries."
+        },
         "subItems": [
-          { "id": "reconciler-github-client.ac1", "title": "Every fetch call checks response.ok; non-ok responses throw or trigger retry", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-github-client.ac2", "title": "On 429 or 5xx: exponential backoff 1s → 2s → 4s → ... capped at 60s, max 5 attempts", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-github-client.ac3", "title": "Retry-After header (seconds or HTTP-date) overrides the backoff schedule when present", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-github-client.ac4", "title": "Errors include issueId, operation, status, and a body snippet in the log; after max retries, the error is thrown (not swallowed)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-github-client.ac1",
+            "title": "Every fetch call checks response.ok; non-ok responses throw or trigger retry",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-github-client.ac2",
+            "title": "On 429 or 5xx: exponential backoff 1s → 2s → 4s → ... capped at 60s, max 5 attempts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-github-client.ac3",
+            "title": "Retry-After header (seconds or HTTP-date) overrides the backoff schedule when present",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-github-client.ac4",
+            "title": "Errors include issueId, operation, status, and a body snippet in the log; after max retries, the error is thrown (not swallowed)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-audit-writer",
         "title": "Audit writer records every attempt to label_sync_audit",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add src/lib/lifecycle/reconciler/audit.ts. Exposes writeAudit({issueId, targetLabel, action, outcome, reason, retryCount, httpStatus}). Called from every terminal point in the reconciler (success, failure after max retries, rate-limited final, skipped). Integrates with issue-state-db.writeAuditRow from the schema bead." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add src/lib/lifecycle/reconciler/audit.ts. Exposes writeAudit({issueId, targetLabel, action, outcome, reason, retryCount, httpStatus}). Called from every terminal point in the reconciler (success, failure after max retries, rate-limited final, skipped). Integrates with issue-state-db.writeAuditRow from the schema bead."
+        },
         "subItems": [
-          { "id": "reconciler-audit-writer.ac1", "title": "Every push attempt (success, failure, rate_limited, skipped) writes exactly one audit row per intent", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-audit-writer.ac2", "title": "retry_count reflects the number of retries attempted before the terminal outcome", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-audit-writer.ac3", "title": "http_status is populated for success/failure/rate_limited rows; NULL for skipped (no API call made)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-audit-writer.ac1",
+            "title": "Every push attempt (success, failure, rate_limited, skipped) writes exactly one audit row per intent",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-audit-writer.ac2",
+            "title": "retry_count reflects the number of retries attempted before the terminal outcome",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-audit-writer.ac3",
+            "title": "http_status is populated for success/failure/rate_limited rows; NULL for skipped (no API call made)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-desired-labels",
         "title": "Pure function mapping canonical_state → desired label set",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add src/lib/lifecycle/reconciler/desired-labels.ts exporting desiredLabelsFor(state: CanonicalState): string[]. Pure, unit-tested. States: todo, in_progress, in_review, merged, closed_wontfix. This is the single source of truth for which labels a state implies." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add src/lib/lifecycle/reconciler/desired-labels.ts exporting desiredLabelsFor(state: CanonicalState): string[]. Pure, unit-tested. States: todo, in_progress, in_review, merged, closed_wontfix. This is the single source of truth for which labels a state implies."
+        },
         "subItems": [
-          { "id": "reconciler-desired-labels.ac1", "title": "desiredLabelsFor returns the exact current Panopticon label convention for each canonical state", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-desired-labels.ac2", "title": "Unit tests cover all 5 canonical states", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-desired-labels.ac1",
+            "title": "desiredLabelsFor returns the exact current Panopticon label convention for each canonical state",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-desired-labels.ac2",
+            "title": "Unit tests cover all 5 canonical states",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-push",
         "title": "Reconciler push step: diff issue_state vs remote, write deltas",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add src/lib/lifecycle/reconciler/push.ts. Each tick: for each row in issue_state where pending_mutation IS NOT NULL (or canonical_state changed since last_synced_at), compute desired labels, diff against last-synced, and write only the add/remove deltas via the github-client. On success, clear pending_mutation and update last_synced_at. Every attempt writes an audit row via audit.ts. No-op diffs write audit with outcome=skipped reason=no_diff." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add src/lib/lifecycle/reconciler/push.ts. Each tick: for each row in issue_state where pending_mutation IS NOT NULL (or canonical_state changed since last_synced_at), compute desired labels, diff against last-synced, and write only the add/remove deltas via the github-client. On success, clear pending_mutation and update last_synced_at. Every attempt writes an audit row via audit.ts. No-op diffs write audit with outcome=skipped reason=no_diff."
+        },
         "subItems": [
-          { "id": "reconciler-push.ac1", "title": "Only deltas are written — if desired == last-synced, no API call is made", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-push.ac2", "title": "On successful write, pending_mutation is cleared and last_synced_at is advanced", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-push.ac3", "title": "On final failure after max retries, pending_mutation is retained so the next tick retries", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-push.ac4", "title": "Every terminal outcome writes exactly one audit row", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-push.ac1",
+            "title": "Only deltas are written — if desired == last-synced, no API call is made",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-push.ac2",
+            "title": "On successful write, pending_mutation is cleared and last_synced_at is advanced",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-push.ac3",
+            "title": "On final failure after max retries, pending_mutation is retained so the next tick retries",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-push.ac4",
+            "title": "Every terminal outcome writes exactly one audit row",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-pull",
         "title": "Reconciler pull step: list-issues, detect remote-ahead, update local",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add src/lib/lifecycle/reconciler/pull.ts. Each tick: one paginated call to GET /repos/:o/:r/issues with labels filter scoped to Panopticon-known labels and state!=closed (or state=all excluding terminal canonical states locally). For each issue: if remote-implied canonical state differs from local AND no pending_mutation, update issue_state.canonical_state + last_synced_at and write audit row with outcome=skipped reason=remote_ahead_pulled. If pending_mutation exists and states conflict, log WARN with both states and let the pending write proceed." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add src/lib/lifecycle/reconciler/pull.ts. Each tick: one paginated call to GET /repos/:o/:r/issues with labels filter scoped to Panopticon-known labels and state!=closed (or state=all excluding terminal canonical states locally). For each issue: if remote-implied canonical state differs from local AND no pending_mutation, update issue_state.canonical_state + last_synced_at and write audit row with outcome=skipped reason=remote_ahead_pulled. If pending_mutation exists and states conflict, log WARN with both states and let the pending write proceed."
+        },
         "subItems": [
-          { "id": "reconciler-pull.ac1", "title": "Pull uses list-issues with pagination per tick (scope narrowed from spec: active/non-terminal issues only, per planning decision recorded in STATE.md), NOT one fetch per issue", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-pull.ac2", "title": "Remote-ahead detection updates local canonical_state and last_synced_at; writes audit row with reason=remote_ahead_pulled", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-pull.ac3", "title": "If a pending_mutation exists and remote state conflicts, WARN log is emitted with both states and the pending local write is preserved (not overwritten)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-pull.ac4", "title": "Issues in terminal canonical states locally are excluded from pull-sync to bound API usage", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-pull.ac1",
+            "title": "Pull uses list-issues with pagination per tick (scope narrowed from spec: active/non-terminal issues only, per planning decision recorded in STATE.md), NOT one fetch per issue",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-pull.ac2",
+            "title": "Remote-ahead detection updates local canonical_state and last_synced_at; writes audit row with reason=remote_ahead_pulled",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-pull.ac3",
+            "title": "If a pending_mutation exists and remote state conflicts, WARN log is emitted with both states and the pending local write is preserved (not overwritten)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-pull.ac4",
+            "title": "Issues in terminal canonical states locally are excluded from pull-sync to bound API usage",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-external-merge-sweep",
         "title": "External merge sweep: detect closed-on-GitHub issues missing the merged label",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add src/lib/lifecycle/reconciler/external-merge-sweep.ts. Each tick: find issues where remote state=closed (from pull data) but local canonical_state != merged and no merged label present. Update local canonical_state to merged and set pending_mutation so the push step labels them. Audit row carries reason=external_merge_detected." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add src/lib/lifecycle/reconciler/external-merge-sweep.ts. Each tick: find issues where remote state=closed (from pull data) but local canonical_state != merged and no merged label present. Update local canonical_state to merged and set pending_mutation so the push step labels them. Audit row carries reason=external_merge_detected."
+        },
         "subItems": [
-          { "id": "reconciler-external-merge-sweep.ac1", "title": "Issues closed on GitHub without a merged label are detected each tick", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-external-merge-sweep.ac2", "title": "Detection flips local canonical_state to merged and enqueues the merged label via pending_mutation", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-external-merge-sweep.ac3", "title": "Audit row for the resulting label write carries reason=external_merge_detected", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-external-merge-sweep.ac1",
+            "title": "Issues closed on GitHub without a merged label are detected each tick",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-external-merge-sweep.ac2",
+            "title": "Detection flips local canonical_state to merged and enqueues the merged label via pending_mutation",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-external-merge-sweep.ac3",
+            "title": "Audit row for the resulting label write carries reason=external_merge_detected",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-boot-backfill",
         "title": "Boot-time backfill of issue_state from local + GitHub",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "On dashboard boot, before starting the reconciler loop: enumerate issues known locally (workspaces + agent state), and for any not present in issue_state, fetch their current label state from GitHub once (batched where possible) and insert a row. This runs once per boot, is idempotent, and populates canonical_state from the labels observed." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "On dashboard boot, before starting the reconciler loop: enumerate issues known locally (workspaces + agent state), and for any not present in issue_state, fetch their current label state from GitHub once (batched where possible) and insert a row. This runs once per boot, is idempotent, and populates canonical_state from the labels observed."
+        },
         "subItems": [
-          { "id": "reconciler-boot-backfill.ac1", "title": "On boot, any locally-known issue missing from issue_state gets a row whose canonical_state matches current GitHub labels", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-boot-backfill.ac2", "title": "Backfill is idempotent — running it twice produces no duplicate rows and no extra API calls", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-boot-backfill.ac3", "title": "Backfill runs before the first reconciler tick to avoid spurious pull-sync updates racing the backfill", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-boot-backfill.ac1",
+            "title": "On boot, any locally-known issue missing from issue_state gets a row whose canonical_state matches current GitHub labels",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-boot-backfill.ac2",
+            "title": "Backfill is idempotent — running it twice produces no duplicate rows and no extra API calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-boot-backfill.ac3",
+            "title": "Backfill runs before the first reconciler tick to avoid spurious pull-sync updates racing the backfill",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "reconciler-boot-wiring",
         "title": "Wire reconciler startup into dashboard boot",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "In src/dashboard/server/main.ts, call the backfill and then startReconciler() during boot. Also register stopReconciler() on shutdown hooks. Do NOT include any repair* wiring (those are removed in separate beads)." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/main.ts, call the backfill and then startReconciler() during boot. Also register stopReconciler() on shutdown hooks. Do NOT include any repair* wiring (those are removed in separate beads)."
+        },
         "subItems": [
-          { "id": "reconciler-boot-wiring.ac1", "title": "Dashboard boot runs backfill then starts the reconciler loop", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "reconciler-boot-wiring.ac2", "title": "Clean shutdown stops the reconciler loop (no dangling timers)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "reconciler-boot-wiring.ac1",
+            "title": "Dashboard boot runs backfill then starts the reconciler loop",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-boot-wiring.ac2",
+            "title": "Clean shutdown stops the reconciler loop (no dangling timers)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "delete-repair-functions",
         "title": "Delete all 5 repair* functions and their tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Remove repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle, repairClosedWontfixIssues, repairClosedPRs from src/lib/lifecycle/label-cleanup.ts. Remove the matching test files. Delete the file if no exports remain. npm run build and npm run typecheck must pass." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Remove repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle, repairClosedWontfixIssues, repairClosedPRs from src/lib/lifecycle/label-cleanup.ts. Remove the matching test files. Delete the file if no exports remain. npm run build and npm run typecheck must pass."
+        },
         "subItems": [
-          { "id": "delete-repair-functions.ac1", "title": "All 5 repair* functions deleted from label-cleanup.ts (not commented out)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "delete-repair-functions.ac2", "title": "Associated test files deleted; npm test passes without them", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "delete-repair-functions.ac3", "title": "npm run build and npm run typecheck pass without any of the repair* symbols referenced anywhere", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "delete-repair-functions.ac4", "title": "grep confirms no remaining references to repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle, repairClosedWontfixIssues, or repairClosedPRs anywhere in src/ or tests/ (imports, callers, comments, or doc references)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "delete-repair-functions.ac1",
+            "title": "All 5 repair* functions deleted from label-cleanup.ts (not commented out)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-repair-functions.ac2",
+            "title": "Associated test files deleted; npm test passes without them",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-repair-functions.ac3",
+            "title": "npm run build and npm run typecheck pass without any of the repair* symbols referenced anywhere",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-repair-functions.ac4",
+            "title": "grep confirms no remaining references to repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle, repairClosedWontfixIssues, or repairClosedPRs anywhere in src/ or tests/ (imports, callers, comments, or doc references)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "delete-boot-repair-wiring",
         "title": "Remove repair* wiring from dashboard boot path",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "trivial", "issueLabel": "pan-805" },
-        "narrative": { "Action": "In src/dashboard/server/main.ts (around line 154), delete the commented-out repair* calls and any surrounding dead imports. Do this cleanly — no // removed comments left behind." },
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/main.ts (around line 154), delete the commented-out repair* calls and any surrounding dead imports. Do this cleanly — no // removed comments left behind."
+        },
         "subItems": [
-          { "id": "delete-boot-repair-wiring.ac1", "title": "src/dashboard/server/main.ts no longer references any repair* symbol (commented or otherwise)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "delete-boot-repair-wiring.ac2", "title": "No orphan imports left behind; npm run lint passes", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "delete-boot-repair-wiring.ac1",
+            "title": "src/dashboard/server/main.ts no longer references any repair* symbol (commented or otherwise)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-boot-repair-wiring.ac2",
+            "title": "No orphan imports left behind; npm run lint passes",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "migrate-transition-in-progress",
         "title": "Migrate transitionIssueToInProgress to reconciler with idempotency + lazy insert",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "In src/lib/agents.ts:~1058, replace the direct label write in transitionIssueToInProgress. New flow: (1) read issue_state.canonical_state; (2) if already in_progress, log INFO issueId=X already in-progress, skipping and return with no API call; (3) if row is missing, lazy-insert it with canonical_state=in_progress; (4) otherwise update canonical_state to in_progress and set pending_mutation so the reconciler push step writes the label." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts:~1058, replace the direct label write in transitionIssueToInProgress. New flow: (1) read issue_state.canonical_state; (2) if already in_progress, log INFO issueId=X already in-progress, skipping and return with no API call; (3) if row is missing, lazy-insert it with canonical_state=in_progress; (4) otherwise update canonical_state to in_progress and set pending_mutation so the reconciler push step writes the label."
+        },
         "subItems": [
-          { "id": "migrate-transition-in-progress.ac1", "title": "transitionIssueToInProgress reads issue_state.canonical_state before acting", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-transition-in-progress.ac2", "title": "When canonical_state is already in_progress, no API call is made and an INFO log is emitted with the expected format", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-transition-in-progress.ac3", "title": "If the issue has no issue_state row, one is lazy-inserted (covers issues missed by boot backfill)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-transition-in-progress.ac4", "title": "Actual label writes flow through the reconciler queue, not a direct fetch from this call site", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "migrate-transition-in-progress.ac1",
+            "title": "transitionIssueToInProgress reads issue_state.canonical_state before acting",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-transition-in-progress.ac2",
+            "title": "When canonical_state is already in_progress, no API call is made and an INFO log is emitted with the expected format",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-transition-in-progress.ac3",
+            "title": "If the issue has no issue_state row, one is lazy-inserted (covers issues missed by boot backfill)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-transition-in-progress.ac4",
+            "title": "Actual label writes flow through the reconciler queue, not a direct fetch from this call site",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "migrate-update-to-in-review",
         "title": "Migrate updateGitHubToInReview to reconciler queue",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "In src/cli/commands/done.ts (note: spec cites src/dashboard/server/done.ts but the current code lives in cli/commands/done.ts — work agent should verify path), route the in-review transition through the reconciler. Any remaining direct fetch gets an explicit .ok check + structured error log (issueId, operation, status, body snippet) and throws instead of swallowing the error." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/done.ts (note: spec cites src/dashboard/server/done.ts but the current code lives in cli/commands/done.ts — work agent should verify path), route the in-review transition through the reconciler. Any remaining direct fetch gets an explicit .ok check + structured error log (issueId, operation, status, body snippet) and throws instead of swallowing the error."
+        },
         "subItems": [
-          { "id": "migrate-update-to-in-review.ac1", "title": "updateGitHubToInReview sets canonical_state=in_review and lets the reconciler perform the label write", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-update-to-in-review.ac2", "title": "Any surviving direct fetch call has an explicit .ok check", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-update-to-in-review.ac3", "title": "Errors are thrown (not swallowed) and logs include issueId, operation, status, and a body snippet", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "migrate-update-to-in-review.ac1",
+            "title": "updateGitHubToInReview sets canonical_state=in_review and lets the reconciler perform the label write",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-update-to-in-review.ac2",
+            "title": "Any surviving direct fetch call has an explicit .ok check",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-update-to-in-review.ac3",
+            "title": "Errors are thrown (not swallowed) and logs include issueId, operation, status, and a body snippet",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "migrate-bulk-close",
         "title": "Migrate bulk-close endpoint (PAN-569) to reconciler queue",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "In src/dashboard/server/routes/issues.ts, update the bulk-close endpoint to set canonical_state=closed_wontfix (or whichever state the endpoint maps to) on each targeted issue and enqueue via the reconciler. Remove direct label write fetch calls from this endpoint." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/issues.ts, update the bulk-close endpoint to set canonical_state=closed_wontfix (or whichever state the endpoint maps to) on each targeted issue and enqueue via the reconciler. Remove direct label write fetch calls from this endpoint."
+        },
         "subItems": [
-          { "id": "migrate-bulk-close.ac1", "title": "Bulk-close endpoint no longer performs direct GitHub label fetch calls", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-bulk-close.ac2", "title": "Each targeted issue has its canonical_state updated and pending_mutation set so the reconciler writes the label", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "migrate-bulk-close.ac3", "title": "Endpoint response is unchanged from the client's perspective (UI contract preserved)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "migrate-bulk-close.ac1",
+            "title": "Bulk-close endpoint no longer performs direct GitHub label fetch calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-bulk-close.ac2",
+            "title": "Each targeted issue has its canonical_state updated and pending_mutation set so the reconciler writes the label",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-bulk-close.ac3",
+            "title": "Endpoint response is unchanged from the client's perspective (UI contract preserved)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "remove-closes-directive",
         "title": "Remove Closes #NNN from PR body template/generator",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Grep the codebase for every emitter of 'Closes #', 'Fixes #', or 'Resolves #' in PR body generation paths. Remove the directive. Keep the human-readable issue link if desired, but no GitHub auto-close keywords." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Grep the codebase for every emitter of 'Closes #', 'Fixes #', or 'Resolves #' in PR body generation paths. Remove the directive. Keep the human-readable issue link if desired, but no GitHub auto-close keywords."
+        },
         "subItems": [
-          { "id": "remove-closes-directive.ac1", "title": "No PR body emitter in the codebase produces Closes #, Fixes #, or Resolves # directives", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "remove-closes-directive.ac2", "title": "Existing tests that assert on PR body content are updated accordingly", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "remove-closes-directive.ac1",
+            "title": "No PR body emitter in the codebase produces Closes #, Fixes #, or Resolves # directives",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-closes-directive.ac2",
+            "title": "Existing tests that assert on PR body content are updated accordingly",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "post-merge-explicit-close",
         "title": "postMergeLifecycle explicitly closes issue via API and enqueues merged label",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "In src/lib/lifecycle/merge-agent.ts (postMergeLifecycle) or equivalent post-merge path: after a successful merge, call PATCH /repos/:o/:r/issues/:n with state=closed (via the github-client for .ok + retry semantics), AND set canonical_state=merged + pending_mutation so the reconciler applies the merged label." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/merge-agent.ts (postMergeLifecycle) or equivalent post-merge path: after a successful merge, call PATCH /repos/:o/:r/issues/:n with state=closed (via the github-client for .ok + retry semantics), AND set canonical_state=merged + pending_mutation so the reconciler applies the merged label."
+        },
         "subItems": [
-          { "id": "post-merge-explicit-close.ac1", "title": "After a Panopticon-driven merge, the issue is closed via explicit GitHub API call (not relying on Closes # keyword)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "post-merge-explicit-close.ac2", "title": "The close call goes through the github-client so .ok + retry + Retry-After semantics apply", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "post-merge-explicit-close.ac3", "title": "canonical_state is set to merged and the merged label is enqueued via the reconciler", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "post-merge-explicit-close.ac1",
+            "title": "After a Panopticon-driven merge, the issue is closed via explicit GitHub API call (not relying on Closes # keyword)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-explicit-close.ac2",
+            "title": "The close call goes through the github-client so .ok + retry + Retry-After semantics apply",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-explicit-close.ac3",
+            "title": "canonical_state is set to merged and the merged label is enqueued via the reconciler",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "ci-enforcement-script",
         "title": "Grep-based CI check prevents label-write regressions outside reconciler",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Add scripts/check-label-writes.sh (or .ts) that greps for 'gh issue edit' and direct fetch calls to /labels endpoints anywhere in src/ outside src/lib/lifecycle/reconciler/**. Wire it into the CI pipeline (package.json script + CI workflow file). Exits non-zero on any hit." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Add scripts/check-label-writes.sh (or .ts) that greps for 'gh issue edit' and direct fetch calls to /labels endpoints anywhere in src/ outside src/lib/lifecycle/reconciler/**. Wire it into the CI pipeline (package.json script + CI workflow file). Exits non-zero on any hit."
+        },
         "subItems": [
-          { "id": "ci-enforcement-script.ac1", "title": "A CI-invoked script fails the build if gh issue edit or direct label-write fetch appears outside src/lib/lifecycle/reconciler/**", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "ci-enforcement-script.ac2", "title": "Script is wired into CI (package.json + workflow) and runs on every PR", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "ci-enforcement-script.ac3", "title": "Script passes cleanly on the migrated codebase", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "ci-enforcement-script.ac1",
+            "title": "A CI-invoked script fails the build if gh issue edit or direct label-write fetch appears outside src/lib/lifecycle/reconciler/**",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-enforcement-script.ac2",
+            "title": "Script is wired into CI (package.json + workflow) and runs on every PR",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-enforcement-script.ac3",
+            "title": "Script passes cleanly on the migrated codebase",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "test-respawn-flood",
         "title": "Test: respawn flood — 1000x transitionIssueToInProgress yields 0 API calls",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Vitest integration test under src/lib/lifecycle/reconciler/__tests__/. Seed issue_state with canonical_state=in_progress for one issue. Mock GitHub. Call transitionIssueToInProgress 1000 times sequentially. Assert: the GitHub mock receives exactly 0 label-write calls." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Vitest integration test under src/lib/lifecycle/reconciler/__tests__/. Seed issue_state with canonical_state=in_progress for one issue. Mock GitHub. Call transitionIssueToInProgress 1000 times sequentially. Assert: the GitHub mock receives exactly 0 label-write calls."
+        },
         "subItems": [
-          { "id": "test-respawn-flood.ac1", "title": "Test calls transitionIssueToInProgress 1000 times with canonical_state already in_progress", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-respawn-flood.ac2", "title": "Assertion: GitHub mock receives 0 label-write calls", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-respawn-flood.ac3", "title": "Test passes in CI", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "test-respawn-flood.ac1",
+            "title": "Test calls transitionIssueToInProgress 1000 times with canonical_state already in_progress",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-respawn-flood.ac2",
+            "title": "Assertion: GitHub mock receives 0 label-write calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-respawn-flood.ac3",
+            "title": "Test passes in CI",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "test-rate-limit-recovery",
         "title": "Test: rate-limit recovery — 429 Retry-After handling and audit trail",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Vitest test. Mock GitHub to return 429 Retry-After: 2 for the first 3 calls, then 200. Use fake timers to advance through the backoff. Enqueue a label write and drive the reconciler. Assert: final outcome is success; label_sync_audit shows retry_count >= 3 and a final row with outcome=success." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Vitest test. Mock GitHub to return 429 Retry-After: 2 for the first 3 calls, then 200. Use fake timers to advance through the backoff. Enqueue a label write and drive the reconciler. Assert: final outcome is success; label_sync_audit shows retry_count >= 3 and a final row with outcome=success."
+        },
         "subItems": [
-          { "id": "test-rate-limit-recovery.ac1", "title": "Mock returns 429 Retry-After: 2 for first 3 attempts then 200", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-rate-limit-recovery.ac2", "title": "Reconciler eventually succeeds on the 4th attempt", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-rate-limit-recovery.ac3", "title": "label_sync_audit contains a row with retry_count >= 3 and outcome=success", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "test-rate-limit-recovery.ac1",
+            "title": "Mock returns 429 Retry-After: 2 for first 3 attempts then 200",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-rate-limit-recovery.ac2",
+            "title": "Reconciler eventually succeeds on the 4th attempt",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-rate-limit-recovery.ac3",
+            "title": "label_sync_audit contains a row with retry_count >= 3 and outcome=success",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "test-external-merge",
         "title": "Test: external merge sweep labels issues merged via GitHub web UI",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Vitest test. Mock an issue+PR where the PR is closed+merged without Panopticon involvement (issue_state.canonical_state != merged locally). Drive a reconciler tick. Assert: canonical_state updates to merged, merged label is applied (push step), audit row written with reason=external_merge_detected." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Vitest test. Mock an issue+PR where the PR is closed+merged without Panopticon involvement (issue_state.canonical_state != merged locally). Drive a reconciler tick. Assert: canonical_state updates to merged, merged label is applied (push step), audit row written with reason=external_merge_detected."
+        },
         "subItems": [
-          { "id": "test-external-merge.ac1", "title": "Scenario: GitHub reports PR merged, issue closed, no merged label locally", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-external-merge.ac2", "title": "After one tick: canonical_state=merged, merged label applied", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-external-merge.ac3", "title": "label_sync_audit row has reason=external_merge_detected", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "test-external-merge.ac1",
+            "title": "Scenario: GitHub reports PR merged, issue closed, no merged label locally",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-external-merge.ac2",
+            "title": "After one tick: canonical_state=merged, merged label applied",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-external-merge.ac3",
+            "title": "label_sync_audit row has reason=external_merge_detected",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "test-closes-absence",
         "title": "Test: PR body generator emits no Closes #NNN / Fixes # / Resolves # directives",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Vitest test. Invoke the Panopticon PR-body code path for a representative issue. Assert: the generated body contains no occurrences of Closes #, Fixes #, or Resolves # (case-insensitive)." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Vitest test. Invoke the Panopticon PR-body code path for a representative issue. Assert: the generated body contains no occurrences of Closes #, Fixes #, or Resolves # (case-insensitive)."
+        },
         "subItems": [
-          { "id": "test-closes-absence.ac1", "title": "Test calls the PR-body generator for at least one representative scenario", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-closes-absence.ac2", "title": "Assertion: output contains no Closes #, Fixes #, or Resolves # (case-insensitive)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "test-closes-absence.ac1",
+            "title": "Test calls the PR-body generator for at least one representative scenario",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-closes-absence.ac2",
+            "title": "Assertion: output contains no Closes #, Fixes #, or Resolves # (case-insensitive)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "test-ci-enforcement",
         "title": "Test: CI enforcement fails when a stray gh issue edit is added",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "simple", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Shell or Vitest test that writes a fixture file under a temp path containing a stray 'gh issue edit' call (or a direct /labels fetch) and invokes the CI enforcement script with that file in scope. Assert: non-zero exit. Then remove the fixture and assert: zero exit." },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Shell or Vitest test that writes a fixture file under a temp path containing a stray 'gh issue edit' call (or a direct /labels fetch) and invokes the CI enforcement script with that file in scope. Assert: non-zero exit. Then remove the fixture and assert: zero exit."
+        },
         "subItems": [
-          { "id": "test-ci-enforcement.ac1", "title": "Fixture with a stray gh issue edit call outside the reconciler path causes the enforcement script to fail (non-zero exit)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-ci-enforcement.ac2", "title": "Fixture with a stray direct /labels fetch call outside the reconciler path causes the enforcement script to fail", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-ci-enforcement.ac3", "title": "Without the fixture, the script passes cleanly on the migrated codebase", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "test-ci-enforcement.ac1",
+            "title": "Fixture with a stray gh issue edit call outside the reconciler path causes the enforcement script to fail (non-zero exit)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-ci-enforcement.ac2",
+            "title": "Fixture with a stray direct /labels fetch call outside the reconciler path causes the enforcement script to fail",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-ci-enforcement.ac3",
+            "title": "Without the fixture, the script passes cleanly on the migrated codebase",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       },
       {
         "id": "test-multi-dev-pull-sync",
         "title": "Test: multi-developer pull-sync detects remote-ahead state",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
-        "metadata": { "difficulty": "medium", "issueLabel": "pan-805" },
-        "narrative": { "Action": "Vitest test. Seed local issue_state with canonical_state=in_progress for an issue. Mock GitHub list-issues to return that issue with labels implying in_review (as if another developer's Panopticon transitioned it). Drive one reconciler tick. Assert: local canonical_state=in_review; last_synced_at advances; label_sync_audit has outcome=skipped reason=remote_ahead_pulled." },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-805"
+        },
+        "narrative": {
+          "Action": "Vitest test. Seed local issue_state with canonical_state=in_progress for an issue. Mock GitHub list-issues to return that issue with labels implying in_review (as if another developer's Panopticon transitioned it). Drive one reconciler tick. Assert: local canonical_state=in_review; last_synced_at advances; label_sync_audit has outcome=skipped reason=remote_ahead_pulled."
+        },
         "subItems": [
-          { "id": "test-multi-dev-pull-sync.ac1", "title": "Seeded local state is in_progress; mocked remote labels imply in_review", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-multi-dev-pull-sync.ac2", "title": "After one tick, local canonical_state=in_review and last_synced_at advances", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "test-multi-dev-pull-sync.ac3", "title": "label_sync_audit row has outcome=skipped and reason=remote_ahead_pulled", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "test-multi-dev-pull-sync.ac1",
+            "title": "Seeded local state is in_progress; mocked remote labels imply in_review",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-multi-dev-pull-sync.ac2",
+            "title": "After one tick, local canonical_state=in_review and last_synced_at advances",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-multi-dev-pull-sync.ac3",
+            "title": "label_sync_audit row has outcome=skipped and reason=remote_ahead_pulled",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
         ]
       }
     ],
     "edges": [
-      { "from": "schema-issue-state-audit", "to": "reconciler-scaffold", "type": "blocks" },
-      { "from": "schema-issue-state-audit", "to": "reconciler-audit-writer", "type": "blocks" },
-      { "from": "reconciler-scaffold", "to": "reconciler-push", "type": "blocks" },
-      { "from": "reconciler-scaffold", "to": "reconciler-pull", "type": "blocks" },
-      { "from": "reconciler-scaffold", "to": "reconciler-external-merge-sweep", "type": "blocks" },
-      { "from": "reconciler-github-client", "to": "reconciler-push", "type": "blocks" },
-      { "from": "reconciler-github-client", "to": "reconciler-pull", "type": "blocks" },
-      { "from": "reconciler-github-client", "to": "post-merge-explicit-close", "type": "blocks" },
-      { "from": "reconciler-audit-writer", "to": "reconciler-push", "type": "blocks" },
-      { "from": "reconciler-audit-writer", "to": "reconciler-pull", "type": "blocks" },
-      { "from": "reconciler-audit-writer", "to": "reconciler-external-merge-sweep", "type": "blocks" },
-      { "from": "reconciler-desired-labels", "to": "reconciler-push", "type": "blocks" },
-      { "from": "reconciler-desired-labels", "to": "reconciler-boot-backfill", "type": "blocks" },
-      { "from": "reconciler-pull", "to": "reconciler-external-merge-sweep", "type": "blocks" },
-      { "from": "reconciler-boot-backfill", "to": "reconciler-boot-wiring", "type": "blocks" },
-      { "from": "reconciler-push", "to": "reconciler-boot-wiring", "type": "blocks" },
-      { "from": "reconciler-pull", "to": "reconciler-boot-wiring", "type": "blocks" },
-      { "from": "reconciler-external-merge-sweep", "to": "reconciler-boot-wiring", "type": "blocks" },
-      { "from": "delete-repair-functions", "to": "delete-boot-repair-wiring", "type": "informs" },
-      { "from": "reconciler-boot-wiring", "to": "delete-boot-repair-wiring", "type": "informs" },
-      { "from": "reconciler-push", "to": "migrate-transition-in-progress", "type": "blocks" },
-      { "from": "reconciler-push", "to": "migrate-update-to-in-review", "type": "blocks" },
-      { "from": "reconciler-push", "to": "migrate-bulk-close", "type": "blocks" },
-      { "from": "reconciler-push", "to": "post-merge-explicit-close", "type": "blocks" },
-      { "from": "remove-closes-directive", "to": "post-merge-explicit-close", "type": "informs" },
-      { "from": "migrate-transition-in-progress", "to": "ci-enforcement-script", "type": "blocks" },
-      { "from": "migrate-update-to-in-review", "to": "ci-enforcement-script", "type": "blocks" },
-      { "from": "migrate-bulk-close", "to": "ci-enforcement-script", "type": "blocks" },
-      { "from": "delete-repair-functions", "to": "ci-enforcement-script", "type": "blocks" },
-      { "from": "migrate-transition-in-progress", "to": "test-respawn-flood", "type": "blocks" },
-      { "from": "reconciler-push", "to": "test-rate-limit-recovery", "type": "blocks" },
-      { "from": "reconciler-external-merge-sweep", "to": "test-external-merge", "type": "blocks" },
-      { "from": "remove-closes-directive", "to": "test-closes-absence", "type": "blocks" },
-      { "from": "ci-enforcement-script", "to": "test-ci-enforcement", "type": "blocks" },
-      { "from": "reconciler-pull", "to": "test-multi-dev-pull-sync", "type": "blocks" }
+      {
+        "from": "schema-issue-state-audit",
+        "to": "reconciler-scaffold",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-issue-state-audit",
+        "to": "reconciler-audit-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-scaffold",
+        "to": "reconciler-push",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-scaffold",
+        "to": "reconciler-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-scaffold",
+        "to": "reconciler-external-merge-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-github-client",
+        "to": "reconciler-push",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-github-client",
+        "to": "reconciler-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-github-client",
+        "to": "post-merge-explicit-close",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-audit-writer",
+        "to": "reconciler-push",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-audit-writer",
+        "to": "reconciler-pull",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-audit-writer",
+        "to": "reconciler-external-merge-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-desired-labels",
+        "to": "reconciler-push",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-desired-labels",
+        "to": "reconciler-boot-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-pull",
+        "to": "reconciler-external-merge-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-boot-backfill",
+        "to": "reconciler-boot-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-push",
+        "to": "reconciler-boot-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-pull",
+        "to": "reconciler-boot-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-external-merge-sweep",
+        "to": "reconciler-boot-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-repair-functions",
+        "to": "delete-boot-repair-wiring",
+        "type": "informs"
+      },
+      {
+        "from": "reconciler-boot-wiring",
+        "to": "delete-boot-repair-wiring",
+        "type": "informs"
+      },
+      {
+        "from": "reconciler-push",
+        "to": "migrate-transition-in-progress",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-push",
+        "to": "migrate-update-to-in-review",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-push",
+        "to": "migrate-bulk-close",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-push",
+        "to": "post-merge-explicit-close",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-closes-directive",
+        "to": "post-merge-explicit-close",
+        "type": "informs"
+      },
+      {
+        "from": "migrate-transition-in-progress",
+        "to": "ci-enforcement-script",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-update-to-in-review",
+        "to": "ci-enforcement-script",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-bulk-close",
+        "to": "ci-enforcement-script",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-repair-functions",
+        "to": "ci-enforcement-script",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-transition-in-progress",
+        "to": "test-respawn-flood",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-push",
+        "to": "test-rate-limit-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-external-merge-sweep",
+        "to": "test-external-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-closes-directive",
+        "to": "test-closes-absence",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-enforcement-script",
+        "to": "test-ci-enforcement",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-pull",
+        "to": "test-multi-dev-pull-sync",
+        "type": "blocks"
+      }
     ]
   }
 }

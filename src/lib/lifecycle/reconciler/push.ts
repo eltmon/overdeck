@@ -67,9 +67,12 @@ export async function runPushStep(
       continue;
     }
 
-    // Apply additions
+    // Apply additions and removals, tracking full success
+    let allOk = true;
+
     for (const label of add) {
       const result = await gh.addLabel(issueNumber, label);
+      if (!result.ok) allOk = false;
       recordAudit({
         issueId,
         targetLabel: label,
@@ -81,9 +84,9 @@ export async function runPushStep(
       });
     }
 
-    // Apply removals
     for (const label of remove) {
       const result = await gh.removeLabel(issueNumber, label);
+      if (!result.ok) allOk = false;
       recordAudit({
         issueId,
         targetLabel: label,
@@ -95,10 +98,13 @@ export async function runPushStep(
       });
     }
 
-    // Update last_synced_at regardless of partial success so we don't retry
-    // infinitely on the same tick; failures will be handled by next tick.
-    db.prepare(
-      `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ?`
-    ).run(now, issueId);
+    // Only advance sync timestamp and clear pending mutation when every
+    // operation succeeded. On failure, leave the row as-is so the next tick
+    // retries (updated_at > last_synced_at still holds).
+    if (allOk) {
+      db.prepare(
+        `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ?`
+      ).run(now, issueId);
+    }
   }
 }
