@@ -148,8 +148,8 @@ function getTrustedOrigins(): string[] {
   const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
   const origins = new Set<string>();
   origins.add(dashboardUrl);
-  // Only trust local development origins outside production
-  if (process.env['NODE_ENV'] !== 'production') {
+  // Only trust local development origins in development mode
+  if (process.env['NODE_ENV'] === 'development') {
     origins.add('http://localhost:3011');
     origins.add('http://localhost:3000');
     origins.add('http://127.0.0.1:3011');
