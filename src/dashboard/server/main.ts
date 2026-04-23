@@ -25,6 +25,8 @@ import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
+import { getGitHubConfig } from './services/tracker-config.js';
+import { startReconciler } from '../../lib/lifecycle/reconciler/index.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
@@ -169,6 +171,19 @@ emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck 
 } }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
+
+// Start label reconciler (PAN-805) — replaces the five repair* sweeps.
+const ghConfig = getGitHubConfig();
+if (ghConfig && ghConfig.repos.length > 0) {
+  const primaryRepo = ghConfig.repos[0];
+  startReconciler({
+    githubToken: ghConfig.token,
+    repo: `${primaryRepo.owner}/${primaryRepo.repo}`,
+    intervalMs: parseInt(process.env.RECONCILER_INTERVAL_MS || '30000', 10),
+  });
+} else {
+  console.warn('[panopticon] No GitHub config found — label reconciler not started');
+}
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
