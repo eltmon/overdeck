@@ -17,11 +17,9 @@ describe('rate-limit recovery (PAN-805)', () => {
     process.env.PANOPTICON_HOME = tempHome;
     process.env.GITHUB_REPOS = 'PAN:eltmon/panopticon-cli';
     resetDatabase();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
     closeDatabase();
     rmSync(tempHome, { recursive: true, force: true });
@@ -67,17 +65,10 @@ describe('rate-limit recovery (PAN-805)', () => {
       intervalMs: 30000,
     });
 
-    const pushPromise = runPushStep(
+    await runPushStep(
       { repo: 'eltmon/panopticon-cli', githubToken: 'fake-token', intervalMs: 30000 },
       gh,
     );
-
-    // Advance through the 3 retry delays (2s each)
-    await vi.advanceTimersByTimeAsync(2000);
-    await vi.advanceTimersByTimeAsync(2000);
-    await vi.advanceTimersByTimeAsync(2000);
-
-    await pushPromise;
 
     // Assert fetch was called 4 times (addLabel: 3 failures + 1 success)
     expect(callCount).toBe(4);
@@ -98,5 +89,5 @@ describe('rate-limit recovery (PAN-805)', () => {
     expect(lastAudit.outcome).toBe('success');
     expect(lastAudit.retry_count).toBeGreaterThanOrEqual(3);
     expect(lastAudit.http_status).toBe(200);
-  });
+  }, 15000);
 });

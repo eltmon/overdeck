@@ -7,7 +7,7 @@ import { tick } from '../loop.js';
 
 const ORIGINAL_GITHUB_REPOS = process.env.GITHUB_REPOS;
 
-describe('external merge sweep (PAN-805)', () => {
+describe('multi-developer pull-sync (PAN-805)', () => {
   let tempHome: string;
 
   beforeEach(() => {
@@ -32,65 +32,55 @@ describe('external merge sweep (PAN-805)', () => {
     delete process.env.PANOPTICON_HOME;
   });
 
-  it('detects external merge, updates canonical_state, applies merged label, and audits', async () => {
+  it('detects remote-ahead state and updates local canonical_state', async () => {
     const db = getDatabase();
 
-    // Seed local issue_state as in_progress (not merged)
+    // Seed local issue_state as in_progress
     const oldTime = new Date(Date.now() - 60000).toISOString();
     db.prepare(
       `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
        VALUES (?, ?, ?, ?)`
-    ).run('PAN-789', 'in_progress', oldTime, oldTime);
+    ).run('PAN-999', 'in_progress', oldTime, oldTime);
 
-    // Mock GitHub: listIssues returns a closed issue without merged label
-    // listIssueLabels returns empty (so push will add merged)
-    // addLabel succeeds
+    // Mock GitHub: listIssues open returns in-review label; closed returns empty
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
       const url = String(_url);
-      if (url.includes('/issues?') && init?.method === 'GET') {
+      if (url.includes('/issues?state=open') && init?.method === 'GET') {
         return new Response(
           JSON.stringify([
-            { number: 789, state: 'closed', labels: [] },
+            { number: 999, state: 'open', labels: [{ name: 'in-review' }] },
           ]),
           { status: 200 }
         );
       }
-      if (url.endsWith('/labels') && init?.method === 'GET') {
+      if (url.includes('/issues?state=closed') && init?.method === 'GET') {
         return new Response(JSON.stringify([]), { status: 200 });
       }
-      if (url.endsWith('/labels') && init?.method === 'POST') {
-        return new Response(JSON.stringify([]), { status: 200 });
-      }
-      return new Response(JSON.stringify({}), { status: 200 });
+      return new Response(JSON.stringify([]), { status: 200 });
     });
 
-    // Drive two reconciler ticks:
-    // Tick 1: external-merge-sweep detects closure → canonical_state = merged
-    // Tick 2: push step applies the merged label
+    // Drive one reconciler tick
     const config = { repo: 'eltmon/panopticon-cli', githubToken: 'fake-token', intervalMs: 30000 };
     const state = { running: false, timer: null, mutex: false };
 
     await tick(config, state);
-    const rowAfterSweep = db
-      .prepare('SELECT canonical_state FROM issue_state WHERE issue_id = ?')
-      .get('PAN-789') as { canonical_state: string };
-    expect(rowAfterSweep.canonical_state).toBe('merged');
 
-    await tick(config, state);
+    // Assert local canonical_state updated to in_review
+    const row = db
+      .prepare('SELECT canonical_state, last_synced_at FROM issue_state WHERE issue_id = ?')
+      .get('PAN-999') as { canonical_state: string; last_synced_at: string };
+    expect(row.canonical_state).toBe('in_review');
+    // pull step updates canonical_state but not last_synced_at (that tracks push sync)
+    expect(row.last_synced_at).toBe(oldTime);
 
-    // Assert merged label was applied
-    const addLabelCall = (global.fetch as any).mock.calls.find(
-      ([url, init]: [any, any]) => String(url).includes('/issues/789/labels') && init?.method === 'POST'
-    );
-    expect(addLabelCall).toBeDefined();
-
-    // Assert audit trail contains external_merge_detected reason
+    // Assert audit row
     const audits = db
-      .prepare('SELECT * FROM label_sync_audit WHERE issue_id = ? ORDER BY attempted_at')
-      .all('PAN-789') as Array<{ reason: string | null; outcome: string }>;
+      .prepare('SELECT * FROM label_sync_audit WHERE issue_id = ?')
+      .all('PAN-999') as Array<{ outcome: string; reason: string | null }>;
 
     expect(audits.length).toBeGreaterThanOrEqual(1);
-    const auditWithReason = audits.find((a) => a.reason === 'external_merge_detected');
-    expect(auditWithReason).toBeDefined();
+    const audit = audits[0];
+    expect(audit.outcome).toBe('skipped');
+    expect(audit.reason).toBe('remote_ahead_pulled');
   });
 });
