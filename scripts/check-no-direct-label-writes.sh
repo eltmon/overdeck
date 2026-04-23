@@ -10,7 +10,9 @@
 
 set -euo pipefail
 
-echo "Checking for direct label writes outside reconciler..."
+SEARCH_DIR="${1:-src/}"
+
+echo "Checking for direct label writes outside reconciler in ${SEARCH_DIR}..."
 
 # Search for gh issue edit with label flags
 matches=$(grep -rn \
@@ -19,7 +21,7 @@ matches=$(grep -rn \
   --include='*.tsx' \
   --include='*.jsx' \
   'gh issue edit.*--\(add-label\|remove-label\|label\)' \
-  src/ \
+  "${SEARCH_DIR}" \
   || true)
 
 # Apply exclusions
