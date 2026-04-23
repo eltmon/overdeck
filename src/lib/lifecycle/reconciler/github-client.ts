@@ -59,9 +59,24 @@ async function fetchWithRetry(
 
   if (!res.ok && isRetryable(res.status) && attempt < MAX_RETRIES) {
     const retryAfter = res.headers.get('retry-after');
-    const backoffMs = retryAfter
-      ? Math.min(parseInt(retryAfter, 10) * 1000, MAX_BACKOFF_MS)
-      : Math.min(INITIAL_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+    let backoffMs: number;
+    if (retryAfter) {
+      const seconds = parseInt(retryAfter, 10);
+      if (!isNaN(seconds) && String(seconds) === retryAfter.trim()) {
+        // Delta-seconds form (e.g., "2")
+        backoffMs = Math.min(seconds * 1000, MAX_BACKOFF_MS);
+      } else {
+        // HTTP-date form (e.g., "Wed, 21 Oct 2015 07:28:00 GMT")
+        const dateMs = new Date(retryAfter).getTime();
+        if (!isNaN(dateMs)) {
+          backoffMs = Math.min(Math.max(0, dateMs - Date.now()), MAX_BACKOFF_MS);
+        } else {
+          backoffMs = Math.min(INITIAL_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+        }
+      }
+    } else {
+      backoffMs = Math.min(INITIAL_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+    }
 
     console.warn(
       `[github-client] ${init.method || 'GET'} ${url} → ${res.status} (attempt ${attempt}/${MAX_RETRIES}), retrying after ${backoffMs}ms`

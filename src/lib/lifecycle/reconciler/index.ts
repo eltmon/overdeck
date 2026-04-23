@@ -96,8 +96,9 @@ export function ensureIssueState(
   const db = getDatabase();
   const now = new Date().toISOString();
 
+  // New rows get epoch last_synced_at so the push step immediately picks them up.
   db.prepare(
     `INSERT OR IGNORE INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
      VALUES (?, ?, ?, ?)`
-  ).run(issueId, canonicalState, now, now);
+  ).run(issueId, canonicalState, '1970-01-01T00:00:00.000Z', now);
 }

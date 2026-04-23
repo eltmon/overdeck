@@ -70,8 +70,7 @@ describe('multi-developer pull-sync (PAN-805)', () => {
       .prepare('SELECT canonical_state, last_synced_at FROM issue_state WHERE issue_id = ?')
       .get('PAN-999') as { canonical_state: string; last_synced_at: string };
     expect(row.canonical_state).toBe('in_review');
-    // pull step updates canonical_state but not last_synced_at (that tracks push sync)
-    expect(row.last_synced_at).toBe(oldTime);
+    expect(row.last_synced_at).not.toBe(oldTime);
 
     // Assert audit row
     const audits = db

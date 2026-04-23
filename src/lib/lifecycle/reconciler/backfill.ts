@@ -31,15 +31,21 @@ function reviewStatusToCanonical(row: {
 }
 
 /**
+ * Valid issue ID pattern: PREFIX-NUMBER (e.g., PAN-805, MIN-123).
+ */
+const ISSUE_ID_RE = /^[A-Z]+-\d+$/;
+
+/**
  * Collect issue IDs from agent state directories.
+ * Filters out non-issue directories (e.g., AGENT-pan-805 configs).
  */
 function collectAgentIssueIds(): string[] {
   try {
     const entries = readdirSync(AGENTS_DIR, { withFileTypes: true });
     return entries
       .filter((e) => e.isDirectory())
-      .map((e) => e.name)
-      .filter((name) => name.includes('-'));
+      .map((e) => e.name.toUpperCase())
+      .filter((name) => ISSUE_ID_RE.test(name));
   } catch {
     return [];
   }
@@ -85,7 +91,7 @@ export function backfillIssueState(): void {
     db.prepare(
       `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
        VALUES (?, ?, ?, ?)`
-    ).run(normalizedId, canonicalState, now, now);
+    ).run(normalizedId, canonicalState, '1970-01-01T00:00:00.000Z', now);
     inserted++;
   }
 

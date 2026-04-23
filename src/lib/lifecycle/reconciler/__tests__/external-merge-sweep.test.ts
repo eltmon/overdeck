@@ -47,7 +47,12 @@ describe('external merge sweep (PAN-805)', () => {
     // addLabel succeeds
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
       const url = String(_url);
-      if (url.includes('/issues?') && init?.method === 'GET') {
+      // Distinguish open vs closed listIssues so pull step doesn't
+      // incorrectly process the closed issue during its open-issues fetch.
+      if (url.includes('/issues?state=open') && init?.method === 'GET') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (url.includes('/issues?state=closed') && init?.method === 'GET') {
         return new Response(
           JSON.stringify([
             { number: 789, state: 'closed', labels: [] },

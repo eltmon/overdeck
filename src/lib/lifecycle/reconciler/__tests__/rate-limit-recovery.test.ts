@@ -90,4 +90,50 @@ describe('rate-limit recovery (PAN-805)', () => {
     expect(lastAudit.retry_count).toBeGreaterThanOrEqual(3);
     expect(lastAudit.http_status).toBe(200);
   }, 15000);
+
+  it('429 Retry-After: HTTP-date form — computes delta correctly', async () => {
+    const futureDate = new Date(Date.now() + 2000).toUTCString();
+    let callCount = 0;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      const url = String(_url);
+      if (url.endsWith('/labels') && init?.method === 'GET') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      callCount++;
+      if (callCount <= 1) {
+        return new Response(JSON.stringify({ message: 'Rate limited' }), {
+          status: 429,
+          headers: { 'retry-after': futureDate },
+        });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+
+    const db = getDatabase();
+    const oldTime = new Date(Date.now() - 60000).toISOString();
+    db.prepare(
+      `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
+       VALUES (?, ?, ?, ?)`
+    ).run('PAN-457', 'in_progress', oldTime, new Date().toISOString());
+
+    const gh = createGitHubClient({
+      repo: 'eltmon/panopticon-cli',
+      githubToken: 'fake-token',
+      intervalMs: 30000,
+    });
+
+    await runPushStep(
+      { repo: 'eltmon/panopticon-cli', githubToken: 'fake-token', intervalMs: 30000 },
+      gh,
+    );
+
+    expect(callCount).toBe(2);
+
+    const audits = db
+      .prepare('SELECT * FROM label_sync_audit WHERE issue_id = ? ORDER BY attempted_at')
+      .all('PAN-457') as Array<{ outcome: string; retry_count: number }>;
+
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+    expect(audits[audits.length - 1].outcome).toBe('success');
+  }, 15000);
 });

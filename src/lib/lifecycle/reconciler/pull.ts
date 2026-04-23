@@ -63,23 +63,22 @@ export async function runPullStep(
     return;
   }
 
-  // Fetch open issues only (terminal states don't change on remote without local intent)
-  let page = 1;
+  // Fetch open issues with pagination (terminal states don't change on remote without local intent)
   const perPage = 100;
-  let fetched: Array<{ number: number; state: string; labels: Array<{ name: string }> }>;
-
-  try {
-    fetched = await gh.listIssues({ state: 'open', perPage, page });
-  } catch (err) {
-    console.warn('[reconciler:pull] listIssues failed:', err);
-    return;
-  }
-
-  if (fetched.length === 0) return;
-
   const now = new Date().toISOString();
 
-  for (const issue of fetched) {
+  for (let page = 1; ; page++) {
+    let fetched: Array<{ number: number; state: string; labels: Array<{ name: string }> }>;
+    try {
+      fetched = await gh.listIssues({ state: 'open', perPage, page });
+    } catch (err) {
+      console.warn('[reconciler:pull] listIssues failed:', err);
+      return;
+    }
+
+    if (fetched.length === 0) break;
+
+    for (const issue of fetched) {
     const issueId = `${prefix}-${issue.number}`;
     const remoteCanonical = remoteToCanonical(
       issue.state,
@@ -110,10 +109,10 @@ export async function runPullStep(
       continue;
     }
 
-    // Remote wins — update local canonical_state
+    // Remote wins — update local canonical_state and advance sync timestamp
     db.prepare(
-      `UPDATE issue_state SET canonical_state = ?, updated_at = ? WHERE issue_id = ?`
-    ).run(remoteCanonical, now, issueId);
+      `UPDATE issue_state SET canonical_state = ?, updated_at = ?, last_synced_at = ? WHERE issue_id = ?`
+    ).run(remoteCanonical, now, now, issueId);
 
     recordAudit({
       issueId,
@@ -128,4 +127,5 @@ export async function runPullStep(
       `[reconciler:pull] Updated ${issueId} canonical_state ${localRow.canonical_state} → ${remoteCanonical} (remote ahead)`
     );
   }
+}
 }
