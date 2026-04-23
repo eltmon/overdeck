@@ -42,16 +42,20 @@ describe('multi-developer pull-sync (PAN-805)', () => {
        VALUES (?, ?, ?, ?)`
     ).run('PAN-999', 'in_progress', oldTime, oldTime);
 
-    // Mock GitHub: listIssues open returns in-review label; closed returns empty
+    // Mock GitHub: listIssues open returns in-review label on page 1 only; closed returns empty
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
       const url = String(_url);
       if (url.includes('/issues?state=open') && init?.method === 'GET') {
-        return new Response(
-          JSON.stringify([
-            { number: 999, state: 'open', labels: [{ name: 'in-review' }] },
-          ]),
-          { status: 200 }
-        );
+        // Pagination: return data on page 1, empty on subsequent pages
+        if (url.includes('&page=1')) {
+          return new Response(
+            JSON.stringify([
+              { number: 999, state: 'open', labels: [{ name: 'in-review' }] },
+            ]),
+            { status: 200 }
+          );
+        }
+        return new Response(JSON.stringify([]), { status: 200 });
       }
       if (url.includes('/issues?state=closed') && init?.method === 'GET') {
         return new Response(JSON.stringify([]), { status: 200 });

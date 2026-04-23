@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resetDatabase, closeDatabase, getDatabase } from '../../../database/index.js';
-import { setCanonicalState } from '../index.js';
 import { runPushStep } from '../push.js';
 import { createGitHubClient } from '../github-client.js';
 
@@ -13,6 +12,7 @@ describe('rate-limit recovery (PAN-805)', () => {
   let tempHome: string;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     tempHome = mkdtempSync(join(tmpdir(), 'pan-reconciler-'));
     process.env.PANOPTICON_HOME = tempHome;
     process.env.GITHUB_REPOS = 'PAN:eltmon/panopticon-cli';
@@ -20,6 +20,7 @@ describe('rate-limit recovery (PAN-805)', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     closeDatabase();
     rmSync(tempHome, { recursive: true, force: true });
@@ -58,17 +59,25 @@ describe('rate-limit recovery (PAN-805)', () => {
        VALUES (?, ?, ?, ?)`
     ).run('PAN-456', 'in_progress', oldTime, new Date().toISOString());
 
-    // Drive push step
+    // Drive push step without awaiting so fake timers can advance retries
     const gh = createGitHubClient({
       repo: 'eltmon/panopticon-cli',
       githubToken: 'fake-token',
       intervalMs: 30000,
     });
 
-    await runPushStep(
+    const promise = runPushStep(
       { repo: 'eltmon/panopticon-cli', githubToken: 'fake-token', intervalMs: 30000 },
       gh,
     );
+
+    // Three rate-limited retries, each waiting ~2000ms
+    for (let i = 0; i < 3; i++) {
+      await vi.advanceTimersByTimeAsync(2100);
+      await Promise.resolve(); // flush microtasks
+    }
+
+    await promise;
 
     // Assert fetch was called 4 times (addLabel: 3 failures + 1 success)
     expect(callCount).toBe(4);
@@ -122,10 +131,15 @@ describe('rate-limit recovery (PAN-805)', () => {
       intervalMs: 30000,
     });
 
-    await runPushStep(
+    const promise = runPushStep(
       { repo: 'eltmon/panopticon-cli', githubToken: 'fake-token', intervalMs: 30000 },
       gh,
     );
+
+    await vi.advanceTimersByTimeAsync(2100);
+    await Promise.resolve();
+
+    await promise;
 
     expect(callCount).toBe(2);
 
