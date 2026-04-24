@@ -3107,10 +3107,17 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    // Kill all reviewer tmux sessions for this issue
-    const prefix = `review-${issueId}-`;
+    // Kill all reviewer AND coordinator tmux sessions for this issue.
+    // Session name patterns (see docs/REVIEW-AGENT-ARCHITECTURE.md):
+    //   review-<issueId>-<ts>-<role>         (per-reviewer session)
+    //   review-<issueId>-<ts>-synthesis      (synthesis session)
+    //   review-coordinator-<issueId>-<ts>    (detached `pan review run` orchestrator)
+    const reviewerPrefix = `review-${issueId}-`;
+    const coordinatorPrefix = `review-coordinator-${issueId}-`;
     const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const reviewSessions = allSessions.filter(s => s.startsWith(prefix));
+    const reviewSessions = allSessions.filter(
+      s => s.startsWith(reviewerPrefix) || s.startsWith(coordinatorPrefix),
+    );
 
     const killed: string[] = [];
     const failed: string[] = [];
