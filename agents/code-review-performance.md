@@ -1,7 +1,6 @@
 ---
 name: code-review-performance
 description: Reviews code for performance issues including algorithms, N+1 queries, and memory leaks
-model: haiku
 tools:
   - Read
   - Grep

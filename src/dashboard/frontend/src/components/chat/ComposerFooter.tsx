@@ -73,11 +73,17 @@ interface ComposerFooterProps {
 export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
-  const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const editorRef = useRef<LexicalEditor | null>(null);
+  // Tracks an in-flight server-side model switch so rapid-fire sends don't
+  // trigger multiple concurrent switches. The message queue (outbox) owns delivery
+  // and is independent of switch state — a send is never blocked by in-flight work.
+  const switchingRef = useRef<Promise<void> | null>(null);
 
-  const isDisabled = !conversation.sessionAlive || sending;
+  // Editor is only disabled if the underlying session is dead. We never
+  // block on "sending" — the outbox accepts messages durably, so rapid Enter
+  // presses must ALWAYS be captured into the outbox, never silently dropped.
+  const isDisabled = !conversation.sessionAlive;
   const isEmpty = text.trim() === '';
 
   // Send /model command to tmux when model is changed on an active conversation
@@ -91,14 +97,14 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     }
   }, [conversation.name, conversation.sessionAlive]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) {
       console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
       return;
     }
-    if (isDisabled) {
-      console.warn('[ComposerFooter] handleSubmit: isDisabled=true, sessionAlive=%s sending=%s', conversation.sessionAlive, sending);
+    if (!conversation.sessionAlive) {
+      toast.error('Conversation session is not active — cannot send.');
       return;
     }
 
@@ -107,38 +113,37 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     editor.read(() => {
       messageText = $getRoot().getTextContent().trim();
     });
-
     if (!messageText) return;
 
-    // Optimistic: notify parent immediately so message appears before server round-trip
+    // Enqueue into the durable outbox IMMEDIATELY. The outbox owns delivery,
+    // retry, and JSONL reconciliation. This call cannot fail or be dropped.
     onSend?.(messageText);
 
-    setSending(true);
-    try {
-      // If the selected model differs from the conversation's current model,
-      // kill the session and restart with the new model before sending.
-      if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(conversation.name, model);
-        // Wait for the new session to spawn before sending the message
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-
-      await sendConversationMessage(conversation.name, messageText);
-
-      // Clear editor after successful send
-      editor.update(() => {
+    // Clear editor ONLY if content still matches what we captured. If the user
+    // typed more characters between Lexical read and clear (e.g. very fast
+    // typing during rapid Enter), those new characters survive as a new draft.
+    editor.update(() => {
+      const current = $getRoot().getTextContent();
+      if (current.trim() === messageText) {
         $getRoot().clear();
-      });
-      setText('');
-    } catch (err) {
-      console.error('[ComposerFooter] Failed to send:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to send message');
-    } finally {
-      setSending(false);
-      // Refocus editor
-      editor.focus();
+      }
+    });
+    setText((prev) => (prev.trim() === messageText ? '' : prev));
+    editor.focus();
+
+    // If the picker model differs from the server's current session model,
+    // kick off a restart in the background. Deliberately NOT awaited — the
+    // message is already in the outbox and will be POSTed by the drain loop
+    // (retry+backoff absorbs any transient failures during the restart window).
+    if (model !== conversation.model && !switchingRef.current) {
+      switchingRef.current = switchModel(conversation.name, model)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] switchModel failed:', err);
+          toast.error(err instanceof Error ? err.message : 'Model switch failed');
+        })
+        .finally(() => { switchingRef.current = null; });
     }
-  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend]);
+  }, [model, conversation.name, conversation.model, conversation.sessionAlive, onSend]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {

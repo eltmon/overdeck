@@ -1585,7 +1585,7 @@ export async function syncMainIntoWorkspace(
       console.log(`[sync-main] Uncommitted changes detected, auto-committing...`);
       logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
       try {
-        await execAsync('git add -A && git commit -m "WIP: auto-commit before sync with main"', {
+        await execAsync('git add -A && git commit -m "chore: auto-commit before sync with main"', {
           cwd: projectPath,
           encoding: 'utf-8',
         });

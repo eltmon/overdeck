@@ -96,6 +96,18 @@ export class WorkTypeRouter {
         score: 100,
         reason: `Explicit override: ${model}`,
       };
+    } else if (
+      workTypeId.startsWith('review:') &&
+      this.config.overrides['specialist-review-agent']
+    ) {
+      // review:* sub-roles inherit from specialist-review-agent when no specific
+      // override is set — configuring the parent key covers all reviewer roles.
+      model = this.config.overrides['specialist-review-agent']!;
+      source = 'override';
+      selection = {
+        score: 100,
+        reason: `Inherited from specialist-review-agent: ${model}`,
+      };
     } else {
       // Use smart (capability-based) selection with tier awareness
       const availableModels = this.getAvailableModels();

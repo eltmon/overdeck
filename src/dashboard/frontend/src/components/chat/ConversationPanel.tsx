@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
@@ -10,6 +10,7 @@ import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
+import { useMessageOutbox, type OutboxEntry } from '../../hooks/useMessageOutbox';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -409,10 +410,6 @@ interface ConversationViewProps {
 }
 
 function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker }: ConversationViewProps) {
-  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
-  // Track count so we know when the server caught up
-  const prevServerCountRef = useRef(0);
-
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
@@ -424,27 +421,34 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
 
-  // Drop optimistic messages once the server has returned at least as many messages
-  // as we had before plus the optimistic ones (the real message has arrived).
-  const expectedCount = prevServerCountRef.current + optimisticMessages.length;
-  const serverCaughtUp = serverMessages.length >= expectedCount && optimisticMessages.length > 0;
-  const messages = serverCaughtUp ? serverMessages : [...serverMessages, ...optimisticMessages];
+  // Resilient outbox: owns durable pending messages (localStorage-backed).
+  // Replaces the old "single optimistic slot that silently drops on rapid Enter".
+  const { entries: outboxEntries, enqueue, retry, discard } = useMessageOutbox({
+    conversationName: conversation.name,
+    serverMessages,
+  });
+
+  // Convert outbox entries into ChatMessage rows for the timeline. Rendering
+  // order: server messages (authoritative) → outbox entries in enqueue order.
+  const optimisticMessages = useMemo<ChatMessage[]>(() =>
+    outboxEntries.map((e: OutboxEntry) => ({
+      id: `outbox-${e.id}`,
+      role: 'user' as const,
+      text: e.text,
+      createdAt: e.createdAt,
+      outboxStatus: e.status,
+      outboxId: e.id,
+      outboxError: e.lastError,
+    })),
+  [outboxEntries]);
+
+  const messages = optimisticMessages.length > 0
+    ? [...serverMessages, ...optimisticMessages]
+    : serverMessages;
 
   const handleMessageSent = useCallback((text: string) => {
-    prevServerCountRef.current = serverMessages.length;
-    const optimistic: ChatMessage = {
-      id: `optimistic-${Date.now()}`,
-      role: 'user',
-      text,
-      createdAt: new Date().toISOString(),
-    };
-    setOptimisticMessages([optimistic]);
-  }, [serverMessages.length]);
-
-  // Clean up optimistic messages in an effect once the server catches up
-  useEffect(() => {
-    if (serverCaughtUp) setOptimisticMessages([]);
-  }, [serverCaughtUp]);
+    enqueue(text);
+  }, [enqueue]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
@@ -507,6 +511,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           messages={messages}
           workLog={workLog}
           streaming={isWorking}
+          onOutboxRetry={retry}
+          onOutboxDiscard={discard}
         />
       )}
       {isForking ? null : onResume ? (

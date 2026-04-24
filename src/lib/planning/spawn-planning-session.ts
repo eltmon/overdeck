@@ -450,6 +450,7 @@ echo ""
 echo "Planning agent has exited. Session kept alive for review."
 echo "Click 'Done' in the dashboard when ready to hand off to implementation."
 echo "[launcher] Keep-alive loop starting at $(date)" >> /tmp/pan-launcher-debug.log
+trap '' HUP
 while true; do sleep 60; done
 `, { mode: 0o755 });
 

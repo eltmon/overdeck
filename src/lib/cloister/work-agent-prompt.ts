@@ -8,6 +8,7 @@ import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
+import { PANOPTICON_HOME } from '../paths.js';
 
 export interface WorkAgentPromptContext {
   issueId: string;
@@ -40,7 +41,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
     }
 
     polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
-    pendingFeedbackStr = readPendingFeedback(ctx.workspacePath);
+    pendingFeedbackStr = readPendingFeedback(ctx.issueId, ctx.workspacePath);
   }
 
   return renderPrompt({
@@ -62,12 +63,30 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
 }
 
 /**
- * Read pending specialist feedback from .planning/feedback/.
+ * Read pending specialist feedback from agent directory or workspace.
+ * Checks ~/.panopticon/agents/{agentId}/feedback/ first, then .planning/feedback/ for backward compat.
  * Returns a summary of the latest feedback file(s) for injection into the prompt.
  */
-function readPendingFeedback(workspacePath: string): string {
-  const feedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (!existsSync(feedbackDir)) return '';
+function readPendingFeedback(issueId: string, workspacePath: string): string {
+  // First, try reading from agent directory
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const agentFeedbackDir = join(PANOPTICON_HOME, 'agents', agentId, 'feedback');
+
+  // Then fall back to workspace for backward compatibility
+  const workspaceFeedbackDir = join(workspacePath, '.planning', 'feedback');
+
+  let feedbackDir = '';
+  let isAgentDir = false;
+
+  if (existsSync(agentFeedbackDir)) {
+    feedbackDir = agentFeedbackDir;
+    isAgentDir = true;
+  } else if (existsSync(workspaceFeedbackDir)) {
+    feedbackDir = workspaceFeedbackDir;
+    isAgentDir = false;
+  } else {
+    return '';
+  }
 
   try {
     const files = readdirSync(feedbackDir)
@@ -78,15 +97,18 @@ function readPendingFeedback(workspacePath: string): string {
 
     // Show the latest feedback file path (agent will read it)
     const latest = files[files.length - 1];
+    const feedbackPath = isAgentDir
+      ? `~/.panopticon/agents/${agentId}/feedback`
+      : `.planning/feedback`;
     const lines: string[] = [
-      `**${files.length} feedback file(s) in \`.planning/feedback/\`:**`,
+      `**${files.length} feedback file(s) in \`${feedbackPath}/\`:**`,
       '',
     ];
 
     // List all files (most recent last)
     for (const file of files) {
       const marker = file === latest ? ' ← **latest, read this first**' : '';
-      lines.push(`- \`.planning/feedback/${file}\`${marker}`);
+      lines.push(`- \`${feedbackPath}/${file}\`${marker}`);
     }
 
     lines.push('');

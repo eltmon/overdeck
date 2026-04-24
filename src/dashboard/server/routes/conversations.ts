@@ -251,10 +251,11 @@ async function spawnConversationSession(
   await writeFile(launcherScript, `#!/bin/bash
 ${envExports}
 cd "${cwd}"
-trap '' HUP
+trap 'exit 0' HUP
 ${runtimeCommand} ${sessionArgs}
 echo ""
 echo "Conversation session ended. Close this panel or click Resume to start a new session."
+trap 'exit 0' HUP
 while true; do sleep 60; done
 `, { mode: 0o755 });
 
