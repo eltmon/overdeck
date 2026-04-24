@@ -6,6 +6,7 @@ import { createSummaryFork } from '../../lib/conversations/summary-fork.js';
 interface ForkOptions {
   model?: string;
   cwd?: string;
+  plain?: boolean;
 }
 
 export async function forkCommand(
@@ -30,11 +31,12 @@ export async function forkCommand(
     process.exit(1);
   }
 
-  console.log(chalk.gray(`Creating summary fork from conversation: ${conv.name} (${conv.title || 'untitled'})`));
+  const modeLabel = options.plain ? 'plain fork' : 'summary fork';
+  console.log(chalk.gray(`Creating ${modeLabel} from conversation: ${conv.name} (${conv.title || 'untitled'})`));
 
   const newConv = (await createSummaryFork(conv, options)).conversation;
 
-  console.log(chalk.green(`Summary-forked conversation ${conv.name} → ${newConv.name}`));
+  console.log(chalk.green(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)}ed conversation ${conv.name} → ${newConv.name}`));
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));

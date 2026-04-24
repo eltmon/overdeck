@@ -192,7 +192,7 @@ function ModelSelect({
 
 interface ForkModalProps {
   conversation: Conversation;
-  onConfirm: (conv: Conversation, launchModel: string, summaryModel: string) => void;
+  onConfirm: (conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean) => void;
   onClose: () => void;
   isPending: boolean;
 }
@@ -202,6 +202,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
   const [summaryModel, setSummaryModel] = useState(compactionModel);
+  const [plainFork, setPlainFork] = useState(false);
 
   useEffect(() => {
     setSummaryModel(compactionModel);
@@ -239,21 +240,46 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
 
         <div className={styles.forkBody}>
           <p className={styles.forkDesc}>
-            Create a new conversation seeded with a summary of{' '}
-            <strong title={title}>{truncatedTitle}</strong>.
-            The summary agent will distill the prior context so the new session can continue seamlessly.
+            {plainFork ? (
+              <>
+                Create a plain fork of{' '}
+                <strong title={title}>{truncatedTitle}</strong>.
+                The new conversation will carry over the raw history
+                (from the last compaction point, if any) without generating a summary.
+              </>
+            ) : (
+              <>
+                Create a new conversation seeded with a summary of{' '}
+                <strong title={title}>{truncatedTitle}</strong>.
+                The summary agent will distill the prior context so the new session can continue seamlessly.
+              </>
+            )}
           </p>
 
           <div className={styles.forkFields}>
-            <ModelSelect
-              value={summaryModel}
-              onChange={setSummaryModel}
-              groups={groups}
-              label="Summary model"
-            />
-            <span className={styles.forkFieldHint}>
-              Generates a concise summary of the conversation history
-            </span>
+            <div className={styles.forkCheckboxRow}>
+              <input
+                type="checkbox"
+                id="plain-fork"
+                checked={plainFork}
+                onChange={(e) => setPlainFork(e.target.checked)}
+              />
+              <label htmlFor="plain-fork">Plain fork (skip summary, copy raw history)</label>
+            </div>
+
+            {!plainFork && (
+              <>
+                <ModelSelect
+                  value={summaryModel}
+                  onChange={setSummaryModel}
+                  groups={groups}
+                  label="Summary model"
+                />
+                <span className={styles.forkFieldHint}>
+                  Generates a concise summary of the conversation history
+                </span>
+              </>
+            )}
 
             <ModelSelect
               value={launchModel}
@@ -274,7 +300,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}
