@@ -247,19 +247,17 @@ export function buildReviewFeedbackBody(issueId: string, result: ReviewResult): 
 
 async function sendFeedbackToWorkAgent(
   context: ReviewContext,
-  result: ReviewResult,
-  synthSessionName?: string
+  result: ReviewResult
 ): Promise<void> {
   const agentSession = `agent-${context.issueId.toLowerCase()}`;
   const outcome = result.reviewResult.toLowerCase().replace(/_/g, '-');
 
   const body = buildReviewFeedbackBody(context.issueId, result);
 
-  // Write feedback file to agent directory if synthesis session is available
+  // Write feedback file to workspace (use workspace path, not project root)
   const fileResult = await writeFeedbackFile({
     issueId: context.issueId,
     workspacePath: context.workspace,
-    agentId: synthSessionName,
     specialist: 'review-agent',
     outcome,
     summary: `Review ${result.reviewResult}: ${(result.notes || '').slice(0, 80)}`,
@@ -813,6 +811,15 @@ export async function dispatchParallelReview(
     workspace: opts.workspace,
   };
 
+  // Archive feedback from any previous review cycle so the work agent only
+  // sees current-cycle feedback when it reads .planning/feedback/.
+  try {
+    const { archiveFeedbackFiles } = await import('./feedback-writer.js');
+    await archiveFeedbackFiles(opts.workspace);
+  } catch {
+    // Non-fatal: archiving is best-effort
+  }
+
   // Set reviewing here so callers don't race against the async .catch that resets
   // to pending on spawn failure. All reviewStatus transitions live in this function.
   try {
@@ -891,9 +898,8 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
     // Log to history
     await logReviewHistory(context, result, reviewId);
 
-    // Send feedback to work agent (write to work agent directory)
-    const workAgentId = `agent-${context.issueId.toLowerCase()}`;
-    await sendFeedbackToWorkAgent(context, result, workAgentId);
+    // Send feedback to work agent
+    await sendFeedbackToWorkAgent(context, result);
 
     return result;
   } catch (error: any) {
@@ -907,8 +913,8 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
 
     await logReviewHistory(context, result);
 
-    // Send feedback even on failure (no agent session on error)
-    await sendFeedbackToWorkAgent(context, result, undefined);
+    // Send feedback even on failure
+    await sendFeedbackToWorkAgent(context, result);
 
     return result;
   }

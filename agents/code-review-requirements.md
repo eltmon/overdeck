@@ -1,6 +1,7 @@
 ---
 name: code-review-requirements
 description: Reviews code against original issue requirements and vBRIEF acceptance criteria to catch missing or incomplete functionality
+model: sonnet
 tools:
   - Read
   - Grep

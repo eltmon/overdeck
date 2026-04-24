@@ -1,6 +1,7 @@
 ---
 name: code-review-security
 description: Reviews code for security vulnerabilities including OWASP Top 10
+model: sonnet
 tools:
   - Read
   - Grep

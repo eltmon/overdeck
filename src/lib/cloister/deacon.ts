@@ -2166,21 +2166,7 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
           try {
             const feedbackFiles = readdirSync(feedbackDir);
             if (feedbackFiles.length > 0) {
-              // Log details about feedback files to help debug blocked agents
-              let feedbackDetails = '';
-              try {
-                for (const file of feedbackFiles) {
-                  if (file.endsWith('.md')) {
-                    const content = readFileSync(join(feedbackDir, file), 'utf-8');
-                    const outcomeMatch = content.match(/^# Review: (\w+)/m);
-                    const summaryMatch = content.match(/## Summary\s*\n(.+?)(?:\n##|$)/s);
-                    if (outcomeMatch) {
-                      feedbackDetails += ` [${file}: ${outcomeMatch[1]}]`;
-                    }
-                  }
-                }
-              } catch { /* ignore if we can't read feedback content */ }
-              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .planning/feedback/${feedbackDetails}`);
+              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .planning/feedback/`);
               continue;
             }
           } catch { /* can't read feedback dir */ }
@@ -3188,18 +3174,6 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     }
     if (state.phase !== 'implementation') {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation)`);
-      continue;
-    }
-
-    // Only auto-resume agents that were active recently. Old state files for
-    // completed/abandoned work accumulate indefinitely; without this filter the
-    // deacon resurrects ancient agents on every startup/patrol.
-    const AUTO_RESUME_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
-    const lastActivityMs = state.lastActivity ? new Date(state.lastActivity).getTime() : 0;
-    const startedAtMs = new Date(state.startedAt).getTime();
-    const lastRelevantMs = Math.max(lastActivityMs, startedAtMs);
-    if (Date.now() - lastRelevantMs > AUTO_RESUME_MAX_AGE_MS) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — last activity ${Math.round((Date.now() - lastRelevantMs) / 3600000)}h ago (older than 24h threshold)`);
       continue;
     }
 

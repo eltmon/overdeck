@@ -117,13 +117,6 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     savePinState(issueId, sessionName);
   }, [issueId]);
 
-  const handleSelectAndPin = useCallback((sessionName: string) => {
-    // Atomically select and pin a session in one batch
-    setPinnedSession(sessionName);
-    setPinned(true);
-    savePinState(issueId, sessionName);
-  }, [issueId]);
-
   const handleTogglePin = useCallback(() => {
     setPinned(prev => {
       const next = !prev;
@@ -131,22 +124,17 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
         // Un-pinning: clear pin from localStorage
         savePinState(issueId, null);
         setPinnedSession(null);
+      } else if (activeSession) {
+        // Engaging pin: capture the currently-displayed session and persist it
+        setPinnedSession(activeSession);
+        savePinState(issueId, activeSession);
       } else {
-        // Engaging pin: use the currently-pinned session (should already be set)
-        // If no pinned session yet, fall back to active session
-        if (pinnedSession) {
-          savePinState(issueId, pinnedSession);
-        } else if (activeSession) {
-          setPinnedSession(activeSession);
-          savePinState(issueId, activeSession);
-        } else {
-          // No session to pin — no-op, stay in auto-follow mode
-          return prev;
-        }
+        // No active session to pin — no-op, stay in auto-follow mode
+        return prev;
       }
       return next;
     });
-  }, [issueId, activeSession, pinnedSession]);
+  }, [issueId, activeSession]);
 
 
   // Reset panel state when issue changes
@@ -274,7 +262,6 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
               activePhase={phase}
               pinned={pinned}
               onSelectSession={handleSelectSession}
-              onSelectAndPin={handleSelectAndPin}
               onTogglePin={handleTogglePin}
             />
           )}

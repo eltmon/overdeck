@@ -2077,13 +2077,10 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
     let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
 
     // Discover active parallel review sessions for this issue
-    // Session names use uppercase issue IDs (e.g. review-PAN-805-1234-correctness)
-    // but the URL parameter may be lowercase, so normalize for filtering.
     let reviewSessionNames: string[] | undefined;
     try {
       const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-      const normalizedIssueId = issueId.toUpperCase();
-      reviewSessionNames = allSessions.filter(s => s.startsWith(`review-${normalizedIssueId}-`));
+      reviewSessionNames = allSessions.filter(s => s.startsWith(`review-${issueId}-`));
     } catch { /* non-fatal: tmux may not be available */ }
 
     // Only the merge queue is persistent — check it when no active phase is detected

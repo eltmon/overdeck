@@ -3,8 +3,6 @@
 // plain TypeScript interfaces so the frontend can use them without resolving
 // through the workspace's contracts package symlink.
 
-export type OutboxStatus = 'sending' | 'queued' | 'stalled' | 'failed';
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -14,12 +12,6 @@ export interface ChatMessage {
   completedAt?: string;
   streaming?: boolean;
   sequence?: number;
-  /** Set only for client-side outbox entries (messages not yet confirmed by server JSONL). */
-  outboxStatus?: OutboxStatus;
-  /** Stable client id used for retry/discard operations on outbox entries. */
-  outboxId?: string;
-  /** Last transport error text when outboxStatus === 'failed'. */
-  outboxError?: string;
 }
 
 export interface WorkLogEntry {
