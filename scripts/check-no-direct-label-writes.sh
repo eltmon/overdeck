@@ -13,13 +13,14 @@ SEARCH_DIR="${1:-src/}"
 
 echo "Checking for direct label writes outside reconciler in ${SEARCH_DIR}..."
 
-# Search for gh issue edit with label flags
+# Search for gh issue edit with label flags AND direct fetch calls to /labels endpoints
 matches=$(grep -rn \
   --include='*.ts' \
   --include='*.js' \
   --include='*.tsx' \
   --include='*.jsx' \
-  'gh issue edit.*--\(add-label\|remove-label\|label\)' \
+  -e 'gh issue edit.*--\(add-label\|remove-label\|label\)' \
+  -e '\/issues\/[0-9${`]*\/labels' \
   "${SEARCH_DIR}" \
   || true)
 
@@ -28,7 +29,7 @@ filtered=""
 while IFS= read -r line; do
   [ -z "$line" ] && continue
 
-  # Exclude reconciler directory
+  # Exclude reconciler directory (owns all label writes)
   if echo "$line" | grep -q 'src/lib/lifecycle/reconciler/'; then
     continue
   fi

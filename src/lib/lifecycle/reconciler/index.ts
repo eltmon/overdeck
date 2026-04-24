@@ -19,7 +19,7 @@ const intentQueue: LabelIntent[] = [];
  */
 export function startReconciler(config: ReconcilerConfig): void {
   if (state.running) {
-    console.log('[reconciler] Already running, skipping start');
+    console.warn('[reconciler] Already running, skipping start');
     return;
   }
 

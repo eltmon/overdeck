@@ -49,6 +49,21 @@ describe('check-no-direct-label-writes.sh', () => {
     }
   });
 
+  it('fails when a stray direct /labels fetch call is found', async () => {
+    const fixture = join(tempDir, 'bad-fetch.ts');
+    await writeFile(
+      fixture,
+      `const res = await fetch(\`https://api.github.com/repos/owner/repo/issues/42/labels\`, { method: 'POST', body: JSON.stringify({ labels: ['in-progress'] }) });`,
+    );
+
+    try {
+      await execFileAsync('bash', [SCRIPT_PATH, tempDir]);
+      expect.fail('Expected script to throw');
+    } catch (err: any) {
+      expect(err.stderr || err.stdout || err.message).toContain('Direct label writes found outside reconciler');
+    }
+  });
+
   it('ignores lines annotated with PAN-805-exempt', async () => {
     const fixture = join(tempDir, 'exempt-file.ts');
     await writeFile(
