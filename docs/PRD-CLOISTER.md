@@ -154,6 +154,8 @@ if (stashCreated) {
 
 ### Review → Test → Merge Pipeline
 
+> The review stage's internal architecture — how `pan review run` orchestrates reviewer tmux sessions, how synthesis is the judgment layer, and why the dashboard never owns review state — is documented separately in [`REVIEW-AGENT-ARCHITECTURE.md`](./REVIEW-AGENT-ARCHITECTURE.md).
+
 Status transitions drive the specialist pipeline:
 
 ```

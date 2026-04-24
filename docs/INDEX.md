@@ -24,6 +24,7 @@
 | [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
+| [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: work-agent-as-orchestrator, dashboard-as-view, `pan review run` CLI, prompt primitives, synthesis as the judgment layer |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, VBRIEFs, STATE.md, multi-tool sync |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
@@ -154,6 +155,9 @@
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
 - **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
 - **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
+- **"review architecture"** / **"review orchestrator"** / **"synthesis model"** / **"pan review run"** / **"review invariants"** / **"prompt primitives"** → REVIEW-AGENT-ARCHITECTURE.md
+- **"reviewer prompts"** / **"synthesis prompt"** / **".claude/prompts/"** / **"prompt-template.md"** → REVIEW-AGENT-ARCHITECTURE.md
+- **"dashboard restart"** / **"review survives restart"** → REVIEW-AGENT-ARCHITECTURE.md (invariants)
 - **"planning"** / **"planning agent"** / **"PLANNING_PROMPT"** → SPECIALIST_WORKFLOW.md (Planning → Implementation Transition)
 - **"environment variables"** / **"agent env"** → SPECIALIST_WORKFLOW.md (Agent Environment Variables), CONFIGURATION.md
 - **"suggested prompts"** → SPECIALIST_WORKFLOW.md (Agent Environment Variables)
