@@ -79,6 +79,18 @@ export function backfillIssueState(): void {
   let inserted = 0;
   let skipped = 0;
 
+  // Batch insert in a single transaction for atomicity and performance.
+  const insert = db.prepare(
+    `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
+     VALUES (?, ?, ?, ?)`
+  );
+  const insertMany = db.transaction((rows: Array<[string, string, string, string]>) => {
+    for (const row of rows) {
+      insert.run(...row);
+    }
+  });
+
+  const toInsert: Array<[string, string, string, string]> = [];
   for (const normalizedId of normalizedIds) {
     if (existingSet.has(normalizedId)) {
       skipped++;
@@ -90,11 +102,12 @@ export function backfillIssueState(): void {
       ? reviewStatusToCanonical(status)
       : 'todo';
 
-    db.prepare(
-      `INSERT INTO issue_state (issue_id, canonical_state, last_synced_at, updated_at)
-       VALUES (?, ?, ?, ?)`
-    ).run(normalizedId, canonicalState, '1970-01-01T00:00:00.000Z', now);
+    toInsert.push([normalizedId, canonicalState, '1970-01-01T00:00:00.000Z', now]);
     inserted++;
+  }
+
+  if (toInsert.length > 0) {
+    insertMany(toInsert);
   }
 
   if (inserted > 0 || skipped > 0) {

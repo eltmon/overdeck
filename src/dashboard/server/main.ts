@@ -185,7 +185,16 @@ if (ghConfig && ghConfig.repos.length > 0) {
   startReconciler({
     githubToken: ghConfig.token,
     repo: `${primaryRepo.owner}/${primaryRepo.repo}`,
-    intervalMs: parseInt(process.env.PANOPTICON_RECONCILER_INTERVAL_MS || '30000', 10),
+    intervalMs: Math.max(1000, (() => {
+      const raw = process.env.PANOPTICON_RECONCILER_INTERVAL_MS;
+      if (!raw) return 30000;
+      const parsed = parseInt(raw, 10);
+      if (isNaN(parsed) || parsed <= 0) {
+        console.warn(`[panopticon] Invalid PANOPTICON_RECONCILER_INTERVAL_MS "${raw}" — using default 30000ms`);
+        return 30000;
+      }
+      return parsed;
+    })()),
   });
 } else {
   console.warn('[panopticon] No GitHub config found — label reconciler not started');

@@ -23,7 +23,7 @@ import { httpHandler } from './http-handler.js';
  *   GET  /api/issues/:id/costs
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
@@ -56,6 +56,7 @@ import { setCanonicalState } from '../../../lib/lifecycle/reconciler/index.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
 // Started by main.ts on boot. Updates flow through the ReadModel via
@@ -141,8 +142,16 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
 
   const branchName = `feature/${issueId.toLowerCase()}`;
   try {
-    const { stdout: prListRaw } = await execAsync(
-      `gh pr list --repo ${githubCheck.owner}/${githubCheck.repo} --head "${branchName}" --state open --json number --jq '.[0].number'`,
+    const { stdout: prListRaw } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'list',
+        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+        '--head', branchName,
+        '--state', 'open',
+        '--json', 'number',
+        '--jq', '.[0].number',
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     const prNumber = prListRaw.trim();
@@ -150,8 +159,13 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
       return ['No open PR found for branch'];
     }
 
-    await execAsync(
-      `gh pr close ${prNumber} --repo ${githubCheck.owner}/${githubCheck.repo} --comment "${reason}"`,
+    await execFileAsync(
+      'gh',
+      [
+        'pr', 'close', prNumber,
+        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+        '--comment', reason,
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     try {
@@ -768,7 +782,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
             if (existsSync(workspacePath)) {
-              await execAsync(`pan workspace destroy ${issueIdentifier!.toLowerCase()} --force`, {
+              await execFileAsync('pan', ['workspace', 'destroy', issueIdentifier!.toLowerCase(), '--force'], {
                 cwd: projectPath,
                 encoding: 'utf-8',
                 timeout: 120000,

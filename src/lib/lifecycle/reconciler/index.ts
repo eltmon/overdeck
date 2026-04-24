@@ -69,7 +69,7 @@ export function setCanonicalState(
      ON CONFLICT(issue_id) DO UPDATE SET
        canonical_state = excluded.canonical_state,
        updated_at = excluded.updated_at,
-       pending_mutation = COALESCE(excluded.pending_mutation, pending_mutation)`
+       pending_mutation = excluded.pending_mutation`
   ).run(issueId, canonicalState, '1970-01-01T00:00:00.000Z', now, reason ?? null);
 }
 

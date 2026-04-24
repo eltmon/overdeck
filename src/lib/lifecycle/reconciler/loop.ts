@@ -3,6 +3,7 @@ import { runPushStep } from './push.js';
 import { runPullStep } from './pull.js';
 import { runExternalMergeSweep } from './external-merge-sweep.js';
 import { resolvePrefix } from './pull.js';
+import { backfillIssueState } from './backfill.js';
 import type { ReconcilerConfig, ReconcilerState } from './types.js';
 
 /**
@@ -27,6 +28,10 @@ export async function tick(
   const start = Date.now();
 
   try {
+    // Re-backfill on every tick to catch issues created since boot / last tick.
+    // INSERT OR IGNORE makes this idempotent and cheap for already-tracked rows.
+    backfillIssueState();
+
     const gh = createGitHubClient(config);
     const prefix = resolvePrefix(config);
 

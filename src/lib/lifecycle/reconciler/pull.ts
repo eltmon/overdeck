@@ -33,15 +33,11 @@ function remoteToCanonical(
   if (labelSet.has('merged') || labelSet.has('needs-close-out')) {
     return 'merged';
   }
-  for (const label of labelSet) {
-    if (label.includes('in review') || label.includes('in-review') || label.includes('review')) {
-      return 'in_review';
-    }
+  if (labelSet.has('in-review')) {
+    return 'in_review';
   }
-  for (const label of labelSet) {
-    if (label.includes('in progress') || label.includes('in-progress') || label.includes('wip')) {
-      return 'in_progress';
-    }
+  if (labelSet.has('in-progress')) {
+    return 'in_progress';
   }
 
   return 'todo';

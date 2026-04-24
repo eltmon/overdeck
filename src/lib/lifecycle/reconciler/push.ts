@@ -20,9 +20,9 @@ export async function runPushStep(
   // Select issues whose local state changed since the last successful sync
   const rows = db
     .prepare(
-      `SELECT issue_id, canonical_state, pending_mutation FROM issue_state WHERE updated_at > last_synced_at`
+      `SELECT issue_id, canonical_state, pending_mutation, updated_at FROM issue_state WHERE updated_at > last_synced_at`
     )
-    .all() as Array<{ issue_id: string; canonical_state: string; pending_mutation: string | null }>;
+    .all() as Array<{ issue_id: string; canonical_state: string; pending_mutation: string | null; updated_at: string }>;
 
   if (rows.length === 0) return;
 
@@ -51,7 +51,9 @@ export async function runPushStep(
     const desired = desiredLabels(row.canonical_state as any);
     const { add, remove } = computeLabelDeltas(desired, actualLabels);
 
-    const now = new Date().toISOString();
+    // Capture updated_at at the start so we can guard against concurrent
+    // modifications while we were fetching/applying labels.
+    const capturedUpdatedAt = row.updated_at;
 
     if (add.length === 0 && remove.length === 0) {
       // No-op diff — record skipped audit and update sync timestamp
@@ -65,8 +67,8 @@ export async function runPushStep(
       });
 
       db.prepare(
-        `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ?`
-      ).run(now, issueId);
+        `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ? AND updated_at = ?`
+      ).run(capturedUpdatedAt, issueId, capturedUpdatedAt);
       continue;
     }
 
@@ -104,10 +106,12 @@ export async function runPushStep(
     // Only advance sync timestamp and clear pending mutation when every
     // operation succeeded. On failure, leave the row as-is so the next tick
     // retries (updated_at > last_synced_at still holds).
+    // Use capturedUpdatedAt as last_synced_at with a guard so concurrent
+    // modifications don't get overwritten with stale data.
     if (allOk) {
       db.prepare(
-        `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ?`
-      ).run(now, issueId);
+        `UPDATE issue_state SET last_synced_at = ?, pending_mutation = NULL WHERE issue_id = ? AND updated_at = ?`
+      ).run(capturedUpdatedAt, issueId, capturedUpdatedAt);
     }
   }
 }
