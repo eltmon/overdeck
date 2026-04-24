@@ -71,19 +71,25 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
 
 // ─── Read operations ──────────────────────────────────────────────────────────
 
-export function listConversations(): Conversation[] {
+export function listConversations(options?: { limit?: number; offset?: number }): Conversation[] {
   const db = getDatabase();
-  const rows = db
-    .prepare(
-      `SELECT id, name, tmux_session, status, cwd, issue_id,
+  let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
        WHERE archived_at IS NULL
-       ORDER BY created_at DESC`,
-    )
-    .all() as Record<string, unknown>[];
+       ORDER BY created_at DESC`;
+  const params: number[] = [];
+  if (options?.limit !== undefined) {
+    sql += ' LIMIT ?';
+    params.push(options.limit);
+  }
+  if (options?.offset !== undefined) {
+    sql += ' OFFSET ?';
+    params.push(options.offset);
+  }
+  const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
   return rows.map(rowToConversation);
 }
 

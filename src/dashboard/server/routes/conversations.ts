@@ -17,7 +17,7 @@ import { exec, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { extname, join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
@@ -74,6 +74,7 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 import {
   ensureConversationAttachmentDir,
+  getConversationAttachmentsRoot,
   extractConversationAttachmentPaths,
   hasConversationAttachment,
   isManagedConversationAttachmentPath,
@@ -85,6 +86,7 @@ import {
 const execAsync = promisify(exec);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
+const MAX_FILENAME_LENGTH = 255;
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -399,6 +401,13 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: 'filename and mimeType are required' }, { status: 400 });
   }
 
+  if (filename.length > MAX_FILENAME_LENGTH) {
+    return jsonResponse(
+      { error: `filename exceeds maximum length of ${MAX_FILENAME_LENGTH} characters` },
+      { status: 400 },
+    );
+  }
+
   if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
     return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
@@ -431,21 +440,22 @@ export async function handleConversationImageUpload(
   }
 
   const attachmentDir = await ensureConversationAttachmentDir(name);
+  // Pre-write containment: resolve the directory before writing to detect
+  // any symlink tampering that would redirect writes outside the intended
+  // root. This eliminates the TOCTOU window between write and check.
+  const resolvedDir = await realpath(attachmentDir);
+  const attachmentsRoot = await realpath(getConversationAttachmentsRoot()).catch(() =>
+    resolve(getConversationAttachmentsRoot()),
+  );
+  if (!resolvedDir.startsWith(`${attachmentsRoot}/`)) {
+    return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
+  }
+
   const fileName = `${randomUUID()}${extension}`;
-  const path = join(attachmentDir, fileName);
+  const path = join(resolvedDir, fileName);
   const tmpPath = `${path}.tmp`;
   await writeFile(tmpPath, bytes);
   await rename(tmpPath, path);
-
-  // Containment assertion: verify the resolved path is still inside the
-  // conversation's attachment directory (defense-in-depth against any
-  // path-manipulation bugs in the generation logic above).
-  const resolved = await realpath(path);
-  const resolvedDir = await realpath(attachmentDir);
-  if (!resolved.startsWith(`${resolvedDir}/`)) {
-    await rm(path, { force: true }).catch(() => {});
-    return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
-  }
 
   return jsonResponse({ path });
 }
@@ -560,14 +570,22 @@ async function backfillConversationModels(): Promise<void> {
   backfillRunning = true;
   try {
     const convs = listConversations();
+    const candidates = convs.filter((conv) => !conv.model && conv.sessionFile);
+    const BATCH_SIZE = 10;
     let backfilled = 0;
-    for (const conv of convs) {
-      if (conv.model || !conv.sessionFile) continue;
-      const model = await extractModelFromSessionFile(conv.sessionFile);
-      if (model && SAFE_MODEL_PATTERN.test(model)) {
-        updateConversationModel(conv.name, model);
-        backfilled++;
-      }
+    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+      const batch = candidates.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (conv) => {
+          const model = await extractModelFromSessionFile(conv.sessionFile!);
+          if (model && SAFE_MODEL_PATTERN.test(model)) {
+            updateConversationModel(conv.name, model);
+            return true;
+          }
+          return false;
+        }),
+      );
+      backfilled += results.filter(Boolean).length;
     }
     if (backfilled > 0) {
       console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
@@ -780,9 +798,14 @@ const getConversationsRoute = HttpRouter.add(
   'GET',
   '/api/conversations',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     return yield* Effect.promise(async () => {
     try {
-        const conversations = listConversations();
+        const conversations = listConversations({ limit: 500 });
         const favoritedNames = new Set(listFavoritedIds('conversation'));
 
         // Enrich with live tmux status
@@ -815,6 +838,11 @@ const getConversationRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:id',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const id = Number(params['id']);
     return yield* Effect.promise(async () => {
@@ -1173,17 +1201,24 @@ const getConversationMessagesRoute = HttpRouter.add(
                   const candidates = dirs
                     .filter((dir) => SAFE_DIR_PATTERN.test(dir))
                     .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
-                  const checks = await Promise.all(
-                    candidates.map(async (candidate) => {
-                      try {
-                        await stat(candidate);
-                        return candidate;
-                      } catch {
-                        return null;
-                      }
-                    }),
-                  );
-                  const found = checks.find((c): c is string => c !== null);
+                  // Batch stat calls to avoid unbounded Promise.all fanout
+                  // when .claude/projects has many directories.
+                  const STAT_BATCH_SIZE = 50;
+                  let found: string | null = null;
+                  for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
+                    const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+                    const checks = await Promise.all(
+                      batch.map(async (candidate) => {
+                        try {
+                          await stat(candidate);
+                          return candidate;
+                        } catch {
+                          return null;
+                        }
+                      }),
+                    );
+                    found = checks.find((c): c is string => c !== null) ?? null;
+                  }
                   if (found) {
                     sessionFile = found;
                     setSpecialistSessionCache(name, found);

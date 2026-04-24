@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /**
  * Initialize the complete database schema.
@@ -711,6 +711,15 @@ export function runMigrations(db: Database.Database): void {
     } catch (err) {
       console.warn('[schema] Failed to seed deacon.globally_paused:', err);
     }
+  }
+
+  if (currentVersion < 28) {
+    try {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+          ON conversations(status, archived_at, created_at)
+      `);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
