@@ -47,7 +47,7 @@ join(packageRoot, "skills");
 join(packageRoot, "dev-skills");
 join(packageRoot, "agents");
 join(packageRoot, "rules");
-join(packageRoot, ".claude", "prompts");
+join(packageRoot, "src", "lib", "cloister", "prompts", "review");
 join(PANOPTICON_HOME, "agent-definitions");
 join(PANOPTICON_HOME, "review-prompts");
 join(PANOPTICON_HOME, "rules");
