@@ -72,7 +72,7 @@ import {
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
-import { generateSummaryForFork, reserveSummaryForkSession } from '../../../lib/conversations/summary-fork.js';
+import { generateSummaryForFork, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
@@ -109,10 +109,15 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-/** Generate a default conversation name, e.g. 20260404-1234 */
+/** Generate a default conversation name, e.g. 20260404-143052-317.
+ *  Includes time-of-day + 3-digit random so collisions within a day
+ *  require the same second AND the same random suffix. */
 function generateConversationName(): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
+  const iso = new Date().toISOString();
+  const date = iso.slice(0, 10).replace(/-/g, '');
+  const time = iso.slice(11, 19).replace(/:/g, '');
+  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return `${date}-${time}-${rand}`;
 }
 
 /** Sanitize a user-provided name to be safe for tmux session names */
@@ -429,8 +434,12 @@ const postConversationRoute = HttpRouter.add(
           return jsonResponse({ error: 'message is required' }, { status: 400 });
         }
 
-        // Generate identifiers
-        const name = generateConversationName();
+        // Generate identifiers — retry on UNIQUE collision (extremely unlikely
+        // with HHMMSS+random, but cheap insurance against sub-second races).
+        let name = generateConversationName();
+        for (let i = 0; i < 5 && getConversationByName(name); i++) {
+          name = generateConversationName();
+        }
         const tmuxSession = `conv-${name}`;
         const claudeSessionId = randomUUID();
         const sessionFile = sessionFilePath(cwd, claudeSessionId);
@@ -948,11 +957,42 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
 
-async function runForkPipeline(convName: string, parentConv: Conversation, sessionId: string, summaryModel?: string): Promise<void> {
+async function runForkPipeline(
+  convName: string,
+  parentConv: Conversation,
+  sessionId: string,
+  summaryModel?: string,
+  plain = false,
+): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
 
   if (!parentConv.sessionFile) throw new Error(`Parent has no session file`);
+
+  if (plain) {
+    // Plain fork: copy JSONL from last compact boundary into the new session file,
+    // then spawn with --resume so Claude Code loads the history directly.
+    if (!conv.sessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
+    await copySessionFromCompactBoundary(parentConv.sessionFile, conv.sessionFile);
+
+    updateForkStatus(convName, 'spawning');
+    await spawnConversationSession(
+      conv.tmuxSession,
+      conv.cwd,
+      sessionId,
+      conv.model ?? undefined,
+      conv.effort ?? undefined,
+      conv.issueId ?? undefined,
+      true, // resume — load the copied JSONL history
+    );
+    await waitForTmuxSession(conv.tmuxSession);
+
+    // No summary injection needed for plain fork
+    markConversationActive(convName);
+    updateForkStatus(convName, null);
+    return;
+  }
+
   const { summary } = await generateSummaryForFork(parentConv.sessionFile, summaryModel);
 
   updateForkStatus(convName, 'spawning');
@@ -1004,6 +1044,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
           ? body['cwd'].trim()
           : undefined;
+        const plain = body['plain'] === true;
 
         if (typeof body['model'] === 'string' && !model) {
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
@@ -1024,17 +1065,21 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           tmuxSession: newTmux,
           cwd: cwd || conv.cwd || process.cwd(),
           issueId: conv.issueId ?? undefined,
-          title: `Summary Fork: ${conv.title || conv.name}`,
+          title: plain
+            ? `Fork: ${conv.title || conv.name}`
+            : `Summary Fork: ${conv.title || conv.name}`,
           titleSource: 'manual',
-          titleSeed: `Summary Fork of ${conv.name}`,
+          titleSeed: plain
+            ? `Fork of ${conv.name}`
+            : `Summary Fork of ${conv.name}`,
           sessionFile,
           model: launchModel ?? undefined,
           effort: conv.effort ?? undefined,
-          forkStatus: 'summarizing',
+          forkStatus: plain ? 'spawning' : 'summarizing',
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });

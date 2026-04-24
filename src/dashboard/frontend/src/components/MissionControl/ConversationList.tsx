@@ -123,11 +123,11 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; plain?: boolean }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: opts.model, summaryModel: opts.summaryModel }),
+    body: JSON.stringify({ model: opts.model, summaryModel: opts.summaryModel, plain: opts.plain }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -285,9 +285,12 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
 
   const summaryForkMutation = useMutation({
     mutationFn: summaryForkConversation,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      toast.success('Fork started — summarizing conversation...', { duration: 4000 });
+      const msg = variables.plain
+        ? 'Plain fork started — copying conversation history...'
+        : 'Fork started — summarizing conversation...';
+      toast.success(msg, { duration: 4000 });
     },
     onError: (err: Error) => {
       toast.error(err.message, { duration: 8000 });
@@ -606,8 +609,8 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
           conversation={forkTarget}
           isPending={summaryForkMutation.isPending}
           onClose={() => setForkTarget(null)}
-          onConfirm={(conv, launchModel, summaryModel) => {
-            summaryForkMutation.mutate({ conv, model: launchModel, summaryModel });
+          onConfirm={(conv, launchModel, summaryModel, plainFork) => {
+            summaryForkMutation.mutate({ conv, model: launchModel, summaryModel, plain: plainFork });
             setForkTarget(null);
           }}
         />
