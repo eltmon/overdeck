@@ -87,6 +87,10 @@ export function derivePipelinePhase(
   } else if (agent?.status === 'healthy' || agent?.status === 'starting') {
     phase = 'working';
     activeSession = workSession;
+  } else if (agent?.status === 'stopped' && agent?.agentPhase === 'review-response') {
+    // Agent called pan done and is on standby for UAT tweaks / review feedback.
+    phase = 'standby';
+    activeSession = workSession;
   } else {
     phase = 'planning';
     activeSession = null; // planning session only shown if it exists
@@ -103,7 +107,7 @@ export function derivePipelinePhase(
       id: isPlanningAgent ? 'planning' : 'working',
       label: isPlanningAgent ? 'Planning' : 'Work',
       sessionName: workSession,
-      isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback',
+      isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback' || phase === 'standby',
       disabled: deadSessions.has(workSession),
       isRunning: isPlanningAgent ? phase === 'planning' : phase === 'working',
     });

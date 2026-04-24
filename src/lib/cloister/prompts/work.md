@@ -352,6 +352,8 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 
 **`pan done` creates a GitHub PR automatically.** The review and test specialists run against this PR. When both pass, the human clicks MERGE in the dashboard, which rebases the feature branch onto main and merges via `gh pr merge --squash`.
 
+**After `pan done`, you remain on standby.** Your tmux session stays alive and the human can send you UAT tweaks via `pan tell {{ISSUE_ID}} "message"` at any time before merge. You do NOT need to be "resumed" — `pan tell` auto-wakes you. If review fails, feedback is delivered the same way.
+
 **If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Re-run `pan done` ONLY if you made NEW commits after receiving APPROVED feedback.\n\n**If the latest feedback says "CODE APPROVED — YOUR WORK IS COMPLETE": STOP.** Do NOT make further changes. Do NOT run `pan done` again. The pipeline handles testing and merge automatically.\n\n**If you see archived feedback files in `.planning/feedback/archive/`:** Ignore them. They are from previous review cycles. Only read the **non-archived** files in `.planning/feedback/`.
 
 **WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.

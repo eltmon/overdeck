@@ -5,6 +5,7 @@ export type PipelinePhase =
   | 'working'
   | 'reviewing'
   | 'review-feedback'
+  | 'standby'
   | 'testing'
   | 'merging'
   | 'merged';
