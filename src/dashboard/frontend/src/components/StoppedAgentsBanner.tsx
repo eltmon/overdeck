@@ -13,10 +13,12 @@ export function StoppedAgentsBanner() {
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
   /** Phases where an agent is considered actively in the pipeline.
-   *  Stopped agents in these phases + not completed = likely crashed/orphaned. */
+   *  Stopped agents in these phases + not completed = likely crashed/orphaned.
+   *  'review-response' is excluded because agents intentionally enter it on
+   *  pan done (standby for UAT tweaks), not because they crashed. */
   const PIPELINE_PHASES = new Set([
     'planning', 'exploration', 'implementation', 'testing',
-    'documentation', 'review', 'review-response', 'pre_push', 'post_push',
+    'documentation', 'review', 'pre_push', 'post_push',
   ]);
 
   const RECENT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
