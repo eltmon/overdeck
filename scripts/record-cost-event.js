@@ -628,6 +628,8 @@ function initSchema(db) {
       pending_mutation TEXT,
       updated_at       TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_issue_state_sync
+      ON issue_state(updated_at, last_synced_at);
 
     -- ===== Label Sync Audit (PAN-805: every API attempt logged) =====
     CREATE TABLE IF NOT EXISTS label_sync_audit (
@@ -644,7 +646,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_audit_issue_time
       ON label_sync_audit(issue_id, attempted_at);
   `);
-	db.pragma(`user_version = 28`);
+	db.pragma(`user_version = 29`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -652,7 +654,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 28) return;
+	if (currentVersion === 29) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -961,7 +963,10 @@ function runMigrations(db) {
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_issue_time ON label_sync_audit(issue_id, attempted_at)`);
 		} catch {}
 	}
-	db.pragma(`user_version = 28`);
+	if (currentVersion < 29) try {
+		db.exec(`CREATE INDEX IF NOT EXISTS idx_issue_state_sync ON issue_state(updated_at, last_synced_at)`);
+	} catch {}
+	db.pragma(`user_version = 29`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
