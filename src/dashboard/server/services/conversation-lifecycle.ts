@@ -6,34 +6,29 @@
  * This drives the status dot update in the ConversationList UI.
  */
 
-import { listConversations, markConversationEnded } from '../../../lib/database/conversations-db.js';
-import { sessionExistsAsync } from '../../../lib/tmux.js';
+import { listActiveConversations, markConversationEnded } from '../../../lib/database/conversations-db.js';
+import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Exported for testing. Checks whether a named tmux session exists. */
-export async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  return sessionExistsAsync(sessionName);
-}
-
 /**
  * Poll all active conversations and mark as ended any whose tmux session is gone.
- * Exported for testing — pass a custom sessionChecker to avoid real tmux calls.
+ * Uses a single `tmux list-sessions` call instead of N individual `sessionExists`
+ * subprocesses to avoid the N+1 spawn problem.
  */
-export async function pollConversations(
-  sessionChecker: (name: string) => Promise<boolean> = tmuxSessionExists,
-): Promise<void> {
+export async function pollConversations(): Promise<void> {
   try {
-    const conversations = listConversations();
-    const active = conversations.filter(c => c.status === 'active');
+    const conversations = listActiveConversations();
+    if (conversations.length === 0) return;
+
+    const aliveSessions = new Set(await listSessionNamesAsync());
 
     await Promise.all(
-      active.map(async (conv) => {
-        const alive = await sessionChecker(conv.tmuxSession);
-        if (!alive) {
+      conversations.map(async (conv) => {
+        if (!aliveSessions.has(conv.tmuxSession)) {
           console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
           markConversationEnded(conv.name);
           await cleanupUnreferencedConversationAttachments(conv);
@@ -48,7 +43,7 @@ export async function pollConversations(
 
 function scheduleNext(): void {
   pollTimer = setTimeout(async () => {
-    await pollConversations(tmuxSessionExists);
+    await pollConversations();
     scheduleNext();
   }, POLL_INTERVAL_MS);
 }

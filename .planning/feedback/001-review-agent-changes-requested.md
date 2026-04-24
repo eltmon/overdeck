@@ -2,26 +2,23 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-24T09:20:41Z
+timestamp: 2026-04-24T17:26:05Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-PAN-539 implements image paste/drop support in the conversation composer. The core feature is functionally complete with good security foundations (CSRF checks, magic-byte validation, parameterized SQL, path containment). Two security MUST-NOT findings block merge: model strings from JSONL session files reach `updateConversationModel` without `SAFE_MODEL_PATTERN` validation, and `cwd` from the database is not re-validated against home-directory containment before being embedded in the launcher script on resume/switch-model. Seven high-priority issues (model validation order, issueId charset, upload timeout, race condition, unhandled rejection, O(n) project scan, missing spinner) should be fixed before merge. One correctness `!` finding (wrong storage location) was demoted to accepted after the requirements reviewer established the vBRIEF has contradictory ACs and the implementation correctly chose the architecturally superior approach.
+PAN-539 implements image paste/drop in the conversation composer and is functionally complete with strong security posture (CSRF, MIME validation, magic-byte checks, path traversal defense all correct). One blocker must be fixed: the upload lifecycle is not scoped to a conversation, so a rapid conversation switch can silently attach a stale image from the prior conversation to the new one. Seven high-priority issues also require fixes before merge: multipart null-check hardening, upload-response containment assertion, upload error recovery guard, concurrent upload/delete race, missing model validation in summary-fork, unbounded message body, and N+1 subprocess spawns in the 10-second lifecycle poller.
 
 ## Security Issues
 
-- Unsanitized model string written to DB via updateConversationModel
-- cwd from DB not re-validated on resume/switch-model
-- Model string from request body reaches library functions before pattern check
-- issueId has no length or charset validation
+- model field not validated in summary-fork route
+- no length limit on message body field
 
 ## Performance Issues
 
-- O(n_projects) directory scan on every specialist-messages fetch
-- listSessionNamesAsync tmux subprocess on every GET /api/conversations
+- N+1 subprocess spawn in 10-second lifecycle poller
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 

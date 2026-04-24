@@ -1,17 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the conversations-db module
-const mockListConversations = vi.fn();
+const mockListActiveConversations = vi.fn();
 const mockMarkConversationEnded = vi.fn();
 const mockCleanupUnreferencedConversationAttachments = vi.fn();
+const mockListSessionNamesAsync = vi.fn();
 
 vi.mock('../../../../lib/database/conversations-db.js', () => ({
-  listConversations: mockListConversations,
+  listActiveConversations: mockListActiveConversations,
   markConversationEnded: mockMarkConversationEnded,
 }));
 
 vi.mock('../conversation-attachments.js', () => ({
   cleanupUnreferencedConversationAttachments: mockCleanupUnreferencedConversationAttachments,
+}));
+
+vi.mock('../../../../lib/tmux.js', () => ({
+  listSessionNamesAsync: mockListSessionNamesAsync,
 }));
 
 // Mock node:child_process so no real tmux processes are spawned
@@ -23,76 +28,73 @@ describe('ConversationLifecycleService — pollConversations', () => {
     vi.clearAllMocks();
   });
 
-  it('marks active conversations as ended when session checker returns false', async () => {
-    mockListConversations.mockReturnValue([
+  it('marks active conversations as ended when session is not in tmux list', async () => {
+    mockListActiveConversations.mockReturnValue([
       { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active', sessionFile: '/tmp/gone.jsonl' },
     ]);
+    mockListSessionNamesAsync.mockResolvedValue([]); // no sessions alive
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
-    const checker = vi.fn().mockResolvedValue(false); // session is gone
 
-    await pollConversations(checker);
+    await pollConversations();
 
-    expect(checker).toHaveBeenCalledWith('conv-gone-session');
+    expect(mockListSessionNamesAsync).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'gone-session', sessionFile: '/tmp/gone.jsonl' }),
     );
   });
 
-  it('does NOT mark conversations as ended when session checker returns true', async () => {
-    mockListConversations.mockReturnValue([
+  it('does NOT mark conversations as ended when session is in tmux list', async () => {
+    mockListActiveConversations.mockReturnValue([
       { name: 'alive-session', tmuxSession: 'conv-alive-session', status: 'active' },
     ]);
+    mockListSessionNamesAsync.mockResolvedValue(['conv-alive-session']);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
-    const checker = vi.fn().mockResolvedValue(true); // session is alive
 
-    await pollConversations(checker);
+    await pollConversations();
 
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
     expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
   });
 
-  it('skips conversations with status "ended"', async () => {
-    mockListConversations.mockReturnValue([
-      { name: 'old-session', tmuxSession: 'conv-old-session', status: 'ended' },
+  it('uses listActiveConversations so ended sessions are already filtered out', async () => {
+    mockListActiveConversations.mockReturnValue([
+      // listActiveConversations only returns active conversations
+      { name: 'active-session', tmuxSession: 'conv-active-session', status: 'active' },
     ]);
+    mockListSessionNamesAsync.mockResolvedValue(['conv-active-session']);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
-    const checker = vi.fn().mockResolvedValue(false);
 
-    await pollConversations(checker);
+    await pollConversations();
 
-    // checker should not be called — ended sessions are skipped
-    expect(checker).not.toHaveBeenCalled();
+    expect(mockListActiveConversations).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
-    expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
   });
 
   it('handles empty conversation list without errors', async () => {
-    mockListConversations.mockReturnValue([]);
+    mockListActiveConversations.mockReturnValue([]);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
-    const checker = vi.fn();
 
-    await expect(pollConversations(checker)).resolves.toBeUndefined();
-    expect(checker).not.toHaveBeenCalled();
+    await expect(pollConversations()).resolves.toBeUndefined();
+    expect(mockListSessionNamesAsync).not.toHaveBeenCalled();
   });
 
   it('marks only gone sessions when multiple active conversations', async () => {
-    mockListConversations.mockReturnValue([
+    mockListActiveConversations.mockReturnValue([
       { name: 'alive', tmuxSession: 'conv-alive', status: 'active', sessionFile: '/tmp/alive.jsonl' },
       { name: 'gone', tmuxSession: 'conv-gone', status: 'active', sessionFile: '/tmp/gone.jsonl' },
     ]);
+    mockListSessionNamesAsync.mockResolvedValue(['conv-alive']);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
-    const checker = vi.fn().mockImplementation(
-      async (name: string) => name === 'conv-alive',
-    );
 
-    await pollConversations(checker);
+    await pollConversations();
 
+    expect(mockListSessionNamesAsync).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledTimes(1);
@@ -101,8 +103,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     );
   });
 
-  it('does not throw when listConversations errors', async () => {
-    mockListConversations.mockImplementation(() => { throw new Error('DB error'); });
+  it('does not throw when listActiveConversations errors', async () => {
+    mockListActiveConversations.mockImplementation(() => { throw new Error('DB error'); });
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await expect(pollConversations()).resolves.toBeUndefined();

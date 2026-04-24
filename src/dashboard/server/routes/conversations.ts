@@ -15,7 +15,7 @@ import { jsonResponse } from "../http-helpers.js";
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat, realpath } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -83,6 +83,7 @@ import {
 
 const execAsync = promisify(exec);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_MESSAGE_LENGTH = 50_000;
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -354,8 +355,21 @@ export async function handleConversationImageUpload(
   }
 
   const attachmentDir = await ensureConversationAttachmentDir(name);
-  const path = join(attachmentDir, `${randomUUID()}${extension}`);
-  await writeFile(path, bytes);
+  const fileName = `${randomUUID()}${extension}`;
+  const path = join(attachmentDir, fileName);
+  const tmpPath = `${path}.tmp`;
+  await writeFile(tmpPath, bytes);
+  await rename(tmpPath, path);
+
+  // Containment assertion: verify the resolved path is still inside the
+  // conversation's attachment directory (defense-in-depth against any
+  // path-manipulation bugs in the generation logic above).
+  const resolved = await realpath(path);
+  const resolvedDir = await realpath(attachmentDir);
+  if (!resolved.startsWith(`${resolvedDir}/`)) {
+    await rm(path, { force: true }).catch(() => {});
+    return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
+  }
 
   return jsonResponse({ path });
 }
@@ -373,6 +387,12 @@ export async function handleConversationMessage(
   const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
   if (!message) {
     return jsonResponse({ error: 'Message is required' }, { status: 400 });
+  }
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return jsonResponse(
+      { error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
+      { status: 400 },
+    );
   }
 
   if (shouldInterceptManualCompact(message)) {
@@ -771,6 +791,12 @@ const postConversationRoute = HttpRouter.add(
         if (!message) {
           return jsonResponse({ error: 'message is required' }, { status: 400 });
         }
+        if (message.length > MAX_MESSAGE_LENGTH) {
+          return jsonResponse(
+            { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
+            { status: 400 },
+          );
+        }
 
         // Generate identifiers — retry on UNIQUE collision (extremely unlikely
         // with HHMMSS+random, but cheap insurance against sub-second races).
@@ -1145,7 +1171,7 @@ const postConversationUploadImageRoute = HttpRouter.add(
     const filename = Array.isArray(filenameField) ? filenameField[0] : filenameField;
     const mimeType = Array.isArray(mimeTypeField) ? mimeTypeField[0] : mimeTypeField;
 
-    if (!file || !filename || !mimeType) {
+    if (!file || !file.path || !filename || !mimeType) {
       return jsonResponse({ error: 'file, filename, and mimeType are required' }, { status: 400 });
     }
 
@@ -1160,6 +1186,10 @@ const postConversationUploadImageRoute = HttpRouter.add(
         ]);
         return await handleConversationImageUpload(name, filename, bytes, mimeType);
       } catch (error: unknown) {
+        // Guard: if the handler threw what looks like an HTTP response, pass it through
+        if (error instanceof Response) {
+          return error;
+        }
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] upload image failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
@@ -1569,6 +1599,10 @@ const postConversationSummaryForkRoute = HttpRouter.add(
 
         if (typeof body['model'] === 'string' && !model) {
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
+        }
+
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
 
         if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {

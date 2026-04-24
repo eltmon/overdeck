@@ -152,6 +152,12 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const removedImageIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const previousConversationNameRef = useRef(conversation.name);
+  // Updated synchronously on every render so upload callbacks see the current
+  // conversation immediately — not after the useEffect fires. This prevents
+  // a race where an upload that completes during a conversation switch gets
+  // attached to the wrong conversation (PAN-539 blocker).
+  const currentConversationNameRef = useRef(conversation.name);
+  currentConversationNameRef.current = conversation.name;
   const uploadQueueRef = useRef<PendingImage[]>([]);
   const activeUploadsRef = useRef(0);
   const MAX_CONCURRENT_UPLOADS = 3;
@@ -204,10 +210,12 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       void uploadConversationImage(ownerConversationName, image.file)
         .then((serverPath) => {
           activeUploadsRef.current--;
+          // Use the synchronously-updated ref so we detect conversation
+          // switches immediately, not after the useEffect fires.
           if (
             removedImageIdsRef.current.has(image.id)
             || !mountedRef.current
-            || ownerConversationName !== previousConversationNameRef.current
+            || ownerConversationName !== currentConversationNameRef.current
           ) {
             deleteUploadedImage(ownerConversationName, serverPath);
           } else {
