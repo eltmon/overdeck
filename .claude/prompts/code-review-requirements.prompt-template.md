@@ -57,6 +57,16 @@ For each finding, cite the evidence tier:
 
 Always prefer the strongest tier; `!` blockers need at least Tier 1 evidence.
 
+## Scope Boundary — CRITICAL
+
+Only review files that were changed in this PR (listed in **Files changed** in the Review Context above).
+
+- You may read unchanged files for context to understand how changed code interacts with the existing system.
+- **Do NOT flag missing requirements in existing code that this PR does not modify.** If the PR does not change a file, any unmet requirement in that file is out of scope.
+- **Do NOT demand fixes to unrelated code** just because the changed code calls it.
+- Scope creep observations (new features beyond what was asked) should be noted but NOT blocked on.
+- Blocker severity (`!`) is reserved for requirements introduced BY this PR that are unfulfilled.
+
 ## Review Process
 
 ### Step 1: Load the Requirements

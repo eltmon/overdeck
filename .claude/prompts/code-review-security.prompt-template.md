@@ -126,6 +126,16 @@ For each finding, note the evidence tier:
 - **Stored in web root** - Uploaded files directly accessible
 - **No virus scanning** - Malware uploaded
 
+## Scope Boundary — CRITICAL
+
+Only review files that were changed in this PR (listed in **Files changed** in the Review Context above).
+
+- You may read unchanged files for context to understand how changed code interacts with the existing system.
+- **Do NOT flag issues in existing code that this PR does not modify.** If you trace data flow into an unchanged file and find a pre-existing vulnerability, note it as a `?` (MAY) observation — never blocker severity.
+- **Do NOT demand fixes to unrelated code** just because the changed code calls it.
+- If a security pattern is missing in unchanged files that were not part of this PR, do NOT flag it as a blocker.
+- Blocker severity (`!`) is reserved for vulnerabilities introduced BY this PR.
+
 ## Review Process
 
 1. **Identify the attack surface** - Find user input points, external integrations
