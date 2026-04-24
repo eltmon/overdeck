@@ -148,17 +148,23 @@ review-PAN-539-1713458001234").
 
 ## Prompts are primitives
 
-All review prompts live at repo root in `.claude/prompts/` with the
+All review prompts live at `src/lib/cloister/prompts/review/` with the
 `.prompt-template.md` suffix:
 
 ```
-.claude/prompts/
+src/lib/cloister/prompts/review/
 ├── code-review-correctness.prompt-template.md
 ├── code-review-security.prompt-template.md
 ├── code-review-performance.prompt-template.md
 ├── code-review-requirements.prompt-template.md
 └── code-review-synthesis.prompt-template.md
 ```
+
+`pan sync` copies these to `~/.panopticon/review-prompts/`, which is where
+`resolvePromptTemplatePath()` reads them from at review time. They are intentionally
+**not** under `.claude/` — storing them there caused work agents in workspace
+worktrees to read the templates and attempt self-review using Claude Code's built-in
+`code-review-*` subagent types, bypassing the Panopticon review pipeline.
 
 The name carries two facts: **prompt** (this is a first-class prompt primitive given
 to an LLM) and **template** (it contains placeholders filled in at spawn time via a
@@ -186,20 +192,14 @@ with the invocation-specific data:
 This means prompt templates themselves are path-agnostic — they are reusable across
 issues and workspaces without edits.
 
-### Workspace overrides
+### Why not `.claude/prompts/` or `.claude/agents/`?
 
-A project may override any review prompt by placing a file with the same filename
-in its own `.claude/prompts/`. The resolver checks workspace first, then falls back
-to the Panopticon default.
-
-### Why not `.claude/agents/`?
-
-The `.claude/agents/` directory is Claude Code's **sub-agent** convention — files
-there are loadable via the Claude Code `Agent` tool by name. Panopticon's review
-prompts are NOT Claude Code sub-agents; they are prompt sources loaded directly and
-fed to `claude --prompt`. Keeping them under `.claude/agents/` implies semantics we
-don't use. `.claude/prompts/` aligns with Panopticon's existing prompt convention
-(`src/lib/cloister/prompts/work.md`, `planning.md`).
+Both `.claude/` subdirectories are visible inside workspace worktrees (they're
+git-tracked). Work agents running in those worktrees can read the files and use
+them to self-review — which happened in PAN-539 when the work agent spawned
+Claude Code's built-in `code-review-correctness` subagent with the template
+content. Moving them to `src/lib/cloister/prompts/review/` keeps them out of
+the `.claude/` namespace entirely.
 
 ---
 
