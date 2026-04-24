@@ -57,6 +57,7 @@ import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
+import { reviewRunCommand } from './commands/review-run.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -205,6 +206,15 @@ review
   .command('abort <id>')
   .description('Kill all running reviewer sessions and leave the worker idle')
   .action(abortReviewCommand);
+
+review
+  .command('run <id>')
+  .description('Run the full review pipeline (blocking): spawn reviewers → synthesize → post to GitHub. Exit codes: 0=approved, 1=changes, 2=failed.')
+  .option('--cwd <path>', 'Workspace directory (default: cwd)')
+  .option('--pr-url <url>', 'Override PR URL detection')
+  .option('--branch <name>', 'Override branch detection')
+  .option('--files-changed <list>', 'Comma-separated file list (overrides git diff)')
+  .action(reviewRunCommand);
 
 // pan plan finalize <id>
 const planCmd = program
