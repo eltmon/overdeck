@@ -90,6 +90,7 @@ function shellQuote(str: string): string {
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -97,13 +98,22 @@ const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
 const UPLOAD_RATE_LIMIT_MAX = 10;
 const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
 
+function isLoopbackAddress(addr: string): boolean {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
 function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
-  // Prefer X-Forwarded-For when behind a proxy; fall back to direct remoteAddress
-  const forwarded = getHeader(request, 'x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
+  const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
+  // Only trust X-Forwarded-From when the direct connection comes from a
+  // loopback address (i.e. we are behind a local reverse proxy). Otherwise
+  // a client can spoof any IP and bypass rate-limiting.
+  if (isLoopbackAddress(remoteAddress)) {
+    const forwarded = getHeader(request, 'x-forwarded-for');
+    if (forwarded) {
+      return forwarded.split(',')[0].trim();
+    }
   }
-  return Option.getOrElse(request.remoteAddress, () => 'unknown');
+  return remoteAddress;
 }
 
 function checkUploadRateLimit(remoteAddress: string): boolean {
@@ -122,6 +132,7 @@ function checkUploadRateLimit(remoteAddress: string): boolean {
 
 // ─── Messages cache ───────────────────────────────────────────────────────────
 
+const MESSAGES_CACHE_MAX = 100;
 const messagesCache = new Map<string, { mtimeMs: number; size: number; result: Awaited<ReturnType<typeof parseConversationMessages>> }>();
 
 async function getCachedMessages(
@@ -138,6 +149,12 @@ async function getCachedMessages(
     ? await parseFromLastCompactBoundary(sessionFile)
     : await parseConversationMessages(sessionFile, 0);
   messagesCache.set(cacheKey, { mtimeMs: fileStats.mtimeMs, size: fileStats.size, result });
+  if (messagesCache.size > MESSAGES_CACHE_MAX) {
+    const firstKey = messagesCache.keys().next().value;
+    if (firstKey !== undefined) {
+      messagesCache.delete(firstKey);
+    }
+  }
   return result;
 }
 
@@ -526,7 +543,7 @@ ${runtimeCommand} ${sessionArgs}
 echo ""
 echo "Conversation session ended. Close this panel or click Resume to start a new session."
 while true; do sleep 60; done
-`, { mode: 0o755 });
+`, { mode: 0o700 });
 
   // Kill any stale session with the same name
   try {
@@ -970,6 +987,9 @@ const getConversationMessagesRoute = HttpRouter.add(
           const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
           if (specialistMatch) {
             const [, project, type] = specialistMatch;
+            if (!SAFE_PROJECT_NAME_PATTERN.test(project)) {
+              return jsonResponse({ error: 'Invalid conversation name' }, { status: 400 });
+            }
             const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
             const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
             try {
@@ -1231,6 +1251,11 @@ const postConversationUnarchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/unarchive',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {

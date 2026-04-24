@@ -499,6 +499,7 @@ export async function parseConversationMessages(
 }
 
 /** In-memory cache mapping sessionFile path → { mtimeMs, size, summary } */
+const ACTIVITY_SUMMARY_CACHE_MAX = 100;
 const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; summary: ConversationActivitySummary }>();
 
 export async function summarizeConversationActivity(
@@ -547,6 +548,12 @@ export async function summarizeConversationActivity(
 
   const summary: ConversationActivitySummary = { messages, streaming, isWorking, currentTool };
   activitySummaryCache.set(sessionFile, { mtimeMs, size: fileStats.size, summary });
+  if (activitySummaryCache.size > ACTIVITY_SUMMARY_CACHE_MAX) {
+    const firstKey = activitySummaryCache.keys().next().value;
+    if (firstKey !== undefined) {
+      activitySummaryCache.delete(firstKey);
+    }
+  }
   return summary;
 }
 
@@ -557,7 +564,18 @@ export async function summarizeConversationActivity(
  * and the byte offset up to which we've scanned complete lines.
  * Persists across requests so we don't re-scan the entire file each time.
  */
+const COMPACT_OFFSET_CACHE_MAX = 100;
 const compactOffsetCache = new Map<string, { boundaryOffset: number; scannedUpTo: number }>();
+
+function setCompactOffsetCache(sessionFile: string, value: { boundaryOffset: number; scannedUpTo: number }): void {
+  compactOffsetCache.set(sessionFile, value);
+  if (compactOffsetCache.size > COMPACT_OFFSET_CACHE_MAX) {
+    const firstKey = compactOffsetCache.keys().next().value;
+    if (firstKey !== undefined) {
+      compactOffsetCache.delete(firstKey);
+    }
+  }
+}
 
 /**
  * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
@@ -644,7 +662,7 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
       await fh.close();
     }
 
-    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: fileSize });
+    setCompactOffsetCache(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: fileSize });
     return lastBoundaryOffset;
   }
 
@@ -660,7 +678,7 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
       const result = await fh.read(buf, 0, toRead, cached.scannedUpTo);
       bytesRead = result.bytesRead;
     } catch {
-      compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+      setCompactOffsetCache(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
       return cached.boundaryOffset;
     }
 
@@ -678,7 +696,7 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
           const result = await fh.read(fullBuf, 0, remaining, cached.scannedUpTo);
           fullBytesRead = result.bytesRead;
         } catch {
-          compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+          setCompactOffsetCache(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
           return cached.boundaryOffset;
         }
         const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
@@ -687,12 +705,12 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
           buf = fullBuf;
         } else {
           // No newline even at EOF — don't scan partial trailing line
-          compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+          setCompactOffsetCache(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
           return cached.boundaryOffset;
         }
       } else {
         // At EOF with no newline — don't scan partial trailing line
-        compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+        setCompactOffsetCache(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
         return cached.boundaryOffset;
       }
     }
@@ -715,7 +733,7 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
       bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
     }
 
-    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: cached.scannedUpTo + scanBytes });
+    setCompactOffsetCache(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: cached.scannedUpTo + scanBytes });
     return lastBoundaryOffset;
   } finally {
     await fh.close();
