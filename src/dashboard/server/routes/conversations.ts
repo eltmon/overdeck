@@ -548,13 +548,14 @@ const postConversationResumeRoute = HttpRouter.add(
         }
 
         // Respawn: resume the previous Claude Code session using --resume
+        // Resume must never mutate the JSONL — `claude --resume` loads the full raw
+        // transcript. Auto-compaction here would fork the conversation (PAN-802).
         const oldSessionId = sessionIdFromFile(conv.sessionFile);
         const modelChanged = !!model && model !== conv.model;
 
         // Persist the new model so the dropdown reflects what we're respawning with.
         if (model && modelChanged) updateConversationModel(name, model);
 
-        await maybeCompactBeforeRespawn({ sessionFile: conv.sessionFile, cwd: conv.cwd, modelChanged });
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
         await waitForTmuxSession(conv.tmuxSession);
         await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
