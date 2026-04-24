@@ -2202,7 +2202,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Failed to write feedback file for ${issueId}: ${fileResult.error}`
             );
           } else {
-            const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+            const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\n\nRead ${fileResult.relativePath}, then immediately continue implementing all required fixes. Do NOT stop at the prompt — keep working until every blocking issue is resolved and you have invoked /rebase-and-submit.`;
             yield* Effect.promise(() => messageAgent(agentId, msg));
             console.log(
               `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
@@ -2289,7 +2289,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Failed to write test feedback file for ${issueId}: ${fileResult.error}`
             );
           } else {
-            const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+            const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\nRead ${fileResult.relativePath}, then immediately fix the failing tests and re-submit. Do NOT stop at the prompt — keep working until all tests pass and you have invoked /rebase-and-submit.`;
             yield* Effect.promise(() => messageAgent(agentId, msg));
             console.log(
               `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
