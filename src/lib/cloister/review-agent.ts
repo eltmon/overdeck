@@ -12,7 +12,7 @@ import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
-import { getModelId } from '../work-type-router.js';
+import { getModelId, hasOverride } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 
@@ -432,14 +432,23 @@ export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: str
     model = agent.model;
   } else {
     const workType = reviewRoleToWorkType(agent.name);
-    if (workType) {
+    if (workType && hasOverride(workType)) {
+      // Only use role-specific work type when explicitly overridden in config.
+      // Without an override, smart selection can pick unsupported models (e.g. gpt-5.5
+      // when CLIProxy isn't configured for it), causing 502 errors in every reviewer.
       try {
         model = getModelId(workType);
       } catch {
-        model = defaultModel;
+        model = getModelId('specialist-review-agent');
       }
     } else {
-      model = defaultModel;
+      // No role-specific override — fall back to specialist-review-agent which is
+      // always configured and uses a known-good model.
+      try {
+        model = getModelId('specialist-review-agent');
+      } catch {
+        model = defaultModel;
+      }
     }
   }
   // Resolve shorthand aliases (haiku/sonnet/opus) via the work-type router so

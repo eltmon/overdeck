@@ -80,7 +80,7 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
-import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
@@ -3086,6 +3086,63 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/review/:issueId/abort ────────────────────────────────
+//
+// Kill all running reviewer tmux sessions for an issue and reset reviewStatus
+// to 'pending'. Does NOT message the work agent — leaves the worker idle.
+// Use this to stop a runaway or stuck review without triggering a resubmit.
+
+const postWorkspaceAbortReviewRoute = HttpRouter.add(
+  'POST',
+  '/api/review/:issueId/abort',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!issueId) {
+      return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
+    }
+
+    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+    if (!workspaceInfo.exists) {
+      return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
+    }
+
+    // Kill all reviewer tmux sessions for this issue
+    const prefix = `review-${issueId}-`;
+    const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+    const reviewSessions = allSessions.filter(s => s.startsWith(prefix));
+
+    const killed: string[] = [];
+    const failed: string[] = [];
+    for (const session of reviewSessions) {
+      try {
+        yield* Effect.promise(() => killSessionAsync(session));
+        killed.push(session);
+      } catch {
+        failed.push(session);
+      }
+    }
+
+    // Reset only reviewStatus — leave test/merge/verification untouched
+    setReviewStatus(issueId, {
+      reviewStatus: 'pending',
+      reviewNotes: undefined,
+    });
+
+    console.log(
+      `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +
+      (failed.length ? ` (${failed.length} kill failed)` : '')
+    );
+
+    return jsonResponse({
+      success: true,
+      message: `Aborted ${killed.length} reviewer session(s) for ${issueId}. Worker left idle.`,
+      killed,
+      failed,
+    });
+  }))
+);
+
 // ─── Route: POST /api/workspaces/:issueId/unstick ────────────────────────
 //
 // Clears the persistent stuck flag set by markWorkspaceStuck() so Deacon
@@ -4520,6 +4577,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceReviewRoute,
   postWorkspaceRequestReviewRoute,
   postWorkspaceResetReviewRoute,
+  postWorkspaceAbortReviewRoute,
   postWorkspaceUnstickRoute,
   postWorkspaceDeaconIgnoreRoute,
   postWorkspaceSyncMainRoute,

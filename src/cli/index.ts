@@ -56,6 +56,7 @@ import { triageCommand } from './commands/triage.js';
 import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
+import { abortReviewCommand } from './commands/abort-review.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -199,6 +200,11 @@ review
   .description('Reset review/test/merge cycles (human override)')
   .option('--session', 'Also clear saved Claude session')
   .action(resetReviewCommand);
+
+review
+  .command('abort <id>')
+  .description('Kill all running reviewer sessions and leave the worker idle')
+  .action(abortReviewCommand);
 
 // pan plan finalize <id>
 const planCmd = program

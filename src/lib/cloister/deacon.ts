@@ -3105,12 +3105,12 @@ async function cleanupOrphanedReviewSessions(): Promise<string[]> {
 
   for (const reviewSession of reviewSessions) {
     // review-PAN-540-1713456789000-correctness → agent-pan-540
-    const match = reviewSession.match(/^review-([a-z]+-\d+)-\d+/);
+    const match = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
     if (!match) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} skipped — unparseable session name`);
       continue;
     }
-    const workAgentSession = `agent-${match[1]}`;
+    const workAgentSession = `agent-${match[1].toLowerCase()}`;
     if (sessionExists(workAgentSession)) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — work agent ${workAgentSession} exists`);
       continue;
