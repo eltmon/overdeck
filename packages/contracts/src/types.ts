@@ -170,6 +170,10 @@ export const ReviewStatusSnapshot = Schema.Struct({
   deaconIgnored: Schema.optional(Schema.Boolean),
   deaconIgnoredAt: Schema.optional(Schema.String),
   deaconIgnoredReason: Schema.optional(Schema.String),
+  /** Active parallel review tmux session names (e.g. review-PAN-540-1234-correctness). Discovered at emission time. */
+  reviewSessionNames: Schema.optional(Schema.Array(Schema.String)),
+  /** Per-role review completion status (keyed by role: 'correctness' | 'security' | ...) */
+  reviewSubStatuses: Schema.optional(Schema.Record(Schema.String, Schema.Literals(["running", "done"]))),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

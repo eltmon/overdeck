@@ -16,6 +16,7 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
+import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -64,16 +65,23 @@ console.log('[panopticon] AgentEnrichmentService started');
 // This handler converts those into domain events so the frontend Zustand store updates.
 setPipelineHandler((event) => {
   if (event.type === 'status_changed') {
-    try {
-      const es = getEventStore();
-      es.append({
-        type: 'review.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: { issueId: event.issueId, status: event.status },
-      } as any);
-    } catch (err) {
-      console.error('[pipeline] Failed to append status_changed event:', err);
-    }
+    // Enrich async — fire-and-forget so the notifier stays sync.
+    // Session-name discovery needs tmux, which is async; appending the event
+    // is delayed by <1 tick which is fine because reviewSessionNames are only
+    // needed for the TerminalTabs UI, not for DB state transitions.
+    void (async () => {
+      try {
+        const enriched = await enrichReviewStatus(event.issueId, event.status);
+        const es = getEventStore();
+        es.append({
+          type: 'review.status_changed',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, status: enriched },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append status_changed event:', err);
+      }
+    })();
   }
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');
@@ -98,18 +106,21 @@ console.log('[panopticon] Agent stopped notifier → domain events wired');
 // Wire deacon merge-ready reminder → domain events so the frontend re-reads the
 // Awaiting Merge list when deacon fires its 1h staleness reminder.
 setMergeReadyNotifier((issueId) => {
-  try {
-    const status = getReviewStatus(issueId);
-    if (!status) return;
-    const es = getEventStore();
-    es.append({
-      type: 'review.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: { issueId, status },
-    } as any);
-  } catch (err) {
-    console.error('[pipeline] Failed to append merge-ready event:', err);
-  }
+  const status = getReviewStatus(issueId);
+  if (!status) return;
+  void (async () => {
+    try {
+      const enriched = await enrichReviewStatus(issueId, status);
+      const es = getEventStore();
+      es.append({
+        type: 'review.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: { issueId, status: enriched },
+      } as any);
+    } catch (err) {
+      console.error('[pipeline] Failed to append merge-ready event:', err);
+    }
+  })();
 });
 console.log('[panopticon] Merge-ready notifier → domain events wired');
 

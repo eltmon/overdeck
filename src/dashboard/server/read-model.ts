@@ -79,7 +79,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason'> & { reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'> }): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -103,6 +103,8 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     deaconIgnored: status.deaconIgnored === true ? true : undefined,
     deaconIgnoredAt: status.deaconIgnoredAt || undefined,
     deaconIgnoredReason: status.deaconIgnoredReason || undefined,
+    reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
+    reviewSubStatuses: status.reviewSubStatuses,
   };
 }
 
@@ -159,14 +161,24 @@ export const ReadModelServiceLive = Layer.effect(
         const { loadReviewStatuses: loadStatuses } = yield* Effect.promise(
           () => import('../../lib/review-status.js'),
         );
+        const { enrichReviewStatusFromSessions } = yield* Effect.promise(
+          () => import('../../lib/review-status-enrichment.js'),
+        );
+        const { listSessionNamesAsync } = yield* Effect.promise(
+          () => import('../../lib/tmux.js'),
+        );
         const statusMap = loadStatuses();
+        // One tmux call for all issues — O(1) tmux cost per snapshot build.
+        const allSessions = yield* Effect.promise(() => listSessionNamesAsync()).pipe(
+          Effect.catchAll(() => Effect.succeed([] as string[])),
+        );
         state = {
           ...state,
           reviewStatusByIssueId: Object.fromEntries(
-            Object.values(statusMap).map((status) => [
-              status.issueId,
-              toReviewStatusSnapshot(status),
-            ]),
+            Object.values(statusMap).map((status) => {
+              const enriched = enrichReviewStatusFromSessions(status.issueId, status, allSessions);
+              return [status.issueId, toReviewStatusSnapshot(enriched)];
+            }),
           ),
         };
       } catch (err) {

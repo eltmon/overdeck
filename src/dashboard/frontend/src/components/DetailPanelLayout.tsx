@@ -10,6 +10,7 @@ import { MergedSummaryCard } from './inspector/MergedSummaryCard';
 import { usePipelinePhase } from './inspector/usePipelinePhase';
 import { Agent, Issue } from '../types';
 import type { ReviewStatus, WorkspaceInfo } from './inspector/types';
+import { useDashboardStore, selectReviewStatus } from '../lib/store';
 
 type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 
@@ -58,16 +59,10 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
-  // Fetch review status from the canonical review-status route — passed as prop to InspectorPanel to avoid duplicate queries
-  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
-    queryKey: ['review-status', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/review/${issueId}/status`);
-      if (!res.ok) throw new Error('Failed to fetch review status');
-      return res.json();
-    },
-    refetchInterval: 15000,
-  });
+  // Read review status from the Zustand store — populated by Effect RPC domain
+  // events (review.status_changed). Single source of truth, no polling.
+  const reviewStatus = useDashboardStore(selectReviewStatus(issueId)) as ReviewStatus | undefined;
+  const reviewStatusLoading = false;
 
   const { data: costData } = useQuery<{ totalCost?: number }>({
     queryKey: ['issueCosts', issueId],
