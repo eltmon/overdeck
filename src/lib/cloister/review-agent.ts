@@ -13,7 +13,7 @@ import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
-import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
+import { CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 
 const execAsync = promisify(exec);
@@ -588,24 +588,36 @@ export function selectCompletedReviewers(
 }
 
 /**
- * Resolve the template path for a reviewer subagent.
- * Workspace agents/ directory takes precedence over the global cache so that
- * branch changes to agent definitions are picked up immediately.
+ * Resolve the prompt template path for a review agent.
+ *
+ * Reviewer/synthesis prompts are primitives — they live at
+ * `.claude/prompts/<promptName>.prompt-template.md` in the Panopticon repo,
+ * synced to `CACHE_REVIEW_PROMPTS_DIR` (~/.panopticon/review-prompts/).
+ *
+ * Falls back to the legacy location (`CACHE_AGENTS_DIR` with `.md` suffix) for
+ * backward compatibility with pre-refactor installs. See
+ * docs/REVIEW-AGENT-ARCHITECTURE.md for the naming convention.
+ *
+ * Review prompts run from the main Panopticon codebase, so they must use
+ * templates from the main cache — never from a workspace's agents/ directory.
  */
-/** Resolve infrastructure reviewer template path (main cache only).
- *  Infrastructure reviewers run from the main Panopticon codebase, so they must
- *  use templates from the main cache — never from a workspace's agents/ directory.
- */
-export function resolveTemplatePath(subagentName: string, _projectPath: string): string {
-  return join(CACHE_AGENTS_DIR, `${subagentName}.md`);
+export function resolvePromptTemplatePath(promptName: string, _projectPath: string): string {
+  const newPath = join(CACHE_REVIEW_PROMPTS_DIR, `${promptName}.prompt-template.md`);
+  if (existsSync(newPath)) return newPath;
+  // Legacy fallback: `<name>.md` under CACHE_AGENTS_DIR (pre-refactor layout)
+  return join(CACHE_AGENTS_DIR, `${promptName}.md`);
 }
+
+/** @deprecated Use resolvePromptTemplatePath. Kept for backward compatibility. */
+export const resolveTemplatePath = resolvePromptTemplatePath;
 
 type RunParallelReviewDeps = {
   spawnFn?: (session: string, model: string, promptFile: string, cwd: string) => Promise<void>;
   waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
   parseSynthesisFn?: typeof parseReviewSynthesis;
   postReviewFn?: typeof postGitHubPRReview;
-  resolveTemplateFn?: (subagentName: string, _projectPath: string) => string;
+  /** Injectable prompt-template resolver (see resolvePromptTemplatePath). */
+  resolvePromptTemplateFn?: (promptName: string, _projectPath: string) => string;
 };
 
 /**
@@ -626,7 +638,7 @@ export async function runParallelReview(
     waitFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs),
     parseSynthesisFn = parseReviewSynthesis,
     postReviewFn = postGitHubPRReview,
-    resolveTemplateFn = resolveTemplatePath,
+    resolvePromptTemplateFn = resolvePromptTemplatePath,
   }: RunParallelReviewDeps = {},
 ): Promise<{ result: ReviewResult; reviewId: string }> {
   // Clean up any stale review sessions for this issue before starting a new review run.
@@ -663,16 +675,16 @@ export async function runParallelReview(
     };
   }
 
-  // Guard: validate all reviewer templates exist before spawning any sessions
+  // Guard: validate all reviewer prompt templates exist before spawning any sessions
   for (const agent of agents) {
-    const subagentName = `code-review-${agent.name}`;
-    const templatePath = resolveTemplateFn(subagentName, context.projectPath);
-    if (!existsSync(templatePath)) {
+    const promptName = `code-review-${agent.name}`;
+    const promptTemplatePath = resolvePromptTemplateFn(promptName, context.projectPath);
+    if (!existsSync(promptTemplatePath)) {
       return {
         result: {
           success: false,
           reviewResult: 'COMMENTED',
-          notes: `Review aborted: no template found for reviewer '${agent.name}'. Built-in names: correctness, security, performance, requirements.`,
+          notes: `Review aborted: no prompt template found for reviewer '${agent.name}'. Built-in names: correctness, security, performance, requirements. See docs/REVIEW-AGENT-ARCHITECTURE.md.`,
           output: `Review ${reviewId}`,
         },
         reviewId,
@@ -700,9 +712,9 @@ export async function runParallelReview(
   const reviewerSessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
 
   await Promise.all(agents.map(async agent => {
-    const subagentName = `code-review-${agent.name}`;
-    const templatePath = resolveTemplateFn(subagentName, context.projectPath);
-    const template = await parseReviewerTemplate(templatePath);
+    const promptName = `code-review-${agent.name}`;
+    const promptTemplatePath = resolvePromptTemplateFn(promptName, context.projectPath);
+    const template = await parseReviewerTemplate(promptTemplatePath);
     const model = resolveReviewerModel(agent, template.model);
     const outputFile = join(outputDir, `${agent.name}.md`);
     const sessionName = `${reviewId}-${agent.name}`;
@@ -743,7 +755,7 @@ export async function runParallelReview(
     };
   }
 
-  const synthTemplatePath = resolveTemplateFn('code-review-synthesis', context.projectPath);
+  const synthTemplatePath = resolvePromptTemplateFn('code-review-synthesis', context.projectPath);
   const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
   const synthOutputFile = join(outputDir, 'synthesis.md');
