@@ -92,6 +92,7 @@ function shellQuote(str: string): string {
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -451,23 +452,32 @@ async function extractModelFromSessionFile(sessionFile: string): Promise<string 
   return null;
 }
 
+let backfillRunning = false;
+
 /**
  * Backfill model column for existing conversations that have a session file
  * but no model stored. Runs once on server startup (async, non-blocking).
+ * Guarded against concurrent runs to prevent races.
  */
 async function backfillConversationModels(): Promise<void> {
-  const convs = listConversations();
-  let backfilled = 0;
-  for (const conv of convs) {
-    if (conv.model || !conv.sessionFile) continue;
-    const model = await extractModelFromSessionFile(conv.sessionFile);
-    if (model) {
-      updateConversationModel(conv.name, model);
-      backfilled++;
+  if (backfillRunning) return;
+  backfillRunning = true;
+  try {
+    const convs = listConversations();
+    let backfilled = 0;
+    for (const conv of convs) {
+      if (conv.model || !conv.sessionFile) continue;
+      const model = await extractModelFromSessionFile(conv.sessionFile);
+      if (model && SAFE_MODEL_PATTERN.test(model)) {
+        updateConversationModel(conv.name, model);
+        backfilled++;
+      }
     }
-  }
-  if (backfilled > 0) {
-    console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
+    if (backfilled > 0) {
+      console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
+    }
+  } finally {
+    backfillRunning = false;
   }
 }
 
@@ -753,6 +763,9 @@ const postConversationRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
+        if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
+          return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
+        }
         const cwd = join(homedir(), 'Projects');
 
         if (!message) {
@@ -899,6 +912,15 @@ const postConversationResumeRoute = HttpRouter.add(
         const oldSessionId = sessionIdFromFile(conv.sessionFile);
         const modelChanged = !!model && model !== conv.model;
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && modelChanged && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
         // Persist the new model so the dropdown reflects what we're respawning with.
         if (model && modelChanged) updateConversationModel(name, model);
 
@@ -948,6 +970,15 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         // Always kill the existing session first (if alive) so the model change takes effect
         await killSessionAsync(conv.tmuxSession).catch(() => {});
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
         // Persist the new model
         if (model) updateConversationModel(name, model);
 
@@ -976,6 +1007,20 @@ const postConversationSwitchModelRoute = HttpRouter.add(
   }),
 );
 
+// Cache specialist session file lookups to avoid O(n) directory scans.
+const specialistSessionFileCache = new Map<string, string>();
+const SPECIALIST_SESSION_CACHE_MAX = 50;
+
+function setSpecialistSessionCache(name: string, sessionFile: string): void {
+  specialistSessionFileCache.set(name, sessionFile);
+  if (specialistSessionFileCache.size > SPECIALIST_SESSION_CACHE_MAX) {
+    const firstKey = specialistSessionFileCache.keys().next().value;
+    if (firstKey !== undefined) {
+      specialistSessionFileCache.delete(firstKey);
+    }
+  }
+}
+
 // ─── Route: GET /api/conversations/:name/messages ────────────────────────────
 
 const getConversationMessagesRoute = HttpRouter.add(
@@ -992,29 +1037,35 @@ const getConversationMessagesRoute = HttpRouter.add(
         // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
         let sessionFile: string | null | undefined = conv?.sessionFile;
         if (!conv) {
-          const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
-          if (specialistMatch) {
-            const [, project, type] = specialistMatch;
-            if (!SAFE_PROJECT_NAME_PATTERN.test(project)) {
-              return jsonResponse({ error: 'Invalid conversation name' }, { status: 400 });
-            }
-            const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
-            const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
-            try {
-              const { readFile, readdir } = await import('node:fs/promises');
-              const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
-              if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
-                const claudeProjects = join(homedir(), '.claude', 'projects');
-                const dirs = await readdir(claudeProjects);
-                for (const dir of dirs) {
-                  const candidate = join(claudeProjects, dir, `${sessionId}.jsonl`);
-                  if (existsSync(candidate)) {
-                    sessionFile = candidate;
-                    break;
+          const cached = specialistSessionFileCache.get(name);
+          if (cached) {
+            sessionFile = cached;
+          } else {
+            const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+            if (specialistMatch) {
+              const [, project, type] = specialistMatch;
+              if (!SAFE_PROJECT_NAME_PATTERN.test(project)) {
+                return jsonResponse({ error: 'Invalid conversation name' }, { status: 400 });
+              }
+              const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
+              const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
+              try {
+                const { readFile, readdir } = await import('node:fs/promises');
+                const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
+                if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
+                  const claudeProjects = join(homedir(), '.claude', 'projects');
+                  const dirs = await readdir(claudeProjects);
+                  for (const dir of dirs) {
+                    const candidate = join(claudeProjects, dir, `${sessionId}.jsonl`);
+                    if (existsSync(candidate)) {
+                      sessionFile = candidate;
+                      setSpecialistSessionCache(name, candidate);
+                      break;
+                    }
                   }
                 }
-              }
-            } catch { /* session file not found */ }
+              } catch { /* session file not found */ }
+            }
           }
           if (!sessionFile) {
             return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
@@ -1096,7 +1147,13 @@ const postConversationUploadImageRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        const bytes = await readFile(file.path);
+        const UPLOAD_READ_TIMEOUT_MS = 10_000;
+        const bytes = await Promise.race([
+          readFile(file.path),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Upload read timeout')), UPLOAD_READ_TIMEOUT_MS),
+          ),
+        ]);
         return await handleConversationImageUpload(name, filename, bytes, mimeType);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
