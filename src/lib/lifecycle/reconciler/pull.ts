@@ -13,30 +13,35 @@ import type { CanonicalState, ReconcilerConfig } from './types.js';
 
 /**
  * Map GitHub labels + state to reconciler canonical_state.
+ * Uses Set-based lookups for O(1) matching instead of repeated .some() scans.
  */
 function remoteToCanonical(
   state: string,
   labels: string[],
 ): CanonicalState {
   const stateLower = state.toLowerCase();
-  const labelNames = labels.map((l) => l.toLowerCase());
+  const labelSet = new Set(labels.map((l) => l.toLowerCase()));
 
   if (stateLower === 'closed') {
-    if (labelNames.some((l) => l === 'wontfix' || l === "won't do" || l === 'duplicate')) {
+    if (labelSet.has('wontfix') || labelSet.has("won't do") || labelSet.has('duplicate')) {
       return 'closed_wontfix';
     }
     // Closed without cancel label → treat as merged (post-merge closure)
     return 'merged';
   }
 
-  if (labelNames.some((l) => l === 'merged' || l === 'needs-close-out')) {
+  if (labelSet.has('merged') || labelSet.has('needs-close-out')) {
     return 'merged';
   }
-  if (labelNames.some((l) => l.includes('in review') || l.includes('in-review') || l.includes('review'))) {
-    return 'in_review';
+  for (const label of labelSet) {
+    if (label.includes('in review') || label.includes('in-review') || label.includes('review')) {
+      return 'in_review';
+    }
   }
-  if (labelNames.some((l) => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) {
-    return 'in_progress';
+  for (const label of labelSet) {
+    if (label.includes('in progress') || label.includes('in-progress') || label.includes('wip')) {
+      return 'in_progress';
+    }
   }
 
   return 'todo';
@@ -45,7 +50,7 @@ function remoteToCanonical(
 /**
  * Resolve the issue prefix for the configured repo.
  */
-function resolvePrefix(config: ReconcilerConfig): string | null {
+export function resolvePrefix(config: ReconcilerConfig): string | null {
   const repos = parseGitHubRepos();
   const [owner, repo] = config.repo.split('/');
   const match = repos.find((r) => r.owner === owner && r.repo === repo);
@@ -55,9 +60,10 @@ function resolvePrefix(config: ReconcilerConfig): string | null {
 export async function runPullStep(
   config: ReconcilerConfig,
   gh: GitHubClient,
+  cachedPrefix?: string | null,
 ): Promise<void> {
   const db = getDatabase();
-  const prefix = resolvePrefix(config);
+  const prefix = cachedPrefix ?? resolvePrefix(config);
   if (!prefix) {
     console.warn(`[reconciler:pull] Could not resolve prefix for repo ${config.repo}`);
     return;
@@ -78,54 +84,61 @@ export async function runPullStep(
 
     if (fetched.length === 0) break;
 
-    for (const issue of fetched) {
-    const issueId = `${prefix}-${issue.number}`;
-    const remoteCanonical = remoteToCanonical(
-      issue.state,
-      issue.labels.map((l) => l.name),
-    );
-
-    const localRow = db
+    // Batch-query local state for all issues on this page to avoid N+1 queries
+    const issueIds = fetched.map((issue) => `${prefix}-${issue.number}`);
+    const placeholders = issueIds.map(() => '?').join(',');
+    const localRows = db
       .prepare(
-        `SELECT canonical_state, pending_mutation FROM issue_state WHERE issue_id = ?`
+        `SELECT issue_id, canonical_state, pending_mutation FROM issue_state WHERE issue_id IN (${placeholders})`
       )
-      .get(issueId) as
-      | { canonical_state: CanonicalState; pending_mutation: string | null }
-      | undefined;
+      .all(...issueIds) as Array<{
+        issue_id: string;
+        canonical_state: CanonicalState;
+        pending_mutation: string | null;
+      }>;
+    const localMap = new Map(localRows.map((r) => [r.issue_id, r]));
 
-    if (!localRow) {
-      // Issue not tracked locally — skip (backfill handles cold-start seeding)
-      continue;
-    }
-
-    if (localRow.canonical_state === remoteCanonical) {
-      continue;
-    }
-
-    if (localRow.pending_mutation) {
-      console.warn(
-        `[reconciler:pull] Remote ahead for ${issueId} (remote=${remoteCanonical}, local=${localRow.canonical_state}), but pending_mutation=${localRow.pending_mutation}. Local intent wins.`
+    for (const issue of fetched) {
+      const issueId = `${prefix}-${issue.number}`;
+      const remoteCanonical = remoteToCanonical(
+        issue.state,
+        issue.labels.map((l) => l.name),
       );
-      continue;
+
+      const localRow = localMap.get(issueId);
+      if (!localRow) {
+        // Issue not tracked locally — skip (backfill handles cold-start seeding)
+        continue;
+      }
+
+      if (localRow.canonical_state === remoteCanonical) {
+        continue;
+      }
+
+      if (localRow.pending_mutation) {
+        console.warn(
+          `[reconciler:pull] Remote ahead for ${issueId} (remote=${remoteCanonical}, local=${localRow.canonical_state}), but pending_mutation=${localRow.pending_mutation}. Local intent wins.`
+        );
+        continue;
+      }
+
+      // Remote wins — update local canonical_state and advance sync timestamp
+      db.prepare(
+        `UPDATE issue_state SET canonical_state = ?, updated_at = ?, last_synced_at = ? WHERE issue_id = ?`
+      ).run(remoteCanonical, now, now, issueId);
+
+      recordAudit({
+        issueId,
+        targetLabel: '',
+        action: 'add',
+        outcome: 'skipped',
+        reason: 'remote_ahead_pulled',
+        retryCount: 0,
+      });
+
+      console.log(
+        `[reconciler:pull] Updated ${issueId} canonical_state ${localRow.canonical_state} → ${remoteCanonical} (remote ahead)`
+      );
     }
-
-    // Remote wins — update local canonical_state and advance sync timestamp
-    db.prepare(
-      `UPDATE issue_state SET canonical_state = ?, updated_at = ?, last_synced_at = ? WHERE issue_id = ?`
-    ).run(remoteCanonical, now, now, issueId);
-
-    recordAudit({
-      issueId,
-      targetLabel: '',
-      action: 'add',
-      outcome: 'skipped',
-      reason: 'remote_ahead_pulled',
-      retryCount: 0,
-    });
-
-    console.log(
-      `[reconciler:pull] Updated ${issueId} canonical_state ${localRow.canonical_state} → ${remoteCanonical} (remote ahead)`
-    );
   }
-}
 }

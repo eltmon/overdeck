@@ -21,9 +21,10 @@ function resolvePrefix(config: ReconcilerConfig): string | null {
 export async function runExternalMergeSweep(
   config: ReconcilerConfig,
   gh: GitHubClient,
+  cachedPrefix?: string | null,
 ): Promise<void> {
   const db = getDatabase();
-  const prefix = resolvePrefix(config);
+  const prefix = cachedPrefix ?? resolvePrefix(config);
   if (!prefix) {
     console.warn(
       `[reconciler:external-merge-sweep] Could not resolve prefix for repo ${config.repo}`

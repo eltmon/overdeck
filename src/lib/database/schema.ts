@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 /**
  * Initialize the complete database schema.
@@ -319,6 +319,8 @@ export function initSchema(db: Database.Database): void {
       pending_mutation TEXT,
       updated_at       TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_issue_state_sync
+      ON issue_state(updated_at, last_synced_at);
 
     -- ===== Label Sync Audit (PAN-805: every API attempt logged) =====
     CREATE TABLE IF NOT EXISTS label_sync_audit (
@@ -765,6 +767,13 @@ export function runMigrations(db: Database.Database): void {
     } catch { /* already exists */ }
     try {
       db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_issue_time ON label_sync_audit(issue_id, attempted_at)`);
+    } catch { /* already exists */ }
+  }
+
+  // v28 → v29: add index on issue_state(updated_at, last_synced_at) for push step query (PAN-805).
+  if (currentVersion < 29) {
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_issue_state_sync ON issue_state(updated_at, last_synced_at)`);
     } catch { /* already exists */ }
   }
 

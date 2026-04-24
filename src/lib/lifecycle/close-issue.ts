@@ -12,7 +12,7 @@
  *   4. Add completion comment
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
@@ -20,7 +20,7 @@ import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix } from '../issue-id.js';
 import { setCanonicalState } from './reconciler/index.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const CLOSED_OUT_LABEL = 'closed-out';
 const CLOSED_OUT_COLOR = '1d4ed8';
@@ -143,11 +143,11 @@ async function closeGitHubDirect(ctx: LifecycleContext, comment?: string): Promi
   }
   const { owner, repo, number } = ctx.github;
   try {
-    const commentArg = comment ? ` --comment "${comment.replace(/"/g, '\\"')}"` : '';
-    await execAsync(
-      `gh issue close ${number} --repo ${owner}/${repo}${commentArg}`,
-      { encoding: 'utf-8' },
-    );
+    const args = ['issue', 'close', String(number), '--repo', `${owner}/${repo}`];
+    if (comment) {
+      args.push('--comment', comment);
+    }
+    await execFileAsync('gh', args, { encoding: 'utf-8' });
     return stepOk(step, [`Closed GitHub issue #${number} on ${owner}/${repo}`]);
   } catch (err) {
     return stepFailed(step, `gh issue close failed: ${(err as Error).message}`);
@@ -167,16 +167,18 @@ async function closeGitHubPr(ctx: LifecycleContext): Promise<StepResult> {
   const branchName = `feature/${issueLower}`;
 
   try {
-    const { stdout: prListRaw } = await execAsync(
-      `gh pr list --repo ${owner}/${repo} --head "${branchName}" --state open --json number --jq '.[0].number'`,
+    const { stdout: prListRaw } = await execFileAsync(
+      'gh',
+      ['pr', 'list', '--repo', `${owner}/${repo}`, '--head', branchName, '--state', 'open', '--json', 'number', '--jq', '.[0].number'],
       { encoding: 'utf-8' },
     );
     const prNumber = prListRaw.trim();
     if (!prNumber) {
       return stepSkipped(step, ['No open PR found for branch']);
     }
-    await execAsync(
-      `gh pr close ${prNumber} --repo ${owner}/${repo} --comment "Merged via Panopticon lifecycle"`,
+    await execFileAsync(
+      'gh',
+      ['pr', 'close', prNumber, '--repo', `${owner}/${repo}`, '--comment', 'Merged via Panopticon lifecycle'],
       { encoding: 'utf-8' },
     );
     return stepOk(step, [`Closed PR #${prNumber} on ${owner}/${repo}`]);
@@ -331,13 +333,15 @@ async function applyLabelGitHub(ctx: LifecycleContext): Promise<StepResult> {
     setCanonicalState(ctx.issueId, 'merged');
 
     // Ensure label exists
-    await execAsync(
-      `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
+    await execFileAsync(
+      'gh',
+      ['label', 'create', CLOSED_OUT_LABEL, '--repo', `${owner}/${repo}`, '--color', CLOSED_OUT_COLOR, '--description', 'Verified and closed out', '--force'],
       { encoding: 'utf-8' },
-    );
+    ).catch(() => { /* label may already exist — non-fatal */ });
     // Add label (closed-out is a human-driven marker, not a workflow label) — PAN-805-exempt
-    await execAsync(
-      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}"`, // PAN-805-exempt: human-driven marker
+    await execFileAsync(
+      'gh',
+      ['issue', 'edit', String(number), '--repo', `${owner}/${repo}`, '--add-label', CLOSED_OUT_LABEL],
       { encoding: 'utf-8' },
     );
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on GitHub`]);

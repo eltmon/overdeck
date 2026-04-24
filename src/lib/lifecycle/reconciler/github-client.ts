@@ -69,7 +69,11 @@ async function fetchWithRetry(
         // HTTP-date form (e.g., "Wed, 21 Oct 2015 07:28:00 GMT")
         const dateMs = new Date(retryAfter).getTime();
         if (!isNaN(dateMs)) {
-          backoffMs = Math.min(Math.max(0, dateMs - Date.now()), MAX_BACKOFF_MS);
+          const delta = dateMs - Date.now();
+          const exponential = Math.min(INITIAL_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+          // If the HTTP-date is in the past or very near, fall back to exponential backoff
+          // to avoid a rapid retry storm.
+          backoffMs = delta > 1000 ? Math.min(delta, MAX_BACKOFF_MS) : exponential;
         } else {
           backoffMs = Math.min(INITIAL_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
         }
@@ -98,7 +102,12 @@ function makeAuthHeaders(token: string): Record<string, string> {
   };
 }
 
+const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
 export function createGitHubClient(config: ReconcilerConfig): GitHubClient {
+  if (!REPO_RE.test(config.repo)) {
+    throw new Error(`[github-client] Invalid repo format: ${config.repo}. Expected owner/repo.`);
+  }
   const [owner, repo] = config.repo.split('/');
   const base = `https://api.github.com/repos/${owner}/${repo}`;
   const headers = makeAuthHeaders(config.githubToken);

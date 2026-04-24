@@ -145,11 +145,11 @@ export function getGitHubConfig(): GitHubConfig | null {
   // 2. Check cached ~/.panopticon.env (also get repos from here)
   if (cachedEnvContent) {
     if (!token) {
-      const tokenMatch = cachedEnvContent.match(/GITHUB_TOKEN=(.+)/);
-      if (tokenMatch) token = tokenMatch[1].trim();
+      const tokenMatch = cachedEnvContent.match(/GITHUB_TOKEN=([^\s#]+)/);
+      if (tokenMatch) token = tokenMatch[1];
     }
 
-    const reposMatch = cachedEnvContent.match(/GITHUB_REPOS=(.+)/);
+    const reposMatch = cachedEnvContent.match(/GITHUB_REPOS=([^\s#]+)/);
     if (reposMatch) {
       repos = reposMatch[1].trim().split(',').map(r => {
         const [repoPath, prefix] = r.trim().split(':');

@@ -70,12 +70,12 @@ function getGitHubConfig(): { token: string; repos: { owner: string; repo: strin
   const envFile = join(homedir(), '.panopticon.env');
   if (!existsSync(envFile)) return null;
   const content = readFileSync(envFile, 'utf-8');
-  const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
+  const tokenMatch = content.match(/GITHUB_TOKEN=([^\s#]+)/);
   if (!tokenMatch) return null;
-  const token = tokenMatch[1].trim();
-  const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
+  const token = tokenMatch[1];
+  const reposMatch = content.match(/GITHUB_REPOS=([^\s#]+)/);
   if (!reposMatch) return null;
-  const repos = reposMatch[1].trim().split(',').map(r => {
+  const repos = reposMatch[1].split(',').map(r => {
     const [repoPath, prefix] = r.trim().split(':');
     const [owner, repo] = repoPath.split('/');
     return { owner, repo, prefix };

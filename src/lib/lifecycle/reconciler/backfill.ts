@@ -68,17 +68,19 @@ export function backfillIssueState(): void {
     ...agentIds,
   ]);
 
+  // Batch existence check to avoid N+1 queries
+  const normalizedIds = Array.from(allIssueIds).map((id) => id.toUpperCase());
+  const placeholders = normalizedIds.map(() => '?').join(',');
+  const existingRows = db
+    .prepare(`SELECT issue_id FROM issue_state WHERE issue_id IN (${placeholders})`)
+    .all(...normalizedIds) as Array<{ issue_id: string }>;
+  const existingSet = new Set(existingRows.map((r) => r.issue_id));
+
   let inserted = 0;
   let skipped = 0;
 
-  for (const issueId of allIssueIds) {
-    const normalizedId = issueId.toUpperCase();
-
-    // Skip if already tracked
-    const exists = db
-      .prepare('SELECT 1 FROM issue_state WHERE issue_id = ?')
-      .get(normalizedId);
-    if (exists) {
+  for (const normalizedId of normalizedIds) {
+    if (existingSet.has(normalizedId)) {
       skipped++;
       continue;
     }
