@@ -327,18 +327,50 @@ Synthesis does NOT add new findings — it synthesizes, not reviews.
 
 ---
 
+## Dispatch mechanics: the coordinator session
+
+When Panopticon's server (or any trigger) calls `dispatchParallelReview()`, it
+does NOT run `runParallelReview` in-process. Instead it spawns a **detached
+tmux session** named:
+
+```
+review-coordinator-<issueId>-<unixMillis>
+```
+
+…running `pan review run <issueId>` in bash. This session is owned by the tmux
+server (not the Node server that spawned it), so it survives dashboard / server
+restarts. When `pan review run` exits, the shell exits, and tmux destroys the
+session automatically.
+
+Inside the coordinator session, `pan review run` spawns per-reviewer tmux
+sessions named:
+
+```
+review-<issueId>-<unixMillis>-<role>
+review-<issueId>-<unixMillis>-synthesis
+```
+
+All three session patterns (`review-coordinator-*`, per-reviewer, synthesis)
+are owned by the tmux server and survive independently of the dashboard.
+
 ## Abort semantics
 
-`pan review abort <issueId>` kills all review tmux sessions matching
-`review-<issueId>-*`. That's it — no state manipulation, no dashboard poke.
+`pan review abort <issueId>` (routed through
+`POST /api/review/:issueId/abort`) kills all tmux sessions matching EITHER:
 
-Because the work agent is blocking on `pan review run`, which itself is blocking on
-`tmux wait-for` channels, killing the sessions closes those channels. `pan review
-run` exits non-zero, and the work agent receives it like any other tool failure —
-it can decide to retry, escalate, or move on.
+- `review-coordinator-<issueId>-*` (the orchestrator)
+- `review-<issueId>-*` (per-reviewer + synthesis)
 
-No "orphaned orchestration" is possible: orchestration lives only inside that
-blocking CLI invocation. No promises survive after its exit.
+That's it — no state manipulation beyond resetting `reviewStatus` to `pending`.
+
+Because `pan review run` inside the coordinator is blocking on `tmux wait-for`
+channels (via `waitForReviewer`), killing the reviewer sessions closes those
+channels. The CLI exits non-zero, the coordinator session exits, and the
+dashboard observes the terminal state when it reads the DB.
+
+No "orphaned orchestration" is possible: orchestration lives only inside the
+coordinator session, which is bounded by `REVIEW_TIMEOUT_MS` and cleanly
+terminates on abort.
 
 ---
 
