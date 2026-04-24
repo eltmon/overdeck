@@ -2521,7 +2521,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
-  const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
+  const isStandby = activeAgent?.status === 'stopped' && activeAgent?.agentPhase === 'review-response';
+  const isRunning = activeAgent && activeAgent.status !== 'dead' && (activeAgent.status !== 'stopped' || isStandby);
   // Show "Watch Planning" when planning agent is starting or has a live session
   const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
 

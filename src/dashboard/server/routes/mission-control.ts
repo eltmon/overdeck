@@ -259,6 +259,33 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
     try {
       const allSessions = await listSessionNamesAsync();
       reviewSessions = allSessions.filter(s => s.startsWith(`review-${issueId}-`));
+      // Keep only the most recent review round (highest timestamp) to avoid
+      // stale tabs from previous review rounds showing "Connection lost".
+      if (reviewSessions.length > 0) {
+        const timestamps = new Set<number>();
+        for (const s of reviewSessions) {
+          const prefix = `review-${issueId}-`;
+          const rest = s.slice(prefix.length);
+          const dashIdx = rest.indexOf('-');
+          if (dashIdx > 0) {
+            const ts = Number(rest.slice(0, dashIdx));
+            if (!isNaN(ts)) timestamps.add(ts);
+          }
+        }
+        if (timestamps.size > 1) {
+          const maxTs = Math.max(...timestamps);
+          reviewSessions = reviewSessions.filter(s => {
+            const prefix = `review-${issueId}-`;
+            const rest = s.slice(prefix.length);
+            const dashIdx = rest.indexOf('-');
+            if (dashIdx > 0) {
+              const ts = Number(rest.slice(0, dashIdx));
+              return !isNaN(ts) && ts === maxTs;
+            }
+            return false;
+          });
+        }
+      }
     } catch { /* tmux may not be available */ }
 
     for (const ss of specialistSections) {

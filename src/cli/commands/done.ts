@@ -301,8 +301,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
 
     // Step 3: Update agent state to stopped (so it appears in dashboard agents list)
+    // Mark phase as 'review-response' so the dashboard shows the agent as on
+    // standby for UAT tweaks rather than fully stopped.
     if (existingState) {
       existingState.status = 'stopped';
+      existingState.phase = 'review-response';
       existingState.lastActivity = new Date().toISOString();
       saveAgentState(existingState);
     }
