@@ -112,11 +112,9 @@ describe('router-config', () => {
         'gpt-5.5',
         'gpt-5.5-mini',
         'gpt-5.5-nano',
-        'gpt-5.5-pro',
         'gpt-5.4',
         'gpt-5.4-mini',
         'gpt-5.4-nano',
-        'gpt-5.4-pro',
         'o3',
       ]);
     });

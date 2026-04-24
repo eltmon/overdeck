@@ -64,10 +64,6 @@ export interface MessagesTimelineProps {
   messages: ChatMessage[];
   workLog: WorkLogEntry[];
   streaming: boolean;
-  /** Called when the user clicks "Retry" on a failed outbox entry. */
-  onOutboxRetry?: (outboxId: string) => void;
-  /** Called when the user clicks "Discard" on a failed outbox entry. */
-  onOutboxDiscard?: (outboxId: string) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -76,8 +72,6 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   messages,
   workLog,
   streaming,
-  onOutboxRetry,
-  onOutboxDiscard,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -194,12 +188,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     transform: `translateY(${virtualItem.start}px)`,
                   }}
                 >
-                  <TimelineRowRenderer
-                    row={row}
-                    isStreaming={streaming}
-                    onOutboxRetry={onOutboxRetry}
-                    onOutboxDiscard={onOutboxDiscard}
-                  />
+                  <TimelineRowRenderer row={row} isStreaming={streaming} />
                 </div>
               );
             })}
@@ -208,13 +197,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
         {/* Non-virtual tail rows — normal flow */}
         {tailRows.map((row) => (
-          <TimelineRowRenderer
-            key={row.id}
-            row={row}
-            isStreaming={streaming}
-            onOutboxRetry={onOutboxRetry}
-            onOutboxDiscard={onOutboxDiscard}
-          />
+          <TimelineRowRenderer key={row.id} row={row} isStreaming={streaming} />
         ))}
       </div>
     </div>
@@ -257,16 +240,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 interface RowProps {
   row: MessagesTimelineRow;
   isStreaming: boolean;
-  onOutboxRetry?: (outboxId: string) => void;
-  onOutboxDiscard?: (outboxId: string) => void;
 }
 
-const TimelineRowRenderer = memo(function TimelineRowRenderer({
-  row,
-  isStreaming,
-  onOutboxRetry,
-  onOutboxDiscard,
-}: RowProps) {
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} />;
   }
@@ -274,13 +250,7 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({
     return <WorkLogGroup entries={row.groupedEntries} />;
   }
   if (row.message.role === 'user') {
-    return (
-      <UserMessageRow
-        message={row.message}
-        onOutboxRetry={onOutboxRetry}
-        onOutboxDiscard={onOutboxDiscard}
-      />
-    );
+    return <UserMessageRow message={row.message} />;
   }
   return (
     <AssistantMessageRow
@@ -298,177 +268,34 @@ function isSummaryForkMessage(text: string): boolean {
     text.includes('**Do not take any action.** This is context from a prior conversation fork');
 }
 
-interface UserMessageRowProps {
-  message: ChatMessage;
-  onOutboxRetry?: (outboxId: string) => void;
-  onOutboxDiscard?: (outboxId: string) => void;
-}
-
-function UserMessageRow({ message, onOutboxRetry, onOutboxDiscard }: UserMessageRowProps) {
+function UserMessageRow({ message }: { message: ChatMessage }) {
   if (isSummaryForkMessage(message.text)) {
     return <ContextMessageBlock message={message} />;
   }
 
-  const outboxStatus = message.outboxStatus;
-  const isPending = outboxStatus !== undefined;
-  const isFailed = outboxStatus === 'failed';
-  const bubbleOpacity = isPending ? (isFailed ? 1 : 0.65) : 1;
-  const tooltipByStatus: Record<string, string> = {
-    sending:  'Sending to Claude Code…',
-    queued:   'Delivered to Claude — waiting for it to appear in conversation history.',
-    stalled:  'Claude may be busy — message still in its queue, not yet acknowledged.',
-    failed:   message.outboxError ? `Failed: ${message.outboxError}` : 'Failed to send.',
-  };
+  const isPending = message.id.startsWith('optimistic-');
   return (
     <div className={styles.userMessageRow}>
       <div
         className={styles.userMessageBubble}
-        style={{
-          opacity: bubbleOpacity,
-          ...(isFailed ? { borderLeft: '3px solid var(--mc-error, #ef4444)' } : {}),
-        }}
-        title={isPending ? tooltipByStatus[outboxStatus] : undefined}
+        style={isPending ? { opacity: 0.6 } : undefined}
+        title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
         <p className={styles.userMessageText}>{message.text}</p>
         <span className={styles.messageTimestamp}>
           {isPending ? (
-            <OutboxStatusLabel
-              status={outboxStatus}
-              outboxId={message.outboxId}
-              errorText={message.outboxError}
-              onRetry={onOutboxRetry}
-              onDiscard={onOutboxDiscard}
-            />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--mc-accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 12a9 9 0 11-6.219-8.56" />
+              </svg>
+              Sending…
+            </span>
           ) : (
             formatTimestamp(message.createdAt)
           )}
         </span>
       </div>
     </div>
-  );
-}
-
-// ─── Outbox status label ──────────────────────────────────────────────────────
-
-interface OutboxStatusLabelProps {
-  status: NonNullable<ChatMessage['outboxStatus']>;
-  outboxId?: string;
-  errorText?: string;
-  onRetry?: (outboxId: string) => void;
-  onDiscard?: (outboxId: string) => void;
-}
-
-function OutboxStatusLabel({
-  status,
-  outboxId,
-  errorText,
-  onRetry,
-  onDiscard,
-}: OutboxStatusLabelProps) {
-  // Failed: transport error — message never reached the server.
-  if (status === 'failed') {
-    return (
-      <OutboxActionRow
-        color="var(--mc-error, #ef4444)"
-        label="Failed to send"
-        labelTitle={errorText}
-        outboxId={outboxId}
-        onRetry={onRetry}
-        onDiscard={onDiscard}
-      />
-    );
-  }
-
-  // Stalled: HTTP succeeded but Claude never confirmed (e.g. auto-compaction
-  // dropped the message from its internal queue). Give the user control.
-  if (status === 'stalled') {
-    return (
-      <OutboxActionRow
-        color="var(--mc-warning, #d97706)"
-        label="Not confirmed by Claude"
-        labelTitle="Claude accepted the message but it never appeared in the conversation — its internal queue may have been wiped (e.g. by auto-compaction). Retry to resend, or discard."
-        outboxId={outboxId}
-        onRetry={onRetry}
-        onDiscard={onDiscard}
-      />
-    );
-  }
-
-  // sending / queued — still in flight, spinner only.
-  const label = status === 'sending' ? 'Sending…' : 'Sent — waiting for Claude';
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-      <svg
-        style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--mc-accent)' }}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M21 12a9 9 0 11-6.219-8.56" />
-      </svg>
-      {label}
-    </span>
-  );
-}
-
-interface OutboxActionRowProps {
-  color: string;
-  label: string;
-  labelTitle?: string;
-  outboxId?: string;
-  onRetry?: (outboxId: string) => void;
-  onDiscard?: (outboxId: string) => void;
-}
-
-function OutboxActionRow({
-  color,
-  label,
-  labelTitle,
-  outboxId,
-  onRetry,
-  onDiscard,
-}: OutboxActionRowProps) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color, fontWeight: 600 }}>
-      <span title={labelTitle}>{label}</span>
-      {outboxId && onRetry && (
-        <button
-          type="button"
-          onClick={() => onRetry(outboxId)}
-          style={{
-            padding: '2px 8px',
-            fontSize: 11,
-            fontWeight: 600,
-            border: '1px solid currentColor',
-            borderRadius: 4,
-            background: 'transparent',
-            color: 'inherit',
-            cursor: 'pointer',
-          }}
-        >
-          Retry
-        </button>
-      )}
-      {outboxId && onDiscard && (
-        <button
-          type="button"
-          onClick={() => onDiscard(outboxId)}
-          title="Remove from outbox — you'll need to retype to resend"
-          style={{
-            padding: '2px 8px',
-            fontSize: 11,
-            fontWeight: 600,
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--mc-text-muted, #888)',
-            cursor: 'pointer',
-          }}
-        >
-          Discard
-        </button>
-      )}
-    </span>
   );
 }
 

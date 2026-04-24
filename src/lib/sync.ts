@@ -15,7 +15,6 @@ import {
   compareFileToManifest,
 } from './manifest.js';
 import { getDevrootPath } from './config.js';
-import { applyModelOverridesToAgents } from './agent-model-sync.js';
 
 export interface SyncItem {
   name: string;
@@ -268,12 +267,6 @@ export function refreshCache(): RefreshCacheResult {
       result.rules.copied++;
     }
   }
-
-  // Rewrite agent frontmatter `model:` per active work-type router config
-  // BEFORE manifest generation, so the cache manifest hashes reflect the
-  // post-override content. The router reads ~/.panopticon/config.yaml, so
-  // changes to models.overrides propagate on the next refreshCache() call.
-  applyModelOverridesToAgents();
 
   // Generate cache manifest
   const manifest = buildManifestFromDirectory(

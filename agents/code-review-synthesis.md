@@ -1,6 +1,7 @@
 ---
 name: code-review-synthesis
 description: Combines findings from multiple code reviewers into a unified report
+model: sonnet
 tools:
   - Read
   - Glob

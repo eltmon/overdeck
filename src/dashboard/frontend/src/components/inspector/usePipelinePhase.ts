@@ -97,19 +97,14 @@ export function derivePipelinePhase(
 
   const isPlanningAgent = agent?.agentPhase === 'planning';
 
-  // Work/Planning tab: always show if agent exists — never disable based on review status
+  // Work/Planning tab: always show if agent exists
   if (workSession) {
-    const isWorkDisabled = deadSessions.has(workSession);
-    // Debug: log work session state for troubleshooting tab disable issues
-    if (input.issueId === 'PAN-805') {
-      console.log('[usePipelinePhase] Work tab:', { workSession, isWorkDisabled, deadSessions: Array.from(deadSessions), phase });
-    }
     tabs.push({
       id: isPlanningAgent ? 'planning' : 'working',
       label: isPlanningAgent ? 'Planning' : 'Work',
       sessionName: workSession,
       isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback',
-      disabled: isWorkDisabled,
+      disabled: deadSessions.has(workSession),
       isRunning: isPlanningAgent ? phase === 'planning' : phase === 'working',
     });
   }

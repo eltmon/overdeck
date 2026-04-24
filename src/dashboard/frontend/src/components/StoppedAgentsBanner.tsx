@@ -19,9 +19,7 @@ export function StoppedAgentsBanner() {
     'documentation', 'review', 'review-response', 'pre_push', 'post_push',
   ]);
 
-  const RECENT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-  const recentStoppedAgents = agents.filter((a) => {
+  const stoppedAgents = agents.filter((a) => {
     if (a.status !== 'stopped') return false;
     // Exclude agents that finished their work normally
     if (a.runtimeState === 'completed') return false;
@@ -29,36 +27,8 @@ export function StoppedAgentsBanner() {
     if (a.lifecycle?.isCompleted) return false;
     // Only care about agents that were in an active pipeline phase
     if (!a.agentPhase) return false;
-    if (!PIPELINE_PHASES.has(a.agentPhase)) return false;
-    // Only show recently-active agents — old state files are historical debris
-    const lastActivity = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-    const startedAt = a.startedAt ? new Date(a.startedAt).getTime() : 0;
-    const lastRelevant = Math.max(lastActivity, startedAt);
-    return lastRelevant > 0 && Date.now() - lastRelevant < RECENT_MS;
+    return PIPELINE_PHASES.has(a.agentPhase);
   });
-
-  // Deduplicate by issueId — keep only the most recent per issue
-  const stoppedAgentsByIssue = new Map<string, Agent>();
-  for (const agent of recentStoppedAgents) {
-    const key = agent.issueId || agent.id;
-    const existing = stoppedAgentsByIssue.get(key);
-    if (!existing) {
-      stoppedAgentsByIssue.set(key, agent);
-      continue;
-    }
-    const existingTime = Math.max(
-      existing.lastActivity ? new Date(existing.lastActivity).getTime() : 0,
-      existing.startedAt ? new Date(existing.startedAt).getTime() : 0,
-    );
-    const agentTime = Math.max(
-      agent.lastActivity ? new Date(agent.lastActivity).getTime() : 0,
-      agent.startedAt ? new Date(agent.startedAt).getTime() : 0,
-    );
-    if (agentTime > existingTime) {
-      stoppedAgentsByIssue.set(key, agent);
-    }
-  }
-  const stoppedAgents = Array.from(stoppedAgentsByIssue.values());
   const [dismissed, setDismissed] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [results, setResults] = useState<RestartResult[] | null>(null);
