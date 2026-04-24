@@ -4,13 +4,13 @@
 
 import { existsSync } from 'fs';
 import { readFile, writeFile, unlink, mkdir, appendFile, readdir } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId } from '../work-type-router.js';
 import { CACHE_AGENTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -478,7 +478,20 @@ async function spawnReviewer(
   ].join('\n');
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
+  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, launcher=${launcherPath}`);
+  console.log(`[review-agent] Launcher content:\n${launcherContent}`);
+
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`);
+
+  // Pipe all pane output to a log file so connection errors and Claude output are
+  // captured even after the session exits.
+  const claudeLogFile = join(dirname(promptFile), `${sessionName.split('-').pop()}-claude.log`);
+  try {
+    await execAsync(`tmux pipe-pane -o -t "${sessionName}" 'cat >> "${claudeLogFile}"'`);
+    console.log(`[review-agent] Claude output logging → ${claudeLogFile}`);
+  } catch (err) {
+    console.warn(`[review-agent] Failed to start pane logging for ${sessionName}: ${err}`);
+  }
 
   // Wait for Claude to start
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -496,28 +509,55 @@ export async function waitForReviewer(
     sessionExists = sessionExistsAsync,
     fileExists = existsSync,
     killSession = killSessionAsync,
+    capturePane = (name: string) => capturePaneAsync(name, 500),
   }: {
     sessionExists?: (name: string) => Promise<boolean>;
     fileExists?: (path: string) => boolean;
     killSession?: (name: string) => Promise<void>;
+    capturePane?: (sessionName: string) => Promise<string>;
   } = {},
 ): Promise<'completed' | 'failed'> {
-  const deadline = Date.now() + timeoutMs;
+  const outputDir = dirname(outputFile);
+  const role = sessionName.split('-').pop() ?? 'unknown';
+  const tmuxLogFile = join(outputDir, `${role}-tmux.log`);
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+
   while (Date.now() < deadline) {
     // Output file is the primary completion signal — Claude sessions don't auto-exit.
     if (fileExists(outputFile)) {
       try { await killSession(sessionName); } catch (err) {
         console.error(`[review-agent] Failed to kill completed reviewer session ${sessionName}:`, err);
       }
+      console.log(`[review-agent] Reviewer ${sessionName} completed in ${Date.now() - startedAt}ms`);
       return 'completed';
     }
     if (!await sessionExists(sessionName)) {
-      // Session exited without writing output
+      // Session exited without writing output — capture pane for diagnosis
+      const elapsed = Date.now() - startedAt;
+      console.error(`[review-agent] Reviewer ${sessionName} exited without output after ${elapsed}ms — capturing pane`);
+      try {
+        const pane = await capturePane(sessionName);
+        if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
+        console.error(`[review-agent] Pane capture written to ${tmuxLogFile}`);
+      } catch (err) {
+        console.error(`[review-agent] Failed to capture pane for ${sessionName}:`, err);
+      }
       return 'failed';
     }
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
-  // Timeout — kill and report failed
+
+  // Timeout — capture pane, kill, report failed
+  const elapsed = Date.now() - startedAt;
+  console.error(`[review-agent] Reviewer ${sessionName} timed out after ${elapsed}ms — capturing pane`);
+  try {
+    const pane = await capturePane(sessionName);
+    if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
+    console.error(`[review-agent] Pane capture written to ${tmuxLogFile}`);
+  } catch (err) {
+    console.error(`[review-agent] Failed to capture pane for ${sessionName}:`, err);
+  }
   try { await killSession(sessionName); } catch (err) {
     console.error(`[review-agent] Failed to kill timed-out reviewer session ${sessionName}:`, err);
   }
