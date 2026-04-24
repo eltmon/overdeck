@@ -5,8 +5,9 @@ description: >
   memory across conversation compaction. Use when work spans sessions, has blockers,
   or needs context recovery after compaction.
 allowed-tools: "Read,Bash(bd:*)"
-version: "0.43.0"
+version: "1.0.0"
 author: "Steve Yegge <https://github.com/steveyegge>"
+repo: "https://github.com/gastownhall/beads"
 license: "MIT"
 ---
 
@@ -68,7 +69,7 @@ bd create "Add feature" --external-ref MIN-123 --json
 ## Prerequisites
 
 ```bash
-bd --version  # Requires v0.34.0+
+bd --version  # Requires v0.62.0+
 ```
 
 - **bd CLI** installed and in PATH
@@ -143,6 +144,9 @@ bd update <id> --claim --json                    # Claim issue (atomic)
 # NOTE: No --blocked-by flag exists! Use 'bd dep add' instead
 ```
 
+**CRITICAL: `bd claim` does NOT exist.** Always use `bd update <id> --claim`.
+Agents frequently waste tokens on `bd claim` — it has never been a standalone command.
+
 ### Comments (For Progress Notes)
 ```bash
 bd comments <id> --json                          # List comments
@@ -173,6 +177,12 @@ bd close <id> --reason "Completed" --json
 bd reopen <id> --reason "Need more work" --json
 ```
 
+**Before closing, check for blockers:**
+```bash
+bd dep tree <id>        # See what's blocking this issue
+# Close blockers first, or use --force (not recommended)
+```
+
 ### Sync (End of Session)
 ```bash
 bd sync                          # Commit and push to git (ALWAYS run at session end)
@@ -186,6 +196,8 @@ bd sync                          # Commit and push to git (ALWAYS run at session
 | Chemistry (pour/wisp) | `bd pour`, `bd wisp` | [CHEMISTRY_PATTERNS.md](resources/CHEMISTRY_PATTERNS.md) |
 | Agent beads | `bd agent --help` | [AGENTS.md](resources/AGENTS.md) |
 | Async gates | `bd gate --help` | [ASYNC_GATES.md](resources/ASYNC_GATES.md) |
+| Batch operations | `bd batch --help` | [BATCH.md](resources/BATCH.md) |
+| Rules audit | `bd rules --help` | [RULES.md](resources/RULES.md) |
 | Worktrees | `bd worktree --help` | [WORKTREES.md](resources/WORKTREES.md) |
 
 ## Resources
@@ -205,10 +217,12 @@ bd sync                          # Commit and push to git (ALWAYS run at session
 | [WORKFLOWS.md](resources/WORKFLOWS.md) | Step-by-step workflow patterns |
 | [AGENTS.md](resources/AGENTS.md) | Agent bead tracking (v0.40+) |
 | [ASYNC_GATES.md](resources/ASYNC_GATES.md) | Human-in-the-loop gates |
+| [BATCH.md](resources/BATCH.md) | Bulk operations in single transaction |
+| [RULES.md](resources/RULES.md) | Rules audit and compact |
 | [CHEMISTRY_PATTERNS.md](resources/CHEMISTRY_PATTERNS.md) | Mol vs Wisp decision tree |
 | [WORKTREES.md](resources/WORKTREES.md) | Parallel development patterns |
 
 ## Full Documentation
 
 - **bd prime**: AI-optimized workflow context
-- **GitHub**: [github.com/steveyegge/beads](https://github.com/steveyegge/beads)
+- **GitHub**: [github.com/gastownhall/beads](https://github.com/gastownhall/beads)
