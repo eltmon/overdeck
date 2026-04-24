@@ -816,8 +816,18 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
 export async function cleanupStaleAgentState(): Promise<string[]> {
   const actions: string[] = [];
   const cloisterConfig = loadCloisterConfig();
-  const retentionDays = cloisterConfig.retention?.agent_state_days ?? 30;
+  // Default retention for work / planning agent state. These are kept for a
+  // short debugging window post-completion; event-driven cleanup in
+  // postMergeLifecycle and executeCloseOut deletes them at the actual event
+  // that renders them obsolete, so this retention is only a safety net.
+  const retentionDays = cloisterConfig.retention?.agent_state_days ?? 7;
   const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+  // Reviewer state is ephemeral by design — it's deleted inside
+  // runParallelReview Phase 6 as soon as the review posts. This 1-day
+  // retention is a safety net for cases where Phase 6 didn't fire
+  // (crash, process killed between post and cleanup).
+  const reviewerRetentionDays = cloisterConfig.retention?.reviewer_state_days ?? 1;
+  const reviewerRetentionMs = reviewerRetentionDays * 24 * 60 * 60 * 1000;
   const now = Date.now();
 
   if (!existsSync(AGENTS_DIR)) {
@@ -830,6 +840,8 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
 
     for (const dir of dirs) {
       const agentDir = join(AGENTS_DIR, dir.name);
+      const isReviewer = dir.name.startsWith('review-');
+      const effectiveRetentionMs = isReviewer ? reviewerRetentionMs : retentionMs;
 
       try {
         // Check if tmux session is active — never clean up running agents
@@ -853,25 +865,29 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
         }
 
         const ageMs = now - mtime;
-        if (ageMs < retentionMs) {
+        if (ageMs < effectiveRetentionMs) {
           continue; // Not old enough, skip
         }
 
-        // Check for recently processed completion (don't delete if completed recently)
-        const completedFile = join(agentDir, 'completed');
-        if (existsSync(completedFile)) {
-          const completedAge = now - statSync(completedFile).mtimeMs;
-          // Keep completed agents for at least 7 days regardless of retention
-          if (completedAge < 7 * 24 * 60 * 60 * 1000) {
-            continue;
+        // Reviewers don't have a `completed` marker and don't warrant the
+        // 7-day grace period — skip the completion check for them.
+        if (!isReviewer) {
+          const completedFile = join(agentDir, 'completed');
+          if (existsSync(completedFile)) {
+            const completedAge = now - statSync(completedFile).mtimeMs;
+            // Keep completed work agents for at least 7 days regardless of retention
+            if (completedAge < 7 * 24 * 60 * 60 * 1000) {
+              continue;
+            }
           }
         }
 
         // Safe to remove
         const ageDays = Math.round(ageMs / (24 * 60 * 60 * 1000));
+        const tag = isReviewer ? 'reviewer' : 'agent';
         rmSync(agentDir, { recursive: true, force: true });
-        actions.push(`Purged stale agent state: ${dir.name} (${ageDays} days old)`);
-        console.log(`[deacon] Purged stale agent state: ${dir.name} (${ageDays} days old)`);
+        actions.push(`Purged stale ${tag} state: ${dir.name} (${ageDays} days old)`);
+        console.log(`[deacon] Purged stale ${tag} state: ${dir.name} (${ageDays} days old)`);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[deacon] Error cleaning up agent ${dir.name}:`, msg);
@@ -884,6 +900,90 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
 
   if (actions.length > 0) {
     console.log(`[deacon] Cleanup complete: purged ${actions.length} stale agent directories`);
+  }
+
+  return actions;
+}
+
+/**
+ * Clean up abandoned feedback directories.
+ *
+ * Event-driven cleanup handles the happy path (new review cycle → clear on
+ * dispatch; merge → close-out removes workspace). This sweep is the safety net
+ * for workspaces where those events never fired: work agent is no longer
+ * running AND no review is in flight AND feedback files are still sitting in
+ * `.planning/feedback/`.
+ *
+ * The feedback is useless once consumed, so we always delete — no archive, no
+ * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
+ */
+export async function cleanupAbandonedFeedback(): Promise<string[]> {
+  const actions: string[] = [];
+
+  const { listProjects } = await import('../projects.js');
+  const { getReviewStatus } = await import('../review-status.js');
+  const { clearFeedbackFiles } = await import('./feedback-writer.js');
+
+  const projects = listProjects();
+  for (const { config: projectConfig } of projects) {
+    const workspacesRoot = join(projectConfig.path, 'workspaces');
+    if (!existsSync(workspacesRoot)) continue;
+
+    let entries: string[];
+    try {
+      entries = readdirSync(workspacesRoot, { withFileTypes: true })
+        .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
+        .map(e => e.name);
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const workspacePath = join(workspacesRoot, entry);
+      const feedbackDir = join(workspacePath, '.planning', 'feedback');
+      if (!existsSync(feedbackDir)) continue;
+
+      // Derive issueId from workspace dir name: feature-pan-539 → PAN-539
+      // or feature-min-123 → MIN-123 (same transform regardless of project).
+      const issueLower = entry.replace(/^feature-/, '');
+      const issueId = issueLower.toUpperCase();
+
+      // Gate 1: work agent tmux session active? If yes, feedback may be current.
+      const agentSession = `agent-${issueLower}`;
+      try {
+        if (await sessionExistsAsync(agentSession)) continue;
+      } catch {
+        // Treat lookup error as "session might exist" — skip out of caution.
+        continue;
+      }
+
+      // Gate 2: review in flight? If yes, feedback is about to be consumed.
+      try {
+        const status = getReviewStatus(issueId);
+        if (status?.reviewStatus === 'reviewing') continue;
+      } catch {
+        // No status entry → safe to clean.
+      }
+
+      // Both gates passed — feedback is abandoned, safe to delete.
+      try {
+        const before = readdirSync(feedbackDir)
+          .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
+          .length;
+        if (before === 0) continue;
+        await clearFeedbackFiles(workspacePath);
+        actions.push(
+          `Cleared ${before} abandoned feedback file(s) in ${entry} (agent stopped, no in-flight review)`,
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[deacon] cleanupAbandonedFeedback failed for ${entry}:`, msg);
+      }
+    }
+  }
+
+  if (actions.length > 0) {
+    console.log(`[deacon] Feedback cleanup: ${actions.length} workspace(s) cleared`);
   }
 
   return actions;
@@ -2791,6 +2891,15 @@ export async function runPatrol(): Promise<PatrolResult> {
     const cleanupActions = await cleanupStaleAgentState();
     actions.push(...cleanupActions);
     for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // Periodic abandoned-feedback sweep — safety net for workspaces where the
+  // event-driven cleanup (new review cycle / merge / close-out) never fired.
+  // See docs/REVIEW-AGENT-ARCHITECTURE.md.
+  if (Math.random() < 0.003) {
+    const feedbackActions = await cleanupAbandonedFeedback();
+    actions.push(...feedbackActions);
+    for (const a of feedbackActions) addLog('action', a, state.patrolCycle);
   }
 
   // Check for mass death (uses shared state)

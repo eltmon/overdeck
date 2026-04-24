@@ -177,7 +177,19 @@ export interface CostLimitsConfig {
  * Retention policy configuration
  */
 export interface RetentionConfig {
-  agent_state_days: number; // Days to keep agent state dirs (default: 30)
+  /**
+   * Days to keep work/planning agent state dirs after their session ends.
+   * Default 7. Event-driven cleanup (postMergeLifecycle, executeCloseOut)
+   * deletes state at the moment it becomes useless; this retention is only
+   * a safety net for cases where those events didn't fire.
+   */
+  agent_state_days: number;
+  /**
+   * Days to keep reviewer state dirs (review-* prefix). Default 1.
+   * runParallelReview Phase 6 deletes reviewer state immediately after the
+   * review posts; this retention catches crashed-mid-cleanup edge cases.
+   */
+  reviewer_state_days?: number;
   health_staleness_hours: number; // Hours before hiding stale agents in health API (default: 24)
 }
 
@@ -297,7 +309,8 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     alert_threshold: 0.8, // Alert at 80%
   },
   retention: {
-    agent_state_days: 30,
+    agent_state_days: 7,
+    reviewer_state_days: 1,
     health_staleness_hours: 24,
   },
 };

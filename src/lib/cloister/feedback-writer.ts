@@ -8,7 +8,7 @@
  * All I/O is async (fs/promises) — never execSync.
  */
 
-import { writeFile, readFile, mkdir, readdir, rename } from 'fs/promises';
+import { writeFile, readFile, mkdir, readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
@@ -99,33 +99,50 @@ async function appendToStateMd(
 }
 
 /**
- * Archive existing feedback files from a previous review cycle.
- * Moves all NNN-*.md files in .planning/feedback/ into .planning/feedback/archive/
- * so the work agent only sees current-cycle feedback.
+ * Clear existing feedback files from a previous review cycle.
+ *
+ * Deletes all NNN-*.md files in .planning/feedback/ (and any legacy
+ * .planning/feedback/archive/ directory left over from the old archive-based
+ * implementation). Feedback has no value once the work agent has consumed it
+ * — there's no history we want to preserve here. See
+ * docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
-export async function archiveFeedbackFiles(workspacePath: string): Promise<void> {
+export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
   const feedbackDir = join(workspacePath, '.planning', 'feedback');
   if (!existsSync(feedbackDir)) return;
 
   const files = await readdir(feedbackDir);
   const feedbackFiles = files.filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'));
-  if (feedbackFiles.length === 0) return;
-
-  const archiveDir = join(feedbackDir, 'archive');
-  await mkdir(archiveDir, { recursive: true });
 
   for (const file of feedbackFiles) {
-    const src = join(feedbackDir, file);
-    const dest = join(archiveDir, file);
     try {
-      await rename(src, dest);
+      await rm(join(feedbackDir, file), { force: true });
     } catch (err: any) {
-      console.error(`[feedback-writer] Failed to archive ${file}:`, err.message);
+      console.error(`[feedback-writer] Failed to delete ${file}:`, err.message);
     }
   }
 
-  console.log(`[feedback-writer] Archived ${feedbackFiles.length} feedback file(s) from previous cycle`);
+  // Legacy: older versions moved feedback into .planning/feedback/archive/.
+  // Nuke that tree too — we no longer keep an archive.
+  const legacyArchiveDir = join(feedbackDir, 'archive');
+  if (existsSync(legacyArchiveDir)) {
+    try {
+      await rm(legacyArchiveDir, { recursive: true, force: true });
+    } catch (err: any) {
+      console.error(`[feedback-writer] Failed to remove legacy archive dir:`, err.message);
+    }
+  }
+
+  if (feedbackFiles.length > 0) {
+    console.log(`[feedback-writer] Cleared ${feedbackFiles.length} feedback file(s) from previous cycle`);
+  }
 }
+
+/**
+ * @deprecated Alias kept for backward compatibility with in-flight code paths.
+ * Prefer `clearFeedbackFiles` directly.
+ */
+export const archiveFeedbackFiles = clearFeedbackFiles;
 
 /**
  * Write specialist feedback to a file in the workspace and update STATE.md.

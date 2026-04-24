@@ -501,6 +501,57 @@ the reasoning:
 
 ---
 
+## State cleanup: event-driven, not retention-driven
+
+Panopticon writes agent state to `~/.panopticon/agents/<name>/` and specialist
+feedback to `<workspace>/.planning/feedback/NNN-*.md`. Both become useless at
+a well-defined moment — we delete at that moment rather than on a timer.
+
+### What's deleted, and when
+
+| Artifact | Deleted on event | Safety net |
+|---|---|---|
+| `~/.panopticon/agents/review-<issueId>-<ts>-<role>/` (reviewer + synthesis state) | End of `runParallelReview` Phase 6, immediately after GitHub review posts | `reviewer_state_days` (default 1) |
+| `~/.panopticon/agents/agent-<issueId>/` (work agent state) | `postMergeLifecycle` step 5b (merge) + `executeCloseOut` step 5 (close) | `agent_state_days` (default 7) |
+| `~/.panopticon/agents/planning-<issueId>/` (planner state) | Same as work agent | `agent_state_days` (default 7) |
+| `<workspace>/.planning/feedback/NNN-*.md` | Start of `dispatchParallelReview` (new review cycle clears previous-cycle feedback) | `cleanupAbandonedFeedback` deacon sweep |
+
+### The feedback rule
+
+`.planning/feedback/` is the **work agent's inbox of specialist findings**.
+Files are `NNN-<specialist>-<outcome>.md`, written by review-agent,
+test-agent, and the verification gate, with a monotonic sequence number. The
+work agent reads them, addresses the feedback, and resubmits. Once consumed,
+they're useless — we do NOT archive.
+
+`clearFeedbackFiles()` deletes all `NNN-*.md` (and any legacy `archive/` tree
+from the old archive-based implementation) at the start of every new review
+cycle. For workspaces where no new cycle starts (abandoned workspace, stopped
+agent), the deacon sweep catches up via `cleanupAbandonedFeedback()` — it
+runs only when the work agent tmux session is gone AND no review is in
+flight, so it can never race with current feedback.
+
+### The retention safety net
+
+Retention exists only for the case where the event-driven deletion missed
+its trigger (process crashed between phases, power loss, killed mid-cleanup).
+`cleanupStaleAgentState` in the deacon sweep purges:
+
+- `review-*` dirs older than `reviewer_state_days` (default 1 day)
+- non-reviewer dirs older than `agent_state_days` (default 7 days)
+
+These defaults are intentionally short. Anything retained longer should go
+through a conscious config override, not accumulated cruft.
+
+### Why this replaces retention-as-primary
+
+Old model (30-day retention for everything) let reviewer state accumulate
+across hundreds of cycles — by the time the sweep ran, 990+ stale reviewer
+dirs existed even though each one had been useless within seconds of its
+review posting. The event-driven model deletes on the exact event that
+renders the state useless, making retention a safety net rather than the
+cleanup mechanism.
+
 ## Related documentation
 
 - [`SPECIALIST_WORKFLOW.md`](./SPECIALIST_WORKFLOW.md) — operational workflow
