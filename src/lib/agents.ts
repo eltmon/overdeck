@@ -189,6 +189,31 @@ export function getProviderExportsForModel(model: string): string {
 }
 
 /**
+ * Build a sanitized env for programmatically spawning `claude`/`claudish`.
+ *
+ * The dashboard parent process may inherit provider env vars (e.g.
+ * ANTHROPIC_BASE_URL pointing at the CLIProxy sidecar) that would mis-route
+ * a child process targeting an Anthropic model. Launcher *scripts* strip
+ * these via `unset` lines; programmatic spawns must do the same.
+ *
+ * Returns a copy of `baseEnv` (default: process.env) with all PROVIDER_ENV_KEYS
+ * deleted, then overlaid with the correct provider env for `model`.
+ */
+export function buildSpawnEnvForModel(
+  model: string,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
+  const sanitized: Record<string, string> = {};
+  for (const [k, v] of Object.entries(baseEnv)) {
+    if (v === undefined) continue;
+    if ((PROVIDER_ENV_KEYS as readonly string[]).includes(k)) continue;
+    sanitized[k] = v;
+  }
+  const providerEnv = getProviderEnvForModel(model);
+  return { ...sanitized, ...providerEnv };
+}
+
+/**
  * Get tmux -e flags for provider env vars (for use in tmux new-session).
  * Returns empty string for Anthropic models.
  */

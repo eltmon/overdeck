@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { getProviderEnvForModel } from '../agents.js';
+import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -610,21 +610,20 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
     '--permission-mode', 'bypassPermissions',
   ];
 
-  let providerEnv: Record<string, string> = {};
-  try {
-    providerEnv = getProviderEnvForModel(useModel);
-    const injectedKeys = Object.keys(providerEnv);
-    if (injectedKeys.length > 0) {
-      console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
-    } else {
-      console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel} (anthropic, no provider env needed)`);
-    }
-  } catch (err) {
-    console.warn(`[smart-compaction] Provider env lookup failed for ${useModel}:`, err instanceof Error ? err.message : String(err));
+  // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
+  // correct provider env for `useModel`. If provider env lookup fails (e.g.
+  // missing API key), let it throw — the caller (compactConversationNative)
+  // falls back to a heuristic summary.
+  const spawnEnv = buildSpawnEnvForModel(useModel);
+  const injectedKeys = Object.keys(getProviderEnvForModel(useModel));
+  if (injectedKeys.length > 0) {
+    console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
+  } else {
+    console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel} (anthropic, parent provider env stripped)`);
   }
 
   const child = spawn('claude', args, {
-    env: { ...process.env, ...providerEnv } as Record<string, string>,
+    env: spawnEnv,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
