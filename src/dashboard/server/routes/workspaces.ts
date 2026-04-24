@@ -71,7 +71,6 @@ import {
   messageAgent,
   saveAgentRuntimeState,
   getAgentRuntimeState,
-  getAgentRuntimeStateAsync,
   transitionIssueToInReview,
   getAgentState,
   getAgentStateAsync,
@@ -2924,6 +2923,90 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
 // ─── Route: POST /api/review/:issueId/reset ───────────────────────
 
+/** HTTP-contract result from the reset-review endpoint. Exported for unit testing. */
+export type ResetReviewResult =
+  | { httpStatus: 400; body: { success: false; error: string } }
+  | {
+      httpStatus: 200;
+      body: {
+        success: true;
+        /** Work-agent runtime state observed before the reset — informational, logged for debugging. */
+        preservedResolution?: { agentId: string; resolution?: string; resolutionCount?: number };
+      };
+    };
+
+/**
+ * Core logic for POST /api/review/:issueId/reset (synchronous, testable).
+ *
+ * Resets the specialist pipeline state (review / test / merge / verification) for
+ * a workspace. Writes ONE setReviewStatus() call, reads the work-agent's runtime
+ * state purely for logging, and returns a structured result that the route
+ * handler maps to an HTTP response.
+ *
+ * CRITICAL — resolution preservation:
+ * This function deliberately does NOT mutate the work-agent's runtime state
+ * (resolution / resolutionCount / activity). `resolution` tracks the WORK
+ * agent's own lifecycle (working/done/unclear/stuck/needs_input) and is written
+ * exclusively by `work-agent-stop-hook` based on the agent's tail. The pipeline
+ * reset is about specialist state — wiping resolution here previously erased
+ * legitimate unclear/stuck counts when `pan done`'s self-heal path triggered a
+ * reset, which prevented the deacon from noticing genuinely confused agents.
+ * (Root cause of PAN-805 never escalating to stuck.)
+ *
+ * Regression test: tests/unit/dashboard/server/routes/reset-review-route.test.ts
+ *
+ * Exported so a unit test can assert the sync mutation set is exactly
+ * {reset review status} — nothing else.
+ */
+export function processResetReviewPipeline(
+  issueId: string,
+  workspaceExists: boolean,
+): ResetReviewResult {
+  if (!workspaceExists) {
+    return {
+      httpStatus: 400,
+      body: { success: false, error: 'Workspace does not exist' },
+    };
+  }
+
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const priorRuntime = getAgentRuntimeState(agentId);
+
+  console.log(
+    `[reset-review] Human-initiated pipeline reset for ${issueId} ` +
+      `(work-agent ${agentId} resolution=${priorRuntime?.resolution ?? 'none'}/` +
+      `${priorRuntime?.resolutionCount ?? 0} — preserved, not reset)`
+  );
+
+  setReviewStatus(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    reviewNotes: undefined,
+    testNotes: undefined,
+    mergeNotes: undefined,
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    verificationCycleCount: 0,
+  });
+
+  return {
+    httpStatus: 200,
+    body: {
+      success: true,
+      preservedResolution: priorRuntime
+        ? {
+            agentId,
+            resolution: priorRuntime.resolution,
+            resolutionCount: priorRuntime.resolutionCount,
+          }
+        : undefined,
+    },
+  };
+}
+
 const postWorkspaceResetReviewRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/reset',
@@ -2933,47 +3016,19 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    if (!workspaceInfo.exists) {
-      return jsonResponse(
-        { success: false, error: 'Workspace does not exist' },
-        { status: 400 }
-      );
+    const result = processResetReviewPipeline(issueId, workspaceInfo.exists);
+    if (result.httpStatus !== 200) {
+      return jsonResponse(result.body, { status: result.httpStatus });
     }
-
-    console.log(`[reset-review] Human-initiated pipeline reset for ${issueId}`);
-
-    setReviewStatus(issueId, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      reviewNotes: undefined,
-      testNotes: undefined,
-      mergeNotes: undefined,
-      readyForMerge: false,
-      autoRequeueCount: 0,
-      verificationStatus: 'pending',
-      verificationNotes: undefined,
-      verificationCycleCount: 0,
-    });
-
-    try {
-      const agentId = `agent-${issueId.toLowerCase()}`;
-      const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(agentId));
-      if (runtimeState) {
-        saveAgentRuntimeState(agentId, {
-          resolution: 'working',
-          resolutionCount: 0,
-          resolutionUpdatedAt: new Date().toISOString(),
-        });
-      }
-    } catch {}
 
     try {
       const { resetPostMergeState } = yield* Effect.promise(() => import(
         '../../../lib/cloister/merge-agent.js'
       ));
       resetPostMergeState(issueId);
-    } catch {}
+    } catch (err) {
+      console.warn(`[reset-review] resetPostMergeState best-effort failed for ${issueId}:`, err);
+    }
 
     console.log(
       `[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`

@@ -92,17 +92,61 @@ if [ -f "$NUDGE_FILE" ]; then
   fi
 fi
 
+# Local cache of the last resolution THIS HOOK emitted for this agent.
+# Authoritative for "what did I say last time" — avoids dashboard round-trips
+# that can silently fail under load and reset the ratchet to count=1.
+RESOLUTION_CACHE="$AGENT_STATE_DIR/last-resolution.tsv"
+RESOLUTION_LOCK="$AGENT_STATE_DIR/last-resolution.lock"
+
+# Read last-emitted resolution from local cache. Echoes "resolution count"
+# (space-separated) or empty string if cache missing/unreadable.
+read_cached_resolution() {
+  [ -f "$RESOLUTION_CACHE" ] || return 0
+  local line
+  line=$(flock -s -w 1 "$RESOLUTION_LOCK" -c "cat '$RESOLUTION_CACHE'" 2>/dev/null || echo "")
+  [ -z "$line" ] && return 0
+  local res count
+  res=$(echo "$line" | awk -F'\t' '{print $1}')
+  count=$(echo "$line" | awk -F'\t' '{print $2}')
+  # Sanity: count must be numeric
+  case "$count" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  echo "$res $count"
+}
+
+# Write last-emitted resolution to local cache (flock-guarded).
+write_cached_resolution() {
+  local res="$1" count="$2"
+  local tmp="$RESOLUTION_CACHE.tmp.$$"
+  printf '%s\t%s\t%s\n' "$res" "$count" "$(date -Iseconds)" > "$tmp" 2>/dev/null || return 0
+  flock -x -w 1 "$RESOLUTION_LOCK" -c "mv '$tmp' '$RESOLUTION_CACHE'" 2>/dev/null || rm -f "$tmp"
+}
+
 # Emit a resolution event via the heartbeat endpoint.
-# Reads the current resolution/count from the in-memory AgentRuntimeSnapshot
-# (via GET /api/agents/:id/runtime) so we can increment vs reset correctly.
+# Uses the local cache as the source of truth for prev resolution/count
+# (the dashboard snapshot is unreliable under load); falls back to the
+# dashboard only if no local cache exists (first emit for this agent).
 emit_resolution() {
   local resolution="$1"
-  local prev_resolution="" prev_count=0
-  local snap
-  snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
-  if [ -n "$snap" ] && command -v jq >/dev/null 2>&1; then
-    prev_resolution=$(echo "$snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
-    prev_count=$(echo "$snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
+  local prev_resolution="" prev_count=0 prev_source=""
+  local cached
+  cached=$(read_cached_resolution)
+  if [ -n "$cached" ]; then
+    prev_resolution=$(echo "$cached" | awk '{print $1}')
+    prev_count=$(echo "$cached" | awk '{print $2}')
+    prev_source="cache"
+  else
+    # No local cache — bootstrap from dashboard snapshot if available.
+    local snap
+    snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+    if [ -n "$snap" ] && command -v jq >/dev/null 2>&1; then
+      prev_resolution=$(echo "$snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
+      prev_count=$(echo "$snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
+      prev_source="dashboard"
+    else
+      prev_source="none"
+    fi
   fi
   local new_count
   if [ "$prev_resolution" = "$resolution" ]; then
@@ -114,7 +158,9 @@ emit_resolution() {
   local body="{\"kind\":\"resolution_set\",\"resolution\":\"$resolution\",\"resolutionCount\":$new_count}"
   pan_emit_event "$AGENT_ID" "$body"
 
-  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID resolution=$resolution count=$new_count" \
+  write_cached_resolution "$resolution" "$new_count"
+
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID resolution=$resolution count=$new_count (prev=$prev_resolution/$prev_count src=$prev_source)" \
     >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 }
 
@@ -240,14 +286,15 @@ If you still have remaining tasks, continue working on them. Do NOT stop until a
   UNCLEAR)
     # Escalate to stuck after 2+ consecutive UNCLEAR — the hook has looked at
     # this agent's tail twice and still can't tell what it's doing, which is
-    # itself signal. Check the runtime snapshot for the previous resolution
-    # before writing, since emit_resolution's own count read can't see the
-    # event we're about to emit.
+    # itself signal. Uses the local resolution cache (not the dashboard) so
+    # this decision is deterministic even when the dashboard is unreachable.
     escalate_to_stuck=false
-    esc_snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
-    if [ -n "$esc_snap" ] && command -v jq >/dev/null 2>&1; then
-      esc_prev_resolution=$(echo "$esc_snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
-      esc_prev_count=$(echo "$esc_snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
+    esc_prev_resolution=""
+    esc_prev_count=0
+    esc_cached=$(read_cached_resolution)
+    if [ -n "$esc_cached" ]; then
+      esc_prev_resolution=$(echo "$esc_cached" | awk '{print $1}')
+      esc_prev_count=$(echo "$esc_cached" | awk '{print $2}')
       # Stay stuck once escalated (don't ratchet back to unclear on subsequent
       # UNCLEAR verdicts — deacon's poke logic counts consecutive stuck heartbeats).
       if { [ "$esc_prev_resolution" = "unclear" ] && [ "$esc_prev_count" -ge 1 ]; } \
@@ -255,6 +302,8 @@ If you still have remaining tasks, continue working on them. Do NOT stop until a
         escalate_to_stuck=true
       fi
     fi
+    echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID UNCLEAR gate prev=$esc_prev_resolution/$esc_prev_count escalate=$escalate_to_stuck" \
+      >> "$LOG_DIR/hooks.log" 2>/dev/null || true
     if [ "$escalate_to_stuck" = "true" ]; then
       emit_resolution "stuck"
     else
