@@ -113,3 +113,4 @@ apps/desktop/server/
 
 # Sibling projects sometimes cloned into working tree (separate repos)
 multica/
+*.log.1
