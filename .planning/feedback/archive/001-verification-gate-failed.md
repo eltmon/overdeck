@@ -2,76 +2,38 @@
 specialist: verification-gate
 issueId: PAN-805
 outcome: failed
-timestamp: 2026-04-23T12:55:12Z
+timestamp: 2026-04-23T21:26:55Z
 ---
 
 VERIFICATION FAILED for PAN-805 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (21663ms):
+Verification FAILED at test (41626ms):
 
-   });
-    133| 
+>, int, v8::internal::AllocationType) [node (vitest 3)]
+13: 0x1720fe8 v8::internal::Handle<v8::internal::NameDictionary> v8::internal::Dictionary<v8::internal::NameDictionary, v8::internal::NameDictionaryShape>::Add<v8::internal::Isolate, (v8::internal::AllocationType)0>(v8::internal::Isolate*, v8::internal::Handle<v8::internal::NameDictionary>, v8::internal::Handle<v8::internal::Name>, v8::internal::Handle<v8::internal::Object>, v8::internal::PropertyDetails, v8::internal::InternalIndex*) [node (vitest 3)]
+14: 0x172724a v8::internal::BaseNameDictionary<v8::internal::NameDictionary, v8::internal::NameDictionaryShape>::Add(v8::internal::Isolate*, v8::internal::Handle<v8::internal::NameDictionary>, v8::internal::Handle<v8::internal::Name>, v8::internal::Handle<v8::internal::Object>, v8::internal::PropertyDetails, v8::internal::InternalIndex*) [node (vitest 3)]
+15: 0x18764f8 v8::internal::Runtime_AddDictionaryProperty(int, unsigned long*, v8::internal::Isolate*) [node (vitest 3)]
+16: 0x7f4d2de6c476 
+stderr | src/__tests__/pipeline-state.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
 
- FAIL |root|  tests/unit/lib/database/schema-migrations.test.ts > schema migrations > fresh initSchema includes reviewed_at_commit and merge_retry_count in review_status
-AssertionError: expected 28 to be 27 // Object.is equality
+ FAIL |root|  tests/unit/lib/lifecycle/label-cleanup.test.ts [ tests/unit/lib/lifecycle/label-cleanup.test.ts ]
+Error: Failed to load url ../../../../src/lib/lifecycle/label-cleanup.js (resolved id: ../../../../src/lib/lifecycle/label-cleanup.js) in /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-805/tests/unit/lib/lifecycle/label-cleanup.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
 
-- Expected
-+ Received
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
-- 27
-+ 28
 
- ❯ tests/unit/lib/database/schema-migrations.test.ts:172:57
-    170|     expect(names).toContain('reviewed_at_commit');
-    171|     expect(names).toContain('merge_retry_count');
-    172|     expect(db.pragma('user_version', { simple: true })).toBe(27);
-       |                                                         ^
-    173|   });
-    174| 
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: Worker exited unexpectedly
+ ❯ ChildProcess.onUnexpectedExit node_modules/.bun/tinypool@1.1.1/node_modules/tinypool/dist/index.js:118:30
+ ❯ ChildProcess.emit node:events:531:35
+ ❯ ChildProcess._handle.onexit node:internal/child_process:293:12
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
-
- FAIL |root|  tests/unit/lib/database/schema-migrations.test.ts > schema migrations > v23 → v24: adds review_spawned_at and test_retry_count columns to review_status
-AssertionError: expected 28 to be 27 // Object.is equality
-
-- Expected
-+ Received
-
-- 27
-+ 28
-
- ❯ tests/unit/lib/database/schema-migrations.test.ts:255:57
-    253|     expect(colsAfter.map(c => c.name)).toContain('review_spawned_at');
-    254|     expect(colsAfter.map(c => c.name)).toContain('test_retry_count');
-    255|     expect(db.pragma('user_version', { simple: true })).toBe(27);
-       |                                                         ^
-    256|   });
-    257| 
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
-
- FAIL |root|  tests/unit/lib/database/schema-migrations.test.ts > schema migrations > leaves session_file unchanged when the corrected transcript is missing
-AssertionError: expected 28 to be 27 // Object.is equality
-
-- Expected
-+ Received
-
-- 27
-+ 28
-
- ❯ tests/unit/lib/database/schema-migrations.test.ts:314:57
-    312|       .get('conv-2') as { session_file: string };
-    313|     expect(row.session_file).toBe(stalePath);
-    314|     expect(db.pragma('user_version', { simple: true })).toBe(27);
-       |                                                         ^
-    315|   });
-    316| });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
 
 
 

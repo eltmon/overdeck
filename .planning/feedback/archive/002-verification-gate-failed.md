@@ -2,36 +2,42 @@
 specialist: verification-gate
 issueId: PAN-805
 outcome: failed
-timestamp: 2026-04-23T13:28:46Z
+timestamp: 2026-04-23T21:27:55Z
 ---
 
 VERIFICATION FAILED for PAN-805 (attempt 1/10):
 
-Failed check: build
+Failed check: test
 
-Verification FAILED at build (9770ms):
+Verification FAILED at test (44390ms):
 
-event-store.ts (124:38) [33m[UNRESOLVED_IMPORT] Warning:[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts
-     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/dashboard/server/event-store.ts:124:39 [38;5;246m][0m
-     [38;5;246m│[0m
- [38;5;246m124 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m{[0m[38;5;249m [0m[38;5;249mD[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mb[0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249me[0m[38;5;249m [0m[38;5;249m}[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[38;5;249ma[0m[38;5;249mw[0m[38;5;249ma[0m[38;5;249mi[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249mi[0m[38;5;249mm[0m[38;5;249mp[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249mt[0m[38;5;249m([0m'bun:sqlite'[38;5;249m)[0m[38;5;249m;[0m
- [38;5;240m    │[0m                                       ──────┬─────  
- [38;5;240m    │[0m                                             ╰─────── Module not found, treating it as an external dependency
-[38;5;246m─────╯[0m
+al::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node (vitest 1)]
+ 4: 0x1444875  [node (vitest 1)]
+ 5: 0x145e109 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node (vitest 1)]
+ 6: 0x14327b8 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node (vitest 1)]
+ 7: 0x14336e5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node (vitest 1)]
+ 8: 0x140c3be v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node (vitest 1)]
+ 9: 0x186dba0 v8::internal::Runtime_AllocateInOldGeneration(int, unsigned long*, v8::internal::Isolate*) [node (vitest 1)]
+10: 0x7f402be6c476 
+stderr | src/__tests__/pipeline-state.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:[0m src/lib/cloister/specialist-logs.ts is dynamically imported by src/cli/commands/specialists/logs.ts, src/lib/cloister/specialists.ts but also statically imported by src/lib/cloister/specialist-context.ts, src/lib/cloister/specialists.ts, dynamic import will not move module into another chunk.
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL |root|  tests/unit/lib/lifecycle/label-cleanup.test.ts [ tests/unit/lib/lifecycle/label-cleanup.test.ts ]
+Error: Failed to load url ../../../../src/lib/lifecycle/label-cleanup.js (resolved id: ../../../../src/lib/lifecycle/label-cleanup.js) in /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-805/tests/unit/lib/lifecycle/label-cleanup.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
-[43m WARN [49m `noExternal` is deprecated. Use `deps.alwaysBundle` instead.
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: Worker exited unexpectedly
+ ❯ ChildProcess.onUnexpectedExit node_modules/.bun/tinypool@1.1.1/node_modules/tinypool/dist/index.js:118:30
+ ❯ ChildProcess.emit node:events:531:35
+ ❯ ChildProcess._handle.onexit node:internal/child_process:293:12
 
-Terminated
-npm error Lifecycle script `build` failed with error:
-npm error code 143
-npm error path /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-805/src/dashboard/frontend
-npm error workspace panopticon-dashboard@0.1.0
-npm error location /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-805/src/dashboard/frontend
-npm error command failed
-npm error command sh -c tsc && vite build
+
 
 
 ## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill
@@ -40,6 +46,6 @@ npm error command sh -c tsc && vite build
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-805 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-805 -m "Fixed build"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-805 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-805 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.
