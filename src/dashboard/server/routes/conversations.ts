@@ -99,6 +99,7 @@ const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
 const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
 const UPLOAD_RATE_LIMIT_MAX = 10;
+const UPLOAD_RATE_LIMIT_MAP_MAX = 1_000;
 const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
 
 function isLoopbackAddress(addr: string): boolean {
@@ -123,10 +124,23 @@ const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 function checkUploadRateLimit(remoteAddress: string): boolean {
   const now = Date.now();
-  // Prune stale entries periodically to prevent unbounded growth
+  // Prune stale entries and enforce a hard size cap to prevent unbounded
+  // growth under distinct-IP traffic.
+  let pruned = 0;
   for (const [ip, entry] of uploadRateLimit) {
     if (now > entry.resetAt) {
       uploadRateLimit.delete(ip);
+      pruned++;
+    }
+  }
+  // If still over cap after pruning stale entries, evict oldest entries
+  // (Map iteration order is insertion order).
+  while (uploadRateLimit.size >= UPLOAD_RATE_LIMIT_MAP_MAX) {
+    const firstKey = uploadRateLimit.keys().next().value;
+    if (firstKey !== undefined) {
+      uploadRateLimit.delete(firstKey);
+    } else {
+      break;
     }
   }
   const entry = uploadRateLimit.get(remoteAddress);
@@ -1095,9 +1109,15 @@ const getConversationMessagesRoute = HttpRouter.add(
                 if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
                   const claudeProjects = join(homedir(), '.claude', 'projects');
                   const dirs = await readdir(claudeProjects);
+                  // Validate directory names to prevent path traversal before
+                  // joining. Only alphanumeric, hyphen, underscore, and dot are
+                  // allowed (encoded CWDs use these characters).
+                  const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
                   // Check all candidates concurrently with async stat instead of
                   // synchronous existsSync in a loop (blocks the event loop).
-                  const candidates = dirs.map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+                  const candidates = dirs
+                    .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+                    .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
                   const checks = await Promise.all(
                     candidates.map(async (candidate) => {
                       try {
@@ -1282,6 +1302,8 @@ const postConversationMessageRoute = HttpRouter.add(
 
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
 
+const MAX_TITLE_LENGTH = 200;
+
 export function patchConversationTitle(
   name: string,
   body: Record<string, unknown>,
@@ -1292,8 +1314,12 @@ export function patchConversationTitle(
   }
 
   if (typeof body.title === 'string' && body.title.trim()) {
+    const trimmed = body.title.trim();
+    if (trimmed.length > MAX_TITLE_LENGTH) {
+      return { status: 400, body: { error: `Title exceeds maximum length of ${MAX_TITLE_LENGTH} characters` } };
+    }
     // User explicitly renamed → mark as 'manual' so AI won't auto-replace
-    updateConversationTitle(name, body.title.trim(), 'manual');
+    updateConversationTitle(name, trimmed, 'manual');
   }
 
   return { status: 200, body: { success: true } };

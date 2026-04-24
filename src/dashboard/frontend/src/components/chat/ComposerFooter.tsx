@@ -11,7 +11,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { SendHorizontal, X } from 'lucide-react';
+import { SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
@@ -376,7 +376,8 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
           revokePreviewUrl(image.previewUrl);
         }
         pendingImagesRef.current = [];
-        removedImageIdsRef.current.clear();
+        // Do NOT clear removedImageIdsRef here — in-flight upload callbacks
+        // still need it to decide whether to delete orphaned server uploads.
         setPendingImages([]);
       }
     } catch (err) {
@@ -398,6 +399,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     previousConversationNameRef.current = conversation.name;
     const images = pendingImagesRef.current;
     pendingImagesRef.current = [];
+    uploadQueueRef.current = [];
     removedImageIdsRef.current.clear();
     for (const image of images) {
       revokePreviewUrl(image.previewUrl);
@@ -446,6 +448,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
         {pendingImages.length > 0 && (
           <div className={styles.composerImageStrip}>
             {pendingImages.map((image) => {
+              const isUploading = !image.serverPath && !image.error;
               const statusLabel = image.error
                 ? image.error
                 : image.serverPath
@@ -457,6 +460,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
                   <div className={styles.composerImageMeta}>
                     <span className={styles.composerImageName}>{image.file.name}</span>
                     <span className={image.error ? styles.composerImageError : styles.composerImageStatus}>
+                      {isUploading ? <Loader2 size={12} className={styles.spinner} /> : null}
                       {statusLabel}
                     </span>
                   </div>

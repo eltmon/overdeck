@@ -20,16 +20,6 @@ vi.mock('../DialogProvider', () => ({
   useAlert: () => vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../hooks/useKillAgent', () => ({
-  useKillAgent: (_agentId: string | undefined, options?: { onSuccess?: () => void }) => ({
-    confirmAndKill: vi.fn().mockImplementation(async () => {
-      options?.onSuccess?.();
-      return true;
-    }),
-    isPending: false,
-  }),
-}));
-
 vi.mock('../../hooks/useResetIssue', () => ({
   useResetIssue: () => ({
     confirmAndReset: vi.fn().mockResolvedValue(true),

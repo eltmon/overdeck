@@ -9,6 +9,20 @@ import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
+/** Run async tasks in bounded batches to avoid unbounded Promise.all
+ *  that can exhaust file descriptors or memory under heavy load. */
+async function runInBatches<T>(items: T[], batchSize: number, fn: (item: T) => Promise<unknown>): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    await Promise.all(batch.map(fn));
+  }
+}
+
+/** Max JSONL line length to process. Lines larger than this are skipped to
+ *  prevent readline from stalling permanently on oversized input (e.g. a
+ *  single-line base64 payload >15 MB). */
+const MAX_JSONL_LINE_LENGTH = 15 * 1024 * 1024;
+
 /** Bounded LRU cache for readSessionAttachmentBasenames to avoid full JSONL
  *  rescans when the session file has not changed. Key = sessionFile:mtimeMs. */
 const SESSION_ATTACHMENT_CACHE_MAX = 100;
@@ -72,11 +86,10 @@ export async function cleanupOrphanedConversationAttachments(): Promise<void> {
     const convNames = new Set(listConversations().map((c) => c.name));
     const root = getConversationAttachmentsRoot();
     const dirs = await readdir(root, { withFileTypes: true });
-    await Promise.all(
-      dirs
-        .filter((entry) => entry.isDirectory() && !convNames.has(entry.name))
-        .map((entry) => rm(join(root, entry.name), { recursive: true, force: true }).catch(() => {})),
-    );
+    const orphaned = dirs
+      .filter((entry) => entry.isDirectory() && !convNames.has(entry.name))
+      .map((entry) => join(root, entry.name));
+    await runInBatches(orphaned, 10, (path) => rm(path, { recursive: true, force: true }).catch(() => {}));
   } catch {
     // ignore — directory may not exist yet
   }
@@ -137,6 +150,8 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
     try {
       for await (const line of rl) {
         if (!line.trim()) continue;
+        // Skip oversized lines that could stall the reader (e.g. huge base64)
+        if (line.length > MAX_JSONL_LINE_LENGTH) continue;
         let text: string | undefined;
         try {
           const entry = JSON.parse(line);
@@ -222,8 +237,10 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
     // ignore
   }
 
-  await Promise.all(
-    attachmentPaths.map(async (attachmentPath) => {
+  await runInBatches(
+    attachmentPaths,
+    10,
+    async (attachmentPath) => {
       if (referencedBasenames.has(basename(attachmentPath))) {
         return;
       }
@@ -241,7 +258,7 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
       }
 
       await rm(attachmentPath, { force: true });
-    }),
+    },
   );
 }
 
