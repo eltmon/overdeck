@@ -86,7 +86,9 @@ export const SOURCE_DEV_SKILLS_DIR = join(packageRoot, 'dev-skills');
 export const SOURCE_AGENTS_DIR = join(packageRoot, 'agents');
 export const SOURCE_RULES_DIR = join(packageRoot, 'rules');
 // Review prompt templates (prompt primitives) — see docs/REVIEW-AGENT-ARCHITECTURE.md
-export const SOURCE_REVIEW_PROMPTS_DIR = join(packageRoot, '.claude', 'prompts');
+// Stored outside .claude/ so they don't appear in workspace worktrees where
+// work agents could read them and attempt self-review.
+export const SOURCE_REVIEW_PROMPTS_DIR = join(packageRoot, 'src', 'lib', 'cloister', 'prompts', 'review');
 
 // Cache directories (where Panopticon keeps its copy of distributed content)
 export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.panopticon/skills/
