@@ -33,6 +33,7 @@ interface TerminalTabsProps {
   /** True when the user has manually pinned a session */
   pinned: boolean;
   onSelectSession: (sessionName: string | null) => void;
+  onSelectAndPin?: (sessionName: string) => void;
   onTogglePin: () => void;
 }
 
@@ -90,6 +91,7 @@ export function TerminalTabs({
   activePhase,
   pinned,
   onSelectSession,
+  onSelectAndPin,
   onTogglePin,
 }: TerminalTabsProps) {
   const phaseColors = PHASE_CHIP_COLORS[activePhase] ?? { bg: '#1e2d47', text: textSecondary };
@@ -117,11 +119,13 @@ export function TerminalTabs({
               key={tab.id}
               disabled={tab.disabled}
               onClick={() => {
-                if (!tab.disabled) {
-                  onSelectSession(tab.sessionName);
-                  // If user clicks a different tab than auto, engage pin
-                  if (!tab.isActive && !pinned) {
-                    onTogglePin();
+                if (!tab.disabled && tab.sessionName) {
+                  // If clicking a non-active tab while not pinned, use atomic pin operation
+                  if (!tab.isActive && !pinned && onSelectAndPin) {
+                    onSelectAndPin(tab.sessionName);
+                  } else {
+                    // Otherwise just select the session
+                    onSelectSession(tab.sessionName);
                   }
                 }
               }}

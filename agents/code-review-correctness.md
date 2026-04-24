@@ -1,7 +1,6 @@
 ---
 name: code-review-correctness
 description: Reviews code for logic errors, edge cases, null handling, and type safety
-model: haiku
 tools:
   - Read
   - Grep

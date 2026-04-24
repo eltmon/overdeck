@@ -1,7 +1,6 @@
 ---
 name: codebase-explorer
 description: Fast read-only codebase exploration and architecture discovery
-model: haiku
 tools:
   - Read
   - Grep

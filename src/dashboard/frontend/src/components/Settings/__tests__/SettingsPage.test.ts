@@ -47,6 +47,20 @@ describe('MODELS_BY_PROVIDER', () => {
     const found = DEPRECATED_MODEL_IDS.filter(dep => allModelIds.includes(dep as never));
     expect(found).toEqual([]);
   });
+
+  it('exposes both GPT-5.5 and GPT-5.4 OpenAI families', () => {
+    const openaiModels = MODELS_BY_PROVIDER.openai.models.map((model) => model.id);
+    expect(openaiModels).toEqual(expect.arrayContaining([
+      'gpt-5.5-pro',
+      'gpt-5.5',
+      'gpt-5.5-mini',
+      'gpt-5.5-nano',
+      'gpt-5.4-pro',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.4-nano',
+    ]));
+  });
 });
 
 describe('getEffectiveModelId', () => {

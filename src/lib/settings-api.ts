@@ -12,6 +12,9 @@ import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import { reloadGlobalRouter } from './work-type-router.js';
+import { applyModelOverridesToAgents } from './agent-model-sync.js';
+import { executeSync } from './sync.js';
+import { getDevrootPath } from './config.js';
 
 /**
  * Optimal model defaults — multi-provider distribution (see docs/research/)
@@ -289,6 +292,17 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
   // and smart-model-selector fallback can pick an unexpected model (e.g. a
   // non-Anthropic top scorer that the runtime can't resolve).
   reloadGlobalRouter();
+
+  // Propagate override changes into the cached agent-definition .md files and
+  // then into the devroot. Claude Code reads the `model:` frontmatter to pick
+  // a model when a subagent is spawned via the Task tool, so without this
+  // step a saved override (e.g. subagent:explore → gpt-5.4-mini) is ignored
+  // and the hardcoded `model: haiku` in the shipped .md file wins — causing
+  // cliproxy 502s when the Claude model isn't registered with its proxy.
+  applyModelOverridesToAgents();
+  if (getDevrootPath()) {
+    executeSync();
+  }
 }
 
 /**

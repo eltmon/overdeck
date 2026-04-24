@@ -1,7 +1,6 @@
 ---
 name: planning-agent
 description: Researches codebase and creates comprehensive execution plans
-model: sonnet
 tools:
   - Read
   - Grep

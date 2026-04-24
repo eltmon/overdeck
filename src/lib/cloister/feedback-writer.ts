@@ -12,10 +12,12 @@ import { writeFile, readFile, mkdir, readdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
+import { PANOPTICON_HOME } from '../paths.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
   workspacePath?: string;
+  agentId?: string;  // Agent directory (e.g., agent-pan-805, review-PAN-805-1776992353562-correctness)
   specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent';
   outcome: string;
   summary: string;
@@ -99,66 +101,52 @@ async function appendToStateMd(
 }
 
 /**
- * Archive existing feedback files from a previous review cycle.
- * Moves all NNN-*.md files in .planning/feedback/ into .planning/feedback/archive/
- * so the work agent only sees current-cycle feedback.
- */
-export async function archiveFeedbackFiles(workspacePath: string): Promise<void> {
-  const feedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (!existsSync(feedbackDir)) return;
-
-  const files = await readdir(feedbackDir);
-  const feedbackFiles = files.filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'));
-  if (feedbackFiles.length === 0) return;
-
-  const archiveDir = join(feedbackDir, 'archive');
-  await mkdir(archiveDir, { recursive: true });
-
-  for (const file of feedbackFiles) {
-    const src = join(feedbackDir, file);
-    const dest = join(archiveDir, file);
-    try {
-      await rename(src, dest);
-    } catch (err: any) {
-      console.error(`[feedback-writer] Failed to archive ${file}:`, err.message);
-    }
-  }
-
-  console.log(`[feedback-writer] Archived ${feedbackFiles.length} feedback file(s) from previous cycle`);
-}
-
-/**
  * Write specialist feedback to a file in the workspace and update STATE.md.
  */
 export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
-  // Validate workspacePath — reject project roots (must contain /workspaces/ or have .planning dir)
-  let providedPath = opts.workspacePath;
-  if (providedPath && !existsSync(join(providedPath, '.planning')) && !providedPath.includes('/workspaces/')) {
-    // Looks like a project root, not a workspace — fall back to resolution
-    providedPath = undefined;
-  }
+  // If agentId provided, write to agent directory. Otherwise fall back to workspace.
+  let feedbackDir: string;
+  let planningDir: string;
+  let workspacePath: string | null = null;
 
-  // Guard: if the provided path looks like a workspace but the issue ID doesn't match the
-  // directory name, fall back to canonical resolution. This catches routing mismatches where
-  // e.g. PAN-645's feedback would be written into feature-pan-647's directory.
-  if (providedPath?.includes('/workspaces/feature-')) {
-    const dirName = providedPath.replace(/.*\/workspaces\/feature-/, '').replace(/\/.*$/, '');
-    const expectedSuffix = opts.issueId.toLowerCase();
-    if (!dirName.includes(expectedSuffix) && !expectedSuffix.replace(/^[a-z]+-/, '').includes(dirName)) {
-      console.error(
-        `[feedback-writer] MISMATCH: issueId=${opts.issueId} but workspacePath points to feature-${dirName} — falling back to canonical resolution`
-      );
+  if (opts.agentId) {
+    // Write to agent directory (new architecture)
+    const agentDir = join(PANOPTICON_HOME, 'agents', opts.agentId);
+    feedbackDir = join(agentDir, 'feedback');
+    // Still need workspace path for STATE.md breadcrumb
+    let providedPath = opts.workspacePath;
+    if (providedPath && !existsSync(join(providedPath, '.planning')) && !providedPath.includes('/workspaces/')) {
       providedPath = undefined;
     }
+    if (providedPath?.includes('/workspaces/feature-')) {
+      const dirName = providedPath.replace(/.*\/workspaces\/feature-/, '').replace(/\/.*$/, '');
+      const expectedSuffix = opts.issueId.toLowerCase();
+      if (!dirName.includes(expectedSuffix) && !expectedSuffix.replace(/^[a-z]+-/, '').includes(dirName)) {
+        providedPath = undefined;
+      }
+    }
+    workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
+    planningDir = workspacePath ? join(workspacePath, '.planning') : '';
+  } else {
+    // Fall back to workspace directory (legacy, for backward compatibility)
+    let providedPath = opts.workspacePath;
+    if (providedPath && !existsSync(join(providedPath, '.planning')) && !providedPath.includes('/workspaces/')) {
+      providedPath = undefined;
+    }
+    if (providedPath?.includes('/workspaces/feature-')) {
+      const dirName = providedPath.replace(/.*\/workspaces\/feature-/, '').replace(/\/.*$/, '');
+      const expectedSuffix = opts.issueId.toLowerCase();
+      if (!dirName.includes(expectedSuffix) && !expectedSuffix.replace(/^[a-z]+-/, '').includes(dirName)) {
+        providedPath = undefined;
+      }
+    }
+    workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
+    if (!workspacePath) {
+      return { success: false, error: `Workspace not found for ${opts.issueId}` };
+    }
+    planningDir = join(workspacePath, '.planning');
+    feedbackDir = join(planningDir, 'feedback');
   }
-
-  const workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
-  if (!workspacePath) {
-    return { success: false, error: `Workspace not found for ${opts.issueId}` };
-  }
-
-  const planningDir = join(workspacePath, '.planning');
-  const feedbackDir = join(planningDir, 'feedback');
 
   try {
     await mkdir(feedbackDir, { recursive: true });
@@ -167,7 +155,9 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
     const seqStr = String(seq).padStart(3, '0');
     const filename = `${seqStr}-${opts.specialist}-${opts.outcome}.md`;
     const filePath = join(feedbackDir, filename);
-    const relativePath = `.planning/feedback/${filename}`;
+    const relativePath = opts.agentId
+      ? `~/.panopticon/agents/${opts.agentId}/feedback/${filename}`
+      : `.planning/feedback/${filename}`;
 
     const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
     const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
@@ -186,14 +176,16 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
 
     await writeFile(filePath, content, 'utf-8');
 
-    // Update STATE.md with breadcrumb
-    await appendToStateMd(planningDir, {
-      timestamp: shortTimestamp,
-      specialist: opts.specialist,
-      outcome: opts.outcome,
-      relativePath,
-      issueId: opts.issueId,
-    });
+    // Update STATE.md with breadcrumb (only if workspace available)
+    if (planningDir && workspacePath) {
+      await appendToStateMd(planningDir, {
+        timestamp: shortTimestamp,
+        specialist: opts.specialist,
+        outcome: opts.outcome,
+        relativePath,
+        issueId: opts.issueId,
+      });
+    }
 
     console.log(`[feedback-writer] Wrote ${relativePath} for ${opts.issueId}`);
     return { success: true, relativePath, filePath };
