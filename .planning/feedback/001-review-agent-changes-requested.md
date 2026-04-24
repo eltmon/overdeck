@@ -2,23 +2,22 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-24T17:26:05Z
+timestamp: 2026-04-24T23:11:12Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-PAN-539 implements image paste/drop in the conversation composer and is functionally complete with strong security posture (CSRF, MIME validation, magic-byte checks, path traversal defense all correct). One blocker must be fixed: the upload lifecycle is not scoped to a conversation, so a rapid conversation switch can silently attach a stale image from the prior conversation to the new one. Seven high-priority issues also require fixes before merge: multipart null-check hardening, upload-response containment assertion, upload error recovery guard, concurrent upload/delete race, missing model validation in summary-fork, unbounded message body, and N+1 subprocess spawns in the 10-second lifecycle poller.
-
-## Security Issues
-
-- model field not validated in summary-fork route
-- no length limit on message body field
+PAN-539 adds image paste/drop to the ConversationPanel composer with strong security posture and complete requirements coverage. Three High-priority issues must be fixed before merge: a misleading error message for empty upload payloads, a silent no-op in the null-sessionFile attachment cleanup path that allows unreferenced files to accumulate, and a full-file JSONL parse on the hot message polling path that degrades under large session files. No security blockers; all three security warnings are low/minimal risk for the current localhost-only deployment.
 
 ## Performance Issues
 
-- N+1 subprocess spawn in 10-second lifecycle poller
+- Full-file JSONL parse on hot polling path
+- Cold-path specialist session file discovery O(n) stat fanout
+- Double stat() per cache-miss request
+- getTrustedOrigins allocates per-request
+- Dual-pass JSONL extraction in readSessionAttachmentBasenames
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
