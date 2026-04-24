@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from 'fs';
-import { readFile, writeFile, unlink, mkdir, appendFile, readdir } from 'fs/promises';
+import { readFile, writeFile, unlink, mkdir, appendFile, readdir, rm } from 'fs/promises';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { exec } from 'child_process';
@@ -13,7 +13,7 @@ import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
-import { CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
+import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 
 const execAsync = promisify(exec);
@@ -802,7 +802,45 @@ export async function runParallelReview(
     console.error(`[review-agent] sendFeedbackToWorkAgent failed for ${context.issueId} (non-fatal):`, err);
   }
 
+  // ── Phase 6: Clean up reviewer state dirs ─────────────────────────────────
+  // Reviewer/synthesis state is pure ephemeral — the orchestration is over,
+  // history is logged, feedback is delivered. These dirs exist in
+  // ~/.panopticon/agents/ as artifacts of the per-session agent runtime and
+  // have zero value past this point. Event-driven cleanup replaces retention.
+  try {
+    await cleanupReviewerStateDirs(reviewId, agents);
+  } catch (err) {
+    console.error(`[review-agent] cleanupReviewerStateDirs failed for ${reviewId} (non-fatal):`, err);
+  }
+
   return { result, reviewId };
+}
+
+/**
+ * Delete ~/.panopticon/agents/review-<issueId>-<ts>-<role>/ for each reviewer
+ * plus the synthesis session. Called once the review has posted and the
+ * state serves no purpose. Non-fatal: logs errors but never throws.
+ */
+async function cleanupReviewerStateDirs(
+  reviewId: string,
+  agents: ReviewAgentConfig[],
+): Promise<void> {
+  const roles = [...agents.map(a => a.name), 'synthesis'];
+  let purged = 0;
+  for (const role of roles) {
+    const dirName = `${reviewId}-${role}`;
+    const dirPath = join(AGENTS_DIR, dirName);
+    if (!existsSync(dirPath)) continue;
+    try {
+      await rm(dirPath, { recursive: true, force: true });
+      purged++;
+    } catch (err) {
+      console.error(`[review-agent] Failed to remove ${dirPath}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  if (purged > 0) {
+    console.log(`[review-agent] Cleaned up ${purged} reviewer state dir(s) for ${reviewId}`);
+  }
 }
 
 /**
