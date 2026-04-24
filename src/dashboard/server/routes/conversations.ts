@@ -63,6 +63,7 @@ import {
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
+  type ParseState,
 } from '../services/conversation-service.js';
 import {
   maybeCompactBeforeRespawn,
@@ -158,7 +159,16 @@ function checkUploadRateLimit(remoteAddress: string): boolean {
 // ─── Messages cache ───────────────────────────────────────────────────────────
 
 const MESSAGES_CACHE_MAX = 100;
-const messagesCache = new Map<string, { mtimeMs: number; size: number; result: Awaited<ReturnType<typeof parseConversationMessages>> }>();
+const messagesCache = new Map<
+  string,
+  {
+    mtimeMs: number;
+    size: number;
+    result: Awaited<ReturnType<typeof parseConversationMessages>>;
+    byteOffset: number;
+    parseState: ParseState | undefined;
+  }
+>();
 
 async function getCachedMessages(
   sessionFile: string,
@@ -170,10 +180,51 @@ async function getCachedMessages(
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
     return cached.result;
   }
-  const result = isSpecialist
-    ? await parseFromLastCompactBoundary(sessionFile)
-    : await parseConversationMessages(sessionFile, 0);
-  messagesCache.set(cacheKey, { mtimeMs: fileStats.mtimeMs, size: fileStats.size, result });
+
+  let result: Awaited<ReturnType<typeof parseConversationMessages>>;
+
+  if (isSpecialist) {
+    result = await parseFromLastCompactBoundary(sessionFile);
+  } else if (
+    cached &&
+    cached.parseState &&
+    cached.byteOffset <= fileStats.size &&
+    cached.size <= fileStats.size
+  ) {
+    // Incremental parse: file grew, continue from where we left off.
+    const incremental = await parseConversationMessages(sessionFile, cached.byteOffset, cached.parseState);
+    if (incremental.byteOffset < cached.byteOffset) {
+      // File was truncated or rotated — fall back to full parse.
+      result = await parseConversationMessages(sessionFile, 0);
+    } else {
+      result = {
+        messages: cached.result.messages.concat(incremental.messages),
+        workLog: cached.result.workLog.concat(incremental.workLog),
+        byteOffset: incremental.byteOffset,
+        streaming: incremental.streaming,
+        totalCost: cached.result.totalCost + incremental.totalCost,
+        pendingToolUse: incremental.pendingToolUse,
+        unresolvedResults: incremental.unresolvedResults,
+        lastSequence: incremental.lastSequence,
+        mtimeMs: incremental.mtimeMs,
+      };
+    }
+  } else {
+    // Full parse (no cache, file shrank, or first time).
+    result = await parseConversationMessages(sessionFile, 0);
+  }
+
+  messagesCache.set(cacheKey, {
+    mtimeMs: fileStats.mtimeMs,
+    size: fileStats.size,
+    result,
+    byteOffset: result.byteOffset,
+    parseState: {
+      pendingToolUse: result.pendingToolUse,
+      unresolvedResults: result.unresolvedResults,
+      lastSequence: result.lastSequence,
+    },
+  });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {
     const firstKey = messagesCache.keys().next().value;
     if (firstKey !== undefined) {
@@ -352,7 +403,11 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
 
-  if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) {
+  if (bytes.length === 0) {
+    return jsonResponse({ error: 'Payload is empty' }, { status: 400 });
+  }
+
+  if (bytes.length > MAX_UPLOAD_BYTES) {
     return jsonResponse(
       { error: `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes` },
       { status: 400 },

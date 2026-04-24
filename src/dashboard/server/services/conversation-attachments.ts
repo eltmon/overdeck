@@ -213,7 +213,15 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
 
 export async function cleanupUnreferencedConversationAttachments(conversation: Pick<Conversation, 'name' | 'sessionFile'>): Promise<void> {
   const attachmentPaths = await listConversationAttachmentPaths(conversation.name);
-  if (attachmentPaths.length === 0 || !conversation.sessionFile) {
+  if (attachmentPaths.length === 0) {
+    return;
+  }
+
+  // No session file means nothing can reference attachments — delete them all.
+  if (!conversation.sessionFile) {
+    await runInBatches(attachmentPaths, 10, async (attachmentPath) => {
+      await rm(attachmentPath, { force: true });
+    });
     return;
   }
 

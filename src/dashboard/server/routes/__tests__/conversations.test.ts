@@ -136,7 +136,7 @@ describe('conversations route — DB integration', () => {
     const response = await handleConversationImageUpload('upload-test', 'empty.png', Buffer.alloc(0), 'image/png');
 
     expect(response.status).toBe(400);
-    expect(decodeJsonResponse(response)).toEqual({ error: 'Payload exceeds maximum size of 5242880 bytes' });
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Payload is empty' });
   });
 
   it('rejects attachment reuse across conversations while preserving referenced uploads', async () => {
