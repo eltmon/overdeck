@@ -396,12 +396,19 @@ describe('resolveReviewerModel', () => {
     expect(model).toBe('claude-opus-4-6');
   });
 
-  it('falls back to defaultModel for unknown roles', () => {
+  it('falls back to specialist-review-agent for unknown roles when no role-specific override', () => {
+    // New behavior (post-gpt-5.5 fix): unknown roles with no override use the
+    // specialist-review-agent work type, not the defaultModel. This prevents
+    // smart selection from picking unsupported models (e.g. gpt-5.5 without
+    // CLIProxy mapping). See resolveReviewerModel for rationale.
     const model = resolveReviewerModel(
       { name: 'unknown-role', focus: [] },
       'claude-haiku-4-5',
     );
-    expect(model).toBe('claude-haiku-4-5');
+    // The returned model comes from the work-type router, not the defaultModel.
+    // Exact ID depends on user config but it MUST be a non-empty string.
+    expect(typeof model).toBe('string');
+    expect(model.length).toBeGreaterThan(0);
   });
 
   it('returns a non-empty string for known roles (routing or fallback)', () => {
@@ -440,8 +447,13 @@ describe('resolveReviewerModel', () => {
     expect(model.length).toBeGreaterThan(0);
   });
 
-  it('passes through concrete model IDs unchanged', () => {
-    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'claude-haiku-4-5');
+  it('passes through agent.model concrete IDs unchanged (highest precedence)', () => {
+    // The only way to force a specific concrete model is via agent.model.
+    // defaultModel is last-resort fallback used only when work-type routing fails.
+    const model = resolveReviewerModel(
+      { name: 'unknown-role', focus: [], model: 'claude-haiku-4-5' },
+      'claude-sonnet-4-5',
+    );
     expect(model).toBe('claude-haiku-4-5');
   });
 
@@ -642,8 +654,13 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function readTemplate(name: string): string {
-  // Templates live at agents/<name>.md, two directories up from tests/lib/cloister/
-  const templatePath = resolve(import.meta.dirname, '../../../agents', `${name}.md`);
+  // Review prompt templates live at .claude/prompts/<name>.prompt-template.md
+  // (three directories up from tests/lib/cloister/).
+  const templatePath = resolve(
+    import.meta.dirname,
+    '../../../.claude/prompts',
+    `${name}.prompt-template.md`,
+  );
   return readFileSync(templatePath, 'utf-8');
 }
 
@@ -791,17 +808,21 @@ describe('runParallelReview configuration regressions', () => {
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toContain('existsSync(templatePath)');
+    expect(src).toContain('existsSync(promptTemplatePath)');
   });
 });
 
-// ── resolveTemplatePath ───────────────────────────────────────────────────────
+// ── resolvePromptTemplatePath (legacy alias: resolveTemplatePath) ────────────
 
-describe('resolveTemplatePath', () => {
-  it('returns CACHE_AGENTS_DIR path (infrastructure reviewers use main cache only)', () => {
+describe('resolvePromptTemplatePath', () => {
+  it('returns a path under either review-prompts (new) or agent-definitions (legacy fallback)', () => {
+    // In test env, the new CACHE_REVIEW_PROMPTS_DIR typically does not exist
+    // (no `pan sync` run), so resolvePromptTemplatePath falls back to the
+    // legacy CACHE_AGENTS_DIR path. Either layout is accepted.
     const result = resolveTemplatePath('code-review-correctness', '/any/workspace');
-    expect(result).toContain('agent-definitions');
-    expect(result).toContain('code-review-correctness.md');
+    const isNew = result.includes('review-prompts') && result.endsWith('.prompt-template.md');
+    const isLegacy = result.includes('agent-definitions') && result.endsWith('code-review-correctness.md');
+    expect(isNew || isLegacy).toBe(true);
   });
 });
 
@@ -813,7 +834,7 @@ describe('runParallelReview', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-review-'));
     // Create workspace agents/ dir with minimal templates; tests inject
-    // resolveTemplateFn so these local templates are used instead of the global cache.
+    // resolvePromptTemplateFn so these local templates are used instead of the global cache.
     mkdirSync(join(tmpDir, 'agents'), { recursive: true });
     const frontmatter = '---\nmodel: sonnet\n---\nReview the code.\n';
     writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), frontmatter);
@@ -837,13 +858,13 @@ describe('runParallelReview', () => {
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
-    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
 
     const { result } = await runParallelReview(
       baseContext(),
       ['src/foo.ts'],
       [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
     expect(spawnFn).toHaveBeenCalledTimes(2); // 1 reviewer + 1 synthesis
@@ -858,13 +879,13 @@ describe('runParallelReview', () => {
     const waitFn = vi.fn().mockResolvedValue('failed'); // all reviewers fail
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
-    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
 
     const { result } = await runParallelReview(
       baseContext(),
       [],
       [{ name: 'correctness' }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
     expect(parseSynthesisFn).not.toHaveBeenCalled();
