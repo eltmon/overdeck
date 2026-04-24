@@ -854,13 +854,34 @@ export function reviewResultToReviewStatus(
  * Dispatch a parallel code review asynchronously (fire-and-forget).
  *
  * Replaces `spawnEphemeralSpecialist('review-agent', ...)` — returns immediately
- * with `{ success: true }` while the review runs in the background.
- * All reviewStatus transitions (pending → reviewing → passed/blocked/failed)
- * are managed exclusively inside this function. Callers must NOT write reviewStatus.
+ * with `{ success: true }` while the review runs in an independent tmux
+ * coordinator session owned by the tmux server (not this Node process).
+ *
+ * **Dashboard-restart invariant:** the review is orchestrated by a detached
+ * tmux session running `pan review run <issueId>`. That session survives
+ * server/dashboard restart — only the tmux server's lifecycle can end it.
+ * See docs/REVIEW-AGENT-ARCHITECTURE.md.
+ *
+ * Upfront status writes happen synchronously before spawn so callers see the
+ * `reviewing` state immediately. The coordinator session writes the terminal
+ * status (passed/failed) directly via `setReviewStatus` when the CLI exits.
  */
 export async function dispatchParallelReview(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string },
-  { spawnFn = spawnReviewAgent }: { spawnFn?: typeof spawnReviewAgent } = {},
+  {
+    /**
+     * Legacy in-process spawn path. Default is undefined — the new flow spawns
+     * a detached tmux coordinator session. Tests pass a mock to exercise the
+     * old path or to avoid spawning real tmux.
+     */
+    spawnFn,
+    coordinatorSpawnFn = spawnReviewCoordinatorSession,
+  }: {
+    spawnFn?: typeof spawnReviewAgent;
+    coordinatorSpawnFn?: (
+      opts: { issueId: string; workspace: string },
+    ) => Promise<{ sessionName: string }>;
+  } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
   const { getReviewStatus, setReviewStatus } = await import('../review-status.js');
   const prUrl = opts.prUrl || getReviewStatus(opts.issueId)?.prUrl || '';
@@ -881,8 +902,9 @@ export async function dispatchParallelReview(
     // Non-fatal: archiving is best-effort
   }
 
-  // Set reviewing here so callers don't race against the async .catch that resets
-  // to pending on spawn failure. All reviewStatus transitions live in this function.
+  // Set reviewing here so callers don't race against the async coordinator.
+  // The coordinator (pan review run) will overwrite this with the terminal
+  // status when it exits.
   try {
     setReviewStatus(opts.issueId, {
       reviewStatus: 'reviewing',
@@ -905,31 +927,74 @@ export async function dispatchParallelReview(
     // Non-fatal: event emission is best-effort
   }
 
-  spawnFn(context)
-    .then(result => {
-      const mapped = reviewResultToReviewStatus(result.reviewResult);
-      // PAN-794: clean terminal result — reset the recovery cycle so stale infra
-      // failures from earlier cycles do not poison the breaker history window.
-      setReviewStatus(opts.issueId, {
-        reviewStatus: mapped,
-        reviewNotes: result.notes,
-        reviewRetryCount: 0,
-        recoveryStartedAt: undefined,
+  // Legacy in-process path (tests may inject spawnFn directly).
+  if (spawnFn) {
+    spawnFn(context)
+      .then(result => {
+        const mapped = reviewResultToReviewStatus(result.reviewResult);
+        setReviewStatus(opts.issueId, {
+          reviewStatus: mapped,
+          reviewNotes: result.notes,
+          reviewRetryCount: 0,
+          recoveryStartedAt: undefined,
+        });
+        console.log(`[review-agent] dispatchParallelReview (legacy path) finished for ${opts.issueId}: ${result.reviewResult}`);
+      })
+      .catch(err => {
+        console.error(`[review-agent] dispatchParallelReview (legacy path) failed for ${opts.issueId}:`, err);
+        setReviewStatus(opts.issueId, {
+          reviewStatus: 'failed',
+          reviewNotes: `Review dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
       });
-      console.log(`[review-agent] dispatchParallelReview finished for ${opts.issueId}: ${result.reviewResult}`);
-    })
-    .catch(err => {
-      // PAN-794: record a terminal 'failed' status instead of bouncing back to
-      // 'pending'. The old 'pending' reset caused the deacon orphan sweep to
-      // re-dispatch the same review indefinitely (the 25-hour infra-failure loop).
-      console.error(`[review-agent] dispatchParallelReview failed for ${opts.issueId}:`, err);
-      setReviewStatus(opts.issueId, {
-        reviewStatus: 'failed',
-        reviewNotes: `Review dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
-      });
-    });
+    return { success: true, message: `Parallel review dispatched (legacy) for ${opts.issueId}` };
+  }
 
-  return { success: true, message: `Parallel review dispatched for ${opts.issueId}` };
+  // New path: spawn a detached tmux coordinator session running `pan review run`.
+  // That session is owned by the tmux server and survives this process exiting.
+  try {
+    const { sessionName } = await coordinatorSpawnFn({
+      issueId: opts.issueId,
+      workspace: opts.workspace,
+    });
+    console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}`);
+    return {
+      success: true,
+      message: `Review coordinator spawned: ${sessionName}`,
+    };
+  } catch (err) {
+    console.error(`[review-agent] Failed to spawn review coordinator for ${opts.issueId}:`, err);
+    setReviewStatus(opts.issueId, {
+      reviewStatus: 'failed',
+      reviewNotes: `Coordinator spawn failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return {
+      success: false,
+      message: 'Failed to spawn review coordinator',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * Spawn a detached tmux coordinator session that runs `pan review run <id>`.
+ *
+ * The session is named `review-coordinator-<issueId>-<timestamp>` and runs
+ * from the workspace directory. It lives until `pan review run` exits (or is
+ * killed externally via `pan review abort`). Dashboard restart does not
+ * affect it — tmux owns the session, not this Node process.
+ */
+export async function spawnReviewCoordinatorSession(opts: {
+  issueId: string;
+  workspace: string;
+}): Promise<{ sessionName: string }> {
+  const sessionName = `review-coordinator-${opts.issueId}-${Date.now()}`;
+  // `pan review run` is globally installed (via npm link or the release).
+  // We wrap in `bash -lc` so PATH and nvm init run; `|| true` on exit so tmux
+  // does not retain the session with a non-zero exit (keeps teardown clean).
+  const command = `bash -lc 'pan review run ${opts.issueId} || true; exit'`;
+  await createSessionAsync(sessionName, opts.workspace, command);
+  return { sessionName };
 }
 
 /**
