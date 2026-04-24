@@ -245,6 +245,7 @@ program
   .description('Summary Fork a conversation — creates new session from a summary of previous work')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
+  .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(forkCommand);
 
 program
