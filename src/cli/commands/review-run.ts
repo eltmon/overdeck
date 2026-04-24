@@ -25,6 +25,7 @@ import {
   getReviewAgents,
   type ReviewContext,
 } from '../../lib/cloister/review-agent.js';
+import { setReviewStatus } from '../../lib/review-status.js';
 
 const execAsync = promisify(exec);
 
@@ -82,6 +83,19 @@ export async function reviewRunCommand(
     filesChanged,
   };
 
+  // Mark reviewing in the review-status DB so the dashboard reflects the
+  // in-flight state even if the server is restarted mid-review. Safe against
+  // the coordinator-dispatch path: setReviewStatus is idempotent and that
+  // path has already written 'reviewing' upfront.
+  try {
+    setReviewStatus(issueId, {
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn(chalk.yellow(`[review-run] setReviewStatus(reviewing) failed (continuing): ${err instanceof Error ? err.message : String(err)}`));
+  }
+
   console.log(chalk.cyan('\nPhase 1/4: spawning reviewers...'));
   console.log(chalk.cyan('Phase 2/4: waiting for reviewer outputs...'));
   console.log(chalk.cyan('Phase 3/4: synthesizing...'));
@@ -111,6 +125,23 @@ export async function reviewRunCommand(
   }
 
   const exitCode = mapToExitCode(result.reviewResult, verdict);
+
+  // Persist the terminal review status. The dashboard reads this from the DB
+  // on next observation — no server API needed.
+  try {
+    const mapped =
+      exitCode === 0 ? ('passed' as const)
+      : exitCode === 1 ? ('failed' as const)
+      : ('failed' as const);
+    setReviewStatus(issueId, {
+      reviewStatus: mapped,
+      reviewNotes: result.notes,
+      reviewRetryCount: 0,
+      recoveryStartedAt: undefined,
+    });
+  } catch (err) {
+    console.warn(chalk.yellow(`[review-run] setReviewStatus(terminal) failed: ${err instanceof Error ? err.message : String(err)}`));
+  }
 
   if (exitCode === 0) {
     console.log(chalk.green(`\n✓ Verdict: APPROVED`));
