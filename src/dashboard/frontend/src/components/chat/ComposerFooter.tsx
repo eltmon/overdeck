@@ -113,8 +113,19 @@ async function uploadConversationImage(
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to upload image (${res.status})${body ? `: ${body}` : ''}`);
   }
-  const payload = await res.json() as { path?: unknown };
-  if (typeof payload.path !== 'string' || payload.path.length === 0) {
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch {
+    throw new Error('Image upload response was not valid JSON');
+  }
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('path' in payload) ||
+    typeof payload.path !== 'string' ||
+    payload.path.length === 0
+  ) {
     throw new Error('Image upload response did not include a path');
   }
   return payload.path;
@@ -141,6 +152,9 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   const removedImageIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const previousConversationNameRef = useRef(conversation.name);
+  const uploadQueueRef = useRef<PendingImage[]>([]);
+  const activeUploadsRef = useRef(0);
+  const MAX_CONCURRENT_UPLOADS = 3;
 
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
@@ -179,11 +193,45 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     });
   }, [conversation.name, deleteUploadedImage]);
 
+  const processUploadQueue = useCallback(() => {
+    const ownerConversationName = conversation.name;
+    while (
+      activeUploadsRef.current < MAX_CONCURRENT_UPLOADS &&
+      uploadQueueRef.current.length > 0
+    ) {
+      const image = uploadQueueRef.current.shift()!;
+      activeUploadsRef.current++;
+      void uploadConversationImage(ownerConversationName, image.file)
+        .then((serverPath) => {
+          activeUploadsRef.current--;
+          if (
+            removedImageIdsRef.current.has(image.id)
+            || !mountedRef.current
+            || ownerConversationName !== previousConversationNameRef.current
+          ) {
+            deleteUploadedImage(ownerConversationName, serverPath);
+          } else {
+            updatePendingImage(image.id, { serverPath, error: null });
+          }
+          processUploadQueue();
+        })
+        .catch((err: unknown) => {
+          activeUploadsRef.current--;
+          if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
+            processUploadQueue();
+            return;
+          }
+          const message = err instanceof Error ? err.message : 'Failed to upload image';
+          updatePendingImage(image.id, { error: message });
+          processUploadQueue();
+        });
+    }
+  }, [conversation.name, deleteUploadedImage, updatePendingImage]);
+
   const enqueueImages = useCallback((files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
 
-    const ownerConversationName = conversation.name;
     const newImages = imageFiles.map((file) => ({
       id: crypto.randomUUID(),
       file,
@@ -198,28 +246,9 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       return next;
     });
 
-    for (const image of newImages) {
-      void uploadConversationImage(ownerConversationName, image.file)
-        .then((serverPath) => {
-          if (
-            removedImageIdsRef.current.has(image.id)
-            || !mountedRef.current
-            || ownerConversationName !== previousConversationNameRef.current
-          ) {
-            deleteUploadedImage(ownerConversationName, serverPath);
-            return;
-          }
-          updatePendingImage(image.id, { serverPath, error: null });
-        })
-        .catch((err: unknown) => {
-          if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
-            return;
-          }
-          const message = err instanceof Error ? err.message : 'Failed to upload image';
-          updatePendingImage(image.id, { error: message });
-        });
-    }
-  }, [conversation.name, deleteUploadedImage, updatePendingImage]);
+    uploadQueueRef.current.push(...newImages);
+    processUploadQueue();
+  }, [processUploadQueue]);
 
   // Send /model command to tmux when model is changed on an active conversation
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {

@@ -54,6 +54,7 @@ import {
   createSessionAsync,
   setOptionAsync,
   waitForClaudePrompt,
+  listSessionNamesAsync,
 } from '../../../lib/tmux.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -116,8 +117,16 @@ function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
   return remoteAddress;
 }
 
+const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+
 function checkUploadRateLimit(remoteAddress: string): boolean {
   const now = Date.now();
+  // Prune stale entries periodically to prevent unbounded growth
+  for (const [ip, entry] of uploadRateLimit) {
+    if (now > entry.resetAt) {
+      uploadRateLimit.delete(ip);
+    }
+  }
   const entry = uploadRateLimit.get(remoteAddress);
   if (!entry || now > entry.resetAt) {
     uploadRateLimit.set(remoteAddress, { count: 1, resetAt: now + UPLOAD_RATE_LIMIT_WINDOW_MS });
@@ -674,17 +683,16 @@ const getConversationsRoute = HttpRouter.add(
         // Grace period: treat recently-created active conversations as alive (tmux may not have
         // started yet — spawn is async). After 30s we fall back to the actual tmux check.
         const SPAWN_GRACE_MS = 30_000;
-        const enriched = await Promise.all(
-          conversations.map(async (conv) => {
-            const withinGrace =
-              conv.status === 'active' &&
-              !conv.endedAt &&
-              Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
-            const sessionAlive = !conv.forkStatus && (withinGrace || (await tmuxSessionExists(conv.tmuxSession)));
+        const liveSessionNames = new Set(await listSessionNamesAsync());
+        const enriched = conversations.map((conv) => {
+          const withinGrace =
+            conv.status === 'active' &&
+            !conv.endedAt &&
+            Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
+          const sessionAlive = !conv.forkStatus && (withinGrace || liveSessionNames.has(conv.tmuxSession));
 
-            return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
-          }),
-        );
+          return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
+        });
 
         return jsonResponse(enriched);
       }    catch (error: unknown) {
@@ -995,7 +1003,7 @@ const getConversationMessagesRoute = HttpRouter.add(
             try {
               const { readFile, readdir } = await import('node:fs/promises');
               const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
-              if (sessionId) {
+              if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
                 const claudeProjects = join(homedir(), '.claude', 'projects');
                 const dirs = await readdir(claudeProjects);
                 for (const dir of dirs) {
@@ -1272,7 +1280,8 @@ const postConversationUnarchiveRoute = HttpRouter.add(
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to unarchive conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] unarchive conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),

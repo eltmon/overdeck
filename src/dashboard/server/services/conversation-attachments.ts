@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -61,6 +62,25 @@ export async function ensureConversationAttachmentDir(name: string): Promise<str
 export async function cleanupConversationAttachments(name: string): Promise<void> {
   assertSafeName(name);
   await rm(getConversationAttachmentDir(name), { recursive: true, force: true });
+}
+
+/** Safety-net cleanup: remove attachment directories for conversations that no
+ *  longer exist in the database. Catches orphaned files from abandoned/crashed
+ *  sessions that the lifecycle poller missed. */
+export async function cleanupOrphanedConversationAttachments(): Promise<void> {
+  try {
+    const { listConversations } = await import('../../../lib/database/conversations-db.js');
+    const convNames = new Set(listConversations().map((c) => c.name));
+    const root = getConversationAttachmentsRoot();
+    const dirs = await readdir(root, { withFileTypes: true });
+    await Promise.all(
+      dirs
+        .filter((entry) => entry.isDirectory() && !convNames.has(entry.name))
+        .map((entry) => rm(join(root, entry.name), { recursive: true, force: true }).catch(() => {})),
+    );
+  } catch {
+    // ignore — directory may not exist yet
+  }
 }
 
 async function listConversationAttachmentPaths(name: string): Promise<string[]> {
@@ -234,24 +254,35 @@ async function resolveForContainment(attachmentPath: string): Promise<string> {
   }
 }
 
+function isTmpdirAttachmentPath(attachmentPath: string): boolean {
+  const base = basename(attachmentPath);
+  return attachmentPath.startsWith(`${tmpdir()}${sep}`) && base.startsWith('panopticon-paste-');
+}
+
 export async function isManagedConversationAttachmentPath(attachmentPath: string): Promise<boolean> {
   try {
     const attachmentsRoot = resolve(getConversationAttachmentsRoot());
     const candidate = await resolveForContainment(attachmentPath);
-    return candidate.startsWith(`${attachmentsRoot}${sep}`);
+    if (candidate.startsWith(`${attachmentsRoot}${sep}`)) {
+      return true;
+    }
   } catch {
-    return false;
+    // fall through to tmpdir check
   }
+  return isTmpdirAttachmentPath(attachmentPath);
 }
 
 export async function isConversationAttachmentPath(name: string, attachmentPath: string): Promise<boolean> {
   try {
     const attachmentDir = resolve(getConversationAttachmentDir(name));
     const candidate = await resolveForContainment(attachmentPath);
-    return candidate.startsWith(`${attachmentDir}${sep}`);
+    if (candidate.startsWith(`${attachmentDir}${sep}`)) {
+      return true;
+    }
   } catch {
-    return false;
+    // fall through to tmpdir check
   }
+  return isTmpdirAttachmentPath(attachmentPath);
 }
 
 export async function hasConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {

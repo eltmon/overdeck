@@ -29,6 +29,7 @@ import { tmpdir } from 'node:os';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 
 const PASTE_IMAGE_FILE_PREFIX = 'panopticon-paste-';
 const PASTE_IMAGE_TTL_MS = 5 * 60 * 1000;
@@ -155,8 +156,10 @@ console.log('[panopticon] ConversationLifecycleService started');
 // Start TTL cleanup for stale pasted-image temp files (1 min interval)
 const pastedImageCleanupTimer = setInterval(() => {
   void cleanupStalePastedImages();
+  void cleanupOrphanedConversationAttachments();
 }, PASTE_IMAGE_CLEANUP_INTERVAL_MS);
 void cleanupStalePastedImages();
+void cleanupOrphanedConversationAttachments();
 console.log('[panopticon] Pasted image cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
