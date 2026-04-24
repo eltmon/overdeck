@@ -1094,6 +1094,7 @@ ${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
+      GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
       ...providerEnv, // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
       ...sageoxEnv // Add SageOx environment variables
     }

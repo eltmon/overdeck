@@ -26,6 +26,8 @@ optional:
 
 - NEVER `cd` to the parent project directory or any path outside your workspace
 - NEVER run `git stash`, `git checkout`, or any destructive git commands outside your workspace
+- **NEVER run history-rewriting git commands:** `git rebase -i`, `git commit --amend`, `git reset --hard`, `git squash`, or any operation that changes commit hashes. These are forbidden — they destroy review history and break the pipeline.
+- **If `pan done` fails with rebase conflicts:** run `git merge main` (or `git merge origin/main`) and resolve the single merge conflict. Do NOT attempt to squash, rewrite, or rebase-interactively to avoid conflicts.
 - Your workspace is a git worktree — it has its own branch and working tree independent of the main repo
 - Running git commands in the parent repo will destroy other agents' uncommitted work
 - If you need to check main branch state, use `git log origin/main` from within your workspace
