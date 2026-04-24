@@ -38,7 +38,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan recover <id>` | Recover a crashed or stopped agent |
 | `pan kill <id>` | Stop the agent (workspace preserved) |
 | `pan sync-main <id>` | Merge latest `main` into the workspace branch |
-| `pan done <id>` | Mark work complete → tracker "In Review" |
+| `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |
 | `pan approve <id>` | Approve agent work, merge MR, update tracker |
 | `pan inspect <id>` | Request human inspection before proceeding |
 | `pan close <id>` | Verify, clean up, close on tracker |
