@@ -320,28 +320,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       messageText = $getRoot().getTextContent().trim();
     });
 
-    const uploadingImages = pendingImages.filter((image) => !image.serverPath && !image.error);
-    if (uploadingImages.length > 0) {
-      toast.error('Please wait for image uploads to finish');
-      return;
-    }
-
-    const failedImages = pendingImages.filter((image) => image.error);
-    if (failedImages.length > 0) {
-      toast.error('Remove failed image uploads before sending');
-      return;
-    }
-
-    const uploadedImages = pendingImages.filter((image) => image.serverPath);
-    if (!messageText && uploadedImages.length === 0) return;
-
-    const imagePrefix = uploadedImages
-      .map((image) => `@${image.serverPath}`)
-      .join('\n');
-    const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
-
-    // Optimistic: notify parent immediately so message appears before server round-trip
-    onSend?.(composedMessage);
+    const submitConversationName = conversation.name;
 
     setSending(true);
     try {
@@ -349,22 +328,57 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       // kill the session and restart with the new model before sending.
       // switchModel already waits for the new session to be ready before returning.
       if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(conversation.name, model);
+        await switchModel(submitConversationName, model);
       }
 
-      await sendConversationMessage(conversation.name, composedMessage);
-
-      // Clear editor after successful send
-      editor.update(() => {
-        $getRoot().clear();
-      });
-      setText('');
-      for (const image of pendingImages) {
-        revokePreviewUrl(image.previewUrl);
+      // Re-read pending images after async gap — they may have changed
+      // (e.g. upload completed, user removed an image, or conversation switched)
+      const currentPendingImages = pendingImagesRef.current;
+      const uploadingImages = currentPendingImages.filter((image) => !image.serverPath && !image.error);
+      if (uploadingImages.length > 0) {
+        toast.error('Please wait for image uploads to finish');
+        return;
       }
-      pendingImagesRef.current = [];
-      removedImageIdsRef.current.clear();
-      setPendingImages([]);
+
+      const failedImages = currentPendingImages.filter((image) => image.error);
+      if (failedImages.length > 0) {
+        toast.error('Remove failed image uploads before sending');
+        return;
+      }
+
+      const uploadedImages = currentPendingImages.filter((image) => image.serverPath);
+      if (!messageText && uploadedImages.length === 0) return;
+
+      // Abort if conversation switched during async operations — the switch
+      // useEffect will have already cleared pending images and deleted uploads
+      if (submitConversationName !== currentConversationNameRef.current) {
+        return;
+      }
+
+      const imagePrefix = uploadedImages
+        .map((image) => `@${image.serverPath}`)
+        .join('\n');
+      const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
+
+      // Optimistic: notify parent immediately so message appears before server round-trip
+      onSend?.(composedMessage);
+
+      await sendConversationMessage(submitConversationName, composedMessage);
+
+      // Only clear state if conversation is still the same (avoid clearing the
+      // new conversation's composer if user switched while send was in flight)
+      if (submitConversationName === currentConversationNameRef.current) {
+        editor.update(() => {
+          $getRoot().clear();
+        });
+        setText('');
+        for (const image of currentPendingImages) {
+          revokePreviewUrl(image.previewUrl);
+        }
+        pendingImagesRef.current = [];
+        removedImageIdsRef.current.clear();
+        setPendingImages([]);
+      }
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
@@ -373,7 +387,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       // Refocus editor
       editor.focus();
     }
-  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, pendingImages]);
+  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -384,8 +398,8 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     previousConversationNameRef.current = conversation.name;
     const images = pendingImagesRef.current;
     pendingImagesRef.current = [];
+    removedImageIdsRef.current.clear();
     for (const image of images) {
-      removedImageIdsRef.current.add(image.id);
       revokePreviewUrl(image.previewUrl);
       if (image.serverPath) {
         deleteUploadedImage(previousConversationName, image.serverPath);
@@ -408,8 +422,8 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       const images = pendingImagesRef.current;
       const conversationName = previousConversationNameRef.current;
       pendingImagesRef.current = [];
+      removedImageIdsRef.current.clear();
       for (const image of images) {
-        removedImageIdsRef.current.add(image.id);
         revokePreviewUrl(image.previewUrl);
         if (image.serverPath) {
           deleteUploadedImage(conversationName, image.serverPath);

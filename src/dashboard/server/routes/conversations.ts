@@ -354,6 +354,13 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
 
+  // Re-verify conversation exists before writing — it may have been deleted or
+  // archived during the async validation above.
+  const convBeforeWrite = getConversationByName(name);
+  if (!convBeforeWrite) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
   const attachmentDir = await ensureConversationAttachmentDir(name);
   const fileName = `${randomUUID()}${extension}`;
   const path = join(attachmentDir, fileName);
@@ -883,10 +890,13 @@ const postConversationStopRoute = HttpRouter.add(
 
         await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
-        // Brief pause to allow any in-flight JSONL writes to complete before
-        // pruning attachments that may have just been referenced.
-        await new Promise((r) => setTimeout(r, 500));
-        await cleanupUnreferencedConversationAttachments(conv);
+        // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
+        // Do NOT await — attachment pruning can read the entire JSONL and must
+        // not block the HTTP response critical path.
+        void (async () => {
+          await new Promise((r) => setTimeout(r, 500));
+          await cleanupUnreferencedConversationAttachments(conv);
+        })();
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
@@ -1080,18 +1090,28 @@ const getConversationMessagesRoute = HttpRouter.add(
               const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
               const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
               try {
-                const { readFile, readdir } = await import('node:fs/promises');
+                const { readFile, readdir, stat } = await import('node:fs/promises');
                 const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
                 if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
                   const claudeProjects = join(homedir(), '.claude', 'projects');
                   const dirs = await readdir(claudeProjects);
-                  for (const dir of dirs) {
-                    const candidate = join(claudeProjects, dir, `${sessionId}.jsonl`);
-                    if (existsSync(candidate)) {
-                      sessionFile = candidate;
-                      setSpecialistSessionCache(name, candidate);
-                      break;
-                    }
+                  // Check all candidates concurrently with async stat instead of
+                  // synchronous existsSync in a loop (blocks the event loop).
+                  const candidates = dirs.map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+                  const checks = await Promise.all(
+                    candidates.map(async (candidate) => {
+                      try {
+                        await stat(candidate);
+                        return candidate;
+                      } catch {
+                        return null;
+                      }
+                    }),
+                  );
+                  const found = checks.find((c): c is string => c !== null);
+                  if (found) {
+                    sessionFile = found;
+                    setSpecialistSessionCache(name, found);
                   }
                 }
               } catch { /* session file not found */ }
@@ -1396,11 +1416,10 @@ const postConversationRestartAllRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       try {
         const allConvs = listConversations();
-        // Filter to conversations with a live tmux session
-        const convs: typeof allConvs = [];
-        for (const c of allConvs) {
-          if (await tmuxSessionExists(c.tmuxSession)) convs.push(c);
-        }
+        // Filter to conversations with a live tmux session — use a single
+        // listSessionNamesAsync() call instead of N subprocess spawns.
+        const liveSessionNames = new Set(await listSessionNamesAsync());
+        const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
         const results: { name: string; model: string | null; status: string }[] = [];
 
         for (const conv of convs) {

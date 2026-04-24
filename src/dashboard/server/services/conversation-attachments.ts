@@ -94,6 +94,19 @@ async function listConversationAttachmentPaths(name: string): Promise<string[]> 
   }
 }
 
+/** Synchronous containment check: does the normalized path start with the
+ *  pre-resolved attachment directory prefix?  Uses resolve() (not realpath)
+ *  so the check is I/O-free — safe because we are only cataloguing references
+ *  in the JSONL, not accessing the filesystem. */
+function isUnderAttachmentDir(resolvedAttachmentDir: string, attachmentPath: string): boolean {
+  try {
+    const normalized = resolve(attachmentPath);
+    return normalized.startsWith(`${resolvedAttachmentDir}/`);
+  } catch {
+    return false;
+  }
+}
+
 async function readSessionAttachmentBasenames(sessionFile: string, name: string): Promise<Set<string>> {
   try {
     let mtimeMs: number;
@@ -106,6 +119,16 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
     const cached = getAttachmentCache(sessionFile, mtimeMs);
     if (cached) {
       return cached;
+    }
+
+    // Pre-resolve the attachment directory once (I/O outside the loop).
+    // realpath follows symlinks for accuracy; resolve() is the fallback if
+    // the directory has not been created yet.
+    let resolvedAttachmentDir: string;
+    try {
+      resolvedAttachmentDir = await realpath(getConversationAttachmentDir(name));
+    } catch {
+      resolvedAttachmentDir = resolve(getConversationAttachmentDir(name));
     }
 
     const referenced = new Set<string>();
@@ -135,7 +158,7 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
         }
         if (text) {
           for (const attachmentPath of extractConversationAttachmentPaths(text)) {
-            if (await isConversationAttachmentPath(name, attachmentPath)) {
+            if (isUnderAttachmentDir(resolvedAttachmentDir, attachmentPath)) {
               referenced.add(basename(attachmentPath));
             }
           }
@@ -156,7 +179,7 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
             attachmentPath = rawValue;
           }
           if (typeof attachmentPath === 'string' && attachmentPath.startsWith('/')) {
-            if (await isConversationAttachmentPath(name, attachmentPath)) {
+            if (isUnderAttachmentDir(resolvedAttachmentDir, attachmentPath)) {
               referenced.add(basename(attachmentPath));
             }
           }
