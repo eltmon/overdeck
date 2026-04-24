@@ -88,6 +88,16 @@ outcomes:
 - **Closure capture issues**
 - **Memory leaks** (unclosed subscriptions, listeners)
 
+## Scope Boundary — CRITICAL
+
+Only review files that were changed in this PR (listed in **Files changed** in the Review Context above).
+
+- You may read unchanged files for context to understand how changed code interacts with the existing system.
+- **Do NOT flag issues in existing code that this PR does not modify.** If you trace data flow into an unchanged file and find a pre-existing bug, note it as a `?` (MAY) observation — never blocker severity.
+- **Do NOT demand fixes to unrelated code** just because the changed code calls it.
+- If a pattern is missing in unchanged files that were not part of this PR, do NOT flag it as a blocker.
+- Blocker severity (`!`) is reserved for issues introduced BY this PR.
+
 ## Review Process
 
 1. **Read the files to review** - Use Glob/Grep to find changed files

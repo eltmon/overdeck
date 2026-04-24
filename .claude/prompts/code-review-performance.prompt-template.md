@@ -104,6 +104,16 @@ Prefer the strongest tier; never claim impact you haven't verified.
 - **Unnecessary work** - Computing values never used
 - **Premature optimization** - Complex code with no benefit
 
+## Scope Boundary — CRITICAL
+
+Only review files that were changed in this PR (listed in **Files changed** in the Review Context above).
+
+- You may read unchanged files for context to understand how changed code interacts with the existing system.
+- **Do NOT flag issues in existing code that this PR does not modify.** If you trace data flow into an unchanged file and find a pre-existing performance issue, note it as a `?` (MAY) observation — never blocker severity.
+- **Do NOT demand fixes to unrelated code** just because the changed code calls it.
+- If a performance pattern is missing in unchanged files that were not part of this PR, do NOT flag it as a blocker.
+- Blocker severity (`!`) is reserved for performance regressions introduced BY this PR.
+
 ## Review Process
 
 1. **Identify hot paths** - Find frequently executed code
