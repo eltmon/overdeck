@@ -184,7 +184,6 @@ export function createConversation(opts: {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, session_file, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error,
               fork_status, fork_error
        FROM conversations WHERE id = ?`,
     )

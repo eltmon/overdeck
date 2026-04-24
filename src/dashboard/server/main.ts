@@ -25,36 +25,10 @@ import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir, readdir, stat, unlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
-
-const PASTE_IMAGE_FILE_PREFIX = 'panopticon-paste-';
-const PASTE_IMAGE_TTL_MS = 5 * 60 * 1000;
-const PASTE_IMAGE_CLEANUP_INTERVAL_MS = 60 * 1000;
-
-async function cleanupStalePastedImages(): Promise<void> {
-  const tempDirectory = tmpdir();
-  try {
-    const names = await readdir(tempDirectory);
-    const now = Date.now();
-    await Promise.all(
-      names
-        .filter((name) => name.startsWith(PASTE_IMAGE_FILE_PREFIX))
-        .map(async (name) => {
-          const path = `${tempDirectory}/${name}`;
-          const details = await stat(path).catch(() => null);
-          if (!details) return;
-          if (now - details.mtimeMs <= PASTE_IMAGE_TTL_MS) return;
-          await unlink(path).catch(() => {});
-        }),
-    );
-  } catch (err) {
-    console.warn('[panopticon] Failed to clean pasted images:', err);
-  }
-}
 
 declare const Bun: unknown;
 
@@ -153,14 +127,12 @@ console.log('[panopticon] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
-// Start TTL cleanup for stale pasted-image temp files (1 min interval)
-const pastedImageCleanupTimer = setInterval(() => {
-  void cleanupStalePastedImages();
+// Start cleanup for orphaned conversation attachments (1 min interval)
+const attachmentCleanupTimer = setInterval(() => {
   void cleanupOrphanedConversationAttachments();
-}, PASTE_IMAGE_CLEANUP_INTERVAL_MS);
-void cleanupStalePastedImages();
+}, 60_000);
 void cleanupOrphanedConversationAttachments();
-console.log('[panopticon] Pasted image cleanup started');
+console.log('[panopticon] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
 startTtsSummarizer();
@@ -182,14 +154,14 @@ const emitShutdownActivity = () => {
 };
 process.once('SIGTERM', () => {
   emitShutdownActivity();
-  clearInterval(pastedImageCleanupTimer);
+  clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
-  clearInterval(pastedImageCleanupTimer);
+  clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();

@@ -266,6 +266,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       event.preventDefault();
       return;
     }
+    if (!event.clipboardData) return;
     const items = Array.from(event.clipboardData.items);
     const imageFiles = items
       .filter((item) => item.type.startsWith('image/'))

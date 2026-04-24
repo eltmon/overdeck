@@ -225,6 +225,9 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
 
+    CREATE INDEX IF NOT EXISTS idx_conversations_archived_created
+      ON conversations(archived_at, created_at);
+
     -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { Conversation } from '../../../lib/database/conversations-db.js';
@@ -254,35 +253,24 @@ async function resolveForContainment(attachmentPath: string): Promise<string> {
   }
 }
 
-function isTmpdirAttachmentPath(attachmentPath: string): boolean {
-  const base = basename(attachmentPath);
-  return attachmentPath.startsWith(`${tmpdir()}${sep}`) && base.startsWith('panopticon-paste-');
-}
-
 export async function isManagedConversationAttachmentPath(attachmentPath: string): Promise<boolean> {
   try {
     const attachmentsRoot = resolve(getConversationAttachmentsRoot());
     const candidate = await resolveForContainment(attachmentPath);
-    if (candidate.startsWith(`${attachmentsRoot}${sep}`)) {
-      return true;
-    }
+    return candidate.startsWith(`${attachmentsRoot}/`);
   } catch {
-    // fall through to tmpdir check
+    return false;
   }
-  return isTmpdirAttachmentPath(attachmentPath);
 }
 
 export async function isConversationAttachmentPath(name: string, attachmentPath: string): Promise<boolean> {
   try {
     const attachmentDir = resolve(getConversationAttachmentDir(name));
     const candidate = await resolveForContainment(attachmentPath);
-    if (candidate.startsWith(`${attachmentDir}${sep}`)) {
-      return true;
-    }
+    return candidate.startsWith(`${attachmentDir}/`);
   } catch {
-    // fall through to tmpdir check
+    return false;
   }
-  return isTmpdirAttachmentPath(attachmentPath);
 }
 
 export async function hasConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {

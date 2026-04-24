@@ -1478,6 +1478,10 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
         }
 
+        if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {
+          return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
+        }
+
         const { sessionId, sessionFile } = await reserveSummaryForkSession(
           cwd || conv.cwd || process.cwd(),
         );
