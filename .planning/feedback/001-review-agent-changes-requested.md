@@ -2,24 +2,26 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-24T06:25:00Z
+timestamp: 2026-04-24T09:20:41Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-PAN-539 delivers a complete image paste/drag-drop feature with strong security fundamentals (parameterized SQL, allowlist validation, magic-byte checks, UUID filenames, rate limiting). The verdict is CHANGES_REQUESTED due to six High-priority findings: dead code in the cleanup interval that misleads readers, a copy-paste SQL duplicate-column bug, a cross-conversation attachment ownership gap in the tmpdir validation branch, a missing null guard on clipboardData, an unvalidated summaryModel parameter reaching a subprocess spawn, and a missing database index on a hot query path. No blockers exist; all required fixes are targeted and well-scoped.
+PAN-539 implements image paste/drop support in the conversation composer. The core feature is functionally complete with good security foundations (CSRF checks, magic-byte validation, parameterized SQL, path containment). Two security MUST-NOT findings block merge: model strings from JSONL session files reach `updateConversationModel` without `SAFE_MODEL_PATTERN` validation, and `cwd` from the database is not re-validated against home-directory containment before being embedded in the launcher script on resume/switch-model. Seven high-priority issues (model validation order, issueId charset, upload timeout, race condition, unhandled rejection, O(n) project scan, missing spinner) should be fixed before merge. One correctness `!` finding (wrong storage location) was demoted to accepted after the requirements reviewer established the vBRIEF has contradictory ACs and the implementation correctly chose the architecturally superior approach.
 
 ## Security Issues
 
-- summaryModel bypasses model-name validation
+- Unsanitized model string written to DB via updateConversationModel
+- cwd from DB not re-validated on resume/switch-model
+- Model string from request body reaches library functions before pattern check
+- issueId has no length or charset validation
 
 ## Performance Issues
 
-- Missing composite index for listConversations
-- N+1 tmux subprocesses per lifecycle poll
-- Async I/O per match in JSONL line-scan loop
+- O(n_projects) directory scan on every specialist-messages fetch
+- listSessionNamesAsync tmux subprocess on every GET /api/conversations
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
