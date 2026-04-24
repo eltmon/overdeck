@@ -159,7 +159,7 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     name: 'Beads CLI (bd)',
     passed: hasBeads,
     message: hasBeads ? `v${beadsVersion}` : 'not found (will auto-install)',
-    fix: 'curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash',
+    fix: 'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash',
   });
 
   // claudish (optional - will be auto-installed)
@@ -390,30 +390,30 @@ async function installCommand(options: InstallOptions): Promise<void> {
       if (plat === 'darwin') {
         // macOS - try homebrew
         try {
-          execSync('brew install steveyegge/beads/bd', { stdio: 'pipe', timeout: 120000 });
+          execSync('brew install gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
           spinner.succeed('beads installed via Homebrew');
         } catch {
           // Fall back to curl script
           try {
-            execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+            execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
               stdio: 'pipe',
               timeout: 120000,
             });
             spinner.succeed('beads installed via install script');
           } catch {
-            spinner.warn('beads installation failed - install manually: brew install steveyegge/beads/bd');
+            spinner.warn('beads installation failed - install manually: brew install gastownhall/beads/bd');
           }
         }
       } else {
         // Linux/WSL - use install script
         try {
-          execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+          execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
             stdio: 'pipe',
             timeout: 120000,
           });
           spinner.succeed('beads installed via install script');
         } catch (error) {
-          spinner.warn('beads installation failed - install manually: curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash');
+          spinner.warn('beads installation failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
         }
       }
     } catch (error) {
@@ -427,9 +427,9 @@ async function installCommand(options: InstallOptions): Promise<void> {
       if (match) {
         const [, major, minor, patch] = match.map(Number);
         const currentVersion = major * 10000 + minor * 100 + patch;
-        const recommendedVersion = 47 * 100 + 1; // v0.47.1 has worktree isolation fix
+        const recommendedVersion = 1 * 10000 + 0 * 100 + 2; // v1.0.2 required for batch, gate, rules
         if (currentVersion < recommendedVersion) {
-          spinner.info(`beads v${major}.${minor}.${patch} installed (v0.47.1+ recommended for worktree isolation)`);
+          spinner.info(`beads v${major}.${minor}.${patch} installed (v1.0.2+ recommended for new features)`);
         } else {
           spinner.info(`beads v${major}.${minor}.${patch} installed`);
         }

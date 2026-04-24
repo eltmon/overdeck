@@ -3,7 +3,7 @@ name: beads-panopticon-guide
 description: >
   Panopticon-specific beads usage patterns. Covers common mistakes agents make
   when filtering beads by issue number (PAN-XXX) and working with Linear-synced beads.
-version: "1.0.0"
+version: "1.1.0"
 allowed-tools: "Read,Bash(bd:*)"
 triggers:
   - "bd list"
@@ -115,9 +115,12 @@ bd list --id panopticon-abc,panopticon-xyz
 | Find beads for issue | `bd list --title-contains "PAN-XXX" --all` |
 | Find open work | `bd ready` or `bd list --status open` |
 | Start a bead | `bd update <bead-id> --status in_progress` |
+| Claim a bead | `bd update <bead-id> --claim` |
 | Add notes | `bd comments add <bead-id> "notes"` |
 | Complete bead | `bd close <bead-id> --reason "done"` |
 | Show bead details | `bd show <bead-id>` |
+| Bulk close beads | `printf 'close <id> done\n' | bd batch` |
+| Check blockers | `bd dep tree <bead-id>` |
 
 ## When to Use Each Filter
 
@@ -141,6 +144,8 @@ For complete beads documentation, see the main `beads` skill:
 2. **`--id` expects bead IDs** (panopticon-abc), not Linear IDs (PAN-116)
 3. **Always add comments** - They survive compaction and help the next agent
 4. **Sync at session end** - `bd sync` commits to git
+5. **NEVER use `bd claim`** - Use `bd update <id> --claim` instead
+6. **Check blockers before closing** - Run `bd dep tree <id>` first; close blockers before using `--force`
 
 ## Example: Complete Workflow for PAN-116
 

@@ -1,53 +1,56 @@
 # Async Gates for Workflow Coordination
 
-> Adapted from ACF beads skill
+`bd gate` provides async coordination primitives for cross-session and external-condition workflows.
 
-`bd gate` provides async coordination primitives for cross-session and external-condition workflows. Gates are **wisps** (ephemeral issues) that block until a condition is met.
-
----
-
-## Gate Types
-
-| Type | Await Syntax | Use Case |
-|------|--------------|----------|
-| Human | `human:<prompt>` | Cross-session human approval |
-| CI | `gh:run:<id>` | Wait for GitHub Actions completion |
-| PR | `gh:pr:<id>` | Wait for PR merge/close |
-| Timer | `timer:<duration>` | Deployment propagation delay |
-| Mail | `mail:<pattern>` | Wait for matching email |
+**IMPORTANT**: Gates are created as issues with `--type gate`, NOT via a `bd gate create` subcommand.
 
 ---
 
 ## Creating Gates
 
+### Step 1: Register the gate type (one-time per project)
+
 ```bash
-# Human approval gate
-bd gate create --await human:deploy-approval \
-  --title "Approve production deploy" \
-  --timeout 4h
-
-# CI gate (GitHub Actions)
-bd gate create --await gh:run:123456789 \
-  --title "Wait for CI" \
-  --timeout 30m
-
-# PR merge gate
-bd gate create --await gh:pr:42 \
-  --title "Wait for PR approval" \
-  --timeout 24h
-
-# Timer gate (deployment propagation)
-bd gate create --await timer:15m \
-  --title "Wait for deployment propagation"
+bd config set types.custom '["gate"]'
 ```
 
-**Required options**:
-- `--await <spec>` — Gate condition (see types above)
-- `--timeout <duration>` — Recommended: prevents forever-open gates
+### Step 2: Create a gate issue
 
-**Optional**:
-- `--title <text>` — Human-readable description
-- `--notify <recipients>` — Email/beads addresses to notify
+```bash
+# Human approval gate
+bd create "Approve production deploy" --type gate
+
+# Timer gate (deployment propagation)
+bd create "Wait for deployment propagation" --type gate --due "+15m"
+
+# CI gate (GitHub Actions)
+bd create "Wait for CI" --type gate
+# Then set the gate condition via labels or external tracking
+
+# PR merge gate
+bd create "Wait for PR approval" --type gate
+```
+
+**Required**: `--type gate` (after registering custom type)
+**Recommended**: `--due` or `--timeout` to prevent forever-open gates
+
+### Step 3: Block work on the gate
+
+```bash
+# Make issue-A blocked by the gate (A cannot start until gate closes)
+bd dep add <blocked-issue> <gate-id> --type blocks
+```
+
+---
+
+## Gate Types
+
+| Type | Resolve Method | Use Case |
+|------|----------------|----------|
+| `human` | `bd gate resolve <id>` | Cross-session human approval |
+| `timer` | Auto-resolves when due date reached | Deployment propagation delay |
+| `gh:run` | `bd gate check` evaluates GitHub API | Wait for GitHub Actions completion |
+| `gh:pr` | `bd gate check` evaluates GitHub API | Wait for PR merge/close |
 
 ---
 
@@ -57,55 +60,51 @@ bd gate create --await timer:15m \
 bd gate list              # All open gates
 bd gate list --all        # Include closed
 bd gate show <gate-id>    # Details for specific gate
-bd gate eval              # Auto-close elapsed/completed gates
-bd gate eval --dry-run    # Preview what would close
+bd gate check             # Auto-evaluate and close resolved gates
+bd gate check --dry-run   # Preview what would close
 ```
 
-**Auto-close behavior** (`bd gate eval`):
-- `timer:*` — Closes when duration elapsed
-- `gh:run:*` — Checks GitHub API, closes on success/failure
-- `gh:pr:*` — Checks GitHub API, closes on merge/close
-- `human:*` — Requires explicit `bd gate approve`
+**Auto-close behavior** (`bd gate check`):
+- `timer` — Closes when due date elapsed
+- `gh:run` — Checks GitHub API, closes on success/failure
+- `gh:pr` — Checks GitHub API, closes on merge/close
+- `human` — Requires explicit `bd gate resolve`
 
 ---
 
-## Closing Gates
+## Resolving Gates
 
 ```bash
 # Human gates require explicit approval
-bd gate approve <gate-id>
-bd gate approve <gate-id> --comment "Reviewed and approved by Steve"
+bd gate resolve <gate-id>
+bd gate resolve <gate-id> --reason "Reviewed and approved by Steve"
 
 # Manual close (any gate)
-bd gate close <gate-id>
-bd gate close <gate-id> --reason "No longer needed"
-
-# Auto-close via evaluation
-bd gate eval
+bd gate resolve <gate-id> --reason "No longer needed"
 ```
 
 ---
 
 ## Best Practices
 
-1. **Always set timeouts**: Prevents forever-open gates
+1. **Always set due dates**: Prevents forever-open gates
    ```bash
-   bd gate create --await human:... --timeout 24h
+   bd create "Approve deploy" --type gate --due "+24h"
    ```
 
 2. **Clear titles**: Title should indicate what's being gated
    ```bash
-   --title "Approve Phase 2: Core Implementation"
+   bd create "Approve Phase 2: Core Implementation" --type gate
    ```
 
-3. **Eval periodically**: Run at session start to close elapsed gates
+3. **Check periodically**: Run at session start to close elapsed gates
    ```bash
-   bd gate eval
+   bd gate check
    ```
 
-4. **Clean up obsolete gates**: Close gates that are no longer needed
+4. **Clean up obsolete gates**: Resolve gates that are no longer needed
    ```bash
-   bd gate close <id> --reason "superseded by new approach"
+   bd gate resolve <id> --reason "superseded by new approach"
    ```
 
 5. **Check before creating**: Avoid duplicate gates
@@ -117,15 +116,15 @@ bd gate eval
 
 ## Gates vs Issues
 
-| Aspect | Gates (Wisp) | Issues |
-|--------|--------------|--------|
-| Persistence | Ephemeral (not synced) | Permanent (synced to git) |
+| Aspect | Gates (type=gate) | Issues |
+|--------|-------------------|--------|
+| Persistence | Permanent (synced to git) | Permanent (synced to git) |
 | Purpose | Block on external condition | Track work items |
 | Lifecycle | Auto-close when condition met | Manual close |
 | Visibility | `bd gate list` | `bd list` |
 | Use case | CI, approval, timers | Tasks, bugs, features |
 
-Gates are designed to be temporary coordination primitives—they exist only until their condition is satisfied.
+Gates are standard issues with a special type — they exist until their condition is satisfied.
 
 ---
 
@@ -141,7 +140,7 @@ bd gate show <gate-id>
 gh run view <run-id>
 
 # Force close if stuck
-bd gate close <gate-id> --reason "manual override"
+bd gate resolve <gate-id> --reason "manual override"
 ```
 
 ### Can't find gate ID

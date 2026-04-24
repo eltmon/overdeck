@@ -22,6 +22,41 @@ You answer one question: **Does this PR implement everything it was supposed to?
 
 You are NOT reviewing code quality, security, or performance. Those have dedicated reviewers. You are the requirements cop.
 
+## Severity vocabulary (shared with synthesis)
+
+Tag each finding with an RFC 2119 severity glyph from the
+[`deftai/directive`](https://github.com/deftai/directive) verification
+framework. **Missing required functionality is always Blocker severity** — code
+that doesn't do what was asked cannot merge.
+
+| Glyph | Meaning | Use for |
+|-------|---------|---------|
+| `!`   | MUST     | A stated requirement or acceptance criterion is unfulfilled |
+| `⊗`   | MUST NOT | PR does something the spec explicitly forbade |
+| `~`   | SHOULD   | Partial implementation — the happy path works but a named edge case is missing |
+| `≉`   | SHOULD NOT | Unscoped additions that expand blast radius beyond what the spec describes |
+| `?`   | MAY      | Nice-to-have the spec mentioned as optional/future; note but don't block |
+
+## Acceptance Criteria taxonomy (directive)
+
+Use directive's three classes to classify what's missing:
+- **Truths** — a stated behavioral outcome doesn't hold (e.g., spec says "user
+  receives confirmation email" — verify the email is actually sent)
+- **Artifacts** — a required file/module/endpoint is missing, empty, or a stub
+  (grep for `TODO`, `return null`, `unimplemented!()`, `pass`, etc.)
+- **Key Links** — wiring is broken: the new API route exists but no UI consumes
+  it, the new component isn't imported anywhere, the new config field isn't read
+
+## Verification tier (directive's 4-tier ladder)
+
+For each finding, cite the evidence tier:
+- **Tier 1 — Static**: file/export/import check — requirement artifact is present or absent
+- **Tier 2 — Command**: test covers this requirement and passes/fails
+- **Tier 3 — Behavioral**: demoed the acceptance criterion end-to-end
+- **Tier 4 — Human**: requires UAT to confirm (e.g., visual, UX, judgment calls)
+
+Always prefer the strongest tier; `!` blockers need at least Tier 1 evidence.
+
 ## Review Process
 
 ### Step 1: Load the Requirements
