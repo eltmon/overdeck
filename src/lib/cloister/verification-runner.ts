@@ -146,7 +146,7 @@ export async function runVerificationForIssue(
             });
             if (fileResult.success) {
               const agentId = `agent-${issueId.toLowerCase()}`;
-              const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — merge conflicts with ${syncTargetBranch}\nRead and address: ${fileResult.relativePath}`;
+              const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — merge conflicts with ${syncTargetBranch}.\n\nRead ${fileResult.relativePath}, then immediately fix the merge conflicts and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
               await messageAgent(agentId, msg);
               console.log(`[${logPrefix}] Sync-target failed for ${issueId} — sent conflict feedback to ${agentId}`);
             }
@@ -254,7 +254,7 @@ export async function runVerificationForIssue(
         });
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}\nRead and address: ${fileResult.relativePath}`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nRead ${fileResult.relativePath}, then immediately fix the failing check and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
           await messageAgent(agentId, msg);
           console.log(`[${logPrefix}] Verification failed for ${issueId} — sent feedback to ${agentId}`);
         }
@@ -295,7 +295,7 @@ export async function runVerificationForIssue(
           });
           if (fileResult.success) {
             const agentId = `agent-${issueId.toLowerCase()}`;
-            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers\nRead and address: ${fileResult.relativePath}`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nRead ${fileResult.relativePath}, then immediately resolve the merge conflict markers and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
             await messageAgent(agentId, msg);
             console.log(`[${logPrefix}] vBRIEF conflict detected for ${issueId} — sent feedback to ${agentId}`);
           }
@@ -342,7 +342,7 @@ export async function runVerificationForIssue(
         });
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete\nRead and address: ${fileResult.relativePath}`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nRead ${fileResult.relativePath}, then immediately complete all pending acceptance criteria and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
           await messageAgent(agentId, msg);
           console.log(`[${logPrefix}] AC verification failed for ${issueId} — sent feedback to ${agentId}`);
         }

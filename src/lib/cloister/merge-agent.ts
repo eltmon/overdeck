@@ -846,7 +846,7 @@ export async function spawnMergeAgentForBranches(
           markdownBody: blockMsg,
         });
         if (fileResult.success) {
-          await sendMessageToAgent(issueId, `SPECIALIST FEEDBACK: merge-agent reported BLOCKED for ${issueId}.\nRead and address: ${fileResult.relativePath}`);
+          await sendMessageToAgent(issueId, `SPECIALIST FEEDBACK: merge-agent reported BLOCKED for ${issueId}.\n\nRead ${fileResult.relativePath}, then immediately fix the blocking issues and re-submit. Do NOT stop at the prompt — keep working until the merge can proceed.`);
         } else {
           console.error(`[merge-agent] Failed to write feedback file for ${issueId}: ${fileResult.error}`);
         }

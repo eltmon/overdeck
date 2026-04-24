@@ -272,7 +272,7 @@ async function sendFeedbackToWorkAgent(
   // Send short reference pointing to the file
   try {
     const { messageAgent } = await import('../agents.js');
-    const msg = `SPECIALIST FEEDBACK: review-agent reported ${result.reviewResult} for ${context.issueId}.\nRead and address: ${fileResult.relativePath}`;
+    const msg = `SPECIALIST FEEDBACK: review-agent reported ${result.reviewResult} for ${context.issueId}.\n\nRead ${fileResult.relativePath}, then immediately continue implementing all required fixes. Do NOT stop at the prompt — keep working until every blocking issue is resolved and you have invoked /rebase-and-submit.`;
     await messageAgent(agentSession, msg);
     console.log(`[review-agent] Sent feedback to ${agentSession}`);
   } catch (error) {
