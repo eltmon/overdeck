@@ -787,6 +787,21 @@ export async function runParallelReview(
 
   await postReviewFn(context, result, outputDir);
 
+  // ── Phase 5: Log to history + notify work agent ───────────────────────────
+  // These were previously in the deprecated spawnReviewAgent wrapper; moved here
+  // so both the coordinator session path (pan review run) and any direct
+  // caller of runParallelReview get consistent history + feedback behavior.
+  try {
+    await logReviewHistory(context, result, reviewId);
+  } catch (err) {
+    console.error(`[review-agent] logReviewHistory failed for ${context.issueId} (non-fatal):`, err);
+  }
+  try {
+    await sendFeedbackToWorkAgent(context, result);
+  } catch (err) {
+    console.error(`[review-agent] sendFeedbackToWorkAgent failed for ${context.issueId} (non-fatal):`, err);
+  }
+
   return { result, reviewId };
 }
 
@@ -869,29 +884,19 @@ export function reviewResultToReviewStatus(
 export async function dispatchParallelReview(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string },
   {
-    /**
-     * Legacy in-process spawn path. Default is undefined — the new flow spawns
-     * a detached tmux coordinator session. Tests pass a mock to exercise the
-     * old path or to avoid spawning real tmux.
-     */
-    spawnFn,
     coordinatorSpawnFn = spawnReviewCoordinatorSession,
   }: {
-    spawnFn?: typeof spawnReviewAgent;
+    /**
+     * Injectable tmux coordinator spawner. Tests pass a mock so they don't
+     * touch real tmux. Production callers should omit and use the default
+     * (spawnReviewCoordinatorSession).
+     */
     coordinatorSpawnFn?: (
       opts: { issueId: string; workspace: string },
     ) => Promise<{ sessionName: string }>;
   } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
-  const { getReviewStatus, setReviewStatus } = await import('../review-status.js');
-  const prUrl = opts.prUrl || getReviewStatus(opts.issueId)?.prUrl || '';
-  const context: ReviewContext = {
-    projectPath: opts.workspace,
-    prUrl,
-    issueId: opts.issueId,
-    branch: opts.branch,
-    workspace: opts.workspace,
-  };
+  const { setReviewStatus } = await import('../review-status.js');
 
   // Archive feedback from any previous review cycle so the work agent only
   // sees current-cycle feedback when it reads .planning/feedback/.
@@ -927,31 +932,9 @@ export async function dispatchParallelReview(
     // Non-fatal: event emission is best-effort
   }
 
-  // Legacy in-process path (tests may inject spawnFn directly).
-  if (spawnFn) {
-    spawnFn(context)
-      .then(result => {
-        const mapped = reviewResultToReviewStatus(result.reviewResult);
-        setReviewStatus(opts.issueId, {
-          reviewStatus: mapped,
-          reviewNotes: result.notes,
-          reviewRetryCount: 0,
-          recoveryStartedAt: undefined,
-        });
-        console.log(`[review-agent] dispatchParallelReview (legacy path) finished for ${opts.issueId}: ${result.reviewResult}`);
-      })
-      .catch(err => {
-        console.error(`[review-agent] dispatchParallelReview (legacy path) failed for ${opts.issueId}:`, err);
-        setReviewStatus(opts.issueId, {
-          reviewStatus: 'failed',
-          reviewNotes: `Review dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
-      });
-    return { success: true, message: `Parallel review dispatched (legacy) for ${opts.issueId}` };
-  }
-
-  // New path: spawn a detached tmux coordinator session running `pan review run`.
-  // That session is owned by the tmux server and survives this process exiting.
+  // Spawn a detached tmux coordinator session running `pan review run`.
+  // That session is owned by the tmux server and survives this process exiting,
+  // which is what enforces the dashboard-restart invariant.
   try {
     const { sessionName } = await coordinatorSpawnFn({
       issueId: opts.issueId,
@@ -997,51 +980,8 @@ export async function spawnReviewCoordinatorSession(opts: {
   return { sessionName };
 }
 
-/**
- * Spawn review-agent to review a pull request using parallel specialized reviewers.
- *
- * @param context - Review context
- * @returns Promise that resolves with review result
- */
-export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewResult> {
-  const reviewAgents = getReviewAgents();
-  console.log(`[review-agent] Starting parallel code review for ${context.issueId} (${context.prUrl})`);
-  console.log(`[review-agent] Reviewers: ${reviewAgents.map(a => a.name).join(', ')}`);
-
-  try {
-    // Get files changed from PR if not provided
-    let filesChanged = context.filesChanged || [];
-    if (filesChanged.length === 0) {
-      filesChanged = await getFilesChangedFromPR(context.prUrl, context.projectPath);
-    }
-
-    console.log(`[review-agent] Starting parallel review with ${filesChanged.length} files and ${reviewAgents.length} reviewers`);
-
-    // runParallelReview spawns N reviewer tmux sessions in parallel, runs synthesis,
-    // posts the GitHub PR review, and returns the parsed ReviewResult.
-    const { result, reviewId } = await runParallelReview(context, filesChanged, reviewAgents);
-
-    // Log to history
-    await logReviewHistory(context, result, reviewId);
-
-    // Send feedback to work agent
-    await sendFeedbackToWorkAgent(context, result);
-
-    return result;
-  } catch (error: any) {
-    console.error(`[review-agent] Parallel review failed:`, error);
-
-    const result: ReviewResult = {
-      success: false,
-      reviewResult: 'COMMENTED',
-      notes: error.message || 'Parallel review failed',
-    };
-
-    await logReviewHistory(context, result);
-
-    // Send feedback even on failure
-    await sendFeedbackToWorkAgent(context, result);
-
-    return result;
-  }
-}
+// spawnReviewAgent was removed — the coordinator-session path
+// (dispatchParallelReview → spawnReviewCoordinatorSession → pan review run →
+// runParallelReview) replaces the in-process orchestration it wrapped.
+// History logging and work-agent feedback moved into runParallelReview (Phase 5).
+// See docs/REVIEW-AGENT-ARCHITECTURE.md.

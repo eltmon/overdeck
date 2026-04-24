@@ -63,77 +63,80 @@ describe('dispatchParallelReview', () => {
     prUrl: 'https://github.com/org/repo/pull/1',
   };
 
-  it('calls setReviewStatus with mapped status when spawnFn resolves', async () => {
-    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
-    const spawnFn = vi.fn().mockResolvedValue(approvedResult);
+  // Post-refactor behavior (see docs/REVIEW-AGENT-ARCHITECTURE.md):
+  // dispatchParallelReview spawns a detached tmux coordinator session running
+  // `pan review run <id>`. The coordinator session writes the terminal
+  // reviewStatus when the CLI exits — NOT this function. Under test we
+  // inject coordinatorSpawnFn to avoid touching real tmux.
 
-    const ret = await dispatchParallelReview(baseOpts, { spawnFn });
+  it('writes reviewing status upfront and invokes the coordinator spawn', async () => {
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-123' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
 
     expect(ret.success).toBe(true);
-    // Fire-and-forget: flush the microtask queue so .then() runs
-    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(ret.message).toContain('Review coordinator spawned');
+    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
+    expect(coordinatorSpawnFn).toHaveBeenCalledWith({
+      issueId: 'PAN-999',
+      workspace: '/workspaces/feature-pan-999',
+    });
 
-    expect(spawnFn).toHaveBeenCalledOnce();
+    // Exactly one setReviewStatus call: the upfront 'reviewing' write.
+    // Terminal status (passed/blocked/failed) is NOT written here — it lives
+    // in the coordinator session's CLI exit path.
+    expect(mockSetReviewStatus).toHaveBeenCalledOnce();
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
-      reviewStatus: 'passed',
-      reviewNotes: 'LGTM',
-      reviewRetryCount: 0,
-      recoveryStartedAt: undefined,
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: expect.any(String),
     });
   });
 
-  // PAN-794: spawn rejection now writes terminal 'failed', not 'pending'.
-  // Writing 'pending' caused the orphan sweep to re-dispatch the same review
-  // indefinitely; a terminal failed status parks the issue until a new commit
-  // or human unstick opens a new recovery cycle.
-  it('calls setReviewStatus with failed when spawnFn rejects', async () => {
-    const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
+  it('records terminal failed status when coordinator spawn throws', async () => {
+    // Coordinator spawn failure is a hard failure — no detached session was
+    // created, so no CLI will ever write the terminal status. dispatchParallelReview
+    // records 'failed' itself in this case to avoid the status stuck at 'reviewing'.
+    const coordinatorSpawnFn = vi.fn().mockRejectedValue(new Error('tmux unavailable'));
 
-    const ret = await dispatchParallelReview(baseOpts, { spawnFn });
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
 
-    expect(ret.success).toBe(true);
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    expect(spawnFn).toHaveBeenCalledOnce();
-    const lastCall = mockSetReviewStatus.mock.calls[mockSetReviewStatus.mock.calls.length - 1];
-    expect(lastCall[0]).toBe('PAN-999');
-    expect(lastCall[1].reviewStatus).toBe('failed');
-    expect(typeof lastCall[1].reviewNotes).toBe('string');
-  });
-
-  it('maps CHANGES_REQUESTED to blocked status on success path', async () => {
-    const blockedResult: ReviewResult = { success: true, reviewResult: 'CHANGES_REQUESTED', notes: 'Fix required' };
-    const spawnFn = vi.fn().mockResolvedValue(blockedResult);
-
-    await dispatchParallelReview(baseOpts, { spawnFn });
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
-      reviewStatus: 'blocked',
-      reviewNotes: 'Fix required',
-      reviewRetryCount: 0,
-      recoveryStartedAt: undefined,
-    });
-  });
-
-  it('reviewing→failed: sets reviewing optimistically then resets to failed on spawn failure (PAN-794)', async () => {
-    // dispatchParallelReview manages the status lifecycle internally:
-    // 1. sets 'reviewing' + reviewSpawnedAt before fire-and-forget
-    // 2. writes terminal 'failed' in .catch if spawn fails (PAN-794 — was 'pending')
-    const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
-
-    await dispatchParallelReview(baseOpts, { spawnFn });
-
-    // Flush the microtask queue so the background .catch() fires
-    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(ret.success).toBe(false);
+    expect(ret.error).toBe('tmux unavailable');
 
     const calls = mockSetReviewStatus.mock.calls;
+    // First call: upfront 'reviewing'. Second call: terminal 'failed' after spawn error.
     expect(calls.length).toBe(2);
-    expect(calls[0][0]).toBe('PAN-999');
     expect(calls[0][1].reviewStatus).toBe('reviewing');
-    expect(calls[0][1].reviewSpawnedAt).toEqual(expect.any(String));
-    expect(calls[1][0]).toBe('PAN-999');
     expect(calls[1][1].reviewStatus).toBe('failed');
+    expect(calls[1][1].reviewNotes).toContain('tmux unavailable');
+  });
+
+  it('returns the coordinator session name in its message for observability', async () => {
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({
+      sessionName: 'review-coordinator-PAN-999-1713456789000',
+    });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(ret.message).toContain('review-coordinator-PAN-999-1713456789000');
+  });
+
+  it('does NOT write a terminal reviewStatus on happy path — coordinator owns it', async () => {
+    // This is the core invariant: dispatchParallelReview transitions to
+    // 'reviewing' and returns. It does NOT know or care about the eventual
+    // passed/blocked/failed outcome — that's the coordinator session's job.
+    // Dashboard-restart invariance depends on this: server can die after
+    // spawning the coordinator and the CLI will still write the terminal
+    // state into SQLite when it exits.
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-123' });
+
+    await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const terminalCalls = mockSetReviewStatus.mock.calls.filter(
+      c => c[1].reviewStatus === 'passed' || c[1].reviewStatus === 'blocked' || c[1].reviewStatus === 'failed',
+    );
+    expect(terminalCalls.length).toBe(0);
   });
 });
 
