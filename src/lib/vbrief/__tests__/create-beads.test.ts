@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { tmpdir } from 'os';
 import type { VBriefDocument } from '../types.js';
 
@@ -118,28 +118,36 @@ describe('createBeadsFromVBrief', () => {
   });
 
   it('auto-inits database when bd list fails with "database not found"', async () => {
-    setupRedirect(WORKSPACE_DIR);
-    writePlan(WORKSPACE_DIR, makeDoc('PAN-INIT', [{ id: 'item-1', title: 'Setup task' }]));
+    // Use a nested workspace path so deriveProjectPrefix is deterministic:
+    // workspace = projectRoot/workspaces/feature-init  →  prefix = basename(projectRoot)
+    const projectRoot = WORKSPACE_DIR;
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-init');
+    mkdirSync(workspacePath, { recursive: true });
+
+    setupRedirect(workspacePath);
+    writePlan(workspacePath, makeDoc('PAN-INIT', [{ id: 'item-1', title: 'Setup task' }]));
+
+    const expectedPrefix = basename(projectRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
     const dbError = new Error('Error: database not found, defaulting to local');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
       .mockRejectedValueOnce(dbError)                                  // bd list --json --limit 0
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix pan-init
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix <expectedPrefix>
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // git config beads.role contributor
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd config set export.git-add false
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
-    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+    const result = await createBeadsFromVBrief(workspacePath);
 
-    // bd init must have been called with the correct prefix.
-    // execFile form: mockExecAsync('bd', ['init', '--prefix', 'pan-init'], opts)
+    // bd init must have been called with the repo-derived prefix.
     const initCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) =>
         file === 'bd' && Array.isArray(args) && args[0] === 'init' && args.includes('--prefix'),
     );
     expect(initCall).toBeDefined();
-    expect(initCall![1]).toContain('pan-init');
+    expect(initCall![1]).toContain(expectedPrefix);
 
     expect(result.success).toBe(true);
     expect(result.created).toContain('PAN-INIT: Setup task');
