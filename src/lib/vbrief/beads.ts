@@ -8,8 +8,8 @@
 
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import { basename, join, resolve } from 'path';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -17,6 +17,19 @@ import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+/**
+ * Derive a consistent project-level bead prefix from a workspace path.
+ * Workspaces live at <projectRoot>/workspaces/feature-<id>/, so the project
+ * root is two levels up. We use the repo directory name as the prefix.
+ * This prevents each issue from getting a different prefix (e.g. pan-569,
+ * pan-821) which breaks cross-issue bead scoping.
+ */
+function deriveProjectPrefix(workspacePath: string): string {
+  const projectRoot = resolve(workspacePath, '..', '..');
+  const repoName = basename(projectRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return repoName;
+}
 
 export interface CreateBeadsResult {
   success: boolean;
@@ -56,14 +69,20 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     const mainBeadsDir = join(projectRoot, '.beads');
     if (existsSync(mainBeadsDir)) {
       mkdirSync(beadsDir, { recursive: true });
+      chmodSync(beadsDir, 0o700);
       writeFileSync(redirectPath, '../../.beads', 'utf-8');
       console.log(`[beads] Created redirect to main repo .beads/ in ${workspacePath}`);
     } else if (!existsSync(beadsDir)) {
       // No main .beads/ and no local .beads/ — fall back to bd init
+      const prefix = deriveProjectPrefix(workspacePath);
       try {
-        await execFileAsync('bd', ['init'], { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        await execFileAsync('bd', ['init', '--prefix', prefix], { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
         await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
-        console.log(`[beads] Initialized beads database in ${workspacePath}`);
+        // Disable beads' auto-export git-add to prevent "git add failed" warnings in worktrees
+        await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
+          encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+        }).catch(() => {});
+        console.log(`[beads] Initialized beads database in ${workspacePath} (prefix: ${prefix})`);
       } catch (initErr: any) {
         return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
       }
@@ -94,7 +113,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     // This covers fresh installs, corrupted DBs, and cases where the redirect was created
     // but bd init was never run for this prefix.
     if (redirectExists) {
-      const prefix = issueLabel;
+      const prefix = deriveProjectPrefix(workspacePath);
       const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
 
       // Categorize the connectivity error for diagnostic clarity
@@ -113,6 +132,11 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
           encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
         });
         await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
+        // Disable beads' auto-export git-add to prevent "git add failed: exit status 128"
+        // warnings in worktrees. Panopticon handles git operations explicitly.
+        await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
+          encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+        }).catch(() => {});
         console.log(`[beads] bd init succeeded for prefix ${prefix}`);
       } catch (initErr: any) {
         // Init failed — return early with a specific error so callers know exactly what happened
