@@ -537,6 +537,11 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
 
+    CREATE INDEX IF NOT EXISTS idx_conversations_archived_created
+      ON conversations(archived_at, created_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+      ON conversations(status, archived_at, created_at);
+
     -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -919,7 +924,15 @@ function runMigrations(db) {
 			if (sessionId) db.prepare(`UPDATE conversations SET claude_session_id = ? WHERE id = ?`).run(sessionId, conv.id);
 		}
 	}
-	db.pragma(`user_version = 28`);
+	if (currentVersion < 29) {
+		try {
+			db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+          ON conversations(status, archived_at, created_at)
+      `);
+		} catch {}
+	}
+	db.pragma(`user_version = 29`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

@@ -23,12 +23,12 @@ import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
-import { getAgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 
 declare const Bun: unknown;
 
@@ -41,7 +41,6 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // `start-server`/`source-file` round-trips. Critical for terminal attach latency
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
-
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 void initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .panopticon.env:', err.message);
@@ -128,6 +127,13 @@ console.log('[panopticon] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
+// Start cleanup for orphaned conversation attachments (1 min interval)
+const attachmentCleanupTimer = setInterval(() => {
+  void cleanupOrphanedConversationAttachments();
+}, 60_000);
+void cleanupOrphanedConversationAttachments();
+console.log('[panopticon] Attachment cleanup started');
+
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
 startTtsSummarizer();
 
@@ -148,12 +154,14 @@ const emitShutdownActivity = () => {
 };
 process.once('SIGTERM', () => {
   emitShutdownActivity();
+  clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
+  clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();

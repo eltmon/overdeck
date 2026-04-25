@@ -1,39 +1,141 @@
-# PAN-698: Dashboard Typography Cleanup — Planning State
+# PAN-539: Image Paste Support in Activity View Conversation
 
-## Status: In Progress
+## Status: In Review — Round 10 Fixes Addressed
 
 ## Current Phase
-Implementing bead pan-569-sqg (eliminate Mission Control typography island) — mission-control.module.css
+Review-agent CHANGES_REQUESTED at 2026-04-23T00:21Z. Addressed all 6 issues (critical import + 5 security/perf items). Tests/typecheck/lint pass. Resubmitting for review.
 
 ## Completed Work
-- [x] pan-569-a5u: Normalize typography foundation stacks (commit: 1b790fa7)
-  - tailwind.config.js: cleaned fontFamily.body/mono stacks
-  - index.css: aligned body and .terminal-output with canonical stacks
-- [x] pan-569-sqg: Eliminate Mission Control typography island (commit: 22d4bf02)
-  - mission-control.module.css: --mc-font-family → DM Sans, --mc-font-mono → canonical SF Mono
-  - Removed .chatMarkdown hardcoded Segoe UI stack
-  - Converted .conversationName and .conversationNameInput from mono to DM Sans prose
-  - Added comments to all remaining mono rules
+- [x] Backend: Added POST /api/conversations/:name/upload-image endpoint with MIME validation, temp-file naming, and async writes (commit: cf85bf1f)
+- [x] Backend: Added async startup cleanup timer for stale panopticon-paste-* temp files in main.ts (commit: d4fb58bb)
+- [x] Frontend: Added paste/drop image ingestion, optimistic upload state, and upload requests in ComposerFooter.tsx (commit: 4ee01ea9)
+- [x] Frontend: Added thumbnail strip with filename, upload/error status, and remove button (commit: 40a5d176)
+- [x] Frontend: Added @/tmp/... prefix injection, upload-in-progress blocking, and pending image cleanup after send (commit: 9f8bdfd9)
+- [x] Fix: Clean up discarded composer uploads while preserving manual attachments (commit: d565a858)
+- [x] Fix: Harden conversation upload lifecycle - limit upload size, keep ended-conversation attachments until archive (commit: 1cc46533)
+- [x] Fix: Reset composer uploads on conversation switch (commit: d0d60ed6)
+- [x] Fix: Preserve archived conversation attachments (commit: aa652f01)
+- [x] Fix: Prune orphaned conversation uploads (commit: db6084c3)
+- [x] Fix: Preserve prose-first attachments (commit: 186d21db)
+- [x] Fix: Keep unsent conversation uploads - mtime-based guard in cleanupUnreferencedConversationAttachments (commit: 7a1fcf1e)
+- [x] Fix: Verification gate test failures in ActionsSection.test.tsx (commit: 5cdd1ae5)
+- [x] Fix: Memory DoS prevention - cap base64 string length before Buffer.from() (commit: 25d996e8)
+- [x] Fix: Split conflated upload error messages into "format" vs "size" (commit: 25d996e8)
+- [x] Fix: Path injection protection - reject messages with unmanaged @attachment paths (commit: 70d07ea9)
+- [x] Fix: Paste/drop race condition - block image paste/drop while sending (commit: 1c289e77)
+- [x] Fix: Symlink escape in attachment path containment - use `realpath` instead of `resolve` (new)
+- [x] Fix: CSRF/origin protection on destructive JSON POSTs - add `validateOrigin` to upload-image, delete-image, stop, archive, message endpoints (new)
+- [x] Fix: Full JSONL reparse during attachment cleanup - replace `parseConversationMessages` with line-by-line stream reading in `readSessionAttachmentBasenames` (new)
+- [x] Fix: Attachment-path regex prose matching - allow unmanaged @paths, only validate managed uploads (commit: 824ed90f)
+- [x] Fix: generateAiTitle spawn timeout, UTF-8 encoding, stdin guard (commit: 824ed90f)
+- [x] Fix: removePendingImage HTTP side effects moved outside React state updater (commit: 824ed90f)
+- [x] Fix: CSRF gate rejects requests with neither Origin nor Referer (commit: 824ed90f)
+- [x] Fix: Cache summarizeConversationActivity by mtimeMs+size to avoid per-poll re-parse (commit: 824ed90f)
+- [x] Fix: Add getConversationByName guard to delete-image route (round 6)
+- [x] Fix: Add assertSafeName boundary check in conversation-attachments module (round 6)
+- [x] Fix: mtime comparison >= to prevent same-tick attachment deletion on stop/archive (round 6)
+- [x] Fix: Remove summarizeConversationActivity from list endpoint to prevent per-poll JSONL parsing (round 6)
+- [x] Fix: readSessionAttachmentBasenames searches raw JSON line for @/ paths (tool-use shapes) (round 7)
+- [x] Fix: isManagedConversationAttachmentPath falls back to resolve for deleted files (round 7)
+- [x] Fix: Remove dead imports getProviderForModel and HttpServerResponse (round 7)
+- [x] Fix: Remove invalid Bun override keys with > character from package.json (test-agent)
+- [x] Fix: Archive route unconditionally cleans up all attachments via cleanupConversationAttachments (round 8)
+- [x] Fix: realpath fallback walks parent directories to preserve symlink containment (round 8)
+- [x] Rebased branch onto origin/main and merged origin/feature/pan-539 (commit: 0b6b1657)
+- [x] Verification: npm run typecheck passes, npm run lint passes, npm test passes (3574/3574)
 
 ## Remaining Work
-- [ ] pan-569-z1o: Convert conversation list titles to DM Sans prose
-- [ ] pan-569-nar: Normalize chat message prose to DM Sans, mono for code only
-- [ ] pan-569-il0: Restrict Sidebar font-display to Panopticon wordmark only
-- [ ] pan-569-4km: Convert AwaitingMergePage title from font-display to DM Sans
-- [ ] pan-569-f03: Convert MetricsSummaryRow values from font-display to DM Sans
-- [ ] pan-569-ces: Replace XTerminal ad hoc mono stack with canonical SF Mono
-- [ ] pan-569-l9t: Repo-wide sweep: remove remaining non–God-View font drift
-- [ ] pan-569-uf4: Rewrite STYLE-GUIDE.md typography section with crisp boundaries
-- [ ] pan-569-jp1: Align related PRDs/docs with final typography policy
-- [ ] pan-569-882: Playwright visual verification of non–God-View typography surfaces
-- [ ] pan-569-ugd: Pass typecheck, lint, and test gates
+- [x] Push branch and resubmit for review via /rebase-and-submit
+- [x] Address review round 5b commented feedback
+- [x] Address review round 6 changes-requested feedback
+- [x] Address review round 7 changes-requested feedback
+- [x] Address review round 8 changes-requested feedback
+- [x] Resubmitted for review after review-agent timeout (2026-04-23T00:10Z)
+- [x] Review approved at 2026-04-23T00:12:54Z
+- [x] All tests passed at 2026-04-23T00:15Z
+- [x] Ready for human merge approval
+- [x] Fix: Missing Conversation type import in routes/conversations.ts (round 10)
+- [x] Fix: Unbounded cwd on summary-fork endpoint — validateCwdContainment now uses realpath, checks directory exists, and requires homedir containment (round 10)
+- [x] Fix: Full JSONL rescan on stop/archive — added bounded LRU cache (100 entries) for readSessionAttachmentBasenames keyed by mtimeMs (round 10)
+- [x] Fix: Upload rate-limit keyed on raw remoteAddress — now checks X-Forwarded-For header first, falls back to remoteAddress (round 10)
+- [x] Fix: Dev-origin trust active whenever NODE_ENV not production — now only trusts localhost origins when NODE_ENV === 'development' (round 10)
+- [x] Fix: @-path extraction regex does not decode JSON-escaped paths — raw JSON line search now JSON-decodes captured values to handle \/ escapes (round 10)
 
 ## Key Decisions
-- D1: Canonical stacks defined in foundation files only:
-  - body: `"DM Sans", system-ui, sans-serif`
-  - mono: `"SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace`
-  - display: `"Space Grotesk", system-ui, sans-serif` (sidebar wordmark only)
-- D2: No ad hoc platform fonts (-apple-system, BlinkMacSystemFont, Segoe UI, Inter, SF Pro, Menlo, Monaco, Courier New) anywhere in non–God-View UI
+- Upload endpoint lives in conversations.ts, not an agent route, because ComposerFooter already targets conversation-specific message APIs.
+- Uploaded images live in the conversation attachment directory (not os.tmpdir()) so they are scoped to the conversation and properly managed.
+- Server-side image handling stays fully async (fs/promises.writeFile) to preserve dashboard event-loop responsiveness.
+- cleanupUnreferencedConversationAttachments uses mtime comparison to preserve unsent uploads that are newer than the session file.
 
-## Specialist Feedback
-- None
+## Specialist Feedback (Resolved)
+- [2026-04-18T16:03Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/031-review-agent-changes-requested.md`
+  - Issues: cleanupUnreferencedConversationAttachments deleting unsent attachments on stop/archive/lifecycle; missing tests for unsent upload protection
+  - Status: FIXED in commits d565a858, 1cc46533, 7a1fcf1e. mtime guard added. Regression tests added.
+- [2026-04-22T19:44Z] verification-gate → FAILED — `.planning/feedback/032-verification-gate-failed.md`
+  - Issue: 24 test failures in ActionsSection.test.tsx
+  - Status: FIXED in commit 5cdd1ae5. Added vi.mock for useConfirm, useAlert, useKillAgent, useResetIssue.
+- [2026-04-22T19:55Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+  - Issues: (1) Memory DoS via oversized base64 strings, (2) path injection via @paths, (3) paste/drop race during send, (4) conflated error messages
+  - Status: FIXED in commits 25d996e8, 70d07ea9, 1c289e77. All four issues resolved with regression tests.
+- [2026-04-22T20:09Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+  - Issues: (1) Path traversal in /delete-image via symlink escape, (2) symlink escape in attachment path containment check, (3) missing CSRF/origin protection on destructive JSON POSTs, (4) full JSONL reparse during attachment cleanup on every stop/archive
+  - Status: FIXED. `isManagedConversationAttachmentPath` and `isConversationAttachmentPath` now use `realpath` to resolve symlinks before containment checks. `validateOrigin` added to upload-image, delete-image, stop, archive, and message endpoints. `readSessionAttachmentBasenames` replaced full JSONL parse with line-by-line stream reading.
+- [2026-04-22T20:24Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round5.md`
+  - Issues: (1) Attachment-path regex matches prose @paths, (2) generateAiTitle spawn lost timeout/UTF-8 guard, (3) removePendingImage HTTP in state updater, (4) CSRF gate allows no Origin/Referer, (5) summarizeConversationActivity re-parses every JSONL on list poll
+  - Status: FIXED in commit 824ed90f. All five issues resolved with regression tests. Feedback archived.
+- [2026-04-22T22:38Z] review-agent → COMMENTED — `.planning/feedback/archive/001-review-agent-commented-round5b.md`
+  - Issues: (1) Unnecessary 2s setTimeout after switchModel, (2) /summary-fork missing cwd containment, (3) mtime cleanup /stop-timing race
+  - Status: FIXED in commit bac3217a. All three issues resolved.
+- [2026-04-22T22:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round6.md`
+  - Issues: (1) delete-image missing getConversationByName guard + assertSafeName, (2) mtime comparison same-tick race, (3) list endpoint JSONL parsing performance regression
+  - Status: FIXED. Added conversation guard to delete-image. Added assertSafeName to conversation-attachments. Changed mtime comparison from > to >=. Removed summarizeConversationActivity from list endpoint.
+- [2026-04-22T23:01Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round7.md`
+  - Issues: (1) JSONL reference extraction misses tool-use-shaped entries, (2) managed-but-deleted attachment silently falls through to unmanaged branch, (3) dead/shadowed imports
+  - Status: FIXED. readSessionAttachmentBasenames now searches raw JSON line for @/ paths. isManagedConversationAttachmentPath and isConversationAttachmentPath fall back to resolve() when realpath() throws (deleted files). Removed dead imports getProviderForModel and HttpServerResponse.
+- [2026-04-22T23:11Z] review-agent → APPROVED — `.planning/feedback/archive/001-review-agent-approved.md`
+  - Status: APPROVED. All 5 vBRIEF items implemented. No blockers.
+- [2026-04-22T23:14Z] test-agent → FAILED — `.planning/feedback/archive/001-test-agent-failed.md`
+  - Issue: Playwright/npm test blocked by pre-existing package.json override corruption (`@effect/platform-node>@effect/platform-node-shared` contains `>` which is not URL-safe)
+  - Status: FIXED. Removed invalid Bun override keys with `>` character. `@effect/platform-node-shared` override retained as direct package name.
+- [2026-04-22T23:21Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/archive/001-review-agent-changes-requested-round8.md`
+  - Issues: (1) Unsent paste attachments leak on archive path — mtime cleanup preserves them, (2) realpath fallback degrades to plain resolve() weakening symlink containment
+  - Status: FIXED. Archive route now calls cleanupConversationAttachments for unconditional cleanup. Added resolveForContainment helper that walks parent directories with realpath instead of falling back to resolve().
+- [2026-04-23T00:07Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-23T00:12Z] review-agent → APPROVED — `.planning/feedback/001-review-agent-approved.md`
+- [2026-04-23T00:21Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-24T02:37Z] review-agent → COMMENTED — `~/.panopticon/agents/agent-pan-539/feedback/001-review-agent-commented.md`
+- [2026-04-24T02:47Z] review-agent → COMMENTED — `~/.panopticon/agents/agent-pan-539/feedback/002-review-agent-commented.md`
+- [2026-04-24T03:06Z] review-agent → COMMENTED — `~/.panopticon/agents/agent-pan-539/feedback/003-review-agent-commented.md`
+- [2026-04-24T03:42Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-24T04:17Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:19Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:20Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:21Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:22Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:23Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:24Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:25Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:32Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/002-review-agent-changes-requested.md`
+- [2026-04-24T04:48Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:50Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:51Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:52Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:54Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:55Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T04:56Z] review-agent → COMMENTED — `.planning/feedback/001-review-agent-commented.md`
+- [2026-04-24T05:02Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/002-review-agent-changes-requested.md`
+- [2026-04-24T06:25Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-24T06:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-24T09:20Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-24T17:26Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-24T22:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/002-review-agent-changes-requested.md`
+- [2026-04-24T23:11Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T00:07Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T00:24Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T00:47Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T01:10Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T01:23Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T01:38Z] verification-gate → FAILED — `.planning/feedback/002-verification-gate-failed.md`
+- [2026-04-25T01:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T02:32Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- [2026-04-25T06:10Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`

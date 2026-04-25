@@ -3,8 +3,7 @@
     "version": "0.5",
     "created": "2026-04-14T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-539: feat: image paste support in activity view conversation",
-    "updated": "2026-04-18T16:08:58.349Z"
+    "description": "Plan for PAN-539: feat: image paste support in activity view conversation"
   },
   "plan": {
     "id": "pan-539",
@@ -12,9 +11,9 @@
     "status": "approved",
     "uid": "98b075a7-1b94-424a-a207-2f08a540f02b",
     "author": "agent:claude-sonnet-4-6",
-    "sequence": 62,
+    "sequence": 1,
     "created": "2026-04-14T00:00:00.000Z",
-    "updated": "2026-04-18T16:08:58.349Z",
+    "updated": "2026-04-14T00:00:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/539",
@@ -22,12 +21,7 @@
         "type": "issue"
       }
     ],
-    "tags": [
-      "frontend",
-      "conversation",
-      "image",
-      "paste"
-    ],
+    "tags": ["frontend", "conversation", "image", "paste"],
     "narratives": {
       "Problem": "Users cannot share images with Claude Code agents via the conversation composer. The ComposerFooter in ConversationPanel only accepts plain text, requiring users to manually upload files and type paths — friction that breaks workflow.",
       "Proposal": "Intercept paste/drop events on the ComposerFooter wrapper div to capture image clipboard data. Upload the image to a new POST /api/conversations/:name/upload-image endpoint (which saves to OS temp dir). Show a thumbnail preview with a remove button. On submit, prepend @/tmp/... path lines before the message text — Claude Code's Read tool handles the @path syntax natively, converting the file to a vision content block automatically."
@@ -36,7 +30,7 @@
       {
         "id": "backend-upload-endpoint",
         "title": "Add POST /api/conversations/:name/upload-image endpoint",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-04-14T00:00:00.000Z",
         "metadata": {
@@ -49,56 +43,40 @@
         "subItems": [
           {
             "id": "backend-upload-endpoint.ac1",
-            "title": "POST /api/conversations/:name/upload-image returns { path } with an absolute file path in the conversation attachment directory",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.095Z"
+            "title": "POST /api/conversations/:name/upload-image returns { path } with an absolute OS temp file path",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "backend-upload-endpoint.ac2",
             "title": "Rejects mimeTypes not in [image/png, image/jpeg, image/gif, image/webp] with 400",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.095Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "backend-upload-endpoint.ac3",
             "title": "Uses fs/promises.writeFile (no sync FS calls)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.095Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "backend-upload-endpoint.ac4",
             "title": "Saved filename matches pattern panopticon-paste-{uuid}.{ext} in os.tmpdir()",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.095Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "backend-upload-endpoint.ac5",
             "title": "Returns 404 if conversation name is not found in DB",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.096Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-18T16:08:58.349Z"
+        ]
       },
       {
         "id": "server-cleanup-interval",
         "title": "Register TTL cleanup for temp paste files on server startup",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-04-14T00:00:00.000Z",
         "metadata": {
@@ -112,37 +90,27 @@
           {
             "id": "server-cleanup-interval.ac1",
             "title": "setInterval registered in main.ts (not in the route file)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.096Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "server-cleanup-interval.ac2",
             "title": "Deletes panopticon-paste-* files from os.tmpdir() older than 5 minutes",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.096Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "server-cleanup-interval.ac3",
             "title": "No sync FS calls (readdir, stat, unlink must all use fs/promises variants)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.096Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-18T16:08:58.349Z"
+        ]
       },
       {
         "id": "frontend-paste-drop",
         "title": "Add paste and drag-drop image capture to ComposerFooter",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-04-14T00:00:00.000Z",
         "metadata": {
@@ -156,55 +124,39 @@
           {
             "id": "frontend-paste-drop.ac1",
             "title": "Ctrl+V with an image in clipboard adds the image to pendingImages state and triggers upload",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.094Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-paste-drop.ac2",
             "title": "Dragging an image file onto the composer adds it and triggers upload",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.094Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-paste-drop.ac3",
             "title": "Pasting plain text is NOT intercepted — Lexical handles it normally",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.094Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-paste-drop.ac4",
             "title": "Multiple images can be pasted/dropped; each appears as a separate thumbnail",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.094Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-paste-drop.ac5",
             "title": "Upload failure shows error state on the thumbnail (not a silent failure)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.094Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-18T16:08:58.349Z"
+        ]
       },
       {
         "id": "frontend-thumbnail-preview",
         "title": "Show image thumbnail strip in ComposerFooter with remove button",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-04-14T00:00:00.000Z",
         "metadata": {
@@ -218,46 +170,33 @@
           {
             "id": "frontend-thumbnail-preview.ac1",
             "title": "Thumbnail appears immediately after paste/drop (before upload completes)",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.093Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-thumbnail-preview.ac2",
             "title": "× button removes the image and revokes its object URL",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.093Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-thumbnail-preview.ac3",
             "title": "Spinner shown while upload is in progress",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.093Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-thumbnail-preview.ac4",
             "title": "Strip is hidden when pendingImages is empty",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.094Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-18T16:08:58.348Z"
+        ]
       },
       {
         "id": "frontend-message-injection",
         "title": "Prepend @path lines to message on submit",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-04-14T00:00:00.000Z",
         "metadata": {
@@ -271,64 +210,35 @@
           {
             "id": "frontend-message-injection.ac1",
             "title": "Submitted message contains @/tmp/panopticon-paste-*.ext lines before user text",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.092Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-message-injection.ac2",
             "title": "If any image is still uploading, submit is blocked with a toast notification",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.092Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-message-injection.ac3",
             "title": "pendingImages cleared and object URLs revoked after successful send",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.092Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "frontend-message-injection.ac4",
             "title": "Image-only message (no text) sends just the @path lines",
-            "status": "completed",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            },
-            "completed": "2026-04-15T22:40:48.093Z"
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
-        ],
-        "completed": "2026-04-18T16:08:58.348Z"
+        ]
       }
     ],
     "edges": [
-      {
-        "from": "backend-upload-endpoint",
-        "to": "frontend-paste-drop",
-        "type": "blocks"
-      },
-      {
-        "from": "frontend-paste-drop",
-        "to": "frontend-thumbnail-preview",
-        "type": "informs"
-      },
-      {
-        "from": "frontend-paste-drop",
-        "to": "frontend-message-injection",
-        "type": "blocks"
-      },
-      {
-        "from": "frontend-thumbnail-preview",
-        "to": "frontend-message-injection",
-        "type": "informs"
-      }
+      { "from": "backend-upload-endpoint", "to": "frontend-paste-drop", "type": "blocks" },
+      { "from": "frontend-paste-drop", "to": "frontend-thumbnail-preview", "type": "informs" },
+      { "from": "frontend-paste-drop", "to": "frontend-message-injection", "type": "blocks" },
+      { "from": "frontend-thumbnail-preview", "to": "frontend-message-injection", "type": "informs" }
     ]
   }
 }
