@@ -91,9 +91,9 @@ export function readPlatformConfig(): PlatformConfig {
 
 async function pidsOnPort(port: number): Promise<number[]> {
   try {
-    const { stdout } = await execAsync(`lsof -ti:${port} 2>/dev/null || true`);
+    const { stdout } = await execAsync(`fuser ${port}/tcp 2>/dev/null || true`);
     return stdout
-      .split('\n')
+      .split(/\s+/)
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => Number.isFinite(n) && n > 0);
   } catch {
