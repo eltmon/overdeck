@@ -76,16 +76,16 @@ describe('SessionPanel', () => {
   });
 
   it('defaults to conversation view', () => {
-    render(<SessionPanel session={makeSession({ jsonlPath: '/path/to/session.jsonl' })} />);
+    render(<SessionPanel session={makeSession({ hasJsonl: true })} />);
     expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
   });
 
-  it('falls back to ChatMarkdown when no jsonlPath but transcript exists', () => {
+  it('falls back to ChatMarkdown when no hasJsonl but transcript exists', () => {
     render(<SessionPanel session={makeSession({ transcript: 'Hello world' })} />);
     expect(screen.getByTestId('chat-markdown')).toHaveTextContent('Hello world');
   });
 
-  it('shows empty state when no jsonlPath and no transcript', () => {
+  it('shows empty state when no hasJsonl and no transcript', () => {
     render(<SessionPanel session={makeSession()} />);
     expect(screen.getByText('No conversation data available for this session.')).toBeInTheDocument();
   });

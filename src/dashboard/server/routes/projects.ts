@@ -31,7 +31,7 @@ async function getIssueDataService(): Promise<IssueDataService> {
 // ─── Concurrency limiter ──────────────────────────────────────────────────────
 
 /** Simple semaphore: run at most `max` promises concurrently. */
-function withConcurrencyLimit<T>(
+export function withConcurrencyLimit<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {
@@ -113,7 +113,7 @@ interface ActivitySection {
   status: string;
   transcript?: string;
   presence: SessionNodePresence;
-  jsonlPath?: string;
+  hasJsonl?: boolean;
 }
 
 function mapSectionToSessionNode(section: ActivitySection): SessionNode {
@@ -129,8 +129,8 @@ function mapSectionToSessionNode(section: ActivitySection): SessionNode {
     status: mapAgentStatus(section.status),
     transcript: section.transcript,
     presence: section.presence,
-    jsonlPath: section.jsonlPath,
-  } as SessionNode;
+    hasJsonl: section.hasJsonl,
+  };
 }
 
 async function resolveFeatureTitle(
@@ -256,7 +256,8 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
           const sessions = activityData.sections.map(mapSectionToSessionNode);
           return { issueId: c.issueId, title, sessions };
-        } catch {
+        } catch (err) {
+          console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
           return null;
         }
       }),

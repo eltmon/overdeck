@@ -82,27 +82,36 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
 
   switch (event.type) {
     case 'agent.started': {
-      const agentId = p['agentId'] as string;
+      const agentId = p['agentId'] as string | undefined;
+      if (!agentId) return null;
       return { kind: 'session_added', issueId, sessionId: agentId, timestamp: event.timestamp };
     }
     case 'agent.stopped': {
-      const agentId = p['agentId'] as string;
+      const agentId = p['agentId'] as string | undefined;
+      if (!agentId) return null;
       return { kind: 'session_removed', issueId, sessionId: agentId, timestamp: event.timestamp };
     }
     case 'agent.status_changed': {
-      const agentId = p['agentId'] as string;
-      const status = p['status'] as string;
+      const agentId = p['agentId'] as string | undefined;
+      const status = p['status'] as string | undefined;
+      if (!agentId || !status) return null;
+      const presence: SessionNodePresence = status === 'stopped' || status === 'error'
+        ? 'ended'
+        : status === 'running'
+          ? 'active'
+          : 'idle';
       return {
         kind: 'status_changed',
         issueId,
         sessionId: agentId,
         status: status as AgentStatus,
+        presence,
         timestamp: event.timestamp,
       };
     }
     case 'specialist.started': {
       const specialist = p['specialist'] as Record<string, unknown> | undefined;
-      const name = specialist?.['name'] as string;
+      const name = specialist?.['name'] as string | undefined;
       const currentIssue = specialist?.['currentIssue'] as string | undefined;
       if (!name) return null;
       return {
@@ -114,7 +123,8 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
     }
     case 'specialist.completed':
     case 'specialist.failed': {
-      const name = p['name'] as string;
+      const name = p['name'] as string | undefined;
+      if (!name) return null;
       return { kind: 'session_removed', issueId, sessionId: name, timestamp: event.timestamp };
     }
     case 'pipeline.review-started': {
