@@ -681,9 +681,8 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function readTemplate(name: string): string {
-  // Source-of-truth review prompt templates live in src/lib/cloister/prompts/review/.
-  // The .claude/prompts/ copy is a sync target produced by `pan sync` and is
-  // gitignored, so it isn't present in CI. Read directly from source.
+  // Review prompt templates live at src/lib/cloister/prompts/review/<name>.prompt-template.md
+  // (workspace root, three directories up from tests/lib/cloister/).
   const templatePath = resolve(
     import.meta.dirname,
     '../../../src/lib/cloister/prompts/review',
