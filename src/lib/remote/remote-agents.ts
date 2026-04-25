@@ -11,6 +11,7 @@ import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 
 const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
 const REMOTE_PAN_DIR = '/workspace/.pan';
@@ -157,11 +158,16 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
     // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
-    const launcherContent = `#!/bin/bash
-export PATH="/usr/local/bin:\$PATH"
-prompt=\$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model} "\$prompt"
-`;
+    const launcherContent = generateLauncherScript({
+      agentType: 'remote',
+      workingDir: '/workspace',
+      changeDir: false,
+      setRemotePath: true,
+      promptFile,
+      baseCommand: 'claude',
+      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      model,
+    });
     const launcherBase64 = Buffer.from(launcherContent).toString('base64');
     await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
 
