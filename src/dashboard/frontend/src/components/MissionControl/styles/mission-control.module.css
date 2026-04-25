@@ -300,6 +300,96 @@
   white-space: nowrap;
 }
 
+/* Session Node (child of FeatureItem) */
+.sessionNode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-8);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: var(--mc-font-size-sm);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--mc-text-primary);
+}
+
+.sessionNode:hover {
+  background: var(--mc-bg-hover);
+}
+
+.sessionNodeSelected {
+  background: var(--mc-bg-selected);
+}
+
+.sessionPresence {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sessionPresenceActive {
+  background: var(--mc-success);
+  animation: pulse 2s infinite;
+}
+
+.sessionPresenceIdle {
+  background: var(--mc-warning);
+}
+
+.sessionPresenceEnded {
+  background: var(--mc-text-muted);
+}
+
+.sessionTypeBadge {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--mc-bg-hover);
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+
+.sessionId {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-secondary);
+  font-family: var(--mc-font-mono);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionModel {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionStatus {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+  text-transform: lowercase;
+}
+
+.sessionDuration {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+  font-family: var(--mc-font-mono);
+}
+
 /* Cost value — technical numeric data, mono for alignment per PAN-698 policy */
 .featureCost {
   font-size: var(--mc-font-size-xs);
