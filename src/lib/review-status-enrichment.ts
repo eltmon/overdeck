@@ -5,8 +5,39 @@ import { resolveProjectFromIssue } from './projects.js';
 import type { ReviewStatus } from './review-status.js';
 
 export interface EnrichedReviewStatus extends ReviewStatus {
+  reviewCoordinatorSessionName?: string;
   reviewSessionNames?: string[];
   reviewSubStatuses?: Record<string, 'running' | 'done'>;
+}
+
+function parseTrailingTimestamp(prefix: string, sessionName: string): number | null {
+  if (!sessionName.startsWith(prefix)) return null;
+  const value = Number(sessionName.slice(prefix.length));
+  return Number.isFinite(value) ? value : null;
+}
+
+function parseReviewerTimestamp(prefix: string, sessionName: string): number | null {
+  if (!sessionName.startsWith(prefix)) return null;
+  const rest = sessionName.slice(prefix.length);
+  const dashIdx = rest.indexOf('-');
+  if (dashIdx <= 0) return null;
+  const value = Number(rest.slice(0, dashIdx));
+  return Number.isFinite(value) ? value : null;
+}
+
+function mostRecentByTimestamp(
+  sessionNames: string[],
+  parseTimestamp: (sessionName: string) => number | null,
+): string | undefined {
+  let latest: { name: string; timestamp: number } | undefined;
+  for (const name of sessionNames) {
+    const timestamp = parseTimestamp(name);
+    if (timestamp === null) continue;
+    if (!latest || timestamp > latest.timestamp) {
+      latest = { name, timestamp };
+    }
+  }
+  return latest?.name;
 }
 
 /**
@@ -38,8 +69,29 @@ export function enrichReviewStatusFromSessions(
   allSessions: string[],
 ): EnrichedReviewStatus {
   const normalizedIssueId = issueId.toUpperCase();
-  const reviewSessionNames = allSessions.filter(s => s.startsWith(`review-${normalizedIssueId}-`));
-  if (reviewSessionNames.length === 0) return { ...status };
+  const reviewerPrefix = `review-${normalizedIssueId}-`;
+  const coordinatorPrefix = `review-coordinator-${normalizedIssueId}-`;
+  const reviewCoordinatorSessionName = mostRecentByTimestamp(
+    allSessions.filter(s => s.startsWith(coordinatorPrefix)),
+    (sessionName) => parseTrailingTimestamp(coordinatorPrefix, sessionName),
+  );
+
+  let reviewSessionNames = allSessions.filter(s => s.startsWith(reviewerPrefix));
+  if (reviewSessionNames.length > 0) {
+    const latestReviewerSession = mostRecentByTimestamp(
+      reviewSessionNames,
+      (sessionName) => parseReviewerTimestamp(reviewerPrefix, sessionName),
+    );
+    const latestTs = latestReviewerSession
+      ? parseReviewerTimestamp(reviewerPrefix, latestReviewerSession)
+      : null;
+    if (latestTs !== null) {
+      reviewSessionNames = reviewSessionNames.filter(
+        s => parseReviewerTimestamp(reviewerPrefix, s) === latestTs,
+      );
+    }
+  }
+  if (reviewSessionNames.length === 0 && !reviewCoordinatorSessionName) return { ...status };
 
   let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
   try {
@@ -59,5 +111,10 @@ export function enrichReviewStatusFromSessions(
     // non-fatal
   }
 
-  return { ...status, reviewSessionNames, reviewSubStatuses };
+  return {
+    ...status,
+    reviewCoordinatorSessionName,
+    reviewSessionNames: reviewSessionNames.length > 0 ? reviewSessionNames : undefined,
+    reviewSubStatuses,
+  };
 }

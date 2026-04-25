@@ -38,12 +38,11 @@ export function derivePipelinePhase(
 
   // Parallel review sessions use review-<issueId>-<timestamp>-<role> naming.
   // Prefer actual discovered session names from the backend when available.
-  // No fallback to old specialist- naming — if sessions aren't discovered yet,
-  // the tab renders without a terminal connection until the backend finds them.
+  // The coordinator is the top-level Review tab; per-role reviewer sessions
+  // render as child review tabs.
+  const reviewCoordinatorSession = reviewStatus?.reviewCoordinatorSessionName ?? null;
   const reviewSessionNames = reviewStatus?.reviewSessionNames;
-  const reviewSession = reviewSessionNames && reviewSessionNames.length > 0
-    ? reviewSessionNames[0]
-    : null;
+  const liveReviewerSession = reviewSessionNames?.find(s => !deadSessions.has(s)) ?? null;
 
   const testSession = specialistSession('test-agent');
   const mergeSession = specialistSession('merge-agent');
@@ -74,10 +73,12 @@ export function derivePipelinePhase(
     activeSession = deadSessions.has(testSession) ? null : testSession;
   } else if (rs === 'reviewing') {
     phase = 'reviewing';
-    if (reviewSessionNames && reviewSessionNames.length > 0) {
-      activeSession = reviewSessionNames.find(s => !deadSessions.has(s)) || reviewSessionNames[0] || null;
+    if (reviewCoordinatorSession && !deadSessions.has(reviewCoordinatorSession)) {
+      activeSession = reviewCoordinatorSession;
+    } else if (reviewSessionNames && reviewSessionNames.length > 0) {
+      activeSession = liveReviewerSession;
     } else {
-      activeSession = reviewSession && !deadSessions.has(reviewSession) ? reviewSession : null;
+      activeSession = null;
     }
   } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
     phase = 'review-feedback';
@@ -118,6 +119,16 @@ export function derivePipelinePhase(
   const reviewSubStatuses = reviewStatus?.reviewSubStatuses;
   const isReviewDone = rs === 'passed' || rs === 'failed' || rs === 'blocked';
   if (rs && rs !== 'pending') {
+    const hasLiveCoordinator = !!reviewCoordinatorSession && !deadSessions.has(reviewCoordinatorSession);
+    tabs.push({
+      id: 'reviewing',
+      label: 'Review',
+      sessionName: reviewCoordinatorSession,
+      isActive: phase === 'reviewing' && hasLiveCoordinator && activeSession === reviewCoordinatorSession,
+      disabled: !hasLiveCoordinator || isReviewDone,
+      isRunning: phase === 'reviewing' && hasLiveCoordinator && !isReviewDone,
+    });
+
     if (reviewSessionNames && reviewSessionNames.length > 0) {
       for (const sessionName of reviewSessionNames) {
         const role = sessionName.split('-').pop() || 'review';
@@ -131,15 +142,6 @@ export function derivePipelinePhase(
           isRunning: phase === 'reviewing' && !isDone && !isReviewDone,
         });
       }
-    } else if (reviewSession) {
-      tabs.push({
-        id: 'reviewing',
-        label: 'Review',
-        sessionName: reviewSession,
-        isActive: phase === 'reviewing',
-        disabled: deadSessions.has(reviewSession) || isReviewDone,
-        isRunning: phase === 'reviewing' && !isReviewDone,
-      });
     }
   }
 
@@ -192,22 +194,37 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
     });
   }, []);
 
-  // Cache reviewSessionNames: the backend discovers them from live tmux sessions,
-  // but by the time the review result (passed/failed) is emitted the sessions are
-  // already killed. Without caching, tabs disappear as soon as the review finishes.
+  // Cache review sessions: the backend discovers them from live tmux sessions,
+  // but by the time the review result (passed/failed) is emitted the sessions
+  // may already be killed. Without caching, tabs disappear immediately.
+  const cachedCoordinatorSessionRef = useRef<string | undefined>(undefined);
   const cachedSessionNamesRef = useRef<string[] | undefined>(undefined);
+  const liveCoordinator = input.reviewStatus?.reviewCoordinatorSessionName;
   const liveNames = input.reviewStatus?.reviewSessionNames;
+  if (liveCoordinator) {
+    cachedCoordinatorSessionRef.current = liveCoordinator;
+  }
   if (liveNames && liveNames.length > 0) {
     cachedSessionNamesRef.current = liveNames;
   }
   const effectiveInput = useMemo(() => {
-    if (liveNames && liveNames.length > 0) return input;
-    if (!cachedSessionNamesRef.current || !input.reviewStatus) return input;
+    if (!input.reviewStatus) return input;
+    const reviewStatus = { ...input.reviewStatus };
+    let changed = false;
+    if (!liveCoordinator && cachedCoordinatorSessionRef.current) {
+      reviewStatus.reviewCoordinatorSessionName = cachedCoordinatorSessionRef.current;
+      changed = true;
+    }
+    if ((!liveNames || liveNames.length === 0) && cachedSessionNamesRef.current) {
+      reviewStatus.reviewSessionNames = cachedSessionNamesRef.current;
+      changed = true;
+    }
+    if (!changed) return input;
     return {
       ...input,
-      reviewStatus: { ...input.reviewStatus, reviewSessionNames: cachedSessionNamesRef.current },
+      reviewStatus,
     };
-  }, [input, liveNames]);
+  }, [input, liveCoordinator, liveNames]);
 
   // Debounce phase changes by 1s to prevent auto-switch churn
   const resultRef = useRef<PipelinePhaseResult | null>(null);
