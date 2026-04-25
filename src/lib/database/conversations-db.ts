@@ -288,8 +288,16 @@ export function updateConversationCost(name: string, totalCost: number): void {
   ).run(totalCost, name);
 }
 
-/** Update the model for a conversation (used by backfill). */
-export function updateConversationModel(name: string, model: string): void {
+/** Set the model for a conversation unconditionally. */
+export function setConversationModel(name: string, model: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET model = ? WHERE name = ?`,
+  ).run(model, name);
+}
+
+/** Backfill the model for a conversation only when currently NULL. */
+export function backfillConversationModel(name: string, model: string): void {
   const db = getDatabase();
   db.prepare(
     `UPDATE conversations SET model = ? WHERE name = ? AND model IS NULL`,

@@ -179,10 +179,6 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     });
   }, []);
 
-  useEffect(() => {
-    pendingImagesRef.current = pendingImages;
-  }, [pendingImages]);
-
   const removePendingImage = useCallback((id: string) => {
     removedImageIdsRef.current.add(id);
     const image = pendingImagesRef.current.find((candidate) => candidate.id === id);
@@ -292,13 +288,10 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   }, [enqueueImages, sending]);
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (sending) {
-      event.preventDefault();
-      return;
-    }
+    event.preventDefault();
+    if (sending) return;
     const imageFiles = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
-    event.preventDefault();
     enqueueImages(imageFiles);
   }, [enqueueImages, sending]);
 
@@ -450,7 +443,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
   return (
     <div className={styles.composerFooter}>
       {/* Single unified container — T3Chat style */}
-      <div className={styles.composerBox} onPaste={handlePaste} onDrop={handleDrop} onDragOver={handleDragOver}>
+      <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
         {pendingImages.length > 0 && (
           <div className={styles.composerImageStrip}>
             {pendingImages.map((image) => {
@@ -491,6 +484,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
           onCommandKeyDown={handleCommandKey}
           editorRef={editorRef}
           onChange={setText}
+          onPaste={handlePaste}
         />
 
         {/* Toolbar inside the box */}

@@ -19,7 +19,7 @@ vi.mock('lexical', () => ({
 }));
 
 vi.mock('../ComposerPromptEditor', () => ({
-  ComposerPromptEditor: ({ editorRef, onChange, disabled }: { editorRef: { current: unknown }; onChange: (value: string) => void; disabled: boolean }) => {
+  ComposerPromptEditor: ({ editorRef, onChange, disabled, onPaste }: { editorRef: { current: unknown }; onChange: (value: string) => void; disabled: boolean; onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void }) => {
     editorRef.current = {
       read: (callback: () => void) => callback(),
       update: (callback: () => void) => callback(),
@@ -35,6 +35,7 @@ vi.mock('../ComposerPromptEditor', () => ({
           editorState.text = event.target.value;
           onChange(event.target.value);
         }}
+        onPaste={onPaste}
       />
     );
   },

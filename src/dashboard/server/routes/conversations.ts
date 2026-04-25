@@ -36,7 +36,8 @@ import {
   updateSessionFile,
   updateConversationTitle,
   updateConversationCost,
-  updateConversationModel,
+  setConversationModel,
+  backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
   canReplaceTitle,
@@ -237,6 +238,21 @@ async function getCachedMessages(
     }
   }
   return result;
+}
+
+// ─── Favorites cache ───────────────────────────────────────────────────────────
+
+const FAVORITES_CACHE_TTL_MS = 5000;
+let favoritesCache: { timestamp: number; ids: Set<string> } | null = null;
+
+function getCachedFavoritedIds(): Set<string> {
+  const now = Date.now();
+  if (favoritesCache && now - favoritesCache.timestamp < FAVORITES_CACHE_TTL_MS) {
+    return favoritesCache.ids;
+  }
+  const ids = new Set(listFavoritedIds('conversation'));
+  favoritesCache = { timestamp: now, ids };
+  return ids;
 }
 
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
@@ -593,7 +609,7 @@ async function backfillConversationModels(): Promise<void> {
         batch.map(async (conv) => {
           const model = await extractModelFromSessionFile(conv.sessionFile!);
           if (model && SAFE_MODEL_PATTERN.test(model)) {
-            updateConversationModel(conv.name, model);
+            backfillConversationModel(conv.name, model);
             return true;
           }
           return false;
@@ -827,7 +843,7 @@ const getConversationsRoute = HttpRouter.add(
         const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
         const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
         const conversations = listConversations({ limit, offset });
-        const favoritedNames = new Set(listFavoritedIds('conversation'));
+        const favoritedNames = getCachedFavoritedIds();
 
         // Enrich with live tmux status
         // Grace period: treat recently-created active conversations as alive (tmux may not have
@@ -1080,7 +1096,7 @@ const postConversationResumeRoute = HttpRouter.add(
         }
 
         // Persist the new model so the dropdown reflects what we're respawning with.
-        if (model && modelChanged) updateConversationModel(name, model);
+        if (model && modelChanged) setConversationModel(name, model);
 
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
         await waitForTmuxSession(conv.tmuxSession);
@@ -1138,7 +1154,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         }
 
         // Persist the new model
-        if (model) updateConversationModel(name, model);
+        if (model) setConversationModel(name, model);
 
         // Extract the session UUID from the existing session file path
         const oldSessionId = sessionIdFromFile(conv.sessionFile);
