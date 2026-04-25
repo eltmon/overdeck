@@ -800,7 +800,6 @@ export async function runParallelReview(
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
   const result = await parseSynthesisFn(outputDir, agents);
-  result.output = `Review ${reviewId}`;
 
   await postReviewFn(context, result, outputDir);
 

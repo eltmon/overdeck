@@ -132,7 +132,7 @@ export class WsTransport {
               }),
             ),
           ),
-          Effect.catchAllDefect((defect) =>
+          Effect.catchDefect((defect: unknown) =>
             Effect.fail(new Error(formatError(defect))),
           ),
           Effect.tapError((err) =>
@@ -150,7 +150,7 @@ export class WsTransport {
             if (active && Exit.isFailure(exit)) {
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
               resetTransport()
-              setTimeout(run, Duration.toMillis(retryDelay))
+              setTimeout(run, 1000)
             }
           },
         },
