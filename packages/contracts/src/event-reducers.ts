@@ -145,7 +145,20 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
 
 export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModelState {
   switch (event.type) {
-    case 'agent.created':
+    case 'agent.created': {
+      const existing = state.agentsById[event.payload.agentId]
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentsById: {
+          ...state.agentsById,
+          [event.payload.agentId]: existing
+            ? { ...existing, ...event.payload.agent }
+            : event.payload.agent,
+        },
+      }
+    }
+
     case 'agent.started':
       return {
         ...state,
