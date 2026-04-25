@@ -95,13 +95,12 @@ const PROVIDER_ENV_UNSETS = [
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ];
-const PROVIDER_UNSET_LINES = PROVIDER_ENV_UNSETS.map(k => `unset ${k}`).join('\n');
 const PROVIDER_UNSET_CMD = `unset ${PROVIDER_ENV_UNSETS.join(' ')}`;
 
 /**
- * Convert a providerEnv dict to bash export lines (re-export after PROVIDER_UNSET_LINES).
+ * Convert a providerEnv dict to bash export lines.
  * Non-Anthropic models (e.g. gpt-5.4 via cliproxy) need ANTHROPIC_BASE_URL set in the
- * script body — tmux -e flags are wiped by PROVIDER_UNSET_LINES before claude runs.
+ * script body after provider env vars are unset.
  */
 function buildProviderExportLines(providerEnv: Record<string, string>): string {
   const entries = Object.entries(providerEnv);
