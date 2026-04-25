@@ -19,6 +19,7 @@ import React, {
   useCallback,
   useRef,
   useEffect,
+  useMemo,
   type ReactNode,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -73,6 +74,21 @@ function cacheKey(code: string, lang: string): string {
 const ALLOWED_SHIKI_TAGS = new Set(['span', 'pre', 'code', 'div', 'br']);
 const ALLOWED_SHIKI_ATTRS = new Set(['class', 'style']);
 
+const ALLOWED_CSS_PROPERTIES = new Set([
+  'color', 'background-color', 'font-style', 'font-weight',
+  'text-decoration', 'opacity',
+]);
+
+function sanitizeStyleAttr(styleValue: string): string {
+  return styleValue.split(';')
+    .map((d) => d.trim()).filter(Boolean)
+    .filter((d) => {
+      const [prop] = d.split(':');
+      return prop && ALLOWED_CSS_PROPERTIES.has(prop.trim().toLowerCase());
+    })
+    .join('; ');
+}
+
 function sanitizeShikiHtml(html: string): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
@@ -91,7 +107,11 @@ function sanitizeShikiHtml(html: string): string {
     }
     const newEl = document.createElement(tagName);
     for (const attr of Array.from(el.attributes)) {
-      if (ALLOWED_SHIKI_ATTRS.has(attr.name.toLowerCase())) {
+      if (!ALLOWED_SHIKI_ATTRS.has(attr.name.toLowerCase())) continue;
+      if (attr.name === 'style') {
+        const safe = sanitizeStyleAttr(attr.value);
+        if (safe) newEl.setAttribute('style', safe);
+      } else {
         newEl.setAttribute(attr.name, attr.value);
       }
     }
@@ -190,6 +210,11 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
     return () => { abortRef.current = true; };
   }, [code, lang, isStreaming]);
 
+  const sanitizedHtml = useMemo(
+    () => (highlighted ? sanitizeShikiHtml(highlighted) : null),
+    [highlighted],
+  );
+
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(code).then(() => {
       setCopied(true);
@@ -206,11 +231,11 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
       >
         {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
       </button>
-      {highlighted ? (
+      {sanitizedHtml ? (
         <div
           className={styles.shikiOutput}
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: sanitizeShikiHtml(highlighted) }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       ) : (
         <pre className={styles.codePlain}>
@@ -277,7 +302,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   text,
   isStreaming = false,
 }: ChatMarkdownProps) {
-  const components = makeComponents(isStreaming);
+  const components = useMemo(() => makeComponents(isStreaming), [isStreaming]);
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>

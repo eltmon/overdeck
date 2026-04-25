@@ -351,6 +351,9 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       // switch useEffect will have already cleared pending images and deleted
       // uploads for the old conversation.
       if (submitConversationName !== currentConversationNameRef.current) {
+        for (const image of currentPendingImages) {
+          revokePreviewUrl(image.previewUrl);
+        }
         return;
       }
 

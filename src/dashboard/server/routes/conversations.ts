@@ -17,7 +17,7 @@ import { exec, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
@@ -468,10 +468,15 @@ export async function handleConversationImageUpload(
   // Pre-write containment: resolve the directory before writing to detect
   // any symlink tampering that would redirect writes outside the intended
   // root. This eliminates the TOCTOU window between write and check.
-  const resolvedDir = await realpath(attachmentDir);
-  const attachmentsRoot = await realpath(getConversationAttachmentsRoot()).catch(() =>
-    resolve(getConversationAttachmentsRoot()),
-  );
+  let resolvedDir: string;
+  let attachmentsRoot: string;
+  try {
+    resolvedDir = await realpath(attachmentDir);
+    attachmentsRoot = await realpath(getConversationAttachmentsRoot());
+  } catch (err) {
+    console.error('[conversations] Failed to resolve attachment path:', err);
+    return jsonResponse({ error: 'Attachment directory is misconfigured' }, { status: 500 });
+  }
   if (!resolvedDir.startsWith(`${attachmentsRoot}/`)) {
     return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
   }
