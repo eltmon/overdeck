@@ -123,11 +123,17 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; plain?: boolean }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; plain?: boolean; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: opts.model, summaryModel: opts.summaryModel, plain: opts.plain }),
+    body: JSON.stringify({
+      model: opts.model,
+      summaryModel: opts.summaryModel,
+      plain: opts.plain,
+      localSummaryOnly: opts.localSummaryOnly,
+      includeThinkingInSummary: opts.includeThinkingInSummary,
+    }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -609,8 +615,15 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
           conversation={forkTarget}
           isPending={summaryForkMutation.isPending}
           onClose={() => setForkTarget(null)}
-          onConfirm={(conv, launchModel, summaryModel, plainFork) => {
-            summaryForkMutation.mutate({ conv, model: launchModel, summaryModel, plain: plainFork });
+          onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary) => {
+            summaryForkMutation.mutate({
+              conv,
+              model: launchModel,
+              summaryModel,
+              plain: plainFork,
+              localSummaryOnly,
+              includeThinkingInSummary,
+            });
             setForkTarget(null);
           }}
         />

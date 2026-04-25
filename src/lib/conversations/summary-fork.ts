@@ -1,3 +1,26 @@
+/**
+ * Conversation fork pipeline.
+ *
+ * This module handles creating a new conversation from an existing one.
+ * Two modes are supported:
+ *
+ * 1. Summary fork (default): The conversation history is serialized and sent
+ *    to an LLM summarizer (see smart-compaction.ts). The generated structured
+ *    summary is injected as the first user message in the new session.
+ *
+ * 2. Plain fork: Raw JSONL history is copied from the last compact_boundary
+ *    into a new session file. Thinking blocks are sanitized (converted to text)
+ *    to prevent signature validation errors on cross-model resumes.
+ *
+ * Entry point: createSummaryFork()
+ * - Reserves a new session ID and file path
+ * - Generates summary (LLM, heuristic fallback, or skips for plain fork)
+ * - Creates a DB record for the new conversation
+ * - Returns the new conversation + session metadata
+ *
+ * Dashboard API: runForkPipeline() in src/dashboard/server/routes/conversations.ts
+ * wires the options through and handles tmux spawn + summary injection.
+ */
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -15,6 +38,8 @@ export interface SummaryForkOptions {
   /** When true, skip summary generation and copy the raw JSONL history
    *  (from the last compact_boundary, if any) into the new session file. */
   plain?: boolean;
+  /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
+  includeThinkingInSummary?: boolean;
 }
 
 export interface SummaryForkResult {
@@ -108,7 +133,7 @@ export async function generateFallbackSummary(jsonlPath: string): Promise<string
   return summary;
 }
 
-export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string): Promise<{ summary: string; summaryModel: string | null }> {
+export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string, includeThinkingInSummary?: boolean): Promise<{ summary: string; summaryModel: string | null }> {
   if (!summaryModel) {
     // Fork summaries serialize the entire conversation in one shot. Sonnet 4.6's
     // 1M-token context handles large sessions that would overflow Haiku's 200k.
@@ -118,7 +143,7 @@ export async function generateSummaryForFork(jsonlPath: string, summaryModel?: s
   const { config } = loadConfig();
   const richMode = config.conversations.richCompaction;
 
-  const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork' });
+  const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary });
   return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
 }
 
@@ -162,8 +187,40 @@ async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number>
 }
 
 /**
+ * Sanitize assistant entries by converting thinking blocks to plain text.
+ * This prevents API errors when resuming a session cross-model/provider,
+ * since thinking block signatures are bound to the original API request.
+ */
+function sanitizeEntryForPlainFork(entry: any): any {
+  if (entry.type !== 'assistant' || !entry.message || !Array.isArray(entry.message.content)) {
+    return entry;
+  }
+
+  const sanitizedContent = entry.message.content.map((block: any) => {
+    if (block.type === 'thinking' && typeof block.thinking === 'string') {
+      // Convert thinking block to text block so the new model doesn't
+      // attempt to validate a signature bound to a different API request.
+      return {
+        type: 'text',
+        text: `[Thinking]\n${block.thinking}`,
+      };
+    }
+    return block;
+  });
+
+  return {
+    ...entry,
+    message: {
+      ...entry.message,
+      content: sanitizedContent,
+    },
+  };
+}
+
+/**
  * Copy JSONL content from the last compact_boundary (or from the start)
- * into a new session file.
+ * into a new session file. Thinking blocks are sanitized to prevent
+ * signature validation errors on cross-model forks.
  */
 export async function copySessionFromCompactBoundary(
   sourcePath: string,
@@ -173,7 +230,21 @@ export async function copySessionFromCompactBoundary(
   const boundaryOffset = await findLastCompactBoundaryOffset(sourcePath);
   const content = await readFile(sourcePath, 'utf-8');
   const sliced = boundaryOffset > 0 ? content.slice(boundaryOffset) : content;
-  await writeFile(destPath, sliced, 'utf-8');
+
+  // Sanitize each line to strip thinking signatures
+  const sanitizedLines = sliced.split('\n').map((line) => {
+    if (!line.trim()) return line;
+    try {
+      const entry = JSON.parse(line);
+      const sanitized = sanitizeEntryForPlainFork(entry);
+      return JSON.stringify(sanitized);
+    } catch {
+      // Keep malformed lines as-is
+      return line;
+    }
+  });
+
+  await writeFile(destPath, sanitizedLines.join('\n'), 'utf-8');
 }
 
 export async function createSummaryFork(
@@ -207,7 +278,7 @@ export async function createSummaryFork(
     summary = await generateFallbackSummary(sourceSessionFile);
     usedSummaryModel = null;
   } else {
-    const result = await generateSummaryForFork(sourceSessionFile, summaryModel ?? undefined);
+    const result = await generateSummaryForFork(sourceSessionFile, summaryModel ?? undefined, options.includeThinkingInSummary);
     summary = result.summary;
     usedSummaryModel = result.summaryModel;
   }

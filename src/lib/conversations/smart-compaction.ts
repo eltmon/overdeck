@@ -15,6 +15,8 @@ export interface CompactionOptions {
   richMode?: boolean;
   /** 'compact' = native compaction (returns stub if nothing to summarize). 'fork' = always produce a real summary for conversation forks. */
   mode?: 'compact' | 'fork';
+  /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
+  includeThinkingInSummary?: boolean;
 }
 
 export interface CompactionResult {
@@ -341,7 +343,7 @@ function truncateForSummary(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}\n\n[... ${text.length - maxChars} more characters truncated]`;
 }
 
-function serializeEntry(entry: any): string | undefined {
+function serializeEntry(entry: any, includeThinking: boolean = true): string | undefined {
   if (entry.type === 'user' && entry.message) {
     const content = entry.message.content;
     let text = '';
@@ -383,7 +385,7 @@ function serializeEntry(entry: any): string | undefined {
       for (const block of content) {
         if (block.type === 'text' && block.text) {
           textParts.push(block.text);
-        } else if (block.type === 'thinking' && block.thinking) {
+        } else if (block.type === 'thinking' && block.thinking && includeThinking) {
           textParts.push(`[thinking]: ${block.thinking}`);
         } else if (block.type === 'tool_use') {
           const args = block.input || {};
@@ -410,10 +412,10 @@ function serializeEntry(entry: any): string | undefined {
   return undefined;
 }
 
-function serializeConversation(entries: any[]): string {
+function serializeConversation(entries: any[], includeThinking: boolean = true): string {
   const parts: string[] = [];
   for (const entry of entries) {
-    const serialized = serializeEntry(entry);
+    const serialized = serializeEntry(entry, includeThinking);
     if (serialized) parts.push(serialized);
   }
   return parts.join('\n\n');
@@ -749,6 +751,7 @@ async function generateChunkedSummary(
   model: string | undefined,
   richMode: boolean,
   timeoutMs: number,
+  includeThinking: boolean = true,
 ): Promise<string> {
   const budget = getChunkBudgetChars(model);
   const chunks = chunkEntriesByBudget(entries, budget);
@@ -758,7 +761,7 @@ async function generateChunkedSummary(
 
   let running: string | undefined = initialPreviousSummary;
   for (let i = 0; i < chunks.length; i++) {
-    const serialized = serializeConversation(chunks[i]);
+    const serialized = serializeConversation(chunks[i], includeThinking);
     if (!serialized.trim()) continue;
     console.log(
       `[smart-compaction] Summarizing chunk ${i + 1}/${chunks.length} ` +
@@ -787,6 +790,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   const reserveTokens = options.reserveTokens ?? 16384;
   const model = options.model || DEFAULT_SUMMARY_MODEL;
   const richMode = options.richMode ?? false;
+  const includeThinking = options.includeThinkingInSummary ?? true;
   const tokensBefore = estimateContextTokens(entries);
 
   // Detect previous compact boundary for incremental summarization
@@ -834,7 +838,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   // Generate summaries
   const llmTimeoutMs = isFork ? FORK_SUMMARY_TIMEOUT_MS : undefined;
   let summary: string;
-  let serializedHistory = serializeConversation(messagesToSummarize);
+  let serializedHistory = serializeConversation(messagesToSummarize, includeThinking);
   let hasHistory = serializedHistory.trim().length > 0;
 
   // For forks, always produce a real summary. If the selected history slice is
@@ -843,7 +847,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   if (isFork && !hasHistory && !cutPoint.isSplitTurn) {
     const allMessages = entries.slice(boundaryStart, cutPoint.firstKeptEntryIndex);
     if (allMessages.length > 0) {
-      serializedHistory = serializeConversation(allMessages);
+      serializedHistory = serializeConversation(allMessages, includeThinking);
       hasHistory = serializedHistory.trim().length > 0;
     }
   }
@@ -860,10 +864,10 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
       // Summarize from the previous compact boundary (if any) forward — the
       // previousSummary already covers everything before boundaryStart.
       const forkEntries = boundaryStart > 0 ? entries.slice(boundaryStart) : entries;
-      const anyContent = forkEntries.some((e) => serializeEntry(e));
+      const anyContent = forkEntries.some((e) => serializeEntry(e, includeThinking));
       if (anyContent) {
         try {
-          summary = await generateChunkedSummary(forkEntries, previousSummary, model, richMode, forkTimeoutMs);
+          summary = await generateChunkedSummary(forkEntries, previousSummary, model, richMode, forkTimeoutMs, includeThinking);
         } catch (error) {
           throw new Error(`Smart summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -886,7 +890,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
           hasHistory
             ? generateSummaryFromPrompt(serializedHistory, previousSummary, model, richMode, llmTimeoutMs)
             : Promise.resolve('No prior history.'),
-          generateTurnPrefixSummary(serializeConversation(turnPrefixMessages), model, llmTimeoutMs),
+          generateTurnPrefixSummary(serializeConversation(turnPrefixMessages, includeThinking), model, llmTimeoutMs),
         ]);
         summary = `${historyResult}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixResult}`;
       } else {

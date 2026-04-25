@@ -11,6 +11,7 @@
  */
 
 import { existsSync, rmSync, unlinkSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -115,12 +116,28 @@ async function stopDocker(
 }
 
 /**
+ * Detect whether a PID belongs to a process running inside a Docker container.
+ * Container processes appear in host lsof output when paths are bind-mounted.
+ */
+async function isDockerContainerProcess(pid: string): Promise<boolean> {
+  try {
+    const cgroup = await readFile(`/proc/${pid}/cgroup`, 'utf-8');
+    return cgroup.includes('/docker-') || cgroup.includes('/docker/');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Kill orphaned host processes for a workspace.
  *
  * When workspaces use `./dev all`, Vite/node processes run on the host (not in
  * containers). Docker compose down doesn't touch them, so they leak and exhaust
  * inotify watchers. This step finds and kills processes whose cwd or args
  * reference the workspace path.
+ *
+ * CRITICAL: lsof on the host sees processes INSIDE bind-mounted containers.
+ * We MUST filter out container PIDs or we kill live container processes.
  */
 async function killOrphanedProcesses(workspacePath: string): Promise<StepResult> {
   const step = 'teardown:orphaned-processes';
@@ -144,8 +161,20 @@ async function killOrphanedProcesses(workspacePath: string): Promise<StepResult>
       return stepSkipped(step, ['No orphaned processes to kill']);
     }
 
-    await execAsync(`kill ${safePids.join(' ')} 2>/dev/null || true`, { encoding: 'utf-8', timeout: 5000 });
-    return stepOk(step, [`Killed ${safePids.length} orphaned process(es)`]);
+    // Filter out Docker container processes — they appear in host lsof due to bind mounts
+    const hostPids: string[] = [];
+    for (const pid of safePids) {
+      if (!(await isDockerContainerProcess(pid))) {
+        hostPids.push(pid);
+      }
+    }
+
+    if (hostPids.length === 0) {
+      return stepSkipped(step, ['No orphaned host processes to kill (all were container processes)']);
+    }
+
+    await execAsync(`kill ${hostPids.join(' ')} 2>/dev/null || true`, { encoding: 'utf-8', timeout: 5000 });
+    return stepOk(step, [`Killed ${hostPids.length} orphaned process(es)`]);
   } catch {
     return stepSkipped(step, ['Orphaned process cleanup failed (non-fatal)']);
   }

@@ -134,3 +134,30 @@ The model used for status reviews is configured in **Settings > Workflow Agents 
 ### Adding Projects
 
 Projects are configured in `~/.panopticon/config.yaml`. Any project with active workspaces appears in Mission Control's project tree.
+
+## Conversations
+
+Mission Control includes a **Conversations** panel for managing Claude Code chat sessions directly through the dashboard.
+
+### Conversation List
+
+The conversation list shows all active and ended sessions:
+
+- **Status indicator**: Green pulse (running), gray (ended)
+- **Model badge**: Which model the conversation is using
+- **Title**: Auto-generated from the first message, or manually renamed
+- **Cost**: Estimated token cost for the session
+
+### Forking Conversations
+
+Click the fork icon on any conversation to create a continuation. The fork dialog offers:
+
+| Option | Description |
+|--------|-------------|
+| **Plain fork** | Copy raw JSONL history (from last compaction point) without generating a summary |
+| **Fast summary** | Use a heuristic local summary instead of calling an LLM |
+| **Include thinking** | Include thinking block content in the summary (off by default) |
+| **Summary model** | Which model generates the summary (when Fast summary is off) |
+| **Launch model** | Which model the new conversation uses |
+
+**Summary fork** (default) distills the conversation into a structured checkpoint and injects it as the first message. **Plain fork** copies the raw history with `--resume`. See [FORKS.md](./FORKS.md) for full details on fork behavior, thinking block handling, and model-switching considerations.

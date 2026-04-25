@@ -1361,6 +1361,22 @@ const postAgentsRoute = HttpRouter.add(
       );
     }
 
+    // Guard: reject starting agents for already-closed issues
+    const issueDataService = getIssueDataService();
+    const cachedIssues = issueDataService.getIssues();
+    const cachedIssue = cachedIssues.find(
+      (i: any) => (i.identifier || '').toUpperCase() === issueId.toUpperCase()
+    );
+    if (cachedIssue && (cachedIssue.canonicalStatus === 'done' || cachedIssue.canonicalStatus === 'canceled')) {
+      return jsonResponse(
+        {
+          error: `Issue ${issueId} is already closed (${cachedIssue.canonicalStatus}). Cannot start an agent for a closed issue.`,
+          hint: 'Reopen the issue first if you need to resume work.',
+        },
+        { status: 422 },
+      );
+    }
+
     const issueLower = issueId.toLowerCase();
     const agentSessionName = `agent-${issueLower}`;
 

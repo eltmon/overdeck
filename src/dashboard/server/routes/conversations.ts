@@ -71,7 +71,7 @@ import {
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
 import { sessionFilePath, sessionIdFromFile } from '../../../lib/paths.js';
-import { generateSummaryForFork, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
+import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
@@ -963,6 +963,8 @@ async function runForkPipeline(
   sessionId: string,
   summaryModel?: string,
   plain = false,
+  localSummaryOnly = false,
+  includeThinkingInSummary?: boolean,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -995,7 +997,13 @@ async function runForkPipeline(
     return;
   }
 
-  const { summary } = await generateSummaryForFork(parentSessionFile, summaryModel);
+  let summary: string;
+  if (localSummaryOnly) {
+    summary = await generateFallbackSummary(parentSessionFile);
+  } else {
+    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary);
+    summary = result.summary;
+  }
 
   updateForkStatus(convName, 'spawning');
   await spawnConversationSession(
@@ -1048,6 +1056,8 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           ? body['cwd'].trim()
           : undefined;
         const plain = body['plain'] === true;
+        const localSummaryOnly = body['localSummaryOnly'] === true;
+        const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
 
         if (typeof body['model'] === 'string' && !model) {
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
@@ -1082,7 +1092,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain, localSummaryOnly, includeThinkingInSummary).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });
