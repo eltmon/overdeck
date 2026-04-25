@@ -300,6 +300,50 @@
   white-space: nowrap;
 }
 
+/* Feature Item Wrapper (expandable) */
+.featureItemWrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.featureItemWrapperSelected {
+  background: var(--mc-bg-selected);
+}
+
+.featureItemRow {
+  display: flex;
+  align-items: center;
+}
+
+.featureItemCaret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+  padding: var(--mc-space-1) 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--mc-text-muted);
+  transition: color 0.1s;
+}
+
+.featureItemCaret:hover {
+  color: var(--mc-text-primary);
+}
+
+.featureItemCaretPlaceholder {
+  display: block;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Session Node (child of FeatureItem) */
 .sessionNode {
   display: flex;
