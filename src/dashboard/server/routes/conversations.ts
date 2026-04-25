@@ -125,15 +125,18 @@ function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
 
 const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
+let lastRateLimitPruneAt = 0;
+
 function checkUploadRateLimit(remoteAddress: string): boolean {
   const now = Date.now();
-  // Prune stale entries and enforce a hard size cap to prevent unbounded
-  // growth under distinct-IP traffic.
-  let pruned = 0;
-  for (const [ip, entry] of uploadRateLimit) {
-    if (now > entry.resetAt) {
-      uploadRateLimit.delete(ip);
-      pruned++;
+  // Prune stale entries at most once per rate-limit window to avoid O(n)
+  // scans on every request. The hard size cap is still enforced after pruning.
+  if (now - lastRateLimitPruneAt > UPLOAD_RATE_LIMIT_WINDOW_MS) {
+    lastRateLimitPruneAt = now;
+    for (const [ip, entry] of uploadRateLimit) {
+      if (now > entry.resetAt) {
+        uploadRateLimit.delete(ip);
+      }
     }
   }
   // If still over cap after pruning stale entries, evict oldest entries
@@ -674,11 +677,15 @@ async function spawnConversationSession(
     ...(effort ? [`--effort ${shellQuote(effort)}`] : []),
   ].join(' ');
 
+  // Quote each token of the runtime command so paths with spaces are handled
+  // safely while preserving the individual arguments.
+  const quotedRuntimeCommand = runtimeCommand.split(' ').map(shellQuote).join(' ');
+
   await writeFile(launcherScript, `#!/bin/bash
 ${envExports}
 cd -- ${shellQuote(cwd)}
 trap '' HUP
-${runtimeCommand} ${sessionArgs}
+${quotedRuntimeCommand} ${sessionArgs}
 echo ""
 echo "Conversation session ended. Close this panel or click Resume to start a new session."
 while true; do sleep 60; done
@@ -1170,6 +1177,11 @@ const getConversationMessagesRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/messages',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
@@ -1567,7 +1579,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
-            results.push({ name: conv.name, model: conv.model, status: `failed: ${msg}` });
+            results.push({ name: conv.name, model: conv.model, status: 'failed' });
           }
         }
 
