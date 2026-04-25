@@ -192,18 +192,35 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
     });
   }, []);
 
+  // Cache reviewSessionNames: the backend discovers them from live tmux sessions,
+  // but by the time the review result (passed/failed) is emitted the sessions are
+  // already killed. Without caching, tabs disappear as soon as the review finishes.
+  const cachedSessionNamesRef = useRef<string[] | undefined>(undefined);
+  const liveNames = input.reviewStatus?.reviewSessionNames;
+  if (liveNames && liveNames.length > 0) {
+    cachedSessionNamesRef.current = liveNames;
+  }
+  const effectiveInput = useMemo(() => {
+    if (liveNames && liveNames.length > 0) return input;
+    if (!cachedSessionNamesRef.current || !input.reviewStatus) return input;
+    return {
+      ...input,
+      reviewStatus: { ...input.reviewStatus, reviewSessionNames: cachedSessionNamesRef.current },
+    };
+  }, [input, liveNames]);
+
   // Debounce phase changes by 1s to prevent auto-switch churn
   const resultRef = useRef<PipelinePhaseResult | null>(null);
   const [debouncedResult, setDebouncedResult] = useState<PipelinePhaseResult>(() =>
-    derivePipelinePhase(input, deadSessions),
+    derivePipelinePhase(effectiveInput, deadSessions),
   );
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const immediateResult = useMemo(
-    () => derivePipelinePhase(input, deadSessions),
+    () => derivePipelinePhase(effectiveInput, deadSessions),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- input.agent narrowed to id+status;
     // the full object reference changes on every parent render, which would reset the 1s debounce timer
-    [input.agent?.id, input.agent?.status, input.reviewStatus, input.projectKey, input.issueId, deadSessions],
+    [effectiveInput.agent?.id, effectiveInput.agent?.status, effectiveInput.reviewStatus, effectiveInput.projectKey, effectiveInput.issueId, deadSessions],
   );
 
   useEffect(() => {
