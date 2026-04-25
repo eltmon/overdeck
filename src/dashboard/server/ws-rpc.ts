@@ -48,7 +48,9 @@ function extractIssueIdFromSession(sessionName: string): string | null {
 /** Compute issue ID prefixes that belong to a project. */
 function getProjectIssuePrefixes(projectKey: string): string[] {
   const projects = listProjects();
-  const project = projects.find(p => p.key === projectKey);
+  const project = projects.find(p =>
+    p.key === projectKey || (p.config as { name?: string }).name === projectKey
+  );
   if (!project) return [];
 
   const prefixes: string[] = [];
