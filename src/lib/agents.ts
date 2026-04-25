@@ -23,6 +23,7 @@ import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix } from './projects.js';
+import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 
 const execAsync = promisify(exec);
@@ -1027,10 +1028,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   );
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  const launcherContent = `#!/bin/bash
-export CI=1
-${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
-`;
+  const launcherContent = generateLauncherScript({
+    agentType: 'work',
+    workingDir: options.workspace,
+    changeDir: false,
+    setCi: true,
+    providerExports,
+    cavemanExports,
+    baseCommand: getAgentRuntimeBaseCommand(state.model),
+  });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
 
