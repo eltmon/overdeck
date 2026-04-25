@@ -20,7 +20,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [AGENTS.md](../AGENTS.md) | Agent system architecture and lifecycle |
+| [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
 | [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
