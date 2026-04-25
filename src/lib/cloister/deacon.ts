@@ -3281,8 +3281,8 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
       continue;
     }
-    if (state.phase !== 'implementation') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation)`);
+    if (state.phase !== 'implementation' && state.phase !== 'review-response') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation or review-response)`);
       continue;
     }
 
@@ -3339,6 +3339,14 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       const deliberatelyStopped = state.stoppedByUser === true;
       if (deliberatelyStopped) {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
+        continue;
+      }
+
+      // Skip agents that are on standby for UAT tweaks after pan done.
+      // review-response phase means the agent is waiting for human input via pan tell,
+      // not crashed or orphaned.
+      if (state.phase === 'review-response') {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — standby for UAT tweaks (phase=review-response)`);
         continue;
       }
 

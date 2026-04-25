@@ -30,15 +30,15 @@ This is the canonical reference for all Panopticon dashboard UI decisions. Every
 
 | Role | Font | Weights | Fallbacks |
 |------|------|---------|-----------|
-| **Display / Headings** | Space Grotesk | 400, 500, 600, 700 | system-ui, sans-serif |
-| **Body / UI** | DM Sans | 300–800 (variable) | -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif |
-| **Code / Terminal** | SF Mono | 400, 500 | SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace |
+| **Display** | Space Grotesk | 400, 500, 600, 700 | system-ui, sans-serif |
+| **Body / UI** | DM Sans | 300–800 (variable) | system-ui, sans-serif |
+| **Code / Terminal** | SF Mono | 400, 500 | SFMono-Regular, Consolas, Liberation Mono, monospace |
 
 ### Why These Fonts
 
-- **Space Grotesk** — geometric, technical, tight apertures. Conveys precision and monitoring. Used for page titles, section headings, nav labels, stat values.
-- **DM Sans** — clean geometric sans with a distinctive single-story "g" (open tail). Variable weight (300–800) gives fine typographic control. Excellent legibility at small sizes in data-dense layouts. Proven in T3Code's dashboard context.
-- **SF Mono** — the standard for terminal and code rendering. Falls back gracefully across platforms.
+- **Space Grotesk** — geometric, technical, tight apertures. Conveys precision and monitoring. Reserved exclusively for the "Panopticon" sidebar wordmark (the single approved non–God-View display-font exception).
+- **DM Sans** — clean geometric sans with a distinctive single-story "g" (open tail). Variable weight (300–800) gives fine typographic control. Excellent legibility at small sizes in data-dense layouts. The universal default for all non–God-View UI text.
+- **SF Mono** — the standard for terminal and code rendering. Falls back gracefully across platforms. Used only for code, terminal output, and technical identifiers.
 
 ### Font Loading
 
@@ -57,8 +57,8 @@ This is the canonical reference for all Panopticon dashboard UI decisions. Every
 ```js
 fontFamily: {
   display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
-  body: ['"DM Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
-  mono: ['"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'Menlo', 'monospace'],
+  body: ['"DM Sans"', 'system-ui', 'sans-serif'],
+  mono: ['"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
 }
 ```
 
@@ -66,11 +66,11 @@ fontFamily: {
 
 ```css
 body {
-  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: "DM Sans", system-ui, sans-serif;
 }
 
 pre, code, textarea.code, input.code {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 ```
 
@@ -80,14 +80,14 @@ Use Tailwind's default scale. Recommended pairings:
 
 | Element | Size | Weight | Font |
 |---------|------|--------|------|
-| Page title | `text-xl` (20px) | `font-medium` (500) | DM Sans (or Space Grotesk for brand) |
+| Page title | `text-xl` (20px) | `font-medium` (500) | DM Sans |
 | Section heading | `text-lg` (18px) | `font-medium` (500) | DM Sans |
 | Card title | `text-sm` (14px) | `font-medium` (500) | DM Sans |
 | Column heading | `text-base` (16px) | `font-medium` (500) | DM Sans |
 | Body text | `text-sm` (14px) | `font-normal` (400) | DM Sans (default) |
 | Small labels | `text-xs` (12px) | `font-medium` (500) | DM Sans |
 | Tiny badges | `text-[.625rem]` (10px) | `font-medium` (500) | DM Sans |
-| Stat values | `text-sm` (14px) | `font-medium` (500) | Space Grotesk |
+| Stat values | `text-sm` (14px) | `font-medium` (500) | DM Sans |
 | Nav items | `text-sm` (14px) | `font-medium` (500) | DM Sans |
 | Nav group labels | `text-xs` (12px) | `font-medium` (500) | DM Sans, `uppercase tracking-wider` |
 | Buttons | `text-sm` (14px) | `font-medium` (500) | DM Sans |
@@ -99,32 +99,48 @@ Use Tailwind's default scale. Recommended pairings:
 1. **`font-medium` (500) for everything.** T3Code uses zero `font-bold` in its component library. Our weight scale is even simpler: `font-medium` (500) across the board — headings, card titles, column headers, stat values, buttons, labels, badges. No `font-semibold`, no `font-bold`. The uniform medium weight creates the quiet, premium feel. Hierarchy comes from font size and color contrast, not weight variation.
 2. **Skip at least one scale step** between heading and subheading (e.g., `text-xl` with `text-sm`, not `text-lg` with `text-base`).
 3. **Don't use 100% black text.** Use `text-foreground` (neutral-800 light / neutral-100 dark) for an ink-on-paper feel.
-4. **Monospace font is only for code, terminal output, and issue IDs.** Never for UI labels.
 
-### CRITICAL: Space Grotesk vs DM Sans Boundary
+### CRITICAL: The Four Canonical Typography Rules (PAN-698)
 
-Space Grotesk (`font-display`) has a distinctive double-story "g" that looks wrong at small/medium sizes in body text. DM Sans has a clean single-story open-tail "g" that is correct for body text. Getting this wrong is immediately visible and makes the UI look cheap.
+These rules are absolute. There are no exceptions outside God View.
 
-**Space Grotesk (`font-display`) is ONLY for:**
-- The "Panopticon" logo/brand text
-- Numeric stat values (e.g., "$12.47", "5/8", "12") — numbers only, NOT labels
-- Page titles that are single proper nouns without "g" (use judgment — if it has a "g", use DM Sans)
+**Rule 1: DM Sans is the universal default for all non–God-View UI.**
+Body text, headings, labels, nav, buttons, dialogs, tables, forms, metric values, conversation prose, list titles, metadata — everything that is not explicitly covered by Rule 2, 3, or 4 uses DM Sans.
 
-Space Grotesk's double-story "g" is the problem glyph. Any heading containing "g" (e.g., "In Progress", "Settings", "Agents") MUST use DM Sans instead.
+**Rule 2: SF Mono is ONLY for code and technical identifiers.**
+Use `font-mono` (canonical SF Mono stack) exclusively for:
+- Code blocks (`<pre>`, `<code>`)
+- Terminal output
+- Command snippets
+- Session IDs, run IDs
+- File paths, env vars
+- Hashes, model IDs
+- Branch names, tool names
+- vBRIEF IDs, issue IDs when shown as identifiers
+- Any string presented as a technical token rather than human-readable prose
 
-**DM Sans (default body font) is for EVERYTHING else:**
-- Card titles (e.g., "Real-time Stream Orchestration for Alpha-Centauri Node")
-- Nav items (e.g., "Command Deck", "Board", "Agents")
-- Badge/pill text (e.g., "RUNNING", "PLANNING", "REVIEWING")
-- Button labels (e.g., "DEPLOY", "MONITOR", "REVIEW", "Current", "All")
-- Stat labels (e.g., "COST TODAY", "AGENTS", "STUCK", "HANDOFFS", "QUEUE")
-- Issue IDs when displayed as labels (e.g., "TSK-2041", "OPS-882")
-- Table/list body text
-- Dialog body text, form labels, descriptions
-- Tooltips, toasts, alerts
-- Any text that is not a top-level heading or page title
+**Rule 3: Space Grotesk (`font-display`) is ONLY for the sidebar "Panopticon" wordmark.**
+No other non–God-View surface uses `font-display`. Page titles, section headings, nav labels, stat values, card titles — all DM Sans.
 
-**The test:** If the text is inside a card, list row, badge, button, nav item, or form — it's DM Sans. If it's a standalone page/section heading that names a view or category — it's Space Grotesk. When in doubt, use DM Sans.
+**Rule 4: God View (`src/dashboard/frontend/src/components/GodView/*`) uses its own scoped typography system.**
+God View is the only deliberate exception to Rules 1–3. It may override tokens within its own scope. Everything else follows the canonical rules.
+
+### Conversation Typography
+
+Conversation UI (Command Deck chat, messages, composer) follows Rule 1 + Rule 2:
+- **Prose** (user messages, assistant markdown paragraphs, headings, lists, tables, blockquotes) — DM Sans
+- **Code** (inline `<code>`, fenced `<pre><code>`) — SF Mono
+- **Technical identifiers** in metadata (session IDs, run IDs, model IDs) — SF Mono
+- **Conversation titles** — DM Sans (titles are human-readable prose, not identifiers)
+
+### Deprecated Patterns (DO NOT USE)
+
+These patterns have been eliminated from the codebase. Do not reintroduce them:
+- `-apple-system`, `BlinkMacSystemFont`, `"Segoe UI"` in font stacks
+- `"Inter"`, `"SF Pro"` as primary fonts
+- `Menlo`, `Monaco`, `"Courier New"` in mono stacks
+- `font-display` on any element other than the sidebar Panopticon wordmark
+- `font-mono` on conversation titles, badge labels, button text, or any other UI prose
 
 ---
 
@@ -973,7 +989,7 @@ See Section 3 "Color Restraint" for the core color philosophy. Implementation de
 - Container: `bg-card border border-border` — inherits theme, never hardcoded colors
 - Icon colors: Cost=`text-success`, Agents=`text-primary`, Stuck=`text-destructive` (if >0) else `text-muted-foreground`, Handoffs=`text-signal-cost`, Escalations=`text-signal-review`, Queue=`text-warning`
 - Label: `text-xs text-muted-foreground`
-- Value: `text-sm font-medium text-foreground font-display` (Space Grotesk for numbers)
+- Value: `text-sm font-medium text-foreground` (DM Sans)
 
 ### Command Deck (formerly Mission Control)
 
@@ -1042,9 +1058,9 @@ CARDS:         rounded-2xl border border-border bg-card p-6
 BUTTONS:       rounded-lg h-9 px-3 text-sm font-medium
 DIALOGS:       rounded-2xl bg-popover shadow-lg/5 centered on viewport
 RADIUS:        sm=6 md=8 lg=10 xl=14 2xl=18 3xl=22 4xl=26
-FONT DISPLAY:  Space Grotesk (numbers, brand only)
-FONT BODY:     DM Sans (everything else)
-FONT CODE:     SF Mono
+FONT DISPLAY:  Space Grotesk (sidebar wordmark ONLY — PAN-698)
+FONT BODY:     DM Sans (everything else in non–God-View UI)
+FONT CODE:     SF Mono (code, terminal, technical identifiers only)
 NOISE:         body::after with feTurbulence at 3.5% opacity
 SCROLLBAR:     6px wide, transparent track, 10-15% opacity thumb
 TRANSITIONS:   200ms ease-in-out (default)

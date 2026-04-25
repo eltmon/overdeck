@@ -159,6 +159,7 @@ describe('TerminalPanel — stopped agent content rendering', () => {
     renderPanel(
       makeAgent(),
       makeFetch({ tmuxAlive: false, conversationMessages: messages, output: 'some output' }),
+
     );
 
     await waitFor(() => {

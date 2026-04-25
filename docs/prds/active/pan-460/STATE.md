@@ -41,7 +41,7 @@ New: Collapsible left sidebar (256px expanded / 48px collapsed) with grouped sec
 
 ### Typography
 - Body font: Noto Sans -> DM Sans (Google Fonts, variable weight 300-800)
-- Display font: Space Grotesk (restricted to brand text + numeric stats only)
+- Display font: Space Grotesk (sidebar Panopticon wordmark ONLY — PAN-698)
 - Code font: SF Mono stack
 - Weight: `font-medium` (500) everywhere. No bold, no semibold.
 

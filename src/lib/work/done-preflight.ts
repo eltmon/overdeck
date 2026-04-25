@@ -1,11 +1,52 @@
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
 import { getVBriefACStatus, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+const BD_LIST_TIMEOUT_MS = 10_000;
+
+function errorCode(error: unknown): unknown {
+  return error instanceof Error
+    ? (error as unknown as Record<string, unknown>).code
+    : undefined;
+}
+
+function isMissingCommand(error: unknown): boolean {
+  const code = errorCode(error);
+  return code === 'ENOENT' || code === 127;
+}
+
+function isTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const record = error as unknown as Record<string, unknown>;
+  return record.killed === true ||
+    record.signal === 'SIGTERM' ||
+    record.signal === 'SIGKILL' ||
+    /timed out|timeout/i.test(error.message);
+}
+
+async function listBeadsByStatus(
+  workspacePath: string,
+  issueId: string,
+  status: 'open' | 'closed',
+): Promise<string> {
+  const { stdout } = await execFileAsync(
+    'bd',
+    ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
+    {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+      timeout: BD_LIST_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+    },
+  );
+  return stdout;
+}
 
 /**
  * Check for open beads scoped to the given issue.
@@ -15,18 +56,13 @@ const execAsync = promisify(exec);
 export async function checkOpenBeads(workspacePath: string, issueId: string): Promise<string[]> {
   let stdout: string;
   try {
-    ({ stdout } = await execAsync(
-      `bd list --status open -l "${issueId.toLowerCase()}" --limit 0 --json`,
-      { cwd: workspacePath }
-    ));
+    stdout = await listBeadsByStatus(workspacePath, issueId, 'open');
   } catch (error: unknown) {
-    // exec() runs through /bin/sh: missing bd is exit 127 (numeric code on the error).
-    // execFile/spawn path: missing binary is ENOENT (string code).
-    // Read code as unknown so TypeScript allows comparison to both types.
-    const code: unknown = error instanceof Error
-      ? (error as unknown as Record<string, unknown>).code
-      : undefined;
-    if (code === 'ENOENT' || code === 127) return [];
+    if (isMissingCommand(error)) return [];
+    if (isTimeout(error)) {
+      console.warn(chalk.yellow(`  ⚠ Beads open-work check timed out after ${BD_LIST_TIMEOUT_MS / 1000}s; continuing without the bead gate`));
+      return [];
+    }
     return ['  Open beads check failed — run `bd list --status open` to diagnose'];
   }
 
@@ -157,10 +193,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
 
   // Sync closed beads to vBRIEF before AC check
   try {
-    const { stdout } = await execAsync(
-      `bd list --status closed -l "${issueId.toLowerCase()}" --json --limit 0`,
-      { cwd: workspacePath, encoding: 'utf-8' }
-    );
+    const stdout = await listBeadsByStatus(workspacePath, issueId, 'closed');
     const closedBeads = JSON.parse(stdout || '[]');
     let synced = 0;
     for (const bead of closedBeads) {
