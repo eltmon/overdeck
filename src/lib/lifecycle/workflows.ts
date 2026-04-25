@@ -86,8 +86,8 @@ export async function approve(
   });
   allSteps.push(...closeSteps);
 
-  // 3. Teardown workspace
-  const teardownSteps = await teardownWorkspace(ctx);
+  // 3. Teardown workspace (delete branches — merge is complete)
+  const teardownSteps = await teardownWorkspace(ctx, { deleteBranches: true });
   allSteps.push(...teardownSteps);
 
   // 4. Compact beads (non-blocking — failure doesn't affect workflow success)
@@ -179,7 +179,7 @@ export async function closeOut(
   }
 
   // 4+5. Teardown workspace + agent state
-  const teardownSteps = await teardownWorkspace(ctx);
+  const teardownSteps = await teardownWorkspace(ctx, { deleteBranches: true });
   allSteps.push(...teardownSteps);
 
   // 6+7. Close issue + apply label
@@ -377,6 +377,23 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
           { cwd: ctx.projectPath, encoding: 'utf-8' },
         );
         const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
+
+        // If the issue is already closed on the tracker, warn but don't block —
+        // the user has explicitly closed it and may have continued work on the branch.
+        if (ctx.github) {
+          try {
+            const { stdout: issueState } = await execAsync(
+              `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
+              { cwd: ctx.projectPath, encoding: 'utf-8' },
+            );
+            if (issueState.trim().toUpperCase() === 'CLOSED') {
+              return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on ${branchName}`]);
+            }
+          } catch {
+            // gh check failed — fall through to hard fail
+          }
+        }
+
         return stepFailed(step, `${count} unmerged commit(s) on ${branchName}. Merge before closing out.`);
       }
     }
@@ -414,6 +431,21 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
           { cwd: ctx.projectPath, encoding: 'utf-8' },
         );
         const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
+
+        if (ctx.github) {
+          try {
+            const { stdout: issueState } = await execAsync(
+              `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
+              { cwd: ctx.projectPath, encoding: 'utf-8' },
+            );
+            if (issueState.trim().toUpperCase() === 'CLOSED') {
+              return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
+            }
+          } catch {
+            // gh check failed — fall through to hard fail
+          }
+        }
+
         return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
       }
     }
