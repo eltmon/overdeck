@@ -50,6 +50,7 @@ import { cpus as osCpus, freemem, totalmem } from 'node:os';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { createSessionAsync, killSessionAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import {
@@ -1198,7 +1199,12 @@ Continue the PLANNING session. Do NOT implement anything.
 
         await writeFile(
           launcherScript,
-          `#!/bin/bash\ncd "${agentCwd}"\nexec ${msgCmdWithArgs} "Please read the continuation prompt at ${continuationPromptPath} and continue the planning session."\n`,
+          generateLauncherScript({
+            agentType: 'work',
+            workingDir: agentCwd,
+            baseCommand: msgCmdWithArgs,
+            promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
+          }),
           { mode: 0o755 },
         );
 
