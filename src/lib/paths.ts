@@ -144,6 +144,23 @@ export function encodeClaudeProjectDir(cwdPath: string): string {
   return cwdPath.replace(/[^a-zA-Z0-9-]/g, '-');
 }
 
+/**
+ * Compute the deterministic JSONL session file path from cwd + session UUID.
+ *
+ * Claude Code stores session files at:
+ *   ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
+ */
+export function sessionFilePath(cwd: string, sessionId: string): string {
+  const encodedCwd = encodeClaudeProjectDir(cwd);
+  return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
+}
+
+/** Extract the session UUID from a full JSONL file path. */
+export function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
+  if (!sessionFile) return undefined;
+  return sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined;
+}
+
 // All directories to create on init
 export const INIT_DIRS = [
   PANOPTICON_HOME,

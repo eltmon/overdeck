@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { encodeClaudeProjectDir, sessionFilePath, sessionIdFromFile } from '../paths.js';
 import { loadConfig } from '../config-yaml.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 
@@ -180,7 +180,10 @@ export async function createSummaryFork(
   conv: Conversation,
   options: SummaryForkOptions = {},
 ): Promise<SummaryForkResult> {
-  if (!conv.sessionFile) {
+  const sourceSessionFile = conv.claudeSessionId
+    ? sessionFilePath(conv.cwd, conv.claudeSessionId)
+    : conv.sessionFile ?? null;
+  if (!sourceSessionFile) {
     throw new Error(`No session file found for conversation ${conv.name}`);
   }
 
@@ -197,14 +200,14 @@ export async function createSummaryFork(
   if (options.plain) {
     // Plain fork: copy raw JSONL from last compact boundary (or full history)
     // into the new session file so Claude Code can --resume it directly.
-    await copySessionFromCompactBoundary(conv.sessionFile, sessionFile);
+    await copySessionFromCompactBoundary(sourceSessionFile, sessionFile);
     summary = '';
     usedSummaryModel = null;
   } else if (options.localSummaryOnly) {
-    summary = await generateFallbackSummary(conv.sessionFile);
+    summary = await generateFallbackSummary(sourceSessionFile);
     usedSummaryModel = null;
   } else {
-    const result = await generateSummaryForFork(conv.sessionFile, summaryModel ?? undefined);
+    const result = await generateSummaryForFork(sourceSessionFile, summaryModel ?? undefined);
     summary = result.summary;
     usedSummaryModel = result.summaryModel;
   }
@@ -226,7 +229,7 @@ export async function createSummaryFork(
     titleSeed: options.plain
       ? `Fork of ${conv.name}`
       : `Summary Fork of ${conv.name}`,
-    sessionFile,
+    claudeSessionId: sessionId,
     model: launchModel ?? undefined,
     effort: conv.effort ?? undefined,
   });

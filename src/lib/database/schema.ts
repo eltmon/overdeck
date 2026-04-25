@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /**
  * Initialize the complete database schema.
@@ -207,7 +207,8 @@ export function initSchema(db: Database.Database): void {
       created_at       TEXT    NOT NULL,
       ended_at         TEXT,
       last_attached_at TEXT,
-      session_file     TEXT,                               -- path to Claude Code JSONL session file (PAN-451)
+      session_file     TEXT,                               -- @deprecated: path to Claude Code JSONL session file (PAN-451). Kept for legacy rows — use claude_session_id.
+      claude_session_id TEXT,                              -- Claude Code session UUID. Immutable for the lifetime of the conversation.
       title            TEXT,                               -- human-readable title, auto-set from first message
       title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
       title_seed       TEXT,                               -- original auto-generated title for replacement check
@@ -707,6 +708,25 @@ export function runMigrations(db: Database.Database): void {
       ).run('deacon.globally_paused', 'true', new Date().toISOString());
     } catch (err) {
       console.warn('[schema] Failed to seed deacon.globally_paused:', err);
+    }
+  }
+
+  // v27 → v28: replace session_file with claude_session_id (PAN-???)
+  // Storing the full JSONL path in the DB caused divergence when tmux sessions
+  // were restarted — the path could go stale while a new JSONL file was written.
+  // Store the session UUID instead and compute the path on demand.
+  if (currentVersion < 28) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN claude_session_id TEXT`); } catch { /* already exists */ }
+
+    const conversations = db
+      .prepare(`SELECT id, session_file FROM conversations WHERE session_file IS NOT NULL`)
+      .all() as Array<{ id: number; session_file: string }>;
+
+    for (const conv of conversations) {
+      const sessionId = conv.session_file.split('/').pop()?.replace('.jsonl', '') ?? null;
+      if (sessionId) {
+        db.prepare(`UPDATE conversations SET claude_session_id = ? WHERE id = ?`).run(sessionId, conv.id);
+      }
     }
   }
 

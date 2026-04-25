@@ -35,7 +35,6 @@ import {
   markConversationEnded,
   markConversationActive,
   updateLastAttached,
-  updateSessionFile,
   updateConversationTitle,
   updateConversationCost,
   updateConversationModel,
@@ -71,7 +70,7 @@ import {
   compactConversationNative,
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { sessionFilePath, sessionIdFromFile } from '../../../lib/paths.js';
 import { generateSummaryForFork, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 
 /**
@@ -91,10 +90,16 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
-/** Compute the deterministic JSONL session file path from cwd + session UUID. */
-function sessionFilePath(cwd: string, sessionId: string): string {
-  const encodedCwd = encodeClaudeProjectDir(cwd);
-  return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
+import type { Conversation } from '../../../lib/database/conversations-db.js';
+
+/** Resolve the JSONL session file path for a conversation.
+ *  Prefers the stored claudeSessionId (computed on demand); falls back to
+ *  the legacy sessionFile column for rows created before the migration. */
+function resolveSessionFile(conv: Conversation): string | null {
+  if (conv.claudeSessionId) {
+    return sessionFilePath(conv.cwd, conv.claudeSessionId);
+  }
+  return conv.sessionFile; // legacy fallback
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -175,8 +180,9 @@ async function backfillConversationModels(): Promise<void> {
   const convs = listConversations();
   let backfilled = 0;
   for (const conv of convs) {
-    if (conv.model || !conv.sessionFile) continue;
-    const model = await extractModelFromSessionFile(conv.sessionFile);
+    const sessionFile = resolveSessionFile(conv);
+    if (conv.model || !sessionFile) continue;
+    const model = await extractModelFromSessionFile(sessionFile);
     if (model) {
       updateConversationModel(conv.name, model);
       backfilled++;
@@ -202,11 +208,6 @@ void backfillConversationModels().catch((err: unknown) => {
 // Dashboard-owned compaction is Panopticon-native. We append the compact
 // boundary and continuation summary directly to the JSONL so subsequent
 // `--resume` calls load only the summarized context forward.
-
-function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
-  if (!sessionFile) return undefined;
-  return sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined;
-}
 
 async function spawnConversationSession(
   tmuxSession: string,
@@ -362,9 +363,10 @@ const getConversationsRoute = HttpRouter.add(
 
             let isWorking = false;
             let currentTool: string | null = null;
-            if (sessionAlive && conv.sessionFile) {
+            const sessionFile = resolveSessionFile(conv);
+            if (sessionAlive && sessionFile) {
               try {
-                const summary = await summarizeConversationActivity(conv.sessionFile);
+                const summary = await summarizeConversationActivity(sessionFile);
                 isWorking = summary.isWorking;
                 currentTool = summary.currentTool;
               } catch {
@@ -442,13 +444,12 @@ const postConversationRoute = HttpRouter.add(
         }
         const tmuxSession = `conv-${name}`;
         const claudeSessionId = randomUUID();
-        const sessionFile = sessionFilePath(cwd, claudeSessionId);
 
         console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'}`);
 
         // Spawn tmux session with model + effort + deterministic session ID
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);
-        console.log(`[conversations] tmux session ${tmuxSession} spawned, JSONL: ${sessionFile}`);
+        console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
         // Title = truncated first message (T3Code pattern)
         const MAX_TITLE_LEN = 60;
@@ -460,7 +461,7 @@ const postConversationRoute = HttpRouter.add(
           tmuxSession,
           cwd,
           issueId,
-          sessionFile,
+          claudeSessionId,
           title,
           titleSource: 'auto',
           titleSeed: title,
@@ -559,7 +560,7 @@ const postConversationResumeRoute = HttpRouter.add(
         // Respawn: resume the previous Claude Code session using --resume
         // Resume must never mutate the JSONL — `claude --resume` loads the full raw
         // transcript. Auto-compaction here would fork the conversation (PAN-802).
-        const oldSessionId = sessionIdFromFile(conv.sessionFile);
+        const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
         const modelChanged = !!model && model !== conv.model;
 
         // Persist the new model so the dropdown reflects what we're respawning with.
@@ -609,10 +610,10 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         if (model) updateConversationModel(name, model);
 
         // Extract the session UUID from the existing session file path
-        const oldSessionId = sessionIdFromFile(conv.sessionFile);
+        const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
 
         // Compact (if needed) then respawn with the new model before reporting success.
-        const sessionFile = conv.sessionFile;
+        const sessionFile = resolveSessionFile(conv);
         const cwd = conv.cwd;
         const tmuxSession = conv.tmuxSession;
         const effort = conv.effort ?? undefined;
@@ -646,7 +647,7 @@ const getConversationMessagesRoute = HttpRouter.add(
 
         // Fall back to specialist session file when name is a specialist tmux session
         // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
-        let sessionFile: string | null | undefined = conv?.sessionFile;
+        let sessionFile: string | null | undefined = conv ? resolveSessionFile(conv) : undefined;
         if (!conv) {
           const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
           if (specialistMatch) {
@@ -738,10 +739,11 @@ const postConversationMessageRoute = HttpRouter.add(
         }
 
         if (shouldInterceptManualCompact(message)) {
-          if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+          const sessionFile = resolveSessionFile(conv);
+          if (!sessionFile || !existsSync(sessionFile)) {
             return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
           }
-          const result = await compactConversationNative(conv.sessionFile);
+          const result = await compactConversationNative(sessionFile);
           return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
         }
 
@@ -880,9 +882,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
             await killSessionAsync(conv.tmuxSession).catch(() => {});
 
             // Re-spawn with stored model
-            const oldSessionId = conv.sessionFile
-              ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
-              : undefined;
+            const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
             await spawnConversationSession(
               conv.tmuxSession,
               conv.cwd,
@@ -967,13 +967,15 @@ async function runForkPipeline(
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
 
-  if (!parentConv.sessionFile) throw new Error(`Parent has no session file`);
+  const parentSessionFile = resolveSessionFile(parentConv);
+  if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
   if (plain) {
     // Plain fork: copy JSONL from last compact boundary into the new session file,
     // then spawn with --resume so Claude Code loads the history directly.
-    if (!conv.sessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-    await copySessionFromCompactBoundary(parentConv.sessionFile, conv.sessionFile);
+    const forkSessionFile = resolveSessionFile(conv);
+    if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
+    await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
 
     updateForkStatus(convName, 'spawning');
     await spawnConversationSession(
@@ -993,7 +995,7 @@ async function runForkPipeline(
     return;
   }
 
-  const { summary } = await generateSummaryForFork(parentConv.sessionFile, summaryModel);
+  const { summary } = await generateSummaryForFork(parentSessionFile, summaryModel);
 
   updateForkStatus(convName, 'spawning');
   await spawnConversationSession(
@@ -1031,7 +1033,8 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+        const sourceSessionFile = resolveSessionFile(conv);
+        if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
           return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
         }
 
@@ -1072,7 +1075,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           titleSeed: plain
             ? `Fork of ${conv.name}`
             : `Summary Fork of ${conv.name}`,
-          sessionFile,
+          claudeSessionId: sessionId,
           model: launchModel ?? undefined,
           effort: conv.effort ?? undefined,
           forkStatus: plain ? 'spawning' : 'summarizing',
