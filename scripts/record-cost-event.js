@@ -536,6 +536,11 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
 
+    CREATE INDEX IF NOT EXISTS idx_conversations_archived_created
+      ON conversations(archived_at, created_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+      ON conversations(status, archived_at, created_at);
+
     -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -622,7 +627,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 27`);
+	db.pragma(`user_version = 28`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -630,7 +635,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 27) return;
+	if (currentVersion === 28) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -908,7 +913,13 @@ function runMigrations(db) {
 			console.warn("[schema] Failed to seed deacon.globally_paused:", err);
 		}
 	}
-	db.pragma(`user_version = 27`);
+	if (currentVersion < 28) try {
+		db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+          ON conversations(status, archived_at, created_at)
+      `);
+	} catch {}
+	db.pragma(`user_version = 28`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

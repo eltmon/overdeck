@@ -13,19 +13,17 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { exec, spawn } from 'node:child_process';
+import { existsSync, createReadStream } from 'node:fs';
+import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { createReadStream } from 'node:fs';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
-const execAsync = promisify(exec);
-
-import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
   listConversations,
@@ -38,7 +36,8 @@ import {
   updateSessionFile,
   updateConversationTitle,
   updateConversationCost,
-  updateConversationModel,
+  setConversationModel,
+  backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
   canReplaceTitle,
@@ -46,6 +45,7 @@ import {
   setFavorite,
   removeFavorite,
   updateForkStatus,
+  type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
   sendKeysAsync,
@@ -55,8 +55,8 @@ import {
   createSessionAsync,
   setOptionAsync,
   waitForClaudePrompt,
+  listSessionNamesAsync,
 } from '../../../lib/tmux.js';
-import { getProviderForModel } from '../../../lib/providers.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -64,7 +64,7 @@ import {
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
-  summarizeConversationActivity,
+  type ParseState,
 } from '../services/conversation-service.js';
 import {
   maybeCompactBeforeRespawn,
@@ -73,6 +73,308 @@ import {
 } from '../services/conversation-compaction.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
+import {
+  ensureConversationAttachmentDir,
+  getConversationAttachmentsRoot,
+  extractConversationAttachmentPaths,
+  hasConversationAttachment,
+  isManagedConversationAttachmentPath,
+  removeConversationAttachment,
+  cleanupUnreferencedConversationAttachments,
+  cleanupConversationAttachments,
+} from '../services/conversation-attachments.js';
+
+const execAsync = promisify(exec);
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_MESSAGE_LENGTH = 50_000;
+const MAX_FILENAME_LENGTH = 255;
+
+/** Quote a string for safe use in a bash script using single-quote wrapping. */
+function shellQuote(str: string): string {
+  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
+}
+
+const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+
+const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
+const UPLOAD_RATE_LIMIT_MAX = 10;
+const UPLOAD_RATE_LIMIT_MAP_MAX = 1_000;
+const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function isLoopbackAddress(addr: string): boolean {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
+  const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
+  // Only trust X-Forwarded-From when the direct connection comes from a
+  // loopback address (i.e. we are behind a local reverse proxy). Otherwise
+  // a client can spoof any IP and bypass rate-limiting.
+  if (isLoopbackAddress(remoteAddress)) {
+    const forwarded = getHeader(request, 'x-forwarded-for');
+    if (forwarded) {
+      return forwarded.split(',')[0].trim();
+    }
+  }
+  return remoteAddress;
+}
+
+const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+
+let lastRateLimitPruneAt = 0;
+
+function checkUploadRateLimit(remoteAddress: string): boolean {
+  const now = Date.now();
+  // Prune stale entries at most once per rate-limit window to avoid O(n)
+  // scans on every request. The hard size cap is still enforced after pruning.
+  if (now - lastRateLimitPruneAt > UPLOAD_RATE_LIMIT_WINDOW_MS) {
+    lastRateLimitPruneAt = now;
+    for (const [ip, entry] of uploadRateLimit) {
+      if (now > entry.resetAt) {
+        uploadRateLimit.delete(ip);
+      }
+    }
+  }
+  // If still over cap after pruning stale entries, evict oldest entries
+  // (Map iteration order is insertion order).
+  while (uploadRateLimit.size >= UPLOAD_RATE_LIMIT_MAP_MAX) {
+    const firstKey = uploadRateLimit.keys().next().value;
+    if (firstKey !== undefined) {
+      uploadRateLimit.delete(firstKey);
+    } else {
+      break;
+    }
+  }
+  const entry = uploadRateLimit.get(remoteAddress);
+  if (!entry || now > entry.resetAt) {
+    uploadRateLimit.set(remoteAddress, { count: 1, resetAt: now + UPLOAD_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= UPLOAD_RATE_LIMIT_MAX) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
+// ─── Messages cache ───────────────────────────────────────────────────────────
+
+const MESSAGES_CACHE_MAX = 100;
+const messagesCache = new Map<
+  string,
+  {
+    mtimeMs: number;
+    size: number;
+    result: Awaited<ReturnType<typeof parseConversationMessages>>;
+    byteOffset: number;
+    parseState: ParseState | undefined;
+  }
+>();
+
+async function getCachedMessages(
+  sessionFile: string,
+  isSpecialist: boolean,
+): Promise<Awaited<ReturnType<typeof parseConversationMessages>>> {
+  const fileStats = await stat(sessionFile);
+  const cacheKey = `${sessionFile}:${isSpecialist}`;
+  const cached = messagesCache.get(cacheKey);
+  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+    return cached.result;
+  }
+
+  let result: Awaited<ReturnType<typeof parseConversationMessages>>;
+
+  if (isSpecialist) {
+    result = await parseFromLastCompactBoundary(sessionFile);
+  } else if (
+    cached &&
+    cached.parseState &&
+    cached.byteOffset <= fileStats.size &&
+    cached.size <= fileStats.size
+  ) {
+    // Incremental parse: file grew, continue from where we left off.
+    const incremental = await parseConversationMessages(sessionFile, cached.byteOffset, cached.parseState);
+    if (incremental.byteOffset < cached.byteOffset) {
+      // File was truncated or rotated — fall back to full parse.
+      result = await parseConversationMessages(sessionFile, 0);
+    } else {
+      // Lazy getters avoid O(n) array copies on the hot incremental-parse path;
+      // the arrays are only materialized when the caller serializes or iterates.
+      const cachedResult = cached.result;
+      result = {
+        get messages() {
+          return cachedResult.messages.concat(incremental.messages);
+        },
+        get workLog() {
+          return cachedResult.workLog.concat(incremental.workLog);
+        },
+        byteOffset: incremental.byteOffset,
+        streaming: incremental.streaming,
+        totalCost: cachedResult.totalCost + incremental.totalCost,
+        pendingToolUse: incremental.pendingToolUse,
+        unresolvedResults: incremental.unresolvedResults,
+        lastSequence: incremental.lastSequence,
+        mtimeMs: incremental.mtimeMs,
+      };
+    }
+  } else {
+    // Full parse (no cache, file shrank, or first time).
+    result = await parseConversationMessages(sessionFile, 0);
+  }
+
+  messagesCache.set(cacheKey, {
+    mtimeMs: fileStats.mtimeMs,
+    size: fileStats.size,
+    result,
+    byteOffset: result.byteOffset,
+    parseState: {
+      pendingToolUse: result.pendingToolUse,
+      unresolvedResults: result.unresolvedResults,
+      lastSequence: result.lastSequence,
+    },
+  });
+  if (messagesCache.size > MESSAGES_CACHE_MAX) {
+    const firstKey = messagesCache.keys().next().value;
+    if (firstKey !== undefined) {
+      messagesCache.delete(firstKey);
+    }
+  }
+  return result;
+}
+
+// ─── Favorites cache ───────────────────────────────────────────────────────────
+
+const FAVORITES_CACHE_TTL_MS = 5000;
+let favoritesCache: { timestamp: number; ids: Set<string> } | null = null;
+
+function getCachedFavoritedIds(): Set<string> {
+  const now = Date.now();
+  if (favoritesCache && now - favoritesCache.timestamp < FAVORITES_CACHE_TTL_MS) {
+    return favoritesCache.ids;
+  }
+  const ids = new Set(listFavoritedIds('conversation'));
+  favoritesCache = { timestamp: now, ids };
+  return ids;
+}
+
+// ─── CSRF / Origin validation ────────────────────────────────────────────────
+
+let cachedTrustedOrigins: string[] | undefined;
+
+function getTrustedOrigins(): string[] {
+  if (cachedTrustedOrigins !== undefined) {
+    return cachedTrustedOrigins;
+  }
+  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
+  const origins = new Set<string>();
+  origins.add(dashboardUrl);
+  // Only trust local development origins in development mode
+  if (process.env['NODE_ENV'] === 'development') {
+    origins.add('http://localhost:3011');
+    origins.add('http://localhost:3000');
+    origins.add('http://127.0.0.1:3011');
+    origins.add('http://127.0.0.1:3000');
+  }
+  cachedTrustedOrigins = Array.from(origins);
+  return cachedTrustedOrigins;
+}
+
+function normalizeOrigin(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
+function getHeader(
+  request: HttpServerRequest.HttpServerRequest,
+  name: string,
+): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: true } | { ok: false; error: string } {
+  const origin = getHeader(request, 'origin');
+  const referer = getHeader(request, 'referer');
+  const trusted = getTrustedOrigins();
+
+  // If Origin is present, it must exactly match a trusted origin
+  if (origin) {
+    const normalized = normalizeOrigin(origin);
+    if (normalized && trusted.includes(normalized)) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid origin' };
+  }
+
+  // If no Origin but Referer is present, normalize and check it
+  if (referer) {
+    const normalized = normalizeOrigin(referer);
+    if (normalized && trusted.includes(normalized)) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid referer' };
+  }
+
+  // Require at least one of Origin or Referer for CSRF protection
+  return { ok: false, error: 'Missing origin' };
+}
+
+/** Validate a caller-supplied cwd is an existing directory under the user's home. */
+async function validateCwdContainment(cwd: string): Promise<boolean> {
+  if (!cwd.startsWith('/')) return false;
+  const segments = cwd.split('/').filter(Boolean);
+  if (segments.includes('..')) return false;
+
+  try {
+    const resolved = await realpath(cwd);
+    const stats = await stat(resolved);
+    if (!stats.isDirectory()) return false;
+    const home = homedir();
+    // Require the resolved cwd to be under the user's home directory
+    if (!resolved.startsWith(`${home}/`) && resolved !== home) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
+  ['image/png', '.png'],
+  ['image/jpeg', '.jpg'],
+  ['image/gif', '.gif'],
+  ['image/webp', '.webp'],
+]);
+
+/** Validate image magic bytes match the declared MIME type. */
+function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
+  switch (mimeType) {
+    case 'image/png':
+      return bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    case 'image/jpeg':
+      return bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
+    case 'image/gif':
+      return bytes.length >= 4 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38;
+    case 'image/webp':
+      return (
+        bytes.length >= 12 &&
+        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+      );
+    default:
+      return false;
+  }
+}
 
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
@@ -109,15 +411,148 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-/** Generate a default conversation name, e.g. 20260404-143052-317.
- *  Includes time-of-day + 3-digit random so collisions within a day
- *  require the same second AND the same random suffix. */
+function safeUploadExtension(filename: string, mimeType: string): string {
+  const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
+  if (!mimeExtension) return '';
+  const originalExtension = extname(filename).toLowerCase();
+  return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+}
+
+export async function handleConversationImageUpload(
+  name: string,
+  filename: string,
+  bytes: Buffer,
+  mimeType: string,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  if (!filename || !mimeType) {
+    return jsonResponse({ error: 'filename and mimeType are required' }, { status: 400 });
+  }
+
+  if (filename.length > MAX_FILENAME_LENGTH) {
+    return jsonResponse(
+      { error: `filename exceeds maximum length of ${MAX_FILENAME_LENGTH} characters` },
+      { status: 400 },
+    );
+  }
+
+  if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
+  }
+
+  if (bytes.length === 0) {
+    return jsonResponse({ error: 'Payload is empty' }, { status: 400 });
+  }
+
+  if (bytes.length > MAX_UPLOAD_BYTES) {
+    return jsonResponse(
+      { error: `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes` },
+      { status: 400 },
+    );
+  }
+
+  if (!validateImageMagicBytes(bytes, mimeType)) {
+    return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
+  }
+
+  const extension = safeUploadExtension(filename, mimeType)!;
+
+  // Re-verify conversation exists before writing — it may have been deleted or
+  // archived during the async validation above.
+  const convBeforeWrite = getConversationByName(name);
+  if (!convBeforeWrite) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const attachmentDir = await ensureConversationAttachmentDir(name);
+  // Pre-write containment: resolve the directory before writing to detect
+  // any symlink tampering that would redirect writes outside the intended
+  // root. This eliminates the TOCTOU window between write and check.
+  let resolvedDir: string;
+  let attachmentsRoot: string;
+  try {
+    resolvedDir = await realpath(attachmentDir);
+    attachmentsRoot = await realpath(getConversationAttachmentsRoot());
+  } catch (err) {
+    console.error('[conversations] Failed to resolve attachment path:', err);
+    return jsonResponse({ error: 'Attachment directory is misconfigured' }, { status: 500 });
+  }
+  if (!resolvedDir.startsWith(`${attachmentsRoot}/`)) {
+    return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
+  }
+
+  const fileName = `${randomUUID()}${extension}`;
+  const path = join(resolvedDir, fileName);
+  const tmpPath = `${path}.tmp`;
+  try {
+    await writeFile(tmpPath, bytes);
+    await rename(tmpPath, path);
+  } catch (err) {
+    await rm(tmpPath, { force: true }).catch(() => {});
+    throw err;
+  }
+
+  return jsonResponse({ path });
+}
+
+export async function handleConversationMessage(
+  name: string,
+  body: Record<string, unknown>,
+  deliverMessage: typeof sendKeysAsync = sendKeysAsync,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
+  if (!message) {
+    return jsonResponse({ error: 'Message is required' }, { status: 400 });
+  }
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return jsonResponse(
+      { error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
+      { status: 400 },
+    );
+  }
+
+  if (shouldInterceptManualCompact(message)) {
+    if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+      return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
+    }
+    const result = await compactConversationNative(conv.sessionFile);
+    return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
+  }
+
+  const allAttachmentPaths = extractConversationAttachmentPaths(message);
+  // Validate managed attachments concurrently — each check is independent IO.
+  const managedChecks = await Promise.all(
+    allAttachmentPaths.map(async (attachmentPath) => {
+      const managed = await isManagedConversationAttachmentPath(attachmentPath);
+      if (!managed) return { managed: false as const, attachmentPath };
+      const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
+      return { managed: true as const, attachmentPath, hasAttachment };
+    }),
+  );
+  for (const check of managedChecks) {
+    if (check.managed && !check.hasAttachment) {
+      return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
+    }
+    // Unmanaged @paths in prose are allowed to pass through
+  }
+
+  await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+  return jsonResponse({ ok: true });
+}
+
+/** Generate a default conversation name, e.g. 20260404-1234 */
 function generateConversationName(): string {
-  const iso = new Date().toISOString();
-  const date = iso.slice(0, 10).replace(/-/g, '');
-  const time = iso.slice(11, 19).replace(/:/g, '');
-  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-  return `${date}-${time}-${rand}`;
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return `${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
 }
 
 /** Sanitize a user-provided name to be safe for tmux session names */
@@ -167,23 +602,40 @@ async function extractModelFromSessionFile(sessionFile: string): Promise<string 
   return null;
 }
 
+let backfillRunning = false;
+
 /**
  * Backfill model column for existing conversations that have a session file
  * but no model stored. Runs once on server startup (async, non-blocking).
+ * Guarded against concurrent runs to prevent races.
  */
 async function backfillConversationModels(): Promise<void> {
-  const convs = listConversations();
-  let backfilled = 0;
-  for (const conv of convs) {
-    if (conv.model || !conv.sessionFile) continue;
-    const model = await extractModelFromSessionFile(conv.sessionFile);
-    if (model) {
-      updateConversationModel(conv.name, model);
-      backfilled++;
+  if (backfillRunning) return;
+  backfillRunning = true;
+  try {
+    const convs = listConversations();
+    const candidates = convs.filter((conv) => !conv.model && conv.sessionFile);
+    const BATCH_SIZE = 10;
+    let backfilled = 0;
+    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+      const batch = candidates.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (conv) => {
+          const model = await extractModelFromSessionFile(conv.sessionFile!);
+          if (model && SAFE_MODEL_PATTERN.test(model)) {
+            backfillConversationModel(conv.name, model);
+            return true;
+          }
+          return false;
+        }),
+      );
+      backfilled += results.filter(Boolean).length;
     }
-  }
-  if (backfilled > 0) {
-    console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
+    if (backfilled > 0) {
+      console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
+    }
+  } finally {
+    backfillRunning = false;
   }
 }
 
@@ -226,6 +678,9 @@ async function spawnConversationSession(
   let runtimeCommand = `claude ${permissionFlags}`;
   const providerEnvExports: string[] = [];
   if (model) {
+    if (!SAFE_MODEL_PATTERN.test(model)) {
+      throw new Error('Invalid model name');
+    }
     runtimeCommand = getAgentRuntimeBaseCommand(model);
     if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
       runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
@@ -239,29 +694,37 @@ async function spawnConversationSession(
     }
   }
 
+  if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
+    throw new Error('Invalid effort level');
+  }
+
   const envExports = [
     `export TERM=xterm-256color`,
     `export COLORTERM=truecolor`,
     `export LANG=C.UTF-8`,
     `export LC_ALL=C.UTF-8`,
-    ...(issueId ? [`export PANOPTICON_ISSUE_ID="${issueId}"`] : []),
+    ...(issueId ? [`export PANOPTICON_ISSUE_ID=${shellQuote(issueId)}`] : []),
     ...providerEnvExports,
   ].join('\n');
 
   const sessionArgs = [
-    resume ? `--resume "${claudeSessionId}"` : `--session-id "${claudeSessionId}"`,
-    ...(effort ? [`--effort "${effort}"`] : []),
+    resume ? `--resume ${shellQuote(claudeSessionId)}` : `--session-id ${shellQuote(claudeSessionId)}`,
+    ...(effort ? [`--effort ${shellQuote(effort)}`] : []),
   ].join(' ');
+
+  // Quote each token of the runtime command so paths with spaces are handled
+  // safely while preserving the individual arguments.
+  const quotedRuntimeCommand = runtimeCommand.split(' ').map(shellQuote).join(' ');
 
   await writeFile(launcherScript, `#!/bin/bash
 ${envExports}
-cd "${cwd}"
+cd -- ${shellQuote(cwd)}
 trap '' HUP
-${runtimeCommand} ${sessionArgs}
+${quotedRuntimeCommand} ${sessionArgs}
 echo ""
 echo "Conversation session ended. Close this panel or click Resume to start a new session."
 while true; do sleep 60; done
-`, { mode: 0o755 });
+`, { mode: 0o700 });
 
   // Kill any stale session with the same name
   try {
@@ -271,7 +734,7 @@ while true; do sleep 60; done
   }
 
   // Spawn the session
-  await createSessionAsync(tmuxSession, cwd, `bash '${launcherScript}'`, {
+  await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
     env: {
       TERM: 'xterm-256color',
     },
@@ -306,10 +769,48 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     firstMessage,
   ].join('\n');
 
-  const { stdout } = await execAsync(
-    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --model claude-haiku-4-5-20251001 --dangerously-skip-permissions --permission-mode bypassPermissions`,
-    { encoding: 'utf-8', timeout: 30_000 },
-  );
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const child = spawn(
+      'claude',
+      [
+        '-p',
+        '--output-format', 'json',
+        '--json-schema', schema,
+        '--model', 'claude-haiku-4-5-20251001',
+      ],
+      { env: { ...process.env, PATH: process.env.PATH } },
+    );
+    let out = '';
+    let errOut = '';
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error('claude title generation timed out after 30s'));
+    }, 30_000);
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', (data: string) => { out += data; });
+    child.stderr.on('data', (data: string) => { errOut += data; });
+    child.on('error', (err: Error) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+    child.on('close', (code: number | null) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(errOut || `claude title generation exited with code ${code}`));
+      } else {
+        resolve(out);
+      }
+    });
+    try {
+      child.stdin.write(prompt, 'utf-8');
+      child.stdin.end();
+    } catch (err) {
+      clearTimeout(timeout);
+      child.kill('SIGTERM');
+      reject(err);
+    }
+  });
 
   // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
   const parsed = JSON.parse(stdout.trim());
@@ -343,43 +844,43 @@ const getConversationsRoute = HttpRouter.add(
   'GET',
   '/api/conversations',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     return yield* Effect.promise(async () => {
     try {
-        const conversations = listConversations();
-        const favoritedNames = new Set(listFavoritedIds('conversation'));
+        const url = new URL(request.url, 'http://localhost');
+        const limitParam = url.searchParams.get('limit');
+        const offsetParam = url.searchParams.get('offset');
+        const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
+        const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
+        const conversations = listConversations({ limit, offset });
+        const favoritedNames = getCachedFavoritedIds();
 
         // Enrich with live tmux status
         // Grace period: treat recently-created active conversations as alive (tmux may not have
         // started yet — spawn is async). After 30s we fall back to the actual tmux check.
         const SPAWN_GRACE_MS = 30_000;
-        const enriched = await Promise.all(
-          conversations.map(async (conv) => {
-            const withinGrace =
-              conv.status === 'active' &&
-              !conv.endedAt &&
-              Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
-            const sessionAlive = !conv.forkStatus && (withinGrace || (await tmuxSessionExists(conv.tmuxSession)));
+        const liveSessionNames = new Set(await listSessionNamesAsync());
+        const now = Date.now();
+        const graceThreshold = now - SPAWN_GRACE_MS;
+        const enriched = conversations.map((conv) => {
+          const withinGrace =
+            conv.status === 'active' &&
+            !conv.endedAt &&
+            new Date(conv.createdAt).getTime() > graceThreshold;
+          const sessionAlive = !conv.forkStatus && (withinGrace || liveSessionNames.has(conv.tmuxSession));
 
-            let isWorking = false;
-            let currentTool: string | null = null;
-            if (sessionAlive && conv.sessionFile) {
-              try {
-                const summary = await summarizeConversationActivity(conv.sessionFile);
-                isWorking = summary.isWorking;
-                currentTool = summary.currentTool;
-              } catch {
-                isWorking = false;
-              }
-            }
-
-            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name) };
-          }),
-        );
+          return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
+        });
 
         return jsonResponse(enriched);
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to list conversations: ' + msg }, { status: 500 });
+        console.error('[conversations] list conversations failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         }})
   }),
 );
@@ -390,6 +891,11 @@ const getConversationRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:id',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const id = Number(params['id']);
     return yield* Effect.promise(async () => {
@@ -405,7 +911,8 @@ const getConversationRoute = HttpRouter.add(
         return jsonResponse({ ...conv, sessionAlive });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to get conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] get conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -421,6 +928,11 @@ const postConversationRoute = HttpRouter.add(
   'POST',
   '/api/conversations',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
@@ -428,10 +940,25 @@ const postConversationRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
+        if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
+          return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
+        }
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+        if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
+          return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+        }
         const cwd = join(homedir(), 'Projects');
 
         if (!message) {
           return jsonResponse({ error: 'message is required' }, { status: 400 });
+        }
+        if (message.length > MAX_MESSAGE_LENGTH) {
+          return jsonResponse(
+            { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
+            { status: 400 },
+          );
         }
 
         // Generate identifiers — retry on UNIQUE collision (extremely unlikely
@@ -485,7 +1012,8 @@ const postConversationRoute = HttpRouter.add(
         return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to create conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] create conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -502,6 +1030,11 @@ const postConversationStopRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/stop',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
@@ -513,11 +1046,19 @@ const postConversationStopRoute = HttpRouter.add(
 
         await killSessionAsync(conv.tmuxSession).catch(() => {});
         markConversationEnded(name);
+        // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
+        // Do NOT await — attachment pruning can read the entire JSONL and must
+        // not block the HTTP response critical path.
+        void (async () => {
+          await new Promise((r) => setTimeout(r, 500));
+          await cleanupUnreferencedConversationAttachments(conv);
+        })();
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to stop conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] stop conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -529,6 +1070,11 @@ const postConversationResumeRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/resume',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -562,8 +1108,17 @@ const postConversationResumeRoute = HttpRouter.add(
         const oldSessionId = sessionIdFromFile(conv.sessionFile);
         const modelChanged = !!model && model !== conv.model;
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && modelChanged && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
         // Persist the new model so the dropdown reflects what we're respawning with.
-        if (model && modelChanged) updateConversationModel(name, model);
+        if (model && modelChanged) setConversationModel(name, model);
 
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
         await waitForTmuxSession(conv.tmuxSession);
@@ -573,7 +1128,8 @@ const postConversationResumeRoute = HttpRouter.add(
         return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, reattached: false, sessionAlive: true });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] resume conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         }})
   }),
 );
@@ -588,6 +1144,11 @@ const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/switch-model',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -605,8 +1166,17 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         // Always kill the existing session first (if alive) so the model change takes effect
         await killSessionAsync(conv.tmuxSession).catch(() => {});
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
         // Persist the new model
-        if (model) updateConversationModel(name, model);
+        if (model) setConversationModel(name, model);
 
         // Extract the session UUID from the existing session file path
         const oldSessionId = sessionIdFromFile(conv.sessionFile);
@@ -626,11 +1196,26 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         return jsonResponse({ ...conv, status: 'active', model, reattached: false, sessionAlive: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to switch model: ' + msg }, { status: 500 });
+        console.error('[conversations] switch model failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
 );
+
+// Cache specialist session file lookups to avoid O(n) directory scans.
+const specialistSessionFileCache = new Map<string, string>();
+const SPECIALIST_SESSION_CACHE_MAX = 50;
+
+function setSpecialistSessionCache(name: string, sessionFile: string): void {
+  specialistSessionFileCache.set(name, sessionFile);
+  if (specialistSessionFileCache.size > SPECIALIST_SESSION_CACHE_MAX) {
+    const firstKey = specialistSessionFileCache.keys().next().value;
+    if (firstKey !== undefined) {
+      specialistSessionFileCache.delete(firstKey);
+    }
+  }
+}
 
 // ─── Route: GET /api/conversations/:name/messages ────────────────────────────
 
@@ -638,6 +1223,11 @@ const getConversationMessagesRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/messages',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
@@ -648,26 +1238,58 @@ const getConversationMessagesRoute = HttpRouter.add(
         // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
         let sessionFile: string | null | undefined = conv?.sessionFile;
         if (!conv) {
-          const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
-          if (specialistMatch) {
-            const [, project, type] = specialistMatch;
-            const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
-            const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
-            try {
-              const { readFile, readdir } = await import('node:fs/promises');
-              const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
-              if (sessionId) {
-                const claudeProjects = join(homedir(), '.claude', 'projects');
-                const dirs = await readdir(claudeProjects);
-                for (const dir of dirs) {
-                  const candidate = join(claudeProjects, dir, `${sessionId}.jsonl`);
-                  if (existsSync(candidate)) {
-                    sessionFile = candidate;
-                    break;
+          const cached = specialistSessionFileCache.get(name);
+          if (cached) {
+            sessionFile = cached;
+          } else {
+            const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
+            if (specialistMatch) {
+              const [, project, type] = specialistMatch;
+              if (!SAFE_PROJECT_NAME_PATTERN.test(project)) {
+                return jsonResponse({ error: 'Invalid conversation name' }, { status: 400 });
+              }
+              const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
+              const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
+              try {
+                const { readFile, readdir, stat } = await import('node:fs/promises');
+                const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
+                if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
+                  const claudeProjects = join(homedir(), '.claude', 'projects');
+                  const dirs = await readdir(claudeProjects);
+                  // Validate directory names to prevent path traversal before
+                  // joining. Only alphanumeric, hyphen, underscore, and dot are
+                  // allowed (encoded CWDs use these characters).
+                  const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+                  // Check all candidates concurrently with async stat instead of
+                  // synchronous existsSync in a loop (blocks the event loop).
+                  const candidates = dirs
+                    .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+                    .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+                  // Batch stat calls to avoid unbounded Promise.all fanout
+                  // when .claude/projects has many directories.
+                  const STAT_BATCH_SIZE = 50;
+                  let found: string | null = null;
+                  for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
+                    const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+                    const checks = await Promise.all(
+                      batch.map(async (candidate) => {
+                        try {
+                          await stat(candidate);
+                          return candidate;
+                        } catch {
+                          return null;
+                        }
+                      }),
+                    );
+                    found = checks.find((c): c is string => c !== null) ?? null;
+                  }
+                  if (found) {
+                    sessionFile = found;
+                    setSpecialistSessionCache(name, found);
                   }
                 }
-              }
-            } catch { /* session file not found */ }
+              } catch { /* session file not found */ }
+            }
           }
           if (!sessionFile) {
             return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
@@ -684,9 +1306,7 @@ const getConversationMessagesRoute = HttpRouter.add(
           // Specialists: parse only from the last compact_boundary so the display
           // shows only the current context window, not the full 30-day history.
           const isSpecialist = !conv && /^specialist-/.test(name);
-          const result = isSpecialist
-            ? await parseFromLastCompactBoundary(sessionFile)
-            : await parseConversationMessages(sessionFile, 0);
+          const result = await getCachedMessages(sessionFile, isSpecialist);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
           if (result.totalCost > 0 && conv) {
@@ -710,7 +1330,76 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to load messages: ' + msg }, { status: 500 });
+        console.error('[conversations] load messages failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: POST /api/conversations/:name/upload-image ───────────────────────
+
+const postConversationUploadImageRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/upload-image',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+
+    const remoteAddress = getClientIp(request);
+    if (!checkUploadRateLimit(remoteAddress)) {
+      return jsonResponse({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const multipart = yield* Effect.provideServices(
+      request.multipart,
+      Multipart.limitsServices({
+        maxFileSize: MAX_UPLOAD_BYTES,
+        maxTotalSize: MAX_UPLOAD_BYTES,
+        maxParts: 3,
+        maxFieldSize: 1024,
+      }),
+    );
+    const files = multipart['file'] as Multipart.PersistedFile[] | undefined;
+    const filenameField = multipart['filename'] as string | string[] | undefined;
+    const mimeTypeField = multipart['mimeType'] as string | string[] | undefined;
+
+    const file = files?.[0];
+    const filenameRaw = Array.isArray(filenameField) ? filenameField[0] : filenameField;
+    const mimeTypeRaw = Array.isArray(mimeTypeField) ? mimeTypeField[0] : mimeTypeField;
+
+    if (typeof filenameRaw !== 'string') {
+      return jsonResponse({ error: 'filename is required' }, { status: 400 });
+    }
+    if (typeof mimeTypeRaw !== 'string') {
+      return jsonResponse({ error: 'mimeType is required' }, { status: 400 });
+    }
+    const filename = filenameRaw;
+    const mimeType = mimeTypeRaw;
+
+    if (!file || !file.path) {
+      return jsonResponse({ error: 'file is required' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      try {
+        const UPLOAD_READ_TIMEOUT_MS = 10_000;
+        const bytes = await Promise.race([
+          readFile(file.path),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Upload read timeout')), UPLOAD_READ_TIMEOUT_MS),
+          ),
+        ]);
+        return await handleConversationImageUpload(name, filename, bytes, mimeType);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] upload image failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -718,10 +1407,15 @@ const getConversationMessagesRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/message ────────────────────────────
 
-const postConversationMessageRoute = HttpRouter.add(
+const postConversationDeleteImageRoute = HttpRouter.add(
   'POST',
-  '/api/conversations/:name/message',
+  '/api/conversations/:name/delete-image',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -731,33 +1425,51 @@ const postConversationMessageRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
-
-        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-        if (!message) {
-          return jsonResponse({ error: 'Message is required' }, { status: 400 });
+        const path = typeof body['path'] === 'string' ? body['path'].trim() : '';
+        if (!path) {
+          return jsonResponse({ error: 'path is required' }, { status: 400 });
         }
-
-        if (shouldInterceptManualCompact(message)) {
-          if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
-            return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
-          }
-          const result = await compactConversationNative(conv.sessionFile);
-          return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
+        const removed = await removeConversationAttachment(name, path);
+        if (!removed) {
+          return jsonResponse({ error: 'Attachment not found for conversation' }, { status: 404 });
         }
-
-        // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
-        await sendKeysAsync(conv.tmuxSession, message, 'conversation-message');
-
         return jsonResponse({ ok: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to send message: ' + msg }, { status: 500 });
+        console.error('[conversations] delete image failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationMessageRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/message',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationMessage(name, body);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] send message failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
 );
 
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
+
+const MAX_TITLE_LENGTH = 200;
 
 export function patchConversationTitle(
   name: string,
@@ -769,8 +1481,12 @@ export function patchConversationTitle(
   }
 
   if (typeof body.title === 'string' && body.title.trim()) {
+    const trimmed = body.title.trim();
+    if (trimmed.length > MAX_TITLE_LENGTH) {
+      return { status: 400, body: { error: `Title exceeds maximum length of ${MAX_TITLE_LENGTH} characters` } };
+    }
     // User explicitly renamed → mark as 'manual' so AI won't auto-replace
-    updateConversationTitle(name, body.title.trim(), 'manual');
+    updateConversationTitle(name, trimmed, 'manual');
   }
 
   return { status: 200, body: { success: true } };
@@ -780,6 +1496,11 @@ const patchConversationRoute = HttpRouter.add(
   'PATCH',
   '/api/conversations/:name',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
@@ -789,7 +1510,8 @@ const patchConversationRoute = HttpRouter.add(
         return jsonResponse(result.body, { status: result.status });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to update conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] update conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -801,6 +1523,11 @@ const postConversationArchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/archive',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
@@ -809,6 +1536,9 @@ const postConversationArchiveRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
+        if (conv.archivedAt) {
+          return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
+        }
 
         // Kill tmux session if still alive
         await killSessionAsync(conv.tmuxSession).catch(() => {});
@@ -816,11 +1546,15 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Mark as ended and archived
         markConversationEnded(name);
         archiveConversation(name);
+        // Unconditionally remove all attachments — archiving is permanent and
+        // unsent paste uploads should not leak.
+        await cleanupConversationAttachments(name);
 
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to archive conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] archive conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -832,6 +1566,11 @@ const postConversationUnarchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/unarchive',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
@@ -848,7 +1587,8 @@ const postConversationUnarchiveRoute = HttpRouter.add(
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to unarchive conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] unarchive conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -864,14 +1604,18 @@ const postConversationRestartAllRoute = HttpRouter.add(
   'POST',
   '/api/conversations/restart-all',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     return yield* Effect.promise(async () => {
       try {
         const allConvs = listConversations();
-        // Filter to conversations with a live tmux session
-        const convs: typeof allConvs = [];
-        for (const c of allConvs) {
-          if (await tmuxSessionExists(c.tmuxSession)) convs.push(c);
-        }
+        // Filter to conversations with a live tmux session — use a single
+        // listSessionNamesAsync() call instead of N subprocess spawns.
+        const liveSessionNames = new Set(await listSessionNamesAsync());
+        const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
         const results: { name: string; model: string | null; status: string }[] = [];
 
         for (const conv of convs) {
@@ -897,7 +1641,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
-            results.push({ name: conv.name, model: conv.model, status: `failed: ${msg}` });
+            results.push({ name: conv.name, model: conv.model, status: 'failed' });
           }
         }
 
@@ -905,7 +1649,8 @@ const postConversationRestartAllRoute = HttpRouter.add(
         return jsonResponse({ restarted: results.length, results });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to restart conversations: ' + msg }, { status: 500 });
+        console.error('[conversations] restart conversations failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -917,6 +1662,11 @@ const postConversationFavoriteRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/favorite',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     return yield* Effect.promise(async () => {
@@ -927,7 +1677,8 @@ const postConversationFavoriteRoute = HttpRouter.add(
         return jsonResponse({ favorited: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to favorite conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] favorite conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -939,6 +1690,11 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
   'DELETE',
   '/api/conversations/:name/favorite',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     return yield* Effect.promise(async () => {
@@ -949,7 +1705,8 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
         return jsonResponse({ favorited: false });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to unfavorite conversation: ' + msg }, { status: 500 });
+        console.error('[conversations] unfavorite conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1021,6 +1778,11 @@ const postConversationSummaryForkRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/summary-fork',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     const body = yield* readJsonBody;
@@ -1046,8 +1808,20 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           : undefined;
         const plain = body['plain'] === true;
 
+        if (cwd && !(await validateCwdContainment(cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
         if (typeof body['model'] === 'string' && !model) {
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
+        }
+
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
+        if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {
+          return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
         }
 
         const { sessionId, sessionFile } = await reserveSummaryForkSession(
@@ -1090,7 +1864,8 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to create summary fork: ' + msg }, { status: 500 });
+        console.error('[conversations] create summary fork failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1110,6 +1885,8 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,
   getConversationMessagesRoute,
+  postConversationUploadImageRoute,
+  postConversationDeleteImageRoute,
   postConversationMessageRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
