@@ -807,10 +807,38 @@ export async function spawnEphemeralSpecialist(
   if (task.workspace) {
     const registry = loadRegistry();
     const projectBucket = registry.projects[projectKey] ?? {};
+    // Snapshot live tmux sessions once so liveness checks below don't fan out
+    // a tmux subprocess per registry entry.
+    const liveSessions = await listSessionNamesAsync().catch(() => [] as string[]);
     for (const [key, entry] of Object.entries(projectBucket)) {
       if (key === registryKey) continue; // same slot — handled by busy check above
       if (!entry.currentRun) continue; // not running
       if (entry.workspace !== task.workspace) continue; // different worktree — no conflict
+
+      // Liveness check: a registry entry's currentRun is only authoritative if
+      // its tmux session is actually alive. Specialist tmux sessions can die
+      // (process crash, manual kill, host reboot, OOM) without the cleanup path
+      // running, leaving currentRun set. Without this check, a dead specialist
+      // permanently blocks every future writer on the same worktree — sync-main,
+      // merge-agent, anything. Only handle the standard {specialistType}:{issueId}
+      // key shape here; role-keyed convoy entries have bespoke session naming
+      // and stay strict to avoid clearing live runs we can't reliably identify.
+      const parsed = parseSpecialistRegistryKey(key);
+      if (parsed.issueId && !parsed.role) {
+        const expectedSession = getTmuxSessionName(
+          parsed.specialistType as SpecialistType,
+          projectKey,
+          parsed.issueId,
+        );
+        if (!liveSessions.includes(expectedSession)) {
+          console.log(
+            `[specialist] Clearing stale currentRun for ${key} (${projectKey}) — tmux session ${expectedSession} is dead`,
+          );
+          setCurrentRun(projectKey, key, null);
+          continue;
+        }
+      }
+
       // Another specialist is running against the same workspace
       const incomingScope = 'full'; // default; convoy callers will pass 'readonly-plus-output' via task.context
       if (incomingScope === 'full' || (entry.writeScope ?? 'full') === 'full') {
