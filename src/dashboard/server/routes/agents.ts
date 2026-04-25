@@ -73,6 +73,7 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
+import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
@@ -643,6 +644,7 @@ const deleteAgentRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
+    const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
     yield* Effect.promise(() => stopAgentAsync(id));
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
@@ -650,6 +652,16 @@ const deleteAgentRoute = HttpRouter.add(
       timestamp: new Date().toISOString(),
       payload: { agentId: id },
     })));
+    const issueId = stateBeforeStop?.issueId;
+    const phaseLabel = stateBeforeStop?.phase === 'planning' ? 'planning' : 'work';
+    emitActivityEntry({
+      source: 'dashboard',
+      level: 'info',
+      message: issueId
+        ? `User stopped ${issueId} ${phaseLabel} agent`
+        : `User stopped agent ${id}`,
+      issueId,
+    });
     invalidateAgentsCache();
     return jsonResponse({ success: true });
   })),
