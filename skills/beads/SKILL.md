@@ -92,6 +92,20 @@ Essential commands: `bd ready`, `bd create`, `bd show`, `bd update`, `bd close`,
 5. `bd close <id> --reason "..."` — Complete task
 6. `bd sync` — Persist to git (always run at session end)
 
+## Invalid Commands (NEVER use these)
+
+The following commands do NOT exist. Agents frequently hallucinate them:
+
+| Invalid Command | Correct Replacement |
+|-----------------|---------------------|
+| `bd claim <id>` | `bd update <id> --claim` |
+| `bd start <id>` | `bd update <id> --status in_progress` |
+| `bd move <id>` | `bd update <id>` (with relevant flags) |
+| `bd refile <id>` | `bd update <id>` (with relevant flags) |
+| `bd gate create` | `bd gate` (no `create` subcommand) |
+
+**If you are tempted to use a command not listed in this skill, run `bd --help` first.**
+
 ## Quick Reference (Exact Syntax)
 
 **DO NOT GUESS FLAGS** - use exactly these commands.
