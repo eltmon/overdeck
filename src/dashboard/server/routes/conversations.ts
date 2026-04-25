@@ -238,7 +238,12 @@ async function getCachedMessages(
 
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
 
+let cachedTrustedOrigins: string[] | undefined;
+
 function getTrustedOrigins(): string[] {
+  if (cachedTrustedOrigins !== undefined) {
+    return cachedTrustedOrigins;
+  }
   const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
   const origins = new Set<string>();
@@ -250,7 +255,8 @@ function getTrustedOrigins(): string[] {
     origins.add('http://127.0.0.1:3011');
     origins.add('http://127.0.0.1:3000');
   }
-  return Array.from(origins);
+  cachedTrustedOrigins = Array.from(origins);
+  return cachedTrustedOrigins;
 }
 
 function normalizeOrigin(origin: string): string | null {

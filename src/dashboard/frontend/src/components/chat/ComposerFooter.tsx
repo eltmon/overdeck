@@ -322,6 +322,24 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
 
     const submitConversationName = conversation.name;
 
+    // Re-read pending images before any async work — if uploads are still in
+    // progress we must return early without switching model or sending.
+    const currentPendingImages = pendingImagesRef.current;
+    const uploadingImages = currentPendingImages.filter((image) => !image.serverPath && !image.error);
+    if (uploadingImages.length > 0) {
+      toast.error('Please wait for image uploads to finish');
+      return;
+    }
+
+    const failedImages = currentPendingImages.filter((image) => image.error);
+    if (failedImages.length > 0) {
+      toast.error('Remove failed image uploads before sending');
+      return;
+    }
+
+    const uploadedImages = currentPendingImages.filter((image) => image.serverPath);
+    if (!messageText && uploadedImages.length === 0) return;
+
     setSending(true);
     try {
       // If the selected model differs from the conversation's current model,
@@ -331,26 +349,9 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
         await switchModel(submitConversationName, model);
       }
 
-      // Re-read pending images after async gap — they may have changed
-      // (e.g. upload completed, user removed an image, or conversation switched)
-      const currentPendingImages = pendingImagesRef.current;
-      const uploadingImages = currentPendingImages.filter((image) => !image.serverPath && !image.error);
-      if (uploadingImages.length > 0) {
-        toast.error('Please wait for image uploads to finish');
-        return;
-      }
-
-      const failedImages = currentPendingImages.filter((image) => image.error);
-      if (failedImages.length > 0) {
-        toast.error('Remove failed image uploads before sending');
-        return;
-      }
-
-      const uploadedImages = currentPendingImages.filter((image) => image.serverPath);
-      if (!messageText && uploadedImages.length === 0) return;
-
-      // Abort if conversation switched during async operations — the switch
-      // useEffect will have already cleared pending images and deleted uploads
+      // Abort if conversation switched during the async model switch — the
+      // switch useEffect will have already cleared pending images and deleted
+      // uploads for the old conversation.
       if (submitConversationName !== currentConversationNameRef.current) {
         return;
       }

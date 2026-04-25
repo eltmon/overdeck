@@ -6,7 +6,7 @@
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -112,6 +112,26 @@ describe('conversations route — DB integration', () => {
 
     expect(response.status).toBe(400);
     expect(decodeJsonResponse(response)).toEqual({ error: 'Unsupported mimeType: image/tiff' });
+  });
+
+  it('rejects magic-byte mismatch for valid mimeType', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    // Valid PNG mimeType but content bytes are JPEG magic numbers, not PNG
+    const response = await handleConversationImageUpload(
+      'upload-test',
+      'fake.png',
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      'image/png',
+    );
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: 'File content does not match declared MIME type',
+    });
   });
 
   it('rejects oversized upload payloads before writing files', async () => {
@@ -235,10 +255,13 @@ describe('conversations route — DB integration', () => {
 
     const keptPath = decodeJsonResponse(keptUpload).path as string;
     const prunedPath = decodeJsonResponse(prunedUpload).path as string;
-    // Ensure session file has a strictly newer mtime than the pruned attachment
-    // so the >= comparison correctly prunes it.
-    await new Promise((r) => setTimeout(r, 50));
     writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `keep this\n@${keptPath}` }] } })}\n`);
+    // Explicitly set the session file mtime to be strictly newer than both
+    // attachments so the >= comparison reliably prunes the unreferenced one.
+    const keptStat = statSync(keptPath);
+    const prunedStat = statSync(prunedPath);
+    const newestAttachmentMtime = Math.max(keptStat.mtimeMs, prunedStat.mtimeMs);
+    utimesSync(sessionFile, newestAttachmentMtime / 1000 + 1, newestAttachmentMtime / 1000 + 1);
 
     markConversationEnded('archived-conv');
     archiveConversation('archived-conv');
