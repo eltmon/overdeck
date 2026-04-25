@@ -89,6 +89,7 @@ import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js
 import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 
 const execAsync = promisify(exec);
 
@@ -2067,47 +2068,27 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
 
     const status = getReviewStatus(issueId);
-    const base = status || {
+    const base: ReviewStatus = status || {
       issueId,
       reviewStatus: 'pending',
       testStatus: 'pending',
+      mergeStatus: 'pending',
       readyForMerge: false,
+      updatedAt: new Date().toISOString(),
     };
 
     let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
 
     // Discover active parallel review sessions for this issue
+    let reviewCoordinatorSessionName: string | undefined;
     let reviewSessionNames: string[] | undefined;
+    let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
     try {
       const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-      reviewSessionNames = allSessions.filter(s => s.startsWith(`review-${issueId}-`));
-      // Keep only the most recent review round (highest timestamp) to avoid
-      // stale tabs from previous review rounds showing "Connection lost".
-      if (reviewSessionNames.length > 0) {
-        const timestamps = new Set<number>();
-        for (const s of reviewSessionNames) {
-          const prefix = `review-${issueId}-`;
-          const rest = s.slice(prefix.length);
-          const dashIdx = rest.indexOf('-');
-          if (dashIdx > 0) {
-            const ts = Number(rest.slice(0, dashIdx));
-            if (!isNaN(ts)) timestamps.add(ts);
-          }
-        }
-        if (timestamps.size > 1) {
-          const maxTs = Math.max(...timestamps);
-          reviewSessionNames = reviewSessionNames.filter(s => {
-            const prefix = `review-${issueId}-`;
-            const rest = s.slice(prefix.length);
-            const dashIdx = rest.indexOf('-');
-            if (dashIdx > 0) {
-              const ts = Number(rest.slice(0, dashIdx));
-              return !isNaN(ts) && ts === maxTs;
-            }
-            return false;
-          });
-        }
-      }
+      const enriched = enrichReviewStatusFromSessions(issueId, base, allSessions);
+      reviewCoordinatorSessionName = enriched.reviewCoordinatorSessionName;
+      reviewSessionNames = enriched.reviewSessionNames;
+      reviewSubStatuses = enriched.reviewSubStatuses;
     } catch { /* non-fatal: tmux may not be available */ }
 
     // Only the merge queue is persistent — check it when no active phase is detected
@@ -2138,26 +2119,7 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       }
     }
 
-    // Detect per-role completion by checking for output files
-    let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
-    if (reviewSessionNames && reviewSessionNames.length > 0) {
-      try {
-        const resolved = resolveProjectFromIssue(issueId);
-        if (resolved) {
-          const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-          reviewSubStatuses = {};
-          for (const sessionName of reviewSessionNames) {
-            const parts = sessionName.split('-');
-            const role = parts[parts.length - 1] || 'review';
-            const reviewRunId = parts.slice(0, -1).join('-');
-            const outputFile = join(workspacePath, '.pan', 'review', reviewRunId, `${role}.md`);
-            reviewSubStatuses[role] = existsSync(outputFile) ? 'done' : 'running';
-          }
-        }
-      } catch { /* non-fatal */ }
-    }
-
-    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewSessionNames, reviewSubStatuses });
+    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewCoordinatorSessionName, reviewSessionNames, reviewSubStatuses });
   }))
 );
 
