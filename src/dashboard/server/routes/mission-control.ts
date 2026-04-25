@@ -35,6 +35,7 @@ import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { SessionNodePresence } from '@panopticon/contracts';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
@@ -139,6 +140,17 @@ async function derivePresence(
   return 'ended';
 }
 
+/**
+ * Resolve JSONL path for a session. Returns the path if the file exists,
+ * otherwise null. Uses encodeClaudeProjectDir for path encoding.
+ */
+async function resolveJsonlPath(sessionId: string, workspacePath: string): Promise<string | null> {
+  const encodedDir = encodeClaudeProjectDir(workspacePath);
+  const jsonlPath = join(homedir(), '.claude', 'projects', encodedDir, `${sessionId}.jsonl`);
+  if (await pathExists(jsonlPath)) return jsonlPath;
+  return null;
+}
+
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -187,9 +199,14 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
     startedAt: string;
     duration: number | null;
     status: string;
-    transcript: string;
+    transcript?: string;
     presence: SessionNodePresence;
+    jsonlPath?: string;
   }> = [];
+
+  // Shared workspace path for JSONL resolution (PAN-821)
+  const projectPath = getProjectPath(issuePrefix);
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
@@ -229,6 +246,9 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await derivePresence(checkId, rtState, tmuxSessionNames);
 
+      // Resolve JSONL path for conversation rendering (PAN-821)
+      const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
@@ -236,28 +256,31 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         duration: state.startedAt ? Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000) : null,
         status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
-        transcript,
+        transcript: jsonlPath ? undefined : transcript,
         presence,
+        jsonlPath: jsonlPath || undefined,
       });
     } catch { /* skip malformed state */ }
   }
 
   // If no planning agent but STATE.md exists, create synthetic planning section
   if (!hasPlanningSection) {
-    const projectPath = getProjectPath(issuePrefix);
-    const stateMdPath = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md');
+    const stateMdPath = join(workspacePath, '.planning', 'STATE.md');
     const stateMdText = await readOptional(stateMdPath);
     if (stateMdText) {
       const fileStat = await stat(stateMdPath).catch(() => null);
+      const sessionId = `planning-${issueLower}-state`;
+      const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
       sections.push({
         type: 'legacy',
-        sessionId: `planning-${issueLower}-state`,
+        sessionId,
         model: 'unknown',
         startedAt: fileStat?.birthtime?.toISOString() || fileStat?.mtime.toISOString() || new Date().toISOString(),
         duration: null,
         status: 'completed',
-        transcript: `PLANNING COMPLETE\n\n${stateMdText}`,
+        transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${stateMdText}`,
         presence: 'ended',
+        jsonlPath: jsonlPath || undefined,
       });
     }
   }
@@ -399,6 +422,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
           const reviewerPresence: SessionNodePresence = tmuxSessionNames.has(tmuxName)
             ? (ss.status === 'running' ? 'active' : 'idle')
             : 'ended';
+          const reviewerJsonlPath = await resolveJsonlPath(tmuxName, workspacePath);
 
           sections.push({
             type: role ? 'reviewer' : 'review',
@@ -409,9 +433,10 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
             endedAt: ss.endedAt,
             duration,
             status: ss.status,
-            transcript: reviewerParts.join('\n'),
+            transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
             tmuxSession: tmuxName,
             presence: reviewerPresence,
+            jsonlPath: reviewerJsonlPath || undefined,
           });
         }
         continue;
@@ -440,17 +465,20 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
       const specialistPresence: SessionNodePresence = tmuxSessionName && tmuxSessionNames.has(tmuxSessionName)
         ? (ss.status === 'running' ? 'active' : 'idle')
         : 'ended';
+      const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
+      const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
 
       sections.push({
         type: ss.type,
-        sessionId: `specialist-${ss.type}-${ss.startedAt}`,
+        sessionId: specialistSessionId,
         model: 'specialist',
         startedAt: ss.startedAt,
         duration,
         status: ss.status,
-        transcript: transcriptParts.join('\n'),
+        transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
         tmuxSession: tmuxSessionName,
         presence: specialistPresence,
+        jsonlPath: specialistJsonlPath || undefined,
       });
     }
   }
