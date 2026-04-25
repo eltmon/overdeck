@@ -68,6 +68,50 @@ function cacheKey(code: string, lang: string): string {
   return `${fnv1a32(code)}:${code.length}:${lang}`;
 }
 
+/** Sanitize Shiki HTML output before rendering with dangerouslySetInnerHTML.
+ *  Only allows the tags and attributes that Shiki legitimately produces. */
+const ALLOWED_SHIKI_TAGS = new Set(['span', 'pre', 'code', 'div', 'br']);
+const ALLOWED_SHIKI_ATTRS = new Set(['class', 'style']);
+
+function sanitizeShikiHtml(html: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  function walk(node: Node): Node | null {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent || '');
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+    const el = node as Element;
+    const tagName = el.tagName.toLowerCase();
+    if (!ALLOWED_SHIKI_TAGS.has(tagName)) {
+      return null;
+    }
+    const newEl = document.createElement(tagName);
+    for (const attr of Array.from(el.attributes)) {
+      if (ALLOWED_SHIKI_ATTRS.has(attr.name.toLowerCase())) {
+        newEl.setAttribute(attr.name, attr.value);
+      }
+    }
+    for (const child of Array.from(el.childNodes)) {
+      const sanitized = walk(child);
+      if (sanitized) newEl.appendChild(sanitized);
+    }
+    return newEl;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const child of Array.from(doc.body.childNodes)) {
+    const sanitized = walk(child);
+    if (sanitized) fragment.appendChild(sanitized);
+  }
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(fragment);
+  return wrapper.innerHTML;
+}
+
 // ─── Highlighter (lazy-loaded) ────────────────────────────────────────────────
 
 let sharedHighlighterPromise: Promise<unknown> | null = null;
@@ -166,7 +210,7 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
         <div
           className={styles.shikiOutput}
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: highlighted }}
+          dangerouslySetInnerHTML={{ __html: sanitizeShikiHtml(highlighted) }}
         />
       ) : (
         <pre className={styles.codePlain}>

@@ -499,13 +499,18 @@ export async function handleConversationMessage(
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
-  for (const attachmentPath of allAttachmentPaths) {
-    const managed = await isManagedConversationAttachmentPath(attachmentPath);
-    if (managed) {
+  // Validate managed attachments concurrently — each check is independent IO.
+  const managedChecks = await Promise.all(
+    allAttachmentPaths.map(async (attachmentPath) => {
+      const managed = await isManagedConversationAttachmentPath(attachmentPath);
+      if (!managed) return { managed: false as const, attachmentPath };
       const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
-      if (!hasAttachment) {
-        return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
-      }
+      return { managed: true as const, attachmentPath, hasAttachment };
+    }),
+  );
+  for (const check of managedChecks) {
+    if (check.managed && !check.hasAttachment) {
+      return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
     }
     // Unmanaged @paths in prose are allowed to pass through
   }
@@ -742,8 +747,6 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
         '--output-format', 'json',
         '--json-schema', schema,
         '--model', 'claude-haiku-4-5-20251001',
-        '--dangerously-skip-permissions',
-        '--permission-mode', 'bypassPermissions',
       ],
       { env: { ...process.env, PATH: process.env.PATH } },
     );
@@ -818,7 +821,12 @@ const getConversationsRoute = HttpRouter.add(
     }
     return yield* Effect.promise(async () => {
     try {
-        const conversations = listConversations({ limit: 500 });
+        const url = new URL(request.url, 'http://localhost');
+        const limitParam = url.searchParams.get('limit');
+        const offsetParam = url.searchParams.get('offset');
+        const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
+        const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
+        const conversations = listConversations({ limit, offset });
         const favoritedNames = new Set(listFavoritedIds('conversation'));
 
         // Enrich with live tmux status
@@ -1476,6 +1484,9 @@ const postConversationArchiveRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        if (conv.archivedAt) {
+          return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
         }
 
         // Kill tmux session if still alive

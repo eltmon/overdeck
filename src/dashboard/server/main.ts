@@ -24,7 +24,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
-import { mkdir, readdir, stat, unlink } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';

@@ -189,7 +189,9 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     if (image) {
       revokePreviewUrl(image.previewUrl);
       if (image.serverPath) {
-        deleteUploadedImage(conversation.name, image.serverPath);
+        // Use the synchronous ref to avoid deleting from the wrong
+        // conversation if a switch happened between render and click.
+        deleteUploadedImage(currentConversationNameRef.current, image.serverPath);
       }
     }
     setPendingImages((images) => {
@@ -197,16 +199,19 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       pendingImagesRef.current = next;
       return next;
     });
-  }, [conversation.name, deleteUploadedImage]);
+  }, [deleteUploadedImage]);
 
   const processUploadQueue = useCallback(() => {
-    const ownerConversationName = conversation.name;
     while (
       activeUploadsRef.current < MAX_CONCURRENT_UPLOADS &&
       uploadQueueRef.current.length > 0
     ) {
       const image = uploadQueueRef.current.shift()!;
       activeUploadsRef.current++;
+      // Capture the ref synchronously at upload start so the callback
+      // always targets the conversation that was active when the upload
+      // began, avoiding stale-closure races on rapid conversation switches.
+      const ownerConversationName = currentConversationNameRef.current;
       void uploadConversationImage(ownerConversationName, image.file)
         .then((serverPath) => {
           activeUploadsRef.current--;
@@ -234,7 +239,7 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
           processUploadQueue();
         });
     }
-  }, [conversation.name, deleteUploadedImage, updatePendingImage]);
+  }, [deleteUploadedImage, updatePendingImage]);
 
   const enqueueImages = useCallback((files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));

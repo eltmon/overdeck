@@ -272,8 +272,18 @@ export async function cleanupUnreferencedConversationAttachments(conversation: P
 
 export function extractConversationAttachmentPaths(message: string): string[] {
   return Array.from(
-    message.matchAll(/(?:^|\s)@((?:\/)[^\s]+)/g),
-    ([, attachmentPath]) => attachmentPath,
+    // Use a negative lookbehind (?<!\S) instead of a consuming group so that
+    // adjacent @-paths (e.g. "@/a @/b") are matched independently. Strip
+    // trailing punctuation that is accidentally captured when a sentence or
+    // parenthetical ends immediately after the path.
+    message.matchAll(/(?<!\S)@(\/[^\s]+)/g),
+    ([, attachmentPath]) => {
+      let path = attachmentPath;
+      while (path.length > 1 && /[.,;:!?)\]}+]$/.test(path)) {
+        path = path.slice(0, -1);
+      }
+      return path;
+    },
   );
 }
 
