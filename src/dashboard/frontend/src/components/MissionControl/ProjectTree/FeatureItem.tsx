@@ -118,10 +118,14 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   const handleRowClick = useCallback(() => {
     onSelect();
+    if (!expanded) {
+      setExpanded(true);
+      writeExpanded(feature.issueId, true);
+    }
     if (bestSessionId && onSelectSession) {
       onSelectSession(feature.issueId, bestSessionId);
     }
-  }, [onSelect, bestSessionId, feature.issueId, onSelectSession]);
+  }, [onSelect, bestSessionId, feature.issueId, onSelectSession, expanded]);
 
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)

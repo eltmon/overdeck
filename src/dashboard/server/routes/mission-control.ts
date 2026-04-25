@@ -33,6 +33,7 @@ import { EventStoreService } from '../services/domain-services.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panopticon/contracts';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
@@ -68,49 +69,14 @@ async function readOptional(p: string): Promise<string | null> {
   return readFile(p, 'utf-8').catch(() => null);
 }
 
-/** Simple semaphore: run at most `max` promises concurrently. */
-function withConcurrencyLimit<T>(
-  tasks: Array<() => Promise<T>>,
-  max: number,
-): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const results = new Array<T>(tasks.length);
-    let index = 0;
-    let running = 0;
-    let completed = 0;
-    let rejected = false;
-
-    function next() {
-      if (rejected) return;
-      if (completed === tasks.length) {
-        resolve(results);
-        return;
-      }
-      while (running < max && index < tasks.length) {
-        const i = index++;
-        running++;
-        tasks[i]!()
-          .then((val) => {
-            results[i] = val;
-            running--;
-            completed++;
-            next();
-          })
-          .catch((err) => {
-            rejected = true;
-            reject(err);
-          });
-      }
-    }
-
-    next();
-  });
-}
-
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
 /** Cache for resolved project paths to avoid repeated sync FS calls. */
 const projectPathCache = new Map<string, string>();
+
+/** TTL cache for closed issues to avoid hammering gh CLI on every poll (~10s). */
+let closedIssuesCache: { timestamp: number; data: Array<{ number: number; title: string }> } | null = null;
+const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
 
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
@@ -157,6 +123,8 @@ function getProjectPath(issuePrefix?: string): string {
  */
 export function extractReviewerRole(tmuxName: string, issueId: string): string | null {
   const prefix = `review-${issueId}-`;
+  // Case-insensitive prefix match but case-sensitive slice — the prefix length
+  // is the same in both cases so slice works correctly.
   if (!tmuxName.toLowerCase().startsWith(prefix.toLowerCase())) return null;
   const rest = tmuxName.slice(prefix.length);
   const dashIdx = rest.indexOf('-');
@@ -166,8 +134,61 @@ export function extractReviewerRole(tmuxName: string, issueId: string): string |
 }
 
 /**
- * Derive session presence from runtime state and tmux session existence.
- * Only stats output.log for alive sessions to avoid unnecessary filesystem calls.
+ * Scan the workspace .pan/review/ directory for persisted reviewer roles
+ * from the most recent review round. Returns objects with sessionId (reconstructed
+ * from the review directory name + role) and role name. Empty array if no review
+ * directory found.
+ */
+async function scanPersistedReviewerRoles(
+  workspacePath: string,
+  issueId: string,
+): Promise<Array<{ sessionId: string; role: string }>> {
+  const reviewDir = join(workspacePath, '.pan', 'review');
+  if (!await pathExists(reviewDir)) return [];
+
+  let entries: string[] = [];
+  try {
+    entries = await readdir(reviewDir);
+  } catch { return []; }
+
+  const prefix = `review-${issueId}-`;
+  const rounds = entries
+    .filter(e => e.toLowerCase().startsWith(prefix.toLowerCase()))
+    .map(e => ({ name: e, path: join(reviewDir, e) }));
+
+  if (rounds.length === 0) return [];
+
+  // Sort by mtime descending to pick the most recent review round
+  const roundsWithStat = await Promise.all(
+    rounds.map(async (r) => {
+      const s = await stat(r.path).catch(() => null);
+      return { ...r, mtime: s?.mtime?.getTime() ?? 0 };
+    })
+  );
+  roundsWithStat.sort((a, b) => b.mtime - a.mtime);
+  const mostRecent = roundsWithStat[0];
+  if (!mostRecent) return [];
+
+  let files: string[] = [];
+  try {
+    files = await readdir(mostRecent.path);
+  } catch { return []; }
+
+  // Extract roles from {role}.md files (exclude prompt and claude log files)
+  const roles = files
+    .filter(f => f.endsWith('.md') && !f.endsWith('-prompt.md'))
+    .map(f => f.replace(/\.md$/, ''))
+    .filter(r => !r.endsWith('-claude')); // {role}-claude.log companion files
+
+  return roles.map(role => ({
+    sessionId: `${mostRecent.name}-${role}`,
+    role,
+  }));
+}
+
+/**
+ * Derive session presence from runtime state, tmux session existence, and heartbeat.
+ * Aligns with Cloister's stuck-detection signals (heartbeat freshness + runtime state).
  */
 async function derivePresence(
   agentId: string,
@@ -181,7 +202,13 @@ async function derivePresence(
 
   if (rtState.state === 'active') return 'active';
   if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
-    // Supplemental check: output.log mtime within 5s indicates recent activity
+    // Supplemental checks: heartbeat or output.log mtime within 5s indicates
+    // recent activity that may not yet be reflected in the in-process state mirror.
+    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`);
+    const hbStat = await stat(heartbeatPath).catch(() => null);
+    if (hbStat && (Date.now() - hbStat.mtime.getTime()) < 5000) {
+      return 'active';
+    }
     const logPath = join(homedir(), '.panopticon', 'agents', agentId, 'output.log');
     const logStat = await stat(logPath).catch(() => null);
     if (logStat && (Date.now() - logStat.mtime.getTime()) < 5000) {
@@ -492,45 +519,86 @@ export async function fetchActivityDataWithContext(
       }
 
       // Split parallel review sessions into individual reviewer sections (PAN-821)
-      if (ss.type === 'review' && reviewSessions.length > 0) {
-        for (const tmuxName of reviewSessions) {
-          const role = extractReviewerRole(tmuxName, issueId);
-          const reviewerParts = [...transcriptParts];
+      if (ss.type === 'review') {
+        if (reviewSessions.length > 0) {
+          for (const tmuxName of reviewSessions) {
+            const role = extractReviewerRole(tmuxName, issueId);
+            const reviewerParts = [...transcriptParts];
 
-          if (ss.status === 'running') {
-            try {
-              const output = (await capturePaneAsync(tmuxName, 100)).trim();
-              if (output) {
-                reviewerParts.push(`\n--- Live Output ---\n${output}`);
-              }
-            } catch { /* session may not be running */ }
+            if (ss.status === 'running') {
+              try {
+                const output = (await capturePaneAsync(tmuxName, 100)).trim();
+                if (output) {
+                  reviewerParts.push(`\n--- Live Output ---\n${output}`);
+                }
+              } catch { /* session may not be running */ }
+            }
+
+            const reviewerPresence: SessionNodePresence = tmuxSessionNames.has(tmuxName)
+              ? (ss.status === 'running' ? 'active' : 'idle')
+              : 'ended';
+            const reviewerJsonlPath = await resolveJsonlPath(tmuxName, workspacePath);
+
+            // Do NOT expose tmuxSession for reviewer sessions — they are autonomous
+            // specialists and should not be interactively attached (PAN-821 review)
+            sections.push({
+              type: role ? 'reviewer' : 'review',
+              role: role || undefined,
+              sessionId: tmuxName,
+              model: 'specialist',
+              startedAt: ss.startedAt,
+              endedAt: ss.endedAt,
+              duration,
+              status: ss.status,
+              transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
+              presence: reviewerPresence,
+              hasJsonl: !!reviewerJsonlPath,
+            });
           }
-
-          const reviewerPresence: SessionNodePresence = tmuxSessionNames.has(tmuxName)
-            ? (ss.status === 'running' ? 'active' : 'idle')
-            : 'ended';
-          const reviewerJsonlPath = await resolveJsonlPath(tmuxName, workspacePath);
-
-          // Do NOT expose tmuxSession for reviewer sessions — they are autonomous
-          // specialists and should not be interactively attached (PAN-821 review)
-          sections.push({
-            type: role ? 'reviewer' : 'review',
-            role: role || undefined,
-            sessionId: tmuxName,
-            model: 'specialist',
-            startedAt: ss.startedAt,
-            endedAt: ss.endedAt,
-            duration,
-            status: ss.status,
-            transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
-            presence: reviewerPresence,
-            hasJsonl: !!reviewerJsonlPath,
-          });
+        } else {
+          // No live tmux sessions — reconstruct individual reviewer nodes from
+          // persisted review output so ended reviewers remain visible (REQ-8).
+          const persisted = await scanPersistedReviewerRoles(workspacePath, issueId);
+          if (persisted.length > 0) {
+            for (const { sessionId, role } of persisted) {
+              const reviewerParts = [...transcriptParts];
+              const reviewerJsonlPath = await resolveJsonlPath(sessionId, workspacePath);
+              sections.push({
+                type: 'reviewer',
+                role,
+                sessionId,
+                model: 'specialist',
+                startedAt: ss.startedAt,
+                endedAt: ss.endedAt,
+                duration,
+                status: ss.status,
+                transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
+                presence: 'ended',
+                hasJsonl: !!reviewerJsonlPath,
+              });
+            }
+          } else {
+            // No persisted reviewers either — fall back to single review node
+            const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
+            const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
+            sections.push({
+              type: ss.type,
+              sessionId: specialistSessionId,
+              model: 'specialist',
+              startedAt: ss.startedAt,
+              endedAt: ss.endedAt,
+              duration,
+              status: ss.status,
+              transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
+              presence: 'ended',
+              hasJsonl: !!specialistJsonlPath,
+            });
+          }
         }
         continue;
       }
 
-      // Normal handling for non-review types or review without parallel sessions
+      // Normal handling for non-review types
       if (ss.status === 'running') {
         const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
         try {
@@ -1200,28 +1268,34 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
   } catch { /* non-fatal */ }
 
-  const [tmuxResult, closedIssuesResult] = await Promise.allSettled([
-    listSessionNamesAsync(),
-    execAsync('gh issue list --repo eltmon/panopticon-cli --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"'),
-  ]);
-
+  const tmuxResult = await listSessionNamesAsync().catch(() => [] as string[]);
   const tmuxSessions = new Set<string>();
-  if (tmuxResult.status === 'fulfilled') {
-    for (const line of tmuxResult.value) {
-      const trimmed = line.trim();
-      if (trimmed) tmuxSessions.add(trimmed);
+  for (const line of tmuxResult) {
+    const trimmed = line.trim();
+    if (trimmed) tmuxSessions.add(trimmed);
+  }
+
+  // Closed issues change at human cadence — cache for 2 min to avoid ~8,600
+  // gh CLI invocations per day while the projects tab is open.
+  let closedIssues: Array<{ number: number; title: string }> = [];
+  if (closedIssuesCache && (Date.now() - closedIssuesCache.timestamp) < CLOSED_ISSUES_TTL_MS) {
+    closedIssues = closedIssuesCache.data;
+  } else {
+    try {
+      const { stdout } = await execAsync(
+        'gh issue list --repo eltmon/panopticon-cli --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"'
+      );
+      closedIssues = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
+      closedIssuesCache = { timestamp: Date.now(), data: closedIssues };
+    } catch {
+      closedIssuesCache = { timestamp: Date.now(), data: [] };
     }
   }
-  if (closedIssuesResult.status === 'fulfilled') {
-    try {
-      const closedIssues = JSON.parse(closedIssuesResult.value.stdout.trim()) as Array<{ number: number; title: string }>;
-      for (const ci of closedIssues) {
-        const key = `PAN-${ci.number}`;
-        if (!issueTitleMap.has(key) && ci.title) {
-          issueTitleMap.set(key, ci.title.replace(/^PAN-\d+:\s*/i, ''));
-        }
-      }
-    } catch { /* non-fatal */ }
+  for (const ci of closedIssues) {
+    const key = `PAN-${ci.number}`;
+    if (!issueTitleMap.has(key) && ci.title) {
+      issueTitleMap.set(key, ci.title.replace(/^PAN-\d+:\s*/i, ''));
+    }
   }
 
   const projectTree: Array<{

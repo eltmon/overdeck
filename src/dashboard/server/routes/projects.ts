@@ -18,6 +18,7 @@ import { httpHandler } from './http-handler.js';
 import { listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
 
@@ -26,47 +27,6 @@ import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } f
 async function getIssueDataService(): Promise<IssueDataService> {
   const { getSharedIssueService } = await import('../services/issue-service-singleton.js');
   return getSharedIssueService();
-}
-
-// ─── Concurrency limiter ──────────────────────────────────────────────────────
-
-/** Simple semaphore: run at most `max` promises concurrently. */
-export function withConcurrencyLimit<T>(
-  tasks: Array<() => Promise<T>>,
-  max: number,
-): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const results = new Array<T>(tasks.length);
-    let index = 0;
-    let running = 0;
-    let completed = 0;
-    let rejected = false;
-
-    function next() {
-      if (rejected) return;
-      if (completed === tasks.length) {
-        resolve(results);
-        return;
-      }
-      while (running < max && index < tasks.length) {
-        const i = index++;
-        running++;
-        tasks[i]!()
-          .then((val) => {
-            results[i] = val;
-            running--;
-            completed++;
-            next();
-          })
-          .catch((err) => {
-            rejected = true;
-            reject(err);
-          });
-      }
-    }
-
-    next();
-  });
 }
 
 // ─── Async FS helpers ─────────────────────────────────────────────────────────
