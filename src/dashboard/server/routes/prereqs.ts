@@ -21,6 +21,16 @@ import {
   type PrereqTool,
 } from "../../../lib/prereqs/registry.js";
 
+const readJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {};
+  }
+});
+
 // ─── Route: GET /api/prereqs ──────────────────────────────────────────────────
 
 const listPrereqsRoute = HttpRouter.add(
@@ -84,10 +94,7 @@ const installToolRoute = HttpRouter.add(
   "/api/prereqs/install",
   httpHandler(
     Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const body = yield* Effect.promise(() =>
-        request.json().catch(() => ({}))
-      ) as { tool?: string };
+      const body = (yield* readJsonBody) as { tool?: string };
       const tool = body.tool;
 
       if (!tool) {
