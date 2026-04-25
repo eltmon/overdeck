@@ -46,6 +46,7 @@ const AGENT_STATUS_DOT: Record<Agent['status'], string> = {
   dead: 'bg-destructive',
   stopped: 'bg-surface-overlay',
   starting: 'bg-signal-review',
+  running: 'bg-primary',
   failed: 'bg-destructive',
 };
 

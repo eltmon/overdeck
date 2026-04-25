@@ -38,6 +38,7 @@ export function AgentFocusView({ agent, onClose }: FocusViewProps) {
     stuck: 'var(--gv-pink)',
     dead: 'var(--gv-text-dim)',
     stopped: 'var(--gv-text-dim)',
+    running: 'var(--gv-green)',
   };
 
   return (

@@ -78,7 +78,7 @@ export interface Agent {
   issueId?: string;
   runtime: string;
   model: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped' | 'starting' | 'failed';
+  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed';
   error?: string;
   pid?: number;
   startedAt: string;
@@ -153,6 +153,7 @@ export const STATUS_LABELS: Record<string, CanonicalState> = {
   // In Progress states
   'In Progress': 'in_progress',
   'In Planning': 'in_progress',
+  'Planning': 'in_progress',
   'Started': 'in_progress',
   'Active': 'in_progress',
 

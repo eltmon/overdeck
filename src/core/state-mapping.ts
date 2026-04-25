@@ -250,7 +250,6 @@ export const WORKFLOW_LABELS = [
   'planned',
   'planning',
   'done',
-  'closed-out',
   'merged',
   'needs-close-out',
   'wontfix',

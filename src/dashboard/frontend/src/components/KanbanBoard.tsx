@@ -793,10 +793,10 @@ export function ListIssueRow({
   // Get cost for this issue
   const cost = issueCosts[issue.identifier.toLowerCase()];
 
-  // Check for running agents
+  // Check for running agents (exclude planning agents — they don't block the plan button)
   const issueIdLower = issue.identifier.toLowerCase();
   const activeAgent = agents.find(
-    a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
+    a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead' && !a.id?.startsWith('planning-')
   );
   const isRunning = !!activeAgent;
 
@@ -1881,10 +1881,10 @@ function ColumnContent({
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
     const workAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase !== 'planning'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && !a.id?.startsWith('planning-')
     );
     const planningAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase === 'planning'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.id?.startsWith('planning-')
     );
     const issueSpecialists = specialists.filter(
       (s) => s.currentIssue?.toLowerCase() === issueIdLower
@@ -2524,7 +2524,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const isStandby = activeAgent?.status === 'stopped' && activeAgent?.agentPhase === 'review-response';
   const isRunning = activeAgent && activeAgent.status !== 'dead' && (activeAgent.status !== 'stopped' || isStandby);
   // Show "Watch Planning" when planning agent is starting or has a live session
-  const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
+  const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'running' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
 
   // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
   const agent = activeAgent || planningAgent;

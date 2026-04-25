@@ -339,7 +339,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName, issueId: issue.identifier, workspace: workspacePath,
           status: 'failed', error: errorMsg,
-          startedAt: new Date().toISOString(), type: 'planning', location: workspaceLocation,
+          startedAt: new Date().toISOString(), type: 'planning', agentPhase: 'planning', location: workspaceLocation,
         }, null, 2));
         return { success: false, error: errorMsg };
       }
@@ -486,6 +486,7 @@ while true; do sleep 60; done
       status: 'running',
       startedAt: new Date().toISOString(),
       type: 'planning',
+      agentPhase: 'planning',
       location: workspaceLocation,
     }, null, 2));
 
@@ -506,6 +507,7 @@ while true; do sleep 60; done
         error: err.message,
         startedAt: new Date().toISOString(),
         type: 'planning',
+        agentPhase: 'planning',
         location: workspaceLocation,
       }, null, 2));
     } catch { /* ignore state write errors */ }

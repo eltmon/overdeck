@@ -18,6 +18,7 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   stuck: <AlertTriangle className="w-3 h-3" />,
   dead: <XCircle className="w-3 h-3" />,
   stopped: <Minus className="w-3 h-3" />,
+  running: <CheckCircle className="w-3 h-3" />,
 };
 
 const STATUS_GLOW: Record<string, string> = {
@@ -26,6 +27,7 @@ const STATUS_GLOW: Record<string, string> = {
   stuck: 'gv-breathe-stuck',
   dead: 'gv-breathe-dead',
   stopped: 'gv-breathe-dead',
+  running: 'gv-breathe-healthy',
 };
 
 const PHASE_COLORS: Record<string, string> = {
