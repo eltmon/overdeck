@@ -77,6 +77,23 @@ Underneath all five, the chat module's structure has drifted from T3Code's. We b
 - Once a prompt is accepted into the Claude JSONL, the local-only entry reconciles away automatically.
 - This applies equally to the first message of a new conversation and to follow-ups in an existing one.
 
+**Enter-key delivery reliability**
+
+`sendKeysAsync` in `src/lib/tmux.ts` does paste-buffer → dynamic delay (600–3000ms) → `send-keys C-m`. PAN-699 bumped the floor to 600ms but the user has still observed cases where the text reaches the input box and Enter does not submit it. The fixed-delay-then-fire-and-forget pattern is the root cause: there is no observation that the paste actually rendered before Enter arrives, and no verification that Enter actually submitted the input.
+
+Replace the fixed delay with a verification loop:
+
+1. Paste the text via `load-buffer` + `paste-buffer` as today.
+2. Poll `capture-pane` at short intervals (e.g. 50ms) until the pasted text is visible in the input region. Cap at 3s to avoid hangs.
+3. Send `C-m`.
+4. Poll `capture-pane` again to confirm the input region is empty (message submitted) or that the text moved out of the input region.
+5. If the input still contains the pasted text after a bounded retry budget, raise a structured `MessageDeliveryFailed` error with the captured pane state attached. Surface this through the unsent-message outbox so the user sees the failure inline with retry / edit / discard, instead of "Sending…" forever.
+6. Detect "Claude is mid-response" state from the capture (e.g. presence of "Whirring…" or other busy indicators) and route the message through the outbox queue instead of attempting paste-then-Enter, since the TUI buffers text without submitting in that state.
+
+This must apply uniformly to every server-reachable `sendKeysAsync` caller — conversation message delivery, fork message delivery, agent message delivery — not just the conversation route.
+
+Files: `src/lib/tmux.ts` (verification helpers), `src/dashboard/server/routes/conversations.ts` (use new helpers), every other `sendKeysAsync` caller surfaced by `git grep sendKeysAsync src/dashboard/server/`.
+
 **Conversation list — favorite icon position**
 
 - The favorited star (rendered when `conv.isFavorited`) currently lives inline in the meta row alongside `lastAttachedAt` and `totalCost`, so its horizontal position drifts based on which meta items are present. The hover-only "favorite this" star already lives in the right-aligned `.conversationActions` group.
@@ -253,6 +270,7 @@ The goal is that a future T3Code update touching `MessagesTimeline.tsx` can be d
 - Deacon recovers a corrupted-signature session within one patrol cycle; the recovery event is visible in the dashboard.
 - A failed user send remains visible in the conversation with retry / edit / copy / discard controls; reload preserves the failed entry.
 - The favorited star icon in the conversation list sits in the same horizontal position as the hover-only favorite-this star; toggling favorited state does not shift the star left or right.
+- `sendKeysAsync` verifies that pasted text reached the input pane before sending Enter, and verifies that Enter actually submitted the input. Failed deliveries raise `MessageDeliveryFailed` and surface in the unsent-message outbox; no fixed-delay-then-hope path remains.
 - `docs/FORKS.md` and `docs/MISSION-CONTROL.md` are updated; this PRD is referenced from issue #826.
 - `npm run typecheck`, `npm run lint`, and `npm test` pass.
 
