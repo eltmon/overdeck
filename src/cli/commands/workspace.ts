@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
-import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync, chmodSync } from 'fs';
 import { join, basename, resolve } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
@@ -21,6 +21,7 @@ import {
   createWorkspace as createWorkspaceFromConfig,
   removeWorkspace as removeWorkspaceFromConfig,
   addReposToWorkspace,
+  copyPanopticonSettingsToWorkspace,
 } from '../../lib/workspace-manager.js';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
@@ -101,6 +102,7 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
         const mainBeadsDir = join(projectRoot, '.beads');
         if (existsSync(mainBeadsDir)) {
           mkdirSync(beadsDir, { recursive: true });
+          chmodSync(beadsDir, 0o700);
           // Write relative path from workspace .beads/ to main .beads/
           writeFileSync(redirectPath, '../../.beads', 'utf-8');
         }
@@ -129,6 +131,8 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
       const prefix = 'workspace';
       await execAsync(`bd init --prefix ${prefix}`, { cwd: workspacePath, encoding: 'utf-8' });
       await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
+      // Disable beads' auto-export git-add to prevent "git add failed" warnings in worktrees
+      await execAsync('bd config set export.git-add false', { cwd: workspacePath, encoding: 'utf-8' }).catch(() => {});
 
       const title = `${issueId.toUpperCase()}: Implementation`;
       const { stdout } = await execAsync(
@@ -209,6 +213,12 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('Update skills/agents/rules in an existing workspace')
     .option('--force', 'Overwrite user-modified files')
     .action(updateCommand);
+
+  workspace
+    .command('use-config <issueId>')
+    .description('Copy installed Panopticon config into workspace (makes it user settings)')
+    .option('--project <path>', 'Explicit project path (overrides registry)')
+    .action(useConfigCommand);
 
   workspace
     .command('add-repo <workspaceId> <repoNames...>')
@@ -1381,6 +1391,65 @@ async function destroyRemoteWorkspace(
     if (!options.force) {
       console.log(chalk.dim('  Tip: Use --force to forcefully clean up'));
     }
+    process.exit(1);
+  }
+}
+
+interface UseConfigOptions {
+  project?: string;
+}
+
+async function useConfigCommand(issueId: string, options: UseConfigOptions): Promise<void> {
+  const spinner = ora('Copying Panopticon config to workspace...').start();
+
+  try {
+    const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const folderName = `feature-${normalizedId}`;
+
+    // Resolve workspace path
+    let workspacePath: string;
+
+    if (options.project) {
+      const workspacesDir = join(options.project, 'workspaces');
+      workspacePath = join(workspacesDir, folderName);
+    } else {
+      const teamPrefix = extractTeamPrefix(issueId);
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+      if (projectConfig) {
+        const workspacesDir = join(projectConfig.path, projectConfig.workspace?.workspaces_dir || 'workspaces');
+        workspacePath = join(workspacesDir, folderName);
+      } else {
+        workspacePath = join(process.cwd(), 'workspaces', folderName);
+      }
+    }
+
+    if (!existsSync(workspacePath)) {
+      spinner.fail(`Workspace not found: ${workspacePath}`);
+      process.exit(1);
+    }
+
+    spinner.text = 'Copying config...';
+    const result = copyPanopticonSettingsToWorkspace(workspacePath);
+
+    if (result.errors.length > 0) {
+      spinner.warn('Config copied with errors');
+      for (const error of result.errors) {
+        console.log(chalk.yellow(`  ⚠ ${error}`));
+      }
+    } else {
+      spinner.succeed('Panopticon config copied to workspace');
+    }
+
+    if (result.copied.length > 0) {
+      console.log(chalk.dim('  Copied:'));
+      for (const file of result.copied) {
+        console.log(chalk.dim(`    • ${file}`));
+      }
+    }
+
+  } catch (error: any) {
+    spinner.fail(`Failed to copy config: ${error.message}`);
     process.exit(1);
   }
 }
