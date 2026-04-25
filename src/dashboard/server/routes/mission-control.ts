@@ -179,7 +179,7 @@ const getMissionControlActivityRoute = HttpRouter.add(
   })),
 );
 
-async function fetchActivityData(issueId: string): Promise<unknown> {
+export async function fetchActivityData(issueId: string): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
