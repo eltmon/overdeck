@@ -459,10 +459,7 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
   }
 
-  const extension = safeUploadExtension(filename, mimeType);
-  if (!extension) {
-    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
-  }
+  const extension = safeUploadExtension(filename, mimeType)!;
 
   // Re-verify conversation exists before writing — it may have been deleted or
   // archived during the async validation above.

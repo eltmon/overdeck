@@ -313,7 +313,7 @@ async function resolveForContainment(attachmentPath: string): Promise<string> {
 
 export async function isManagedConversationAttachmentPath(attachmentPath: string): Promise<boolean> {
   try {
-    const attachmentsRoot = resolve(getConversationAttachmentsRoot());
+    const attachmentsRoot = await realpath(getConversationAttachmentsRoot());
     const candidate = await resolveForContainment(attachmentPath);
     return candidate.startsWith(`${attachmentsRoot}/`);
   } catch {
@@ -333,7 +333,7 @@ export async function isConversationAttachmentPath(name: string, attachmentPath:
 
 export async function hasConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {
   try {
-    const attachmentDir = resolve(getConversationAttachmentDir(name));
+    const attachmentDir = await realpath(getConversationAttachmentDir(name));
     const candidate = await resolveForContainment(attachmentPath);
     if (!candidate.startsWith(`${attachmentDir}/`)) {
       return false;

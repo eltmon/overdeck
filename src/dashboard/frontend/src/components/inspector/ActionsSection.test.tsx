@@ -254,12 +254,6 @@ describe('ActionsSection', () => {
     expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
   });
 
-  it('shows Merge button when ready for merge', () => {
-    const reviewStatus = makeReviewStatus({ readyForMerge: true });
-    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
-    expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
-  });
-
   it('shows Merged badge when mergeStatus is merged', () => {
     const reviewStatus = makeReviewStatus({ mergeStatus: 'merged' });
     renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);

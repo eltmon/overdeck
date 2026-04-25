@@ -295,11 +295,11 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (sending) return;
+    if (sending || !conversation.sessionAlive) return;
     const imageFiles = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
     enqueueImages(imageFiles);
-  }, [enqueueImages, sending]);
+  }, [enqueueImages, sending, conversation.sessionAlive]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (Array.from(event.dataTransfer.items).some((item) => item.type.startsWith('image/'))) {
