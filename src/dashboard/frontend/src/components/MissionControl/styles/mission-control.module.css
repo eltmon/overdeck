@@ -476,6 +476,123 @@
   margin-left: 2px;
 }
 
+/* Session Panel */
+.sessionPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sessionPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mc-space-2) var(--mc-space-3);
+  border-bottom: 1px solid var(--mc-border);
+  background: var(--mc-bg-secondary);
+  flex-shrink: 0;
+}
+
+.sessionPanelInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  min-width: 0;
+}
+
+.sessionPanelType {
+  font-size: 10px;
+  text-transform: lowercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+}
+
+.sessionPanelPresence {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sessionPanelModel {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionPanelDuration {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
+  flex-shrink: 0;
+}
+
+.sessionPanelToggle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sessionPanelToggleBtn {
+  padding: 2px 10px;
+  font-size: 10px;
+  border: none;
+  background: var(--mc-bg-main);
+  color: var(--mc-text-muted);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.sessionPanelToggleBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
+.sessionPanelToggleBtnActive {
+  background: var(--mc-accent);
+  color: #fff;
+}
+
+.sessionPanelToggleBtnActive:hover {
+  background: var(--mc-accent-hover);
+  color: #fff;
+}
+
+.sessionPanelContent {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sessionPanelTranscript {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--mc-space-3);
+}
+
+.sessionPanelEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mc-text-muted);
+  font-size: var(--mc-font-size-sm);
+}
+
 /* Session Node (child of FeatureItem) */
 .sessionNode {
   display: flex;
