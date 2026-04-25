@@ -15,6 +15,7 @@ import { ReadModelService } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
 import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
+import { sessionFilePath } from '../../lib/paths.js';
 import type { ConversationEvent, DomainEvent } from '@panopticon/contracts';
 import type { StoredEvent } from './event-store.js';
 
@@ -111,12 +112,14 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Effect.gen(function* () {
             const conv = getConversationByName(input.conversationName);
 
-            if (!conv || !conv.sessionFile) {
+            const sessionFile = conv?.claudeSessionId
+              ? sessionFilePath(conv.cwd, conv.claudeSessionId)
+              : conv?.sessionFile ?? null;
+
+            if (!sessionFile) {
               // Session file not yet discovered — emit a single discovering event
               return Stream.make<ConversationEvent>({ kind: 'discovering' });
             }
-
-            const sessionFile = conv.sessionFile;
 
             return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
               Effect.acquireRelease(

@@ -149,7 +149,7 @@ describe('conversations route — DB integration', () => {
       name: 'source-conv',
       tmuxSession: 'conv-source-conv',
       cwd,
-      sessionFile,
+      claudeSessionId: sessionId,
       title: 'Original conversation',
       effort: 'medium',
     });

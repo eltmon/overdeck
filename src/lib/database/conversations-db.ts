@@ -21,8 +21,10 @@ export interface Conversation {
   createdAt: string;
   endedAt: string | null;
   lastAttachedAt: string | null;
-  /** Absolute path to the Claude Code JSONL session file. Null until discovered (PAN-451). */
+  /** @deprecated Kept for legacy rows — use claudeSessionId + sessionFilePath() instead. */
   sessionFile: string | null;
+  /** Claude Code session UUID. Immutable for the lifetime of the conversation. */
+  claudeSessionId: string | null;
   /** Human-readable title, auto-set from first message content. Null until first message sent. */
   title: string | null;
   /** How the title was set: 'auto' (truncated message), 'ai' (Claude-generated), 'manual' (user renamed). */
@@ -57,6 +59,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     endedAt: (row['ended_at'] as string | null) ?? null,
     lastAttachedAt: (row['last_attached_at'] as string | null) ?? null,
     sessionFile: (row['session_file'] as string | null) ?? null,
+    claudeSessionId: (row['claude_session_id'] as string | null) ?? null,
     title: (row['title'] as string | null) ?? null,
     titleSource: (row['title_source'] as TitleSource | null) ?? null,
     titleSeed: (row['title_seed'] as string | null) ?? null,
@@ -76,7 +79,7 @@ export function listConversations(): Conversation[] {
   const rows = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title,
+              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -92,7 +95,7 @@ export function getConversationByName(name: string): Conversation | null {
   const row = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title,
+              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -107,7 +110,7 @@ export function getConversationById(id: number): Conversation | null {
   const row = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title,
+              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -122,7 +125,7 @@ export function listArchivedConversations(): Conversation[] {
   const rows = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title,
+              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -140,7 +143,7 @@ export function createConversation(opts: {
   tmuxSession: string;
   cwd: string;
   issueId?: string;
-  sessionFile?: string;
+  claudeSessionId?: string;
   title?: string;
   titleSource?: TitleSource;
   titleSeed?: string;
@@ -152,7 +155,7 @@ export function createConversation(opts: {
   const now = new Date().toISOString();
   const result = db
     .prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file, title, title_source, title_seed, model, effort, fork_status)
+      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status)
        VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
@@ -161,7 +164,7 @@ export function createConversation(opts: {
       opts.cwd,
       opts.issueId ?? null,
       now,
-      opts.sessionFile ?? null,
+      opts.claudeSessionId ?? null,
       opts.title ?? null,
       opts.titleSource ?? null,
       opts.titleSeed ?? null,
@@ -172,9 +175,8 @@ export function createConversation(opts: {
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title,
+              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error,
               fork_status, fork_error
        FROM conversations WHERE id = ?`,
     )
@@ -209,14 +211,6 @@ export function markAllEndedOnStartup(): void {
   db.prepare(
     `UPDATE conversations SET status = 'ended', ended_at = ? WHERE status = 'active'`,
   ).run(new Date().toISOString());
-}
-
-/** Store the discovered JSONL session file path for a conversation (PAN-451). */
-export function updateSessionFile(name: string, sessionFilePath: string): void {
-  const db = getDatabase();
-  db.prepare(
-    `UPDATE conversations SET session_file = ? WHERE name = ?`,
-  ).run(sessionFilePath, name);
 }
 
 /** Set the human-readable title for a conversation. */
