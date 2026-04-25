@@ -51,8 +51,8 @@ const execAsync = promisify(exec);
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
-function getIssueDataService(): IssueDataService {
-  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
+async function getIssueDataService(): Promise<IssueDataService> {
+  const { getSharedIssueService } = await import('../services/issue-service-singleton.js');
   return getSharedIssueService();
 }
 
@@ -222,9 +222,12 @@ export async function fetchActivityDataWithContext(
 
   const sections: Array<{
     type: string;
+    role?: string;
     sessionId: string;
+    tmuxSession?: string;
     model: string;
     startedAt: string;
+    endedAt?: string;
     duration: number | null;
     status: string;
     transcript?: string;
@@ -706,7 +709,7 @@ async function generateStatusReview(issueId: string): Promise<
 
   let issueContext = '';
   try {
-    const issueDataService = getIssueDataService();
+    const issueDataService = await getIssueDataService();
     const allIssues = issueDataService.getIssues();
     const issue = allIssues.find((i: Record<string, unknown>) =>
       i['identifier'] === issueId || (i['identifier'] as string)?.toLowerCase() === issueId.toLowerCase()
@@ -1037,8 +1040,11 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     } else if (tracker === 'rally') {
       try {
-        const issueDataService = getIssueDataService();
-        const allIssues = issueDataService.getIssues() as Record<string, unknown>[];
+        const issueDataService = yield* Effect.tryPromise({
+          try: () => getIssueDataService(),
+          catch: () => null,
+        });
+        const allIssues = (issueDataService?.getIssues() ?? []) as Record<string, unknown>[];
         const parentFeature = allIssues.find((i) => i['source'] === 'rally' && i['identifier'] === issueId);
         const childStories = allIssues.filter((i) => i['source'] === 'rally' && i['parentRef'] === issueId);
 
@@ -1137,7 +1143,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
   const issueStateMap = new Map<string, string>();
   let allIssues: Array<Record<string, unknown>> = [];
   try {
-    const issueDataService = getIssueDataService();
+    const issueDataService = await getIssueDataService();
     allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
     for (const issue of allIssues) {
       const id = issue['identifier'] as string | undefined;
