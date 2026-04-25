@@ -4,8 +4,11 @@
  * Covers:
  *  - clean workspace returns []
  *  - failures from multiple checks are aggregated
- *  - auto-commit of .planning/ is attempted before and after vBRIEF sync
+ *  - no commits issued (pure validator)
  *  - bead sync (bd list --status closed) is called before checkVBriefACStatus
+ *
+ * SUT uses execFile for bd (avoids shell injection of issueId) and exec for git.
+ * Both are mocked separately.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -14,12 +17,13 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 const mockExecFn = vi.fn();
+const mockExecFileFn = vi.fn();
 const mockGetVBriefACStatus = vi.fn();
 const mockSyncBeadStatusToVBrief = vi.fn();
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: mockExecFn };
+  return { ...actual, exec: mockExecFn, execFile: mockExecFileFn };
 });
 
 vi.mock('../../../src/lib/vbrief/beads.js', () => ({
@@ -33,6 +37,7 @@ describe('runPreflightChecks', () => {
   beforeEach(() => {
     vi.resetModules();
     mockExecFn.mockReset();
+    mockExecFileFn.mockReset();
     mockGetVBriefACStatus.mockReset();
     mockSyncBeadStatusToVBrief.mockReset();
 
@@ -46,22 +51,13 @@ describe('runPreflightChecks', () => {
   });
 
   it('returns [] when all checks pass (clean workspace, no open beads, AC complete)', async () => {
-    // All exec calls succeed with "pass" results:
-    // 1. git status --porcelain .planning/ → empty (no dirty planning files to auto-commit)
-    // 2. bd list --status open → [] (no open beads)
-    // 3. git status --porcelain → empty (clean workspace)
-    // 4. bd list --status closed → [] (no closed beads to sync)
-    // 5. git status --porcelain .planning/ → empty (no dirty planning after sync)
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      cb(null, { stdout: '[]', stderr: '' }); // '[]' is valid JSON for bd calls; empty for git
+    // bd list (open + closed) → []
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '[]', stderr: '' });
     });
-    // Override git status to return empty
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      if (cmd.includes('bd list')) {
-        cb(null, { stdout: '[]', stderr: '' });
-      } else {
-        cb(null, { stdout: '', stderr: '' }); // git commands: empty = clean
-      }
+    // git status → empty (clean)
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null); // no vBRIEF plan
 
@@ -71,17 +67,19 @@ describe('runPreflightChecks', () => {
   });
 
   it('aggregates failures from open beads AND uncommitted changes', async () => {
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      if (cmd.includes('--status open')) {
-        // Return one open bead
+    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
+      if (args.includes('open')) {
         cb(null, { stdout: JSON.stringify([{ id: 'bead-aaa', title: 'Unfinished work' }]), stderr: '' });
-      } else if (cmd.includes('git status --porcelain') && !cmd.includes('.planning/')) {
-        // Uncommitted changes
-        cb(null, { stdout: ' M dirty.ts\n', stderr: '' });
-      } else if (cmd.includes('--status closed')) {
-        cb(null, { stdout: '[]', stderr: '' });
       } else {
-        cb(null, { stdout: '', stderr: '' }); // .planning/ status: clean
+        // closed beads
+        cb(null, { stdout: '[]', stderr: '' });
+      }
+    });
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      if (cmd.includes('git status --porcelain')) {
+        cb(null, { stdout: ' M dirty.ts\n', stderr: '' });
+      } else {
+        cb(null, { stdout: '', stderr: '' });
       }
     });
     mockGetVBriefACStatus.mockReturnValue(null);
@@ -89,7 +87,6 @@ describe('runPreflightChecks', () => {
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     const result = await runPreflightChecks(tempDir, 'PAN-714');
 
-    // Should contain both bead failure lines AND git failure lines
     expect(result.some((l) => l.includes('Open beads'))).toBe(true);
     expect(result.some((l) => l.includes('bead-aaa'))).toBe(true);
     expect(result.some((l) => l.includes('Uncommitted changes'))).toBe(true);
@@ -100,39 +97,35 @@ describe('runPreflightChecks', () => {
     const capturedCmds: string[] = [];
     mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
       capturedCmds.push(cmd);
-      if (cmd.includes('bd list')) {
-        cb(null, { stdout: '[]', stderr: '' });
-      } else {
-        cb(null, { stdout: '', stderr: '' });
-      }
+      cb(null, { stdout: '', stderr: '' });
+    });
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '[]', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null);
 
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await runPreflightChecks(tempDir, 'PAN-714');
 
-    // runPreflightChecks must not write any commits — it is a pure validator
     expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(false);
     expect(capturedCmds.some((c) => c.includes('git add'))).toBe(false);
   });
 
   it('calls bd list --status closed to sync beads to vBRIEF before AC check', async () => {
-    const capturedCmds: string[] = [];
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      capturedCmds.push(cmd);
-      if (cmd.includes('bd list')) {
-        cb(null, { stdout: '[]', stderr: '' });
-      } else {
-        cb(null, { stdout: '', stderr: '' });
-      }
+    const capturedArgs: string[][] = [];
+    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
+      capturedArgs.push(args);
+      cb(null, { stdout: '[]', stderr: '' });
+    });
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null);
 
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await runPreflightChecks(tempDir, 'PAN-714');
 
-    expect(capturedCmds.some((c) => c.includes('--status closed'))).toBe(true);
-    // syncBeadStatusToVBrief is called for each closed bead (none here, but the call was attempted)
+    expect(capturedArgs.some((args) => args.includes('closed'))).toBe(true);
   });
 
   it('calls syncBeadStatusToVBrief for each closed bead', async () => {
@@ -140,14 +133,16 @@ describe('runPreflightChecks', () => {
       { id: 'bead-c1', title: 'Task one' },
       { id: 'bead-c2', title: 'Task two' },
     ];
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      if (cmd.includes('--status closed')) {
+    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
+      if (args.includes('closed')) {
         cb(null, { stdout: JSON.stringify(closedBeads), stderr: '' });
-      } else if (cmd.includes('bd list')) {
-        cb(null, { stdout: '[]', stderr: '' });
       } else {
-        cb(null, { stdout: '', stderr: '' });
+        // open beads
+        cb(null, { stdout: '[]', stderr: '' });
       }
+    });
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null);
     mockSyncBeadStatusToVBrief.mockReturnValue('item-1');
