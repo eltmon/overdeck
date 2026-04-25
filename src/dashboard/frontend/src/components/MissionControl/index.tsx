@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient, useQueries } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
@@ -13,6 +13,9 @@ import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
 import type { Agent, Issue } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
+import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { WS_METHODS } from '@panopticon/contracts';
+import type { ProjectSessionTree, SessionTreeDelta } from '@panopticon/contracts';
 import styles from './styles/mission-control.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -50,6 +53,61 @@ async function fetchVersion(): Promise<{ version: string }> {
   return res.json();
 }
 
+async function fetchProjectSessionTree(projectKey: string): Promise<ProjectSessionTree> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/session-tree`);
+  if (!res.ok) throw new Error(`Failed to fetch session tree for ${projectKey}`);
+  return res.json();
+}
+
+/** Apply a live delta to a cached ProjectSessionTree. Returns a new object or undefined if not applicable. */
+function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta): ProjectSessionTree {
+  const feature = tree.features.find(f => f.issueId === delta.issueId);
+  if (!feature) return tree;
+
+  switch (delta.kind) {
+    case 'session_added': {
+      // Lightweight delta — invalidate to trigger refetch
+      return tree;
+    }
+    case 'session_removed': {
+      const filtered = feature.sessions.filter(s => s.sessionId !== delta.sessionId);
+      if (filtered.length === feature.sessions.length) return tree;
+      return {
+        ...tree,
+        features: tree.features.map(f =>
+          f.issueId === delta.issueId ? { ...f, sessions: filtered } : f,
+        ),
+      };
+    }
+    case 'presence_changed':
+    case 'status_changed': {
+      const session = feature.sessions.find(s => s.sessionId === delta.sessionId);
+      if (!session) return tree;
+      return {
+        ...tree,
+        features: tree.features.map(f =>
+          f.issueId === delta.issueId
+            ? {
+                ...f,
+                sessions: f.sessions.map(s =>
+                  s.sessionId === delta.sessionId
+                    ? {
+                        ...s,
+                        ...(delta.presence !== undefined && { presence: delta.presence }),
+                        ...(delta.status !== undefined && { status: delta.status }),
+                      }
+                    : s,
+                ),
+              }
+            : f,
+        ),
+      };
+    }
+    default:
+      return tree;
+  }
+}
+
 interface MissionControlProps {
   issues?: Issue[];
   /** Deep-link conversation ID — selects this conversation on mount */
@@ -70,6 +128,7 @@ export function MissionControl({
   onConversationViewModeChange,
 }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
@@ -85,6 +144,7 @@ export function MissionControl({
   const startX = useRef(0);
   const startWidth = useRef(0);
   const currentWidth = useRef(sidebarWidth);
+  const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['command-deck-projects'],
@@ -104,6 +164,82 @@ export function MissionControl({
     queryFn: fetchVersion,
     staleTime: Infinity,
   });
+
+  // ── Session Tree (PAN-821) ───────────────────────────────────────────────────
+  // Fetch session trees for all projects when in projects tab
+  const sessionTreeQueries = useQueries({
+    queries: projects.map(project => ({
+      queryKey: ['session-tree', project.name],
+      queryFn: () => fetchProjectSessionTree(project.name),
+      enabled: sidebarTab === 'projects',
+      refetchInterval: 10000,
+    })),
+  });
+
+  const sessionTreeMap = useMemo(() => {
+    const map: Record<string, ProjectSessionTree> = {};
+    for (const query of sessionTreeQueries) {
+      if (query.data) {
+        map[query.data.projectKey] = query.data;
+      }
+    }
+    return map;
+  }, [sessionTreeQueries]);
+
+  // Subscribe to live session tree deltas for each project
+  useEffect(() => {
+    if (sidebarTab !== 'projects') return;
+    const transport = getTransport();
+    const unsubscribes: Array<() => void> = [];
+
+    for (const project of projects) {
+      const unsubscribe = transport.subscribe(
+        (client) =>
+          (client as PanRpcProtocolClient)[WS_METHODS.subscribeProjectSessionTree]({
+            projectKey: project.name,
+          }) as unknown as import('effect').Stream.Stream<SessionTreeDelta, Error>,
+        (delta) => {
+          const tree = queryClient.getQueryData<ProjectSessionTree>(['session-tree', project.name]);
+          if (!tree) return;
+          if (delta.kind === 'session_added') {
+            // Lightweight delta — refetch to get full session data
+            queryClient.invalidateQueries({ queryKey: ['session-tree', project.name] });
+          } else {
+            const updated = applySessionTreeDelta(tree, delta);
+            queryClient.setQueryData(['session-tree', project.name], updated);
+          }
+        },
+      );
+      unsubscribes.push(unsubscribe);
+    }
+
+    return () => {
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+    };
+  }, [sidebarTab, projects, queryClient]);
+
+  // Merge session trees into project features
+  const projectsWithSessions = useMemo(() => {
+    return projects.map(project => {
+      const tree = sessionTreeMap[project.name];
+      if (!tree) return project;
+
+      const featureSessions = new Map<string, import('@panopticon/contracts').SessionNode[]>();
+      for (const feature of tree.features) {
+        featureSessions.set(feature.issueId.toLowerCase(), [...feature.sessions]);
+      }
+
+      return {
+        ...project,
+        features: project.features.map((feature: ProjectFeature) => ({
+          ...feature,
+          sessions: featureSessions.get(feature.issueId.toLowerCase()) ?? feature.sessions,
+        })),
+      };
+    });
+  }, [projects, sessionTreeMap]);
 
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
@@ -174,6 +310,14 @@ export function MissionControl({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
+    setSelectedSessionId(null);
+    setSelectedConversation(null);
+    setIsDraft(false);
+  }, []);
+
+  const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
+    setSelectedFeature(issueId);
+    setSelectedSessionId(sessionId);
     setSelectedConversation(null);
     setIsDraft(false);
   }, []);
@@ -194,8 +338,6 @@ export function MissionControl({
     setSelectedFeature(null);
     setSidebarTab('conversations');
   }, []);
-
-  const queryClient = useQueryClient();
 
   const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
     setDraftKey(0);
@@ -336,13 +478,15 @@ export function MissionControl({
             ) : projects.length === 0 ? (
               <div className={styles.emptyProject}>No projects configured</div>
             ) : (
-              projects.map(project => (
+              projectsWithSessions.map(project => (
                 <ProjectNode
                   key={project.path}
                   name={project.name}
                   features={project.features}
                   selectedFeature={selectedFeature}
                   onSelectFeature={handleSelectFeature}
+                  selectedSessionId={selectedSessionId}
+                  onSelectSession={handleSelectSession}
                   issueTitles={issueTitles}
                   issueCosts={issueCosts}
                 />
