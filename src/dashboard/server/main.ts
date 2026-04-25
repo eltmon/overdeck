@@ -169,22 +169,6 @@ emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck 
 } }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
-// Startup label-cleanup sweep (PAN-676/PAN-670) DISABLED — the five repair
-// functions had no idempotency check and re-wrote GitHub labels on every
-// merged issue every boot, hitting the GitHub API ~5×(#merged) times per
-// startup. Every merged issue's timeline was accumulating label-change
-// events on each dashboard restart.
-//
-// Re-enable only after each repairXxx() learns to read current state before
-// writing and skips issues that are already correct.
-//
-// import('../../lib/lifecycle/label-cleanup.js').then(({ repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle, repairClosedWontfixIssues, repairClosedPRs }) => {
-//   repairMergedLabels().catch(err => console.warn('[panopticon] repairMergedLabels failed:', err));
-//   repairAlreadyMergedPRs().catch(err => console.warn('[panopticon] repairAlreadyMergedPRs failed:', err));
-//   repairIncompletePostMergeLifecycle().catch(err => console.warn('[panopticon] repairIncompletePostMergeLifecycle failed:', err));
-//   repairClosedWontfixIssues().catch(err => console.warn('[panopticon] repairClosedWontfixIssues failed:', err));
-//   repairClosedPRs().catch(err => console.warn('[panopticon] repairClosedPRs failed:', err));
-// });
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
