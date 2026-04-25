@@ -602,10 +602,11 @@ program
 
     // Kill any existing dashboard processes before starting a new one.
     // This prevents EADDRINUSE when pan up is run while a dashboard is already running.
-    // Uses SIGTERM (default) so the old instance can clean up gracefully.
+    // Uses fuser instead of lsof | xargs kill — busybox lsof on Alpine ignores -t/-i
+    // and lists ALL processes, which xargs then tries to kill (including PID 1).
     try {
-      execSync(`lsof -ti:${dashboardPort} 2>/dev/null | xargs -r kill 2>/dev/null || true`, { stdio: 'pipe' });
-      execSync(`lsof -ti:${dashboardApiPort} 2>/dev/null | xargs -r kill 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`fuser -k -TERM ${dashboardPort}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`fuser -k -TERM ${dashboardApiPort}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
     } catch {
       // No existing processes — that's fine
     }
@@ -614,8 +615,7 @@ program
       const start = Date.now();
       while (Date.now() - start < timeoutMs) {
         try {
-          const pids = execSync(`lsof -ti:${port} 2>/dev/null || true`, { encoding: 'utf8', stdio: 'pipe' }).trim();
-          if (!pids) return;
+          execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${port}'`, { encoding: 'utf8', stdio: 'pipe', timeout: 1000 });
         } catch {
           return;
         }
