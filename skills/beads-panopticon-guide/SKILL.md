@@ -108,6 +108,17 @@ bd list --id PAN-116
 bd list --id panopticon-abc,panopticon-xyz
 ```
 
+## Invalid Commands (NEVER use these)
+
+The following commands do NOT exist. Agents frequently hallucinate them:
+
+| Invalid Command | Correct Replacement |
+|-----------------|---------------------|
+| `bd claim <id>` | `bd update <id> --claim` |
+| `bd start <id>` | `bd update <id> --status in_progress` |
+| `bd move <id>` | `bd update <id>` (with relevant flags) |
+| `bd refile <id>` | `bd update <id>` (with relevant flags) |
+
 ## Quick Cheat Sheet
 
 | Task | Command |
