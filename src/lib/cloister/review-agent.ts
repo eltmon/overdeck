@@ -225,6 +225,19 @@ function parseAgentOutput(output: string): ReviewResult {
  * Exported for testing so the resubmit command contract can be verified.
  */
 export function buildReviewFeedbackBody(issueId: string, result: ReviewResult): string {
+  const actionBlock = result.reviewResult === 'CHANGES_REQUESTED'
+    ? `\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.\n`
+    : result.reviewResult === 'APPROVED'
+      ? `\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run \`pan done\` again.**\n**Do NOT run \`pan review request\`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n`
+      : '';
+
+  if (result.output) {
+    const synthesisBody = result.output
+      .replace(/\n(?=(?:REVIEW_RESULT|FILES_REVIEWED|SECURITY_ISSUES|PERFORMANCE_ISSUES|NOTES):)[^\n]*/g, '')
+      .trim();
+    return synthesisBody + '\n' + actionBlock;
+  }
+
   let body = `# Review: ${result.reviewResult}\n\n`;
   body += `## Summary\n\n${result.notes || 'No details provided.'}\n`;
 
@@ -236,12 +249,7 @@ export function buildReviewFeedbackBody(issueId: string, result: ReviewResult): 
     body += `\n## Performance Issues\n\n${result.performanceIssues.map(i => `- ${i}`).join('\n')}\n`;
   }
 
-  if (result.reviewResult === 'CHANGES_REQUESTED') {
-    body += `\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.\n`;
-  } else if (result.reviewResult === 'APPROVED') {
-    body += `\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run \`pan done\` again.**\n**Do NOT run \`pan review request\`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n`;
-  }
-
+  body += actionBlock;
   return body;
 }
 
@@ -481,6 +489,9 @@ async function spawnReviewer(
     '#!/bin/bash',
     'set -o pipefail',
     `cd "${packageRoot}"`,
+    // Prevent inherited Panopticon env from attributing review sub-agent heartbeats
+    // and session IDs to the parent work agent (PAN-XXX).
+    'unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE',
     providerExports.trimEnd(),
     `exec ${claudeCmd}`,
     '',
@@ -490,7 +501,13 @@ async function spawnReviewer(
   console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, launcher=${launcherPath}`);
   console.log(`[review-agent] Launcher content:\n${launcherContent}`);
 
-  await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`);
+  await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
+    env: {
+      PANOPTICON_AGENT_ID: '',
+      PANOPTICON_ISSUE_ID: '',
+      PANOPTICON_SESSION_TYPE: '',
+    },
+  });
 
   // Pipe all pane output to a log file so connection errors and Claude output are
   // captured even after the session exits.
@@ -591,7 +608,7 @@ export function selectCompletedReviewers(
  * Resolve the prompt template path for a review agent.
  *
  * Reviewer/synthesis prompts are primitives — they live at
- * `.claude/prompts/<promptName>.prompt-template.md` in the Panopticon repo,
+ * `src/lib/cloister/prompts/review/<promptName>.prompt-template.md` in the Panopticon repo,
  * synced to `CACHE_REVIEW_PROMPTS_DIR` (~/.panopticon/review-prompts/).
  *
  * Falls back to the legacy location (`CACHE_AGENTS_DIR` with `.md` suffix) for
@@ -783,7 +800,6 @@ export async function runParallelReview(
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
   const result = await parseSynthesisFn(outputDir, agents);
-  result.output = `Review ${reviewId}`;
 
   await postReviewFn(context, result, outputDir);
 
@@ -1014,7 +1030,13 @@ export async function spawnReviewCoordinatorSession(opts: {
   // We wrap in `bash -lc` so PATH and nvm init run; `|| true` on exit so tmux
   // does not retain the session with a non-zero exit (keeps teardown clean).
   const command = `bash -lc 'pan review run ${opts.issueId} || true; exit'`;
-  await createSessionAsync(sessionName, opts.workspace, command);
+  await createSessionAsync(sessionName, opts.workspace, command, {
+    env: {
+      PANOPTICON_AGENT_ID: '',
+      PANOPTICON_ISSUE_ID: '',
+      PANOPTICON_SESSION_TYPE: '',
+    },
+  });
   return { sessionName };
 }
 

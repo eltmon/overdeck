@@ -188,7 +188,6 @@ describe('buildReviewFeedbackBody', () => {
 
   it('CHANGES_REQUESTED body instructs agent to use pan done (not a curl URL)', () => {
     const body = buildReviewFeedbackBody('PAN-999', changesRequested);
-    // Must reference pan done / rebase-and-submit skill
     expect(body).toMatch(/pan done|rebase-and-submit/);
   });
 
@@ -210,6 +209,31 @@ describe('buildReviewFeedbackBody', () => {
     expect(body).toContain('CODE APPROVED');
     expect(body).toContain('Do NOT run `pan done` again');
     expect(body).toContain('Do NOT run `pan review request`');
+  });
+
+  it('uses full synthesis output when available, stripping tail markers', () => {
+    const withOutput: ReviewResult = {
+      success: true,
+      reviewResult: 'CHANGES_REQUESTED',
+      notes: 'Short summary.',
+      output: '# Verdict: CHANGES_REQUESTED\n\n## Blockers\n\n### 1. Missing CSRF guard\nFix: add validateOrigin()\n\nREVIEW_RESULT: CHANGES_REQUESTED\nNOTES: Short summary.\nFILES_REVIEWED: foo.ts,bar.ts\nSECURITY_ISSUES: Missing CSRF guard',
+    };
+    const body = buildReviewFeedbackBody('PAN-999', withOutput);
+    // Full synthesis body is present
+    expect(body).toContain('## Blockers');
+    expect(body).toContain('Missing CSRF guard');
+    expect(body).toContain('add validateOrigin()');
+    // Tail markers are stripped
+    expect(body).not.toContain('REVIEW_RESULT:');
+    expect(body).not.toContain('FILES_REVIEWED:');
+    // Action block is appended
+    expect(body).toMatch(/rebase-and-submit/);
+  });
+
+  it('falls back to tail-marker reconstruction when output is absent', () => {
+    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
+    expect(body).toContain('# Review: CHANGES_REQUESTED');
+    expect(body).toContain('Fix the linting issues.');
   });
 });
 
@@ -1001,8 +1025,12 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Must NOT pass env via tmux -e flags (old pattern that fails for Anthropic models)
-    expect(fn).not.toMatch(/\{\s*env\s*:/);
+    // Must NOT pass provider env via tmux -e flags (old pattern that fails for Anthropic models).
+    // Panopticon identity vars may be passed as empty strings to prevent inherited env leakage.
     expect(fn).not.toContain('getProviderEnvForModel(');
+    const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
+    if (envMatch) {
+      expect(envMatch[0]).not.toMatch(/ANTHROPIC_BASE_URL|OPENAI_API_KEY|providerEnv/);
+    }
   });
 });

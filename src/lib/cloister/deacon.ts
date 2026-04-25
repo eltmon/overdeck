@@ -2517,7 +2517,23 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
     const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
 
     // 3. Filter out protected PIDs (agent tmux panes and descendants)
-    const safePids = pids.filter(p => !protectedPids.has(p));
+    //    AND Docker container processes — they have files open via volume mounts
+    //    but are legitimate; killing them causes container exit → restart loop.
+    const { readFile } = await import('fs/promises');
+    const isDockerContainerProcess = async (pid: string): Promise<boolean> => {
+      try {
+        const cgroup = await readFile(`/proc/${pid}/cgroup`, 'utf-8');
+        return cgroup.includes('/docker-') || cgroup.includes('/docker/');
+      } catch {
+        return false;
+      }
+    };
+    const safePids: string[] = [];
+    for (const pid of pids) {
+      if (protectedPids.has(pid)) continue;
+      if (await isDockerContainerProcess(pid)) continue;
+      safePids.push(pid);
+    }
 
     if (safePids.length > 0) {
       await execAsync(`kill ${safePids.join(' ')} 2>/dev/null || true`, { encoding: 'utf-8', timeout: 5000 });
@@ -3281,8 +3297,8 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
       continue;
     }
-    if (state.phase !== 'implementation') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation)`);
+    if (state.phase !== 'implementation' && state.phase !== 'review-response') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation or review-response)`);
       continue;
     }
 
@@ -3339,6 +3355,14 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       const deliberatelyStopped = state.stoppedByUser === true;
       if (deliberatelyStopped) {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
+        continue;
+      }
+
+      // Skip agents that are on standby for UAT tweaks after pan done.
+      // review-response phase means the agent is waiting for human input via pan tell,
+      // not crashed or orphaned.
+      if (state.phase === 'review-response') {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — standby for UAT tweaks (phase=review-response)`);
         continue;
       }
 

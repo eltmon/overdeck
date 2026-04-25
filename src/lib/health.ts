@@ -149,6 +149,12 @@ export async function pingAgent(
     health.status = 'stopped';
     health.consecutiveFailures = 0;
     health.reason = 'Agent was intentionally stopped';
+  } else if (state?.phase === 'review-response') {
+    // Agent is on standby after pan done, waiting for UAT tweaks via pan tell.
+    // No tmux session is expected in this state.
+    health.status = 'stopped';
+    health.consecutiveFailures = 0;
+    health.reason = 'Agent on standby for UAT tweaks';
   } else if (!alive) {
     health.status = 'dead';
     health.consecutiveFailures++;

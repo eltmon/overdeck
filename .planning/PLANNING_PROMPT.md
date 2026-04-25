@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-539
+# Planning Session: PAN-698
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -68,108 +68,43 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 ---
 
 ## Issue Details
-- **ID:** PAN-539
-- **Title:** feat: image paste support in activity view conversation
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/539
+- **ID:** PAN-698
+- **Title:** PAN: clean up dashboard typography end-to-end
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/698
 
 ## Description
 ## Summary
+- Clean up dashboard typography across all non–God View surfaces so the app has one explicit, enforceable font policy.
+- Normalize conversations to DM Sans prose with SF Mono reserved for code and technical identifiers.
+- Update the style guide and related documentation so the typography boundary does not drift again.
 
-Enable users to paste images (Ctrl+V or drag-drop) into the conversation input in the activity view. The image should be transmitted to the underlying tmux Claude Code session and appear as a vision input in the conversation.
+## Scope
+- Keep DM Sans as the universal app sans for all non–God View UI.
+- Keep SF Mono for code, terminal output, and technical strings.
+- Allow only one non–God View display-font exception: the upper-left `Panopticon` wordmark in the sidebar.
+- Keep God View as its own scoped typography exception for aesthetic reasons.
+- Remove Mission Control / conversation typography drift caused by local font stacks and decorative mono usage.
+- Leave `src/dashboard/frontend/src/components/GodView/*` untouched.
 
-## How Claude Code Handles Images (Research Findings)
+## Plan reference
+- Committed plan: `docs/prds/planned/pan-dashboard-typography-cleanup.md`
+- Commit: `d621e8af` (`docs: add dashboard typography cleanup plan`)
 
-Claude Code's `Read` tool automatically handles image file paths. When a message includes `@/path/to/image.png`, Claude Code invokes the Read tool on that path, base64-encodes the bytes (with `sharp` compression if >5MB), and sends it as an Anthropic API `{type:"image"}` content block.
+## Key implementation targets
+- `src/dashboard/frontend/src/components/MissionControl/styles/mission-control.module.css`
+- `src/dashboard/frontend/src/components/chat/*`
+- `src/dashboard/frontend/src/components/Sidebar.tsx`
+- `src/dashboard/frontend/src/components/AwaitingMergePage.tsx`
+- `src/dashboard/frontend/src/components/MetricsSummaryRow.tsx`
+- `src/dashboard/frontend/src/components/XTerminal.tsx`
+- `design/style-guide/STYLE-GUIDE.md`
+- `docs/prds/active/pan-460/STATE.md`
 
-Supported extensions: `png`, `jpg`, `jpeg`, `gif`, `webp`
-
-This means **no X11 clipboard manipulation is needed** — the image can be injected entirely through the existing `load-buffer + paste-buffer` text mechanism Panopticon already uses.
-
-## Implementation Plan
-
-### 1. Browser — Capture paste event
-In the conversation composer (activity view input), listen for `paste` events:
-```typescript
-onPaste={(e) => {
-  const items = Array.from(e.clipboardData.items);
-  const imageItem = items.find(i => i.type.startsWith('image/'));
-  if (imageItem) {
-    e.preventDefault();
-    const blob = imageItem.getAsFile();
-    handleImagePaste(blob);
-  }
-}}
-```
-Also support drag-drop: `onDrop` with `dataTransfer.files`.
-
-Show a thumbnail preview in the composer input (similar to how t3code shows image attachments) so the user sees what they pasted before sending.
-
-### 2. Upload — Send image to server
-POST to a new endpoint `/api/agents/:agentId/upload-image` as `multipart/form-data`.
-
-### 3. Server — Save to workspace temp file
-```typescript
-// Save to agent workspace temp dir (cleaned up periodically)
-const imgPath = path.join(agentWorkspacePath, '.tmp', `paste-${uuid()}.png`);
-await fs.writeFile(imgPath, imageBuffer);
-return { path: imgPath };
-```
-Save inside the agent's workspace so the path is accessible to Claude Code running there.
-
-### 4. Message injection
-When sending the message, prepend the `@path` reference:
-```
-@/home/eltmon/.panopticon/agents/agent-pan-xxx/workspace/.tmp/paste-abc123.png
-
-<user's message text>
-```
-Send via existing `load-buffer + paste-buffer + C-m` mechanism. Claude Code invokes the Read tool automatically on the `@path`, reads the image bytes, and attaches as vision input.
-
-If the user pasted image with no text, send:
-```
-@/path/to/image.png
-```
-
-### 5. Cleanup
-Delete temp image files after the message is confirmed sent (or after a 5-min TTL).
-
-## Why Not X11 Clipboard?
-
-The alternative (xclip + tmux send-keys C-v) also works but has downsides:
-- Requires `xclip` or `wl-clipboard` installed
-- Race condition between clipboard write and keystroke
-- Doesn't work in headless/remote/Wayland-only environments
-- Adds OS-level dependency
-
-The `@path` approach works everywhere tmux text injection works.
-
-## UI Spec
-
-**Composer input with image attached:**
-```
-┌─────────────────────────────────────────────┐
-│ [🖼 paste-abc123.png ×]                      │
-│                                              │
-│ What do you see in this screenshot?_         │
-│                                          ↵  │
-└─────────────────────────────────────────────┘
-```
-
-- Image thumbnail shown in composer before send
-- × button to remove the image
-- Multiple images supported (each gets its own `@path` line)
-- Paste on the image thumbnail area, drag-drop on the whole composer
-
-## Files to Change
-
-- `src/dashboard/frontend/src/components/MissionControl/ActivityView/index.tsx` — add paste/drop handler to input
-- `src/dashboard/server/routes/agents.ts` (or new `agent-uploads.ts`) — new `POST /api/agents/:id/upload-image` endpoint
-- `src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx` — may need image attachment display in timeline
-
-## Out of Scope
-
-- Video / non-image file attachments (separate issue)
-- Images in the Kanban card message composer (follow-on)
+## Acceptance criteria
+- No non–God View ad hoc sans stacks remain.
+- No non–God View display-font usage remains except the sidebar `Panopticon` wordmark.
+- Conversations render prose in DM Sans and only use SF Mono for code/technical strings.
+- Documentation matches the final typography policy.
 
 ---
 
@@ -189,6 +124,41 @@ Use AskUserQuestion tool to ask contextual questions:
 - Any technical constraints or preferences?
 - What does "done" look like?
 - Are there edge cases we need to handle?
+
+### Playwright Isolation
+
+If the issue will require browser-based verification, encode that expectation clearly in STATE.md and acceptance criteria:
+- Playwright/browser verification must use an isolated browser instance/profile.
+- Agents must not depend on another agent's Playwright session or shared browser state.
+- Any required login/setup should be reproducible inside the isolated session.
+
+### Task Granularity — Decompose Aggressively
+
+**Default to the smallest bead you can defend.** Your job is to produce a *lot* of small, independently reviewable beads — not a handful of large ones.
+
+A well-sized bead has all of these properties:
+- **One focused change.** One command added, one file moved, one collapsed handler, one rename batch. If you need the word "and" in the title, it's probably two beads.
+- **Independently reviewable.** A reviewer can verify the acceptance criteria by reading the diff for this bead alone, without cross-referencing others.
+- **Independently mergeable.** Landing this bead on its own leaves the tree in a working state. If it can only ship as part of a set, it's a sub-step inside a larger bead, not a bead itself.
+- **Testable in isolation.** The acceptance criteria name a specific behavior you can exercise after this bead and no others.
+
+**When a PRD has phases, phases are NOT bead boundaries.** Phases are organizational scaffolding for humans reading the PRD. A single phase will typically decompose into many beads. For example, a phase that says "rename 10 commands" is 10 beads (or 10 sub-items under one rename bead), not 1.
+
+**Concrete heuristics:**
+- One collapsed command = one bead. (`pan show`, `pan review`, `pan issues`, `pan plan finalize` → four beads, not one.)
+- One renamed verb = one bead, unless several renames are mechanically identical and land in the same file — then they can be sub-items under one bead.
+- One admin group moved under a new namespace = one bead per group.
+- One distributed-skill rename batch = one bead per logical group (lifecycle shortcuts, admin namespace, umbrella skill, description rewrite sweep). Not one bead for "rename all skills."
+- One snapshot test = one bead.
+- One doc migration = one bead (per doc or per logical doc cluster, not one bead for "update all docs").
+
+**When in doubt, split.** The cost of too-small beads is mild (more rows to track); the cost of too-large beads is severe (reviewers can't reason about them, work agents deliver partial results, specialists can't pinpoint which acceptance criterion failed, and the `inspect` specialist can't verify mid-implementation). Err on the side of more beads.
+
+**What this does NOT mean:**
+- It does NOT mean ship partial features. CLAUDE.md's "Deliver Complete Features" rule still applies: every bead's acceptance criteria must be fully met before it's marked done, and every bead in the plan must ship before the issue itself is marked done. Decomposition is about *reviewability and verifiability*, not about scope reduction.
+- It does NOT mean creating beads for trivia that doesn't need tracking (e.g. "update one line in a comment"). If the acceptance criterion fits inside another bead's existing scope and tests, absorb it as a sub-item instead of inflating the bead count.
+
+If the user ever asks "should this be one bead or many?", the answer is almost always "many" unless you can point to a specific reason the work is genuinely indivisible (e.g. a single atomic rename that touches N call sites in one commit).
 
 ### Difficulty Estimation
 
@@ -223,19 +193,19 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-539: <issue title>"
+    "description": "Plan for PAN-698: <issue title>"
   },
   "plan": {
-    "id": "pan-539",
+    "id": "pan-698",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
-    "author": "agent:gpt-5.4-pro",
+    "author": "agent:claude-opus-4-7",
     "sequence": 1,
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/539", "label": "PAN-539", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/698", "label": "PAN-698", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -251,7 +221,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-539"
+          "issueLabel": "pan-698"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -273,7 +243,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-539")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-698")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled

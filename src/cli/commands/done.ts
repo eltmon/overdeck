@@ -306,6 +306,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (existingState) {
       existingState.status = 'stopped';
       existingState.phase = 'review-response';
+      existingState.stoppedByUser = true;
       existingState.lastActivity = new Date().toISOString();
       saveAgentState(existingState);
     }

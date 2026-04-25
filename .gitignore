@@ -69,6 +69,10 @@ docker-compose.devcontainer.yml
 .claude/.panopticon-manifest.json
 # Workspace-specific agent definitions (triage-agent etc. are local tooling)
 .claude/agents/
+# Review prompt templates — source of truth is src/lib/cloister/prompts/review/,
+# synced to ~/.panopticon/review-prompts/ by pan sync. Must not appear in worktrees
+# where work agents could read them and attempt self-review.
+.claude/prompts/code-review-*.prompt-template.md
 # Workspace-specific settings (absolute paths, caveman variant — must not merge to main)
 .claude/settings.json
 .claude/.caveman-variant
