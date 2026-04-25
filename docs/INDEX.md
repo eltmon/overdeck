@@ -156,7 +156,7 @@
 - **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
 - **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
 - **"review architecture"** / **"review orchestrator"** / **"synthesis model"** / **"pan review run"** / **"review invariants"** / **"prompt primitives"** → REVIEW-AGENT-ARCHITECTURE.md
-- **"reviewer prompts"** / **"synthesis prompt"** / **".claude/prompts/"** / **"prompt-template.md"** → REVIEW-AGENT-ARCHITECTURE.md
+- **"reviewer prompts"** / **"synthesis prompt"** / **"prompt-template.md"** → REVIEW-AGENT-ARCHITECTURE.md
 - **"dashboard restart"** / **"review survives restart"** → REVIEW-AGENT-ARCHITECTURE.md (invariants)
 - **"planning"** / **"planning agent"** / **"PLANNING_PROMPT"** → SPECIALIST_WORKFLOW.md (Planning → Implementation Transition)
 - **"environment variables"** / **"agent env"** → SPECIALIST_WORKFLOW.md (Agent Environment Variables), CONFIGURATION.md
