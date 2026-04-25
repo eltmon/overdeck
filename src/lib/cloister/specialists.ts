@@ -1070,23 +1070,25 @@ ${basePrompt}`;
     );
 
     const providerExportLines = buildProviderExportLines(providerEnv);
-    writeFileSync(innerScript, `#!/bin/bash
-set -o pipefail
-cd "${cwd}"
-${PROVIDER_UNSET_LINES}
-${providerExportLines}export CI=1
-export PANOPTICON_AGENT_ID="${tmuxSession}"
-export PANOPTICON_ISSUE_ID="${task.issueId}"
-export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
-${specialistCavemanExports}prompt=$(cat "${promptFile}")
-
-# Fresh session every dispatch — no --resume (PAN-612: thinking signature corruption)
-claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
-
-# Signal completion
-echo ""
-echo "## Specialist completed task"
-`, { mode: 0o755 });
+    writeFileSync(
+      innerScript,
+      generateLauncherScript({
+        agentType: 'specialist-dispatch',
+        workingDir: cwd,
+        setPipefail: true,
+        unsetProviderEnv: true,
+        providerExports: providerExportLines,
+        setCi: true,
+        panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
+        cavemanExports: specialistCavemanExports,
+        promptFile,
+        baseCommand: 'claude',
+        permissionFlags: permissionFlags.split(' '),
+        sessionId,
+        model,
+      }),
+      { mode: 0o755 },
+    );
 
     // Outer launcher: exec into script(1) so the tmux pane's main process IS script.
     // CRITICAL: must use `exec` (not a pipeline) so tmux kill-session SIGHUP propagates
@@ -1097,9 +1099,17 @@ echo "## Specialist completed task"
     // via -a), so we get the same log capture as the old tee pipeline without the pipe.
     // -q quiet (no Script started/done banners), -f flush on every write, -a append,
     // -e propagate child exit code, -c run command.
-    writeFileSync(launcherScript, `#!/bin/bash
-exec script -qfaec "bash '${innerScript}'" "${logFilePath}"
-`, { mode: 0o755 });
+    writeFileSync(
+      launcherScript,
+      generateLauncherWrapper({
+        agentType: 'specialist-dispatch',
+        workingDir: cwd,
+        useScriptWrapper: true,
+        scriptLogFile: logFilePath,
+        innerScriptPath: innerScript,
+      })!,
+      { mode: 0o755 },
+    );
 
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt — PAN-384)
