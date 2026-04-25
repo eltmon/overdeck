@@ -33,6 +33,7 @@ import { EventStoreService } from '../services/domain-services.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { SessionNodePresence } from '@panopticon/contracts';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
@@ -110,6 +111,34 @@ export function extractReviewerRole(tmuxName: string, issueId: string): string |
   return role || null;
 }
 
+/**
+ * Derive session presence from runtime state and tmux session existence.
+ * Only stats output.log for alive sessions to avoid unnecessary filesystem calls.
+ */
+async function derivePresence(
+  agentId: string,
+  rtState: { state: string } | null,
+  tmuxSessionNames: Set<string>,
+): Promise<SessionNodePresence> {
+  const hasTmux = tmuxSessionNames.has(agentId);
+  if (!hasTmux) return 'ended';
+
+  if (!rtState) return 'idle';
+
+  if (rtState.state === 'active') return 'active';
+  if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
+    // Supplemental check: output.log mtime within 5s indicates recent activity
+    const logPath = join(homedir(), '.panopticon', 'agents', agentId, 'output.log');
+    const logStat = await stat(logPath).catch(() => null);
+    if (logStat && (Date.now() - logStat.mtime.getTime()) < 5000) {
+      return 'active';
+    }
+    return 'idle';
+  }
+
+  return 'ended';
+}
+
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -142,6 +171,15 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
+  // Fetch all tmux session names once for presence derivation (PAN-821)
+  const tmuxSessionNames = new Set<string>();
+  try {
+    const allSessions = await listSessionNamesAsync();
+    for (const s of allSessions) {
+      if (s.trim()) tmuxSessionNames.add(s.trim());
+    }
+  } catch { /* tmux may not be available */ }
+
   const sections: Array<{
     type: string;
     sessionId: string;
@@ -150,6 +188,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
     duration: number | null;
     status: string;
     transcript: string;
+    presence: SessionNodePresence;
   }> = [];
 
   const agentId = `agent-${issueLower}`;
@@ -188,6 +227,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
       }
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
+      const presence = await derivePresence(checkId, rtState, tmuxSessionNames);
 
       sections.push({
         type: sectionType,
@@ -197,6 +237,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         duration: state.startedAt ? Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000) : null,
         status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
         transcript,
+        presence,
       });
     } catch { /* skip malformed state */ }
   }
@@ -216,6 +257,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         duration: null,
         status: 'completed',
         transcript: `PLANNING COMPLETE\n\n${stateMdText}`,
+        presence: 'ended',
       });
     }
   }
@@ -354,6 +396,10 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
             } catch { /* session may not be running */ }
           }
 
+          const reviewerPresence: SessionNodePresence = tmuxSessionNames.has(tmuxName)
+            ? (ss.status === 'running' ? 'active' : 'idle')
+            : 'ended';
+
           sections.push({
             type: role ? 'reviewer' : 'review',
             role: role || undefined,
@@ -365,6 +411,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
             status: ss.status,
             transcript: reviewerParts.join('\n'),
             tmuxSession: tmuxName,
+            presence: reviewerPresence,
           });
         }
         continue;
@@ -390,6 +437,10 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
       }
 
+      const specialistPresence: SessionNodePresence = tmuxSessionName && tmuxSessionNames.has(tmuxSessionName)
+        ? (ss.status === 'running' ? 'active' : 'idle')
+        : 'ended';
+
       sections.push({
         type: ss.type,
         sessionId: `specialist-${ss.type}-${ss.startedAt}`,
@@ -399,6 +450,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         status: ss.status,
         transcript: transcriptParts.join('\n'),
         tmuxSession: tmuxSessionName,
+        presence: specialistPresence,
       });
     }
   }
