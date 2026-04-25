@@ -95,6 +95,21 @@ function getProjectPath(issuePrefix?: string): string {
   return join(homedir(), 'Projects');
 }
 
+/**
+ * Extract reviewer role from tmux session name.
+ * Format: review-<issueId>-<timestamp>-<role>
+ * Returns the role string or null if the name doesn't match the expected pattern.
+ */
+export function extractReviewerRole(tmuxName: string, issueId: string): string | null {
+  const prefix = `review-${issueId}-`;
+  if (!tmuxName.toLowerCase().startsWith(prefix.toLowerCase())) return null;
+  const rest = tmuxName.slice(prefix.length);
+  const dashIdx = rest.indexOf('-');
+  if (dashIdx <= 0) return null;
+  const role = rest.slice(dashIdx + 1);
+  return role || null;
+}
+
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -317,26 +332,6 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         if (ageMs > STALE_THRESHOLD_MS) {
           ss.status = 'completed';
           transcriptParts[0] = `${ss.type.toUpperCase()} TIMED OUT (no result recorded)`;
-        } else if (ss.type === 'review' && reviewSessions.length > 0) {
-          // Parallel review: capture from all active review sessions
-          for (const tmuxName of reviewSessions) {
-            try {
-              const output = (await capturePaneAsync(tmuxName, 100)).trim();
-              if (output) {
-                transcriptParts.push(`\n--- Live Output (${tmuxName}) ---\n${output}`);
-              }
-            } catch { /* session may not be running */ }
-          }
-        } else {
-          const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
-          try {
-            const output = (await capturePaneAsync(tmuxName, 100)).trim();
-            if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
-              transcriptParts.push(`\n--- Live Output ---\n${output}`);
-            } else if (output) {
-              transcriptParts.push(`\n--- Waiting ---\nSpecialist is processing another issue. Will update when it reaches ${issueId}.`);
-            }
-          } catch { /* specialist may not be running */ }
         }
       }
 
@@ -344,15 +339,55 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
       }
 
+      // Split parallel review sessions into individual reviewer sections (PAN-821)
+      if (ss.type === 'review' && reviewSessions.length > 0) {
+        for (const tmuxName of reviewSessions) {
+          const role = extractReviewerRole(tmuxName, issueId);
+          const reviewerParts = [...transcriptParts];
+
+          if (ss.status === 'running') {
+            try {
+              const output = (await capturePaneAsync(tmuxName, 100)).trim();
+              if (output) {
+                reviewerParts.push(`\n--- Live Output ---\n${output}`);
+              }
+            } catch { /* session may not be running */ }
+          }
+
+          sections.push({
+            type: role ? 'reviewer' : 'review',
+            role: role || undefined,
+            sessionId: tmuxName,
+            model: 'specialist',
+            startedAt: ss.startedAt,
+            endedAt: ss.endedAt,
+            duration,
+            status: ss.status,
+            transcript: reviewerParts.join('\n'),
+            tmuxSession: tmuxName,
+          });
+        }
+        continue;
+      }
+
+      // Normal handling for non-review types or review without parallel sessions
+      if (ss.status === 'running') {
+        const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
+        try {
+          const output = (await capturePaneAsync(tmuxName, 100)).trim();
+          if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
+            transcriptParts.push(`\n--- Live Output ---\n${output}`);
+          } else if (output) {
+            transcriptParts.push(`\n--- Waiting ---\nSpecialist is processing another issue. Will update when it reaches ${issueId}.`);
+          }
+        } catch { /* specialist may not be running */ }
+      }
+
       let tmuxSessionName: string | undefined;
       if (ss.status === 'running') {
-        if (ss.type === 'review' && reviewSessions.length > 0) {
-          tmuxSessionName = reviewSessions[0];
-        } else {
-          const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
-          const resolved = resolveProjectFromIssue(issueId);
-          tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
-        }
+        const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
+        const resolved = resolveProjectFromIssue(issueId);
+        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
       }
 
       sections.push({
