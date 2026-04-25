@@ -9,6 +9,7 @@ export async function refreshDashboardState(queryClient?: QueryClient): Promise<
     queryClient?.invalidateQueries({ queryKey: ['issues'] }),
     queryClient?.invalidateQueries({ queryKey: ['agents'] }),
     queryClient?.invalidateQueries({ queryKey: ['review-status'] }),
+    queryClient?.invalidateQueries({ queryKey: ['agent-session'] }),
   ]);
 
   try {

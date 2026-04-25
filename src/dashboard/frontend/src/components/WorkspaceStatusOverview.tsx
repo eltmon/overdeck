@@ -122,6 +122,7 @@ export function WorkspaceStatusOverview({
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
   const isResume = !!agent && agent.status === 'stopped' && !isStandby && lifecycle?.canResumeSession === true && !resetSessionSuccess;
+  const isLifecycleUnresolved = !!agent && agent.status === 'stopped' && !isStandby && !lifecycle;
 
   const mergingElapsed = reviewStatus?.mergeStatus === 'merging' && reviewStatus.updatedAt
     ? now - new Date(reviewStatus.updatedAt).getTime()
@@ -322,11 +323,12 @@ export function WorkspaceStatusOverview({
             ) : onStartAgent ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onStartAgent(); }}
-                disabled={startPending || isLaunching}
+                disabled={startPending || isLaunching || isLifecycleUnresolved}
                 className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
               >
-                {(startPending || isLaunching) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                {(startPending || isLaunching) ? 'Starting...' : 'Start Agent'}
+                {(startPending || isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                {isLifecycleUnresolved ? 'Checking…' : ((startPending || isLaunching) ? 'Starting...' : 'Start Agent')}
               </button>
             ) : null}
             {!workspace?.exists && onCreateWorkspace && (
@@ -496,11 +498,12 @@ export function WorkspaceStatusOverview({
                   onStartAgent();
                 }
               }}
-              disabled={isLaunching || showResumeInput}
+              disabled={isLaunching || showResumeInput || isLifecycleUnresolved}
               className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+              title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
             >
-              {isLaunching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-              <span>{isLaunching ? launchLabel : (isResume ? 'Resume Session' : 'Start Agent')}</span>
+              {(isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+              <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
             </button>
             {isResume && onResetSession && (
               <button

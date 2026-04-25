@@ -26,6 +26,7 @@ import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -3385,6 +3386,23 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         console.log(`[deacon] ${msg}`);
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
         logAgentLifecycle(agentId, `resumed by deacon auto-recovery (session restored after system event)`);
+        const issueId = state.issueId;
+        const phaseLabel = state.phase === 'review-response' ? 'review-response' : 'work';
+        emitActivityEntry({
+          source: 'cloister',
+          level: 'info',
+          message: issueId
+            ? `Deacon auto-resumed ${issueId} ${phaseLabel} agent`
+            : `Deacon auto-resumed agent ${agentId}`,
+          issueId,
+        });
+        emitActivityTts({
+          utterance: issueId
+            ? `Deacon auto resumed ${issueId} ${phaseLabel} agent`
+            : `Deacon auto resumed agent ${agentId}`,
+          priority: 1,
+          issueId,
+        });
       } else {
         const msg = `Failed to auto-resume ${agentId}: ${result.error}`;
         console.warn(`[deacon] ${msg}`);
