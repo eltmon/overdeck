@@ -292,9 +292,15 @@ export function isCliproxyRunning(): boolean {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) return true;
   // Fallback: something may be listening on the port without our pidfile.
+  // Use bash /dev/tcp instead of lsof — busybox lsof on Alpine ignores -t/-i
+  // and returns all processes, making this check both incorrect and dangerous.
   try {
-    const out = execSync(`lsof -ti:${CLIPROXY_PORT} 2>/dev/null || true`, { encoding: 'utf8' }).trim();
-    return out.length > 0;
+    execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${CLIPROXY_PORT}'`, {
+      encoding: 'utf8',
+      stdio: 'pipe',
+      timeout: 1000,
+    });
+    return true;
   } catch {
     return false;
   }
@@ -346,8 +352,10 @@ export function stopCliproxy(): void {
     try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
   }
   // Also clear anything else bound to the port (stale / manually-started instances).
+  // Use fuser instead of lsof | xargs kill — busybox lsof on Alpine ignores -t/-i
+  // and lists ALL processes, which xargs then tries to kill (including PID 1).
   try {
-    execSync(`lsof -ti:${CLIPROXY_PORT} 2>/dev/null | xargs -r kill 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`fuser -k -TERM ${CLIPROXY_PORT}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
   } catch {
     /* ignore */
   }
@@ -403,8 +411,11 @@ export async function stopCliproxyAsync(): Promise<void> {
     try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
     await new Promise((r) => setTimeout(r, 500));
   }
+  // Fallback: kill any process still holding the port.
+  // Use fuser instead of lsof | xargs kill — busybox lsof on Alpine ignores -t/-i
+  // and lists ALL processes, which xargs then tries to kill (including PID 1).
   try {
-    await execAsync(`lsof -ti:${CLIPROXY_PORT} 2>/dev/null | xargs -r kill 2>/dev/null || true`);
+    await execAsync(`fuser -k -TERM ${CLIPROXY_PORT}/tcp 2>/dev/null || true`);
   } catch { /* ignore */ }
   try {
     if (existsSync(getCliproxyPidPath())) {
