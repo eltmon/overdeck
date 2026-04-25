@@ -170,9 +170,14 @@ export const ReadModelServiceLive = Layer.effect(
         );
         const statusMap = loadStatuses();
         // One tmux call for all issues — O(1) tmux cost per snapshot build.
-        const allSessions = yield* Effect.promise(() => listSessionNamesAsync()).pipe(
-          Effect.catchAll(() => Effect.succeed([] as string[])),
-        );
+        // Keep tmux failures non-fatal; Effect's static catchAll is not available
+        // in the dashboard runtime version.
+        let allSessions: string[] = [];
+        try {
+          allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+        } catch {
+          allSessions = [];
+        }
         state = {
           ...state,
           reviewStatusByIssueId: Object.fromEntries(
