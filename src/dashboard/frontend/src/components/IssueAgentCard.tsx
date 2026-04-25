@@ -37,6 +37,7 @@ const STATUS_COLORS: Record<string, string> = {
   stuck: 'bg-status-stuck',
   dead: 'bg-status-dead',
   stopped: 'bg-muted-foreground',
+  running: 'bg-status-healthy',
 };
 
 const HEALTH_STATE_EMOJI = {

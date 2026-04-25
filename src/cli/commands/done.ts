@@ -105,6 +105,12 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
     });
     const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
 
+    // Defense-in-depth: refuse to re-submit an already-closed-out issue
+    if (currentLabels.some(l => l.toLowerCase() === 'closed-out')) {
+      console.error(chalk.red(`\n✖ ${issueId} has already been closed out. Cannot mark work as done.\n`));
+      return false;
+    }
+
     // Clean up workflow labels and get target labels for in_review state
     const targetLabels = cleanupWorkflowLabels(currentLabels, 'in_review');
 
@@ -141,14 +147,25 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (ghInfo.isGitHub) {
       try {
         const { stdout } = await execAsync(
-          `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state --jq '.state'`,
+          `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state,labels --jq '[.state, (.labels | map(.name) | join(","))] | @tsv'`,
           { encoding: 'utf-8' }
         );
-        if (stdout.trim().toLowerCase() === 'closed') {
+        const [state, labelsStr] = stdout.trim().split('\t');
+        const stateLower = (state || '').toLowerCase();
+        const labels = (labelsStr || '').split(',').filter(Boolean);
+        if (stateLower === 'closed') {
           console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
           process.exit(1);
         }
-      } catch { /* gh not available or issue not found — proceed */ }
+        // Defense-in-depth: refuse to re-submit an issue that has already been closed out
+        if (labels.some(l => l.toLowerCase() === 'closed-out')) {
+          console.error(chalk.red(`\n✖ ${issueId} has already been closed out. Cannot mark work as done on a closed-out issue.\n`));
+          process.exit(1);
+        }
+      } catch (guardErr) {
+        console.error(chalk.yellow(`\n⚠ Could not verify issue state for ${issueId} (${(guardErr as Error).message}). Aborting for safety — use --force to override.\n`));
+        process.exit(1);
+      }
     } else {
       const linearApiKey = getLinearApiKey();
       if (linearApiKey) {
@@ -171,7 +188,10 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
               }
             }
           }
-        } catch { /* Linear API error — proceed */ }
+        } catch (guardErr) {
+          console.error(chalk.yellow(`\n⚠ Could not verify Linear issue state for ${issueId} (${(guardErr as Error).message}). Aborting for safety — use --force to override.\n`));
+          process.exit(1);
+        }
       }
     }
   }

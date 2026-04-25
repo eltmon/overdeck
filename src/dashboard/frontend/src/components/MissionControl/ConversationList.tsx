@@ -521,88 +521,111 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
                   </span>
                 )}
-                {/* Rename button */}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={styles.conversationEditBtn}
-                  onClick={e => startEditing(conv, e)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') startEditing(conv, e as unknown as React.MouseEvent); }}
-                  title="Rename conversation"
-                  aria-label={`Rename ${conv.name}`}
-                >
-                  <Pencil size={11} />
-                </span>
-                {/* Star / favorite button */}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={`${styles.conversationStarBtn} ${conv.isFavorited ? styles.conversationStarBtnActive : ''}`}
-                  onClick={e => {
-                    e.stopPropagation();
-                    favoriteMutation.mutate({ name: conv.name, favorited: !!conv.isFavorited });
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
-                      e.stopPropagation();
-                      favoriteMutation.mutate({ name: conv.name, favorited: !!conv.isFavorited });
-                    }
-                  }}
-                  title={conv.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-                  aria-label={conv.isFavorited ? `Unfavorite ${conv.title ?? conv.name}` : `Favorite ${conv.title ?? conv.name}`}
-                  aria-pressed={conv.isFavorited}
-                >
-                  <Star
-                    size={11}
-                    style={{
-                      fill: conv.isFavorited ? 'currentColor' : 'none',
-                    }}
-                  />
-                </span>
-                {conv.sessionFile && !conv.forkStatus && (
+                {/* Persistent favorited star — visible in both hover and non-hover states */}
+                {conv.isFavorited && (
                   <span
                     role="button"
                     tabIndex={0}
-                    className={styles.conversationSummaryForkBtn}
+                    className={styles.conversationStarPersistent}
                     onClick={e => {
                       e.stopPropagation();
-                      if (!summaryForkMutation.isPending) {
-                        setForkTarget(conv);
-                      }
+                      favoriteMutation.mutate({ name: conv.name, favorited: true });
                     }}
                     onKeyDown={e => {
-                      if ((e.key === 'Enter' || e.key === ' ') && !summaryForkMutation.isPending) {
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
                         e.stopPropagation();
-                        setForkTarget(conv);
+                        favoriteMutation.mutate({ name: conv.name, favorited: true });
                       }
                     }}
-                    title="Create summary fork"
-                    aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
+                    title="Remove from favorites"
+                    aria-label={`Unfavorite ${conv.title ?? conv.name}`}
+                    aria-pressed={true}
                   >
-                    <GitBranchPlus size={11} />
+                    <Star size={11} style={{ fill: 'currentColor' }} />
                   </span>
                 )}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={styles.conversationArchiveBtn}
-                  onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
-                  title="Archive conversation"
-                  aria-label={`Archive ${conv.name}`}
-                >
-                  <Archive size={11} />
-                </span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={styles.conversationCopyBtn}
-                  onClick={e => handleCopyLink(conv.id, e)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCopyLink(conv.id, e as unknown as React.MouseEvent); } }}
-                  title="Copy link to conversation"
-                  aria-label={`Copy link to ${conv.name}`}
-                >
-                  {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
+                {/* Hover-only action group — collapses when row is not hovered */}
+                <span className={styles.conversationActions}>
+                  {/* Rename button */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={styles.conversationEditBtn}
+                    onClick={e => startEditing(conv, e)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') startEditing(conv, e as unknown as React.MouseEvent); }}
+                    title="Rename conversation"
+                    aria-label={`Rename ${conv.name}`}
+                  >
+                    <Pencil size={11} />
+                  </span>
+                  {/* Star / favorite button (only when NOT favorited; favorited state shown by persistent star above) */}
+                  {!conv.isFavorited && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className={styles.conversationStarBtn}
+                      onClick={e => {
+                        e.stopPropagation();
+                        favoriteMutation.mutate({ name: conv.name, favorited: false });
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
+                          e.stopPropagation();
+                          favoriteMutation.mutate({ name: conv.name, favorited: false });
+                        }
+                      }}
+                      title="Add to favorites"
+                      aria-label={`Favorite ${conv.title ?? conv.name}`}
+                      aria-pressed={false}
+                    >
+                      <Star size={11} style={{ fill: 'none' }} />
+                    </span>
+                  )}
+                  {conv.sessionFile && !conv.forkStatus && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className={styles.conversationSummaryForkBtn}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!summaryForkMutation.isPending) {
+                          setForkTarget(conv);
+                        }
+                      }}
+                      onKeyDown={e => {
+                        if ((e.key === 'Enter' || e.key === ' ') && !summaryForkMutation.isPending) {
+                          e.stopPropagation();
+                          setForkTarget(conv);
+                        }
+                      }}
+                      title="Create summary fork"
+                      aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
+                    >
+                      <GitBranchPlus size={11} />
+                    </span>
+                  )}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={styles.conversationArchiveBtn}
+                    onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
+                    title="Archive conversation"
+                    aria-label={`Archive ${conv.name}`}
+                  >
+                    <Archive size={11} />
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={styles.conversationCopyBtn}
+                    onClick={e => handleCopyLink(conv.id, e)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCopyLink(conv.id, e as unknown as React.MouseEvent); } }}
+                    title="Copy link to conversation"
+                    aria-label={`Copy link to ${conv.name}`}
+                  >
+                    {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
+                  </span>
                 </span>
               </motion.button>
             ))}

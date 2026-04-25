@@ -397,6 +397,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       setMinimized(false);
       setSetupSteps([]);
       setSetupSessionName(null);
+      setWatchPlanning(true);
+      watchPlanningRef.current = true;
       hasConnectedToSession.current = false;
     } else if (issueChanged) {
       // Switching to a different issue - reset state and unminimize
@@ -406,6 +408,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       setMinimized(false);
       setSetupSteps([]);
       setSetupSessionName(null);
+      setWatchPlanning(true);
+      watchPlanningRef.current = true;
       hasConnectedToSession.current = false;
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
     } else {
@@ -433,7 +437,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
             // Planning was done but not marked complete - go directly to complete step
             // This allows user to click "Done Planning" without restarting
             setStep('complete');
-          } else if (data.sessionName && data.hasPromptFile && ['In Planning', 'Planning', 'Discovery'].includes(issue.status)) {
+          } else if (data.sessionName && data.hasPromptFile && (['In Planning', 'Planning', 'Discovery'].includes(issue.status) || issue.labels?.some(l => l.toLowerCase() === 'planning'))) {
             // Issue is in planning state with a known session that actually started work
             // (hasPromptFile confirms workspace was created successfully)
             if (!watchPlanningRef.current) { onClose(); return; }
@@ -670,7 +674,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     <Terminal className="w-10 h-10 text-signal-review" />
                   </div>
                   {/* Check if already in planning state */}
-                  {['In Planning', 'Planning', 'Planned', 'Discovery'].includes(issue.status) ? (
+                  {(['In Planning', 'Planning', 'Planned', 'Discovery'].includes(issue.status) || issue.labels?.some(l => l.toLowerCase() === 'planning')) ? (
                     <>
                       <h3 className="text-xl font-semibold text-content mb-2">Resume Planning Session</h3>
                       <p className="text-content-subtle text-center max-w-md mb-6">

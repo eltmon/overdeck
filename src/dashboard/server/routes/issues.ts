@@ -45,6 +45,7 @@ import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
@@ -462,6 +463,9 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
+    // Clear agents cache so the next dashboard poll sees the new planning agent
+    invalidateAgentsCache();
+
     // Check if a work agent is already running
     const issueLowerForCheck = id.toLowerCase();
     const tmuxSessions = yield* Effect.promise(() => listSessionNamesAsync());
@@ -601,6 +605,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       status: 'starting',
       startedAt: new Date().toISOString(),
       type: 'planning',
+      agentPhase: 'planning',
       location: workspaceLocation,
     }, null, 2)));
 
@@ -799,6 +804,9 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
       payload: { issueId: issueIdentifier || id, sessionName },
     });
     try { getIssueDataService().patchIssue(issueIdentifier || id, { status: revertedState, canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
+
+    // Clear agents cache so the dashboard stops showing the planning agent as active
+    invalidateAgentsCache();
 
     return jsonResponse({
       success: true,
@@ -1053,6 +1061,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       payload: { issueId: id, status: newState, canonicalStatus: completeCanonical },
     });
     try { getIssueDataService().patchIssue(id, { status: newState, canonicalStatus: completeCanonical }); } catch { /* non-fatal */ }
+
+    // Clear agents cache so the dashboard stops showing the planning agent as active
+    invalidateAgentsCache();
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
@@ -1950,14 +1961,30 @@ const postIssueCloseOutRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => closeOut(ctx));
 
     if (result.success) {
-      issueDataService.invalidateTracker('github').catch(() => {});
-      issueDataService.invalidateTracker('linear').catch(() => {});
       yield* eventStore.append({
         type: 'issue.statusChanged',
         timestamp: new Date().toISOString(),
         payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
       });
-      try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
+
+      // Patch cached labels immediately so the board hides the issue right away
+      // without waiting for the background tracker refresh.
+      try {
+        const cachedIssues = issueDataService.getIssues();
+        const cachedIssue = cachedIssues.find(
+          (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
+        );
+        const currentLabels: string[] = cachedIssue?.labels || [];
+        const newLabels = [
+          ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
+          'closed-out',
+        ];
+        issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
+      } catch { /* non-fatal */ }
+
+      // Refresh tracker data in background so cache stays consistent
+      issueDataService.invalidateTracker('github').catch(() => {});
+      issueDataService.invalidateTracker('linear').catch(() => {});
     }
 
     return jsonResponse({

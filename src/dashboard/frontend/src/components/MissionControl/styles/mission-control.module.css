@@ -20,7 +20,7 @@
 
   --mc-font-family: "DM Sans", system-ui, sans-serif;
   --mc-font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --mc-font-size-xs: 11px;
+  --mc-font-size-xs: 12px;
   --mc-font-size-sm: 12px;
   --mc-font-size-base: 14px;
   --mc-font-size-md: 16px;
@@ -43,6 +43,8 @@
   font-family: var(--mc-font-family);
   color: var(--mc-text-primary);
   line-height: var(--mc-line-height);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   height: 100%;
 }
 
@@ -1309,8 +1311,26 @@
   background: var(--mc-bg-hover);
 }
 
-.conversationItem:hover .conversationArchiveBtn {
+/* Hover-only action group — collapses to 0 width when row is not hovered,
+   letting the title flex into the freed space. Negative margin nullifies the
+   parent's 6px gap when collapsed so no visual artifact remains. */
+.conversationActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-left: -6px;
+  transition: max-width 0.15s ease, opacity 0.15s ease, margin-left 0.15s ease;
+}
+
+.conversationItem:hover .conversationActions,
+.conversationItem:focus-within .conversationActions {
+  max-width: 120px;
   opacity: 1;
+  margin-left: 0;
 }
 
 .conversationItemSelected {
@@ -1386,8 +1406,7 @@
   border-radius: var(--mc-radius-sm);
   font-size: 14px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
   padding: 0;
 }
@@ -1403,7 +1422,7 @@
   letter-spacing: 0;
 }
 
-/* Star / favorite button */
+/* Star / favorite button (in-group, only rendered when NOT favorited) */
 .conversationStarBtn {
   display: flex;
   align-items: center;
@@ -1416,19 +1435,31 @@
   color: var(--mc-text-muted);
   border-radius: var(--mc-radius-sm);
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
   padding: 0;
 }
 
-.conversationItem:hover .conversationStarBtn {
-  opacity: 1;
+/* Persistent favorited star — always visible (not collapsed by .conversationActions) */
+.conversationStarPersistent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-accent);
+  border-radius: var(--mc-radius-sm);
+  line-height: 1;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
 }
 
-.conversationStarBtnActive {
-  opacity: 1 !important;
-  color: var(--mc-accent);
+.conversationStarPersistent:hover {
+  background: var(--mc-bg-hover);
 }
 
 .conversationStarBtn:hover {
@@ -1439,10 +1470,6 @@
 .conversationArchiveBtn:hover {
   background: var(--mc-bg-hover);
   color: var(--mc-text-primary);
-}
-
-.conversationItem:hover .conversationSummaryForkBtn {
-  opacity: 1;
 }
 
 .conversationSummaryForkBtn {
@@ -1458,8 +1485,7 @@
   border-radius: var(--mc-radius-sm);
   font-size: 14px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
   padding: 0;
 }
@@ -1467,10 +1493,6 @@
 .conversationSummaryForkBtn:hover {
   background: var(--mc-bg-hover);
   color: var(--mc-text-primary);
-}
-
-.conversationItem:hover .conversationCopyBtn {
-  opacity: 1;
 }
 
 .conversationCopyBtn {
@@ -1486,8 +1508,7 @@
   border-radius: var(--mc-radius-sm);
   font-size: 14px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
   padding: 0;
 }
@@ -1495,10 +1516,6 @@
 .conversationCopyBtn:hover {
   background: var(--mc-bg-hover);
   color: var(--mc-text-primary);
-}
-
-.conversationItem:hover .conversationEditBtn {
-  opacity: 1;
 }
 
 .conversationEditBtn {
@@ -1514,8 +1531,7 @@
   border-radius: var(--mc-radius-sm);
   font-size: 14px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
   padding: 0;
 }

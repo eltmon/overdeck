@@ -157,18 +157,33 @@ const staticRouteLayer = HttpRouter.add(
       if (!indexInfo || indexInfo.type !== 'File') {
         return HttpServerResponse.text('Not Found', { status: 404 });
       }
+      // index.html must never be cached: it references hashed JS bundles that
+      // change on every build. If the browser caches an old index.html, it will
+      // load stale JS bundles and the user sees outdated UI.
       return yield* HttpServerResponse.file(indexPath).pipe(
+        Effect.map((res) =>
+          HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate'),
+        ),
         Effect.catch(() =>
           Effect.succeed(HttpServerResponse.text('Internal Server Error', { status: 500 })),
         ),
       );
     }
 
-    return yield* HttpServerResponse.file(filePath).pipe(
+    const res = yield* HttpServerResponse.file(filePath).pipe(
       Effect.catch(() =>
         Effect.succeed(HttpServerResponse.text('Internal Server Error', { status: 500 })),
       ),
     );
+
+    // index.html must never be cached: it references hashed JS bundles that
+    // change on every build. If the browser caches an old index.html, it will
+    // load stale JS bundles and the user sees outdated UI.
+    if (filePath.endsWith('index.html')) {
+      return HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+
+    return res;
   }),
 );
 
