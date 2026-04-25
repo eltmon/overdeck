@@ -197,12 +197,12 @@ function ActivityItem({ activity }: { activity: ActivityEntry }) {
 
       {/* Details (collapsible) */}
       {activity.details && (
-        <details className="mt-1">
-          <summary className="text-xs text-content-muted cursor-pointer hover:text-content">
+        <details className="mt-1 group">
+          <summary className="text-xs text-content-muted cursor-pointer hover:text-content select-none">
             Details
           </summary>
-          <pre className="mt-1 bg-surface rounded p-2 text-xs text-content-body font-mono overflow-x-auto whitespace-pre-wrap">
-            {activity.details}
+          <pre className="mt-1 bg-surface rounded p-2 text-xs text-content-body font-mono overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+            {activity.details.replace(/\x1b\[[0-9;]*m/g, '')}
           </pre>
         </details>
       )}

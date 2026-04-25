@@ -224,36 +224,37 @@ export function setReviewStatus(
   // Emit activity log entries for meaningful pipeline state transitions.
   // Each transition produces one entry so the ActivityPanel shows live pipeline progress.
   if (update.verificationStatus && update.verificationStatus !== existing.verificationStatus) {
-    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string }> = {
-      running:  { level: 'info',    msg: `${issueId} — verification running` },
-      passed:   { level: 'success', msg: `${issueId} — verification passed` },
-      failed:   { level: 'error',   msg: `${issueId} — verification failed${update.verificationNotes ? ': ' + update.verificationNotes : ''}` },
+    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
+      running:  { level: 'info',    msg: `${issueId} — verification running`, tts: `${issueId} verification running` },
+      passed:   { level: 'success', msg: `${issueId} — verification passed`, tts: `${issueId} verification passed` },
+      failed:   { level: 'error',   msg: `${issueId} — verification failed`, tts: `${issueId} verification failed` },
       skipped:  { level: 'info',    msg: `${issueId} — verification skipped` },
     };
     const entry = vMap[update.verificationStatus];
-    if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, issueId });
+    if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
+    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.reviewStatus && update.reviewStatus !== existing.reviewStatus) {
     const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       reviewing: { level: 'info',    msg: `${issueId} — review started`, tts: `${issueId} review started` },
       passed:    { level: 'success', msg: `${issueId} — review passed`, tts: `${issueId} review passed` },
-      failed:    { level: 'error',   msg: `${issueId} — review failed${update.reviewNotes ? ': ' + update.reviewNotes : ''}`, tts: `${issueId} review failed` },
-      blocked:   { level: 'warn',    msg: `${issueId} — review blocked${update.reviewNotes ? ': ' + update.reviewNotes : ''}`, tts: `${issueId} review blocked` },
+      failed:    { level: 'error',   msg: `${issueId} — review failed`, tts: `${issueId} review failed` },
+      blocked:   { level: 'warn',    msg: `${issueId} — review blocked`, tts: `${issueId} review blocked` },
     };
     const entry = rMap[update.reviewStatus];
-    if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, issueId });
+    if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.testStatus && update.testStatus !== existing.testStatus) {
     const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       testing:         { level: 'info',    msg: `${issueId} — tests running` },
       passed:          { level: 'success', msg: `${issueId} — tests passed`, tts: `${issueId} tests passed` },
-      failed:          { level: 'error',   msg: `${issueId} — tests failed${update.testNotes ? ': ' + update.testNotes : ''}`, tts: `${issueId} tests failed` },
+      failed:          { level: 'error',   msg: `${issueId} — tests failed`, tts: `${issueId} tests failed` },
       skipped:         { level: 'info',    msg: `${issueId} — tests skipped` },
       dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
     };
     const entry = tMap[update.testStatus];
-    if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, issueId });
+    if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
@@ -262,10 +263,10 @@ export function setReviewStatus(
       merging:   { level: 'info',    msg: `${issueId} — merge in progress` },
       verifying: { level: 'info',    msg: `${issueId} — post-merge verification` },
       merged:    { level: 'success', msg: `${issueId} — merged`, tts: `${issueId} merged to main` },
-      failed:    { level: 'error',   msg: `${issueId} — merge failed${update.mergeNotes ? ': ' + update.mergeNotes : ''}`, tts: `${issueId} merge failed` },
+      failed:    { level: 'error',   msg: `${issueId} — merge failed`, tts: `${issueId} merge failed` },
     };
     const entry = mMap[update.mergeStatus];
-    if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, issueId });
+    if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.readyForMerge === true && !existing.readyForMerge) {
