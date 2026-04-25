@@ -5,6 +5,8 @@ import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
 import { DetailPanelLayout } from '../DetailPanelLayout';
+import { IssueHeader } from './SessionView/IssueHeader';
+import { SessionPanel } from './SessionView/SessionPanel';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
@@ -325,6 +327,7 @@ export function MissionControl({
   const handleSelectConversation = useCallback((name: string | null) => {
     setDraftKey(0);
     setSelectedConversation(name);
+    setSelectedSessionId(null);
     setIsDraft(false);
     if (name !== null) {
       setSelectedFeature(null);
@@ -410,6 +413,23 @@ export function MissionControl({
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
     : '';
+
+  // Find the selected session object from merged project data
+  const selectedSession = useMemo(() => {
+    if (!selectedSessionId || !selectedFeature) return null;
+    for (const project of projectsWithSessions) {
+      const feature = project.features.find(f => f.issueId === selectedFeature);
+      if (feature?.sessions) {
+        const session = feature.sessions.find(s => s.sessionId === selectedSessionId);
+        if (session) return session;
+      }
+    }
+    return null;
+  }, [projectsWithSessions, selectedFeature, selectedSessionId]);
+
+  const selectedIssue = selectedFeature
+    ? issues.find(i => i.identifier === selectedFeature)
+    : null;
 
   return (
     <div className={styles.missionControl}>
@@ -537,6 +557,24 @@ export function MissionControl({
                 </div>
               );
             })()
+          ) : selectedFeature && selectedSessionId && selectedSession ? (
+            <>
+              <IssueHeader
+                issueId={selectedFeature}
+                title={selectedIssueTitle}
+                cost={issueCosts[selectedFeature.toLowerCase()]}
+                source={selectedIssue?.source}
+                url={selectedIssue?.url}
+                onOpenBeads={() => setShowBeads(true)}
+              />
+              <SessionPanel session={selectedSession} issueId={selectedFeature} />
+            </>
+          ) : selectedFeature && sidebarTab === 'projects' ? (
+            <div className={styles.contentEmpty}>
+              <div style={{ textAlign: 'center' }}>
+                <p>Select an issue to view agent activity</p>
+              </div>
+            </div>
           ) : selectedFeature ? (
             <>
               {/* Feature Header */}
