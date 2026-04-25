@@ -253,7 +253,9 @@ describe('waitForReviewer', () => {
 
     expect(result).toBe('completed');
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+    // Session is NOT killed when output file is found — kept alive so dashboard
+    // can show reviewer tabs after completion.
+    expect(killSession).not.toHaveBeenCalled();
   });
 
   it('returns completed when session exits with output file present', async () => {
@@ -267,8 +269,9 @@ describe('waitForReviewer', () => {
 
     expect(result).toBe('completed');
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    // killSession still called (session exists check never reached when file found first)
-    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+    // Session is NOT killed when output file is found — kept alive so dashboard
+    // can show reviewer tabs after completion.
+    expect(killSession).not.toHaveBeenCalled();
   });
 
   it('returns failed when session exits without output file', async () => {
