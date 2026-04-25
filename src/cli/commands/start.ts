@@ -8,6 +8,7 @@ import { exec } from 'child_process';
 
 const execAsync = promisify(exec);
 import { spawnAgent, type SpawnOptions } from '../../lib/agents.js';
+import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
@@ -542,7 +543,6 @@ function validateAndCleanStateFile(workspacePath: string, issueId: string): { va
   }
 }
 
-
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
@@ -581,6 +581,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Handle local workspace
     const projectRoot = findProjectRoot(id);
     let workspace = workspacePath;
+    const workspaceExisted = !!workspace;
 
     if (!workspace) {
       spinner.text = `Creating workspace for ${id}...`;
@@ -595,6 +596,26 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       } catch (wsErr) {
         spinner.fail(`Failed to create workspace for ${id}: ${(wsErr as Error).message}`);
         process.exit(1);
+      }
+    }
+
+    // If workspace was created during planning, main may have moved forward.
+    // Fetch and merge latest main before the agent starts working.
+    if (workspaceExisted) {
+      spinner.text = 'Syncing latest main into workspace...';
+      try {
+        const syncResult = await syncMainIntoWorkspace(workspace, id);
+        if (syncResult.success) {
+          if (syncResult.alreadyUpToDate) {
+            spinner.text = 'Workspace already up to date with main';
+          } else {
+            spinner.text = `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`;
+          }
+        } else {
+          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}`);
+        }
+      } catch (syncErr: any) {
+        spinner.warn(`Sync main failed: ${syncErr.message}`);
       }
     }
 
