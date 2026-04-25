@@ -31,6 +31,8 @@ export function derivePipelinePhase(
 ): PipelinePhaseResult {
   const { agent, reviewStatus, projectKey, issueId } = input;
 
+  const isAlive = (s?: string) => s === 'healthy' || s === 'running' || s === 'starting';
+
   // Session name helpers
   const workSession = agent?.id ?? null;
   const specialistSession = (role: string): string =>
@@ -60,7 +62,7 @@ export function derivePipelinePhase(
     // Monorepo merges use the work agent for rebase (no merge-agent is spawned).
     // Polyrepo merges spawn a merge-agent (work agent is stopped by then).
     // If the work agent is alive, it's handling the merge — stream it.
-    if (workSession && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+    if (workSession && isAlive(agent?.status)) {
       activeSession = workSession;
     } else {
       activeSession = deadSessions.has(mergeSession) ? null : mergeSession;
@@ -80,13 +82,13 @@ export function derivePipelinePhase(
     } else {
       activeSession = null;
     }
-  } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+  } else if ((rs === 'failed' || rs === 'blocked') && isAlive(agent?.status)) {
     phase = 'review-feedback';
     activeSession = workSession;
-  } else if (agent?.agentPhase === 'planning' && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+  } else if (agent?.agentPhase === 'planning' && isAlive(agent?.status)) {
     phase = 'planning';
     activeSession = workSession;
-  } else if (agent?.status === 'healthy' || agent?.status === 'starting') {
+  } else if (isAlive(agent?.status)) {
     phase = 'working';
     activeSession = workSession;
   } else if (agent?.status === 'stopped' && agent?.agentPhase === 'review-response') {
@@ -160,7 +162,7 @@ export function derivePipelinePhase(
   // Merge tab: show once merge has been queued or beyond
   if (ms && ms !== 'pending') {
     // Monorepo merges stream the work agent (it handles rebase); polyrepo uses merge-agent.
-    const effectiveMergeSession = (workSession && (agent?.status === 'healthy' || agent?.status === 'starting'))
+    const effectiveMergeSession = (workSession && isAlive(agent?.status))
       ? workSession
       : mergeSession;
     tabs.push({
