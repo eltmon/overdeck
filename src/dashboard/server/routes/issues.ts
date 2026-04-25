@@ -2065,10 +2065,15 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
     const originStr = Array.isArray(origin) ? origin[0] : origin;
     const isValidOrigin = (() => {
-      if (!originStr) return false;
+      // Same-origin requests omit the Origin header — accept them.
+      if (!originStr) return true;
       try {
         const url = new URL(originStr);
-        return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+        return (
+          url.hostname === 'localhost' ||
+          url.hostname === '127.0.0.1' ||
+          url.hostname.endsWith('.localhost')
+        );
       } catch {
         return false;
       }
