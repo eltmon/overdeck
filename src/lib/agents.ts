@@ -1591,12 +1591,18 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
     // requests through the proxy → "unknown provider" 502. Always include --model when
     // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
-    const resumeModelFlag = providerExports.includes('ANTHROPIC_BASE_URL') ? ` --model ${model}` : '';
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    const launcherContent = `#!/bin/bash
-export CI=1
-${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --dangerously-skip-permissions --permission-mode bypassPermissions
-`;
+    const launcherContent = generateLauncherScript({
+      agentType: 'resume',
+      workingDir: agentState.workspace,
+      changeDir: false,
+      setCi: true,
+      providerExports,
+      baseCommand: 'claude',
+      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      resumeSessionId: sessionId,
+      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+    });
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
