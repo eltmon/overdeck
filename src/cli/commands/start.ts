@@ -472,6 +472,33 @@ export function hasBeadsTasks(workspacePath: string): boolean {
 }
 
 /**
+ * Validate that plan.vbrief.json belongs to the current issue.
+ * If the plan is for a different issue, the workspace contains stale planning
+ * artifacts and should not be used for work until planning is re-run.
+ */
+function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
+  const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+
+  if (!existsSync(planPath)) {
+    return { valid: true };
+  }
+
+  try {
+    const raw = readFileSync(planPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    const planIssueId = parsed?.plan?.id;
+
+    if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) {
+      return { valid: false, wrongIssue: planIssueId.toUpperCase() };
+    }
+  } catch {
+    // If we can't read/parse the file, let other validations handle it
+  }
+
+  return { valid: true };
+}
+
+/**
  * Validate that STATE.md belongs to the current issue.
  * If the STATE.md is for a different issue (cross-contamination from git merge),
  * remove it to prevent the agent from working on the wrong issue.
@@ -650,6 +677,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
+    }
+
+    // Validate plan.vbrief.json belongs to this issue (prevent stale .planning-complete from wrong issue)
+    const planValidation = validatePlanMatchesIssue(workspace, id);
+    if (!planValidation.valid) {
+      spinner.fail(`Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`);
+      console.log('');
+      console.log(chalk.red(`The workspace contains a stale plan from a different issue.`));
+      console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
+      console.log('');
+      console.log(chalk.bold('To fix this:'));
+      console.log(`  ${chalk.cyan(`1. Clean the workspace .planning/ directory`)}`);
+      console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
+      process.exit(1);
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)

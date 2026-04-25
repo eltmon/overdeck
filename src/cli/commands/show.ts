@@ -46,15 +46,16 @@ function relativeTime(iso: string | null | undefined): string {
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
   const { shadow, cv, context, health, json } = options;
 
-  // Scoped views delegate to the full sub-commands
-  if (shadow) return shadowCommand(id);
-  if (cv) return cvCommand(id, { json });
-  if (context) return contextCommand('state', `agent-${id.toLowerCase()}`, undefined, { json });
-  if (health) return healthCommand('ping', id, { json });
+  // Normalize input: accept both bare issue IDs (PAN-821) and prefixed agent IDs (agent-pan-821)
+  const normalizedId = id.toLowerCase().replace(/^agent-/, '');
+  const issueId = normalizedId.toUpperCase();
+  const agentId = `agent-${normalizedId}`;
 
-  // Default: compact combined summary (≤ 25 lines).
-  const issueId = id.toUpperCase();
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  // Scoped views delegate to the full sub-commands
+  if (shadow) return shadowCommand(issueId);
+  if (cv) return cvCommand(issueId, { json });
+  if (context) return contextCommand('state', agentId, undefined, { json });
+  if (health) return healthCommand('ping', issueId, { json });
 
   const shadowState = await getShadowState(issueId);
   const healthData = await (async () => {
