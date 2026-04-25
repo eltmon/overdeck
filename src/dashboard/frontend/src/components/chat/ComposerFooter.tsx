@@ -208,32 +208,38 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
       // always targets the conversation that was active when the upload
       // began, avoiding stale-closure races on rapid conversation switches.
       const ownerConversationName = currentConversationNameRef.current;
-      void uploadConversationImage(ownerConversationName, image.file)
-        .then((serverPath) => {
+      void uploadConversationImage(ownerConversationName, image.file).then(
+        (serverPath) => {
           activeUploadsRef.current--;
-          // Use the synchronously-updated ref so we detect conversation
-          // switches immediately, not after the useEffect fires.
-          if (
-            removedImageIdsRef.current.has(image.id)
-            || !mountedRef.current
-            || ownerConversationName !== currentConversationNameRef.current
-          ) {
-            deleteUploadedImage(ownerConversationName, serverPath);
-          } else {
-            updatePendingImage(image.id, { serverPath, error: null });
-          }
-          processUploadQueue();
-        })
-        .catch((err: unknown) => {
-          activeUploadsRef.current--;
-          if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
+          try {
+            // Use the synchronously-updated ref so we detect conversation
+            // switches immediately, not after the useEffect fires.
+            if (
+              removedImageIdsRef.current.has(image.id)
+              || !mountedRef.current
+              || ownerConversationName !== currentConversationNameRef.current
+            ) {
+              deleteUploadedImage(ownerConversationName, serverPath);
+            } else {
+              updatePendingImage(image.id, { serverPath, error: null });
+            }
+          } finally {
             processUploadQueue();
-            return;
           }
-          const message = err instanceof Error ? err.message : 'Failed to upload image';
-          updatePendingImage(image.id, { error: message });
-          processUploadQueue();
-        });
+        },
+        (err: unknown) => {
+          activeUploadsRef.current--;
+          try {
+            if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
+              return;
+            }
+            const message = err instanceof Error ? err.message : 'Failed to upload image';
+            updatePendingImage(image.id, { error: message });
+          } finally {
+            processUploadQueue();
+          }
+        },
+      );
     }
   }, [deleteUploadedImage, updatePendingImage]);
 

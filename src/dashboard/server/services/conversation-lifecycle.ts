@@ -26,13 +26,23 @@ export async function pollConversations(): Promise<void> {
 
     const aliveSessions = new Set(await listSessionNamesAsync());
 
+    const endedConversations: typeof conversations = [];
     for (const conv of conversations) {
       if (!aliveSessions.has(conv.tmuxSession)) {
         console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
         markConversationEnded(conv.name);
-        await cleanupUnreferencedConversationAttachments(conv);
+        endedConversations.push(conv);
       }
     }
+    // Parallelize attachment cleanup so one slow conversation doesn't block
+    // the rest of the poll loop.
+    await Promise.all(
+      endedConversations.map((conv) =>
+        cleanupUnreferencedConversationAttachments(conv).catch((err: unknown) => {
+          console.error(`[conversation-lifecycle] Cleanup failed for ${conv.name}:`, err);
+        }),
+      ),
+    );
   } catch (err: unknown) {
     // Don't crash the server on poll errors
     console.error('[conversation-lifecycle] Poll error:', err);

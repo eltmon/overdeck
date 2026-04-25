@@ -932,6 +932,12 @@ const postConversationRoute = HttpRouter.add(
         if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
           return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
         }
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+        if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
+          return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+        }
         const cwd = join(homedir(), 'Projects');
 
         if (!message) {

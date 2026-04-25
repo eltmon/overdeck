@@ -89,9 +89,10 @@ function sanitizeStyleAttr(styleValue: string): string {
     .join('; ');
 }
 
+const sharedDomParser = new DOMParser();
+
 function sanitizeShikiHtml(html: string): string {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
+  const doc = sharedDomParser.parseFromString(html, 'text/html');
 
   function walk(node: Node): Node | null {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -277,9 +278,15 @@ function makeComponents(isStreaming: boolean): Components {
       );
     },
     a({ href, children }) {
+      // Block javascript: and data: URIs to prevent XSS from assistant markdown
+      const safeHref =
+        typeof href === 'string' &&
+        !/^(javascript|data|vbscript):/i.test(href.trim())
+          ? href
+          : undefined;
       return (
         <a
-          href={href}
+          href={safeHref}
           target="_blank"
           rel="noopener noreferrer"
           className={styles.mdLink}
