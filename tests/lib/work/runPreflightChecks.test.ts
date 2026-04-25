@@ -17,7 +17,6 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 const mockExecFn = vi.fn();
-const mockExecFileFn = vi.fn();
 const mockGetVBriefACStatus = vi.fn();
 const mockSyncBeadStatusToVBrief = vi.fn();
 

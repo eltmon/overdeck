@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockExecFileFn = vi.fn();
+const mockExecFn = vi.fn();
 
 // execFile mock delegates to mockExecFn so tests that only set up exec
 // implementations also cover the bd list calls done-preflight makes via execFile.

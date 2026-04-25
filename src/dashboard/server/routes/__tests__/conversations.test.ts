@@ -214,7 +214,7 @@ describe('conversations route — DB integration', () => {
   });
 
   it('ended and archived cleanup preserve unsent uploads newer than session history', async () => {
-    const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
@@ -222,7 +222,6 @@ describe('conversations route — DB integration', () => {
 
     const sessionFile = join(TEST_HOME, 'unsent-session.jsonl');
     writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'existing history' }] } })}\n`);
-    updateSessionFile('unsent-conv', sessionFile);
 
     await new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -240,14 +239,13 @@ describe('conversations route — DB integration', () => {
   });
 
   it('archive prunes unreferenced uploads while preserving prose-first referenced ones', async () => {
-    const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
 
     const sessionFile = join(TEST_HOME, 'archived-session.jsonl');
-    updateSessionFile('archived-conv', sessionFile);
 
     const bytes = Buffer.from([137, 80, 78, 71]);
     const keptUpload = await handleConversationImageUpload('archived-conv', 'kept.png', bytes, 'image/png');
