@@ -139,3 +139,4 @@ Review-agent CHANGES_REQUESTED at 2026-04-23T00:21Z. Addressed all 6 issues (cri
 - [2026-04-25T01:51Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
 - [2026-04-25T02:32Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
 - [2026-04-25T06:10Z] review-agent → CHANGES-REQUESTED — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-25T22:59Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
