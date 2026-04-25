@@ -70,31 +70,45 @@ async function readOptional(p: string): Promise<string | null> {
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
+/** Cache for resolved project paths to avoid repeated sync FS calls. */
+const projectPathCache = new Map<string, string>();
+
 function getProjectPath(issuePrefix?: string): string {
-  if (issuePrefix) {
-    const resolved = resolveProjectFromIssue(`${issuePrefix}-1`);
-    if (resolved) return resolved.projectPath;
-    const config = getGitHubConfig();
-    if (config) {
-      for (const { owner, repo, prefix } of config.repos) {
-        const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
-        if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
-          for (const path of [
-            join(homedir(), 'Projects', repo),
-            join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
-            join(homedir(), 'Projects', owner, repo),
-          ]) {
-            // Sync existsSync is acceptable per CLAUDE.md for fast stat checks
-            // but we can't await here since this is a sync helper. Keep existsSync.
-            // TODO: if this becomes a hot path, convert to async
-            const { existsSync } = require('node:fs');
-            if (existsSync(path)) return path;
+  if (!issuePrefix) return join(homedir(), 'Projects');
+
+  const cached = projectPathCache.get(issuePrefix);
+  if (cached) return cached;
+
+  const resolved = resolveProjectFromIssue(`${issuePrefix}-1`);
+  if (resolved) {
+    projectPathCache.set(issuePrefix, resolved.projectPath);
+    return resolved.projectPath;
+  }
+
+  const config = getGitHubConfig();
+  if (config) {
+    for (const { owner, repo, prefix } of config.repos) {
+      const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
+      if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
+        for (const path of [
+          join(homedir(), 'Projects', repo),
+          join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
+          join(homedir(), 'Projects', owner, repo),
+        ]) {
+          // Sync existsSync is acceptable per CLAUDE.md for fast stat checks
+          const { existsSync } = require('node:fs');
+          if (existsSync(path)) {
+            projectPathCache.set(issuePrefix, path);
+            return path;
           }
         }
       }
     }
   }
-  return join(homedir(), 'Projects');
+
+  const fallback = join(homedir(), 'Projects');
+  projectPathCache.set(issuePrefix, fallback);
+  return fallback;
 }
 
 /**
@@ -249,6 +263,9 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
 
+      // Only expose interactive terminal for work/planning sessions (PAN-821 review)
+      const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning';
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
@@ -259,6 +276,7 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
         transcript: jsonlPath ? undefined : transcript,
         presence,
         jsonlPath: jsonlPath || undefined,
+        tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
       });
     } catch { /* skip malformed state */ }
   }
@@ -275,7 +293,9 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
         type: 'legacy',
         sessionId,
         model: 'unknown',
-        startedAt: fileStat?.birthtime?.toISOString() || fileStat?.mtime.toISOString() || new Date().toISOString(),
+        startedAt: (fileStat?.birthtime && !isNaN(fileStat.birthtime.getTime()) ? fileStat.birthtime.toISOString() : undefined)
+          || fileStat?.mtime.toISOString()
+          || new Date().toISOString(),
         duration: null,
         status: 'completed',
         transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${stateMdText}`,
@@ -335,10 +355,10 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
     const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
 
     // Discover parallel review sessions for this issue (review-<issueId>-<timestamp>-<role>)
+    // Reuse the already-fetched tmuxSessionNames instead of calling listSessionNamesAsync again.
     let reviewSessions: string[] = [];
     try {
-      const allSessions = await listSessionNamesAsync();
-      reviewSessions = allSessions.filter(s => s.startsWith(`review-${issueId}-`));
+      reviewSessions = Array.from(tmuxSessionNames).filter(s => s.startsWith(`review-${issueId}-`));
       // Keep only the most recent review round (highest timestamp) to avoid
       // stale tabs from previous review rounds showing "Connection lost".
       if (reviewSessions.length > 0) {
@@ -424,6 +444,8 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
             : 'ended';
           const reviewerJsonlPath = await resolveJsonlPath(tmuxName, workspacePath);
 
+          // Do NOT expose tmuxSession for reviewer sessions — they are autonomous
+          // specialists and should not be interactively attached (PAN-821 review)
           sections.push({
             type: role ? 'reviewer' : 'review',
             role: role || undefined,
@@ -434,7 +456,6 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
             duration,
             status: ss.status,
             transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
-            tmuxSession: tmuxName,
             presence: reviewerPresence,
             jsonlPath: reviewerJsonlPath || undefined,
           });
@@ -468,6 +489,8 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
       const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
 
+      // Do NOT expose tmuxSession for specialist sessions — they are autonomous
+      // and should not be interactively attached (PAN-821 review)
       sections.push({
         type: ss.type,
         sessionId: specialistSessionId,
@@ -476,7 +499,6 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
         duration,
         status: ss.status,
         transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
-        tmuxSession: tmuxSessionName,
         presence: specialistPresence,
         jsonlPath: specialistJsonlPath || undefined,
       });

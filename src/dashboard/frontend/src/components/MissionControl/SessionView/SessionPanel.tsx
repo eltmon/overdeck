@@ -75,7 +75,11 @@ export function SessionPanel({ session, issueId }: SessionPanelProps) {
 
   const hasJsonl = !!session.jsonlPath;
   const hasTranscript = !!session.transcript;
-  const hasTerminal = !!session.tmuxSession && session.presence !== 'ended';
+  // Only allow terminal for work/planning sessions with a live tmux session
+  const allowTerminal = (session.type === 'work' || session.type === 'planning') &&
+    !!session.tmuxSession &&
+    session.presence !== 'ended';
+  const hasTerminal = allowTerminal;
   const isEnded = session.presence === 'ended';
 
   return (
