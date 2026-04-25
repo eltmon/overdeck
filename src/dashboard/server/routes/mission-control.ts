@@ -193,18 +193,32 @@ const getMissionControlActivityRoute = HttpRouter.add(
   })),
 );
 
+export interface ActivityContext {
+  tmuxSessionNames?: Set<string>;
+  taskFileContents?: Map<string, string>;
+}
+
 export async function fetchActivityData(issueId: string): Promise<unknown> {
+  return fetchActivityDataWithContext(issueId, {});
+}
+
+export async function fetchActivityDataWithContext(
+  issueId: string,
+  context: ActivityContext = {},
+): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
-  // Fetch all tmux session names once for presence derivation (PAN-821)
-  const tmuxSessionNames = new Set<string>();
-  try {
-    const allSessions = await listSessionNamesAsync();
-    for (const s of allSessions) {
-      if (s.trim()) tmuxSessionNames.add(s.trim());
-    }
-  } catch { /* tmux may not be available */ }
+  // Use shared tmux session names if provided, else fetch once (PAN-821)
+  const tmuxSessionNames = context.tmuxSessionNames ?? new Set<string>();
+  if (!context.tmuxSessionNames) {
+    try {
+      const allSessions = await listSessionNamesAsync();
+      for (const s of allSessions) {
+        if (s.trim()) tmuxSessionNames.add(s.trim());
+      }
+    } catch { /* tmux may not be available */ }
+  }
 
   const sections: Array<{
     type: string;
@@ -294,7 +308,7 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
         sessionId,
         model: 'unknown',
         startedAt: (fileStat?.birthtime && !isNaN(fileStat.birthtime.getTime()) ? fileStat.birthtime.toISOString() : undefined)
-          || fileStat?.mtime.toISOString()
+          || fileStat?.mtime?.toISOString()
           || new Date().toISOString(),
         duration: null,
         status: 'completed',
@@ -311,20 +325,28 @@ export async function fetchActivityData(issueId: string): Promise<unknown> {
     const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
     const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };
 
-    if (await pathExists(tasksDir)) {
-      const taskFiles = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
-      for (const f of taskFiles) {
-        const content = await readOptional(join(tasksDir, f));
-        if (!content) continue;
-        if (content.includes(issueId.toUpperCase()) || content.includes(issueId)) {
-          if (f.startsWith('review-agent')) taskFilesByType.review!.push(f);
-          else if (f.startsWith('test-agent')) taskFilesByType.test!.push(f);
-          else if (f.startsWith('merge-agent')) taskFilesByType.merge!.push(f);
-        }
+    // Use shared task file contents if provided, else read once and cache (PAN-821)
+    let taskFileContents = context.taskFileContents;
+    if (!taskFileContents) {
+      taskFileContents = new Map<string, string>();
+      if (await pathExists(tasksDir)) {
+        const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
+        await Promise.all(filenames.map(async (f) => {
+          const content = await readOptional(join(tasksDir, f));
+          if (content) taskFileContents!.set(f, content);
+        }));
       }
-      for (const type of Object.keys(taskFilesByType)) {
-        taskFilesByType[type]!.sort();
+    }
+
+    for (const [f, content] of taskFileContents) {
+      if (content.includes(issueId.toUpperCase()) || content.includes(issueId)) {
+        if (f.startsWith('review-agent')) taskFilesByType.review!.push(f);
+        else if (f.startsWith('test-agent')) taskFilesByType.test!.push(f);
+        else if (f.startsWith('merge-agent')) taskFilesByType.merge!.push(f);
       }
+    }
+    for (const type of Object.keys(taskFilesByType)) {
+      taskFilesByType[type]!.sort();
     }
 
     const typeMap: Record<string, string> = { review: 'review', test: 'test', merge: 'merge' };

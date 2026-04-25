@@ -622,15 +622,18 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.sessionPresenceActive {
-  background: var(--mc-success);
-  animation: pulse 2s infinite;
+.sessionPresenceSpinner {
+  color: var(--mc-success);
+  animation: spin 1.5s linear infinite;
 }
 
 .sessionPresenceIdle {
-  background: var(--mc-warning);
+  background: var(--mc-success);
 }
 
 .sessionPresenceEnded {

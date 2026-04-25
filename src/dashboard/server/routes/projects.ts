@@ -13,10 +13,11 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { fetchActivityData } from './mission-control.js';
+import { fetchActivityDataWithContext, type ActivityContext } from './mission-control.js';
 import { httpHandler } from './http-handler.js';
 import { listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
+import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
 
@@ -93,7 +94,7 @@ function mapSectionToSessionNode(section: ActivitySection): SessionNode {
 async function resolveFeatureTitle(
   issueId: string,
   issueLower: string,
-  issuePrefix: string,
+  project?: { config: { path: string; workspace?: { workspaces_dir?: string } } },
 ): Promise<string> {
   // Try issue data service first
   try {
@@ -109,9 +110,8 @@ async function resolveFeatureTitle(
   } catch { /* non-fatal */ }
 
   // Fall back to PLANNING_PROMPT.md first line
-  try {
-    const projects = listProjects();
-    for (const project of projects) {
+  if (project) {
+    try {
       const projectPath = (project.config as { path: string }).path;
       const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
       const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
@@ -122,8 +122,8 @@ async function resolveFeatureTitle(
         const title = firstLine.replace(/^#+\s*/, '').trim();
         if (title) return title;
       }
-    }
-  } catch { /* non-fatal */ }
+    } catch { /* non-fatal */ }
+  }
 
   return issueId;
 }
@@ -150,14 +150,35 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   })),
 );
 
-async function fetchProjectSessionTree(projectKey: string): Promise<unknown | null> {
+export async function fetchProjectSessionTree(projectKey: string): Promise<unknown | null> {
   const projects = listProjects();
-  const project = projects.find(p => p.key === projectKey);
+  const project = projects.find(p =>
+    p.key === projectKey || (p.config as { name?: string }).name === projectKey
+  );
   if (!project) return null;
 
   const projectPath = (project.config as { path: string }).path;
   const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
   const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
+
+  // Hoist shared subprocess calls once per request (PAN-821 review)
+  const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
+  const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
+
+  const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
+  const sharedTaskFileContents = new Map<string, string>();
+  if (await pathExists(tasksDir)) {
+    const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
+    await Promise.all(filenames.map(async (f) => {
+      const content = await readOptional(join(tasksDir, f));
+      if (content) sharedTaskFileContents.set(f, content);
+    }));
+  }
+
+  const sharedContext: ActivityContext = {
+    tmuxSessionNames: sharedTmuxSessionNames,
+    taskFileContents: sharedTaskFileContents,
+  };
 
   const features: Array<{
     issueId: string;
@@ -176,7 +197,6 @@ async function fetchProjectSessionTree(projectKey: string): Promise<unknown | nu
       }));
 
     const results = await Promise.all(featureCandidates.map(async (c) => {
-      const issuePrefix = extractPrefix(c.issueId) ?? c.issueId.split('-')[0];
       const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
       const planningDir = join(workspacesDir, c.name, '.planning');
       const [hasAgent, hasPlanning] = await Promise.all([
@@ -185,12 +205,12 @@ async function fetchProjectSessionTree(projectKey: string): Promise<unknown | nu
       ]);
       if (!hasAgent && !hasPlanning) return null;
       try {
-        const activityData = await fetchActivityData(c.issueId) as {
+        const activityData = await fetchActivityDataWithContext(c.issueId, sharedContext) as {
           issueId: string;
           sections: ActivitySection[];
         };
         if (!activityData.sections || activityData.sections.length === 0) return null;
-        const title = await resolveFeatureTitle(c.issueId, c.issueLower, issuePrefix);
+        const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
         const sessions = activityData.sections.map(mapSectionToSessionNode);
         return { issueId: c.issueId, title, sessions };
       } catch {

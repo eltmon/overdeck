@@ -175,7 +175,6 @@ export function MissionControl({
       queryKey: ['session-tree', project.name],
       queryFn: () => fetchProjectSessionTree(project.name),
       enabled: sidebarTab === 'projects',
-      refetchInterval: 10000,
     })),
   });
 

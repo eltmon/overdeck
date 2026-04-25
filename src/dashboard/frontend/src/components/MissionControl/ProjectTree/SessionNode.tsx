@@ -8,12 +8,34 @@ interface SessionNodeProps {
 }
 
 function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
+  if (presence === 'active') {
+    return (
+      <span className={styles.sessionPresence}>
+        <svg
+          className={styles.sessionPresenceSpinner}
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+        >
+          <circle
+            cx="5"
+            cy="5"
+            r="4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeDasharray="16"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+    );
+  }
+
   const className =
-    presence === 'active'
-      ? styles.sessionPresenceActive
-      : presence === 'idle'
-        ? styles.sessionPresenceIdle
-        : styles.sessionPresenceEnded;
+    presence === 'idle'
+      ? styles.sessionPresenceIdle
+      : styles.sessionPresenceEnded;
 
   return <span className={`${styles.sessionPresence} ${className}`} />;
 }
