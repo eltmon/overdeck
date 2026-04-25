@@ -12,6 +12,7 @@ import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
+import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
 import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolation } from '../../lib/claude-mcp.js';
@@ -116,6 +117,19 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
             }
           }
         }
+      }
+    }
+
+    // Agent directory cleanup preview
+    const agentCleanupPreview = await cleanupAgentDirectories({ dryRun: true });
+    if (agentCleanupPreview.totalOrphaned > 0) {
+      console.log(chalk.cyan(`\nagent cleanup (~/.panopticon/agents/):`));
+      console.log(chalk.dim(`  Found ${agentCleanupPreview.totalOrphaned} orphaned directories`));
+      for (const name of agentCleanupPreview.wouldRemove) {
+        console.log(`  ${chalk.red('✗')} ${name}`);
+      }
+      for (const name of agentCleanupPreview.protected) {
+        console.log(`  ${chalk.yellow('◆')} ${name} ${chalk.dim('(running session)')}`);
       }
     }
 
@@ -523,5 +537,26 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (skillsMirror.removed.length > 0) skillsParts.push(`${skillsMirror.removed.length} removed`);
   if (skillsParts.length > 0) {
     console.log(chalk.cyan(`Skills mirror: ${skillsParts.join(', ')}`));
+  }
+
+  // Agent directory cleanup
+  const cleanupSpinner = ora('Checking for orphaned agent directories...').start();
+  const agentCleanupResult = await cleanupAgentDirectories({ dryRun: false, force: options.force });
+
+  if (agentCleanupResult.totalOrphaned === 0) {
+    cleanupSpinner.succeed('No orphaned agent directories found');
+  } else {
+    const removedCount = agentCleanupResult.removed.length;
+    const protectedCount = agentCleanupResult.protected.length;
+
+    if (removedCount > 0) {
+      cleanupSpinner.succeed(`Removed ${removedCount} orphaned director${removedCount === 1 ? 'y' : 'ies'}`);
+    } else if (protectedCount > 0) {
+      cleanupSpinner.info(`Found ${protectedCount} orphaned director${protectedCount === 1 ? 'y' : 'ies'} with running sessions (skipped)`);
+    }
+
+    if (agentCleanupResult.protected.length > 0) {
+      console.log(chalk.dim(`  Protected (running sessions): ${agentCleanupResult.protected.join(', ')}`));
+    }
   }
 }
