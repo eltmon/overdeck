@@ -23,7 +23,7 @@ import { promisify } from 'node:util';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import type * as Multipart from 'effect/unstable/http/Multipart';
+import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
   listConversations,
@@ -864,11 +864,13 @@ const getConversationsRoute = HttpRouter.add(
         // started yet — spawn is async). After 30s we fall back to the actual tmux check.
         const SPAWN_GRACE_MS = 30_000;
         const liveSessionNames = new Set(await listSessionNamesAsync());
+        const now = Date.now();
+        const graceThreshold = now - SPAWN_GRACE_MS;
         const enriched = conversations.map((conv) => {
           const withinGrace =
             conv.status === 'active' &&
             !conv.endedAt &&
-            Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
+            new Date(conv.createdAt).getTime() > graceThreshold;
           const sessionAlive = !conv.forkStatus && (withinGrace || liveSessionNames.has(conv.tmuxSession));
 
           return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
@@ -1354,7 +1356,15 @@ const postConversationUploadImageRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    const multipart = yield* request.multipart;
+    const multipart = yield* Effect.provideServices(
+      request.multipart,
+      Multipart.limitsServices({
+        maxFileSize: MAX_UPLOAD_BYTES,
+        maxTotalSize: MAX_UPLOAD_BYTES,
+        maxParts: 3,
+        maxFieldSize: 1024,
+      }),
+    );
     const files = multipart['file'] as Multipart.PersistedFile[] | undefined;
     const filenameField = multipart['filename'] as string | string[] | undefined;
     const mimeTypeField = multipart['mimeType'] as string | string[] | undefined;
@@ -1387,10 +1397,6 @@ const postConversationUploadImageRoute = HttpRouter.add(
         ]);
         return await handleConversationImageUpload(name, filename, bytes, mimeType);
       } catch (error: unknown) {
-        // Guard: if the handler threw what looks like an HTTP response, pass it through
-        if (error instanceof Response) {
-          return error;
-        }
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] upload image failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });

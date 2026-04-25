@@ -153,6 +153,7 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
         // Skip oversized lines that could stall the reader (e.g. huge base64)
         if (line.length > MAX_JSONL_LINE_LENGTH) continue;
         let text: string | undefined;
+        let structuredFoundPaths = false;
         try {
           const entry = JSON.parse(line);
           // Extract text from known Claude Code JSONL shapes
@@ -175,15 +176,17 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
           for (const attachmentPath of extractConversationAttachmentPaths(text)) {
             if (isUnderAttachmentDir(resolvedAttachmentDir, attachmentPath)) {
               referenced.add(basename(attachmentPath));
+              structuredFoundPaths = true;
             }
           }
         }
-        // Also search the raw JSON line for @/attachment paths. This catches
-        // tool-use and other shapes where the path may be in nested fields
-        // (e.g. tool_use.input, tool_result.content) that structured extraction
-        // above does not reach. We JSON-decode the captured value to handle
-        // escaped slashes (\/) that appear in raw JSON strings.
-        for (const match of line.matchAll(/"@([^"]+)"/g)) {
+        // Only run regex fallback on the raw JSON line when structured extraction
+        // found nothing. This catches tool-use and other shapes where the path may
+        // be in nested fields (e.g. tool_use.input, tool_result.content) that
+        // structured extraction above does not reach. We JSON-decode the captured
+        // value to handle escaped slashes (\/) that appear in raw JSON strings.
+        if (!structuredFoundPaths) {
+          for (const match of line.matchAll(/"@([^"]+)"/g)) {
           const rawValue = match[1];
           // Only consider values that look like attachment paths
           if (!rawValue.startsWith('/') && !rawValue.startsWith('\\/')) continue;
@@ -199,6 +202,7 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
             }
           }
         }
+      }
       }
     } finally {
       rl.close();

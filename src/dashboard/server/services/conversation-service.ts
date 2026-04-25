@@ -461,16 +461,20 @@ export async function parseConversationMessages(
 
   // Sort by (createdAt, sequence) so the conversation view matches terminal order.
   // Use direct string comparison (not localeCompare) — ISO 8601 timestamps sort lexicographically.
-  messages.sort((a, b) => {
-    if (a.createdAt < b.createdAt) return -1;
-    if (a.createdAt > b.createdAt) return 1;
-    return (a.sequence ?? 0) - (b.sequence ?? 0);
-  });
-  workLog.sort((a, b) => {
-    if (a.createdAt < b.createdAt) return -1;
-    if (a.createdAt > b.createdAt) return 1;
-    return (a.sequence ?? 0) - (b.sequence ?? 0);
-  });
+  // For incremental parses (the hot path), messages arrive in file order and are already
+  // sorted — skip the O(n log n) sort entirely.
+  if (!isIncremental) {
+    messages.sort((a, b) => {
+      if (a.createdAt < b.createdAt) return -1;
+      if (a.createdAt > b.createdAt) return 1;
+      return (a.sequence ?? 0) - (b.sequence ?? 0);
+    });
+    workLog.sort((a, b) => {
+      if (a.createdAt < b.createdAt) return -1;
+      if (a.createdAt > b.createdAt) return 1;
+      return (a.sequence ?? 0) - (b.sequence ?? 0);
+    });
+  }
 
   // Streaming detection: agent is active if the last assistant message is incomplete,
   // or if there are pending/unresolved tools (mid-turn), or a user message arrived
