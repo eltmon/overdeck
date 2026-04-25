@@ -13,6 +13,15 @@ vi.mock('../../../../lib/database/conversations-db.js', () => ({
 
 vi.mock('../conversation-attachments.js', () => ({
   cleanupUnreferencedConversationAttachments: mockCleanupUnreferencedConversationAttachments,
+  runInBatches: async (
+    items: unknown[],
+    _batchSize: number,
+    fn: (item: unknown) => Promise<unknown>,
+  ) => {
+    for (const item of items) {
+      await fn(item);
+    }
+  },
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({

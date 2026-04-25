@@ -203,12 +203,19 @@ async function getCachedMessages(
       // File was truncated or rotated — fall back to full parse.
       result = await parseConversationMessages(sessionFile, 0);
     } else {
+      // Lazy getters avoid O(n) array copies on the hot incremental-parse path;
+      // the arrays are only materialized when the caller serializes or iterates.
+      const cachedResult = cached.result;
       result = {
-        messages: cached.result.messages.concat(incremental.messages),
-        workLog: cached.result.workLog.concat(incremental.workLog),
+        get messages() {
+          return cachedResult.messages.concat(incremental.messages);
+        },
+        get workLog() {
+          return cachedResult.workLog.concat(incremental.workLog);
+        },
         byteOffset: incremental.byteOffset,
         streaming: incremental.streaming,
-        totalCost: cached.result.totalCost + incremental.totalCost,
+        totalCost: cachedResult.totalCost + incremental.totalCost,
         pendingToolUse: incremental.pendingToolUse,
         unresolvedResults: incremental.unresolvedResults,
         lastSequence: incremental.lastSequence,
@@ -484,8 +491,13 @@ export async function handleConversationImageUpload(
   const fileName = `${randomUUID()}${extension}`;
   const path = join(resolvedDir, fileName);
   const tmpPath = `${path}.tmp`;
-  await writeFile(tmpPath, bytes);
-  await rename(tmpPath, path);
+  try {
+    await writeFile(tmpPath, bytes);
+    await rename(tmpPath, path);
+  } catch (err) {
+    await rm(tmpPath, { force: true }).catch(() => {});
+    throw err;
+  }
 
   return jsonResponse({ path });
 }
@@ -1351,11 +1363,20 @@ const postConversationUploadImageRoute = HttpRouter.add(
     const mimeTypeField = multipart['mimeType'] as string | string[] | undefined;
 
     const file = files?.[0];
-    const filename = Array.isArray(filenameField) ? filenameField[0] : filenameField;
-    const mimeType = Array.isArray(mimeTypeField) ? mimeTypeField[0] : mimeTypeField;
+    const filenameRaw = Array.isArray(filenameField) ? filenameField[0] : filenameField;
+    const mimeTypeRaw = Array.isArray(mimeTypeField) ? mimeTypeField[0] : mimeTypeField;
 
-    if (!file || !file.path || !filename || !mimeType) {
-      return jsonResponse({ error: 'file, filename, and mimeType are required' }, { status: 400 });
+    if (typeof filenameRaw !== 'string') {
+      return jsonResponse({ error: 'filename is required' }, { status: 400 });
+    }
+    if (typeof mimeTypeRaw !== 'string') {
+      return jsonResponse({ error: 'mimeType is required' }, { status: 400 });
+    }
+    const filename = filenameRaw;
+    const mimeType = mimeTypeRaw;
+
+    if (!file || !file.path) {
+      return jsonResponse({ error: 'file is required' }, { status: 400 });
     }
 
     return yield* Effect.promise(async () => {

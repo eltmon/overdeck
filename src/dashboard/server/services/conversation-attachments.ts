@@ -11,7 +11,7 @@ const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
 /** Run async tasks in bounded batches to avoid unbounded Promise.all
  *  that can exhaust file descriptors or memory under heavy load. */
-async function runInBatches<T>(items: T[], batchSize: number, fn: (item: T) => Promise<unknown>): Promise<void> {
+export async function runInBatches<T>(items: T[], batchSize: number, fn: (item: T) => Promise<unknown>): Promise<void> {
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     await Promise.all(batch.map(fn));
@@ -279,7 +279,7 @@ export function extractConversationAttachmentPaths(message: string): string[] {
     message.matchAll(/(?<!\S)@(\/[^\s]+)/g),
     ([, attachmentPath]) => {
       let path = attachmentPath;
-      while (path.length > 1 && /[.,;:!?)\]}+]$/.test(path)) {
+      while (path.length > 1 && /[.,;:!?)\]}+"']$/.test(path)) {
         path = path.slice(0, -1);
       }
       return path;
@@ -332,7 +332,18 @@ export async function isConversationAttachmentPath(name: string, attachmentPath:
 }
 
 export async function hasConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {
-  return (await isConversationAttachmentPath(name, attachmentPath)) && existsSync(attachmentPath);
+  try {
+    const attachmentDir = resolve(getConversationAttachmentDir(name));
+    const candidate = await resolveForContainment(attachmentPath);
+    if (!candidate.startsWith(`${attachmentDir}/`)) {
+      return false;
+    }
+    // Use the resolved path for existence check so dangling symlinks inside
+    // the root are handled consistently with the containment check.
+    return existsSync(candidate);
+  } catch {
+    return false;
+  }
 }
 
 export async function removeConversationAttachment(name: string, attachmentPath: string): Promise<boolean> {

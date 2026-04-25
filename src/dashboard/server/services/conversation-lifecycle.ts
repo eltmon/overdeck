@@ -8,7 +8,7 @@
 
 import { listActiveConversations, markConversationEnded } from '../../../lib/database/conversations-db.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
-import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
+import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -34,15 +34,13 @@ export async function pollConversations(): Promise<void> {
         endedConversations.push(conv);
       }
     }
-    // Parallelize attachment cleanup so one slow conversation doesn't block
-    // the rest of the poll loop.
-    await Promise.all(
-      endedConversations.map((conv) =>
-        cleanupUnreferencedConversationAttachments(conv).catch((err: unknown) => {
-          console.error(`[conversation-lifecycle] Cleanup failed for ${conv.name}:`, err);
-        }),
-      ),
-    );
+    // Batch attachment cleanup to avoid an unbounded fan-out when many
+    // conversations end simultaneously (e.g., after server restart).
+    await runInBatches(endedConversations, 5, async (conv) => {
+      await cleanupUnreferencedConversationAttachments(conv).catch((err: unknown) => {
+        console.error(`[conversation-lifecycle] Cleanup failed for ${conv.name}:`, err);
+      });
+    });
   } catch (err: unknown) {
     // Don't crash the server on poll errors
     console.error('[conversation-lifecycle] Poll error:', err);
