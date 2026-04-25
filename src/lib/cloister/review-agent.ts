@@ -15,6 +15,7 @@ import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agent
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -551,10 +552,8 @@ export async function waitForReviewer(
 
   while (Date.now() < deadline) {
     // Output file is the primary completion signal — Claude sessions don't auto-exit.
+    // Keep the session alive so the dashboard can show reviewer tabs after completion.
     if (fileExists(outputFile)) {
-      try { await killSession(sessionName); } catch (err) {
-        console.error(`[review-agent] Failed to kill completed reviewer session ${sessionName}:`, err);
-      }
       console.log(`[review-agent] Reviewer ${sessionName} completed in ${Date.now() - startedAt}ms`);
       return 'completed';
     }
@@ -747,6 +746,7 @@ export async function runParallelReview(
   }));
 
   console.log(`[review-agent] Spawned ${reviewerSessions.length} reviewer sessions for review ${reviewId}`);
+  emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) spawned`, issueId: context.issueId });
 
   // ── Phase 2: Wait for all reviewers ───────────────────────────────────────
   const reviewerResults = await Promise.all(
@@ -761,6 +761,8 @@ export async function runParallelReview(
   if (!completedReviewers) {
     const failed = reviewerResults.filter(r => r.status === 'failed').map(r => r.role);
     console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed or timed out: ${failed.join(', ')}`);
+    emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failed.join(', ')} failed`, issueId: context.issueId });
+    emitActivityTts({ utterance: `${context.issueId} review aborted, ${failed.join(', ')} failed`, priority: 0, issueId: context.issueId });
     return {
       result: {
         success: false,
@@ -796,12 +798,14 @@ export async function runParallelReview(
   await writeFile(synthPromptFile, synthPrompt);
 
   await spawnFn(synthSessionName, synthModel, synthPromptFile, context.projectPath);
+  emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — synthesis started`, issueId: context.issueId });
   await waitFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
   const result = await parseSynthesisFn(outputDir, agents);
 
   await postReviewFn(context, result, outputDir);
+  emitActivityEntry({ source: 'review-specialist', level: result.success ? (result.reviewResult === 'APPROVED' ? 'success' : 'warn') : 'error', message: `${context.issueId} — review complete: ${result.reviewResult}`, issueId: context.issueId });
 
   // ── Phase 5: Log to history + notify work agent ───────────────────────────
   // These were previously in the deprecated spawnReviewAgent wrapper; moved here
@@ -814,6 +818,7 @@ export async function runParallelReview(
   }
   try {
     await sendFeedbackToWorkAgent(context, result);
+    emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — feedback sent to work agent`, issueId: context.issueId });
   } catch (err) {
     console.error(`[review-agent] sendFeedbackToWorkAgent failed for ${context.issueId} (non-fatal):`, err);
   }
@@ -995,6 +1000,7 @@ export async function dispatchParallelReview(
       workspace: opts.workspace,
     });
     console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}`);
+    emitActivityEntry({ source: 'review-specialist', level: 'info', message: `Review coordinator spawned for ${opts.issueId}: ${sessionName}`, issueId: opts.issueId });
     return {
       success: true,
       message: `Review coordinator spawned: ${sessionName}`,
