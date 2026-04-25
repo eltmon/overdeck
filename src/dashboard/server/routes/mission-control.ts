@@ -68,6 +68,45 @@ async function readOptional(p: string): Promise<string | null> {
   return readFile(p, 'utf-8').catch(() => null);
 }
 
+/** Simple semaphore: run at most `max` promises concurrently. */
+function withConcurrencyLimit<T>(
+  tasks: Array<() => Promise<T>>,
+  max: number,
+): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const results = new Array<T>(tasks.length);
+    let index = 0;
+    let running = 0;
+    let completed = 0;
+    let rejected = false;
+
+    function next() {
+      if (rejected) return;
+      if (completed === tasks.length) {
+        resolve(results);
+        return;
+      }
+      while (running < max && index < tasks.length) {
+        const i = index++;
+        running++;
+        tasks[i]!()
+          .then((val) => {
+            results[i] = val;
+            running--;
+            completed++;
+            next();
+          })
+          .catch((err) => {
+            rejected = true;
+            reject(err);
+          });
+      }
+    }
+
+    next();
+  });
+}
+
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
 /** Cache for resolved project paths to avoid repeated sync FS calls. */
@@ -232,7 +271,7 @@ export async function fetchActivityDataWithContext(
     status: string;
     transcript?: string;
     presence: SessionNodePresence;
-    jsonlPath?: string;
+    hasJsonl?: boolean;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
@@ -288,11 +327,14 @@ export async function fetchActivityDataWithContext(
         sessionId: checkId,
         model: state.model || state.runtime || 'unknown',
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
-        duration: state.startedAt ? Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000) : null,
+        duration: state.startedAt ? (() => {
+          const ms = Date.now() - new Date(state.startedAt).getTime();
+          return isNaN(ms) ? null : Math.floor(ms / 1000);
+        })() : null,
         status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
         presence,
-        jsonlPath: jsonlPath || undefined,
+        hasJsonl: !!jsonlPath,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
       });
     } catch { /* skip malformed state */ }
@@ -317,7 +359,7 @@ export async function fetchActivityDataWithContext(
         status: 'completed',
         transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${stateMdText}`,
         presence: 'ended',
-        jsonlPath: jsonlPath || undefined,
+        hasJsonl: !!jsonlPath,
       });
     }
   }
@@ -482,7 +524,7 @@ export async function fetchActivityDataWithContext(
             status: ss.status,
             transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
             presence: reviewerPresence,
-            jsonlPath: reviewerJsonlPath || undefined,
+            hasJsonl: !!reviewerJsonlPath,
           });
         }
         continue;
@@ -525,7 +567,7 @@ export async function fetchActivityDataWithContext(
         status: ss.status,
         transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
         presence: specialistPresence,
-        jsonlPath: specialistJsonlPath || undefined,
+        hasJsonl: !!specialistJsonlPath,
       });
     }
   }
@@ -1200,91 +1242,96 @@ async function fetchProjectTree(): Promise<unknown[]> {
 
     if (await pathExists(workspacesDir)) {
       const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
-      for (const entry of entries) {
-        if (!entry.isDirectory() || !entry.name.startsWith('feature-')) continue;
+      const featureEntries = entries.filter(e => e.isDirectory() && e.name.startsWith('feature-'));
 
-        const featurePath = join(workspacesDir, entry.name);
-        const issueLower = entry.name.replace('feature-', '');
-        const issueId = issueLower.toUpperCase();
-        const planningDir = join(featurePath, '.planning');
+      const featureResults = await withConcurrencyLimit(
+        featureEntries.map((entry) => async () => {
+          const featurePath = join(workspacesDir, entry.name);
+          const issueLower = entry.name.replace('feature-', '');
+          const issueId = issueLower.toUpperCase();
+          const planningDir = join(featurePath, '.planning');
 
-        const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
-        let agentStatus: string | null = null;
-        let lastActivity: number | null = null;
+          const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+          let agentStatus: string | null = null;
+          let lastActivity: number | null = null;
 
-        const stateText = await readOptional(join(agentDir, 'state.json'));
-        if (stateText) {
-          try {
-            const state = JSON.parse(stateText) as { state?: string; lastActivity?: string };
-            agentStatus = state.state || null;
-            if (state.lastActivity) lastActivity = new Date(state.lastActivity).getTime();
-          } catch { /* skip */ }
-        }
-
-        const hasTmux = tmuxSessions.has(`agent-${issueLower}`);
-        const hasRecentAgentActivity = lastActivity != null && (now - lastActivity) < recentMs;
-        const isAgentLive = (agentStatus === 'active' || agentStatus === 'suspended') && (hasTmux || hasRecentAgentActivity);
-
-        const hasWorkspace = await pathExists(featurePath);
-
-        const issueCanonicalState = issueStateMap.get(issueId) || '';
-        const showByTrackerState = ['in_progress', 'in_review'].includes(issueCanonicalState);
-
-        if (!hasTmux && !isAgentLive && !hasWorkspace && !showByTrackerState) continue;
-
-        const [hasPlanning, hasPrd, hasState, isShadow] = await Promise.all([
-          pathExists(planningDir),
-          pathExists(join(planningDir, 'PLANNING_PROMPT.md')),
-          pathExists(join(planningDir, 'STATE.md')),
-          pathExists(join(planningDir, 'INFERENCE.md')),
-        ]);
-
-        const centralReviewStatus = getReviewStatus(issueId);
-        const reviewStatus = centralReviewStatus?.reviewStatus || null;
-        const testStatus = centralReviewStatus?.testStatus || null;
-        const mergeStatus = centralReviewStatus?.mergeStatus || null;
-
-        const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `agent-${issueLower}.json`);
-        let isHeartbeatFresh = false;
-        const hbText = await readOptional(heartbeatFile);
-        if (hbText) {
-          try {
-            const hb = JSON.parse(hbText) as { timestamp: string };
-            isHeartbeatFresh = (now - new Date(hb.timestamp).getTime()) < 10 * 60 * 1000;
-          } catch { /* skip */ }
-        }
-
-        const isAgentTrulyActive = hasTmux && (isHeartbeatFresh || agentStatus === 'active');
-
-        let stateLabel = 'Idle';
-        if (mergeStatus === 'merged') stateLabel = 'Done';
-        else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'In Review';
-        else if (reviewStatus === 'reviewing' || testStatus === 'testing') stateLabel = 'In Review';
-        else if (reviewStatus === 'passed' && testStatus === 'pending') stateLabel = 'In Review';
-        else if (isAgentTrulyActive) stateLabel = 'In Progress';
-        else if (hasTmux && !isHeartbeatFresh && agentStatus === 'active') stateLabel = 'Has Context';
-        else if (agentStatus === 'suspended') stateLabel = 'Suspended';
-        else if (hasRecentAgentActivity && agentStatus === 'active' && isHeartbeatFresh) stateLabel = 'In Progress';
-        else if (hasPrd && !hasState) stateLabel = 'Planning';
-        else if (hasState) stateLabel = 'Has Context';
-
-        let title = issueTitleMap.get(issueId) || '';
-        if (!title && hasPrd) {
-          const promptContent = await readOptional(join(planningDir, 'PLANNING_PROMPT.md'));
-          if (promptContent) {
-            const firstLine = promptContent.split('\n').find(l => l.trim().length > 0) || '';
-            title = firstLine.replace(/^#+\s*/, '').trim();
+          const stateText = await readOptional(join(agentDir, 'state.json'));
+          if (stateText) {
+            try {
+              const state = JSON.parse(stateText) as { state?: string; lastActivity?: string };
+              agentStatus = state.state || null;
+              if (state.lastActivity) lastActivity = new Date(state.lastActivity).getTime();
+            } catch { /* skip */ }
           }
-        }
-        if (!title) title = issueId;
 
-        features.push({
-          issueId, title, branch: `feature/${issueLower}`,
-          status: isAgentTrulyActive ? 'running' : hasState ? 'has_state' : 'idle',
-          stateLabel, agentStatus, hasPlanning, hasPrd, hasState, isShadow,
-          readyForMerge: centralReviewStatus?.readyForMerge ?? false,
-        });
-      }
+          const hasTmux = tmuxSessions.has(`agent-${issueLower}`);
+          const hasRecentAgentActivity = lastActivity != null && (now - lastActivity) < recentMs;
+          const isAgentLive = (agentStatus === 'active' || agentStatus === 'suspended') && (hasTmux || hasRecentAgentActivity);
+
+          const hasWorkspace = await pathExists(featurePath);
+
+          const issueCanonicalState = issueStateMap.get(issueId) || '';
+          const showByTrackerState = ['in_progress', 'in_review'].includes(issueCanonicalState);
+
+          if (!hasTmux && !isAgentLive && !hasWorkspace && !showByTrackerState) return null;
+
+          const [hasPlanning, hasPrd, hasState, isShadow] = await Promise.all([
+            pathExists(planningDir),
+            pathExists(join(planningDir, 'PLANNING_PROMPT.md')),
+            pathExists(join(planningDir, 'STATE.md')),
+            pathExists(join(planningDir, 'INFERENCE.md')),
+          ]);
+
+          const centralReviewStatus = getReviewStatus(issueId);
+          const reviewStatus = centralReviewStatus?.reviewStatus || null;
+          const testStatus = centralReviewStatus?.testStatus || null;
+          const mergeStatus = centralReviewStatus?.mergeStatus || null;
+
+          const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `agent-${issueLower}.json`);
+          let isHeartbeatFresh = false;
+          const hbText = await readOptional(heartbeatFile);
+          if (hbText) {
+            try {
+              const hb = JSON.parse(hbText) as { timestamp: string };
+              isHeartbeatFresh = (now - new Date(hb.timestamp).getTime()) < 10 * 60 * 1000;
+            } catch { /* skip */ }
+          }
+
+          const isAgentTrulyActive = hasTmux && (isHeartbeatFresh || agentStatus === 'active');
+
+          let stateLabel = 'Idle';
+          if (mergeStatus === 'merged') stateLabel = 'Done';
+          else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'In Review';
+          else if (reviewStatus === 'reviewing' || testStatus === 'testing') stateLabel = 'In Review';
+          else if (reviewStatus === 'passed' && testStatus === 'pending') stateLabel = 'In Review';
+          else if (isAgentTrulyActive) stateLabel = 'In Progress';
+          else if (hasTmux && !isHeartbeatFresh && agentStatus === 'active') stateLabel = 'Has Context';
+          else if (agentStatus === 'suspended') stateLabel = 'Suspended';
+          else if (hasRecentAgentActivity && agentStatus === 'active' && isHeartbeatFresh) stateLabel = 'In Progress';
+          else if (hasPrd && !hasState) stateLabel = 'Planning';
+          else if (hasState) stateLabel = 'Has Context';
+
+          let title = issueTitleMap.get(issueId) || '';
+          if (!title && hasPrd) {
+            const promptContent = await readOptional(join(planningDir, 'PLANNING_PROMPT.md'));
+            if (promptContent) {
+              const firstLine = promptContent.split('\n').find(l => l.trim().length > 0) || '';
+              title = firstLine.replace(/^#+\s*/, '').trim();
+            }
+          }
+          if (!title) title = issueId;
+
+          return {
+            issueId, title, branch: `feature/${issueLower}`,
+            status: isAgentTrulyActive ? 'running' : hasState ? 'has_state' : 'idle',
+            stateLabel, agentStatus, hasPlanning, hasPrd, hasState, isShadow,
+            readyForMerge: centralReviewStatus?.readyForMerge ?? false,
+          };
+        }),
+        15,
+      );
+
+      features.push(...featureResults.filter((f): f is NonNullable<typeof f> => f !== null));
     }
 
     // Add Rally Features from cached issues

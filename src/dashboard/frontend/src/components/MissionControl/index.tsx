@@ -245,20 +245,25 @@ export function MissionControl({
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
-  // Build title map from issues
-  const issueTitles: Record<string, string> = {};
-  const issueCosts: Record<string, number> = {};
+  // Build title map from issues (memoized to avoid new object identity per render)
+  const issueTitles = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const issue of issues) {
+      map[issue.identifier.toLowerCase()] = issue.title;
+      map[issue.identifier] = issue.title;
+    }
+    return map;
+  }, [issues]);
 
-  for (const issue of issues) {
-    issueTitles[issue.identifier.toLowerCase()] = issue.title;
-    issueTitles[issue.identifier] = issue.title;
-  }
-
-  // Map aggregated costs per issue (supports both upper and lower case keys)
-  for (const entry of costData?.issues || []) {
-    issueCosts[entry.issueId] = entry.totalCost;
-    issueCosts[entry.issueId.toLowerCase()] = entry.totalCost;
-  }
+  // Map aggregated costs per issue (memoized to avoid new object identity per render)
+  const issueCosts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const entry of costData?.issues || []) {
+      map[entry.issueId] = entry.totalCost;
+      map[entry.issueId.toLowerCase()] = entry.totalCost;
+    }
+    return map;
+  }, [costData]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations'],

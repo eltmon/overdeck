@@ -57,9 +57,9 @@ export function SessionPanel({ session, issueId }: SessionPanelProps) {
   };
 
   const synthesizedConversation = useMemo<Conversation | null>(() => {
-    if (!session.jsonlPath) return null;
+    if (!session.hasJsonl) return null;
     return {
-      id: 0,
+      id: -1,
       name: session.sessionId,
       tmuxSession: session.tmuxSession || session.sessionId,
       status: session.presence === 'ended' ? 'ended' : 'active',
@@ -69,16 +69,16 @@ export function SessionPanel({ session, issueId }: SessionPanelProps) {
       endedAt: session.endedAt || null,
       lastAttachedAt: null,
       sessionAlive: session.presence !== 'ended',
-      sessionFile: session.jsonlPath,
+      sessionFile: session.sessionId,
     };
   }, [session, issueId]);
 
-  const hasJsonl = !!session.jsonlPath;
+  const hasJsonl = !!session.hasJsonl;
   const hasTranscript = !!session.transcript;
   // Only allow terminal for work/planning sessions with a live tmux session
   const allowTerminal = (session.type === 'work' || session.type === 'planning') &&
     !!session.tmuxSession &&
-    session.presence !== 'ended';
+    session.presence === 'active';
   const hasTerminal = allowTerminal;
   const isEnded = session.presence === 'ended';
 
