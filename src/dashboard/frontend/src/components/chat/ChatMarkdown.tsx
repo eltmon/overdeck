@@ -19,6 +19,7 @@ import React, {
   useCallback,
   useRef,
   useEffect,
+  useMemo,
   type ReactNode,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -66,6 +67,70 @@ function fnv1a32(str: string): number {
 
 function cacheKey(code: string, lang: string): string {
   return `${fnv1a32(code)}:${code.length}:${lang}`;
+}
+
+/** Sanitize Shiki HTML output before rendering with dangerouslySetInnerHTML.
+ *  Only allows the tags and attributes that Shiki legitimately produces. */
+const ALLOWED_SHIKI_TAGS = new Set(['span', 'pre', 'code', 'div', 'br']);
+const ALLOWED_SHIKI_ATTRS = new Set(['class', 'style']);
+
+const ALLOWED_CSS_PROPERTIES = new Set([
+  'color', 'background-color', 'font-style', 'font-weight',
+  'text-decoration', 'opacity',
+]);
+
+function sanitizeStyleAttr(styleValue: string): string {
+  return styleValue.split(';')
+    .map((d) => d.trim()).filter(Boolean)
+    .filter((d) => {
+      const [prop] = d.split(':');
+      return prop && ALLOWED_CSS_PROPERTIES.has(prop.trim().toLowerCase());
+    })
+    .join('; ');
+}
+
+const sharedDomParser = new DOMParser();
+
+function sanitizeShikiHtml(html: string): string {
+  const doc = sharedDomParser.parseFromString(html, 'text/html');
+
+  function walk(node: Node): Node | null {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent || '');
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+    const el = node as Element;
+    const tagName = el.tagName.toLowerCase();
+    if (!ALLOWED_SHIKI_TAGS.has(tagName)) {
+      return null;
+    }
+    const newEl = document.createElement(tagName);
+    for (const attr of Array.from(el.attributes)) {
+      if (!ALLOWED_SHIKI_ATTRS.has(attr.name.toLowerCase())) continue;
+      if (attr.name === 'style') {
+        const safe = sanitizeStyleAttr(attr.value);
+        if (safe) newEl.setAttribute('style', safe);
+      } else {
+        newEl.setAttribute(attr.name, attr.value);
+      }
+    }
+    for (const child of Array.from(el.childNodes)) {
+      const sanitized = walk(child);
+      if (sanitized) newEl.appendChild(sanitized);
+    }
+    return newEl;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const child of Array.from(doc.body.childNodes)) {
+    const sanitized = walk(child);
+    if (sanitized) fragment.appendChild(sanitized);
+  }
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(fragment);
+  return wrapper.innerHTML;
 }
 
 // ─── Highlighter (lazy-loaded) ────────────────────────────────────────────────
@@ -146,6 +211,11 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
     return () => { abortRef.current = true; };
   }, [code, lang, isStreaming]);
 
+  const sanitizedHtml = useMemo(
+    () => (highlighted ? sanitizeShikiHtml(highlighted) : null),
+    [highlighted],
+  );
+
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(code).then(() => {
       setCopied(true);
@@ -162,11 +232,11 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
       >
         {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
       </button>
-      {highlighted ? (
+      {sanitizedHtml ? (
         <div
           className={styles.shikiOutput}
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: highlighted }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       ) : (
         <pre className={styles.codePlain}>
@@ -208,9 +278,15 @@ function makeComponents(isStreaming: boolean): Components {
       );
     },
     a({ href, children }) {
+      // Block javascript: and data: URIs to prevent XSS from assistant markdown
+      const safeHref =
+        typeof href === 'string' &&
+        !/^(javascript|data|vbscript):/i.test(href.trim())
+          ? href
+          : undefined;
       return (
         <a
-          href={href}
+          href={safeHref}
           target="_blank"
           rel="noopener noreferrer"
           className={styles.mdLink}
@@ -233,7 +309,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   text,
   isStreaming = false,
 }: ChatMarkdownProps) {
-  const components = makeComponents(isStreaming);
+  const components = useMemo(() => makeComponents(isStreaming), [isStreaming]);
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>

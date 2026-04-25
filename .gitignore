@@ -100,6 +100,7 @@ temp/
 .pan/events/
 .pan/convoy/
 .pan/prompts/
+.panopticon/
 
 # Beads / Dolt files (added by bd init)
 .dolt/

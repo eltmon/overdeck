@@ -6,7 +6,7 @@
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -65,6 +65,12 @@ async function resetDb() {
   resetDatabase();
 }
 
+function decodeJsonResponse(response: { status: number; body: unknown }) {
+  const payload = response.body as { body: Uint8Array } | null;
+  const text = payload?.body ? new TextDecoder().decode(payload.body) : '{}';
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
 beforeEach(async () => {
   // Close any stale DB connection from a previous test before changing PANOPTICON_HOME
   await resetDb();
@@ -80,6 +86,191 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
+  it('stores uploaded images under the owning conversation attachment directory', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { getConversationAttachmentDir } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const response = await handleConversationImageUpload('upload-test', 'evidence.txt', bytes, 'image/png');
+
+    const body = decodeJsonResponse(response);
+    expect(response.status).toBe(200);
+    expect(body.path).toEqual(expect.stringMatching(new RegExp(`${getConversationAttachmentDir('upload-test').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.+\\.png$`)));
+    expect(readFileSync(body.path as string)).toEqual(Buffer.from([137, 80, 78, 71]));
+  });
+
+  it('rejects unsupported mimeType before writing files', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const response = await handleConversationImageUpload('upload-test', 'evidence.png', Buffer.from([0]), 'image/tiff');
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Unsupported mimeType: image/tiff' });
+  });
+
+  it('rejects magic-byte mismatch for valid mimeType', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    // Valid PNG mimeType but content bytes are JPEG magic numbers, not PNG
+    const response = await handleConversationImageUpload(
+      'upload-test',
+      'fake.png',
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      'image/png',
+    );
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: 'File content does not match declared MIME type',
+    });
+  });
+
+  it('rejects oversized upload payloads before writing files', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const oversized = Buffer.alloc(5 * 1024 * 1024 + 1, 1);
+    const response = await handleConversationImageUpload('upload-test', 'oversized.png', oversized, 'image/png');
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Payload exceeds maximum size of 5242880 bytes' });
+  });
+
+  it('rejects empty upload payloads', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+
+    createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
+
+    const response = await handleConversationImageUpload('upload-test', 'empty.png', Buffer.alloc(0), 'image/png');
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Payload is empty' });
+  });
+
+  it('rejects attachment reuse across conversations while preserving referenced uploads', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
+
+    createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
+    createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
+
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const uploadResponse = await handleConversationImageUpload('owner-conv', 'owned.png', bytes, 'image/png');
+    const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
+
+    const { extractConversationAttachmentPaths, hasConversationAttachment } = await import('../../services/conversation-attachments.js');
+    expect(extractConversationAttachmentPaths(`hello\n@${uploadedPath}`)).toEqual([uploadedPath]);
+    expect(await hasConversationAttachment('owner-conv', uploadedPath)).toBe(true);
+    expect(await hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
+
+    // Prose @paths (unmanaged) are allowed to pass through
+    const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
+    const proseDelivery = vi.fn().mockResolvedValue(undefined);
+    const proseResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, proseDelivery);
+    expect(proseResponse.status).toBe(200);
+    expect(proseDelivery).toHaveBeenCalledWith('conv-owner-conv', `hello\n@${manualPath}`, 'conversation-message');
+
+    const delivery = vi.fn().mockResolvedValue(undefined);
+    const sendResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${uploadedPath}` }, delivery);
+    expect(sendResponse.status).toBe(200);
+    expect(delivery).toHaveBeenCalledWith('conv-owner-conv', `hello\n@${uploadedPath}`, 'conversation-message');
+    expect(existsSync(uploadedPath)).toBe(true);
+
+    const rejectedResponse = await handleConversationMessage('other-conv', { message: `hello\n@${uploadedPath}` }, delivery);
+    expect(rejectedResponse.status).toBe(400);
+    expect(decodeJsonResponse(rejectedResponse)).toEqual({ error: 'One or more attached images are unavailable for this conversation' });
+    expect(existsSync(uploadedPath)).toBe(true);
+  });
+
+  it('delete-image removes only conversation-owned uploads', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { removeConversationAttachment } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
+    createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
+
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const uploadResponse = await handleConversationImageUpload('owner-conv', 'owned.png', bytes, 'image/png');
+    const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
+
+    expect(await removeConversationAttachment('other-conv', uploadedPath)).toBe(false);
+    expect(existsSync(uploadedPath)).toBe(true);
+
+    expect(await removeConversationAttachment('owner-conv', uploadedPath)).toBe(true);
+    expect(existsSync(uploadedPath)).toBe(false);
+  });
+
+  it('ended and archived cleanup preserve unsent uploads newer than session history', async () => {
+    const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'unsent-conv', tmuxSession: 'conv-unsent-conv', cwd: '/cwd' });
+
+    const sessionFile = join(TEST_HOME, 'unsent-session.jsonl');
+    writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'existing history' }] } })}\n`);
+    updateSessionFile('unsent-conv', sessionFile);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const uploadResponse = await handleConversationImageUpload('unsent-conv', 'draft.png', bytes, 'image/png');
+    const uploadedPath = decodeJsonResponse(uploadResponse).path as string;
+
+    markConversationEnded('unsent-conv');
+    await cleanupUnreferencedConversationAttachments({ name: 'unsent-conv', sessionFile });
+    expect(existsSync(uploadedPath)).toBe(true);
+
+    archiveConversation('unsent-conv');
+    await cleanupUnreferencedConversationAttachments({ name: 'unsent-conv', sessionFile });
+    expect(existsSync(uploadedPath)).toBe(true);
+  });
+
+  it('archive prunes unreferenced uploads while preserving prose-first referenced ones', async () => {
+    const { createConversation, updateSessionFile, markConversationEnded, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
+
+    createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
+
+    const sessionFile = join(TEST_HOME, 'archived-session.jsonl');
+    updateSessionFile('archived-conv', sessionFile);
+
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    const keptUpload = await handleConversationImageUpload('archived-conv', 'kept.png', bytes, 'image/png');
+    const prunedUpload = await handleConversationImageUpload('archived-conv', 'pruned.png', bytes, 'image/png');
+
+    const keptPath = decodeJsonResponse(keptUpload).path as string;
+    const prunedPath = decodeJsonResponse(prunedUpload).path as string;
+    writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `keep this\n@${keptPath}` }] } })}\n`);
+    // Explicitly set the session file mtime to be strictly newer than both
+    // attachments so the >= comparison reliably prunes the unreferenced one.
+    const keptStat = statSync(keptPath);
+    const prunedStat = statSync(prunedPath);
+    const newestAttachmentMtime = Math.max(keptStat.mtimeMs, prunedStat.mtimeMs);
+    utimesSync(sessionFile, newestAttachmentMtime / 1000 + 1, newestAttachmentMtime / 1000 + 1);
+
+    markConversationEnded('archived-conv');
+    archiveConversation('archived-conv');
+    await cleanupUnreferencedConversationAttachments({ name: 'archived-conv', sessionFile });
+
+    expect(existsSync(keptPath)).toBe(true);
+    expect(existsSync(prunedPath)).toBe(false);
+  });
+
   it('creating and listing a conversation returns the right data', async () => {
     const { createConversation, listConversations } = await import('../../../../lib/database/conversations-db.js');
     createConversation({ name: 'integration-test', tmuxSession: 'conv-integration-test', cwd: '/cwd' });
@@ -165,5 +356,70 @@ describe('conversations route — DB integration', () => {
 
     const sourceConv = getConversationByName('source-conv');
     expect(sourceConv?.status).toBe('active');
+  });
+});
+
+// ─── validateOrigin unit tests ────────────────────────────────────────────────
+
+function getTrustedOrigins(): string[] {
+  return ['http://localhost:3011', 'http://localhost:3000', 'http://127.0.0.1:3011', 'http://127.0.0.1:3000'];
+}
+
+function normalizeOrigin(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
+function validateOrigin(headers: Record<string, string | undefined>): { ok: true } | { ok: false; error: string } {
+  const origin = headers['origin'];
+  const referer = headers['referer'];
+  const trusted = getTrustedOrigins();
+
+  if (origin) {
+    const normalized = normalizeOrigin(origin);
+    if (normalized && trusted.includes(normalized)) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid origin' };
+  }
+
+  if (referer) {
+    const normalized = normalizeOrigin(referer);
+    if (normalized && trusted.includes(normalized)) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid referer' };
+  }
+
+  return { ok: false, error: 'Missing origin' };
+}
+
+describe('validateOrigin', () => {
+  it('accepts matching Origin header', () => {
+    expect(validateOrigin({ origin: 'http://localhost:3000' })).toEqual({ ok: true });
+  });
+
+  it('accepts matching Referer header', () => {
+    expect(validateOrigin({ referer: 'http://localhost:3000/' })).toEqual({ ok: true });
+  });
+
+  it('rejects untrusted Origin', () => {
+    expect(validateOrigin({ origin: 'https://evil.com' })).toEqual({ ok: false, error: 'Invalid origin' });
+  });
+
+  it('rejects untrusted Referer', () => {
+    expect(validateOrigin({ referer: 'https://evil.com/' })).toEqual({ ok: false, error: 'Invalid referer' });
+  });
+
+  it('rejects prefix-match origin attack', () => {
+    expect(validateOrigin({ origin: 'https://evil.com/?origin=http://localhost:3000' })).toEqual({ ok: false, error: 'Invalid origin' });
+  });
+
+  it('rejects requests with neither Origin nor Referer', () => {
+    expect(validateOrigin({})).toEqual({ ok: false, error: 'Missing origin' });
   });
 });
