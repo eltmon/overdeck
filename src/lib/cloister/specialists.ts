@@ -23,6 +23,7 @@ import { readCavemanVariant } from '../caveman/workspace.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -2272,12 +2273,21 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
     const initProviderExportLines = buildProviderExportLines(providerEnv);
-    writeFileSync(launcherScript, `#!/bin/bash
-cd "${cwd}"
-${PROVIDER_UNSET_LINES}
-${initProviderExportLines}prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "${newSessionId}" --model ${model} "$prompt"
-`, { mode: 0o755 });
+    writeFileSync(
+      launcherScript,
+      generateLauncherScript({
+        agentType: 'specialist-init',
+        workingDir: cwd,
+        unsetProviderEnv: true,
+        providerExports: initProviderExportLines,
+        promptFile,
+        baseCommand: 'claude',
+        permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+        sessionId: newSessionId,
+        model,
+      }),
+      { mode: 0o755 },
+    );
     setSessionId(name, newSessionId);
 
     // Pre-trust cwd so specialists don't hit the trust prompt (same as spawnSpecialist)
