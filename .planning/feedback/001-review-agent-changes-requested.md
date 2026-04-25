@@ -2,24 +2,24 @@
 specialist: review-agent
 issueId: PAN-539
 outcome: changes-requested
-timestamp: 2026-04-25T00:07:08Z
+timestamp: 2026-04-25T00:24:32Z
 ---
 
 # Review: CHANGES_REQUESTED
 
 ## Summary
 
-PAN-539 implements image paste/drop support for the conversation composer. The feature is functionally complete and the implementation is notably well-crafted — async FS throughout, magic-byte validation, TOCTOU mitigation, proper rate limiting, and path containment. Two blockers require resolution before merge: both are vBRIEF plan documentation items where the plan ACs describe an os.tmpdir() storage strategy that was intentionally replaced by a superior per-conversation attachment directory; the plan.vbrief.json must be updated to reflect the as-built design. Three high-priority security findings should also be addressed: a missing CSRF guard on the messages route, an unquoted shell variable in the launcher script, and internal error string leakage in the restart-all endpoint.
+PAN-539 adds image paste/drop support to the conversation composer with a complete implementation (all 5 vBRIEF items satisfied). Two High findings block merge: the generateAiTitle subprocess is launched with full bypassPermissions against user-supplied content (fix: remove --dangerously-skip-permissions), and a stale-closure race condition in processUploadQueue can silently drop an image when the user switches conversations mid-upload (fix: capture currentConversationNameRef.current instead of conversation.name). Five additional High-priority items should be addressed: dead imports in main.ts, the archive guard that doesn't actually check archivedAt, serial attachment validation on the message send hot path, a potential XSS path via dangerouslySetInnerHTML with Shiki (pre-existing surface), and a regex partial-match edge case in the @path scanner.
 
 ## Security Issues
 
-- CSRF guard missing on GET /api/conversations/:name/messages
-- runtimeCommand unquoted in bash launcher script
-- restart-all leaks internal error strings
+- generateAiTitle bypassPermissions subprocess
+- dangerouslySetInnerHTML XSS via Shiki code blocks
 
 ## Performance Issues
 
-- O(n) full-map prune on every upload rate-limit check
+- Serial attachment validation on message send hot path
+- Hardcoded limit 500 with no pagination
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
