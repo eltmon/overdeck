@@ -235,10 +235,10 @@ export function setReviewStatus(
   }
   if (update.reviewStatus && update.reviewStatus !== existing.reviewStatus) {
     const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
-      reviewing: { level: 'info',    msg: `${issueId} — review started` },
+      reviewing: { level: 'info',    msg: `${issueId} — review started`, tts: `${issueId} review started` },
       passed:    { level: 'success', msg: `${issueId} — review passed`, tts: `${issueId} review passed` },
       failed:    { level: 'error',   msg: `${issueId} — review failed${update.reviewNotes ? ': ' + update.reviewNotes : ''}`, tts: `${issueId} review failed` },
-      blocked:   { level: 'warn',    msg: `${issueId} — review blocked${update.reviewNotes ? ': ' + update.reviewNotes : ''}` },
+      blocked:   { level: 'warn',    msg: `${issueId} — review blocked${update.reviewNotes ? ': ' + update.reviewNotes : ''}`, tts: `${issueId} review blocked` },
     };
     const entry = rMap[update.reviewStatus];
     if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, issueId });
