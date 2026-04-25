@@ -167,37 +167,38 @@ async function fetchProjectSessionTree(projectKey: string): Promise<unknown | nu
 
   if (await pathExists(workspacesDir)) {
     const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !entry.name.startsWith('feature-')) continue;
+    const featureCandidates = entries
+      .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
+      .map(e => ({
+        name: e.name,
+        issueLower: e.name.replace('feature-', ''),
+        issueId: e.name.replace('feature-', '').toUpperCase(),
+      }));
 
-      const issueLower = entry.name.replace('feature-', '');
-      const issueId = issueLower.toUpperCase();
-      const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-
-      // Skip features with no activity data
-      const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
-      const planningDir = join(workspacesDir, entry.name, '.planning');
-      const hasAgent = await pathExists(agentDir);
-      const hasPlanning = await pathExists(planningDir);
-      if (!hasAgent && !hasPlanning) continue;
-
+    const results = await Promise.all(featureCandidates.map(async (c) => {
+      const issuePrefix = extractPrefix(c.issueId) ?? c.issueId.split('-')[0];
+      const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
+      const planningDir = join(workspacesDir, c.name, '.planning');
+      const [hasAgent, hasPlanning] = await Promise.all([
+        pathExists(agentDir),
+        pathExists(planningDir),
+      ]);
+      if (!hasAgent && !hasPlanning) return null;
       try {
-        const activityData = await fetchActivityData(issueId) as {
+        const activityData = await fetchActivityData(c.issueId) as {
           issueId: string;
           sections: ActivitySection[];
         };
-
-        if (!activityData.sections || activityData.sections.length === 0) continue;
-
-        const title = await resolveFeatureTitle(issueId, issueLower, issuePrefix);
+        if (!activityData.sections || activityData.sections.length === 0) return null;
+        const title = await resolveFeatureTitle(c.issueId, c.issueLower, issuePrefix);
         const sessions = activityData.sections.map(mapSectionToSessionNode);
-
-        features.push({ issueId, title, sessions });
+        return { issueId: c.issueId, title, sessions };
       } catch {
-        // Skip features that fail to load activity data
-        continue;
+        return null;
       }
-    }
+    }));
+
+    features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
   }
 
   // Sort features by issueId for stable ordering

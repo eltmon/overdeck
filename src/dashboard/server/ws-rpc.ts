@@ -141,47 +141,92 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
 }
 
 /**
- * 1 Hz polling stream for tmux presence changes not covered by domain events.
+ * Shared singleton poller for tmux presence changes.
+ * One interval polls tmux and fans out to all subscribers,
+ * avoiding O(subscribers) subprocess QPS.
+ */
+const sharedPresencePoller: {
+  refCount: number;
+  interval: NodeJS.Timeout | null;
+  knownSessions: Set<string>;
+  subscribers: Set<(d: SessionTreeDelta) => void>;
+} = {
+  refCount: 0,
+  interval: null,
+  knownSessions: new Set(),
+  subscribers: new Set(),
+};
+
+function startSharedPresencePoller(): void {
+  if (sharedPresencePoller.interval) return;
+
+  const tick = async () => {
+    try {
+      const sessions = await listSessionNamesAsync();
+      const current = new Set(sessions.filter(s => s.trim()));
+
+      for (const s of sharedPresencePoller.knownSessions) {
+        if (!current.has(s)) {
+          const issueId = extractIssueIdFromSession(s);
+          if (issueId) {
+            const delta: SessionTreeDelta = {
+              kind: 'presence_changed',
+              issueId,
+              sessionId: s,
+              presence: 'ended',
+              timestamp: new Date().toISOString(),
+            };
+            for (const sub of sharedPresencePoller.subscribers) {
+              try { sub(delta); } catch { /* ignore subscriber errors */ }
+            }
+          }
+        }
+      }
+
+      sharedPresencePoller.knownSessions = current;
+    } catch { /* tmux may not be available, ignore */ }
+  };
+
+  sharedPresencePoller.interval = setInterval(tick, 2000);
+  tick();
+}
+
+function stopSharedPresencePoller(): void {
+  if (sharedPresencePoller.interval) {
+    clearInterval(sharedPresencePoller.interval);
+    sharedPresencePoller.interval = null;
+  }
+  sharedPresencePoller.knownSessions.clear();
+}
+
+/**
+ * Create a stream that subscribes to the shared presence poller.
  * Tracks tmux session existence and emits presence_changed deltas when
  * sessions disappear (→ ended).
  */
 function createPresencePollStream(): Stream.Stream<SessionTreeDelta, never, never> {
   return Stream.callback<SessionTreeDelta>((queue) =>
     Effect.acquireRelease(
-      Effect.promise(async () => {
-        let knownSessions = new Set<string>();
+      Effect.sync(() => {
+        sharedPresencePoller.refCount++;
+        if (sharedPresencePoller.refCount === 1) {
+          startSharedPresencePoller();
+        }
 
-        const tick = async () => {
-          try {
-            const sessions = await listSessionNamesAsync();
-            const currentSessions = new Set(sessions.filter(s => s.trim()));
-
-            // Sessions that disappeared → emit ended
-            for (const session of knownSessions) {
-              if (!currentSessions.has(session)) {
-                const issueId = extractIssueIdFromSession(session);
-                if (issueId) {
-                  Queue.offerUnsafe(queue, {
-                    kind: 'presence_changed',
-                    issueId,
-                    sessionId: session,
-                    presence: 'ended',
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-              }
-            }
-
-            knownSessions = currentSessions;
-          } catch { /* tmux may not be available, ignore */ }
+        const subscriber = (d: SessionTreeDelta) => {
+          Queue.offerUnsafe(queue, d);
         };
-
-        const interval = setInterval(tick, 1000);
-        tick(); // Run immediately
-
-        return () => clearInterval(interval);
+        sharedPresencePoller.subscribers.add(subscriber);
+        return subscriber;
       }),
-      (cleanup) => Effect.sync(cleanup),
+      (subscriber) =>
+        Effect.sync(() => {
+          sharedPresencePoller.subscribers.delete(subscriber);
+          sharedPresencePoller.refCount--;
+          if (sharedPresencePoller.refCount === 0) {
+            stopSharedPresencePoller();
+          }
+        }),
     ),
   );
 }

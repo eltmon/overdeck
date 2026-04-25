@@ -63,7 +63,8 @@ async function fetchProjectSessionTree(projectKey: string): Promise<ProjectSessi
 
 /** Apply a live delta to a cached ProjectSessionTree. Returns a new object or undefined if not applicable. */
 function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta): ProjectSessionTree {
-  const feature = tree.features.find(f => f.issueId === delta.issueId);
+  const deltaIssueIdLower = delta.issueId.toLowerCase();
+  const feature = tree.features.find(f => f.issueId.toLowerCase() === deltaIssueIdLower);
   if (!feature) return tree;
 
   switch (delta.kind) {
@@ -77,7 +78,7 @@ function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta
       return {
         ...tree,
         features: tree.features.map(f =>
-          f.issueId === delta.issueId ? { ...f, sessions: filtered } : f,
+          f.issueId.toLowerCase() === deltaIssueIdLower ? { ...f, sessions: filtered } : f,
         ),
       };
     }
@@ -88,7 +89,7 @@ function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta
       return {
         ...tree,
         features: tree.features.map(f =>
-          f.issueId === delta.issueId
+          f.issueId.toLowerCase() === deltaIssueIdLower
             ? {
                 ...f,
                 sessions: f.sessions.map(s =>
@@ -186,7 +187,8 @@ export function MissionControl({
       }
     }
     return map;
-  }, [sessionTreeQueries]);
+    // Spread data refs so deps compare referentially stable query.data values
+  }, [...sessionTreeQueries.map(q => q.data)]);
 
   // Subscribe to live session tree deltas for each project
   useEffect(() => {
