@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import type { ProjectFeature } from './ProjectNode';
@@ -104,6 +104,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const hasSessions = (feature.sessions?.length ?? 0) > 0;
   const [expanded, setExpanded] = useState(() => readExpanded(feature.issueId));
 
+  // Derive best session once per data change instead of on every click (PAN-821 review)
+  const bestSessionId = useMemo(() =>
+    feature.sessions ? pickBestSession(feature.sessions) : null,
+  [feature.sessions]);
+
   const handleToggleExpanded = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const next = !expanded;
@@ -113,13 +118,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   const handleRowClick = useCallback(() => {
     onSelect();
-    if (hasSessions && feature.sessions) {
-      const best = pickBestSession(feature.sessions);
-      if (best && onSelectSession) {
-        onSelectSession(feature.issueId, best);
-      }
+    if (bestSessionId && onSelectSession) {
+      onSelectSession(feature.issueId, bestSessionId);
     }
-  }, [onSelect, hasSessions, feature.sessions, feature.issueId, onSelectSession]);
+  }, [onSelect, bestSessionId, feature.issueId, onSelectSession]);
 
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)

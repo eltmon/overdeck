@@ -205,6 +205,12 @@ function stopSharedPresencePoller(): void {
  * Create a stream that subscribes to the shared presence poller.
  * Tracks tmux session existence and emits presence_changed deltas when
  * sessions disappear (→ ended).
+ *
+ * NOTE: The poller only emits on session *disappearance* (ended), not on
+ * session *appearance*. New sessions are discovered via the event stream
+ * (session_added deltas) or the next periodic snapshot refetch. This is
+ * intentional — the event stream handles arrivals, and the poller handles
+ * cleanup of stale presence state.
  */
 function createPresencePollStream(): Stream.Stream<SessionTreeDelta, never, never> {
   return Stream.callback<SessionTreeDelta>((queue) =>

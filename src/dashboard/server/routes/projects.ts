@@ -23,9 +23,50 @@ import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } f
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
-function getIssueDataService(): IssueDataService {
-  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
+async function getIssueDataService(): Promise<IssueDataService> {
+  const { getSharedIssueService } = await import('../services/issue-service-singleton.js');
   return getSharedIssueService();
+}
+
+// ─── Concurrency limiter ──────────────────────────────────────────────────────
+
+/** Simple semaphore: run at most `max` promises concurrently. */
+function withConcurrencyLimit<T>(
+  tasks: Array<() => Promise<T>>,
+  max: number,
+): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const results = new Array<T>(tasks.length);
+    let index = 0;
+    let running = 0;
+    let completed = 0;
+    let rejected = false;
+
+    function next() {
+      if (rejected) return;
+      if (completed === tasks.length) {
+        resolve(results);
+        return;
+      }
+      while (running < max && index < tasks.length) {
+        const i = index++;
+        running++;
+        tasks[i]!()
+          .then((val) => {
+            results[i] = val;
+            running--;
+            completed++;
+            next();
+          })
+          .catch((err) => {
+            rejected = true;
+            reject(err);
+          });
+      }
+    }
+
+    next();
+  });
 }
 
 // ─── Async FS helpers ─────────────────────────────────────────────────────────
@@ -52,6 +93,7 @@ function mapSessionType(type: string): SessionNodeType {
 function mapAgentStatus(status: string): AgentStatus {
   switch (status) {
     case 'running': return 'running';
+    case 'active': return 'running';
     case 'completed': return 'stopped';
     case 'failed': return 'error';
     case 'suspended': return 'stopped';
@@ -98,7 +140,7 @@ async function resolveFeatureTitle(
 ): Promise<string> {
   // Try issue data service first
   try {
-    const issueDataService = getIssueDataService();
+    const issueDataService = await getIssueDataService();
     const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
     const issue = allIssues.find(i =>
       i['identifier'] === issueId ||
@@ -196,27 +238,30 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
         issueId: e.name.replace('feature-', '').toUpperCase(),
       }));
 
-    const results = await Promise.all(featureCandidates.map(async (c) => {
-      const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
-      const planningDir = join(workspacesDir, c.name, '.planning');
-      const [hasAgent, hasPlanning] = await Promise.all([
-        pathExists(agentDir),
-        pathExists(planningDir),
-      ]);
-      if (!hasAgent && !hasPlanning) return null;
-      try {
-        const activityData = await fetchActivityDataWithContext(c.issueId, sharedContext) as {
-          issueId: string;
-          sections: ActivitySection[];
-        };
-        if (!activityData.sections || activityData.sections.length === 0) return null;
-        const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
-        const sessions = activityData.sections.map(mapSectionToSessionNode);
-        return { issueId: c.issueId, title, sessions };
-      } catch {
-        return null;
-      }
-    }));
+    const results = await withConcurrencyLimit(
+      featureCandidates.map((c) => async () => {
+        const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
+        const planningDir = join(workspacesDir, c.name, '.planning');
+        const [hasAgent, hasPlanning] = await Promise.all([
+          pathExists(agentDir),
+          pathExists(planningDir),
+        ]);
+        if (!hasAgent && !hasPlanning) return null;
+        try {
+          const activityData = await fetchActivityDataWithContext(c.issueId, sharedContext) as {
+            issueId: string;
+            sections: ActivitySection[];
+          };
+          if (!activityData.sections || activityData.sections.length === 0) return null;
+          const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
+          const sessions = activityData.sections.map(mapSectionToSessionNode);
+          return { issueId: c.issueId, title, sessions };
+        } catch {
+          return null;
+        }
+      }),
+      15,
+    );
 
     features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
   }

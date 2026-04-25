@@ -61,10 +61,15 @@ async function fetchProjectSessionTree(projectKey: string): Promise<ProjectSessi
   return res.json();
 }
 
-/** Apply a live delta to a cached ProjectSessionTree. Returns a new object or undefined if not applicable. */
+/** Apply a live delta to a cached ProjectSessionTree. Returns a new object or undefined if not applicable.
+ *  Optimized to O(F + S) per delta by finding the target feature/session by index instead of nested scans.
+ */
 function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta): ProjectSessionTree {
   const deltaIssueIdLower = delta.issueId.toLowerCase();
-  const feature = tree.features.find(f => f.issueId.toLowerCase() === deltaIssueIdLower);
+  const featureIdx = tree.features.findIndex(f => f.issueId.toLowerCase() === deltaIssueIdLower);
+  if (featureIdx === -1) return tree;
+
+  const feature = tree.features[featureIdx];
   if (!feature) return tree;
 
   switch (delta.kind) {
@@ -75,36 +80,23 @@ function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta
     case 'session_removed': {
       const filtered = feature.sessions.filter(s => s.sessionId !== delta.sessionId);
       if (filtered.length === feature.sessions.length) return tree;
-      return {
-        ...tree,
-        features: tree.features.map(f =>
-          f.issueId.toLowerCase() === deltaIssueIdLower ? { ...f, sessions: filtered } : f,
-        ),
-      };
+      const newFeatures = [...tree.features];
+      newFeatures[featureIdx] = { ...feature, sessions: filtered };
+      return { ...tree, features: newFeatures };
     }
     case 'presence_changed':
     case 'status_changed': {
-      const session = feature.sessions.find(s => s.sessionId === delta.sessionId);
-      if (!session) return tree;
-      return {
-        ...tree,
-        features: tree.features.map(f =>
-          f.issueId.toLowerCase() === deltaIssueIdLower
-            ? {
-                ...f,
-                sessions: f.sessions.map(s =>
-                  s.sessionId === delta.sessionId
-                    ? {
-                        ...s,
-                        ...(delta.presence !== undefined && { presence: delta.presence }),
-                        ...(delta.status !== undefined && { status: delta.status }),
-                      }
-                    : s,
-                ),
-              }
-            : f,
-        ),
+      const sessionIdx = feature.sessions.findIndex(s => s.sessionId === delta.sessionId);
+      if (sessionIdx === -1) return tree;
+      const newSessions = [...feature.sessions];
+      newSessions[sessionIdx] = {
+        ...feature.sessions[sessionIdx]!,
+        ...(delta.presence !== undefined && { presence: delta.presence }),
+        ...(delta.status !== undefined && { status: delta.status }),
       };
+      const newFeatures = [...tree.features];
+      newFeatures[featureIdx] = { ...feature, sessions: newSessions };
+      return { ...tree, features: newFeatures };
     }
     default:
       return tree;
@@ -178,16 +170,22 @@ export function MissionControl({
     })),
   });
 
+  const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
   const sessionTreeMap = useMemo(() => {
     const map: Record<string, ProjectSessionTree> = {};
+    let changed = false;
     for (const query of sessionTreeQueries) {
       if (query.data) {
         map[query.data.projectKey] = query.data;
+        if (sessionTreeDataRef.current[query.data.projectKey] !== query.data) changed = true;
       }
     }
+    if (!changed && Object.keys(map).length === Object.keys(sessionTreeDataRef.current).length) {
+      return sessionTreeDataRef.current;
+    }
+    sessionTreeDataRef.current = map;
     return map;
-    // Spread data refs so deps compare referentially stable query.data values
-  }, [...sessionTreeQueries.map(q => q.data)]);
+  }, [sessionTreeQueries]);
 
   // Subscribe to live session tree deltas for each project
   useEffect(() => {
@@ -406,10 +404,15 @@ export function MissionControl({
     };
   }, []);
 
-  // Find selected feature data
-  const selectedFeatureData = selectedFeature
-    ? projects.flatMap(p => p.features).find(f => f.issueId === selectedFeature)
-    : null;
+  // Find selected feature data (memoized to avoid O(P×F) scan per render)
+  const selectedFeatureData = useMemo(() => {
+    if (!selectedFeature) return null;
+    for (const p of projectsWithSessions) {
+      const f = p.features.find(f => f.issueId === selectedFeature);
+      if (f) return f;
+    }
+    return null;
+  }, [projectsWithSessions, selectedFeature]);
 
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
