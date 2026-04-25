@@ -150,39 +150,12 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelId('claude-sonnet-4-6');
 }
 
-/** convoy:* override keys → review:* equivalents (translated on every read) */
-const CONVOY_TO_REVIEW_MIGRATION: Partial<Record<string, WorkTypeId>> = {
-  'convoy:security-reviewer': 'review:security',
-  'convoy:performance-reviewer': 'review:performance',
-  'convoy:correctness-reviewer': 'review:correctness',
-  'convoy:requirements-reviewer': 'review:requirements',
-  'convoy:synthesis-agent': 'review:synthesis',
-};
-
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
-  // Translate persisted convoy:* override keys to review:* equivalents on every read.
-  // The rename is applied in-memory; it persists to disk only when the user calls saveSettingsApi.
-  const migratedOverrides: Partial<Record<WorkTypeId, ModelId>> = {};
-  let migrationNeeded = false;
-  for (const [workType, modelId] of Object.entries(config.overrides)) {
-    const newKey = CONVOY_TO_REVIEW_MIGRATION[workType];
-    if (newKey) {
-      migratedOverrides[newKey] = modelId as ModelId;
-      migrationNeeded = true;
-    } else {
-      migratedOverrides[workType as WorkTypeId] = modelId as ModelId;
-    }
-  }
-  // Use migratedOverrides for the response without mutating the loaded config object.
-  const effectiveOverrides = migrationNeeded
-    ? (migratedOverrides as Record<WorkTypeId, ModelId>)
-    : config.overrides;
-
   // Detect deprecated models in current overrides
   const deprecationWarnings: ApiDeprecationWarning[] = [];
-  for (const [workType, modelId] of Object.entries(effectiveOverrides)) {
+  for (const [workType, modelId] of Object.entries(config.overrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       deprecationWarnings.push({
         workType: workType as WorkTypeId,
@@ -203,7 +176,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         kimi: config.enabledProviders.has('kimi'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
-      overrides: effectiveOverrides,
+      overrides: config.overrides,
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },

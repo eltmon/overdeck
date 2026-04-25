@@ -790,6 +790,34 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
   return { config: result, explicitlyDisabled };
 }
 
+/** Renamed work-type keys from the convoy→review migration */
+const CONVOY_KEY_MIGRATION: Record<string, WorkTypeId> = {
+  'convoy:security-reviewer': 'review:security',
+  'convoy:performance-reviewer': 'review:performance',
+  'convoy:correctness-reviewer': 'review:correctness',
+  'convoy:requirements-reviewer': 'review:requirements',
+  'convoy:synthesis-agent': 'review:synthesis',
+};
+
+/**
+ * Migrate legacy convoy:* override keys → review:* equivalents.
+ * Mutates config in-place and returns true if any keys were migrated.
+ */
+function migrateConvoyKeys(config: YamlConfig): boolean {
+  if (!config.models?.overrides) return false;
+
+  let migrated = false;
+  for (const [oldKey, newKey] of Object.entries(CONVOY_KEY_MIGRATION)) {
+    if (oldKey in config.models.overrides) {
+      const value = (config.models.overrides as Record<string, string>)[oldKey];
+      delete (config.models.overrides as Record<string, string>)[oldKey];
+      (config.models.overrides as Record<string, string>)[newKey] = value;
+      migrated = true;
+    }
+  }
+  return migrated;
+}
+
 /**
  * Detect deprecated model IDs in config overrides
  *
@@ -925,27 +953,33 @@ export function loadConfig(): ConfigLoadResult {
   let globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
 
-  // Check for deprecated models in global config
+  // Check for deprecated models and legacy key names in global config
   let migrationResult: MigrationResult | undefined;
   if (globalConfig && hasGlobalConfig()) {
+    const convoyMigrated = migrateConvoyKeys(globalConfig);
     const migrations = detectDeprecatedModels(globalConfig);
 
-    if (migrations.length > 0) {
-      // Create backup
+    if (convoyMigrated || migrations.length > 0) {
       const backedUp = backupGlobalConfig();
 
-      // Apply migrations to global config
-      applyMigrations(globalConfig, migrations);
+      if (migrations.length > 0) {
+        applyMigrations(globalConfig, migrations);
+      }
 
-      // Write migrated config back to disk
       writeGlobalConfig(globalConfig);
 
-      // Log migrations
-      console.log('\n🔄 Model ID Migration:');
-      for (const { workType, from, to } of migrations) {
-        console.log(`  ${workType}: ${from} → ${to}`);
+      if (convoyMigrated) {
+        console.log('\n🔄 Work-type key migration: convoy:* → review:*');
       }
-      console.log('');
+      if (migrations.length > 0) {
+        console.log('\n🔄 Model ID Migration:');
+        for (const { workType, from, to } of migrations) {
+          console.log(`  ${workType}: ${from} → ${to}`);
+        }
+      }
+      if (convoyMigrated || migrations.length > 0) {
+        console.log('');
+      }
 
       migrationResult = { migrated: migrations, backedUp };
     }
