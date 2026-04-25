@@ -3109,3 +3109,14 @@
   cursor: pointer;
   user-select: none;
 }
+
+.forkWarning {
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #d4a017;
+  line-height: 1.4;
+  margin-top: 4px;
+}

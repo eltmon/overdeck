@@ -134,6 +134,48 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const issueId = resolveIssueId(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
 
+  // Guard: reject completion for already-closed issues
+  if (!options.force) {
+    const { resolveGitHubIssue } = await import('../../lib/tracker-utils.js');
+    const ghInfo = resolveGitHubIssue(issueId);
+    if (ghInfo.isGitHub) {
+      try {
+        const { stdout } = await execAsync(
+          `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state --jq '.state'`,
+          { encoding: 'utf-8' }
+        );
+        if (stdout.trim().toLowerCase() === 'closed') {
+          console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
+          process.exit(1);
+        }
+      } catch { /* gh not available or issue not found — proceed */ }
+    } else {
+      const linearApiKey = getLinearApiKey();
+      if (linearApiKey) {
+        try {
+          const { LinearClient } = await import('@linear/sdk');
+          const client = new LinearClient({ apiKey: linearApiKey });
+          const { extractNumber, extractPrefix } = await import('../../lib/issue-id.js');
+          const issueNum = extractNumber(issueId);
+          const teamKey = extractPrefix(issueId);
+          if (issueNum !== null && teamKey !== null) {
+            const results = await client.issues({
+              filter: { number: { eq: issueNum }, team: { key: { eq: teamKey } } },
+              first: 1,
+            });
+            if (results.nodes.length > 0) {
+              const state = await results.nodes[0].state;
+              if (state?.type === 'completed' || state?.type === 'canceled') {
+                console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
+                process.exit(1);
+              }
+            }
+          }
+        } catch { /* Linear API error — proceed */ }
+      }
+    }
+  }
+
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
     const { getAgentState } = await import('../../lib/agents.js');

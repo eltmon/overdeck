@@ -66,6 +66,7 @@
 | [TLDR.md](./TLDR.md) | TLDR code analysis — architecture, hooks, index lifecycle, API |
 | [CONFIGURATION.md § External Services](./CONFIGURATION.md#external-service-integrations) | Cloudflare tunnels, Hume EVI, and adding new integrations |
 | [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format — spec reference, Panopticon extensions, field reference |
+| [FORKS.md](./FORKS.md) | Conversation forking: summary fork vs plain fork, options, thinking block handling, model switching |
 
 ---
 

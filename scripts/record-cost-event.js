@@ -518,7 +518,8 @@ function initSchema(db) {
       created_at       TEXT    NOT NULL,
       ended_at         TEXT,
       last_attached_at TEXT,
-      session_file     TEXT,                               -- path to Claude Code JSONL session file (PAN-451)
+      session_file     TEXT,                               -- @deprecated: path to Claude Code JSONL session file (PAN-451). Kept for legacy rows — use claude_session_id.
+      claude_session_id TEXT,                              -- Claude Code session UUID. Immutable for the lifetime of the conversation.
       title            TEXT,                               -- human-readable title, auto-set from first message
       title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
       title_seed       TEXT,                               -- original auto-generated title for replacement check
@@ -622,7 +623,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 27`);
+	db.pragma(`user_version = 28`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -630,7 +631,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 27) return;
+	if (currentVersion === 28) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -908,7 +909,17 @@ function runMigrations(db) {
 			console.warn("[schema] Failed to seed deacon.globally_paused:", err);
 		}
 	}
-	db.pragma(`user_version = 27`);
+	if (currentVersion < 28) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN claude_session_id TEXT`);
+		} catch {}
+		const conversations = db.prepare(`SELECT id, session_file FROM conversations WHERE session_file IS NOT NULL`).all();
+		for (const conv of conversations) {
+			const sessionId = conv.session_file.split("/").pop()?.replace(".jsonl", "") ?? null;
+			if (sessionId) db.prepare(`UPDATE conversations SET claude_session_id = ? WHERE id = ?`).run(sessionId, conv.id);
+		}
+	}
+	db.pragma(`user_version = 28`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

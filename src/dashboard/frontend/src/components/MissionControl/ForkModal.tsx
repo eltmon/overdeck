@@ -192,7 +192,14 @@ function ModelSelect({
 
 interface ForkModalProps {
   conversation: Conversation;
-  onConfirm: (conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean) => void;
+  onConfirm: (
+    conv: Conversation,
+    launchModel: string,
+    summaryModel: string,
+    plainFork: boolean,
+    localSummaryOnly: boolean,
+    includeThinkingInSummary: boolean,
+  ) => void;
   onClose: () => void;
   isPending: boolean;
 }
@@ -203,11 +210,16 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [plainFork, setPlainFork] = useState(false);
+  const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
+  const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
 
   useEffect(() => {
     setSummaryModel(compactionModel);
   }, [compactionModel]);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  const modelChanged = launchModel !== (conversation.model || defaultModel);
+  const showModelSwitchWarning = plainFork && modelChanged;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -267,16 +279,51 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               <label htmlFor="plain-fork">Plain fork (skip summary, copy raw history)</label>
             </div>
 
+            {showModelSwitchWarning && (
+              <div className={styles.forkWarning}>
+                <strong>Warning:</strong> Plain fork with a different model may fail
+                if the raw history contains provider-specific blocks (e.g., signed thinking
+                blocks). Use a summary fork for cross-model forks.
+              </div>
+            )}
+
             {!plainFork && (
               <>
-                <ModelSelect
-                  value={summaryModel}
-                  onChange={setSummaryModel}
-                  groups={groups}
-                  label="Summary model"
-                />
+                <div className={styles.forkCheckboxRow}>
+                  <input
+                    type="checkbox"
+                    id="local-summary"
+                    checked={localSummaryOnly}
+                    onChange={(e) => setLocalSummaryOnly(e.target.checked)}
+                  />
+                  <label htmlFor="local-summary">Fast summary (no LLM, heuristic only)</label>
+                </div>
+
+                {!localSummaryOnly && (
+                  <>
+                    <ModelSelect
+                      value={summaryModel}
+                      onChange={setSummaryModel}
+                      groups={groups}
+                      label="Summary model"
+                    />
+                    <span className={styles.forkFieldHint}>
+                      Generates a concise summary of the conversation history
+                    </span>
+                  </>
+                )}
+
+                <div className={styles.forkCheckboxRow}>
+                  <input
+                    type="checkbox"
+                    id="include-thinking"
+                    checked={includeThinkingInSummary}
+                    onChange={(e) => setIncludeThinkingInSummary(e.target.checked)}
+                  />
+                  <label htmlFor="include-thinking">Include thinking in summary</label>
+                </div>
                 <span className={styles.forkFieldHint}>
-                  Generates a concise summary of the conversation history
+                  When enabled, thinking content is included as labeled text in the summary
                 </span>
               </>
             )}
@@ -300,7 +347,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}
