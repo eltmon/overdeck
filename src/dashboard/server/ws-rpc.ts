@@ -16,7 +16,9 @@ import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
 import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
 import { sessionFilePath } from '../../lib/paths.js';
-import type { ConversationEvent, DomainEvent } from '@panopticon/contracts';
+import { listSessionNamesAsync } from '../../lib/tmux.js';
+import { listProjects } from '../../lib/projects.js';
+import type { AgentStatus, ConversationEvent, DomainEvent, SessionTreeDelta } from '@panopticon/contracts';
 import type { StoredEvent } from './event-store.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -28,6 +30,160 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
     timestamp: stored.timestamp,
     payload: stored.payload,
   } as DomainEvent;
+}
+
+// ─── Session Tree Subscription Helpers (PAN-821) ──────────────────────────────
+
+/** Extract issue ID from a tmux session name. */
+function extractIssueIdFromSession(sessionName: string): string | null {
+  const agentMatch = sessionName.match(/^(agent|planning)-([a-z0-9-]+)$/);
+  if (agentMatch) return agentMatch[2]!.toUpperCase();
+
+  const reviewMatch = sessionName.match(/^review-(?:coordinator-)?([A-Z0-9-]+)-\d+/);
+  if (reviewMatch) return reviewMatch[1]!;
+
+  return null;
+}
+
+/** Compute issue ID prefixes that belong to a project. */
+function getProjectIssuePrefixes(projectKey: string): string[] {
+  const projects = listProjects();
+  const project = projects.find(p => p.key === projectKey);
+  if (!project) return [];
+
+  const prefixes: string[] = [];
+  if (project.config.issue_prefix) {
+    prefixes.push(project.config.issue_prefix.toUpperCase());
+  }
+  if (project.config.issue_prefixes) {
+    for (const p of project.config.issue_prefixes) {
+      prefixes.push(p.toUpperCase());
+    }
+  }
+  if (prefixes.length === 0) {
+    prefixes.push(project.key.toUpperCase().replace(/-/g, ''));
+  }
+  return prefixes;
+}
+
+/** Check if an issue ID belongs to a project by prefix match. */
+function issueBelongsToProject(issueId: string, prefixes: string[]): boolean {
+  const prefix = issueId.split('-')[0];
+  return prefix ? prefixes.includes(prefix.toUpperCase()) : false;
+}
+
+/** Map a domain event to a session tree delta. Returns null if not relevant. */
+function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
+  const p = event.payload as Record<string, unknown>;
+  const issueId = p['issueId'] as string | undefined;
+  if (!issueId) return null;
+
+  switch (event.type) {
+    case 'agent.started': {
+      const agentId = p['agentId'] as string;
+      return { kind: 'session_added', issueId, sessionId: agentId, timestamp: event.timestamp };
+    }
+    case 'agent.stopped': {
+      const agentId = p['agentId'] as string;
+      return { kind: 'session_removed', issueId, sessionId: agentId, timestamp: event.timestamp };
+    }
+    case 'agent.status_changed': {
+      const agentId = p['agentId'] as string;
+      const status = p['status'] as string;
+      return {
+        kind: 'status_changed',
+        issueId,
+        sessionId: agentId,
+        status: status as AgentStatus,
+        timestamp: event.timestamp,
+      };
+    }
+    case 'specialist.started': {
+      const specialist = p['specialist'] as Record<string, unknown> | undefined;
+      const name = specialist?.['name'] as string;
+      const currentIssue = specialist?.['currentIssue'] as string | undefined;
+      if (!name) return null;
+      return {
+        kind: 'session_added',
+        issueId: currentIssue || issueId,
+        sessionId: name,
+        timestamp: event.timestamp,
+      };
+    }
+    case 'specialist.completed':
+    case 'specialist.failed': {
+      const name = p['name'] as string;
+      return { kind: 'session_removed', issueId, sessionId: name, timestamp: event.timestamp };
+    }
+    case 'pipeline.review-started': {
+      return {
+        kind: 'session_added',
+        issueId,
+        sessionId: `review-coordinator-${issueId}`,
+        timestamp: event.timestamp,
+      };
+    }
+    case 'pipeline.review-completed': {
+      return {
+        kind: 'session_removed',
+        issueId,
+        sessionId: `review-coordinator-${issueId}`,
+        timestamp: event.timestamp,
+      };
+    }
+    case 'planning.started': {
+      const sessionName = p['sessionName'] as string;
+      return { kind: 'session_added', issueId, sessionId: sessionName, timestamp: event.timestamp };
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * 1 Hz polling stream for tmux presence changes not covered by domain events.
+ * Tracks tmux session existence and emits presence_changed deltas when
+ * sessions disappear (→ ended).
+ */
+function createPresencePollStream(): Stream.Stream<SessionTreeDelta, never, never> {
+  return Stream.callback<SessionTreeDelta>((queue) =>
+    Effect.acquireRelease(
+      Effect.promise(async () => {
+        let knownSessions = new Set<string>();
+
+        const tick = async () => {
+          try {
+            const sessions = await listSessionNamesAsync();
+            const currentSessions = new Set(sessions.filter(s => s.trim()));
+
+            // Sessions that disappeared → emit ended
+            for (const session of knownSessions) {
+              if (!currentSessions.has(session)) {
+                const issueId = extractIssueIdFromSession(session);
+                if (issueId) {
+                  Queue.offerUnsafe(queue, {
+                    kind: 'presence_changed',
+                    issueId,
+                    sessionId: session,
+                    presence: 'ended',
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+              }
+            }
+
+            knownSessions = currentSessions;
+          } catch { /* tmux may not be available, ignore */ }
+        };
+
+        const interval = setInterval(tick, 1000);
+        tick(); // Run immediately
+
+        return () => clearInterval(interval);
+      }),
+      (cleanup) => Effect.sync(cleanup),
+    ),
+  );
 }
 
 // ─── RPC handler layer ────────────────────────────────────────────────────────
@@ -155,6 +311,24 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             );
           }),
         ),
+
+      // ── subscribeProjectSessionTree — live session tree deltas (PAN-821) ─────
+      [WS_METHODS.subscribeProjectSessionTree]: (input) =>
+        Effect.gen(function* () {
+          const prefixes = getProjectIssuePrefixes(input.projectKey);
+
+          const eventDeltas = eventStore.streamEvents.pipe(
+            Stream.map(mapEventToDelta),
+            Stream.filter((d): d is SessionTreeDelta => d !== null),
+            Stream.filter(d => issueBelongsToProject(d.issueId, prefixes)),
+          );
+
+          const pollDeltas = createPresencePollStream().pipe(
+            Stream.filter(d => issueBelongsToProject(d.issueId, prefixes)),
+          );
+
+          return Stream.merge(eventDeltas, pollDeltas);
+        }).pipe(Stream.unwrap),
     });
   }),
 );

@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import * as Rpc from "effect/unstable/rpc/Rpc"
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup"
 import { DomainEvent } from "./events"
-import { DashboardSnapshot, IssueId, SequenceNumber, WorkspaceDetail } from "./types"
+import { AgentStatus, DashboardSnapshot, IssueId, SequenceNumber, SessionNodePresence, WorkspaceDetail } from "./types"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -12,6 +12,7 @@ export const WS_METHODS = {
   subscribeTerminal: "pan.subscribeTerminal",
   subscribeAgentOutput: "pan.subscribeAgentOutput",
   subscribeConversationMessages: "pan.subscribeConversationMessages",
+  subscribeProjectSessionTree: "pan.subscribeProjectSessionTree",
 
   // Snapshot / replay
   getSnapshot: "pan.getSnapshot",
@@ -108,6 +109,18 @@ export const ConversationEvent = Schema.Union([
   }),
 ])
 export type ConversationEvent = typeof ConversationEvent.Type
+
+// ─── Session Tree Delta (PAN-821) ─────────────────────────────────────────────
+
+export const SessionTreeDelta = Schema.Struct({
+  kind: Schema.Literals(['session_added', 'session_removed', 'presence_changed', 'status_changed']),
+  issueId: Schema.String,
+  sessionId: Schema.String,
+  presence: Schema.optional(SessionNodePresence),
+  status: Schema.optional(AgentStatus),
+  timestamp: Schema.String,
+})
+export type SessionTreeDelta = typeof SessionTreeDelta.Type
 
 // ─── RPC definitions ──────────────────────────────────────────────────────────
 
@@ -221,9 +234,17 @@ export const SubscribeConversationMessagesRpc = Rpc.make(WS_METHODS.subscribeCon
   stream: true,
 })
 
+/** 17. Subscribe to live session tree deltas for a project (stream, PAN-821) */
+export const SubscribeProjectSessionTreeRpc = Rpc.make(WS_METHODS.subscribeProjectSessionTree, {
+  payload: Schema.Struct({ projectKey: Schema.String }),
+  success: SessionTreeDelta,
+  error: PanRpcError,
+  stream: true,
+})
+
 // ─── RPC Group ────────────────────────────────────────────────────────────────
 
-/** All 16 Panopticon WebSocket RPC methods */
+/** All 17 Panopticon WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
   SubscribeTerminalRpc,
@@ -241,5 +262,6 @@ export const PanRpcGroup = RpcGroup.make(
   SendTerminalInputRpc,
   ResizeTerminalRpc,
   SubscribeConversationMessagesRpc,
+  SubscribeProjectSessionTreeRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup
