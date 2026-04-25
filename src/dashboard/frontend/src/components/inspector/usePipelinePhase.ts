@@ -38,11 +38,12 @@ export function derivePipelinePhase(
 
   // Parallel review sessions use review-<issueId>-<timestamp>-<role> naming.
   // Prefer actual discovered session names from the backend when available.
+  // No fallback to old specialist- naming — if sessions aren't discovered yet,
+  // the tab renders without a terminal connection until the backend finds them.
   const reviewSessionNames = reviewStatus?.reviewSessionNames;
-  const fallbackReviewSession = specialistSession('review-agent');
   const reviewSession = reviewSessionNames && reviewSessionNames.length > 0
     ? reviewSessionNames[0]
-    : fallbackReviewSession;
+    : null;
 
   const testSession = specialistSession('test-agent');
   const mergeSession = specialistSession('merge-agent');
@@ -76,7 +77,7 @@ export function derivePipelinePhase(
     if (reviewSessionNames && reviewSessionNames.length > 0) {
       activeSession = reviewSessionNames.find(s => !deadSessions.has(s)) || reviewSessionNames[0] || null;
     } else {
-      activeSession = deadSessions.has(reviewSession) ? null : reviewSession;
+      activeSession = reviewSession && !deadSessions.has(reviewSession) ? reviewSession : null;
     }
   } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
     phase = 'review-feedback';
@@ -130,7 +131,7 @@ export function derivePipelinePhase(
           isRunning: phase === 'reviewing' && !isDone && !isReviewDone,
         });
       }
-    } else {
+    } else if (reviewSession) {
       tabs.push({
         id: 'reviewing',
         label: 'Review',
