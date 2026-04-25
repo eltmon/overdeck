@@ -301,8 +301,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
 
     // Step 3: Update agent state to stopped (so it appears in dashboard agents list)
+    // Mark phase as 'review-response' so the dashboard shows the agent as on
+    // standby for UAT tweaks rather than fully stopped.
     if (existingState) {
       existingState.status = 'stopped';
+      existingState.phase = 'review-response';
+      existingState.stoppedByUser = true;
       existingState.lastActivity = new Date().toISOString();
       saveAgentState(existingState);
     }
@@ -320,6 +324,50 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       trackerUpdated,
       comment: options.comment,
     }));
+
+    // Step 4b: Guard against already-merged issues (e.g. merge completed in
+    // background while agent was finishing up). If already merged, skip the
+    // review pipeline entirely — no review status init, no HTTP trigger.
+    const { getReviewStatus } = await import('../../lib/review-status.js');
+    const currentStatus = getReviewStatus(issueId);
+    if (currentStatus?.mergeStatus === 'merged') {
+      spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
+      console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
+      console.log('');
+      return;
+    }
+
+    // Step 4c: Guard against no-op re-submission. If review already passed and
+    // HEAD hasn't changed since the review snapshot, skip re-review entirely.
+    // This prevents agents from accidentally cycling the pipeline after approval.
+    if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
+      const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
+      try {
+        const { HEAD } = await getWorkspaceGitInfo(workspacePath);
+        if (HEAD === currentStatus.reviewedAtCommit) {
+          spinner.succeed(`Work complete: ${issueId} (review already passed at ${HEAD.slice(0, 8)} — no new commits, skipping re-review)`);
+          console.log(chalk.green(`  ✓ Review already passed and no new commits detected. Pipeline continues normally.`));
+          console.log('');
+          return;
+        }
+        console.log(chalk.yellow(`  ⚠ New commits since review passed (${currentStatus.reviewedAtCommit.slice(0, 8)} → ${HEAD.slice(0, 8)}). Re-running review pipeline.`));
+      } catch {
+        // Git info unavailable — proceed with normal flow rather than blocking
+      }
+    }
+
+    // Atomically initialize review status in SQLite so the pipeline
+    // can proceed even if the dashboard is offline. The HTTP trigger below is
+    // an optimization — deacon will pick this up if it fails.
+    setReviewStatus(issueId, {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      verificationStatus: 'pending',
+      verificationCycleCount: 0,
+      autoRequeueCount: 0,
+    });
 
     spinner.succeed(`Work complete: ${issueId}`);
     console.log('');

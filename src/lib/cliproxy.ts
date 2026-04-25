@@ -24,8 +24,12 @@ import {
 } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { spawn, execSync } from 'child_process';
+import { spawn, execSync, exec } from 'child_process';
+import { promisify } from 'util';
+import net from 'net';
 import { PANOPTICON_HOME, BIN_DIR } from './paths.js';
+
+const execAsync = promisify(exec);
 
 export const CLIPROXY_HOST = '127.0.0.1';
 export const CLIPROXY_PORT = 8317;
@@ -264,7 +268,7 @@ export function installCliproxy(force = false): void {
   } catch { /* non-fatal */ }
 }
 
-function readPidFile(): number | null {
+export function readPidFile(): number | null {
   const pidPath = getCliproxyPidPath();
   if (!existsSync(pidPath)) return null;
   try {
@@ -365,4 +369,90 @@ export function getCliproxyClientEnv(): Record<string, string> {
     ANTHROPIC_BASE_URL: CLIPROXY_BASE_URL,
     ANTHROPIC_AUTH_TOKEN: CLIPROXY_AUTH_TOKEN,
   };
+}
+
+// ─── Async lifecycle (safe for dashboard server — no execSync) ─────────────────
+
+/** Check whether the cliproxy TCP port is accepting connections. */
+export async function checkCliproxyPortAsync(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.connect(CLIPROXY_PORT, CLIPROXY_HOST);
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('error', () => resolve(false));
+    socket.setTimeout(2000, () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+/** Async variant of isCliproxyRunning — safe for the event loop. */
+export async function isCliproxyRunningAsync(): Promise<boolean> {
+  const pid = readPidFile();
+  if (pid && isProcessAlive(pid)) return true;
+  return checkCliproxyPortAsync();
+}
+
+/** Async variant of stopCliproxy — safe for the event loop. */
+export async function stopCliproxyAsync(): Promise<void> {
+  const pid = readPidFile();
+  if (pid && isProcessAlive(pid)) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  try {
+    await execAsync(`lsof -ti:${CLIPROXY_PORT} 2>/dev/null | xargs -r kill 2>/dev/null || true`);
+  } catch { /* ignore */ }
+  try {
+    if (existsSync(getCliproxyPidPath())) {
+      const { unlinkSync } = await import('fs');
+      unlinkSync(getCliproxyPidPath());
+    }
+  } catch { /* ignore */ }
+}
+
+/** Async variant of startCliproxy — safe for the event loop.
+ *  Throws if cliproxy is not installed (does not perform blocking install). */
+export async function startCliproxyAsync(): Promise<void> {
+  ensureDirs();
+  ensureConfigFile();
+  try { bridgeCodexAuthToCliproxy(); } catch { /* non-fatal */ }
+
+  if (await isCliproxyRunningAsync()) return;
+
+  if (!isCliproxyInstalled()) {
+    throw new Error(
+      'CLIProxy is not installed. Run `pan up` from the CLI to install it.',
+    );
+  }
+
+  const bin = getCliproxyBinary();
+  const config = getCliproxyConfigPath();
+  const logPath = getCliproxyLogPath();
+
+  const { openSync } = await import('fs');
+  const logFd = openSync(logPath, 'a');
+
+  const child = spawn(bin, ['-config', config], {
+    detached: true,
+    stdio: ['ignore', logFd, logFd],
+    cwd: getCliproxyDir(),
+  });
+
+  if (!child.pid) {
+    throw new Error('Failed to spawn cliproxy');
+  }
+
+  writeFileSync(getCliproxyPidPath(), String(child.pid));
+  child.unref();
+}
+
+/** Restart cliproxy asynchronously. Safe for the event loop. */
+export async function restartCliproxyAsync(): Promise<void> {
+  await stopCliproxyAsync();
+  await new Promise((r) => setTimeout(r, 500));
+  await startCliproxyAsync();
 }

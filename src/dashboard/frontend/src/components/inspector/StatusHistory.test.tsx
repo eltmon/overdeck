@@ -12,13 +12,13 @@ const entries: StatusHistoryEntry[] = [
 describe('StatusHistory', () => {
   it('renders collapsed by default showing entry count', () => {
     render(<StatusHistory history={entries} />);
-    expect(screen.getByText('History (3)')).toBeInTheDocument();
+    expect(screen.getByText('Previous attempts (3)')).toBeInTheDocument();
     expect(screen.queryByText('review')).not.toBeInTheDocument();
   });
 
   it('expands on click to show history entries', () => {
     render(<StatusHistory history={entries} />);
-    fireEvent.click(screen.getByText('History (3)'));
+    fireEvent.click(screen.getByText('Previous attempts (3)'));
     expect(screen.getByText('review')).toBeInTheDocument();
     expect(screen.getByText('test')).toBeInTheDocument();
     expect(screen.getByText('merge')).toBeInTheDocument();
@@ -26,21 +26,21 @@ describe('StatusHistory', () => {
 
   it('shows notes when present', () => {
     render(<StatusHistory history={entries} />);
-    fireEvent.click(screen.getByText('History (3)'));
+    fireEvent.click(screen.getByText('Previous attempts (3)'));
     expect(screen.getByText(/Looks good/)).toBeInTheDocument();
   });
 
   it('collapses again on second click', () => {
     render(<StatusHistory history={entries} />);
-    fireEvent.click(screen.getByText('History (3)'));
+    fireEvent.click(screen.getByText('Previous attempts (3)'));
     expect(screen.getByText('review')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('History (3)'));
+    fireEvent.click(screen.getByText('Previous attempts (3)'));
     expect(screen.queryByText('review')).not.toBeInTheDocument();
   });
 
   it('renders entries in reverse chronological order', () => {
     render(<StatusHistory history={entries} />);
-    fireEvent.click(screen.getByText('History (3)'));
+    fireEvent.click(screen.getByText('Previous attempts (3)'));
     const statuses = screen.getAllByText(/passed|failed|merged/);
     // Most recent (merged) appears first since we reverse sort
     expect(statuses[0].textContent).toBe('merged');

@@ -19,12 +19,30 @@
 
 import { spawn, exec, execSync } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
-import { PANOPTICON_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
+import { LOGS_DIR, PANOPTICON_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
 
 const execAsync = promisify(exec);
+
+export const DASHBOARD_LOG_FILE = join(LOGS_DIR, 'dashboard.log');
+
+/**
+ * Build the stdio tuple for a detached dashboard spawn. Writes stdout+stderr
+ * to `~/.panopticon/logs/dashboard.log` (append) so `pan up --detach` failures
+ * leave a paper trail instead of vanishing into /dev/null. Falls back to
+ * 'ignore' if the log file cannot be opened.
+ */
+export function openDashboardLogStdio(): ['ignore', number | 'ignore', number | 'ignore'] {
+  try {
+    mkdirSync(LOGS_DIR, { recursive: true });
+    const fd = openSync(DASHBOARD_LOG_FILE, 'a');
+    return ['ignore', fd, fd];
+  } catch {
+    return ['ignore', 'ignore', 'ignore'];
+  }
+}
 
 export interface PlatformConfig {
   dashboardPort: number;

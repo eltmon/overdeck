@@ -8,7 +8,10 @@ export default defineConfig({
     environment: 'node',
     pool: 'forks',
     poolOptions: {
-      forks: { minForks: 1, maxForks: 4, singleFork: false },
+      // GitHub Actions runners have limited memory (~7GB). Use 1 fork in CI to prevent OOM.
+      // Local development can use up to 4 concurrent workers. PAN-805 root cause: multiple
+      // reconciler tests with real async I/O (sleep/retry) exhaust heap when parallelized.
+      forks: { minForks: 1, maxForks: process.env.CI ? 1 : 4, singleFork: false },
     },
     include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],

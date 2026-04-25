@@ -18,6 +18,7 @@ import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerR
 import { ServerConfig } from './config.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
+import { AgentStateServiceLive } from './services/agent-state-service.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
 import { LinearClientOptionalLive } from './services/linear-client.js';
 import { GitHubClientOptionalLive } from './services/github-client.js';
@@ -45,6 +46,7 @@ import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
+import { cliproxyRouteLayer } from './routes/cliproxy.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -192,6 +194,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   showRouteLayer,
   adminRouteLayer,
   prereqsRouteLayer,
+  cliproxyRouteLayer,
   staticRouteLayer,
 );
 
@@ -215,6 +218,7 @@ const IssueLifecycleServiceLive = IssueLifecycleLive.pipe(
 
 const DomainServicesLive = Layer.mergeAll(
   ReadModelServiceLive,
+  AgentStateServiceLive,
   EventStoreServiceLive.pipe(Layer.provide(ReadModelServiceLive)),
   TerminalServiceLive,
   TrackerClientsLive,

@@ -14,6 +14,7 @@ import {
   getDefaultConversationModel,
   ensureDefaultConversationModel,
 } from './defaultConversationModel';
+import { usePickerPosition } from './usePickerPosition';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'openai',
     label: 'OpenAI',
     models: [
+      { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
     ],
   },
@@ -133,31 +135,8 @@ interface ModelPickerProps {
 export function ModelPicker({ value, onChange, disabled = false }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
-  const [dropdownAlign, setDropdownAlign] = useState<'left' | 'right'>('left');
-  const [openUp, setOpenUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Adjust dropdown alignment if it would overflow the viewport
-  useEffect(() => {
-    if (!open || !dropdownRef.current || !ref.current) return;
-
-    const dropdownRect = dropdownRef.current.getBoundingClientRect();
-
-    // If dropdown extends past right edge of viewport, align to right
-    if (dropdownRect.right > window.innerWidth - 8) {
-      setDropdownAlign('right');
-    } else {
-      setDropdownAlign('left');
-    }
-
-    // If dropdown extends past bottom edge of viewport, open upward
-    if (dropdownRect.bottom > window.innerHeight - 8) {
-      setOpenUp(true);
-    } else {
-      setOpenUp(false);
-    }
-  }, [open]);
+  const { openUp, align, maxHeight } = usePickerPosition(open, ref);
 
   // Fetch available models on mount so known models stay in sync with the current provider config.
   useEffect(() => {
@@ -267,9 +246,11 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
       {open && (
         <div
-          ref={dropdownRef}
           className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
-          style={dropdownAlign === 'right' ? { left: 'auto', right: 0 } : {}}
+          style={{
+            maxHeight: `${maxHeight}px`,
+            ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
+          }}
         >
           {groups.map((group) => (
             <div key={group.provider}>

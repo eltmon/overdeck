@@ -108,19 +108,35 @@ async function rebaseOneRepo(
 
       if (!resolution.resolved) {
         await execAsync('git rebase --abort', { cwd: repoPath }).catch(() => {});
+
+        // Fallback: try merge instead of rebase for non-planning conflicts.
+        // Rebasing large branches (many commits) across file conflicts is painful;
+        // a single merge commit is acceptable and far safer.
         if (resolution.remainingConflicts.length > 0) {
+          try {
+            await execAsync(`git merge origin/${targetBranch}`, {
+              cwd: repoPath,
+              encoding: 'utf-8',
+              timeout: 120000,
+            });
+            // Merge succeeded — continue to push below.
+            alreadyRebased = false; // mark as needing push
+          } catch (mergeErr: any) {
+            await execAsync('git merge --abort', { cwd: repoPath }).catch(() => {});
+            return {
+              repoKey,
+              outcome: 'conflict',
+              message: `Merge conflicts: ${resolution.remainingConflicts.join(', ')}`,
+              conflictFiles: resolution.remainingConflicts,
+            };
+          }
+        } else {
           return {
             repoKey,
-            outcome: 'conflict',
-            message: `Rebase conflicts in non-planning files: ${resolution.remainingConflicts.join(', ')}`,
-            conflictFiles: resolution.remainingConflicts,
+            outcome: 'error',
+            message: `Rebase failed: ${rebaseErr.message?.trim() || rebaseErr.message}`,
           };
         }
-        return {
-          repoKey,
-          outcome: 'error',
-          message: `Rebase failed: ${rebaseErr.message?.trim() || rebaseErr.message}`,
-        };
       }
     }
   }

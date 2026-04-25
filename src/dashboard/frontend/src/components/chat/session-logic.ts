@@ -13,8 +13,8 @@ import type { ChatMessage, WorkLogEntry } from './chat-types';
 // ─── Timeline entry types ─────────────────────────────────────────────────────
 
 export type TimelineEntry =
-  | { id: string; kind: 'message'; createdAt: string; message: ChatMessage }
-  | { id: string; kind: 'work'; createdAt: string; entry: WorkLogEntry };
+  | { id: string; kind: 'message'; createdAt: string; sequence?: number; message: ChatMessage }
+  | { id: string; kind: 'work'; createdAt: string; sequence?: number; entry: WorkLogEntry };
 
 // ─── Row types (after grouping consecutive work entries) ──────────────────────
 
@@ -30,6 +30,8 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string;
       message: ChatMessage;
+      /** Timestamp of the preceding user message — used for duration display. */
+      durationStart: string;
     }
   | {
       kind: 'working';
@@ -49,14 +51,54 @@ export function deriveTimelineEntries(
 ): TimelineEntry[] {
   const entries: TimelineEntry[] = [
     ...messages.map(
-      (m): TimelineEntry => ({ id: m.id, kind: 'message', createdAt: m.createdAt, message: m }),
+      (m): TimelineEntry => ({ id: m.id, kind: 'message', createdAt: m.createdAt, sequence: m.sequence, message: m }),
     ),
     ...workLog.map(
-      (w): TimelineEntry => ({ id: w.id, kind: 'work', createdAt: w.createdAt, entry: w }),
+      (w): TimelineEntry => ({ id: w.id, kind: 'work', createdAt: w.createdAt, sequence: w.sequence, entry: w }),
     ),
   ];
 
-  return entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return entries.sort((a, b) => {
+    // ISO 8601 timestamps sort lexicographically — use direct comparison,
+    // not localeCompare, to avoid locale-sensitive ordering surprises.
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
+    if (a.sequence !== undefined && b.sequence !== undefined) {
+      return a.sequence - b.sequence;
+    }
+    return 0;
+  });
+}
+
+// ─── computeMessageDurationStart ──────────────────────────────────────────────
+
+/**
+ * Compute the duration-start timestamp for each message.
+ *
+ * For assistant messages, duration starts at the most recent user message
+ * (the request that triggered the response). This lets us keep createdAt as
+ * the actual response time (for correct chronological interleaving with work
+ * log entries) while still showing accurate response durations.
+ *
+ * Mirrors T3Code's computeMessageDurationStart.
+ */
+export function computeMessageDurationStart(
+  messages: ReadonlyArray<ChatMessage>,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  let lastBoundary: string | null = null;
+
+  for (const message of messages) {
+    if (message.role === 'user') {
+      lastBoundary = message.createdAt;
+    }
+    result.set(message.id, lastBoundary ?? message.createdAt);
+    if (message.role === 'assistant' && message.completedAt) {
+      lastBoundary = message.completedAt;
+    }
+  }
+
+  return result;
 }
 
 // ─── deriveMessagesTimelineRows ───────────────────────────────────────────────
@@ -72,6 +114,10 @@ export function deriveMessagesTimelineRows(
 ): MessagesTimelineRow[] {
   const rows: MessagesTimelineRow[] = [];
   let i = 0;
+
+  const durationStartByMessageId = computeMessageDurationStart(
+    timelineEntries.flatMap((entry) => (entry.kind === 'message' ? [entry.message] : [])),
+  );
 
   while (i < timelineEntries.length) {
     const entry = timelineEntries[i]!;
@@ -97,6 +143,7 @@ export function deriveMessagesTimelineRows(
         id: entry.id,
         createdAt: entry.createdAt,
         message: entry.message,
+        durationStart: durationStartByMessageId.get(entry.message.id) ?? entry.message.createdAt,
       });
       i++;
     }

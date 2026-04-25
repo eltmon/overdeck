@@ -29,9 +29,16 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         review_notes, test_notes, merge_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
         stuck, stuck_reason, stuck_at, stuck_details,
-        reviewed_at_commit
+        reviewed_at_commit,
+        review_spawned_at,
+        test_retry_count,
+        review_retry_count,
+        recovery_started_at,
+        deacon_ignored,
+        deacon_ignored_at,
+        deacon_ignored_reason
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -53,7 +60,14 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         stuck_reason          = excluded.stuck_reason,
         stuck_at              = excluded.stuck_at,
         stuck_details         = excluded.stuck_details,
-        reviewed_at_commit    = excluded.reviewed_at_commit
+        reviewed_at_commit    = excluded.reviewed_at_commit,
+        review_spawned_at     = excluded.review_spawned_at,
+        test_retry_count      = excluded.test_retry_count,
+        review_retry_count    = excluded.review_retry_count,
+        recovery_started_at   = excluded.recovery_started_at,
+        deacon_ignored        = excluded.deacon_ignored,
+        deacon_ignored_at     = excluded.deacon_ignored_at,
+        deacon_ignored_reason = excluded.deacon_ignored_reason
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -76,6 +90,13 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.stuckAt ?? null,
       s.stuckDetails ?? null,
       s.reviewedAtCommit ?? null,
+      s.reviewSpawnedAt ?? null,
+      s.testRetryCount ?? null,
+      s.reviewRetryCount ?? null,
+      s.recoveryStartedAt ?? null,
+      s.deaconIgnored ? 1 : 0,
+      s.deaconIgnoredAt ?? null,
+      s.deaconIgnoredReason ?? null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -184,6 +205,18 @@ interface DbReviewStatusRow {
   stuck_details: string | null;
   // PAN-653: commit SHA at which review passed
   reviewed_at_commit: string | null;
+  // PAN-699: timestamp when review agents were dispatched
+  review_spawned_at: string | null;
+  // PAN-699: test-agent dispatch retry counter
+  test_retry_count: number | null;
+  // PAN-794: parallel-review re-dispatch retry counter
+  review_retry_count: number | null;
+  // PAN-794: ISO timestamp marking current recovery-cycle boundary
+  recovery_started_at: string | null;
+  // Human-requested deacon ignore (per-issue patrol opt-out)
+  deacon_ignored: number;
+  deacon_ignored_at: string | null;
+  deacon_ignored_reason: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -209,6 +242,13 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     stuckAt: row.stuck_at ?? undefined,
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
+    reviewSpawnedAt: row.review_spawned_at ?? undefined,
+    testRetryCount: row.test_retry_count ?? undefined,
+    reviewRetryCount: row.review_retry_count ?? undefined,
+    recoveryStartedAt: row.recovery_started_at ?? undefined,
+    deaconIgnored: row.deacon_ignored === 1 ? true : undefined,
+    deaconIgnoredAt: row.deacon_ignored_at ?? undefined,
+    deaconIgnoredReason: row.deacon_ignored_reason ?? undefined,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -246,6 +286,45 @@ export function markWorkspaceStuck(
     SET stuck = 1, stuck_reason = ?, stuck_at = ?, stuck_details = ?, updated_at = ?
     WHERE issue_id = ?
   `).run(reason, now, detailsJson, now, issueId);
+}
+
+/**
+ * Set (or clear) the human-requested deacon-ignore flag for a workspace.
+ * When ignored=true, Deacon patrol skips this issue entirely — distinct from
+ * `stuck`, which is a system-set failure marker. Used by the per-issue "Pause"
+ * button on the kanban and by bulk-apply tooling.
+ */
+export function setDeaconIgnored(
+  issueId: string,
+  ignored: boolean,
+  reason?: string,
+): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  // Ensure a row exists (same pattern as markWorkspaceStuck) so setting the
+  // flag on an issue that has no prior review_status row still works.
+  db.prepare(`
+    INSERT OR IGNORE INTO review_status (
+      issue_id, review_status, test_status, updated_at, ready_for_merge,
+      deacon_ignored, deacon_ignored_at, deacon_ignored_reason
+    ) VALUES (?, 'pending', 'pending', ?, 0, ?, ?, ?)
+  `).run(issueId, now, ignored ? 1 : 0, ignored ? now : null, ignored ? (reason ?? null) : null);
+
+  db.prepare(`
+    UPDATE review_status
+    SET deacon_ignored       = ?,
+        deacon_ignored_at    = ?,
+        deacon_ignored_reason = ?,
+        updated_at           = ?
+    WHERE issue_id = ?
+  `).run(
+    ignored ? 1 : 0,
+    ignored ? now : null,
+    ignored ? (reason ?? null) : null,
+    now,
+    issueId,
+  );
 }
 
 /**

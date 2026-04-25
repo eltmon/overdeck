@@ -9,6 +9,7 @@ function makeTab(overrides: Partial<TerminalTab> = {}): TerminalTab {
     sessionName: 'agent-123',
     isActive: true,
     disabled: false,
+    isRunning: false,
     ...overrides,
   };
 }
@@ -106,6 +107,43 @@ describe('TerminalTabs', () => {
       // Find the pin toggle button (contains "Auto" text)
       fireEvent.click(screen.getByText('Auto').closest('button')!);
       expect(onTogglePin).toHaveBeenCalled();
+    });
+  });
+
+  describe('running spinner', () => {
+    it('shows a spinner on tabs with isRunning=true', () => {
+      const tabs = [
+        makeTab({ id: 'working', label: 'Work', isActive: true, isRunning: false }),
+        makeTab({ id: 'reviewing-correctness', label: 'Review (correctness)', sessionName: 'review-pan-1-correctness', isActive: false, isRunning: true }),
+      ];
+      const { container } = render(
+        <TerminalTabs {...defaultProps} tabs={tabs} selectedSession="agent-123" />,
+      );
+      // Loader2 renders as an svg with animate-spin class
+      const spinners = container.querySelectorAll('svg.animate-spin');
+      expect(spinners.length).toBe(1);
+    });
+
+    it('shows the active dot only when not running', () => {
+      const tabs = [
+        makeTab({ id: 'working', label: 'Work', isActive: true, isRunning: false }),
+      ];
+      const { container } = render(
+        <TerminalTabs {...defaultProps} tabs={tabs} selectedSession="agent-123" />,
+      );
+      const dots = container.querySelectorAll('span.rounded-full');
+      expect(dots.length).toBe(1);
+    });
+
+    it('hides the active dot when running', () => {
+      const tabs = [
+        makeTab({ id: 'working', label: 'Work', isActive: true, isRunning: true }),
+      ];
+      const { container } = render(
+        <TerminalTabs {...defaultProps} tabs={tabs} selectedSession="agent-123" />,
+      );
+      const dots = container.querySelectorAll('span.rounded-full');
+      expect(dots.length).toBe(0);
     });
   });
 

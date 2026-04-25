@@ -20,6 +20,7 @@ export const BACKUPS_DIR = join(PANOPTICON_HOME, 'backups');
 export const COSTS_DIR = join(PANOPTICON_HOME, 'costs');
 export const HEARTBEATS_DIR = join(PANOPTICON_HOME, 'heartbeats');
 export const ARCHIVES_DIR = join(PANOPTICON_HOME, 'archives');
+export const LOGS_DIR = join(PANOPTICON_HOME, 'logs');
 
 // Traefik directories
 export const TRAEFIK_DIR = join(PANOPTICON_HOME, 'traefik');
@@ -84,10 +85,15 @@ export const SOURCE_SKILLS_DIR = join(packageRoot, 'skills');
 export const SOURCE_DEV_SKILLS_DIR = join(packageRoot, 'dev-skills');
 export const SOURCE_AGENTS_DIR = join(packageRoot, 'agents');
 export const SOURCE_RULES_DIR = join(packageRoot, 'rules');
+// Review prompt templates (prompt primitives) — see docs/REVIEW-AGENT-ARCHITECTURE.md
+// Stored outside .claude/ so they don't appear in workspace worktrees where
+// work agents could read them and attempt self-review.
+export const SOURCE_REVIEW_PROMPTS_DIR = join(packageRoot, 'src', 'lib', 'cloister', 'prompts', 'review');
 
 // Cache directories (where Panopticon keeps its copy of distributed content)
 export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.panopticon/skills/
 export const CACHE_AGENTS_DIR = join(PANOPTICON_HOME, 'agent-definitions');  // separate from agent state
+export const CACHE_REVIEW_PROMPTS_DIR = join(PANOPTICON_HOME, 'review-prompts');
 export const CACHE_RULES_DIR = join(PANOPTICON_HOME, 'rules');
 export const CACHE_MANIFEST = join(PANOPTICON_HOME, '.manifest.json');
 

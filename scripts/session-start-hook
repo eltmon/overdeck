@@ -1,0 +1,47 @@
+#!/bin/bash
+# ~/.panopticon/bin/session-start-hook  (PAN-800)
+#
+# Fires on Claude Code SessionStart. Emits agent.activity_changed(idle) so the
+# runtime snapshot is current before the first tool fires, and emits
+# agent.model_set when the model is inferable from the payload or env.
+#
+# This hook replaces the waitForReadySignal tmux fallback referenced in
+# PAN-759 — the hook that was supposed to exist from the start but was never
+# registered in ~/.claude/settings.json by the installer.
+
+set +e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+
+CLAUDE_SESSION_ID=""
+MODEL=""
+if command -v jq >/dev/null 2>&1; then
+  CLAUDE_SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)
+  MODEL=$(echo "$INPUT" | jq -r '.model // .model_name // ""' 2>/dev/null)
+fi
+[ -z "$MODEL" ] && MODEL="${ANTHROPIC_MODEL:-}"
+
+TS=$(date -Iseconds)
+
+pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+
+if [ -n "$MODEL" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    BODY=$(jq -n --arg model "$MODEL" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
+      'if $sid == "" then {kind: "model_set", model: $model, timestamp: $ts}
+       else {kind: "model_set", model: $model, claudeSessionId: $sid, timestamp: $ts} end')
+  elif [ -n "$CLAUDE_SESSION_ID" ]; then
+    BODY="{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"claudeSessionId\":\"$CLAUDE_SESSION_ID\",\"timestamp\":\"$TS\"}"
+  else
+    BODY="{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"timestamp\":\"$TS\"}"
+  fi
+  pan_emit_event "$AGENT_ID" "$BODY"
+fi
+
+exit 0

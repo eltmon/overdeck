@@ -129,7 +129,9 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     // Order matters - check more specific patterns first
 
     // Opus models
-    if (model.includes('opus-4-6') || model.includes('opus-4.6')) {
+    if (model.includes('opus-4-7') || model.includes('opus-4.7')) {
+      normalizedModel = 'claude-opus-4-7';
+    } else if (model.includes('opus-4-6') || model.includes('opus-4.6')) {
       normalizedModel = 'claude-opus-4-6';
     } else if (model.includes('opus-4-1') || model.includes('opus-4.1')) {
       normalizedModel = 'claude-opus-4-1';

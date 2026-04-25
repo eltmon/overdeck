@@ -1,73 +1,82 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle, ChevronRight,
+  XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, Box, Tag, LayoutGrid,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../../lib/pipeline-state';
+import { ResetIssueButton } from '../ResetIssueButton';
+import { StopAgentButton } from '../StopAgentButton';
+import { MergeButton } from '../MergeButton';
+import { RecoverButton } from '../RecoverButton';
+import { RestartFromPlanButton } from '../RestartFromPlanButton';
+import { ArtifactLinks } from '../ArtifactLinks';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
-type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unknown>;
-type ResetReviewMutation = UseMutationResult<unknown, Error, { rerun?: boolean } | undefined, unknown>;
 type SyncMutation = UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?: number }, Error, void, unknown>;
+type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unknown>;
 
 interface ActionsSectionProps {
   agent?: Agent;
+  issueId: string;
   reviewStatus?: ReviewStatus;
   reviewStatusLoading?: boolean;
   workspace?: WorkspaceInfo;
-  mergeMutation: AnyMutation;
+  hasPlan: boolean;
+  beadsCount: number;
   reviewMutation: AnyMutation;
-  killMutation: AnyMutation;
   cancelMutation: AnyMutation;
-  reopenMutation: ReopenMutation;
-  resetReviewMutation: ResetReviewMutation;
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
   createWorkspaceMutation: AnyMutation;
   syncMainMutation: SyncMutation;
+  copySettingsMutation: AnyMutation;
   resetSessionMutation: AnyMutation;
-  onMerge: () => void;
+  reopenMutation?: ReopenMutation;
   onReview: () => void;
-  onKill: () => void;
   onCancel: () => void;
-  onReopen: () => void;
-  onResetReview: () => void;
   onResetSession: () => void;
   onDismissPending: () => void;
   onStartAgent: (message?: string) => void;
   onCreateWorkspace: () => void;
+  onCopySettings: () => void;
+  onReopen?: () => void;
+  onKillSuccess?: () => void;
+  onViewBeads: () => void;
+  onViewVBrief: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
 
 export function ActionsSection({
   agent,
+  issueId,
   reviewStatus,
   reviewStatusLoading,
   workspace,
-  mergeMutation,
+  hasPlan,
+  beadsCount,
   reviewMutation,
-  killMutation,
   cancelMutation,
-  reopenMutation,
-  resetReviewMutation,
   startAgentMutation,
   createWorkspaceMutation,
   syncMainMutation,
+  copySettingsMutation,
   resetSessionMutation,
-  onMerge,
+  reopenMutation,
   onReview,
-  onKill,
   onCancel,
-  onReopen,
-  onResetReview,
   onResetSession,
   onDismissPending,
   onStartAgent,
   onCreateWorkspace,
+  onCopySettings,
+  onReopen,
+  onKillSuccess,
+  onViewBeads,
+  onViewVBrief,
   lifecycle,
   agentLaunchState,
 }: ActionsSectionProps) {
@@ -77,18 +86,6 @@ export function ActionsSection({
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
 
-  // Stuck merge detection: if mergeStatus has been 'merging' for > 2 min, enable retry (PAN-490)
-  const STUCK_MERGE_MS = 2 * 60 * 1000;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (reviewStatus?.mergeStatus !== 'merging') return;
-    const interval = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(interval);
-  }, [reviewStatus?.mergeStatus]);
-  const mergingElapsed = reviewStatus?.mergeStatus === 'merging' && reviewStatus.updatedAt
-    ? now - new Date(reviewStatus.updatedAt).getTime()
-    : 0;
-  const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
   const hasVerificationState = !!reviewStatus?.verificationStatus && reviewStatus.verificationStatus !== 'pending';
   const showPipelineStatus = !!reviewStatus && (
@@ -101,9 +98,8 @@ export function ActionsSection({
   const reviewActionHint = !reviewStatus ? null : (() => {
     if (reviewStatus.verificationStatus === 'failed') {
       return {
-        label: 'Next: Review & Test',
-        detail: reviewStatus.verificationNotes || 'Verification failed.',
-        title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+        label: 'Fix build gate errors, then re-run',
+        title: 'Build gate (typecheck/lint) failed — fix the errors before review can start.',
       };
     }
     if (reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked') {
@@ -172,139 +168,126 @@ export function ActionsSection({
       )}
       {reviewActionHint && (
         <div
-          className="mt-2 rounded border border-warning/40 badge-bg-warning px-2 py-1.5 text-xs text-warning-foreground"
+          className="mt-2 rounded border border-warning/40 badge-bg-warning px-2 py-1 text-xs text-warning-foreground"
           title={reviewActionHint.title}
         >
-          <div className="font-medium">{reviewActionHint.label}</div>
-          <div className="mt-1 text-warning-foreground/80">{reviewActionHint.detail}</div>
+          <span className="font-medium">{reviewActionHint.label}</span>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5 mt-2">
-        {/* MERGE button */}
-        {reviewStatus?.readyForMerge && reviewStatus?.mergeStatus !== 'merged' && (
+      {/* Workspace Actions */}
+      <div className="mt-4">
+        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-content-subtle flex items-center gap-1.5">
+          <Box className="w-3 h-3" /> Workspace
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {/* MERGE */}
+          <div className="flex items-center gap-1">
+            <MergeButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
+            <span title="Also shown on card">
+              <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+            </span>
+          </div>
+          {reviewStatus?.mergeStatus === 'merged' && (
+            <span className="flex items-center gap-1 px-2 py-1 text-xs badge-bg-success text-success rounded font-medium">
+              <CheckCircle className="w-3 h-3" />Merged
+            </span>
+          )}
+
+          {/* Review & Test */}
           <button
-            data-testid="merge-btn"
-            onClick={onMerge}
-            disabled={mergeMutation.isPending || ((reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying' || reviewStatus?.mergeStatus === 'queued') && !isMergeStuck)}
-            className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-medium ${
-              isMergeStuck
-                ? 'bg-warning text-white hover:bg-warning/90'
-                : 'bg-success text-white hover:bg-success/90 disabled:opacity-50'
+            data-testid="review-test-btn"
+            onClick={onReview}
+            disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
+              shouldPromoteReviewAction
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
-            title={isMergeStuck ? 'Merge appears stuck — click to retry' : undefined}
           >
-            {mergeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> :
-             isMergeStuck ? <AlertTriangle className="w-3 h-3" /> :
-             reviewStatus?.mergeStatus === 'verifying' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-             reviewStatus?.mergeStatus === 'merging' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-             <CheckCircle className="w-3 h-3" />}
-            {isMergeStuck ? 'RETRY MERGE' :
-             reviewStatus?.mergeStatus === 'queued' ? 'QUEUED' :
-             reviewStatus?.mergeStatus === 'verifying' ? 'VERIFYING...' :
-             reviewStatus?.mergeStatus === 'merging' ? 'REBASING...' : 'MERGE'}
+            {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
+              <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            {isReReview ? 'Re-Review' : 'Review & Test'}
           </button>
-        )}
-        {reviewStatus?.mergeStatus === 'merged' && (
-          <span className="flex items-center gap-1 px-2 py-1 text-xs badge-bg-success text-success rounded font-medium">
-            <CheckCircle className="w-3 h-3" />MERGED
-          </span>
-        )}
 
-        {/* Review & Test */}
-        <button
-          data-testid="review-test-btn"
-          onClick={onReview}
-          disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
-          className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
-            shouldPromoteReviewAction
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-          }`}
-        >
-          {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
-            <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-          {isReReview ? 'Re-Review' : 'Review & Test'}
-        </button>
+          {/* Stop Agent */}
+          {agent && agent.status !== 'stopped' && (
+            <div className="flex items-center gap-1">
+              <StopAgentButton
+                agentId={agent?.id}
+                variant="inspector"
+                onSuccess={onKillSuccess}
+              />
+              <span title="Also shown on card">
+                <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+              </span>
+            </div>
+          )}
 
-        {/* Stop Agent */}
-        {agent && agent.status !== 'stopped' && (
-          <button
-            onClick={onKill}
-            disabled={killMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-destructive rounded badge-bg-destructive hover:bg-destructive/20"
-          >
-            <Square className="w-3 h-3" />Stop
-          </button>
-        )}
+          {/* Recover failed review/test/merge pipeline */}
+          {reviewStatus && isPipelineStuck && (
+            <div className="flex items-center gap-1">
+              <RecoverButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
+              <span title="Also shown on card">
+                <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+              </span>
+            </div>
+          )}
 
-        {/* Reopen button */}
-        {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (
-          <button
-            data-testid="reopen-btn"
-            onClick={onReopen}
-            disabled={reopenMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
-          >
-            {reopenMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
-          </button>
-        )}
-
-        {/* Recover failed review/test/merge pipeline */}
-        {reviewStatus && isPipelineStuck && (
-          <button
-            onClick={onResetReview}
-            disabled={resetReviewMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
-          >
-            {resetReviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-            {resetReviewMutation.isPending ? 'Recovering...' : 'Recover'}
-          </button>
-        )}
-
-        {/* Start/Resume Agent when no agent or stopped */}
-        {(!agent || agent.status === 'stopped') && (
-          <>
-            <button
-              onClick={() => {
-                if (isResume) {
-                  setShowResumeInput(true);
-                } else {
-                  onStartAgent();
-                }
-              }}
-              disabled={isLaunching || showResumeInput}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-            >
-              {isLaunching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-              <span>{isLaunching ? launchLabel : (isResume ? 'Resume Session' : 'Start Agent')}</span>
-            </button>
-            {/* Reset Session — only when resuming (has a saved session) */}
-            {isResume && (
+          {/* Start/Resume Agent when no agent or stopped */}
+          {(!agent || agent.status === 'stopped') && (
+            <>
               <button
-                onClick={onResetSession}
-                disabled={resetSessionMutation.isPending || resetSessionMutation.isSuccess}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
-                title="Clear saved session so next start creates a fresh Claude session (preserves workspace)"
+                onClick={() => {
+                  if (isResume) {
+                    setShowResumeInput(true);
+                  } else {
+                    onStartAgent();
+                  }
+                }}
+                disabled={isLaunching || showResumeInput}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
               >
-                {resetSessionMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : resetSessionMutation.isSuccess ? <Check className="w-3 h-3" /> : <RotateCcw className="w-3 h-3" />}
-                {resetSessionMutation.isPending ? 'Resetting...' : resetSessionMutation.isSuccess ? 'Session Reset' : 'Reset Session'}
+                {isLaunching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                <span>{isLaunching ? launchLabel : (isResume ? 'Resume Session' : 'Start Agent')}</span>
               </button>
-            )}
-            {!workspace?.exists && (
-               <button
-                 onClick={onCreateWorkspace}
-                 disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
-                 className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded disabled:opacity-50 border bg-surface-emphasis border-divider"
-               >
-                 {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderPlus className="w-3 h-3" />}
-                 {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
-               </button>
-             )}
-           </>
-         )}
-       </div>
+              {/* Reset Session — only when resuming (has a saved session) */}
+              {isResume && (
+                <button
+                  onClick={onResetSession}
+                  disabled={resetSessionMutation.isPending || resetSessionMutation.isSuccess}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
+                  title="Clear saved session so next start creates a fresh Claude session (preserves workspace)"
+                >
+                  {resetSessionMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : resetSessionMutation.isSuccess ? <Check className="w-3 h-3" /> : <RotateCcw className="w-3 h-3" />}
+                  {resetSessionMutation.isPending ? 'Resetting...' : resetSessionMutation.isSuccess ? 'Session Reset' : 'Reset Session'}
+                </button>
+              )}
+              {!workspace?.exists && (
+                 <button
+                   onClick={onCreateWorkspace}
+                   disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
+                   className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded disabled:opacity-50 border bg-surface-emphasis border-divider"
+                 >
+                   {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderPlus className="w-3 h-3" />}
+                   {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
+                 </button>
+               )}
+               {workspace?.exists && (
+                 <button
+                   onClick={onCopySettings}
+                   disabled={copySettingsMutation.isPending || copySettingsMutation.isSuccess}
+                   className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
+                   title="Copy Panopticon global settings (projects, models, hooks) into workspace"
+                 >
+                   {copySettingsMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : copySettingsMutation.isSuccess ? <Check className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
+                   {copySettingsMutation.isPending ? 'Copying...' : copySettingsMutation.isSuccess ? 'Settings Copied' : 'Copy Settings'}
+                 </button>
+               )}
+             </>
+           )}
+         </div>
+      </div>
 
       {!!agent && agent.status === 'stopped' && lifecycle?.reason && (
         <div className="text-xs text-content-subtle mt-2 px-2 py-1 rounded bg-surface-emphasis/40 border border-divider">
@@ -365,11 +348,6 @@ export function ActionsSection({
           {reviewMutation.error instanceof Error ? reviewMutation.error.message : 'Failed to start review'}
         </div>
       )}
-      {mergeMutation.isError && (
-        <div className="text-xs text-destructive badge-bg-destructive px-2 py-1 rounded mt-2">
-          {mergeMutation.error instanceof Error ? mergeMutation.error.message : 'Failed to merge'}
-        </div>
-      )}
       {startAgentMutation.isError && (
         <div className="text-xs text-destructive badge-bg-destructive px-2 py-1 rounded mt-2">
           {startAgentMutation.error instanceof Error ? startAgentMutation.error.message : 'Failed to start agent'}
@@ -385,32 +363,97 @@ export function ActionsSection({
           {syncMainMutation.data.alreadyUpToDate ? 'Already up to date with main' : `Synced ${syncMainMutation.data.commitCount ?? 0} commit(s) from main`}
         </div>
       )}
+      {copySettingsMutation.isError && (
+        <div className="text-xs text-destructive badge-bg-destructive px-2 py-1 rounded mt-2">
+          {copySettingsMutation.error instanceof Error ? copySettingsMutation.error.message : 'Failed to copy settings'}
+        </div>
+      )}
+      {copySettingsMutation.isSuccess && (
+        <div className="text-xs text-success badge-bg-success px-2 py-1 rounded mt-2">
+          Copied Panopticon settings into workspace
+        </div>
+      )}
 
-      {/* Danger Zone — Cancel Issue (collapsed by default) */}
-      {reviewStatus?.mergeStatus !== 'merged' && (
-        <details className="mt-6 rounded border border-destructive/30 group">
-          <summary className="px-3 py-2 bg-destructive/5 rounded cursor-pointer list-none select-none flex items-center gap-1.5 group-open:rounded-b-none group-open:border-b group-open:border-destructive/30">
-            <ChevronRight className="w-3 h-3 text-destructive transition-transform group-open:rotate-90" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-destructive">Danger Zone</span>
-          </summary>
-          <div className="px-3 py-3 space-y-2.5">
-            <div className="min-w-0">
-              <div className="text-xs font-medium text-content">Cancel this issue</div>
-              <div className="text-[11px] text-content-subtle mt-0.5">
-                Permanently stops the agent, deletes the workspace and branch, closes the PR, and moves the issue to Canceled. This cannot be undone.
+      {/* Issue Actions */}
+      <div className="mt-4">
+        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-content-subtle flex items-center gap-1.5">
+          <Tag className="w-3 h-3" /> Issue
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <div className="flex items-center gap-1">
+            <ArtifactLinks
+              issueId={issueId}
+              hasPlan={hasPlan}
+              beadsCount={beadsCount}
+              onViewBeads={onViewBeads}
+              onViewVBrief={onViewVBrief}
+              variant="inspector"
+            />
+            <span title="Also shown on card">
+              <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+            </span>
+          </div>
+        </div>
+
+        {/* Danger Zone — destructive actions (collapsed by default) */}
+        {reviewStatus?.mergeStatus !== 'merged' && (
+          <details className="mt-4 rounded border border-destructive/30 group">
+            <summary className="px-3 py-2 bg-destructive/5 rounded cursor-pointer list-none select-none flex items-center gap-1.5 group-open:rounded-b-none group-open:border-b group-open:border-destructive/30">
+              <ChevronRight className="w-3 h-3 text-destructive transition-transform group-open:rotate-90" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-destructive">Danger Zone</span>
+            </summary>
+            <div className="px-3 py-3 space-y-4">
+              {/* Reopen */}
+              {onReopen && (
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-content">Reopen for more work</div>
+                  <div className="text-[11px] text-content-subtle mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">
+                    Moves the issue back to In Progress. The workspace, branch, PR, STATE.md, and all planning artifacts are preserved.
+                  </div>
+                  <button
+                    onClick={onReopen}
+                    disabled={reopenMutation?.isPending}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-white transition-colors disabled:opacity-50"
+                    title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + STATE.md + beads"
+                  >
+                    {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    {reopenMutation?.isPending ? 'Reopening...' : 'Reopen'}
+                  </button>
+                </div>
+              )}
+
+              {/* Restart from Plan */}
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-content">Restart from Plan</div>
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.">
+                  Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.
+                </div>
+                <RestartFromPlanButton issueId={issueId} />
+              </div>
+
+              {/* Reset Issue */}
+              <ResetIssueButton issueId={issueId} variant="danger-zone" />
+
+              {/* Cancel Issue */}
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-content">Cancel this issue</div>
+                <div className="text-[11px] text-content-subtle mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
+                  Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, and moves the issue to Canceled. This cannot be undone.
+                </div>
+                <button
+                  onClick={onCancel}
+                  disabled={cancelMutation.isPending}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
+                  title="Cancel Issue: permanent — stops agent, deletes workspace + branch + STATE.md, closes PR, moves to Canceled"
+                >
+                  {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                  {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
+                </button>
               </div>
             </div>
-            <button
-              onClick={onCancel}
-              disabled={cancelMutation.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
-            >
-              {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-              {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
-            </button>
-          </div>
-        </details>
-      )}
+          </details>
+        )}
+      </div>
     </div>
   );
 }

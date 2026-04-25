@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
 import {
+  openDashboardLogStdio,
   readPlatformConfig,
   restartDashboard,
   restartCliproxy,
@@ -83,7 +84,7 @@ function spawnDashboardDetached(config: PlatformConfig): void {
   }
   const child = spawn(resolveNode22(), [serverPath], {
     detached: true,
-    stdio: 'ignore',
+    stdio: openDashboardLogStdio(),
     env: {
       ...process.env,
       DASHBOARD_PORT: String(config.dashboardPort),

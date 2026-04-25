@@ -416,7 +416,8 @@ export function MissionControl({
               {/* Inspector + Terminal split view */}
               {(() => {
                 const issue = issues.find(i => i.identifier === selectedFeature);
-                const agent = agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase());
+                const agent = agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase() && a.id.startsWith('agent-'))
+                  ?? agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase());
                 return issue ? (
                   <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <DetailPanelLayout

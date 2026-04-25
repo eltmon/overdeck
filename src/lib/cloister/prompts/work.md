@@ -26,6 +26,8 @@ optional:
 
 - NEVER `cd` to the parent project directory or any path outside your workspace
 - NEVER run `git stash`, `git checkout`, or any destructive git commands outside your workspace
+- **NEVER run history-rewriting git commands:** `git rebase -i`, `git commit --amend`, `git reset --hard`, `git squash`, or any operation that changes commit hashes. These are forbidden — they destroy review history and break the pipeline.
+- **If `pan done` fails with rebase conflicts:** run `git merge main` (or `git merge origin/main`) and resolve the single merge conflict. Do NOT attempt to squash, rewrite, or rebase-interactively to avoid conflicts.
 - Your workspace is a git worktree — it has its own branch and working tree independent of the main repo
 - Running git commands in the parent repo will destroy other agents' uncommitted work
 - If you need to check main branch state, use `git log origin/main` from within your workspace
@@ -33,6 +35,17 @@ optional:
 {{#POLYREPO_CONTEXT}}
 {{POLYREPO_CONTEXT}}
 {{/POLYREPO_CONTEXT}}
+
+## CRITICAL: Do NOT Self-Review
+
+**NEVER perform code reviews yourself.** Panopticon has a dedicated review pipeline with specialist agents (correctness, security, performance, requirements) that runs automatically when you call `pan done`.
+
+- Do NOT spawn `code-review-*` subagents via the Agent tool
+- Do NOT read review prompt template files — those are for the review pipeline, not for you
+- Do NOT run your own correctness/security/performance analysis before submitting
+- When you receive review feedback, fix the specific issues listed and resubmit via `/rebase-and-submit` — do NOT re-review your own fixes
+
+Your job is implementation. Reviews are handled by `pan done` → review specialist pipeline.
 
 ## IMPORTANT: Read Context Files First
 
@@ -43,7 +56,8 @@ Before starting any work, you MUST read these files to understand the full conte
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
 4. **Check `.planning/feedback/`** - If this directory exists, read the latest file(s).
-   These contain specialist feedback (review issues, test failures, merge blocks) requiring action.
+   Ignore any files in `.planning/feedback/archive/` — those are from previous review cycles.
+   Only read non-archived files. These contain specialist feedback (review issues, test failures, merge blocks) requiring action.
    STATE.md's "Specialist Feedback" section lists all feedback received.
 
 These files contain critical context that may have been updated since the last session.
@@ -349,7 +363,9 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 
 **`pan done` creates a GitHub PR automatically.** The review and test specialists run against this PR. When both pass, the human clicks MERGE in the dashboard, which rebases the feature branch onto main and merges via `gh pr merge --squash`.
 
-**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Always re-run `pan done` after any new commits, even if you were told "review already passed". Do NOT assume a prior passing review still covers new code.
+**After `pan done`, you remain on standby.** Your tmux session stays alive and the human can send you UAT tweaks via `pan tell {{ISSUE_ID}} "message"` at any time before merge. You do NOT need to be "resumed" — `pan tell` auto-wakes you. If review fails, feedback is delivered the same way.
+
+**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Re-run `pan done` ONLY if you made NEW commits after receiving APPROVED feedback.\n\n**If the latest feedback says "CODE APPROVED — YOUR WORK IS COMPLETE": STOP.** Do NOT make further changes. Do NOT run `pan done` again. The pipeline handles testing and merge automatically.\n\n**If you see archived feedback files in `.planning/feedback/archive/`:** Ignore them. They are from previous review cycles. Only read the **non-archived** files in `.planning/feedback/`.
 
 **WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.
 {{/LOCAL}}

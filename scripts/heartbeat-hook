@@ -1,196 +1,113 @@
 #!/bin/bash
-# ~/.panopticon/bin/heartbeat-hook
-# Called by Claude Code after every tool use with JSON on stdin
+# ~/.panopticon/bin/heartbeat-hook  (PAN-800)
 #
-# This hook receives PostToolUse event data from Claude Code and writes
-# rich heartbeat information to enable real-time agent monitoring.
+# Fires on Claude Code PostToolUse. POSTs agent.activity_changed(working, tool)
+# to the dashboard, then records the cost event.
+#
+# Rewritten from the ~200-line jq read-modify-write version to a pure POST
+# emitter. runtime.json and heartbeats/<id>.json are no longer written —
+# AgentStateService's SubscriptionRef + projection_cache is canonical.
+# activity.jsonl is retained as a forensic grep-able artifact (cheap to keep).
+# The sessions.json append-only list is retained because it's a bookkeeping
+# record of Claude session UUIDs, not runtime state.
+# Cost-event recording stays on its own flock-serialized path.
 
-# Don't use set -e - we want the hook to be resilient to failures
-# and never break Claude Code execution
+set +e
 
-# Parse tool info from stdin
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
 TOOL_INFO=$(cat 2>/dev/null || echo '{}')
 
-# Check if jq is available
-if ! command -v jq &> /dev/null; then
-  echo "Warning: jq not found. Heartbeat hook requires jq to parse tool data." >&2
-  exit 0  # Silent failure - don't break Claude Code execution
+HAVE_JQ=0
+if command -v jq >/dev/null 2>&1; then HAVE_JQ=1; fi
+
+TOOL_NAME="unknown"
+TOOL_INPUT=""
+CLAUDE_SESSION_ID=""
+if [ "$HAVE_JQ" = "1" ]; then
+  TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || echo "unknown")
+  TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""' 2>/dev/null || echo "")
+  CLAUDE_SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // ""' 2>/dev/null || echo "")
 fi
 
-# Extract tool name and input (truncate input to 100 chars to avoid huge files)
-TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || echo "unknown")
-TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""' 2>/dev/null || echo "")
+TS=$(date -Iseconds)
 
-# Get agent ID from env (set by pan work issue) or tmux session name
-# Only use tmux session name if we're actually INSIDE a tmux session ($TMUX is set)
-if [ -n "$PANOPTICON_AGENT_ID" ]; then
-  AGENT_ID="$PANOPTICON_AGENT_ID"
-elif [ -n "$TMUX" ]; then
-  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
+# ── Emit agent.activity_changed(working, tool) ─────────────────────────────
+if [ "$HAVE_JQ" = "1" ]; then
+  BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" \
+    '{kind: "activity", activity: "working", tool: $tool, timestamp: $ts}')
 else
-  AGENT_ID="main-cli"
+  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"timestamp\":\"$TS\"}"
 fi
-AGENT_ID="${AGENT_ID:-unknown}"
+pan_emit_event "$AGENT_ID" "$BODY"
 
-# Get current beads task from cache (if exists)
-TASK_CACHE="$HOME/.panopticon/agents/$AGENT_ID/current-task.json"
-CURRENT_TASK=""
-if [ -f "$TASK_CACHE" ]; then
-  CURRENT_TASK=$(jq -r '.title // ""' "$TASK_CACHE" 2>/dev/null || echo "")
-fi
-
-# Get git branch (fast, single command) - suppress all errors
-GIT_BRANCH=$(git branch --show-current 2>/dev/null || true)
-GIT_BRANCH="${GIT_BRANCH:-unknown}"
-
-# Get workspace from pwd
-WORKSPACE=$(pwd)
-
-# Ensure heartbeat directory exists
-HEARTBEAT_DIR="$HOME/.panopticon/heartbeats"
-mkdir -p "$HEARTBEAT_DIR"
-
-# Ensure agent state directory exists for activity log
+# ── Activity log (retained for forensics) ─────────────────────────────────
 AGENT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
-mkdir -p "$AGENT_DIR"
-
-# Write heartbeat atomically (write to temp file, then move)
-# Use jq to properly escape all strings in the JSON output
-TEMP_FILE="$HEARTBEAT_DIR/$AGENT_ID.json.tmp"
-jq -n \
-  --arg timestamp "$(date -Iseconds)" \
-  --arg agent_id "$AGENT_ID" \
-  --arg tool_name "$TOOL_NAME" \
-  --arg last_action "$TOOL_INPUT" \
-  --arg current_task "$CURRENT_TASK" \
-  --arg git_branch "$GIT_BRANCH" \
-  --arg workspace "$WORKSPACE" \
-  --argjson pid $$ \
-  '{
-    timestamp: $timestamp,
-    agent_id: $agent_id,
-    tool_name: $tool_name,
-    last_action: $last_action,
-    current_task: $current_task,
-    git_branch: $git_branch,
-    workspace: $workspace,
-    pid: $pid
-  }' > "$TEMP_FILE" 2>/dev/null || true
-
-# Atomic move to avoid race conditions
-mv "$TEMP_FILE" "$HEARTBEAT_DIR/$AGENT_ID.json" 2>/dev/null || true
-
-# Append to activity log (JSONL format)
-ACTIVITY_FILE="$AGENT_DIR/activity.jsonl"
-
-# Create activity entry
-ACTIVITY_ENTRY=$(jq -n \
-  --arg ts "$(date -Iseconds)" \
-  --arg tool "$TOOL_NAME" \
-  --arg action "$TOOL_INPUT" \
-  '{
-    ts: $ts,
-    tool: $tool,
-    action: $action
-  }' 2>/dev/null || echo "")
-
-# Append to activity log if we successfully created the entry
-if [ -n "$ACTIVITY_ENTRY" ]; then
-  echo "$ACTIVITY_ENTRY" >> "$ACTIVITY_FILE" 2>/dev/null || true
-
-  # Prune to last 100 entries (use tail for atomic operation)
-  if [ -f "$ACTIVITY_FILE" ]; then
-    TEMP_ACTIVITY="$ACTIVITY_FILE.tmp"
-    tail -n 100 "$ACTIVITY_FILE" > "$TEMP_ACTIVITY" 2>/dev/null && mv "$TEMP_ACTIVITY" "$ACTIVITY_FILE" 2>/dev/null || true
+mkdir -p "$AGENT_DIR" 2>/dev/null
+if [ "$HAVE_JQ" = "1" ]; then
+  ENTRY=$(jq -n --arg ts "$TS" --arg tool "$TOOL_NAME" --arg action "$TOOL_INPUT" \
+    '{ts: $ts, tool: $tool, action: $action}' 2>/dev/null || echo "")
+  if [ -n "$ENTRY" ]; then
+    echo "$ENTRY" >> "$AGENT_DIR/activity.jsonl" 2>/dev/null || true
+    # Prune to last 100 entries.
+    if [ -f "$AGENT_DIR/activity.jsonl" ]; then
+      TMP="$AGENT_DIR/activity.jsonl.tmp"
+      tail -n 100 "$AGENT_DIR/activity.jsonl" > "$TMP" 2>/dev/null \
+        && mv "$TMP" "$AGENT_DIR/activity.jsonl" 2>/dev/null || true
+    fi
   fi
 fi
 
-# Extract Claude Code session ID from tool info (needed for runtime + cost tracking)
-CLAUDE_SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
-
-# Update agent runtime state in runtime.json (NOT state.json — prevents corrupting AgentState config)
-RUNTIME_FILE="$AGENT_DIR/runtime.json"
-TIMESTAMP="$(date -Iseconds)"
-
-if [ -f "$RUNTIME_FILE" ]; then
-  # Update existing runtime state (include active Claude session ID)
-  TEMP_RUNTIME="$RUNTIME_FILE.tmp"
-  jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" --arg sid "$CLAUDE_SESSION_ID" \
-    '.lastActivity = $ts | .currentTool = $tool | .state = "active" | .claudeSessionId = $sid' \
-    "$RUNTIME_FILE" > "$TEMP_RUNTIME" 2>/dev/null && mv "$TEMP_RUNTIME" "$RUNTIME_FILE" 2>/dev/null || true
-else
-  # Create initial runtime state
-  jq -n \
-    --arg ts "$TIMESTAMP" \
-    --arg tool "$TOOL_NAME" \
-    --arg sid "$CLAUDE_SESSION_ID" \
-    '{
-      state: "active",
-      lastActivity: $ts,
-      currentTool: $tool,
-      claudeSessionId: $sid
-    }' > "$RUNTIME_FILE" 2>/dev/null || true
-fi
-
-# Maintain session history — append-only list of all Claude session UUIDs this agent has used
-# The reconciler uses this to map transcript files back to agents
-SESSIONS_FILE="$AGENT_DIR/sessions.json"
-if [ "$CLAUDE_SESSION_ID" != "unknown" ]; then
+# ── Claude session history (append-only bookkeeping) ──────────────────────
+if [ "$HAVE_JQ" = "1" ] && [ -n "$CLAUDE_SESSION_ID" ]; then
+  SESSIONS_FILE="$AGENT_DIR/sessions.json"
   if [ -f "$SESSIONS_FILE" ]; then
-    # Only append if not already in the list
     if ! jq -e --arg sid "$CLAUDE_SESSION_ID" 'any(.[]; . == $sid)' "$SESSIONS_FILE" >/dev/null 2>&1; then
-      TEMP_SESSIONS="$SESSIONS_FILE.tmp"
-      jq --arg sid "$CLAUDE_SESSION_ID" '. + [$sid]' "$SESSIONS_FILE" > "$TEMP_SESSIONS" 2>/dev/null && \
-        mv "$TEMP_SESSIONS" "$SESSIONS_FILE" 2>/dev/null || true
+      TMP="$SESSIONS_FILE.tmp"
+      jq --arg sid "$CLAUDE_SESSION_ID" '. + [$sid]' "$SESSIONS_FILE" > "$TMP" 2>/dev/null \
+        && mv "$TMP" "$SESSIONS_FILE" 2>/dev/null || true
     fi
   else
     echo "[\"$CLAUDE_SESSION_ID\"]" > "$SESSIONS_FILE" 2>/dev/null || true
   fi
 fi
 
-# Record cost event from tool usage (PAN-81)
-# Find the record-cost-event.js script - check multiple locations
+# ── Cost-event recording (unchanged, its own flock-serialized path) ──────
 COST_SCRIPT=""
 if [ -f "$HOME/.panopticon/bin/record-cost-event.js" ]; then
   COST_SCRIPT="$HOME/.panopticon/bin/record-cost-event.js"
-elif [ -f "$(dirname "$0")/record-cost-event.js" ]; then
-  COST_SCRIPT="$(dirname "$0")/record-cost-event.js"
+elif [ -f "$SCRIPT_DIR/record-cost-event.js" ]; then
+  COST_SCRIPT="$SCRIPT_DIR/record-cost-event.js"
 fi
 
-if [ -n "$COST_SCRIPT" ] && [ -f "$COST_SCRIPT" ]; then
-  # Infer issue ID from git branch if not set by Panopticon agent launcher
-  # Matches branches like: feature/pan-208, feature-min-665, pan-142
+if [ -n "$COST_SCRIPT" ] && [ -n "$CLAUDE_SESSION_ID" ]; then
+  GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "")
+  WORKSPACE=$(pwd)
+
   if [ -z "$PANOPTICON_ISSUE_ID" ]; then
     if [[ "$GIT_BRANCH" =~ (pan|min|aud|krux|cli|PAN|MIN|AUD|KRUX|CLI)[-]([0-9]+) ]]; then
       PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
     fi
   fi
-
-  # Fallback: infer from workspace path (e.g., /workspaces/feature-pan-208/)
   if [ -z "$PANOPTICON_ISSUE_ID" ]; then
     if [[ "$WORKSPACE" =~ (pan|min|aud|krux|cli|PAN|MIN|AUD|KRUX|CLI)[-]([0-9]+) ]]; then
       PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
     fi
   fi
-
-  # Export issue context for the cost recording script
   export PANOPTICON_ISSUE_ID="${PANOPTICON_ISSUE_ID:-UNKNOWN}"
   export PANOPTICON_SESSION_TYPE="${PANOPTICON_SESSION_TYPE:-implementation}"
 
-  # Serialize per-session cost recording with flock to prevent duplicate events.
-  # Claude Code fires parallel tool calls, which spawn multiple heartbeat-hooks
-  # simultaneously. Without serialization they race on the same offset file and
-  # record duplicate cost events. flock -x waits for exclusive access, ensuring
-  # only one process reads/updates the offset at a time per session.
   STATE_DIR="$HOME/.panopticon/costs/state"
-  mkdir -p "$STATE_DIR"
+  mkdir -p "$STATE_DIR" 2>/dev/null
   LOCK_FILE="$STATE_DIR/${CLAUDE_SESSION_ID}.lock"
-
   {
     flock -x -w 30 200
     echo "$TOOL_INFO" | node "$COST_SCRIPT" 2>/dev/null || true
   } 200>"$LOCK_FILE"
 fi
 
-# Always exit successfully - never break Claude Code execution
 exit 0

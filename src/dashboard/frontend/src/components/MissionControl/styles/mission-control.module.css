@@ -2412,6 +2412,8 @@
   display: flex;
   flex-direction: column;
   padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .pickerDropdownUp {
@@ -3085,4 +3087,25 @@
 .forkConfirmBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.forkCheckboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.forkCheckboxRow input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--mc-accent);
+}
+
+.forkCheckboxRow label {
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-secondary);
+  cursor: pointer;
+  user-select: none;
 }

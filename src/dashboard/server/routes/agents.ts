@@ -22,7 +22,6 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   GET    /api/agents/:id/cloister-health
  *   GET    /api/agents/:id/handoff/suggestion
  *   POST   /api/agents/:id/handoff
- *   GET    /api/agents/:id/handoffs
  *   GET    /api/agents/:id/cost
  *   POST   /api/agents/:id/reset-session
  *   POST   /api/agents
@@ -35,14 +34,14 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { DomainEvent } from '@panopticon/contracts';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
 import { checkAllTriggers } from '../../../lib/cloister/triggers.js';
 import { performHandoff } from '../../../lib/cloister/handoff.js';
-import { readAgentHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
@@ -761,7 +760,133 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/agents/:id/heartbeat ───────────────────────────────────
+// ─── Route: POST /api/agents/:id/heartbeat (PAN-800 ingestion) ──────────────
+//
+// Typed event ingestion for agent runtime state. Hooks POST a Schema-validated
+// body describing a single runtime transition; the handler translates to an
+// agent.* DomainEvent and hands it to AgentStateService.emit (which durably
+// appendAsyncs via EventStore).
+//
+// Body shape (discriminated by `kind`):
+//   {kind: "activity",          activity, tool?}
+//   {kind: "thinking_start",    lastToolAt}
+//   {kind: "thinking_stop",     resolvedBy}
+//   {kind: "waiting_start",     reason, message?}
+//   {kind: "waiting_clear",     clearedBy}
+//   {kind: "message_received",  direction, source}
+//   {kind: "model_set",         model, claudeSessionId?}
+//   {kind: "resolution_set",    resolution, resolutionCount}
+//   {kind: "current_issue_set", currentIssue?}
+
+/**
+ * Translate a decoded body into an unsigned DomainEvent (no sequence yet).
+ * Returns null if the body doesn't map to a runtime event.
+ */
+export const bodyToEvent = (
+  agentId: string,
+  body: Record<string, unknown>,
+  timestamp: string,
+): Record<string, unknown> | null => {
+  const source = body;
+  if (typeof source['kind'] !== 'string') return null;
+  const kind = source['kind'] as string;
+  switch (kind) {
+    case 'activity':
+      return {
+        type: 'agent.activity_changed',
+        timestamp,
+        payload: {
+          agentId,
+          activity: source['activity'],
+          currentTool: source['tool'] as string | undefined,
+        },
+      };
+    case 'thinking_start':
+      return {
+        type: 'agent.thinking_started',
+        timestamp,
+        payload: {
+          agentId,
+          lastToolAt: (source['lastToolAt'] as string) ?? timestamp,
+        },
+      };
+    case 'thinking_stop':
+      return {
+        type: 'agent.thinking_stopped',
+        timestamp,
+        payload: {
+          agentId,
+          resolvedBy: source['resolvedBy'] ?? 'tool',
+        },
+      };
+    case 'waiting_start':
+      return {
+        type: 'agent.waiting_started',
+        timestamp,
+        payload: {
+          agentId,
+          reason: source['reason'] ?? 'other',
+          message: source['message'] as string | undefined,
+        },
+      };
+    case 'waiting_clear':
+      return {
+        type: 'agent.waiting_cleared',
+        timestamp,
+        payload: {
+          agentId,
+          clearedBy: source['clearedBy'] ?? 'user_response',
+        },
+      };
+    case 'message_received':
+      return {
+        type: 'agent.message_received',
+        timestamp,
+        payload: {
+          agentId,
+          direction: source['direction'] ?? 'to_agent',
+          source: source['source'] ?? 'user',
+        },
+      };
+    case 'model_set':
+      return {
+        type: 'agent.model_set',
+        timestamp,
+        payload: {
+          agentId,
+          model: source['model'],
+          claudeSessionId: source['claudeSessionId'] as string | undefined,
+        },
+      };
+    case 'resolution_set':
+      return {
+        type: 'agent.resolution_changed',
+        timestamp,
+        payload: {
+          agentId,
+          resolution: source['resolution'],
+          resolutionCount: Number(source['resolutionCount'] ?? 1),
+        },
+      };
+    case 'current_issue_set':
+      return {
+        type: 'agent.current_issue_set',
+        timestamp,
+        payload: {
+          agentId,
+          currentIssue: source['currentIssue'] as string | undefined,
+        },
+      };
+    default:
+      return null;
+  }
+};
+
+// Runtime-event decoder. We validate the assembled event (with a placeholder
+// sequence) against the DomainEvent union — bad payloads (unknown kind, bad
+// activity enum, missing required field) are rejected with 400 rather than
+// silently corrupting the AgentRuntimeSnapshot.
+const decodeDomainEvent = Schema.decodeUnknownResult(DomainEvent);
 
 const postAgentHeartbeatRoute = HttpRouter.add(
   'POST',
@@ -769,15 +894,60 @@ const postAgentHeartbeatRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
+    if (!id.trim()) {
+      return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
+    }
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const timestamp = (body['timestamp'] as string) ?? new Date().toISOString();
 
-    const { state, tool, timestamp } = body as any;
-    saveAgentRuntimeState(id, {
-      state,
-      lastActivity: timestamp || new Date().toISOString(),
-      currentTool: tool,
-    });
-    return jsonResponse({ success: true });
+    const raw = bodyToEvent(id, body, timestamp);
+    if (!raw) {
+      // Legacy 'uninitialized' or unknown kind — accept but no-op so hooks
+      // don't retry forever.
+      return jsonResponse({ success: true, emitted: false });
+    }
+
+    // Placeholder sequence — appendAsync assigns the real server-side number.
+    const candidate = { ...raw, sequence: 0 };
+    const decoded = decodeDomainEvent(candidate);
+    if (decoded._tag === 'Failure') {
+      return jsonResponse(
+        { success: false, error: 'invalid event', detail: String(decoded.failure) },
+        { status: 400 },
+      );
+    }
+
+    const { AgentStateService } = yield* Effect.promise(
+      () => import('../services/agent-state-service.js'),
+    );
+    const agentState = yield* AgentStateService;
+    yield* agentState.emit(decoded.success as never);
+
+    return jsonResponse({ success: true, emitted: true });
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/runtime (PAN-800) ────────────────────────────
+// Exposes AgentRuntimeSnapshot to out-of-process readers (CLI, tests).
+
+const getAgentRuntimeRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/runtime',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) {
+      return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
+    }
+    const { AgentStateService } = yield* Effect.promise(
+      () => import('../services/agent-state-service.js'),
+    );
+    const agentState = yield* AgentStateService;
+    const snapshot = yield* agentState.get(id);
+    if (!snapshot) {
+      return jsonResponse({ success: false, error: 'not found' }, { status: 404 });
+    }
+    return jsonResponse({ success: true, snapshot });
   })),
 );
 
@@ -1062,19 +1232,6 @@ const postAgentHandoffRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/agents/:id/handoffs ─────────────────────────────────────
-
-const getAgentHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/agents/:id/handoffs',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-
-    const handoffs = readAgentHandoffEvents(id);
-    return jsonResponse({ handoffs });
-  })),
-);
 
 // ─── Route: GET /api/agents/:id/cost ─────────────────────────────────────────
 
@@ -1958,6 +2115,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentPendingQuestionsRoute,
   postAgentAnswerQuestionRoute,
   postAgentHeartbeatRoute,
+  getAgentRuntimeRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,
@@ -1966,7 +2124,6 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentCloisterHealthRoute,
   getAgentHandoffSuggestionRoute,
   postAgentHandoffRoute,
-  getAgentHandoffsRoute,
   getAgentCostRoute,
   postAgentsRoute,
   postAgentsRestartAllRoute,

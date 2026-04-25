@@ -184,7 +184,7 @@ async function installBeads(): Promise<InstallResult> {
   const plat = detectPlatform();
   if (plat === "darwin") {
     try {
-      await execAsync("brew install steveyegge/beads/bd", {
+      await execAsync("brew install gastownhall/beads/bd", {
         timeout: 120000,
       });
       return {
@@ -198,7 +198,7 @@ async function installBeads(): Promise<InstallResult> {
   }
 
   await execAsync(
-    "curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash",
+    "curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash",
     { timeout: 120000 }
   );
   return {

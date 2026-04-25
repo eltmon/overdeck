@@ -50,13 +50,14 @@ import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
-import { planCommand } from './commands/plan.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
 import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
+import { abortReviewCommand } from './commands/abort-review.js';
+import { reviewRunCommand } from './commands/review-run.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -201,19 +202,24 @@ review
   .option('--session', 'Also clear saved Claude session')
   .action(resetReviewCommand);
 
-// pan plan <id> and pan plan finalize <id>
+review
+  .command('abort <id>')
+  .description('Kill all running reviewer sessions and leave the worker idle')
+  .action(abortReviewCommand);
+
+review
+  .command('run <id>')
+  .description('Run the full review pipeline (blocking): spawn reviewers → synthesize → post to GitHub. Exit codes: 0=approved, 1=changes, 2=failed.')
+  .option('--cwd <path>', 'Workspace directory (default: cwd)')
+  .option('--pr-url <url>', 'Override PR URL detection')
+  .option('--branch <name>', 'Override branch detection')
+  .option('--files-changed <list>', 'Comma-separated file list (overrides git diff)')
+  .action(reviewRunCommand);
+
+// pan plan finalize <id>
 const planCmd = program
   .command('plan')
-  .description('Create execution plan for an issue, or finalize an existing plan');
-
-planCmd
-  .argument('<id>', 'issue ID to plan for')
-  .option('-o, --output <path>', 'Write the plan JSON to a file')
-  .option('--json', 'Emit plan as JSON (in addition to the interactive flow)')
-  .option('--skip-discovery', 'Skip the interactive discovery phase')
-  .option('--force', 'Create the plan even when the issue is not marked as complex')
-  .option('--shadow', 'Track status locally in shadow mode instead of updating the tracker')
-  .action(planCommand);
+  .description('Finalize an existing plan');
 
 planCmd
   .command('finalize')
@@ -239,6 +245,7 @@ program
   .description('Summary Fork a conversation — creates new session from a summary of previous work')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
+  .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(forkCommand);
 
 program
@@ -644,9 +651,10 @@ program
 
     if (options.detach) {
       // Run in background
+      const { openDashboardLogStdio } = await import('../lib/platform-lifecycle.js');
       const child = spawn(node22, [bundledServer], {
             detached: true,
-            stdio: 'ignore',
+            stdio: openDashboardLogStdio(),
             env: {
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),

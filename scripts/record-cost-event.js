@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import { createRequire as createRequire$1 } from "module";
 import { promisify } from "util";
 //#region \0rolldown/runtime.js
-var __commonJSMin = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 //#endregion
 //#region ../src/lib/paths.ts
@@ -26,6 +26,7 @@ join(PANOPTICON_HOME, "backups");
 const COSTS_DIR = join(PANOPTICON_HOME, "costs");
 join(PANOPTICON_HOME, "heartbeats");
 join(PANOPTICON_HOME, "archives");
+join(PANOPTICON_HOME, "logs");
 const TRAEFIK_DIR = join(PANOPTICON_HOME, "traefik");
 join(TRAEFIK_DIR, "dynamic");
 join(TRAEFIK_DIR, "certs");
@@ -46,7 +47,9 @@ join(packageRoot, "skills");
 join(packageRoot, "dev-skills");
 join(packageRoot, "agents");
 join(packageRoot, "rules");
+join(packageRoot, "src", "lib", "cloister", "prompts", "review");
 join(PANOPTICON_HOME, "agent-definitions");
+join(PANOPTICON_HOME, "review-prompts");
 join(PANOPTICON_HOME, "rules");
 join(PANOPTICON_HOME, ".manifest.json");
 const PRDS_DIR = join(join(PANOPTICON_HOME, "docs"), "prds");
@@ -72,6 +75,16 @@ function encodeClaudeProjectDir(cwdPath) {
 //#endregion
 //#region ../src/lib/cost.ts
 const DEFAULT_PRICING = [
+	{
+		provider: "anthropic",
+		model: "claude-opus-4-7",
+		inputPer1k: .005,
+		outputPer1k: .025,
+		cacheReadPer1k: 5e-4,
+		cacheWrite5mPer1k: .00625,
+		cacheWrite1hPer1k: .01,
+		currency: "USD"
+	},
 	{
 		provider: "anthropic",
 		model: "claude-opus-4-6",
@@ -140,6 +153,34 @@ const DEFAULT_PRICING = [
 		cacheReadPer1k: 3e-5,
 		cacheWrite5mPer1k: 3e-4,
 		cacheWrite1hPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.5",
+		inputPer1k: .003,
+		outputPer1k: .018,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.5-mini",
+		inputPer1k: 5e-4,
+		outputPer1k: .002,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.5-nano",
+		inputPer1k: 25e-5,
+		outputPer1k: .0015,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.5-pro",
+		inputPer1k: .018,
+		outputPer1k: .22,
 		currency: "USD"
 	},
 	{
@@ -354,7 +395,19 @@ function initSchema(db) {
       stuck_at              TEXT,
       stuck_details         TEXT,
       -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
-      reviewed_at_commit    TEXT
+      reviewed_at_commit    TEXT,
+      -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
+      review_spawned_at     TEXT,
+      -- PAN-699: number of test-agent dispatch retries (circuit breaker)
+      test_retry_count      INTEGER DEFAULT 0,
+      -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
+      review_retry_count    INTEGER DEFAULT 0,
+      -- PAN-794: ISO timestamp marking the start of the current recovery cycle (breaker history cutoff)
+      recovery_started_at   TEXT,
+      -- Human-requested deacon ignore: when set, patrol skips this issue entirely
+      deacon_ignored          INTEGER NOT NULL DEFAULT 0,
+      deacon_ignored_at       TEXT,
+      deacon_ignored_reason   TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -412,6 +465,16 @@ function initSchema(db) {
       value       TEXT NOT NULL,  -- JSON string
       expires_at  TEXT,
       created_at  TEXT NOT NULL
+    );
+
+    -- ===== App Settings (global key/value) =====
+    -- Generic persisted settings that survive restarts. Currently used for the
+    -- global deacon pause flag; add keys here rather than spawning new tables
+    -- for every bool/string the dashboard wants to remember.
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key         TEXT PRIMARY KEY,
+      value       TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
     );
 
     -- ===== Rate Limits =====
@@ -559,7 +622,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 23`);
+	db.pragma(`user_version = 27`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -567,7 +630,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 23) return;
+	if (currentVersion === 27) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -802,7 +865,50 @@ function runMigrations(db) {
 	if (currentVersion < 23) try {
 		db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`);
 	} catch {}
-	db.pragma(`user_version = 23`);
+	if (currentVersion < 24) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`);
+		} catch {}
+	}
+	if (currentVersion < 25) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN review_retry_count INTEGER DEFAULT 0`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN recovery_started_at TEXT`);
+		} catch {}
+	}
+	if (currentVersion < 26) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored INTEGER NOT NULL DEFAULT 0`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_reason TEXT`);
+		} catch {}
+	}
+	if (currentVersion < 27) {
+		try {
+			db.exec(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key         TEXT PRIMARY KEY,
+          value       TEXT NOT NULL,
+          updated_at  TEXT NOT NULL
+        )
+      `);
+		} catch {}
+		try {
+			db.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`).run("deacon.globally_paused", "true", (/* @__PURE__ */ new Date()).toISOString());
+		} catch (err) {
+			console.warn("[schema] Failed to seed deacon.globally_paused:", err);
+		}
+	}
+	db.pragma(`user_version = 27`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
@@ -1323,6 +1429,11 @@ var require_anchors = /* @__PURE__ */ __commonJSMin(((exports) => {
 				prevAnchors.add(anchor);
 				return anchor;
 			},
+			/**
+			* With circular references, the source node is only resolved after all
+			* of its child nodes are. This is why anchors are set only after all of
+			* the nodes have been created.
+			*/
 			setAnchors: () => {
 				for (const source of aliasObjects) {
 					const ref = sourceObjects.get(source);
@@ -3075,6 +3186,14 @@ var require_binary = /* @__PURE__ */ __commonJSMin(((exports) => {
 		identify: (value) => value instanceof Uint8Array,
 		default: false,
 		tag: "tag:yaml.org,2002:binary",
+		/**
+		* Returns a Buffer in node and an Uint8Array in browsers
+		*
+		* To use the resulting buffer as an image, you'll want to do something like:
+		*
+		*   const blob = new Blob([buffer], { type: 'image/jpeg' })
+		*   document.querySelector('#photo').src = URL.createObjectURL(blob)
+		*/
 		resolve(src, onError) {
 			if (typeof node_buffer.Buffer === "function") return node_buffer.Buffer.from(src, "base64");
 			else if (typeof atob === "function") {
@@ -4760,6 +4879,7 @@ var require_resolve_block_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 					onError(token, "UNEXPECTED_TOKEN", token.message);
 					length += token.source.length;
 					break;
+				/* istanbul ignore next should not happen */
 				default: {
 					onError(token, "UNEXPECTED_TOKEN", `Unexpected token in block scalar header: ${token.type}`);
 					const ts = token.source;
@@ -4809,6 +4929,7 @@ var require_resolve_flow_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 				_type = Scalar.Scalar.QUOTE_DOUBLE;
 				value = doubleQuotedValue(source, _onError);
 				break;
+			/* istanbul ignore next should not happen */
 			default:
 				onError(scalar, "UNEXPECTED_TOKEN", `Expected a flow scalar value, but found: ${type}`);
 				return {
@@ -4838,6 +4959,7 @@ var require_resolve_flow_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function plainValue(source, onError) {
 		let badChar = "";
 		switch (source[0]) {
+			/* istanbul ignore next should not happen */
 			case "	":
 				badChar = "a tab character";
 				break;
@@ -6498,6 +6620,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 				return it.sep ?? it.start;
 			}
 			case "block-seq": return parent.items[parent.items.length - 1].start;
+			/* istanbul ignore next should not happen */
 			default: return [];
 		}
 	}
@@ -6750,6 +6873,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 						});
 						return;
 					}
+					/* istanbul ignore next should not happen */
 					default:
 						yield* this.pop();
 						yield* this.pop(token);
@@ -6867,6 +6991,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 					}
 					yield* this.pop();
 					break;
+				/* istanbul ignore next should not happen */
 				default:
 					yield* this.pop();
 					yield* this.step();

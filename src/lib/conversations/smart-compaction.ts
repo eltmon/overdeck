@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
+const FORK_SUMMARY_TIMEOUT_MS = 300_000;
 
 const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -608,8 +610,20 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
     '--permission-mode', 'bypassPermissions',
   ];
 
+  // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
+  // correct provider env for `useModel`. If provider env lookup fails (e.g.
+  // missing API key), let it throw — the caller (compactConversationNative)
+  // falls back to a heuristic summary.
+  const spawnEnv = buildSpawnEnvForModel(useModel);
+  const injectedKeys = Object.keys(getProviderEnvForModel(useModel));
+  if (injectedKeys.length > 0) {
+    console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
+  } else {
+    console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel} (anthropic, parent provider env stripped)`);
+  }
+
   const child = spawn('claude', args, {
-    env: process.env as Record<string, string>,
+    env: spawnEnv,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -818,7 +832,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   recentOps.edited.forEach(f => fileOps.edited.add(f));
 
   // Generate summaries
-  const llmTimeoutMs = isFork ? 120_000 : undefined;
+  const llmTimeoutMs = isFork ? FORK_SUMMARY_TIMEOUT_MS : undefined;
   let summary: string;
   let serializedHistory = serializeConversation(messagesToSummarize);
   let hasHistory = serializedHistory.trim().length > 0;
@@ -842,7 +856,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
     // passes (carrying <previous-summary> forward) so arbitrarily large
     // JSONL files fit the selected model's context window.
     if (isFork) {
-      const forkTimeoutMs = llmTimeoutMs ?? 120_000;
+      const forkTimeoutMs = llmTimeoutMs ?? FORK_SUMMARY_TIMEOUT_MS;
       // Summarize from the previous compact boundary (if any) forward — the
       // previousSummary already covers everything before boundaryStart.
       const forkEntries = boundaryStart > 0 ? entries.slice(boundaryStart) : entries;

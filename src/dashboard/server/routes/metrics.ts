@@ -6,7 +6,6 @@ import { jsonResponse } from "../http-helpers.js";
  *
  *   GET  /api/metrics/summary
  *   GET  /api/metrics/costs
- *   GET  /api/metrics/handoffs
  *   GET  /api/metrics/stuck
  *   GET  /api/activity
  *   GET  /api/activity/:id
@@ -134,14 +133,6 @@ const getMetricsCostsRoute = HttpRouter.add(
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
-);
-
-// ─── Route: GET /api/metrics/handoffs ────────────────────────────────────────
-
-const getMetricsHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/metrics/handoffs',
-  Effect.succeed(jsonResponse({ totalHandoffs: 0, successRate: 0, byType: {} })),
 );
 
 // ─── Route: GET /api/metrics/stuck ───────────────────────────────────────────
@@ -306,7 +297,6 @@ const getGitActivityRoute = HttpRouter.add(
 export const metricsRouteLayer = Layer.mergeAll(
   getMetricsSummaryRoute,
   getMetricsCostsRoute,
-  getMetricsHandoffsRoute,
   getMetricsStuckRoute,
   getActivityRoute,
   getActivityDetailedRoute,

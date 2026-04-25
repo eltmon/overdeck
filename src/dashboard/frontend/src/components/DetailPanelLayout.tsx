@@ -10,6 +10,7 @@ import { MergedSummaryCard } from './inspector/MergedSummaryCard';
 import { usePipelinePhase } from './inspector/usePipelinePhase';
 import { Agent, Issue } from '../types';
 import type { ReviewStatus, WorkspaceInfo } from './inspector/types';
+import { useDashboardStore, selectReviewStatus } from '../lib/store';
 
 type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 
@@ -58,16 +59,10 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
-  // Fetch review status from the canonical review-status route — passed as prop to InspectorPanel to avoid duplicate queries
-  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
-    queryKey: ['review-status', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/review/${issueId}/status`);
-      if (!res.ok) throw new Error('Failed to fetch review status');
-      return res.json();
-    },
-    refetchInterval: 15000,
-  });
+  // Read review status from the Zustand store — populated by Effect RPC domain
+  // events (review.status_changed). Single source of truth, no polling.
+  const reviewStatus = useDashboardStore(selectReviewStatus(issueId)) as ReviewStatus | undefined;
+  const reviewStatusLoading = false;
 
   const { data: costData } = useQuery<{ totalCost?: number }>({
     queryKey: ['issueCosts', issueId],
@@ -148,6 +143,20 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     setPinnedSession(saved);
     setPinned(saved !== null);
   }, [issueId]);
+
+  // Validate pinned session against available terminals. If the pinned session
+  // is no longer in the tabs (e.g. review ended, merge session changed from
+  // merge-agent to work-agent for monorepo), fall back to auto-follow.
+  useEffect(() => {
+    if (!pinned || !pinnedSession) return;
+    if (availableTerminals.length === 0) return; // loading state — don't clear
+    const tab = availableTerminals.find(t => t.sessionName === pinnedSession);
+    if (!tab || tab.disabled) {
+      setPinned(false);
+      setPinnedSession(null);
+      savePinState(issueId, null);
+    }
+  }, [availableTerminals, pinned, pinnedSession, issueId]);
 
   const openTerminal = useCallback(() => {
     setPanelState(prev => {

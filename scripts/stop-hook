@@ -1,85 +1,43 @@
 #!/bin/bash
-# ~/.panopticon/bin/stop-hook
-# Called by Claude Code when it finishes responding (waiting for input)
+# ~/.panopticon/bin/stop-hook  (PAN-800)
 #
-# This hook sets agent state to "idle" for auto-suspend detection
+# Fires on Claude Code Stop. Emits agent.activity_changed(idle) — the reducer
+# clears currentTool / thinking / waiting on that transition, so no separate
+# waiting_cleared is needed. Still chains to specialist-stop-hook and
+# work-agent-stop-hook, and still fires the planning auto-completion call.
 
-# Don't use set -e - we want the hook to be resilient to failures
-# and never break Claude Code execution
+set +e
 
-# Get agent ID from env (set by pan work issue) or tmux session name
-if [ -n "$PANOPTICON_AGENT_ID" ]; then
-  AGENT_ID="$PANOPTICON_AGENT_ID"
-elif [ -n "$TMUX" ]; then
-  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
-else
-  AGENT_ID="main-cli"
-fi
-AGENT_ID="${AGENT_ID:-unknown}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
 
-# Check if jq is available
-if ! command -v jq &> /dev/null; then
-  exit 0  # Silent failure - don't break Claude Code execution
-fi
+pan_resolve_agent_id || exit 0
 
-# Ensure state directory exists
-STATE_DIR="$HOME/.panopticon/agents/$AGENT_ID"
-mkdir -p "$STATE_DIR"
+TS=$(date -Iseconds)
+BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+pan_emit_event "$AGENT_ID" "$BODY"
 
-# Update runtime state in runtime.json (NOT state.json — state.json holds AgentState config
-# like workspace, runtime, model which must not be overwritten by hooks)
-RUNTIME_FILE="$STATE_DIR/runtime.json"
-TEMP_FILE="$RUNTIME_FILE.tmp"
-if [ -f "$RUNTIME_FILE" ]; then
-  # Merge with existing runtime state (preserves contextPercent, sessionId, etc.)
-  jq --arg ts "$(date -Iseconds)" \
-    '.state = "idle" | .lastActivity = $ts | del(.currentTool) | del(.waitingReason) | del(.waitingStartedAt) | del(.waitingNotification)' \
-    "$RUNTIME_FILE" > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
-else
-  # Create initial runtime state
-  jq -n --arg ts "$(date -Iseconds)" \
-    '{state: "idle", lastActivity: $ts}' > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
-fi
-
-# Optionally send heartbeat to API server (non-blocking)
-# Only if dashboard is running
-if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; then
-  curl -s -X POST "http://localhost:3011/api/agents/$AGENT_ID/heartbeat" \
-    -H "Content-Type: application/json" \
-    -d "{\"state\":\"idle\",\"timestamp\":\"$(date -Iseconds)\"}" \
-    > /dev/null 2>&1 &
-fi
-
-# Chain to specialist-specific hook for auto-completion detection
-# This runs in background and only affects specialist agents
+# Chain to specialist-specific hook (auto-completion detection).
 SPECIALIST_HOOK="$HOME/.panopticon/bin/specialist-stop-hook"
 if [ -x "$SPECIALIST_HOOK" ]; then
   "$SPECIALIST_HOOK" &
 fi
 
-# Chain to work-agent completion detection hook
-# Detects when a work agent forgot to call "pan work done" and nudges it
+# Chain to work-agent completion detection (nudges agents that forgot `pan work done`).
 WORK_AGENT_HOOK="$HOME/.panopticon/bin/work-agent-stop-hook"
 if [ -x "$WORK_AGENT_HOOK" ]; then
   "$WORK_AGENT_HOOK" &
 fi
 
 # Auto-mark planning complete when a planning agent finishes.
-# The planning agent creates STATE.md + beads but the .planning-complete marker
-# is only written by the dashboard "Done" button. If the user doesn't click it
-# (or the system crashes), the marker is never created and Panopticon shows
-# "Plan" instead of "Start Agent". This hook fixes that by calling
-# complete-planning automatically when a planning-* agent stops.
 if [[ "$AGENT_ID" == planning-* ]]; then
-  # Extract issue ID from agent ID (planning-min-796 → MIN-796)
   ISSUE_ID=$(echo "$AGENT_ID" | sed 's/^planning-//' | tr '[:lower:]' '[:upper:]')
   if [ -n "$ISSUE_ID" ]; then
-    # Fire and forget — don't block the stop hook
-    curl -s -X POST "http://localhost:3011/api/issues/$ISSUE_ID/complete-planning" \
+    curl -s -m 1.0 -X POST "$PAN_DASHBOARD_URL/api/issues/$ISSUE_ID/complete-planning" \
       -H "Content-Type: application/json" \
       -d '{"skipKill":true}' > /dev/null 2>&1 &
   fi
 fi
 
-# Always exit successfully
 exit 0

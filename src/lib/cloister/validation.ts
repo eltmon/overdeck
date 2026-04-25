@@ -324,12 +324,12 @@ export interface QualityGateRunOptions {
 
 /**
  * Default quality gates used when no quality_gates config exists in projects.yaml.
- * Runs typecheck → lint → test sequentially (bail on first failure).
+ * Runs typecheck → lint sequentially (bail on first failure).
+ * Tests are handled by the test specialist with baseline comparison, not verification.
  */
 export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   typecheck: { command: 'npm run typecheck 2>&1' },
   lint: { command: 'npm run lint 2>&1' },
-  test: { command: 'npm test 2>&1' },
 };
 
 /**

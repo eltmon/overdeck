@@ -21,6 +21,7 @@ import {
 } from '@panopticon/contracts';
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panopticon/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
+import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -78,7 +79,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit'>): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'> }): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -95,6 +96,16 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     stuckAt: status.stuckAt || undefined,
     stuckDetails: status.stuckDetails || undefined,
     reviewedAtCommit: status.reviewedAtCommit || undefined,
+    reviewSpawnedAt: status.reviewSpawnedAt || undefined,
+    testRetryCount: typeof status.testRetryCount === 'number' ? status.testRetryCount : undefined,
+    reviewRetryCount: typeof status.reviewRetryCount === 'number' ? status.reviewRetryCount : undefined,
+    recoveryStartedAt: status.recoveryStartedAt || undefined,
+    deaconIgnored: status.deaconIgnored === true ? true : undefined,
+    deaconIgnoredAt: status.deaconIgnoredAt || undefined,
+    deaconIgnoredReason: status.deaconIgnoredReason || undefined,
+    reviewCoordinatorSessionName: status.reviewCoordinatorSessionName || undefined,
+    reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
+    reviewSubStatuses: status.reviewSubStatuses,
   };
 }
 
@@ -142,7 +153,62 @@ export const ReadModelServiceLive = Layer.effect(
       projectionCache?.save(buildSnapshot());
     };
 
-    const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.sync(() => buildSnapshot());
+    const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
+      // Refresh review statuses from DB before building snapshot.
+      // Defensive: the event-driven path should keep these in sync, but if an
+      // event is lost (e.g. pipeline notifier throws silently) the read model
+      // can drift. Reloading from SQLite guarantees the snapshot is authoritative.
+      try {
+        const { loadReviewStatuses: loadStatuses } = yield* Effect.promise(
+          () => import('../../lib/review-status.js'),
+        );
+        const { enrichReviewStatusFromSessions } = yield* Effect.promise(
+          () => import('../../lib/review-status-enrichment.js'),
+        );
+        const { listSessionNamesAsync } = yield* Effect.promise(
+          () => import('../../lib/tmux.js'),
+        );
+        const statusMap = loadStatuses();
+        // One tmux call for all issues — O(1) tmux cost per snapshot build.
+        // Keep tmux failures non-fatal; Effect's static catchAll is not available
+        // in the dashboard runtime version.
+        let allSessions: string[] = [];
+        try {
+          allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+        } catch {
+          allSessions = [];
+        }
+        state = {
+          ...state,
+          reviewStatusByIssueId: Object.fromEntries(
+            Object.values(statusMap).map((status) => {
+              const enriched = enrichReviewStatusFromSessions(status.issueId, status, allSessions);
+              return [status.issueId, toReviewStatusSnapshot(enriched)];
+            }),
+          ),
+        };
+      } catch (err) {
+        console.error('[ReadModel] Failed to refresh review statuses for snapshot:', err);
+      }
+
+      // Refresh issues from the shared issue service before building snapshot.
+      // IssueDataService polls trackers in the background; its cached issues are
+      // the freshest available without blocking on API calls.
+      try {
+        const { getSharedIssueService } = yield* Effect.promise(
+          () => import('./services/issue-service-singleton.js'),
+        );
+        const issueService = getSharedIssueService();
+        const currentIssues = JSON.parse(JSON.stringify(issueService.getIssues()));
+        if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
+          state = { ...state, issuesRaw: currentIssues };
+        }
+      } catch (err) {
+        console.error('[ReadModel] Failed to refresh issues for snapshot:', err);
+      }
+
+      return buildSnapshot();
+    });
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
@@ -274,10 +340,20 @@ export const ReadModelServiceLive = Layer.effect(
             workspace: a.workspace || undefined,
             runtime: a.runtime || undefined,
             model: a.model || undefined,
-            // Reconcile on-disk status with live tmux state: if the tmux session is
-            // active but state.json says 'stopped', the agent is actually running
-            // (e.g. resumed outside the API, or state.json write was missed).
-            status: toAgentStatus(a.tmuxActive && a.status === 'stopped' ? 'running' : a.status),
+            // Reconcile on-disk status with live tmux state:
+            // - tmux active but state.json says 'stopped' → actually running (resumed outside API)
+            // - tmux inactive but state.json says 'running' → actually stopped (reboot/crash)
+            status: (() => {
+              let reconciled = a.status as AgentStatus | string;
+              if (a.tmuxActive && a.status === 'stopped') {
+                reconciled = 'running';
+                logDeaconEvent(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
+              } else if (!a.tmuxActive && a.status === 'running') {
+                reconciled = 'stopped';
+                logDeaconEvent(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
+              }
+              return toAgentStatus(reconciled);
+            })(),
             startedAt: a.startedAt || undefined,
             lastActivity: a.lastActivity || undefined,
             branch: a.branch || undefined,

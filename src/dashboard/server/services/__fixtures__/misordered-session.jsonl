@@ -1,0 +1,7 @@
+{"type":"user","uuid":"u-1","timestamp":"2024-01-15T09:23:10.000Z","message":{"content":[{"type":"text","text":"List the files in the current directory"}]}}
+{"type":"user","uuid":"u-2","timestamp":"2024-01-15T09:23:12.500Z","message":{"content":[{"type":"tool_result","tool_use_id":"tool-bash-1","content":"package.json\nsrc/\nREADME.md\n","is_error":false}]}}
+{"type":"assistant","uuid":"a-1","timestamp":"2024-01-15T09:23:11.000Z","message":{"id":"msg-1","role":"assistant","content":[{"type":"text","text":"I'll list the files for you."},{"type":"tool_use","id":"tool-bash-1","name":"Bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}}
+{"type":"user","uuid":"u-3","timestamp":"2024-01-15T09:23:15.000Z","message":{"content":[{"type":"text","text":"Now show me the contents of package.json"}]}}
+{"type":"assistant","uuid":"a-2","timestamp":"2024-01-15T09:23:16.000Z","message":{"id":"msg-2","role":"assistant","content":[{"type":"text","text":"Here is the package.json content."},{"type":"tool_use","id":"tool-read-1","name":"Read","input":{"file":"package.json"}}],"stop_reason":"tool_use"}}
+{"type":"user","uuid":"u-4","timestamp":"2024-01-15T09:23:14.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"tool-read-1","content":"{\n  \"name\": \"example\",\n  \"version\": \"1.0.0\"\n}","is_error":false}]}}
+{"type":"assistant","uuid":"a-3","timestamp":"2024-01-15T09:23:18.000Z","message":{"id":"msg-3","role":"assistant","content":[{"type":"text","text":"Done!"}],"stop_reason":"end_turn"}}

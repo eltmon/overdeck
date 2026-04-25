@@ -85,6 +85,10 @@ function mapDomainEventToDetailed(event: StoredEvent): {
       return { source: 'pipeline', level: 'info', message: `Pipeline status updated for ${issueId}`, issueId, triggeringEvent: event.type };
     case 'review.status_changed':
       return { source: 'review', level: 'info', message: `Review status updated for ${issueId}`, issueId, triggeringEvent: event.type };
+    case 'pipeline.verification-started':
+      return { source: 'verification', level: 'info', message: `Verification started for ${issueId}`, issueId, triggeringEvent: event.type };
+    case 'pipeline.verification-failed':
+      return { source: 'verification', level: 'error', message: `Verification failed for ${issueId}${p['failedCheck'] ? `: ${p['failedCheck']}` : ''}`, issueId, triggeringEvent: event.type };
     case 'pipeline.review-started':
       return { source: 'review-specialist', level: 'info', message: `Review specialist started for ${issueId}`, issueId, triggeringEvent: event.type };
     case 'pipeline.review-completed':

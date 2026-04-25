@@ -312,6 +312,8 @@ After `pan done`:
 
 ### Review Agent Workflow
 
+> For the full end-to-end review architecture — `pan review run` CLI, the four-phase flow, prompt primitives under `src/lib/cloister/prompts/review/`, the dashboard-restart invariant, and synthesis as the judgment layer — see [`REVIEW-AGENT-ARCHITECTURE.md`](./REVIEW-AGENT-ARCHITECTURE.md). The summary below covers the specialist-pipeline integration only.
+
 1. **Dispatched immediately** via `spawnEphemeralSpecialist` when verification gate passes
 2. **Reads PR** using GitHub CLI (`gh pr view`, `gh pr diff`)
 3. **Reviews code** for:

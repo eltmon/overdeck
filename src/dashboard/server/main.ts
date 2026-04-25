@@ -16,6 +16,7 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
+import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -27,6 +28,7 @@ import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
+import { startCliproxyWatchdog } from './routes/cliproxy.js';
 
 declare const Bun: unknown;
 
@@ -63,14 +65,23 @@ console.log('[panopticon] AgentEnrichmentService started');
 // This handler converts those into domain events so the frontend Zustand store updates.
 setPipelineHandler((event) => {
   if (event.type === 'status_changed') {
-    try {
-      const es = getEventStore();
-      es.append({
-        type: 'review.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: { issueId: event.issueId, status: event.status },
-      } as any);
-    } catch { /* non-fatal — event store may not be ready during early boot */ }
+    // Enrich async — fire-and-forget so the notifier stays sync.
+    // Session-name discovery needs tmux, which is async; appending the event
+    // is delayed by <1 tick which is fine because reviewSessionNames are only
+    // needed for the TerminalTabs UI, not for DB state transitions.
+    void (async () => {
+      try {
+        const enriched = await enrichReviewStatus(event.issueId, event.status);
+        const es = getEventStore();
+        es.append({
+          type: 'review.status_changed',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, status: enriched },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append status_changed event:', err);
+      }
+    })();
   }
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');
@@ -86,23 +97,30 @@ setAgentStoppedNotifier((agentId) => {
       timestamp: new Date().toISOString(),
       payload: { agentId },
     } as any);
-  } catch { /* non-fatal — event store may not be ready during early boot */ }
+  } catch (err) {
+    console.error('[pipeline] Failed to append agent.stopped event:', err);
+  }
 });
 console.log('[panopticon] Agent stopped notifier → domain events wired');
 
 // Wire deacon merge-ready reminder → domain events so the frontend re-reads the
 // Awaiting Merge list when deacon fires its 1h staleness reminder.
 setMergeReadyNotifier((issueId) => {
-  try {
-    const status = getReviewStatus(issueId);
-    if (!status) return;
-    const es = getEventStore();
-    es.append({
-      type: 'review.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: { issueId, status },
-    } as any);
-  } catch { /* non-fatal */ }
+  const status = getReviewStatus(issueId);
+  if (!status) return;
+  void (async () => {
+    try {
+      const enriched = await enrichReviewStatus(issueId, status);
+      const es = getEventStore();
+      es.append({
+        type: 'review.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: { issueId, status: enriched },
+      } as any);
+    } catch (err) {
+      console.error('[pipeline] Failed to append merge-ready event:', err);
+    }
+  })();
 });
 console.log('[panopticon] Merge-ready notifier → domain events wired');
 
@@ -112,6 +130,10 @@ console.log('[panopticon] ConversationLifecycleService started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
 startTtsSummarizer();
+
+// Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
+startCliproxyWatchdog();
+console.log('[panopticon] CLIProxy watchdog started (30s interval)');
 
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
@@ -139,19 +161,14 @@ process.once('SIGINT', () => {
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
+emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
 // Mark any in-progress forks as failed — they were interrupted by the restart.
-{ const n = clearStuckForks(); if (n) console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`); }
+{ const n = clearStuckForks(); if (n) {
+  console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`);
+  emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Marked ${n} stuck fork(s) as failed on startup` });
+} }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
-// Repair workflow labels for any GitHub issue that merged but still has in-review label (PAN-676).
-// Also detect PRs already merged on GitHub with incorrect internal state (PAN-670 pattern).
-import('../../lib/lifecycle/label-cleanup.js').then(({ repairMergedLabels, repairAlreadyMergedPRs, repairIncompletePostMergeLifecycle, repairClosedWontfixIssues, repairClosedPRs }) => {
-  repairMergedLabels().catch(err => console.warn('[panopticon] repairMergedLabels failed:', err));
-  repairAlreadyMergedPRs().catch(err => console.warn('[panopticon] repairAlreadyMergedPRs failed:', err));
-  repairIncompletePostMergeLifecycle().catch(err => console.warn('[panopticon] repairIncompletePostMergeLifecycle failed:', err));
-  repairClosedWontfixIssues().catch(err => console.warn('[panopticon] repairClosedWontfixIssues failed:', err));
-  repairClosedPRs().catch(err => console.warn('[panopticon] repairClosedPRs failed:', err));
-});
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
@@ -160,6 +177,7 @@ try {
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
     console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
+    emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
   }
   await resumeQueuedMerges();
 } catch (err: any) {
@@ -169,13 +187,16 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 
-// Auto-start Cloister if configured (startup.auto_start = true in cloister config).
-// Without this, Cloister had to be manually started after every dashboard restart.
+// Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
+// work agents that forgot to call `pan work done`, nudges dead-end agents,
+// and detects stuck thinking loops. Without it, stalled agents are invisible.
 if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
     console.error('[panopticon] Cloister auto-start failed:', err);
+    emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });
   console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
+  emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;

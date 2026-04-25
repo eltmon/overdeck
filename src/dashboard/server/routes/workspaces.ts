@@ -58,6 +58,7 @@ import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
+  setDeaconIgnored,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
@@ -70,7 +71,6 @@ import {
   messageAgent,
   saveAgentRuntimeState,
   getAgentRuntimeState,
-  getAgentRuntimeStateAsync,
   transitionIssueToInReview,
   getAgentState,
   getAgentStateAsync,
@@ -80,7 +80,7 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
-import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
@@ -89,6 +89,7 @@ import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js
 import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 
 const execAsync = promisify(exec);
 
@@ -2067,14 +2068,28 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
 
     const status = getReviewStatus(issueId);
-    const base = status || {
+    const base: ReviewStatus = status || {
       issueId,
       reviewStatus: 'pending',
       testStatus: 'pending',
+      mergeStatus: 'pending',
       readyForMerge: false,
+      updatedAt: new Date().toISOString(),
     };
 
     let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
+
+    // Discover active parallel review sessions for this issue
+    let reviewCoordinatorSessionName: string | undefined;
+    let reviewSessionNames: string[] | undefined;
+    let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
+    try {
+      const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+      const enriched = enrichReviewStatusFromSessions(issueId, base, allSessions);
+      reviewCoordinatorSessionName = enriched.reviewCoordinatorSessionName;
+      reviewSessionNames = enriched.reviewSessionNames;
+      reviewSubStatuses = enriched.reviewSubStatuses;
+    } catch { /* non-fatal: tmux may not be available */ }
 
     // Only the merge queue is persistent — check it when no active phase is detected
     if (queuePosition === null) {
@@ -2104,7 +2119,7 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       }
     }
 
-    return jsonResponse({ ...base, queuePosition, activeSpecialist });
+    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewCoordinatorSessionName, reviewSessionNames, reviewSubStatuses });
   }))
 );
 
@@ -2176,7 +2191,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Failed to write feedback file for ${issueId}: ${fileResult.error}`
             );
           } else {
-            const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+            const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\n\nRead ${fileResult.relativePath}, then immediately continue implementing all required fixes. Do NOT stop at the prompt — keep working until every blocking issue is resolved and you have invoked /rebase-and-submit.`;
             yield* Effect.promise(() => messageAgent(agentId, msg));
             console.log(
               `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
@@ -2263,7 +2278,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Failed to write test feedback file for ${issueId}: ${fileResult.error}`
             );
           } else {
-            const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+            const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\nRead ${fileResult.relativePath}, then immediately fix the failing tests and re-submit. Do NOT stop at the prompt — keep working until all tests pass and you have invoked /rebase-and-submit.`;
             yield* Effect.promise(() => messageAgent(agentId, msg));
             console.log(
               `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
@@ -2314,6 +2329,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
     const forceReview =
@@ -2456,6 +2472,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	              console.warn(`[review] Review artifact creation failed for ${issueId}: ${artifactErr.message}`);
 	            }
 
+            try {
+              eventStore.append({
+                type: 'pipeline.verification-started',
+                timestamp: new Date().toISOString(),
+                payload: { issueId },
+              } as any);
+            } catch { /* non-fatal */ }
+
             const verifyOutcome = await runVerificationForIssue(
               issueId,
               workspacePath,
@@ -2471,6 +2495,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewStatus: 'failed',
                 reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
               });
+              try {
+                eventStore.append({
+                  type: 'pipeline.verification-failed',
+                  timestamp: new Date().toISOString(),
+                  payload: { issueId, failedCheck: verifyOutcome.failedCheck },
+                } as any);
+              } catch { /* non-fatal */ }
               return;
             }
             if (verifyOutcome.outcome === 'error') {
@@ -2482,6 +2513,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewStatus: 'failed',
                 reviewNotes: `Verification error: ${verifyOutcome.message}`,
               });
+              try {
+                eventStore.append({
+                  type: 'pipeline.verification-failed',
+                  timestamp: new Date().toISOString(),
+                  payload: { issueId, message: verifyOutcome.message },
+                } as any);
+              } catch { /* non-fatal */ }
               return;
             }
 
@@ -2510,6 +2548,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             // PAN-511: set 'reviewing' only after dispatch succeeds
             setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
+            try {
+              eventStore.append({
+                type: 'pipeline.review-started',
+                timestamp: new Date().toISOString(),
+                payload: { issueId },
+              } as any);
+            } catch { /* non-fatal */ }
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
             completePendingOperation(issueId, error.message);
@@ -2867,6 +2912,90 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
 // ─── Route: POST /api/review/:issueId/reset ───────────────────────
 
+/** HTTP-contract result from the reset-review endpoint. Exported for unit testing. */
+export type ResetReviewResult =
+  | { httpStatus: 400; body: { success: false; error: string } }
+  | {
+      httpStatus: 200;
+      body: {
+        success: true;
+        /** Work-agent runtime state observed before the reset — informational, logged for debugging. */
+        preservedResolution?: { agentId: string; resolution?: string; resolutionCount?: number };
+      };
+    };
+
+/**
+ * Core logic for POST /api/review/:issueId/reset (synchronous, testable).
+ *
+ * Resets the specialist pipeline state (review / test / merge / verification) for
+ * a workspace. Writes ONE setReviewStatus() call, reads the work-agent's runtime
+ * state purely for logging, and returns a structured result that the route
+ * handler maps to an HTTP response.
+ *
+ * CRITICAL — resolution preservation:
+ * This function deliberately does NOT mutate the work-agent's runtime state
+ * (resolution / resolutionCount / activity). `resolution` tracks the WORK
+ * agent's own lifecycle (working/done/unclear/stuck/needs_input) and is written
+ * exclusively by `work-agent-stop-hook` based on the agent's tail. The pipeline
+ * reset is about specialist state — wiping resolution here previously erased
+ * legitimate unclear/stuck counts when `pan done`'s self-heal path triggered a
+ * reset, which prevented the deacon from noticing genuinely confused agents.
+ * (Root cause of PAN-805 never escalating to stuck.)
+ *
+ * Regression test: tests/unit/dashboard/server/routes/reset-review-route.test.ts
+ *
+ * Exported so a unit test can assert the sync mutation set is exactly
+ * {reset review status} — nothing else.
+ */
+export function processResetReviewPipeline(
+  issueId: string,
+  workspaceExists: boolean,
+): ResetReviewResult {
+  if (!workspaceExists) {
+    return {
+      httpStatus: 400,
+      body: { success: false, error: 'Workspace does not exist' },
+    };
+  }
+
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const priorRuntime = getAgentRuntimeState(agentId);
+
+  console.log(
+    `[reset-review] Human-initiated pipeline reset for ${issueId} ` +
+      `(work-agent ${agentId} resolution=${priorRuntime?.resolution ?? 'none'}/` +
+      `${priorRuntime?.resolutionCount ?? 0} — preserved, not reset)`
+  );
+
+  setReviewStatus(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    reviewNotes: undefined,
+    testNotes: undefined,
+    mergeNotes: undefined,
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    verificationCycleCount: 0,
+  });
+
+  return {
+    httpStatus: 200,
+    body: {
+      success: true,
+      preservedResolution: priorRuntime
+        ? {
+            agentId,
+            resolution: priorRuntime.resolution,
+            resolutionCount: priorRuntime.resolutionCount,
+          }
+        : undefined,
+    },
+  };
+}
+
 const postWorkspaceResetReviewRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/reset',
@@ -2876,47 +3005,19 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    if (!workspaceInfo.exists) {
-      return jsonResponse(
-        { success: false, error: 'Workspace does not exist' },
-        { status: 400 }
-      );
+    const result = processResetReviewPipeline(issueId, workspaceInfo.exists);
+    if (result.httpStatus !== 200) {
+      return jsonResponse(result.body, { status: result.httpStatus });
     }
-
-    console.log(`[reset-review] Human-initiated pipeline reset for ${issueId}`);
-
-    setReviewStatus(issueId, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      reviewNotes: undefined,
-      testNotes: undefined,
-      mergeNotes: undefined,
-      readyForMerge: false,
-      autoRequeueCount: 0,
-      verificationStatus: 'pending',
-      verificationNotes: undefined,
-      verificationCycleCount: 0,
-    });
-
-    try {
-      const agentId = `agent-${issueId.toLowerCase()}`;
-      const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(agentId));
-      if (runtimeState) {
-        saveAgentRuntimeState(agentId, {
-          resolution: 'working',
-          resolutionCount: 0,
-          resolutionUpdatedAt: new Date().toISOString(),
-        });
-      }
-    } catch {}
 
     try {
       const { resetPostMergeState } = yield* Effect.promise(() => import(
         '../../../lib/cloister/merge-agent.js'
       ));
       resetPostMergeState(issueId);
-    } catch {}
+    } catch (err) {
+      console.warn(`[reset-review] resetPostMergeState best-effort failed for ${issueId}:`, err);
+    }
 
     console.log(
       `[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`
@@ -2970,6 +3071,70 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
         ? `Pipeline reset and review re-dispatched for ${issueId}.`
         : `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
       rerun,
+    });
+  }))
+);
+
+// ─── Route: POST /api/review/:issueId/abort ────────────────────────────────
+//
+// Kill all running reviewer tmux sessions for an issue and reset reviewStatus
+// to 'pending'. Does NOT message the work agent — leaves the worker idle.
+// Use this to stop a runaway or stuck review without triggering a resubmit.
+
+const postWorkspaceAbortReviewRoute = HttpRouter.add(
+  'POST',
+  '/api/review/:issueId/abort',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!issueId) {
+      return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
+    }
+
+    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+    if (!workspaceInfo.exists) {
+      return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
+    }
+
+    // Kill all reviewer AND coordinator tmux sessions for this issue.
+    // Session name patterns (see docs/REVIEW-AGENT-ARCHITECTURE.md):
+    //   review-<issueId>-<ts>-<role>         (per-reviewer session)
+    //   review-<issueId>-<ts>-synthesis      (synthesis session)
+    //   review-coordinator-<issueId>-<ts>    (detached `pan review run` orchestrator)
+    const reviewerPrefix = `review-${issueId}-`;
+    const coordinatorPrefix = `review-coordinator-${issueId}-`;
+    const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+    const reviewSessions = allSessions.filter(
+      s => s.startsWith(reviewerPrefix) || s.startsWith(coordinatorPrefix),
+    );
+
+    const killed: string[] = [];
+    const failed: string[] = [];
+    for (const session of reviewSessions) {
+      try {
+        yield* Effect.promise(() => killSessionAsync(session));
+        killed.push(session);
+      } catch {
+        failed.push(session);
+      }
+    }
+
+    // Reset only reviewStatus — leave test/merge/verification untouched
+    setReviewStatus(issueId, {
+      reviewStatus: 'pending',
+      reviewNotes: undefined,
+    });
+
+    console.log(
+      `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +
+      (failed.length ? ` (${failed.length} kill failed)` : '')
+    );
+
+    return jsonResponse({
+      success: true,
+      message: `Aborted ${killed.length} reviewer session(s) for ${issueId}. Worker left idle.`,
+      killed,
+      failed,
     });
   }))
 );
@@ -3042,6 +3207,10 @@ export function processUnstickRequest(
     stuckAt: undefined,
     stuckDetails: undefined,
     reviewedAtCommit: undefined,
+    // PAN-794: unstick opens a fresh recovery cycle — arm the breaker budget
+    // again so legitimate transient failures don't inherit prior cycle counts.
+    reviewRetryCount: 0,
+    recoveryStartedAt: undefined,
   });
   console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
@@ -3080,12 +3249,61 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
 
     // Pre-verify git state before mutating stuck flag.
     // For main_diverged: check that local main is not ahead of origin/main.
+    // PAN-794: review_infrastructure_failure is unrelated to git divergence —
+    // skip the git safe-state check so operators can unstick review-infra
+    // workspaces without touching the project's main branch.
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const gitSafeState = yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
+    const skipGitCheck = current?.stuckReason === 'review_infrastructure_failure';
+    const gitSafeState = skipGitCheck
+      ? true
+      : yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
 
     const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitSafeState);
     return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
+  }))
+);
+
+// ─── Route: POST /api/workspaces/:issueId/deacon-ignore ──────────────────
+
+/**
+ * Operator toggle: tell Deacon to stop patrolling this issue. Body:
+ *   { ignored: boolean, reason?: string }
+ *
+ * Idempotent — calling with ignored=true repeatedly refreshes the timestamp
+ * but otherwise no-ops. Separate from stuck/unstick: stuck is a system-set
+ * failure marker, deaconIgnored is an explicit human "hands off".
+ */
+const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/deacon-ignore',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!issueId) {
+      return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
+    }
+
+    const body = (yield* readJsonBody) as { ignored?: unknown; reason?: unknown };
+    if (typeof body.ignored !== 'boolean') {
+      return jsonResponse(
+        { success: false, error: 'Body must include { ignored: boolean }' },
+        { status: 400 },
+      );
+    }
+    const reason = typeof body.reason === 'string' && body.reason.trim().length > 0
+      ? body.reason.trim()
+      : undefined;
+
+    setDeaconIgnored(issueId, body.ignored, reason);
+    const updated = getReviewStatus(issueId);
+    return jsonResponse({
+      success: true,
+      issueId,
+      deaconIgnored: updated?.deaconIgnored ?? body.ignored,
+      deaconIgnoredAt: updated?.deaconIgnoredAt,
+      deaconIgnoredReason: updated?.deaconIgnoredReason,
+    });
   }))
 );
 
@@ -3684,7 +3902,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const { postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
-    const { sessionExists } = await import('../../../lib/tmux.js');
+    const { sessionExistsAsync } = await import('../../../lib/tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
@@ -4355,7 +4573,9 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceReviewRoute,
   postWorkspaceRequestReviewRoute,
   postWorkspaceResetReviewRoute,
+  postWorkspaceAbortReviewRoute,
   postWorkspaceUnstickRoute,
+  postWorkspaceDeaconIgnoreRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
   postWorkspaceApproveRoute,

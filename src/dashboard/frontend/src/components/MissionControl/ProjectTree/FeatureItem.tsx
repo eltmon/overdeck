@@ -1,4 +1,4 @@
-import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge } from 'lucide-react';
 import type { ProjectFeature } from './ProjectNode';
 import styles from '../styles/mission-control.module.css';
 
@@ -10,7 +10,11 @@ interface FeatureItemProps {
   cost?: number;
 }
 
-function StatusIcon({ status, agentStatus, stateLabel, isRally }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean }) {
+function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
+  // Merge-ready takes precedence — human action needed
+  if (readyForMerge) {
+    return <GitMerge size={14} style={{ color: 'var(--mc-accent)' }} />;
+  }
   // Rally feature: layers icon with color based on state
   if (isRally) {
     const color = stateLabel === 'Done' ? 'var(--mc-success)'
@@ -54,7 +58,7 @@ export function FeatureItem({ feature, isSelected, onSelect, title, cost }: Feat
         {feature.isShadow ? (
           <Eye size={14} style={{ color: 'var(--mc-accent)' }} />
         ) : (
-          <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} />
+          <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
         )}
       </span>
       <span className={styles.featureId_sidebar}>{feature.issueId}</span>

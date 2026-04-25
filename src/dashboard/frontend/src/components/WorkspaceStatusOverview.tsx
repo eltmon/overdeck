@@ -117,10 +117,11 @@ export function WorkspaceStatusOverview({
     || hasVerificationState
   );
 
-  const isRunning = agent && agent.status !== 'dead' && agent.status !== 'stopped';
+  const isStandby = agent?.status === 'stopped' && agent?.agentPhase === 'review-response';
+  const isRunning = agent && agent.status !== 'dead' && (agent.status !== 'stopped' || isStandby);
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
-  const isResume = !!agent && agent.status === 'stopped' && lifecycle?.canResumeSession === true && !resetSessionSuccess;
+  const isResume = !!agent && agent.status === 'stopped' && !isStandby && lifecycle?.canResumeSession === true && !resetSessionSuccess;
 
   const mergingElapsed = reviewStatus?.mergeStatus === 'merging' && reviewStatus.updatedAt
     ? now - new Date(reviewStatus.updatedAt).getTime()

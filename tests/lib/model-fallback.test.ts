@@ -76,6 +76,10 @@ describe('model-fallback', () => {
 
     it('should return all OpenAI models', () => {
       const models = getModelsByProvider('openai');
+      expect(models).toContain('gpt-5.5');
+      expect(models).toContain('gpt-5.5-mini');
+      expect(models).toContain('gpt-5.5-nano');
+      expect(models).toContain('gpt-5.5-pro');
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('gpt-5.4-mini');
       expect(models).toContain('gpt-5.4-nano');
@@ -86,7 +90,7 @@ describe('model-fallback', () => {
       expect(models).toContain('o3-deep-research'); // legacy
       expect(models).toContain('gpt-4o'); // legacy
       expect(models).toContain('gpt-4o-mini'); // legacy
-      expect(models).toHaveLength(10);
+      expect(models).toHaveLength(14);
     });
 
     it('should return all Google models', () => {
@@ -354,18 +358,19 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(26); // 5 Anthropic + 10 OpenAI + 7 Google + 4 Kimi
+      expect(models.length).toBe(30); // 5 Anthropic + 14 OpenAI + 7 Google + 4 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
       const models = getAvailableModels(enabled);
 
+      expect(models).toContain('gpt-5.5');
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('o3');
       expect(models).toContain('gpt-5.2-codex');
       expect(models).toContain('gpt-4o');
-      expect(models.length).toBe(15); // 5 Anthropic + 10 OpenAI
+      expect(models.length).toBe(19); // 5 Anthropic + 14 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {

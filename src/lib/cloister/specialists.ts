@@ -2905,7 +2905,7 @@ export async function sendFeedbackToAgent(
   // Send short reference pointing to the file
   try {
     const { messageAgent } = await import('../agents.js');
-    const msg = `SPECIALIST FEEDBACK: ${fromSpecialist} reported ${feedback.feedbackType.toUpperCase()} for ${toIssueId}.\nRead and address: ${fileResult.relativePath}`;
+    const msg = `SPECIALIST FEEDBACK: ${fromSpecialist} reported ${feedback.feedbackType.toUpperCase()} for ${toIssueId}.\n\nRead ${fileResult.relativePath}, then immediately address the feedback and continue working. Do NOT stop at the prompt.`;
     await messageAgent(agentSession, msg);
     console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession} (file: ${fileResult.relativePath})`);
     return true;

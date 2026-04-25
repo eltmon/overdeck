@@ -8,6 +8,7 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
+import { copyFile } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -223,6 +224,24 @@ async function destructiveResetWorkflow(
   };
 
   stepNum = 1;
+
+  // Preserve PRD before workspace teardown so it survives reset/cancel.
+  // complete-planning copies STATE.md and plan.vbrief.json to docs/prds/active/
+  // but does not copy prd.md. Ensure it is preserved here.
+  const issueLower = ctx.issueId.toLowerCase();
+  const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
+  if (workspacePath && existsSync(workspacePath)) {
+    const prdPath = join(workspacePath, '.planning', 'prd.md');
+    if (existsSync(prdPath)) {
+      try {
+        const activeDir = join(ctx.projectPath, 'docs', 'prds', 'active', issueLower);
+        const { mkdir } = await import('fs/promises');
+        await mkdir(activeDir, { recursive: true });
+        await copyFile(prdPath, join(activeDir, 'prd.md'));
+      } catch { /* non-fatal — PRD preservation is best-effort */ }
+    }
+  }
+
   progress('Tearing down workspace', 'Killing agents, stopping services, removing files');
   const teardownSteps = await teardownWorkspace(ctx, {
     deleteWorkspace,

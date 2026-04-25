@@ -12,6 +12,9 @@ export interface SummaryForkOptions {
   model?: string;
   cwd?: string;
   localSummaryOnly?: boolean;
+  /** When true, skip summary generation and copy the raw JSONL history
+   *  (from the last compact_boundary, if any) into the new session file. */
+  plain?: boolean;
 }
 
 export interface SummaryForkResult {
@@ -134,6 +137,45 @@ export async function reserveSummaryForkSession(
   };
 }
 
+/**
+ * Find the byte offset of the last `compact_boundary` entry in a JSONL file.
+ * Returns 0 if no boundary is found.
+ */
+async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number> {
+  const { readFile } = await import('node:fs/promises');
+  const content = await readFile(jsonlPath, 'utf-8');
+  const lines = content.split('\n');
+  let offset = 0;
+  let lastBoundaryOffset = 0;
+  for (const line of lines) {
+    if (line.trim()) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+          lastBoundaryOffset = offset;
+        }
+      } catch { /* skip invalid lines */ }
+    }
+    offset += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+  }
+  return lastBoundaryOffset;
+}
+
+/**
+ * Copy JSONL content from the last compact_boundary (or from the start)
+ * into a new session file.
+ */
+export async function copySessionFromCompactBoundary(
+  sourcePath: string,
+  destPath: string,
+): Promise<void> {
+  const { readFile, writeFile } = await import('node:fs/promises');
+  const boundaryOffset = await findLastCompactBoundaryOffset(sourcePath);
+  const content = await readFile(sourcePath, 'utf-8');
+  const sliced = boundaryOffset > 0 ? content.slice(boundaryOffset) : content;
+  await writeFile(destPath, sliced, 'utf-8');
+}
+
 export async function createSummaryFork(
   conv: Conversation,
   options: SummaryForkOptions = {},
@@ -144,10 +186,28 @@ export async function createSummaryFork(
 
   const cwd = options.cwd || conv.cwd || process.cwd();
   const launchModel = options.model || conv.model;
-  const { summary, summaryModel: usedSummaryModel } = options.localSummaryOnly
-    ? { summary: await generateFallbackSummary(conv.sessionFile), summaryModel: null }
-    : await generateSummaryForFork(conv.sessionFile, options.model);
+  const summaryModel = options.model || conv.model;
+  console.log(`[summary-fork] Forking conv=${conv.name} launchModel=${launchModel || 'default'} summaryModel=${summaryModel || 'default'} localOnly=${options.localSummaryOnly || false} plain=${options.plain || false}`);
+
   const { sessionId, sessionFile } = await reserveSummaryForkSession(cwd);
+
+  let summary: string;
+  let usedSummaryModel: string | null;
+
+  if (options.plain) {
+    // Plain fork: copy raw JSONL from last compact boundary (or full history)
+    // into the new session file so Claude Code can --resume it directly.
+    await copySessionFromCompactBoundary(conv.sessionFile, sessionFile);
+    summary = '';
+    usedSummaryModel = null;
+  } else if (options.localSummaryOnly) {
+    summary = await generateFallbackSummary(conv.sessionFile);
+    usedSummaryModel = null;
+  } else {
+    const result = await generateSummaryForFork(conv.sessionFile, summaryModel ?? undefined);
+    summary = result.summary;
+    usedSummaryModel = result.summaryModel;
+  }
 
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const suffix = randomUUID().slice(0, 4);
@@ -159,9 +219,13 @@ export async function createSummaryFork(
     tmuxSession: newTmux,
     cwd,
     issueId: conv.issueId ?? undefined,
-    title: `Summary Fork: ${conv.title || conv.name}`,
+    title: options.plain
+      ? `Fork: ${conv.title || conv.name}`
+      : `Summary Fork: ${conv.title || conv.name}`,
     titleSource: 'manual',
-    titleSeed: `Summary Fork of ${conv.name}`,
+    titleSeed: options.plain
+      ? `Fork of ${conv.name}`
+      : `Summary Fork of ${conv.name}`,
     sessionFile,
     model: launchModel ?? undefined,
     effort: conv.effort ?? undefined,

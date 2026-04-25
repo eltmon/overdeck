@@ -46,7 +46,11 @@ const readJsonBody = Effect.gen(function* () {
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
-  // OpenAI models — gpt-5.4 family maps to real API model names
+  // OpenAI models — gpt-5.x family maps to real API model names
+  'gpt-5.5-pro': { apiModel: 'gpt-4o' },
+  'gpt-5.5': { apiModel: 'gpt-4o' },
+  'gpt-5.5-mini': { apiModel: 'gpt-4o-mini' },
+  'gpt-5.5-nano': { apiModel: 'gpt-4o-mini' },
   'gpt-5.4-pro': { apiModel: 'gpt-4o' },
   'gpt-5.4': { apiModel: 'gpt-4o' },
   'gpt-5.4-mini': { apiModel: 'gpt-4o-mini' },

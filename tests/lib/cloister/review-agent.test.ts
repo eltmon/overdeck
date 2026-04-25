@@ -63,64 +63,80 @@ describe('dispatchParallelReview', () => {
     prUrl: 'https://github.com/org/repo/pull/1',
   };
 
-  it('calls setReviewStatus with mapped status when spawnFn resolves', async () => {
-    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
-    const spawnFn = vi.fn().mockResolvedValue(approvedResult);
+  // Post-refactor behavior (see docs/REVIEW-AGENT-ARCHITECTURE.md):
+  // dispatchParallelReview spawns a detached tmux coordinator session running
+  // `pan review run <id>`. The coordinator session writes the terminal
+  // reviewStatus when the CLI exits — NOT this function. Under test we
+  // inject coordinatorSpawnFn to avoid touching real tmux.
 
-    const ret = await dispatchParallelReview(baseOpts, { spawnFn });
+  it('writes reviewing status upfront and invokes the coordinator spawn', async () => {
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-123' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
 
     expect(ret.success).toBe(true);
-    // Fire-and-forget: flush the microtask queue so .then() runs
-    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(ret.message).toContain('Review coordinator spawned');
+    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
+    expect(coordinatorSpawnFn).toHaveBeenCalledWith({
+      issueId: 'PAN-999',
+      workspace: '/workspaces/feature-pan-999',
+    });
 
-    expect(spawnFn).toHaveBeenCalledOnce();
+    // Exactly one setReviewStatus call: the upfront 'reviewing' write.
+    // Terminal status (passed/blocked/failed) is NOT written here — it lives
+    // in the coordinator session's CLI exit path.
+    expect(mockSetReviewStatus).toHaveBeenCalledOnce();
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
-      reviewStatus: 'passed',
-      reviewNotes: 'LGTM',
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: expect.any(String),
     });
   });
 
-  it('calls setReviewStatus with pending when spawnFn rejects', async () => {
-    const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
+  it('records terminal failed status when coordinator spawn throws', async () => {
+    // Coordinator spawn failure is a hard failure — no detached session was
+    // created, so no CLI will ever write the terminal status. dispatchParallelReview
+    // records 'failed' itself in this case to avoid the status stuck at 'reviewing'.
+    const coordinatorSpawnFn = vi.fn().mockRejectedValue(new Error('tmux unavailable'));
 
-    const ret = await dispatchParallelReview(baseOpts, { spawnFn });
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
 
-    expect(ret.success).toBe(true);
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    expect(spawnFn).toHaveBeenCalledOnce();
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', { reviewStatus: 'pending' });
-  });
-
-  it('maps CHANGES_REQUESTED to blocked status on success path', async () => {
-    const blockedResult: ReviewResult = { success: true, reviewResult: 'CHANGES_REQUESTED', notes: 'Fix required' };
-    const spawnFn = vi.fn().mockResolvedValue(blockedResult);
-
-    await dispatchParallelReview(baseOpts, { spawnFn });
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
-      reviewStatus: 'blocked',
-      reviewNotes: 'Fix required',
-    });
-  });
-
-  it('reviewing→pending: sets reviewing optimistically then resets to pending on spawn failure', async () => {
-    // dispatchParallelReview now manages the status lifecycle internally:
-    // 1. sets 'reviewing' before fire-and-forget
-    // 2. resets to 'pending' in .catch if spawn fails
-    // Callers no longer set reviewStatus themselves, eliminating the race condition.
-    const spawnFn = vi.fn().mockRejectedValue(new Error('spawn failure'));
-
-    await dispatchParallelReview(baseOpts, { spawnFn });
-
-    // Flush the microtask queue so the background .catch() fires
-    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(ret.success).toBe(false);
+    expect(ret.error).toBe('tmux unavailable');
 
     const calls = mockSetReviewStatus.mock.calls;
+    // First call: upfront 'reviewing'. Second call: terminal 'failed' after spawn error.
     expect(calls.length).toBe(2);
-    expect(calls[0]).toEqual(['PAN-999', { reviewStatus: 'reviewing' }]);
-    expect(calls[1]).toEqual(['PAN-999', { reviewStatus: 'pending' }]);
+    expect(calls[0][1].reviewStatus).toBe('reviewing');
+    expect(calls[1][1].reviewStatus).toBe('failed');
+    expect(calls[1][1].reviewNotes).toContain('tmux unavailable');
+  });
+
+  it('returns the coordinator session name in its message for observability', async () => {
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({
+      sessionName: 'review-coordinator-PAN-999-1713456789000',
+    });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(ret.message).toContain('review-coordinator-PAN-999-1713456789000');
+  });
+
+  it('does NOT write a terminal reviewStatus on happy path — coordinator owns it', async () => {
+    // This is the core invariant: dispatchParallelReview transitions to
+    // 'reviewing' and returns. It does NOT know or care about the eventual
+    // passed/blocked/failed outcome — that's the coordinator session's job.
+    // Dashboard-restart invariance depends on this: server can die after
+    // spawning the coordinator and the CLI will still write the terminal
+    // state into SQLite when it exits.
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-123' });
+
+    await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const terminalCalls = mockSetReviewStatus.mock.calls.filter(
+      c => c[1].reviewStatus === 'passed' || c[1].reviewStatus === 'blocked' || c[1].reviewStatus === 'failed',
+    );
+    expect(terminalCalls.length).toBe(0);
   });
 });
 
@@ -172,7 +188,6 @@ describe('buildReviewFeedbackBody', () => {
 
   it('CHANGES_REQUESTED body instructs agent to use pan done (not a curl URL)', () => {
     const body = buildReviewFeedbackBody('PAN-999', changesRequested);
-    // Must reference pan done / rebase-and-submit skill
     expect(body).toMatch(/pan done|rebase-and-submit/);
   });
 
@@ -187,11 +202,38 @@ describe('buildReviewFeedbackBody', () => {
     expect(body).toContain('PAN-999');
   });
 
-  it('APPROVED body does not include resubmit instructions', () => {
+  it('APPROVED body includes completion notice and warns against resubmit', () => {
     const approved: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const body = buildReviewFeedbackBody('PAN-999', approved);
-    expect(body).toContain('approved');
-    expect(body).not.toMatch(/pan done|rebase-and-submit|request-review/);
+    expect(body).toContain('APPROVED');
+    expect(body).toContain('CODE APPROVED');
+    expect(body).toContain('Do NOT run `pan done` again');
+    expect(body).toContain('Do NOT run `pan review request`');
+  });
+
+  it('uses full synthesis output when available, stripping tail markers', () => {
+    const withOutput: ReviewResult = {
+      success: true,
+      reviewResult: 'CHANGES_REQUESTED',
+      notes: 'Short summary.',
+      output: '# Verdict: CHANGES_REQUESTED\n\n## Blockers\n\n### 1. Missing CSRF guard\nFix: add validateOrigin()\n\nREVIEW_RESULT: CHANGES_REQUESTED\nNOTES: Short summary.\nFILES_REVIEWED: foo.ts,bar.ts\nSECURITY_ISSUES: Missing CSRF guard',
+    };
+    const body = buildReviewFeedbackBody('PAN-999', withOutput);
+    // Full synthesis body is present
+    expect(body).toContain('## Blockers');
+    expect(body).toContain('Missing CSRF guard');
+    expect(body).toContain('add validateOrigin()');
+    // Tail markers are stripped
+    expect(body).not.toContain('REVIEW_RESULT:');
+    expect(body).not.toContain('FILES_REVIEWED:');
+    // Action block is appended
+    expect(body).toMatch(/rebase-and-submit/);
+  });
+
+  it('falls back to tail-marker reconstruction when output is absent', () => {
+    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
+    expect(body).toContain('# Review: CHANGES_REQUESTED');
+    expect(body).toContain('Fix the linting issues.');
   });
 });
 
@@ -381,12 +423,19 @@ describe('resolveReviewerModel', () => {
     expect(model).toBe('claude-opus-4-6');
   });
 
-  it('falls back to defaultModel for unknown roles', () => {
+  it('falls back to specialist-review-agent for unknown roles when no role-specific override', () => {
+    // New behavior (post-gpt-5.5 fix): unknown roles with no override use the
+    // specialist-review-agent work type, not the defaultModel. This prevents
+    // smart selection from picking unsupported models (e.g. gpt-5.5 without
+    // CLIProxy mapping). See resolveReviewerModel for rationale.
     const model = resolveReviewerModel(
       { name: 'unknown-role', focus: [] },
       'claude-haiku-4-5',
     );
-    expect(model).toBe('claude-haiku-4-5');
+    // The returned model comes from the work-type router, not the defaultModel.
+    // Exact ID depends on user config but it MUST be a non-empty string.
+    expect(typeof model).toBe('string');
+    expect(model.length).toBeGreaterThan(0);
   });
 
   it('returns a non-empty string for known roles (routing or fallback)', () => {
@@ -425,21 +474,27 @@ describe('resolveReviewerModel', () => {
     expect(model.length).toBeGreaterThan(0);
   });
 
-  it('passes through concrete model IDs unchanged', () => {
-    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'claude-haiku-4-5');
+  it('passes through agent.model concrete IDs unchanged (highest precedence)', () => {
+    // The only way to force a specific concrete model is via agent.model.
+    // defaultModel is last-resort fallback used only when work-type routing fails.
+    const model = resolveReviewerModel(
+      { name: 'unknown-role', focus: [], model: 'claude-haiku-4-5' },
+      'claude-sonnet-4-5',
+    );
     expect(model).toBe('claude-haiku-4-5');
   });
 
-  // Regression: haiku and sonnet must resolve to distinct concrete model IDs.
-  // Previously both were routed through review:correctness, producing the same model.
-  // The exact IDs depend on enabled providers (provider-aware routing), so we only
-  // assert distinctness and that aliases are not passed through verbatim.
-  it('haiku alias resolves to a distinct model from sonnet alias (real reviewer role)', () => {
-    const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
+  // All reviewer aliases (opus/sonnet/haiku) resolve to specialist-review-agent
+  // so they consistently respect the user's configured reviewer model override.
+  it('all reviewer aliases resolve to the same configured reviewer model', () => {
+    const opus = resolveReviewerModel({ name: 'correctness', model: 'opus', focus: [] }, 'any-default');
     const sonnet = resolveReviewerModel({ name: 'correctness', model: 'sonnet', focus: [] }, 'any-default');
-    expect(haiku).not.toBe('haiku');
+    const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
+    expect(opus).not.toBe('opus');
     expect(sonnet).not.toBe('sonnet');
-    expect(haiku).not.toBe(sonnet);
+    expect(haiku).not.toBe('haiku');
+    expect(opus).toBe(sonnet);
+    expect(sonnet).toBe(haiku);
   });
 
   it('opus alias is resolved (not passed through verbatim) for a real reviewer role', () => {
@@ -626,8 +681,13 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function readTemplate(name: string): string {
-  // Templates live at agents/<name>.md, two directories up from tests/lib/cloister/
-  const templatePath = resolve(import.meta.dirname, '../../../agents', `${name}.md`);
+  // Review prompt templates live at .claude/prompts/<name>.prompt-template.md
+  // (three directories up from tests/lib/cloister/).
+  const templatePath = resolve(
+    import.meta.dirname,
+    '../../../.claude/prompts',
+    `${name}.prompt-template.md`,
+  );
   return readFileSync(templatePath, 'utf-8');
 }
 
@@ -775,17 +835,21 @@ describe('runParallelReview configuration regressions', () => {
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toContain('existsSync(templatePath)');
+    expect(src).toContain('existsSync(promptTemplatePath)');
   });
 });
 
-// ── resolveTemplatePath ───────────────────────────────────────────────────────
+// ── resolvePromptTemplatePath (legacy alias: resolveTemplatePath) ────────────
 
-describe('resolveTemplatePath', () => {
-  it('returns CACHE_AGENTS_DIR path (infrastructure reviewers use main cache only)', () => {
+describe('resolvePromptTemplatePath', () => {
+  it('returns a path under either review-prompts (new) or agent-definitions (legacy fallback)', () => {
+    // In test env, the new CACHE_REVIEW_PROMPTS_DIR typically does not exist
+    // (no `pan sync` run), so resolvePromptTemplatePath falls back to the
+    // legacy CACHE_AGENTS_DIR path. Either layout is accepted.
     const result = resolveTemplatePath('code-review-correctness', '/any/workspace');
-    expect(result).toContain('agent-definitions');
-    expect(result).toContain('code-review-correctness.md');
+    const isNew = result.includes('review-prompts') && result.endsWith('.prompt-template.md');
+    const isLegacy = result.includes('agent-definitions') && result.endsWith('code-review-correctness.md');
+    expect(isNew || isLegacy).toBe(true);
   });
 });
 
@@ -797,7 +861,7 @@ describe('runParallelReview', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-review-'));
     // Create workspace agents/ dir with minimal templates; tests inject
-    // resolveTemplateFn so these local templates are used instead of the global cache.
+    // resolvePromptTemplateFn so these local templates are used instead of the global cache.
     mkdirSync(join(tmpDir, 'agents'), { recursive: true });
     const frontmatter = '---\nmodel: sonnet\n---\nReview the code.\n';
     writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), frontmatter);
@@ -821,13 +885,13 @@ describe('runParallelReview', () => {
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
-    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
 
     const { result } = await runParallelReview(
       baseContext(),
       ['src/foo.ts'],
       [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
     expect(spawnFn).toHaveBeenCalledTimes(2); // 1 reviewer + 1 synthesis
@@ -842,13 +906,13 @@ describe('runParallelReview', () => {
     const waitFn = vi.fn().mockResolvedValue('failed'); // all reviewers fail
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
-    const resolveTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
 
     const { result } = await runParallelReview(
       baseContext(),
       [],
       [{ name: 'correctness' }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolveTemplateFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
     expect(parseSynthesisFn).not.toHaveBeenCalled();
@@ -961,8 +1025,12 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Must NOT pass env via tmux -e flags (old pattern that fails for Anthropic models)
-    expect(fn).not.toMatch(/\{\s*env\s*:/);
+    // Must NOT pass provider env via tmux -e flags (old pattern that fails for Anthropic models).
+    // Panopticon identity vars may be passed as empty strings to prevent inherited env leakage.
     expect(fn).not.toContain('getProviderEnvForModel(');
+    const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
+    if (envMatch) {
+      expect(envMatch[0]).not.toMatch(/ANTHROPIC_BASE_URL|OPENAI_API_KEY|providerEnv/);
+    }
   });
 });
