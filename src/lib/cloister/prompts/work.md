@@ -41,7 +41,7 @@ optional:
 **NEVER perform code reviews yourself.** Panopticon has a dedicated review pipeline with specialist agents (correctness, security, performance, requirements) that runs automatically when you call `pan done`.
 
 - Do NOT spawn `code-review-*` subagents via the Agent tool
-- Do NOT read `.claude/prompts/code-review-*.prompt-template.md` files — those are for the review pipeline, not for you
+- Do NOT read review prompt template files — those are for the review pipeline, not for you
 - Do NOT run your own correctness/security/performance analysis before submitting
 - When you receive review feedback, fix the specific issues listed and resubmit via `/rebase-and-submit` — do NOT re-review your own fixes
 

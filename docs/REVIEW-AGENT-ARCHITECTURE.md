@@ -47,7 +47,7 @@ EXEC: `pan review run <issueId>`             ← blocking shell command
   │                                                              │
   │  For each reviewer in config (correctness, security,         │
   │                               performance, requirements):    │
-  │    • load prompt:   .claude/prompts/                         │
+  │    • load prompt:   src/lib/cloister/prompts/review/         │
   │                       code-review-<role>.prompt-template.md  │
   │    • inject ctx:    PR url, issue id, workspace path,        │
   │                     files changed, output file path          │
@@ -76,7 +76,7 @@ EXEC: `pan review run <issueId>`             ← blocking shell command
   ┌──────────────────────────────────────────────────────────────┐
   │ PHASE 3 — synthesize                                         │
   │                                                              │
-  │  • load prompt:   .claude/prompts/                           │
+  │  • load prompt:   src/lib/cloister/prompts/review/           │
   │                     code-review-synthesis.prompt-template.md │
   │  • inject ctx:    review dir, list of reviewer output paths, │
   │                   synthesis.md + synthesis.json output paths │
@@ -415,7 +415,7 @@ specialists:
 
 Enabling or disabling reviewers is list membership; adding a custom reviewer
 requires placing a matching prompt template at
-`.claude/prompts/code-review-<name>.prompt-template.md`.
+`src/lib/cloister/prompts/review/code-review-<name>.prompt-template.md`.
 
 Model selection is via work-type routing (see [`WORK-TYPES.md`](./WORK-TYPES.md)
 and [`MODEL_ROUTING.md`](./MODEL_ROUTING.md)):
