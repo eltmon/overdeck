@@ -111,44 +111,57 @@ export class WsTransport {
     if (this.disposed) return () => undefined
 
     let active = true
+    let currentCancel: (() => void) | null = null
     const retryDelay = options?.retryDelay ?? DEFAULT_RETRY_DELAY
 
-    const cancel = this.runtime.runCallback(
-      Effect.promise(() => this.clientPromise).pipe(
-        Effect.flatMap((client) =>
-          Stream.runForEach(connect(client), (value) =>
+    const run = () => {
+      if (!active) return
+      const transport = getTransport()
+
+      currentCancel = transport.runtime.runCallback(
+        Effect.promise(() => transport.clientPromise).pipe(
+          Effect.flatMap((client) =>
+            Stream.runForEach(connect(client), (value) =>
+              Effect.sync(() => {
+                if (!active) return
+                try {
+                  listener(value)
+                } catch {
+                  // Swallow listener errors
+                }
+              }),
+            ),
+          ),
+          Effect.catchAllDefect((defect) =>
+            Effect.fail(new Error(formatError(defect))),
+          ),
+          Effect.tapError((err) =>
             Effect.sync(() => {
-              if (!active) return
-              try {
-                listener(value)
-              } catch {
-                // Swallow listener errors
+              if (active) {
+                console.warn('[WsTransport] subscription error, retrying:', formatError(err))
               }
             }),
           ),
+          Effect.retry(Schedule.fixed(retryDelay)),
+          Effect.forever,
         ),
-        Effect.tapError((err) =>
-          Effect.sync(() => {
-            if (active) {
-              console.warn('[WsTransport] subscription error, retrying:', formatError(err))
+        {
+          onExit: (exit) => {
+            if (active && Exit.isFailure(exit)) {
+              console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
+              resetTransport()
+              setTimeout(run, Duration.toMillis(retryDelay))
             }
-          }),
-        ),
-        Effect.retry(Schedule.fixed(retryDelay)),
-        Effect.forever,
-      ),
-      {
-        onExit: (exit) => {
-          if (active && Exit.isFailure(exit)) {
-            console.warn('[WsTransport] subscription exited unexpectedly')
-          }
+          },
         },
-      },
-    )
+      )
+    }
+
+    run()
 
     return () => {
       active = false
-      cancel()
+      currentCancel?.()
     }
   }
 
@@ -167,4 +180,11 @@ export function getTransport(): WsTransport {
     _transport = new WsTransport()
   }
   return _transport
+}
+
+export function resetTransport(): void {
+  if (_transport) {
+    _transport.dispose()
+    _transport = null
+  }
 }
