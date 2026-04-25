@@ -94,7 +94,7 @@ Features:
 - **Cards**: #24283b (lighter dark)
 - **Text**: White headings, #a9b1d6 body
 - **Accents**: Blue #7aa2f7, Gold #e0af68, Green #9ece6a
-- **Typography**: Inter font, 8px corners, 24px spacing
+- **Typography**: DM Sans (body), Space Grotesk (sidebar wordmark only), SF Mono (code), 8px corners, 24px spacing
 
 ---
 

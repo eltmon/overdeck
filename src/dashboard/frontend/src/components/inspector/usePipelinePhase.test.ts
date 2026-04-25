@@ -155,10 +155,15 @@ describe('derivePipelinePhase precedence table', () => {
 
   describe('reviewing phase', () => {
     it('returns reviewing when reviewStatus === reviewing', () => {
-      const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({
+          reviewStatus: 'reviewing',
+          reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        }),
+      });
       const { phase, activeSession } = derivePipelinePhase(input);
       expect(phase).toBe('reviewing');
-      expect(activeSession).toBe('specialist-panopticon-pan-509-review-agent');
+      expect(activeSession).toBe('review-coordinator-pan-509-1234567890');
     });
 
     it('does NOT return reviewing when reviewStatus !== reviewing', () => {
@@ -177,8 +182,13 @@ describe('derivePipelinePhase precedence table', () => {
     });
 
     it('returns null activeSession when review session is dead', () => {
-      const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
-      const dead = new Set(['specialist-panopticon-pan-509-review-agent']);
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({
+          reviewStatus: 'reviewing',
+          reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        }),
+      });
+      const dead = new Set(['review-coordinator-pan-509-1234567890']);
       const { activeSession } = derivePipelinePhase(input, dead);
       expect(activeSession).toBeNull();
     });
@@ -413,11 +423,38 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(availableTerminals.find(t => t.id === 'merging')).toBeTruthy();
   });
 
-  it('marks Review tab as active when phase is reviewing', () => {
-    const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
+  it('marks Review tab as active when phase is reviewing and coordinator exists', () => {
+    const input = makeInput({
+      reviewStatus: makeReviewStatus({
+        reviewStatus: 'reviewing',
+        reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+      }),
+    });
     const { availableTerminals } = derivePipelinePhase(input);
     const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
     expect(reviewTab?.isActive).toBe(true);
+  });
+
+  it('includes coordinator Review tab plus per-reviewer tabs during parallel review', () => {
+    const input = makeInput({
+      reviewStatus: makeReviewStatus({
+        reviewStatus: 'reviewing',
+        reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        reviewSessionNames: [
+          'review-pan-509-1234567891-correctness',
+          'review-pan-509-1234567891-security',
+          'review-pan-509-1234567891-performance',
+          'review-pan-509-1234567891-requirements',
+        ],
+      }),
+    });
+    const { activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(activeSession).toBe('review-coordinator-pan-509-1234567890');
+    expect(availableTerminals.find(t => t.id === 'reviewing')?.sessionName).toBe('review-coordinator-pan-509-1234567890');
+    expect(availableTerminals.find(t => t.id === 'reviewing-correctness')).toBeTruthy();
+    expect(availableTerminals.find(t => t.id === 'reviewing-security')).toBeTruthy();
+    expect(availableTerminals.find(t => t.id === 'reviewing-performance')).toBeTruthy();
+    expect(availableTerminals.find(t => t.id === 'reviewing-requirements')).toBeTruthy();
   });
 
   it('marks Work tab as active when phase is working', () => {

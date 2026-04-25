@@ -385,11 +385,19 @@ export async function parseConversationMessages(
       }
 
       let assistantText = '';
+      let blockIndex = 0;
       for (const block of content as ContentBlock[]) {
         if (block.type === 'text' && block.text) {
           assistantText += block.text;
         } else if (block.type === 'thinking' && block.thinking) {
-          assistantText += block.thinking;
+          workLog.push({
+            id: `${entry.uuid ?? msg.id ?? `asst-${messages.length}`}-thinking-${blockIndex}`,
+            createdAt: entry.timestamp ?? new Date().toISOString(),
+            label: 'thinking',
+            detail: block.thinking,
+            tone: 'thinking',
+            sequence: lineSequence,
+          });
         } else if (block.type === 'tool_use' && block.id) {
           // WorkLogEntry for the tool call
           const toolEntry: WorkLogEntry = {
@@ -416,6 +424,7 @@ export async function parseConversationMessages(
             pendingToolUse.set(block.id, toolEntry);
           }
         }
+        blockIndex++;
       }
 
       if (assistantText) {

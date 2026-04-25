@@ -42,7 +42,7 @@ function MetricTile({ icon, label, value, subtext, valueClass = 'text-foreground
         </span>
         <div className="flex items-baseline gap-1">
           {pulse && <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" style={{ color: 'var(--primary)' }} />}
-          <span className={`text-base font-semibold tabular-nums leading-none font-display ${valueClass}`}>
+          <span className={`text-base font-semibold tabular-nums leading-none ${valueClass}`}>
             {value}
           </span>
           {subtext && (
