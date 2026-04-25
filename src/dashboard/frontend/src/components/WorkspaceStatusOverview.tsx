@@ -324,7 +324,11 @@ export function WorkspaceStatusOverview({
               <button
                 onClick={(e) => { e.stopPropagation(); onStartAgent(); }}
                 disabled={startPending || isLaunching || isLifecycleUnresolved}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-60 ${
+                  isLifecycleUnresolved
+                    ? 'text-destructive cursor-not-allowed'
+                    : 'text-primary hover:text-primary/80'
+                }`}
                 title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
               >
                 {(startPending || isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -499,7 +503,11 @@ export function WorkspaceStatusOverview({
                 }
               }}
               disabled={isLaunching || showResumeInput || isLifecycleUnresolved}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+              className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-60 ${
+                isLifecycleUnresolved
+                  ? 'text-destructive cursor-not-allowed'
+                  : 'text-primary hover:text-primary/80'
+              }`}
               title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
             >
               {(isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
