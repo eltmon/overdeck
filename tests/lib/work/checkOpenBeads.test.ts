@@ -2,18 +2,19 @@
  * Tests for checkOpenBeads pre-flight helper.
  *
  * Exercises the open-bead check without invoking the actual `bd` CLI by
- * mocking child_process.exec at the module level.
+ * mocking child_process.execFile at the module level. The SUT uses
+ * execFile (not exec) for the bd call so the issueId never goes through a shell.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockExecFn = vi.fn();
+const mockExecFileFn = vi.fn();
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return {
     ...actual,
-    exec: mockExecFn,
+    execFile: mockExecFileFn,
   };
 });
 
@@ -26,11 +27,11 @@ vi.mock('../../../src/lib/vbrief/beads.js', () => ({
 describe('checkOpenBeads', () => {
   beforeEach(() => {
     vi.resetModules();
-    mockExecFn.mockReset();
+    mockExecFileFn.mockReset();
   });
 
   it('returns empty array when no open beads exist', async () => {
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(null, { stdout: '[]', stderr: '' });
     });
 
@@ -44,7 +45,7 @@ describe('checkOpenBeads', () => {
       { id: 'bead-abc', title: 'Implement feature X' },
       { id: 'bead-def', title: 'Write tests' },
     ];
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(null, { stdout: JSON.stringify(beads), stderr: '' });
     });
 
@@ -58,7 +59,7 @@ describe('checkOpenBeads', () => {
   });
 
   it('uses the title field when task/subject are absent', async () => {
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(null, { stdout: JSON.stringify([{ id: 'bead-xyz', title: 'My task' }]), stderr: '' });
     });
 
@@ -68,7 +69,7 @@ describe('checkOpenBeads', () => {
   });
 
   it('falls back to "untitled" when no title field is present', async () => {
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(null, { stdout: JSON.stringify([{ id: 'bead-nnn' }]), stderr: '' });
     });
 
@@ -77,20 +78,20 @@ describe('checkOpenBeads', () => {
     expect(result[1]).toContain('untitled');
   });
 
-  it('passes the issueId lowercased in the bd command', async () => {
-    let capturedCmd = '';
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      capturedCmd = cmd;
+  it('passes the issueId lowercased in the bd args', async () => {
+    let capturedArgs: string[] = [];
+    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
+      capturedArgs = args;
       cb(null, { stdout: '[]', stderr: '' });
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     await checkOpenBeads('/fake/workspace', 'PAN-714');
-    expect(capturedCmd).toContain('pan-714');
+    expect(capturedArgs).toContain('pan-714');
   });
 
   it('returns empty array when bd CLI is not installed (ENOENT)', async () => {
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       const err = Object.assign(new Error('spawn bd ENOENT'), { code: 'ENOENT' });
       cb(err, { stdout: '', stderr: '' });
     });
@@ -100,11 +101,10 @@ describe('checkOpenBeads', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns empty array when bd CLI is not installed (shell exit 127)', async () => {
-    // exec() runs through /bin/sh; missing command exits 127 (not ENOENT)
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+  it('returns empty array when bd CLI is not installed (exit 127)', async () => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       const err = Object.assign(new Error('Command failed: bd list --status open'), { code: 127 });
-      cb(err, { stdout: '', stderr: '/bin/sh: bd: not found' });
+      cb(err, { stdout: '', stderr: 'bd: not found' });
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
@@ -113,7 +113,7 @@ describe('checkOpenBeads', () => {
   });
 
   it('returns failure message when bd command fails with non-ENOENT error', async () => {
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(new Error('bd exited with code 1'), { stdout: '', stderr: 'error' });
     });
 
@@ -124,7 +124,7 @@ describe('checkOpenBeads', () => {
   });
 
   it('returns failure message when bd returns invalid JSON', async () => {
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(null, { stdout: 'not-json', stderr: '' });
     });
 

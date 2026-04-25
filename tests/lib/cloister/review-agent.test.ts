@@ -681,11 +681,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function readTemplate(name: string): string {
-  // Review prompt templates live at .claude/prompts/<name>.prompt-template.md
-  // (three directories up from tests/lib/cloister/).
+  // Source-of-truth review prompt templates live in src/lib/cloister/prompts/review/.
+  // The .claude/prompts/ copy is a sync target produced by `pan sync` and is
+  // gitignored, so it isn't present in CI. Read directly from source.
   const templatePath = resolve(
     import.meta.dirname,
-    '../../../.claude/prompts',
+    '../../../src/lib/cloister/prompts/review',
     `${name}.prompt-template.md`,
   );
   return readFileSync(templatePath, 'utf-8');
