@@ -1397,10 +1397,14 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
 
     const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
-    const fallbackContent = `#!/bin/bash
-export CI=1
-${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')}
-`;
+    const fallbackContent = generateLauncherScript({
+      agentType: 'work',
+      workingDir: agentState.workspace,
+      changeDir: false,
+      setCi: true,
+      providerExports,
+      baseCommand: getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+    });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
