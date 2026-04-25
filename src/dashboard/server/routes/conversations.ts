@@ -392,8 +392,6 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
-import type { Conversation } from '../../../lib/database/conversations-db.js';
-
 /** Resolve the JSONL session file path for a conversation.
  *  Prefers the stored claudeSessionId (computed on demand); falls back to
  *  the legacy sessionFile column for rows created before the migration. */
